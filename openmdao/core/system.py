@@ -174,6 +174,10 @@ class System(object):
         dict of all driver design vars added to the system.
     _responses : dict of dict
         dict of all driver responses added to the system.
+    _design_vars_cache : dict of dict
+        dict of all driver design vars added to the system or any of its descendants.
+    _responses_cache : dict of dict
+        dict of all driver responses added to the system or any of its descendants.
     #
     _static_mode : bool
         If true, we are outside of setup.
@@ -244,7 +248,6 @@ class System(object):
         self._ext_sizes = {'input': (0, 0), 'output': (0, 0)}
         self._ext_sizes_byset = {'input': {}, 'output': {}}
 
-        self._rhs_names = ['nonlinear', 'linear']
         self._vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._excluded_vars_out = set()
         self._excluded_vars_in = set()
@@ -277,6 +280,8 @@ class System(object):
 
         self._design_vars = {}
         self._responses = {}
+        self._design_vars_cache = None
+        self._responses_cache = None
 
         self._static_mode = True
         self._static_subsystems_allprocs = []
@@ -432,11 +437,11 @@ class System(object):
             ext_sizes = {'input': (0, 0), 'output': (0, 0)}
             ext_num_vars_byset = {
                 'input': {set_name: (0, 0) for set_name in self._var_set2iset['input']},
-                'output': {set_name: (0, 0) for set_name in self._var_set2iset['output']},
+                'output': {set_name: (0, 0) for set_name in self._var_set2iset['output']}
             }
             ext_sizes_byset = {
                 'input': {set_name: (0, 0) for set_name in self._var_set2iset['input']},
-                'output': {set_name: (0, 0) for set_name in self._var_set2iset['output']},
+                'output': {set_name: (0, 0) for set_name in self._var_set2iset['output']}
             }
             return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
@@ -460,11 +465,18 @@ class System(object):
         dict of set
             Dictionary of sets of excluded input variable absolute names, keyed by vec_name.
         """
-        root_vectors = {'input': {}, 'output': {}, 'residual': {}}
+        root_vectors = {'input': OrderedDict(), 'output': OrderedDict(), 'residual': OrderedDict()}
+
+        # get all rhs_names.  We don't know mode here, so for now, retrieve names
+        # from both dvs and responses and use both.
+        # TODO: fix this
+        in_rhs_names = _get_rhs_names(self.get_design_vars(recurse=True))
+        out_rhs_names = _get_rhs_names(self.get_responses(recurse=True))
+        rhs_names = sorted(in_rhs_names | out_rhs_names)
 
         for key in ['input', 'output', 'residual']:
             type_ = 'output' if key is 'residual' else key
-            for vec_name in self._rhs_names:
+            for vec_name in rhs_names:
                 if not initial:
                     root_vectors[key][vec_name] = self._vectors[key][vec_name]._root_vector
                 else:
@@ -474,8 +486,8 @@ class System(object):
             excl_out = self._excluded_vars_out
             excl_in = self._excluded_vars_in
         else:
-            excl_out = {vec_name: set() for vec_name in self._rhs_names}
-            excl_in = {vec_name: set() for vec_name in self._rhs_names}
+            excl_out = {vec_name: set() for vec_name in root_vectors['output']}
+            excl_in = {vec_name: set() for vec_name in root_vectors['output']}
 
         return root_vectors, excl_out, excl_in
 
@@ -535,7 +547,7 @@ class System(object):
             vec_key, coeff_key = key
             type_ = 'output' if vec_key == 'residual' else vec_key
 
-            for vec_name in self._rhs_names:
+            for vec_name in self._vectors['output']:
                 if not initial:
                     root_vectors[key][vec_name] = self._scaling_vecs[key][vec_name]._root_vector
                 else:
@@ -836,11 +848,13 @@ class System(object):
         resize : bool
             Whether to resize the root vectors - i.e, because this system is initiating a reconf.
         """
-        self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
+        self._vectors = vectors = {'input': OrderedDict(),
+                                   'output': OrderedDict(),
+                                   'residual': OrderedDict()}
         self._excluded_vars_out = excl_out
         self._excluded_vars_in = excl_in
 
-        for vec_name in self._rhs_names:
+        for vec_name in root_vectors['output']:
             vector_class = root_vectors['output'][vec_name].__class__
 
             for key in ['input', 'output', 'residual']:
@@ -923,7 +937,7 @@ class System(object):
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
         abs2meta_in = self._var_abs2meta['input']
 
-        for vec_name in self._rhs_names:
+        for vec_name in self._vectors['output']:
             vector_class = root_vectors['residual', 'phys0'][vec_name].__class__
 
             for key in vecs:
@@ -2053,39 +2067,34 @@ class System(object):
             recurse=True, its subsystems.
 
         """
-        pro2abs = self._var_allprocs_prom2abs_list['output']
+        if self._design_vars_cache is None:
+            pro2abs = self._var_allprocs_prom2abs_list['output']
 
-        # Human readable error message during Driver setup.
-        try:
-            out = {pro2abs[name][0]: data for name, data in iteritems(self._design_vars)}
-        except KeyError as err:
-            msg = "Output not found for design variable {0} in system '{1}'."
-            raise RuntimeError(msg.format(str(err), self.pathname))
+            # Human readable error message during Driver setup.
+            try:
+                out = {pro2abs[name][0]: data for name, data in iteritems(self._design_vars)}
+            except KeyError as err:
+                msg = "Output not found for design variable {0} in system '{1}'."
+                raise RuntimeError(msg.format(str(err), self.pathname))
 
-        # Size them all
-        vec = self._outputs._views_flat
-        iproc = self.comm.rank
-        for name, data in iteritems(out):
-            if 'size' not in data:
-                data['size'] = self._var_sizes['output'][iproc, self._var_allprocs_abs2idx['output'][name]]
-                # # Depending on where the designvar was added, the name in the
-                # # vectors might be relative instead of absolute. Lucky we have
-                # # both.
-                # if name in vec:
-                #     data['size'] = vec[name].size
-                # else:
-                #     data['size'] = vec[out[name]['name']].size
+            # Size them all
+            iproc = self.comm.rank
+            for name, data in iteritems(out):
+                if 'size' not in data:
+                    data['size'] = self._var_sizes['output'][iproc,
+                                                             self._var_allprocs_abs2idx['output'][name]]
 
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                out.update(subsys.get_design_vars(recurse=recurse))
+            if recurse:
+                for subsys in self._subsystems_myproc:
+                    out.update(subsys.get_design_vars(recurse=recurse))
 
-            if self.comm.size > 1 and self._subsystems_allprocs:
-                for rank, all_out in enumerate(self.comm.allgather(out)):
-                    if rank != iproc:
-                        out.update(all_out)
+                if self.comm.size > 1 and self._subsystems_allprocs:
+                    for rank, all_out in enumerate(self.comm.allgather(out)):
+                        if rank != iproc:
+                            out.update(all_out)
+            self._design_vars_cache = out
 
-        return out
+        return self._design_vars_cache
 
     def get_responses(self, recurse=True):
         """
@@ -2107,32 +2116,35 @@ class System(object):
             recurse=True, its subsystems.
 
         """
-        prom2abs = self._var_allprocs_prom2abs_list['output']
+        if self._responses_cache is None:
+            prom2abs = self._var_allprocs_prom2abs_list['output']
 
-        # Human readable error message during Driver setup.
-        try:
-            out = {prom2abs[name][0]: data for name, data in iteritems(self._responses)}
-        except KeyError as err:
-            msg = "Output not found for response {0} in system '{1}'."
-            raise RuntimeError(msg.format(str(err), self.pathname))
+            # Human readable error message during Driver setup.
+            try:
+                out = {prom2abs[name][0]: data for name, data in iteritems(self._responses)}
+            except KeyError as err:
+                msg = "Output not found for response {0} in system '{1}'."
+                raise RuntimeError(msg.format(str(err), self.pathname))
 
-        # Size them all
-        vec = self._outputs._views_flat
-        for name in out:
-            if 'size' not in out[name]:
-                out[name]['size'] = vec[name].size
+            # Size them all
+            iproc = self.comm.rank
+            for name in out:
+                if 'size' not in out[name]:
+                    out[name]['size'] = self._var_sizes['output'][iproc,
+                                                                  self._var_allprocs_abs2idx['output'][name]]
 
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                out.update(subsys.get_responses(recurse=recurse))
+            if recurse:
+                for subsys in self._subsystems_myproc:
+                    out.update(subsys.get_responses(recurse=recurse))
 
-            if self.comm.size > 1 and self._subsystems_allprocs:
-                iproc = self.comm.rank
-                for rank, all_out in enumerate(self.comm.allgather(out)):
-                    if rank != iproc:
-                        out.update(all_out)
+                if self.comm.size > 1 and self._subsystems_allprocs:
+                    for rank, all_out in enumerate(self.comm.allgather(out)):
+                        if rank != iproc:
+                            out.update(all_out)
 
-        return out
+            self._responses_cache = out
+
+        return self._responses_cache
 
     def get_constraints(self, recurse=True):
         """
@@ -2578,3 +2590,12 @@ class System(object):
             states.extend(subsys._list_states())
 
         return states
+
+
+def _get_rhs_names(voi_dict):
+    names = set(['nonlinear', 'linear'])
+    for voi, data in iteritems(voi_dict):
+        rhs_name = data['rhs_group']
+        if rhs_name is not None:
+            names.add(rhs_name)
+    return names

@@ -45,69 +45,69 @@ class ExecComp4Test(ExecComp):
                  fail_hard=False, **kwargs):
 
         super(ExecComp4Test, self).__init__(exprs, **kwargs)
-        self.nl_delay = nl_delay
-        self.lin_delay = lin_delay
-        self.trace = trace
-        self.num_nl_solves = 0
-        self.num_apply_lins = 0
-        self.req_procs = req_procs
-        self.fail_rank = fail_rank
-        if isinstance(fail_rank, int):
-            self.fail_rank = (self.fail_rank,)
-        self.fails = fails
-        self.fail_hard = fail_hard
+        #self.nl_delay = nl_delay
+        #self.lin_delay = lin_delay
+        #self.trace = trace
+        #self.num_nl_solves = 0
+        #self.num_apply_lins = 0
+        #self.req_procs = req_procs
+        #self.fail_rank = fail_rank
+        #if isinstance(fail_rank, int):
+            #self.fail_rank = (self.fail_rank,)
+        #self.fails = fails
+        #self.fail_hard = fail_hard
 
-        # # make a case_rank output so that we can see in tests which rank
-        # # ran a case
-        # self.add_output('case_rank', 0, pass_by_obj=True)
+        ## # make a case_rank output so that we can see in tests which rank
+        ## # ran a case
+        ## self.add_output('case_rank', 0, pass_by_obj=True)
 
-    def get_req_procs(self):
-        return self.req_procs
+    #def get_req_procs(self):
+        #return self.req_procs
 
-    def compute(self, inputs, outputs):
-        """
-        Execute this component's assignment statements.
+    #def compute(self, inputs, outputs):
+        #"""
+        #Execute this component's assignment statements.
 
-        Parameters
-        ----------
-        inputs : `Vector`
-            `Vector` containing inputs.
+        #Parameters
+        #----------
+        #inputs : `Vector`
+            #`Vector` containing inputs.
 
-        outputs : `Vector`
-            `Vector` containing outputs.
-        """
-        if MPI:
-            myrank = outputs['case_rank'] = MPI.COMM_WORLD.rank
-        else:
-            myrank = 0
+        #outputs : `Vector`
+            #`Vector` containing outputs.
+        #"""
+        ## if MPI:
+        ##     myrank = outputs['case_rank'] = MPI.COMM_WORLD.rank
+        ## else:
+        #myrank = 0
 
-        try:
-            if myrank in self.fail_rank and self.num_nl_solves in self.fails:
-                if self.fail_hard:
-                    raise RuntimeError("OMG, a critical error!")
-                else:
-                    # raise AnalysisError("just an analysis error")
-                    pass
-            super(ExecComp4Test, self).compute(inputs, outputs)
-            time.sleep(self.nl_delay)
-        finally:
-            self.num_nl_solves += 1
+        #try:
+            #if myrank in self.fail_rank and self.num_nl_solves in self.fails:
+                #if self.fail_hard:
+                    #raise RuntimeError("OMG, a critical error!")
+                #else:
+                    ## raise AnalysisError("just an analysis error")
+                    #pass
+            #super(ExecComp4Test, self).compute(inputs, outputs)
+            #time.sleep(self.nl_delay)
+        #finally:
+            #self.num_nl_solves += 1
 
-    def compute_partials(self, inputs, outputs, partials):
-        """
-        Use complex step method to update the given Jacobian.
+    #def compute_partials(self, inputs, outputs, partials):
+        #"""
+        #Use complex step method to update the given Jacobian.
 
-        Parameters
-        ----------
-        inputs : `VecWrapper`
-            `VecWrapper` containing parameters. (p)
+        #Parameters
+        #----------
+        #inputs : `VecWrapper`
+            #`VecWrapper` containing parameters. (p)
 
-        outputs : `VecWrapper`
-            `VecWrapper` containing outputs and states. (u)
+        #outputs : `VecWrapper`
+            #`VecWrapper` containing outputs and states. (u)
 
-        partials : `Jacobian`
-            Contains sub-jacobians.
-        """
-        self.compute_partials(inputs, outputs, partials)
-        time.sleep(self.lin_delay)
-        self.num_apply_lins += 1
+        #partials : `Jacobian`
+            #Contains sub-jacobians.
+        #"""
+        #super(ExecComp4Test, self).compute_partials(inputs, outputs, partials)
+        #time.sleep(self.lin_delay)
+        #self.num_apply_lins += 1

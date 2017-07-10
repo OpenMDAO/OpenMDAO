@@ -777,21 +777,20 @@ class Group(System):
 
         transfers = self._transfers
         vectors = self._vectors
-        for vec_name in self._rhs_names:
-            transfer_class = vectors['output'][vec_name].TRANSFER
+        for vec_name, out_vec in iteritems(vectors['output']):
+            transfer_class = out_vec.TRANSFER
 
             transfers[vec_name] = {}
-            xfer_all = transfer_class(
-                vectors['input'][vec_name], vectors['output'][vec_name],
-                xfer_in, xfer_out, self.comm)
+            xfer_all = transfer_class(vectors['input'][vec_name], out_vec,
+                                      xfer_in, xfer_out, self.comm)
             transfers[vec_name]['fwd', None] = xfer_all
             transfers[vec_name]['rev', None] = xfer_all
             for isub in range(nsub_allprocs):
                 transfers[vec_name]['fwd', isub] = transfer_class(
-                    vectors['input'][vec_name], vectors['output'][vec_name],
+                    vectors['input'][vec_name], out_vec,
                     fwd_xfer_in[isub], fwd_xfer_out[isub], self.comm)
                 transfers[vec_name]['rev', isub] = transfer_class(
-                    vectors['input'][vec_name], vectors['output'][vec_name],
+                    vectors['input'][vec_name], out_vec,
                     rev_xfer_in[isub], rev_xfer_out[isub], self.comm)
 
     def add(self, name, subsys, promotes=None):
@@ -814,8 +813,8 @@ class Group(System):
         System
             The System that was passed in.
         """
-        warn_deprecation('This method provides backwards compatibility with '
-                         'OpenMDAO <= 1.x ; use add_subsystem instead.')
+        warn_deprecation("The 'add' method provides backwards compatibility with "
+                         "OpenMDAO <= 1.x ; use 'add_subsystem' instead.")
 
         return self.add_subsystem(name, subsys, promotes=promotes)
 
@@ -1057,8 +1056,7 @@ class Group(System):
             for sub in chain(system._static_subsystems_allprocs,
                              system._subsystems_allprocs):
                 if sub.name == subname:
-                    system = sub
-                    break
+                    return sub
             else:
                 return None
         return system
@@ -1133,6 +1131,7 @@ class Group(System):
 
                 if mode == 'rev':
                     for vec_name in rhs_names:
+                        print("%s: %s transfers" % (self.pathname, vec_name))
                         self._transfer(vec_name, mode)
 
     def _solve_linear(self, rhs_names, mode):

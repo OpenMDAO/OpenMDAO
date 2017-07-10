@@ -215,8 +215,8 @@ class Problem(object):
         float
             absolute error.
         """
-        warn_deprecation('This method provides backwards compatibility with '
-                         'OpenMDAO <= 1.x ; use run_driver instead.')
+        warn_deprecation("The 'run_once' method provides backwards compatibility with "
+                         "OpenMDAO <= 1.x ; use 'run_model' instead.")
 
         return self.run_model()
 
@@ -229,8 +229,8 @@ class Problem(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        warn_deprecation('This method provides backwards compatibility with '
-                         'OpenMDAO <= 1.x ; use run_driver instead.')
+        warn_deprecation("The 'run' method provides backwards compatibility with "
+                         "OpenMDAO <= 1.x ; use 'run_driver' instead.")
 
         return self.run_driver()
 
@@ -678,7 +678,7 @@ class Problem(object):
         totals = OrderedDict()
         if return_format == 'flat_dict':
             for okey in of:
-                 for ikey in wrt:
+                for ikey in wrt:
                     totals[(okey, ikey)] = None
 
         elif return_format == 'dict':
@@ -789,60 +789,59 @@ class Problem(object):
                     model._solve_linear([vecname], mode)
 
                     # Pull out the answers and pack into our data structure.
-                    for ocount, output_names in enumerate(output_list):
-                        for oname_count, output_name in enumerate(output_names):
-                            out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
-                            deriv_val = doutputs._views_flat[output_name]
-                            out_idxs = None
-                            if output_name in output_vois:
-                                out_voi_meta = output_vois[output_name]
-                                if 'indices' in out_voi_meta:
-                                    out_idxs = out_voi_meta['indices']
+                    for ocount, output_name in enumerate(output_list):
+                        out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
+                        deriv_val = doutputs._views_flat[output_name]
+                        out_idxs = None
+                        if output_name in output_vois:
+                            out_voi_meta = output_vois[output_name]
+                            if 'indices' in out_voi_meta:
+                                out_idxs = out_voi_meta['indices']
 
-                            if out_idxs is not None:
-                                deriv_val = deriv_val[out_idxs]
-                            len_val = len(deriv_val)
+                        if out_idxs is not None:
+                            deriv_val = deriv_val[out_idxs]
+                        len_val = len(deriv_val)
 
-                            if dup and nproc > 1:
-                                self.comm.Bcast(deriv_val, root=np.min(np.nonzero(
-                                    model._var_sizes['output'][:, out_var_idx])[0][0]))
+                        if dup and nproc > 1:
+                            self.comm.Bcast(deriv_val, root=np.min(np.nonzero(
+                                model._var_sizes['output'][:, out_var_idx])[0][0]))
 
-                            if return_format == 'flat_dict':
-                                if fwd:
-                                    key = (old_output_list[ocount], old_input_name)
+                        if return_format == 'flat_dict':
+                            if fwd:
+                                key = (old_output_list[ocount], old_input_name)
 
-                                    if totals[key] is None:
-                                        totals[key] = np.zeros((len_val, loc_size))
-                                    if store:
-                                        totals[key][:, loc_idx] = deriv_val
-
-                                else:
-                                    key = (old_input_name, old_output_list[ocount])
-
-                                    if totals[key] is None:
-                                        totals[key] = np.zeros((loc_size, len_val))
-                                    if store:
-                                        totals[key][loc_idx, :] = deriv_val
-
-                            elif return_format == 'dict':
-                                if fwd:
-                                    okey = old_output_list[ocount]
-
-                                    if totals[okey][old_input_name] is None:
-                                        totals[okey][old_input_name] = np.zeros((len_val, loc_size))
-                                    if store:
-                                        totals[okey][old_input_name][:, loc_idx] = deriv_val
-
-                                else:
-                                    ikey = old_output_list[ocount]
-
-                                    if totals[old_input_name][ikey] is None:
-                                        totals[old_input_name][ikey] = np.zeros((loc_size, len_val))
-                                    if store:
-                                        totals[old_input_name][ikey][loc_idx, :] = deriv_val
+                                if totals[key] is None:
+                                    totals[key] = np.zeros((len_val, loc_size))
+                                if store:
+                                    totals[key][:, loc_idx] = deriv_val
 
                             else:
-                                raise RuntimeError("unsupported return format")
+                                key = (old_input_name, old_output_list[ocount])
+
+                                if totals[key] is None:
+                                    totals[key] = np.zeros((loc_size, len_val))
+                                if store:
+                                    totals[key][loc_idx, :] = deriv_val
+
+                        elif return_format == 'dict':
+                            if fwd:
+                                okey = old_output_list[ocount]
+
+                                if totals[okey][old_input_name] is None:
+                                    totals[okey][old_input_name] = np.zeros((len_val, loc_size))
+                                if store:
+                                    totals[okey][old_input_name][:, loc_idx] = deriv_val
+
+                            else:
+                                ikey = old_output_list[ocount]
+
+                                if totals[old_input_name][ikey] is None:
+                                    totals[old_input_name][ikey] = np.zeros((loc_size, len_val))
+                                if store:
+                                    totals[old_input_name][ikey][loc_idx, :] = deriv_val
+
+                        else:
+                            raise RuntimeError("unsupported return format")
 
         return totals
 

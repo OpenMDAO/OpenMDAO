@@ -59,6 +59,7 @@ class DefaultTransfer(Transfer):
                 in_vec._data[in_set_name][in_inds[key]] = \
                     out_vec._data[out_set_name][out_inds[key]]
         elif mode == 'rev':
+            print("in:", in_vec._data[0])
             for key in in_inds:
                 in_set_name, out_set_name = key
                 np.add.at(
