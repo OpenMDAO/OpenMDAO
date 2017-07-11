@@ -375,9 +375,8 @@ class ScipyOptimizer(Driver):
             Gradient of objective with respect to parameter array.
         """
         try:
-
             quantities = list(self._objs) + list(self._cons)
-            grad = self._compute_total_derivs(of=quantities, wrt=self._designvars,
+            grad = self._compute_total_derivs(of=quantities, wrt=list(self._designvars),
                                               return_format='array')
             self._grad_cache = grad
 

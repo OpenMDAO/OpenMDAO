@@ -2081,8 +2081,9 @@ class System(object):
             iproc = self.comm.rank
             for name, data in iteritems(out):
                 if 'size' not in data:
-                    data['size'] = self._var_sizes['output'][iproc,
-                                                             self._var_allprocs_abs2idx['output'][name]]
+                    data['size'] = \
+                        self._var_sizes['output'][iproc,
+                                                  self._var_allprocs_abs2idx['output'][name]]
 
             if recurse:
                 for subsys in self._subsystems_myproc:
@@ -2130,8 +2131,9 @@ class System(object):
             iproc = self.comm.rank
             for name in out:
                 if 'size' not in out[name]:
-                    out[name]['size'] = self._var_sizes['output'][iproc,
-                                                                  self._var_allprocs_abs2idx['output'][name]]
+                    out[name]['size'] = \
+                        self._var_sizes['output'][iproc,
+                                                  self._var_allprocs_abs2idx['output'][name]]
 
             if recurse:
                 for subsys in self._subsystems_myproc:

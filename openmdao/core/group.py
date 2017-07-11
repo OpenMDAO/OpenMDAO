@@ -1061,7 +1061,8 @@ class Group(System):
             for sub in chain(system._static_subsystems_allprocs,
                              system._subsystems_allprocs):
                 if sub.name == subname:
-                    return sub
+                    system = sub
+                    break
             else:
                 return None
         return system

@@ -740,9 +740,6 @@ class Problem(object):
                 dinputs = input_vec[vecname]
                 doutputs = output_vec[vecname]
 
-                # Dictionary access returns a scaler for 1d input, and we
-                # need a vector for clean code, so use _views_flat.
-                flat_view = dinputs._views_flat[input_name]
                 in_var_idx = model._var_allprocs_abs2idx['output'][input_name]
                 in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
                 start = np.sum(model._var_sizes['output'][:iproc, in_var_idx])
@@ -778,7 +775,9 @@ class Problem(object):
                     if idx < 0:
                         idx += end
                     if start <= idx < end:
-                        flat_view[idx - start] = 1.0
+                        # Dictionary access returns a scaler for 1d input, and we
+                        # need a vector for clean code, so use _views_flat.
+                        dinputs._views_flat[input_name][idx - start] = 1.0
                         store = True
                     else:
                         store = dup
