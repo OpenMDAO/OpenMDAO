@@ -775,6 +775,8 @@ class Group(System):
                     rev_xfer_in[isub][key] = merge(rev_xfer_in[isub][key])
                     rev_xfer_out[isub][key] = merge(rev_xfer_out[isub][key])
 
+        subs = self._subsystems_allprocs
+
         transfers = self._transfers
         vectors = self._vectors
         for vec_name, out_vec in iteritems(vectors['output']):
@@ -785,13 +787,16 @@ class Group(System):
                                       xfer_in, xfer_out, self.comm)
             transfers[vec_name]['fwd', None] = xfer_all
             transfers[vec_name]['rev', None] = xfer_all
+            xfer_all.pathname = "all_%s" % self.pathname
             for isub in range(nsub_allprocs):
-                transfers[vec_name]['fwd', isub] = transfer_class(
-                    vectors['input'][vec_name], out_vec,
+                transfers[vec_name]['fwd', isub] = trans = transfer_class(
+                    vectors['input'][vec_name], vectors['output'][vec_name],
                     fwd_xfer_in[isub], fwd_xfer_out[isub], self.comm)
-                transfers[vec_name]['rev', isub] = transfer_class(
-                    vectors['input'][vec_name], out_vec,
+                trans.pathname = "to_%s" % subs[isub].pathname
+                transfers[vec_name]['rev', isub] = trans = transfer_class(
+                    vectors['input'][vec_name], vectors['output'][vec_name],
                     rev_xfer_in[isub], rev_xfer_out[isub], self.comm)
+                trans.pathname = "to_%s" % subs[isub].pathname
 
     def add(self, name, subsys, promotes=None):
         """

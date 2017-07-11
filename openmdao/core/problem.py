@@ -758,11 +758,11 @@ class Problem(object):
                 if in_idxs is not None:
                     irange = in_idxs
                     loc_size = len(in_idxs)
-                    dup = False
                 else:
                     irange = range(in_var_meta['global_size'])
                     loc_size = end - start
-                    dup = not distrib
+
+                dup = not distrib
 
                 loc_idx = -1
                 for idx in irange:
