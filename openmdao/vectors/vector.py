@@ -96,6 +96,14 @@ class Vector(object):
         self._initialize_views()
 
     def __str__(self):
+        """
+        Return a string representation of the Vector object.
+
+        Returns
+        -------
+        str
+            String rep of this object.
+        """
         return str(self.get_data())
 
     def _create_subvector(self, system):
@@ -542,6 +550,14 @@ class Transfer(object):
         self._initialize_transfer()
 
     def __str__(self):
+        """
+        Return a string representation of the Transfer object.
+
+        Returns
+        -------
+        str
+            String rep of this object.
+        """
         return "%s(in=%s, out=%s" % (self.__class__.__name__, self._in_inds, self._out_inds)
 
     def _initialize_transfer(self):

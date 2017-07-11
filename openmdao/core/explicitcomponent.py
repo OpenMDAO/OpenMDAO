@@ -2,8 +2,6 @@
 
 from __future__ import division
 
-import inspect
-
 import numpy as np
 from six import itervalues
 from itertools import product
