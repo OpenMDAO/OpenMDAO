@@ -753,11 +753,11 @@ class Problem(object):
                 if in_idxs is not None:
                     irange = in_idxs
                     loc_size = len(in_idxs)
-                    dup = False
                 else:
                     irange = range(in_var_meta['global_size'])
                     loc_size = end - start
-                    dup = not distrib
+
+                dup = not distrib
 
                 loc_idx = -1
                 for idx in irange:
@@ -788,6 +788,8 @@ class Problem(object):
                         for oname_count, output_name in enumerate(output_names):
                             out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
                             deriv_val = doutputs._views_flat[output_name]
+                            print("deriv_val:", deriv_val)
+                            print("dup:", dup)
                             out_idxs = None
                             if output_name in output_vois:
                                 out_voi_meta = output_vois[output_name]

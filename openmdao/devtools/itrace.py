@@ -3,9 +3,10 @@ from __future__ import print_function
 import os
 import sys
 import argparse
-
 from contextlib import contextmanager
 from collections import defaultdict
+
+from six import string_types
 
 from openmdao.devtools.iprof_utils import _create_profile_callback, find_qualified_name, \
                                          func_group, _collect_methods
@@ -36,8 +37,13 @@ def _trace_call(frame, arg, stack, context):
     fullname = '.'.join((sname, funcname))
     method_counts[fullname] += 1
 
-    print("%s%s (%d)" % ('   ' * (len(stack)-1), fullname, method_counts[fullname]))
-
+    indent = '    ' * (len(stack)-1)
+    print("%s%s (%d)" % (indent, fullname, method_counts[fullname]))
+    for name in frame.f_locals:
+        if frame.f_code.co_name != '__init__':
+            s = "%s  %s=%s" % (indent, name, frame.f_locals[name])
+            if ' object at ' not in s:
+                print(s)
 
 def setup(methods=None):
     """
@@ -53,6 +59,8 @@ def setup(methods=None):
     if not _registered:
         if methods is None:
             methods = func_group['openmdao']
+        elif isinstance(methods, string_types):
+            methods = func_group[methods]
 
         call_stack = []
         qual_cache = {}

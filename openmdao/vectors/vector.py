@@ -95,6 +95,9 @@ class Vector(object):
         self._initialize_data(root_vector)
         self._initialize_views()
 
+    def __str__(self):
+        return str(self.get_data())
+
     def _create_subvector(self, system):
         """
         Return a smaller vector for a subsystem.
@@ -537,6 +540,9 @@ class Transfer(object):
         self._comm = comm
 
         self._initialize_transfer()
+
+    def __str__(self):
+        return "%s(in=%s, out=%s" % (self.__class__.__name__, self._in_inds, self._out_inds)
 
     def _initialize_transfer(self):
         """

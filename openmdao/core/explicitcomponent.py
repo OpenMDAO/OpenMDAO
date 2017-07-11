@@ -123,11 +123,6 @@ class ExplicitComponent(Component):
         if res_ref is None:
             res_ref = ref
 
-        if inspect.stack()[1][3] == '__init__':
-            warn_deprecation("In the future, the 'add_output' method must be "
-                             "called from 'setup' rather than "
-                             "in the '__init__' function.")
-
         return super(ExplicitComponent, self).add_output(name,
                                                          val=val, shape=shape, units=units,
                                                          res_units=res_units, desc=desc,
