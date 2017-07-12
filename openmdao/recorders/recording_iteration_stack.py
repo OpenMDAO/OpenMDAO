@@ -79,12 +79,32 @@ class Recording(object):
         """
         Initialize Recording.
 
+        Parameters
+        ----------
+
         name : str
             Name of object getting recorded.
         iter_count : int
             Current counter of iterations completed.
         object_requesting_recording : object
             The object that wants to be recorded.
+
+        Attributes
+        ----------
+        name : str
+            Name of object getting recorded.
+        iter_count : int
+            Current counter of iterations completed.
+        object_requesting_recording : object
+            The object that wants to be recorded.
+        abs : float
+            Absolute error.
+        rel : float
+            Relative error.
+        method : str
+            Current method.
+        _is_solver : bool
+            True if object_requesting_recording is a Solver.
         """
         self.name = name
         self.iter_count = iter_count
@@ -92,6 +112,9 @@ class Recording(object):
         self.abs = 0
         self.rel = 0
         self.method = ''
+
+        from openmdao.solvers.solver import Solver
+        self._is_solver = isinstance(self.object_requesting_recording, Solver)
 
     def __enter__(self):
         """
@@ -109,8 +132,7 @@ class Recording(object):
             compute_total_derivs_on_call_stack()
 
         if do_recording:
-            from openmdao.solvers.solver import Solver
-            if isinstance(self.object_requesting_recording, Solver):
+            if self._is_solver:
                 self.object_requesting_recording.record_iteration(abs=self.abs, rel=self.rel)
             else:
                 self.object_requesting_recording.record_iteration()

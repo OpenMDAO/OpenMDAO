@@ -29,7 +29,7 @@ class BaseCaseReader(object):
         The dictionary of driver metadata to be loaded.
     system_metadata : dict
         The dictionary of system metadata to be loaded.
-    solver_metadata :
+    solver_metadata : dict
         The dictionary of solver metadata to be loaded..
     """
 

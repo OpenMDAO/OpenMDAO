@@ -182,7 +182,7 @@ class NewtonSolver(NonlinearSolver):
             for isub, subsys in enumerate(system._subsystems_allprocs):
                 system._transfer('nonlinear', 'fwd', isub)
 
-                with Recording('Newton', self._iter_count, self) as rec:
+                with Recording('Newton_subsolve', self._iter_count, self) as rec:
                     if subsys in system._subsystems_myproc:
                         subsys._solve_nonlinear()
                 rec.abs = 0.0
@@ -190,7 +190,8 @@ class NewtonSolver(NonlinearSolver):
 
             self._solver_info.prefix = self._solver_info.prefix[:-3]
 
-            system._apply_nonlinear()
+            with Recording('Newton', self._iter_count, self):
+                system._apply_nonlinear()
 
         system._vectors['residual']['linear'].set_vec(system._residuals)
         system._vectors['residual']['linear'] *= -1.0

@@ -142,12 +142,12 @@ class BaseRecorder(object):
             self.options['record_inputs'] = True
 
         if self.options['record_unknowns']:
-            warn_deprecation("record_ is deprecated, please use record_inputs.")
+            warn_deprecation("record_ is deprecated, please use record_outputs.")
             # set option to what the user intended.
             self.options['record_outputs'] = True
 
         if self.options['record_resids']:
-            warn_deprecation("record_params is deprecated, please use record_inputs.")
+            warn_deprecation("record_params is deprecated, please use record_residuals.")
             # set option to what the user intended.
             self.options['record_residuals'] = True
 
@@ -285,7 +285,7 @@ class BaseRecorder(object):
         metadata : dict, optional
             Dictionary containing execution metadata (e.g. iteration coordinate).
         **kwargs : keyword args
-            Some implementations of record_iteration need additional args, e.g. "method" for Systems.
+            Some implementations of record_iteration need additional args.
         """
         self._counter += 1
 
