@@ -1402,7 +1402,16 @@ class System(object):
 
         yield
 
+        first = True
         for vec in outputs:
+
+            # Restore any complex views if under complex step.
+            if first and vec._vector_info._under_complex_step:
+                for abs_name, value in iteritems(vec._complex_view_cache):
+                    vec._views[abs_name][:] = value.real
+                    vec._imag_views[abs_name][:] = value.imag
+            first = False
+
             self._scale_vec(vec, 'output', 'norm')
         for vec in residuals:
             self._scale_vec(vec, 'residual', 'norm')

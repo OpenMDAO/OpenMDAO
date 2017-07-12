@@ -117,6 +117,7 @@ class Vector(object):
         # Support for Complex Step
         self._imag_data = {}
         self._imag_views = {}
+        self._complex_view_cache = {}
         self._imag_views_flat = {}
         self._alloc_complex = alloc_complex
 
@@ -290,7 +291,9 @@ class Vector(object):
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
             if self._vector_info._under_complex_step:
-                return self._views[abs_name] + 1j * self._imag_views[abs_name]
+                cmplx = self._views[abs_name] + 1j * self._imag_views[abs_name]
+                self._complex_view_cache[abs_name] = cmplx
+                return cmplx
             return self._views[abs_name]
         else:
             msg = 'Variable name "{}" not found.'
