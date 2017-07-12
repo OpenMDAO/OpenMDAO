@@ -5,7 +5,7 @@ from __future__ import division
 import inspect
 
 import numpy as np
-from six import itervalues
+from six import itervalues, iteritems
 from itertools import product
 
 from openmdao.core.component import Component
@@ -180,6 +180,14 @@ class ExplicitComponent(Component):
                 outputs=[self._outputs], residuals=[self._residuals]):
             self._residuals.set_vec(self._outputs)
             self.compute(self._inputs, self._outputs)
+
+            # Restore any complex views if under complex step.
+            if self._outputs._vector_info._under_complex_step:
+                for vec in [self._outputs, self._residuals]:
+                    for abs_name, value in iteritems(vec._complex_view_cache):
+                        vec._views[abs_name][:] = value.real
+                        vec._imag_views[abs_name][:] = value.imag
+
             self._residuals -= self._outputs
             self._outputs += self._residuals
 
