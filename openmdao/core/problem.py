@@ -733,9 +733,11 @@ class Problem(object):
 
         for rhs_name, vois in iteritems(voi_lists):
 
+            store = np.zeros(len(vois), dtype=bool)
+
             # If Forward mode, solve linear system for each 'wrt'
             # If Adjoint mode, solve linear system for each 'of'
-            for input_name, old_input_name in vois:
+            for voi_count, (input_name, old_input_name) in enumerate(vois):
                 vecname = v2rhs_group[input_name]
                 dinputs = input_vec[vecname]
                 doutputs = output_vec[vecname]
@@ -778,11 +780,11 @@ class Problem(object):
                         # Dictionary access returns a scaler for 1d input, and we
                         # need a vector for clean code, so use _views_flat.
                         dinputs._views_flat[input_name][idx - start] = 1.0
-                        store = True
+                        store[voi_count] = True
                     else:
-                        store = dup
+                        store[voi_count] = dup
 
-                    if store:
+                    if store[voi_count]:
                         loc_idx += 1
 
                     model._solve_linear([vecname], mode)
@@ -811,7 +813,7 @@ class Problem(object):
 
                                 if totals[key] is None:
                                     totals[key] = np.zeros((len_val, loc_size))
-                                if store:
+                                if store[voi_count]:
                                     totals[key][:, loc_idx] = deriv_val
 
                             else:
@@ -819,7 +821,7 @@ class Problem(object):
 
                                 if totals[key] is None:
                                     totals[key] = np.zeros((loc_size, len_val))
-                                if store:
+                                if store[voi_count]:
                                     totals[key][loc_idx, :] = deriv_val
 
                         elif return_format == 'dict':
@@ -828,7 +830,7 @@ class Problem(object):
 
                                 if totals[okey][old_input_name] is None:
                                     totals[okey][old_input_name] = np.zeros((len_val, loc_size))
-                                if store:
+                                if store[voi_count]:
                                     totals[okey][old_input_name][:, loc_idx] = deriv_val
 
                             else:
@@ -836,7 +838,7 @@ class Problem(object):
 
                                 if totals[old_input_name][ikey] is None:
                                     totals[old_input_name][ikey] = np.zeros((loc_size, len_val))
-                                if store:
+                                if store[voi_count]:
                                     totals[old_input_name][ikey][loc_idx, :] = deriv_val
 
                         else:

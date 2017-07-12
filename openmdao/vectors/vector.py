@@ -30,6 +30,8 @@ class Vector(object):
         Pointer to the owning system.
     _iproc : int
         Global processor index.
+    _length : int
+        Length of flattened vector.
     _views : dict
         Dictionary mapping absolute variable names to the ndarray views.
     _views_flat : dict
@@ -80,6 +82,7 @@ class Vector(object):
         self._root_vector = None
         self._data = {}
         self._indices = {}
+
         if root_vector is None:
             self._root_vector = self
         else:
@@ -95,6 +98,8 @@ class Vector(object):
         self._initialize_data(root_vector)
         self._initialize_views()
 
+        self._length = np.sum(self._system._var_sizes[self._typ][self._iproc, :])
+
     def __str__(self):
         """
         Return a string representation of the Vector object.
@@ -105,6 +110,17 @@ class Vector(object):
             String rep of this object.
         """
         return str(self.get_data())
+
+    def __len__(self):
+        """
+        Return the flattened length of this Vector.
+
+        Returns
+        -------
+        int
+            Total flattened length of this vector.
+        """
+        return self._length
 
     def _create_subvector(self, system):
         """
@@ -159,8 +175,7 @@ class Vector(object):
             Array combining the data of all the varsets.
         """
         if new_array is None:
-            total_size = np.sum(self._system._var_sizes[self._typ][self._iproc, :])
-            new_array = np.zeros(total_size)
+            new_array = np.zeros(self._length)
 
         for set_name, data in iteritems(self._data):
             new_array[self._indices[set_name]] = data
