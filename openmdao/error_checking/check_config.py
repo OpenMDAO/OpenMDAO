@@ -4,8 +4,6 @@ import sys
 import logging
 
 import numpy as np
-from scipy.sparse import csr_matrix
-from scipy.sparse.csgraph import connected_components
 
 import networkx as nx
 from six import iteritems
