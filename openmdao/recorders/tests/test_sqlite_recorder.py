@@ -29,7 +29,6 @@ if PY2:
 if PY3:
     import pickle
 
-
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
@@ -50,7 +49,7 @@ def run_driver(problem):
 
 def _assertDriverIterationDataRecorded(test, db_cur, expected, tolerance):
     """
-        expected can be from multiple cases
+        Expected can be from multiple cases.
     """
     # iterate through the cases
     for coord, (t0, t1), desvars_expected, responses_expected, objectives_expected, \
@@ -104,7 +103,7 @@ def _assertDriverIterationDataRecorded(test, db_cur, expected, tolerance):
 
 def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
     """
-        expected can be from multiple cases
+        Expected can be from multiple cases.
     """
 
     # iterate through the cases
@@ -154,7 +153,7 @@ def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
 
 def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
     """
-        expected can be from multiple cases
+        Expected can be from multiple cases.
     """
 
     # iterate through the cases

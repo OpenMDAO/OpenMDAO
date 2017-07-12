@@ -1,6 +1,4 @@
-"""
-Docstring.
-"""
+"""Define a BaseCases class for all CaseReader implementations."""
 from abc import ABCMeta, abstractmethod
 
 
@@ -11,20 +9,16 @@ class BaseCases(object):
     Parameters
     ----------
     filename : str
-        The name of the file from which to instantiate the case reader.
+        The name of the recording file from which to instantiate the case reader.
 
     Attributes
     ----------
-    format_version : int
-        An integer representation of the format version in the recorded file.
     filename : str
         The name of the file from which the recorded cases are to be loaded.
-    parameters : dict
-        Parameters metadata from the cases.
-    unknowns : dict
-        Unknowns metadata from the cases.
     num_cases : int
         The number of cases contained in the recorded file.
+    _case_keys : tuple
+        Case string identifiers available in this CaseReader.
     """
 
     __metaclass__ = ABCMeta
@@ -50,7 +44,7 @@ class BaseCases(object):
 
         Returns
         -------
-        Case
+        Case : object
             The case from the recorded file with the given identifier or index.
 
         """
@@ -62,20 +56,19 @@ class BaseCases(object):
 
         Returns
         -------
-        case_keys : tuple
+        _case_keys : tuple
             The case string identifiers.
         """
         return self._case_keys
 
     def get_iteration_coordinate(self, case_id):
         """
-        Return the iteration coordinate .
+        Return the iteration coordinate.
 
         Returns
         -------
         iteration_coordinate : str
             The iteration coordinate.
-
         """
         if isinstance(case_id, int):
             # If case_id is an integer, assume the user

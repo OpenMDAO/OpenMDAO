@@ -11,37 +11,31 @@ class Case(object):
     ----------
     filename : str
         The filename from which the Case was constructed.
-    case_id : str
-        The identifier string associated with the Case.
-    case_dict : dict
-        A dictionary containing fields for the parameters, unknowns,
-        derivatives, and residuals in the Case, as well as a Case
-        timestamp, success flag, and string message.
+    counter : int
+        The global execution counter.
+    iteration_coordinate : str
+        The string that holds the full unique identifier for this iteration.
+    timestamp : float
+        Time of execution of the case.
+    success : str
+        Success flag for the case.
+    msg : str
+        Message associated with the case.
 
     Attributes
     ----------
     filename : str
-        The file from which the case was loaded
-    case_id : str
-        The identifier of the case/iteration in the case recorder
-    timestamp : str
-        Time of execution of the case
+        The file from which the case was loaded.
+    counter : int
+        The global execution counter.
+    iteration_coordinate : str
+        The string that holds the full unique identifier for this iteration.
+    timestamp : float
+        Time of execution of the case.
     success : str
-        Success flag for the case
+        Success flag for the case.
     msg : str
-        Message associated with the case
-    parameters : dict
-        Parameters in the case.  Keyed by parameter path name, values are
-        float or dict.
-    unknowns : dict
-        Unknowns in the case.  Keyed by variable path name, values are
-        float or dict.
-    derivs : dict
-        Derivatives in the case.  Different optimizers store the derivatives
-        in different ways.
-    resids : dict
-        Residuals in the case.  Keyed by variable path name, values are
-        float or dict.
+        Message associated with the case.
     """
 
     def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg):
@@ -59,43 +53,41 @@ class Case(object):
 
 class DriverCase(Case):
     """
-    Case wraps the data from a single iteration of a recording to make it more easily accessible.
+    Wrap data from a single iteration of a Driver recording to make it more easily accessible.
 
     Parameters
     ----------
     filename : str
-        The filename from which the Case was constructed.
-    case_id : str
-        The identifier string associated with the Case.
-    case_dict : dict
-        A dictionary containing fields for the parameters, unknowns,
-        derivatives, and residuals in the Case, as well as a Case
-        timestamp, success flag, and string message.
+        The filename from which the DriverCase was constructed.
+    counter : int
+        The global execution counter.
+    iteration_coordinate: str
+        The string that holds the full unique identifier for the desired iteration.
+    timestamp : float
+        Time of execution of the case.
+    success : str
+        Success flag for the case.
+    msg : str
+        Message associated with the case.
+    desvars : array
+        Driver design variables to read in from the recording file.
+    responses : array
+        Driver responses to read in from the recording file.
+    objectives : array
+        Driver objectives to read in from the recording file.
+    constraints : array
+        Driver constraints to read in from the recording file.
 
     Attributes
     ----------
-    filename : str
-        The file from which the case was loaded
-    case_id : str
-        The identifier of the case/iteration in the case recorder
-    timestamp : str
-        Time of execution of the case
-    success : str
-        Success flag for the case
-    msg : str
-        Message associated with the case
-    parameters : dict
-        Parameters in the case.  Keyed by parameter path name, values are
-        float or dict.
-    unknowns : dict
-        Unknowns in the case.  Keyed by variable path name, values are
-        float or dict.
-    derivs : dict
-        Derivatives in the case.  Different optimizers store the derivatives
-        in different ways.
-    resids : dict
-        Residuals in the case.  Keyed by variable path name, values are
-        float or dict.
+    desvars : array
+        Driver design variables that have been read in from the recording file.
+    responses : array
+        Driver responses that have been read in from the recording file.
+    objectives : array
+        Driver objectives that have been read in from the recording file.
+    constraints : array
+        Driver constraints that have been read in from the recording file.
     """
 
     def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, desvars,
@@ -114,43 +106,37 @@ class DriverCase(Case):
 
 class SystemCase(Case):
     """
-    Case wraps the data from a single iteration of a recording to make it more easily accessible.
+    Wraps data from a single iteration of a System recording to make it more accessible.
 
     Parameters
     ----------
     filename : str
-        The filename from which the Case was constructed.
-    case_id : str
-        The identifier string associated with the Case.
-    case_dict : dict
-        A dictionary containing fields for the parameters, unknowns,
-        derivatives, and residuals in the Case, as well as a Case
-        timestamp, success flag, and string message.
-
-    Attributes
-    ----------
-    filename : str
-        The file from which the case was loaded
-    case_id : str
-        The identifier of the case/iteration in the case recorder
-    timestamp : str
+        The filename from which the SystemCase was constructed.
+    counter : int
+        The global execution counter.
+    iteration_coordinate: str
+        The string that holds the full unique identifier for the desired iteration.
+    timestamp : float
         Time of execution of the case
     success : str
         Success flag for the case
     msg : str
         Message associated with the case
-    parameters : dict
-        Parameters in the case.  Keyed by parameter path name, values are
-        float or dict.
-    unknowns : dict
-        Unknowns in the case.  Keyed by variable path name, values are
-        float or dict.
-    derivs : dict
-        Derivatives in the case.  Different optimizers store the derivatives
-        in different ways.
-    resids : dict
-        Residuals in the case.  Keyed by variable path name, values are
-        float or dict.
+    inputs : array
+        System inputs to read in from the recording file.
+    outputs : array
+        System outputs to read in from the recording file.
+    residuals : array
+        System residuals to read in from the recording file.
+
+    Attributes
+    ----------
+    inputs : array
+        System inputs that have been read in from the recording file.
+    outputs : array
+        System outputs that have been read in from the recording file.
+    residuals : array
+        System residuals that have been read in from the recording file.
     """
 
     def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, inputs,
@@ -168,43 +154,41 @@ class SystemCase(Case):
 
 class SolverCase(Case):
     """
-    Case wraps the data from a single iteration of a recording to make it more easily accessible.
+    Wraps data from a single iteration of a System recording to make it more accessible.
 
     Parameters
     ----------
     filename : str
-        The filename from which the Case was constructed.
-    case_id : str
-        The identifier string associated with the Case.
-    case_dict : dict
-        A dictionary containing fields for the parameters, unknowns,
-        derivatives, and residuals in the Case, as well as a Case
-        timestamp, success flag, and string message.
+        The filename from which the SystemCase was constructed.
+    counter : int
+        The global execution counter.
+    iteration_coordinate: str
 
-    Attributes
-    ----------
-    filename : str
-        The file from which the case was loaded
-    case_id : str
-        The identifier of the case/iteration in the case recorder
-    timestamp : str
+    timestamp : float
         Time of execution of the case
     success : str
         Success flag for the case
     msg : str
         Message associated with the case
-    parameters : dict
-        Parameters in the case.  Keyed by parameter path name, values are
-        float or dict.
-    unknowns : dict
-        Unknowns in the case.  Keyed by variable path name, values are
-        float or dict.
-    derivs : dict
-        Derivatives in the case.  Different optimizers store the derivatives
-        in different ways.
-    resids : dict
-        Residuals in the case.  Keyed by variable path name, values are
-        float or dict.
+    abs_err : array
+        Solver absolute error to read in from the recording file.
+    rel_err : array
+        Solver relative error to read in from the recording file.
+    outputs : array
+        Solver outputs to read in from the recording file.
+    residuals : array
+        Solver residuals to read in from the recording file.
+
+    Attributes
+    ----------
+    abs_err : array
+        Solver absolute error that has been read in from the recording file.
+    rel_err : array
+        Solver relative error that has been read in from the recording file.
+    outputs : array
+        Solver outputs that have been read in from the recording file.
+    residuals : array
+        Solver residuals that have been read in from the recording file.
     """
 
     def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg,

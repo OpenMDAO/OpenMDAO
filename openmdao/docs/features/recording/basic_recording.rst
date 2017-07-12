@@ -41,7 +41,7 @@ General Recording Options
 System Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-    options['record_outputs'] :  bool(True)
+    options['record_outputs'] \:  bool(True)
         Tells recorder whether to record the outputs of a System.
     options['record_inputs'] :  bool(False)
         Tells recorder whether to record the inputs of a System.

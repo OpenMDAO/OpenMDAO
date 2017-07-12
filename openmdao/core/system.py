@@ -1673,7 +1673,7 @@ class System(object):
             If True, include this system in the iteration.
         recurse : bool
             If True, iterate over the whole tree under this system.
-        typ : type
+        typ :
             If not None, only yield Systems that match that are instances of the
             given type.
         """

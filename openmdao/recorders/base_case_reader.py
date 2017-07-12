@@ -19,12 +19,18 @@ class BaseCaseReader(object):
         An integer representation of the format version in the recorded file.
     filename : str
         The name of the file from which the recorded cases are to be loaded.
-    parameters : dict
-        Parameters metadata from the cases.
-    unknowns : dict
-        Unknowns metadata from the cases.
-    num_cases : int
-        The number of cases contained in the recorded file.
+    driver_cases : list
+        The list of driver cases to be loaded.
+    system_cases : list
+        The list of system cases to be loaded.
+    solver_cases : list
+        The list of solver cases to be loaded.
+    driver_metadata : dict
+        The dictionary of driver metadata to be loaded.
+    system_metadata : dict
+        The dictionary of system metadata to be loaded.
+    solver_metadata :
+        The dictionary of solver metadata to be loaded..
     """
 
     __metaclass__ = ABCMeta

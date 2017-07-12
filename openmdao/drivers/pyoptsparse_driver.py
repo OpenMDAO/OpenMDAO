@@ -360,11 +360,12 @@ class pyOptSparseDriver(Driver):
         """
         model = self._problem.model
         fail = 0
-        metadata = self.metadata
 
         try:
             for name in self._indep_list:
                 self.set_design_var(name, dv_dict[name])
+
+            # print("Setting DV")
 
             # Execute the model
             with Recording(self.options['optimizer'], self.iter_count, self) as rec:
@@ -388,6 +389,9 @@ class pyOptSparseDriver(Driver):
             print(70 * "=", tb, 70 * "=")
             fail = 1
             func_dict = {}
+
+            # print("Functions calculated")
+            # print(dv_dict)
 
         return func_dict, fail
 

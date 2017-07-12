@@ -4,14 +4,18 @@ Definition of the SqliteCaseReader.
 from __future__ import print_function, absolute_import
 
 import sqlite3
-
-from six.moves import cPickle as pickle
+from six import PY2, PY3
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import DriverCase, SystemCase, SolverCase
 from openmdao.recorders.cases import BaseCases
 from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import is_valid_sqlite3_db
+
+if PY2:
+    import cPickle as pickle
+if PY3:
+    import pickle
 
 
 class SqliteCaseReader(BaseCaseReader):
@@ -22,6 +26,11 @@ class SqliteCaseReader(BaseCaseReader):
     ----------
     filename : str
         The path to the filename containing the recorded data.
+
+    Attributes
+    ----------
+    format_version : int
+        The version of the format assumed when loading the file.
     """
 
     def __init__(self, filename):
@@ -54,11 +63,6 @@ class SqliteCaseReader(BaseCaseReader):
 
         The `iterations` table is read to load the keys which identify
         the individual cases/iterations from the recorded file.
-
-        Parameters
-        ----------
-        format_version : int
-            The version of the format assumed when loading the file.
         """
         self.driver_cases = DriverCases(self.filename)
         self.system_cases = SystemCases(self.filename)
@@ -87,18 +91,27 @@ class SqliteCaseReader(BaseCaseReader):
                 # Read in metadata for Drivers, Systems, and Solvers
                 cur.execute("SELECT model_viewer_data FROM driver_metadata")
                 for row in cur:
-                    self.driver_metadata = pickle.loads(str(row[0]))
+                    if PY2:
+                        self.driver_metadata = pickle.loads(str(row[0]))
+                    if PY3:
+                        self.driver_metadata = pickle.loads(row[0])
 
                 cur.execute("SELECT id, scaling_factors FROM system_metadata")
                 for row in cur:
                     id = row[0]
-                    scaling_factors = pickle.loads(str(row[1]))
+                    if PY2:
+                        scaling_factors = pickle.loads(str(row[1]))
+                    if PY3:
+                        scaling_factors = pickle.loads(row[1])
                     self.system_metadata[id] = scaling_factors
 
                 cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")
                 for row in cur:
                     id = row[0]
-                    solver_options = pickle.loads(str(row[1]))
+                    if PY2:
+                        solver_options = pickle.loads(str(row[0]))
+                    if PY3:
+                        solver_options = pickle.loads(row[0])
                     solver_class = row[2]
                     self.solver_metadata[id] = {
                         'solver_options': solver_options,
