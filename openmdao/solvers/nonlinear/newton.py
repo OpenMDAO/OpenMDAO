@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 from openmdao.solvers.solver import NonlinearSolver
+from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.general_utils import warn_deprecation
 
 
@@ -181,8 +182,11 @@ class NewtonSolver(NonlinearSolver):
             for isub, subsys in enumerate(system._subsystems_allprocs):
                 system._transfer('nonlinear', 'fwd', isub)
 
-                if subsys in system._subsystems_myproc:
-                    subsys._solve_nonlinear()
+                with Recording('Newton', self._iter_count, self) as rec:
+                    if subsys in system._subsystems_myproc:
+                        subsys._solve_nonlinear()
+                rec.abs = 0.0
+                rec.rel = 0.0
 
             self._solver_info.prefix = self._solver_info.prefix[:-3]
 

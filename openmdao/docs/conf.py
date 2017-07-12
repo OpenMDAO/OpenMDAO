@@ -11,8 +11,8 @@ from openmdao.docs._utils.patch import do_monkeypatch
 
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
-#start off running the monkeypatch to keep options/parameters
-#usable in docstring for autodoc.
+# start off running the monkeypatch to keep options/parameters
+# usable in docstring for autodoc.
 def __init__(self, docstring, config={}):
     """
     init
@@ -83,7 +83,6 @@ extensions = [
     'show_unittest_examples',
     'embed_code',
     'embed_test',
-    'link_class_from_docstring',
     'tags'
 ]
 
@@ -127,18 +126,13 @@ language = None
 
 # exclude_patterns is a list of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-if tags.has("usr") or tags.has("dev"):
+if tags.has("usr"):
     from openmdao.docs._utils.generate_sourcedocs import generate_docs
     if tags.has("usr"):
         exclude_patterns = ['_build', '_srcdocs/dev']
         absp = os.path.join('.', '_srcdocs', 'usr')
         sys.path.insert(0, os.path.abspath(absp))
         generate_docs("usr")
-    if tags.has("dev"):
-        exclude_patterns = ['_build', '_srcdocs/usr']
-        absp = os.path.join('.', '_srcdocs', 'dev')
-        sys.path.insert(0, os.path.abspath(absp))
-        generate_docs("dev")
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
@@ -151,7 +145,6 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 html_theme = '_theme'
-# html_theme = 'sphinxdoc'
 
 # Add any paths that contain custom themes here, relative to this directory.
 html_theme_path = ['.']
