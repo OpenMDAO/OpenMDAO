@@ -12,10 +12,6 @@ From the blue/openmdao/docs level, type:
 Viewing Docs
 ------------
 
-After the build completes, to view docs, either:
+After the build completes, to view docs:
 
-`open _build/html/index.html`
-
-or
-
-Open file `blue/openmdao/docs/_build/html/index.html` in a browser.
+Open the file `blue/openmdao/docs/_build/html/index.html` in a browser.
