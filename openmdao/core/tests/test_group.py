@@ -254,7 +254,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as err:
             p.setup(check=False)
         self.assertEqual(str(err.exception),
-                         "comp1: no variables were promoted based on promotes_outputs=[('xx', 'foo')]")
+                         "comp1: 'promotes_outputs' failed to find any matches for the following names or patterns: ['xx'].")
 
     def test_group_renames_errors_bad_tuple(self):
         p = Problem(model=Group())
@@ -320,7 +320,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as err:
             p.setup(check=False)
         self.assertEqual(str(err.exception),
-                         "d1: no variables were promoted based on promotes_outputs=['foo']")
+                         "d1: 'promotes_outputs' failed to find any matches for the following names or patterns: ['foo'].")
 
     def test_group_nested_conn(self):
         """Example of adding subsystems and issuing connections with nested groups."""
@@ -477,7 +477,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup(check=False)
         self.assertEqual(str(context.exception),
-                         "C2: no variables were promoted based on promotes_outputs=['x*']")
+                         "C2: 'promotes_outputs' failed to find any matches for the following names or patterns: ['x*'].")
 
     def test_promote_not_found2(self):
         p = Problem(model=Group())
@@ -489,7 +489,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup(check=False)
         self.assertEqual(str(context.exception),
-                         "C2: no variables were promoted based on promotes_inputs=['xx']")
+                         "C2: 'promotes_inputs' failed to find any matches for the following names or patterns: ['xx'].")
 
     def test_promote_not_found3(self):
         p = Problem(model=Group())
@@ -501,7 +501,35 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup(check=False)
         self.assertEqual(str(context.exception),
-                         "C2: no variables were promoted based on promotes=['xx']")
+                         "C2: 'promotes' failed to find any matches for the following names or patterns: ['xx'].")
+
+    def test_missing_promote_var(self):
+        p = Problem()
+
+        indep_var_comp = IndepVarComp('z', val=2.)
+        p.model.add_subsystem('indep_vars', indep_var_comp, promotes=['*'])
+
+        p.model.add_subsystem('d1', ExecComp("y1=z+bar"),
+                              promotes_inputs=['z', 'foo'])
+
+        with self.assertRaises(Exception) as context:
+            p.setup(check=False)
+        self.assertEqual(str(context.exception),
+                         "d1: 'promotes_inputs' failed to find any matches for the following names or patterns: ['foo'].")
+
+    def test_missing_promote_var2(self):
+        p = Problem()
+
+        indep_var_comp = IndepVarComp('z', val=2.)
+        p.model.add_subsystem('indep_vars', indep_var_comp, promotes=['*'])
+
+        p.model.add_subsystem('d1', ExecComp("y1=z+bar"),
+                              promotes_outputs=['y1', 'blammo', ('bar', 'blah')])
+
+        with self.assertRaises(Exception) as context:
+            p.setup(check=False)
+        self.assertEqual(str(context.exception),
+                         "d1: 'promotes_outputs' failed to find any matches for the following names or patterns: ['bar', 'blammo'].")
 
     def test_promote_src_indices(self):
         class MyComp1(ExplicitComponent):
