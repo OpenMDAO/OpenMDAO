@@ -187,6 +187,7 @@ class ExplicitComponent(Component):
                     for abs_name, value in iteritems(vec._complex_view_cache):
                         vec._views[abs_name][:] = value.real
                         vec._imag_views[abs_name][:] = value.imag
+                    vec._complex_view_cache = {}
 
             self._residuals -= self._outputs
             self._outputs += self._residuals

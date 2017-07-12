@@ -74,6 +74,8 @@ class Vector(object):
     _imag_data : {}
         Dict of the actual allocated data (depends on implementation) for the imaginary part, keyed
         by varset name.
+    _complex_view_cache : {}
+        Temporary storage of complex views used by in-place numpy operations.
     """
 
     _vector_info = VectorInfo()
@@ -291,9 +293,14 @@ class Vector(object):
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
             if self._vector_info._under_complex_step:
-                if abs_name not in self._complex_view_cache:
-                    self._complex_view_cache[abs_name] = self._views[abs_name] + 1j * self._imag_views[abs_name]
-                return self._complex_view_cache[abs_name]
+                if self._typ == 'input':
+                    return self._views[abs_name] + 1j * self._imag_views[abs_name]
+                else:
+                    if abs_name not in self._complex_view_cache:
+                        self._complex_view_cache[abs_name] = self._views[abs_name] + \
+                            1j * self._imag_views[abs_name]
+                    return self._complex_view_cache[abs_name]
+
             return self._views[abs_name]
         else:
             msg = 'Variable name "{}" not found.'
@@ -314,10 +321,13 @@ class Vector(object):
         if abs_name is not None:
             value, shape = ensure_compatible(name, value, self._views[abs_name].shape)
             if self._vector_info._under_complex_step:
+
+                # setitem overwrites anything you may have done with numpy indexing
                 try:
                     del self._complex_view_cache[abs_name]
                 except:
                     pass
+
                 self._views[abs_name][:] = value.real
                 self._imag_views[abs_name][:] = value.imag
             else:
