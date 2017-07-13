@@ -731,13 +731,15 @@ class Problem(object):
                 voi_lists[grp].append((name, old_input_list[i]))
                 v2rhs_group[name] = grp
 
-        for rhs_name, vois in iteritems(voi_lists):
+        rhs_groups = sorted(set(v2rhs_group.values()))
 
-            store = np.zeros(len(vois), dtype=bool)
+        for rhs_name, vois in iteritems(voi_lists):
+            voi_info = {}
+            old_size = None
 
             # If Forward mode, solve linear system for each 'wrt'
             # If Adjoint mode, solve linear system for each 'of'
-            for voi_count, (input_name, old_input_name) in enumerate(vois):
+            for input_name, old_input_name in vois:
                 vecname = v2rhs_group[input_name]
                 dinputs = input_vec[vecname]
                 doutputs = output_vec[vecname]
@@ -753,18 +755,36 @@ class Problem(object):
                     if 'indices' in in_voi_meta:
                         in_idxs = in_voi_meta['indices']
 
-                distrib = in_var_meta['distributed']
+                dup = not in_var_meta['distributed']
                 if in_idxs is not None:
                     irange = in_idxs
-                    loc_size = len(in_idxs)
+                    loc_size = new_size = len(in_idxs)
                 else:
-                    irange = range(in_var_meta['global_size'])
+                    new_size = in_var_meta['global_size']
+                    irange = list(range(new_size))
                     loc_size = end - start
 
-                dup = not distrib
+                if old_size is None:
+                    old_size = new_size
+                elif old_size != new_size:
+                    raise RuntimeError("Indices within the same VOI group must be "
+                                       "the same size, but in the group %s, %d != %d" %
+                                       (vecname, old_size, new_size))
 
-                loc_idx = -1
-                for idx in irange:
+                voi_info[input_name] = (dinputs, doutputs, irange, loc_size, start, end, dup)
+
+            loc_idxs = np.ones(len(vois), dtype=int) * -1
+
+            # at this point, we know that for all vars in the current
+            # group of interest, the number of indices is the same. We loop
+            # over the *size* of the indices and use the loop index to look
+            # up the actual indices for the current members of the group
+            # of interest.
+            for i in range(len(irange)):
+
+                for input_name, old_input_name in vois:
+                    dinputs, doutputs, irange, loc_size, start, end, dup = voi_info[input_name]
+                    idx = irange[i]
 
                     # Maybe we don't need to clean up so much at the beginning,
                     # since we clean this every time.
@@ -780,14 +800,16 @@ class Problem(object):
                         # Dictionary access returns a scaler for 1d input, and we
                         # need a vector for clean code, so use _views_flat.
                         dinputs._views_flat[input_name][idx - start] = 1.0
-                        store[voi_count] = True
-                    else:
-                        store[voi_count] = dup
 
-                    if store[voi_count]:
-                        loc_idx += 1
+                model._solve_linear(rhs_groups, mode)
 
-                    model._solve_linear([vecname], mode)
+                for voi_count, (input_name, old_input_name) in enumerate(vois):
+                    dinputs, doutputs, irange, loc_size, start, end, dup = voi_info[input_name]
+                    idx = irange[i]
+                    store = True if start <= idx < end else dup
+                    if store:
+                        loc_idxs[voi_count] += 1
+                    loc_idx = loc_idxs[voi_count]
 
                     # Pull out the answers and pack into our data structure.
                     for ocount, output_name in enumerate(output_list):
@@ -813,7 +835,7 @@ class Problem(object):
 
                                 if totals[key] is None:
                                     totals[key] = np.zeros((len_val, loc_size))
-                                if store[voi_count]:
+                                if store:
                                     totals[key][:, loc_idx] = deriv_val
 
                             else:
@@ -821,7 +843,7 @@ class Problem(object):
 
                                 if totals[key] is None:
                                     totals[key] = np.zeros((loc_size, len_val))
-                                if store[voi_count]:
+                                if store:
                                     totals[key][loc_idx, :] = deriv_val
 
                         elif return_format == 'dict':
@@ -830,7 +852,7 @@ class Problem(object):
 
                                 if totals[okey][old_input_name] is None:
                                     totals[okey][old_input_name] = np.zeros((len_val, loc_size))
-                                if store[voi_count]:
+                                if store:
                                     totals[okey][old_input_name][:, loc_idx] = deriv_val
 
                             else:
@@ -838,7 +860,7 @@ class Problem(object):
 
                                 if totals[old_input_name][ikey] is None:
                                     totals[old_input_name][ikey] = np.zeros((loc_size, len_val))
-                                if store[voi_count]:
+                                if store:
                                     totals[old_input_name][ikey][loc_idx, :] = deriv_val
 
                         else:
