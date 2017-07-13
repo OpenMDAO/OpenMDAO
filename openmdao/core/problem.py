@@ -634,6 +634,7 @@ class Problem(object):
         fwd = mode == 'fwd'
         nproc = self.comm.size
         iproc = model.comm.rank
+        sizes = model._var_sizes['output']
 
         # TODO - Pull 'of' and 'wrt' from driver if unspecified.
         if wrt is None:
@@ -680,13 +681,11 @@ class Problem(object):
             for okey in of:
                 for ikey in wrt:
                     totals[(okey, ikey)] = None
-
         elif return_format == 'dict':
             for okey in of:
                 totals[okey] = OrderedDict()
                 for ikey in wrt:
                     totals[okey][ikey] = None
-
         else:
             msg = "Unsupported return format '%s." % return_format
             raise NotImplementedError(msg)
@@ -746,8 +745,8 @@ class Problem(object):
 
                 in_var_idx = model._var_allprocs_abs2idx['output'][input_name]
                 in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
-                start = np.sum(model._var_sizes['output'][:iproc, in_var_idx])
-                end = np.sum(model._var_sizes['output'][:iproc + 1, in_var_idx])
+                start = np.sum(sizes[:iproc, in_var_idx])
+                end = np.sum(sizes[:iproc + 1, in_var_idx])
 
                 in_idxs = None
                 if input_name in input_vois:
@@ -771,9 +770,17 @@ class Problem(object):
                                        "the same size, but in the group %s, %d != %d" %
                                        (vecname, old_size, new_size))
 
+                if loc_size == 0:
+                    # var is not local. get size of var in owned proc
+                    for rank in range(nproc):
+                        sz = sizes[rank, in_var_idx]
+                        if sz > 0:
+                            loc_size = sz
+                            break
+
                 voi_info[input_name] = (dinputs, doutputs, irange, loc_size, start, end, dup)
 
-            loc_idxs = np.ones(len(vois), dtype=int) * -1
+            loc_idxs = defaultdict(lambda: -1)
 
             # at this point, we know that for all vars in the current
             # group of interest, the number of indices is the same. We loop
@@ -781,40 +788,43 @@ class Problem(object):
             # up the actual indices for the current members of the group
             # of interest.
             for i in range(len(irange)):
+                # this sets dinputs for the current rhs_group to 0
+                voi_info[vois[0][0]][0].set_const(0.0)
 
                 for input_name, old_input_name in vois:
-                    dinputs, doutputs, irange, loc_size, start, end, dup = voi_info[input_name]
-                    idx = irange[i]
+                    dinputs, doutputs, idxs, loc_size, start, end, dup = voi_info[input_name]
+                    idx = idxs[i]
 
-                    # Maybe we don't need to clean up so much at the beginning,
-                    # since we clean this every time.
-                    dinputs.set_const(0.0)
-
-                    # the 'store' flag is here so that we properly initialize
-                    # totals to zeros instead of None in those cases when none
-                    # of the specified indices are within the range of interest
-                    # for this proc.
                     if idx < 0:
                         idx += end
-                    if start <= idx < end:
+                    if start <= idx < end and input_name in dinputs._views_flat:
                         # Dictionary access returns a scaler for 1d input, and we
                         # need a vector for clean code, so use _views_flat.
                         dinputs._views_flat[input_name][idx - start] = 1.0
 
                 model._solve_linear(rhs_groups, mode)
 
-                for voi_count, (input_name, old_input_name) in enumerate(vois):
+                for input_name, old_input_name in vois:
                     dinputs, doutputs, irange, loc_size, start, end, dup = voi_info[input_name]
                     idx = irange[i]
+                    # the 'store' flag is here so that we properly initialize
+                    # totals to zeros instead of None in those cases when none
+                    # of the specified indices are within the range of interest
+                    # for this proc.
                     store = True if start <= idx < end else dup
                     if store:
-                        loc_idxs[voi_count] += 1
-                    loc_idx = loc_idxs[voi_count]
+                        loc_idxs[input_name] += 1
+                    loc_idx = loc_idxs[input_name]
 
                     # Pull out the answers and pack into our data structure.
                     for ocount, output_name in enumerate(output_list):
                         out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
-                        deriv_val = doutputs._views_flat[output_name]
+                        if output_name in doutputs._views_flat:
+                            deriv_val = doutputs._views_flat[output_name]
+                            size = deriv_val.size
+                        else:
+                            deriv_val = None
+
                         out_idxs = None
                         if output_name in output_vois:
                             out_voi_meta = output_vois[output_name]
@@ -822,12 +832,21 @@ class Problem(object):
                                 out_idxs = out_voi_meta['indices']
 
                         if out_idxs is not None:
-                            deriv_val = deriv_val[out_idxs]
-                        len_val = len(deriv_val)
+                            size = out_idxs.size
+                            if deriv_val is not None:
+                                deriv_val = deriv_val[out_idxs]
 
                         if dup and nproc > 1:
-                            self.comm.Bcast(deriv_val, root=np.min(np.nonzero(
-                                model._var_sizes['output'][:, out_var_idx])[0][0]))
+                            root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
+                            if deriv_val is None:
+                                if out_idxs is not None:
+                                    sz = size
+                                else:
+                                    sz = sizes[root, out_var_idx]
+                                deriv_val = np.empty(sz, dtype=float)
+                            self.comm.Bcast(deriv_val, root=root)
+
+                        len_val = len(deriv_val)
 
                         if return_format == 'flat_dict':
                             if fwd:

@@ -2,6 +2,7 @@
 
 import sys
 import logging
+from collections import defaultdict
 
 import numpy as np
 from scipy.sparse import csr_matrix
@@ -83,34 +84,18 @@ def compute_sys_graph(group, input_srcs, comps_only=False):
     else:
         subsystems = group._subsystems_allprocs
 
-    i_start = group._ext_num_vars['input'][0]
-    i_end = group._ext_num_vars['input'][0] + group._num_var['input']
-    o_start = group._ext_num_vars['output'][0]
-    o_end = group._ext_num_vars['output'][0] + group._num_var['output']
-
-    # mapping arrays to find the system ID given the variable ID
-    invar2sys = np.empty(group._num_var['input'], dtype=int)
-    outvar2sys = np.empty(group._num_var['output'], dtype=int)
-
-    for i, s in enumerate(subsystems):
-        start = s._ext_num_vars['input'][0]
-        end = s._ext_num_vars['input'][0] + s._num_var['input']
-        invar2sys[start - i_start:end - i_start] = i
-
-        start = s._ext_num_vars['output'][0]
-        end = s._ext_num_vars['output'][0] + s._num_var['output']
-        outvar2sys[start - o_start:end - o_start] = i
-
+    glen = len(group.pathname.split('.')) if group.pathname else 0
     graph = nx.DiGraph()
+    graph.add_nodes_from([s.pathname for s in subsystems])
 
-    indices = group._var_allprocs_abs2idx
     for in_abs, src_abs in iteritems(input_srcs):
         if src_abs is not None:
-            src_id = indices['output'][src_abs] + group._ext_num_vars['output'][0]
-            in_id = indices['input'][in_abs] + group._ext_num_vars['input'][0]
-            if ((o_start <= src_id < o_end) and (i_start <= in_id < i_end)):
-                graph.add_edge(subsystems[outvar2sys[src_id - o_start]].pathname,
-                               subsystems[invar2sys[in_id - i_start]].pathname)
+            iparts = in_abs.split('.')
+            oparts = src_abs.split('.')
+            if comps_only:
+                graph.add_edge('.'.join(oparts[glen:-1]), '.'.join(iparts[glen:-1]))
+            else:
+                graph.add_edge(oparts[glen], iparts[glen])
 
     return graph
 
@@ -229,7 +214,7 @@ def _get_out_of_order_subs(group, input_srcs):
         outvar2sys[start - o_start:end - o_start] = i
 
     indices = group._var_allprocs_abs2idx
-    ubcs = {}
+    ubcs = defaultdict(list)
     for in_abs, src_abs in iteritems(input_srcs):
         if src_abs is not None:
             src_id = indices['output'][src_abs] + group._ext_num_vars['output'][0]
@@ -241,7 +226,7 @@ def _get_out_of_order_subs(group, input_srcs):
                 if (src_sysID > tgt_sysID):
                     src_sys = subsystems[src_sysID].pathname
                     tgt_sys = subsystems[tgt_sysID].pathname
-                    ubcs.setdefault(tgt_sys, []).append(src_sys)
+                    ubcs[tgt_sys].append(src_sys)
 
     return ubcs
 

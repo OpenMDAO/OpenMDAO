@@ -83,33 +83,6 @@ class FanOutGroupedVarSets(Group):
         self.connect('sub.c3.y', 'c3.x')
 
 
-class FanOut3Grouped(Group):
-    """ Topology where one comp broadcasts an output to two target
-    components. 3 Nodes in this one."""
-
-    def __init__(self):
-        super(FanOut3Grouped, self).__init__()
-
-        self.add_subsystem('iv', IndepVarComp('x', 1.0))
-        self.add_subsystem('comp1', ExecComp(['y=3.0*x']))
-        sub = self.add_subsystem('sub', ParallelGroup())
-        sub.add_subsystem('comp2', ExecComp(['y=-2.0*x']))
-        sub.add_subsystem('comp3', ExecComp(['y=5.0*x']))
-        sub.add_subsystem('comp4', ExecComp(['y=11.0*x']))
-
-        self.add_subsystem('c2', ExecComp(['y=x']))
-        self.add_subsystem('c3', ExecComp(['y=x']))
-        self.add_subsystem('c4', ExecComp(['y=x']))
-        self.connect('sub.comp2.y', 'c2.x')
-        self.connect('sub.comp3.y', 'c3.x')
-        self.connect('sub.comp4.y', 'c4.x')
-
-        self.connect("comp1.y", "sub.comp2.x")
-        self.connect("comp1.y", "sub.comp3.x")
-        self.connect("comp1.y", "sub.comp4.x")
-        self.connect("iv.x", "comp1.x")
-
-
 class FanIn(Group):
     """
     Topology where two comps feed a single comp.
