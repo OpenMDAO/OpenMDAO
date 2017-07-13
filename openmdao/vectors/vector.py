@@ -325,7 +325,7 @@ class Vector(object):
                 # setitem overwrites anything you may have done with numpy indexing
                 try:
                     del self._complex_view_cache[abs_name]
-                except:
+                except KeyError:
                     pass
 
                 self._views[abs_name][:] = value.real
@@ -538,6 +538,15 @@ class Vector(object):
             Upper bounds vector.
         """
         pass
+
+    def _remove_complex_views(self):
+        """
+        Remove temporary complex view and migrate its values into real and imaginary views.
+        """
+        for abs_name, value in iteritems(self._complex_view_cache):
+            self._views[abs_name][:] = value.real
+            self._imag_views[abs_name][:] = value.imag
+        self._complex_view_cache = {}
 
     def print_variables(self):
         """

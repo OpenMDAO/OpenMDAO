@@ -184,10 +184,7 @@ class ExplicitComponent(Component):
             # Restore any complex views if under complex step.
             if self._outputs._vector_info._under_complex_step:
                 for vec in [self._outputs, self._residuals]:
-                    for abs_name, value in iteritems(vec._complex_view_cache):
-                        vec._views[abs_name][:] = value.real
-                        vec._imag_views[abs_name][:] = value.imag
-                    vec._complex_view_cache = {}
+                    vec._remove_complex_views()
 
             self._residuals -= self._outputs
             self._outputs += self._residuals

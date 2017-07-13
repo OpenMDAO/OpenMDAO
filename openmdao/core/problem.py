@@ -234,7 +234,8 @@ class Problem(object):
 
         return self.run_driver()
 
-    def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='auto'):
+    def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='auto',
+              force_alloc_complex=False):
         """
         Set up everything.
 
@@ -250,6 +251,10 @@ class Problem(object):
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'auto', which lets OpenMDAO choose
             the best mode for your problem.
+        force_alloc_complex : bool
+            Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
+            detect when you need to do this, but in some cases (e.g., complex step is used
+            after a reconfiguration) you may need to set this to True.
 
         Returns
         -------
@@ -274,7 +279,7 @@ class Problem(object):
             mode = 'rev'
         self._mode = mode
 
-        model._setup(comm, vector_class, 'full')
+        model._setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex)
         self.driver._setup_driver(self)
 
         # Now that setup has been called, we can set the iprints.

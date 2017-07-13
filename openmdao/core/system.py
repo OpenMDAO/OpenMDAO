@@ -456,7 +456,7 @@ class System(object):
             }
             return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
-    def _get_root_vectors(self, vector_class, initial):
+    def _get_root_vectors(self, vector_class, initial, force_alloc_complex=False):
         """
         Get the root vectors for the nonlinear and linear vectors for the model.
 
@@ -466,6 +466,10 @@ class System(object):
             The Vector class used to instantiate the root vectors.
         initial : bool
             Whether we are reconfiguring - i.e., whether the model has been previously setup.
+        force_alloc_complex : bool
+            Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
+            detect when you need to do this, but in some cases (e.g., complex step is used
+            after a reconfiguration) you may need to set this to True.
 
         Returns
         -------
@@ -487,11 +491,13 @@ class System(object):
 
                     # Check for complex step to set vectors up appropriately.
                     # If any subsystem needs complex step, then we need to allocate it everywhere.
-                    alloc_complex = 'cs' in self._approx_schemes
-                    for sub in self.system_iter(include_self=True, recurse=True):
-                        if alloc_complex:
-                            break
-                        alloc_complex = 'cs' in sub._approx_schemes
+                    alloc_complex = force_alloc_complex
+                    if vec_name == 'nonlinear':
+                        alloc_complex = 'cs' in self._approx_schemes
+                        for sub in self.system_iter(include_self=True, recurse=True):
+                            if alloc_complex:
+                                break
+                            alloc_complex = 'cs' in sub._approx_schemes
 
                     root_vectors[key][vec_name] = vector_class(vec_name, type_, self,
                                                                alloc_complex=alloc_complex)
@@ -583,7 +589,7 @@ class System(object):
         """
         self._setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
 
-    def _setup(self, comm, vector_class, setup_mode):
+    def _setup(self, comm, vector_class, setup_mode, force_alloc_complex=False):
         """
         Perform setup for this system and its descendant systems.
 
@@ -600,6 +606,10 @@ class System(object):
             reference to an actual <Vector> class; not an instance.
         setup_mode : str
             Must be one of 'full', 'reconf', or 'update'.
+        force_alloc_complex : bool
+            Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
+            detect when you need to do this, but in some cases (e.g., complex step is used
+            after a reconfiguration) you may need to set this to True.
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
@@ -635,7 +645,9 @@ class System(object):
         # For vector-related, setup, recursion is always necessary, even for updating.
         # For reconfiguration setup, we resize the vectors once, only in the current system.
         self._setup_global(*self._get_initial_global(initial))
-        self._setup_vectors(*self._get_root_vectors(vector_class, initial), resize=resize)
+        self._setup_vectors(*self._get_root_vectors(vector_class, initial,
+                                                    force_alloc_complex=force_alloc_complex),
+                            resize=resize)
         self._setup_bounds(*self._get_bounds_root_vectors(vector_class, initial), resize=resize)
         self._setup_scaling(self._get_scaling_root_vectors(vector_class, initial), resize=resize)
 
@@ -868,9 +880,15 @@ class System(object):
         self._excluded_vars_out = excl_out
         self._excluded_vars_in = excl_in
 
-        # Check for complex step to set vectors up appropriately.
-        if 'cs' in self._approx_schemes or alloc_complex:
-            alloc_complex = True
+        # Allocate complex if root vector was allocated complex.
+        alloc_complex = root_vectors['output']['nonlinear']._alloc_complex
+
+        # This happens if you reconfigure and switch to 'cs' without forcing the vectors to be
+        # initially allocated as complex.
+        if not alloc_complex and 'cs' in self._approx_schemes:
+            msg = 'In order to activate complex step during reconfiguration, you need to set ' + \
+                '"force_alloc_complex" to True during setup.'
+            raise RuntimeError(msg)
 
         for vec_name in self._vec_names:
             vector_class = root_vectors['output'][vec_name].__class__
@@ -880,7 +898,7 @@ class System(object):
 
                 vectors[key][vec_name] = vector_class(
                     vec_name, type_, self, root_vectors[key][vec_name], resize=resize,
-                    alloc_complex=alloc_complex)
+                    alloc_complex=alloc_complex and vec_name == 'nonlinear')
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
@@ -1404,23 +1422,17 @@ class System(object):
 
         for vec in outputs:
 
-            # Restore any complex views if under complex step.
+            # Process any complex views if under complex step.
             if vec._vector_info._under_complex_step:
-                for abs_name, value in iteritems(vec._complex_view_cache):
-                    vec._views[abs_name][:] = value.real
-                    vec._imag_views[abs_name][:] = value.imag
-                vec._complex_view_cache = {}
+                vec._remove_complex_views()
 
             self._scale_vec(vec, 'output', 'norm')
 
         for vec in residuals:
 
-            # Restore any complex views if under complex step.
+            # Process any complex views if under complex step.
             if vec._vector_info._under_complex_step:
-                for abs_name, value in iteritems(vec._complex_view_cache):
-                    vec._views[abs_name][:] = value.real
-                    vec._imag_views[abs_name][:] = value.imag
-                vec._complex_view_cache = {}
+                vec._remove_complex_views()
 
             self._scale_vec(vec, 'residual', 'norm')
 

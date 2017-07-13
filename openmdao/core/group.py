@@ -1284,7 +1284,10 @@ class Group(System):
                     }
                     if key[0] == key[1]:
                         size = self._outputs._views_flat[key[0]].shape[0]
-                        meta_changes['value'] = np.eye(size)
+                        meta_changes['rows'] = np.arange(size)
+                        meta_changes['cols'] = np.arange(size)
+                        meta_changes['value'] = np.ones(size)
+
                     meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
                     meta.update(meta_changes)
                     meta.update(self._owns_approx_jac_meta)

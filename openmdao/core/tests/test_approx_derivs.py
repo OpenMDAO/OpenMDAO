@@ -7,7 +7,7 @@ from parameterized import parameterized
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, ExecComp, NewtonSolver, \
-     ExplicitComponent, PETScVector, DefaultVector, NonlinearBlockGS
+     ExplicitComponent, DefaultVector, NonlinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -16,6 +16,10 @@ from openmdao.test_suite.components.sellar_feature import SellarNoDerivativesCS
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.unit_conv import SrcComp, TgtCompC, TgtCompF, TgtCompK
 
+try:
+    from openmdao.parallel_api import PETScVector
+except ImportError:
+    PETScVector = None
 
 class TestGroupFiniteDifference(unittest.TestCase):
 
@@ -353,17 +357,25 @@ def title(txt):
 class TestGroupComplexStep(unittest.TestCase):
 
     def setUp(self):
+
         self.prob = Problem()
 
     def tearDown(self):
         # Global stuff seems to not get cleaned up if test fails.
-        self.prob.model._outputs._vector_info._under_complex_step = False
+        try:
+            self.prob.model._outputs._vector_info._under_complex_step = False
+        except:
+            pass
 
     @parameterized.expand(itertools.product(
         [DefaultVector, PETScVector],
         ), testcase_func_name=lambda f, n, p: 'test_paraboloid_'+'_'.join(title(a) for a in p.args)
     )
     def test_paraboloid(self, vec_class):
+
+        if not vec_class:
+            raise unittest.SkipTest("PETSc is not installed")
+
         prob = self.prob
         model = prob.model = Group()
         model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
@@ -392,6 +404,10 @@ class TestGroupComplexStep(unittest.TestCase):
         ), testcase_func_name=lambda f, n, p: 'test_paraboloid_subbed_'+'_'.join(title(a) for a in p.args)
     )
     def test_paraboloid_subbed(self, vec_class):
+
+        if not vec_class:
+            raise unittest.SkipTest("PETSc is not installed")
+
         prob = self.prob
         model = prob.model = Group()
         model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
@@ -426,6 +442,10 @@ class TestGroupComplexStep(unittest.TestCase):
         ), testcase_func_name=lambda f, n, p: 'test_paraboloid_subbed_with_connections_'+'_'.join(title(a) for a in p.args)
     )
     def test_paraboloid_subbed_with_connections(self, vec_class):
+
+        if not vec_class:
+            raise unittest.SkipTest("PETSc is not installed")
+
         prob = self.prob
         model = prob.model = Group()
         model.add_subsystem('p1', IndepVarComp('x', 0.0))
@@ -468,6 +488,9 @@ class TestGroupComplexStep(unittest.TestCase):
     )
     def test_arrray_comp(self, vec_class):
 
+        if not vec_class:
+            raise unittest.SkipTest("PETSc is not installed")
+
         class DoubleArrayFD(DoubleArrayComp):
 
             def compute_partials(self, inputs, outputs, partials):
@@ -503,6 +526,9 @@ class TestGroupComplexStep(unittest.TestCase):
         ), testcase_func_name=lambda f, n, p: 'test_unit_conv_group_'+'_'.join(title(a) for a in p.args)
     )
     def test_unit_conv_group(self, vec_class):
+
+        if not vec_class:
+            raise unittest.SkipTest("PETSc is not installed")
 
         prob = self.prob
         prob.model = Group()
@@ -554,6 +580,9 @@ class TestGroupComplexStep(unittest.TestCase):
     def test_sellar(self, vec_class):
         # Basic sellar test.
 
+        if not vec_class:
+            raise unittest.SkipTest("PETSc is not installed")
+
         prob = self.prob
         model = prob.model = Group()
 
@@ -596,7 +625,7 @@ class TestComponentComplexStep(unittest.TestCase):
         # Global stuff seems to not get cleaned up if test fails.
         self.prob.model._outputs._vector_info._under_complex_step = False
 
-    def test_implicit_component_fd(self):
+    def test_implicit_component(self):
 
         class TestImplCompArrayDense(TestImplCompArray):
 
@@ -618,6 +647,57 @@ class TestComponentComplexStep(unittest.TestCase):
         prob.run_model()
         model.run_linearize()
 
+        Jfd = comp.jacobian._subjacs
+        assert_rel_error(self, Jfd['sub.comp.x', 'sub.comp.rhs'], -np.eye(2), 1e-6)
+        assert_rel_error(self, Jfd['sub.comp.x', 'sub.comp.x'], comp.mtx, 1e-6)
+
+    def test_reconfigure(self):
+        # In this test, we switch to 'cs' when we reconfigure.
+
+        class TestImplCompArrayDense(TestImplCompArray):
+
+            def initialize(self):
+                self.mtx = np.array([
+                    [0.99, 0.01],
+                    [0.01, 0.99],
+                ])
+                self.count = 0
+
+            def setup(self):
+                super(TestImplCompArrayDense, self).setup()
+                if self.count > 0:
+                    self.approx_partials('*', '*', method='cs')
+                else:
+                    self.approx_partials('*', '*', method='fd')
+                self.count += 1
+
+        prob = self.prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p_rhs', IndepVarComp('rhs', val=np.ones(2)))
+        sub = model.add_subsystem('sub', Group())
+        comp = sub.add_subsystem('comp', TestImplCompArrayDense())
+        model.connect('p_rhs.rhs', 'sub.comp.rhs')
+
+        model.linear_solver = ScipyIterativeSolver()
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        with self.assertRaises(RuntimeError) as context:
+            model.resetup(setup_mode='reconf')
+
+        msg = 'In order to activate complex step during reconfiguration, you need to set ' + \
+            '"force_alloc_complex" to True during setup.'
+        self.assertEqual(str(context.exception), msg)
+
+        # This time, allocate complex in setup.
+        prob.setup(check=False, force_alloc_complex=True)
+        prob.run_model()
+        model.resetup(setup_mode='reconf')
+        prob.run_model()
+
+        model.run_linearize()
         Jfd = comp.jacobian._subjacs
         assert_rel_error(self, Jfd['sub.comp.x', 'sub.comp.rhs'], -np.eye(2), 1e-6)
         assert_rel_error(self, Jfd['sub.comp.x', 'sub.comp.x'], comp.mtx, 1e-6)

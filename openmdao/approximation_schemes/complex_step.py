@@ -1,4 +1,4 @@
-"""Finite difference derivative approximations."""
+"""Complex Step derivative approximations."""
 from __future__ import division, print_function
 
 import numpy as np
@@ -11,7 +11,7 @@ from openmdao.utils.name_maps import abs_key2rel_key
 
 
 DEFAULT_CS_OPTIONS = {
-    'step': 1e-6,
+    'step': 1e-15,
     'form': 'forward',
 }
 
@@ -20,12 +20,12 @@ class ComplexStep(ApproximationScheme):
     r"""
     Approximation scheme using complex step to calculate derivatives.
 
-    For example, using the 'forward' form with a step size of 'h' will approximate the derivative in
+    For example, using  a step size of 'h' will approximate the derivative in
     the following way:
 
     .. math::
 
-        f'(x) = \frac{f(x+h) - f(x)}{h} + O(h).
+        f'(x) = \Im{\frac{f(x+ih)}{h}}.
 
     Attributes
     ----------
@@ -70,8 +70,8 @@ class ComplexStep(ApproximationScheme):
 
         Returns
         -------
-        tuple(str, str, float, int, str)
-            Sorting key (wrt, form, step_size, order, step_calc)
+        tuple(str, str, float)
+            Sorting key (wrt, form, step_size)
 
         """
         options = approx_tuple[2]

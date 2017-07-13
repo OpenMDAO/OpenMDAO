@@ -77,7 +77,7 @@ class PETScTransfer(DefaultTransfer):
 
                 # Imaginary transfer
                 # (for CS, so only need in fwd)
-                if in_vec._vector_info._under_complex_step:
+                if in_vec._vector_info._under_complex_step and out_vec._alloc_complex:
                     in_petsc = self._in_vec._imag_petsc[in_set_name]
                     out_petsc = self._out_vec._imag_petsc[out_set_name]
                     self._transfers[key].scatter(out_petsc, in_petsc, addv=False, mode=False)
