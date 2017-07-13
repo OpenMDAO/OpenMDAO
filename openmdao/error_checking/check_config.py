@@ -79,14 +79,13 @@ def compute_sys_graph(group, input_srcs, comps_only=False):
     DiGraph
         A directed graph containing names of subsystems and their connections.
     """
+    glen = len(group.pathname.split('.')) if group.pathname else 0
+    graph = nx.DiGraph()
+
     if comps_only:
         subsystems = list(group.system_iter(recurse=True, typ=Component))
     else:
         subsystems = group._subsystems_allprocs
-
-    glen = len(group.pathname.split('.')) if group.pathname else 0
-    graph = nx.DiGraph()
-    graph.add_nodes_from([s.pathname for s in subsystems])
 
     for in_abs, src_abs in iteritems(input_srcs):
         if src_abs is not None:
