@@ -176,6 +176,71 @@ class TestPetscKSP(unittest.TestCase):
         assert_rel_error(self, output[1], group.expected_solution[0], 3e-15)
         assert_rel_error(self, output[5], group.expected_solution[1], 3e-15)
 
+    def test_solve_linear_ksp_precon_left(self):
+        """Solve implicit system with PetscKSP using a preconditioner."""
+
+        group = TestImplicitGroup(lnSolverClass=PetscKSP)
+        precon = group.linear_solver.precon = LinearBlockGS()
+        group.linear_solver.options['precon_side'] = 'left'
+        group.linear_solver.options['ksp_type'] = 'gmres'
+
+        p = Problem(group)
+        p.setup(vector_class=PETScVector, check=False)
+        p.set_solver_print(level=0)
+
+        d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
+
+        # forward
+        d_residuals.set_const(1.0)
+        d_outputs.set_const(0.0)
+        group.run_solve_linear(['linear'], 'fwd')
+
+        output = d_outputs._data
+        assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
+        assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
+
+        self.assertTrue(precon._iter_count > 0)
+
+        # reverse
+        d_outputs.set_const(1.0)
+        d_residuals.set_const(0.0)
+        group.run_solve_linear(['linear'], 'rev')
+
+        output = d_residuals._data
+        assert_rel_error(self, output[1], group.expected_solution[0], 3e-15)
+        assert_rel_error(self, output[5], group.expected_solution[1], 3e-15)
+
+        self.assertTrue(precon._iter_count > 0)
+
+        # test the direct solver and make sure KSP correctly recurses for _linearize
+        precon = group.linear_solver.precon = DirectSolver()
+        group.linear_solver.options['precon_side'] = 'left'
+        group.linear_solver.options['ksp_type'] = 'gmres'
+
+        p.setup(vector_class=PETScVector, check=False)
+
+        d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
+
+        # forward
+        d_residuals.set_const(1.0)
+        d_outputs.set_const(0.0)
+        group.linear_solver._linearize()
+        group.run_solve_linear(['linear'], 'fwd')
+
+        output = d_outputs._data
+        assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
+        assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
+
+        # reverse
+        d_outputs.set_const(1.0)
+        d_residuals.set_const(0.0)
+        group.linear_solver._linearize()
+        group.run_solve_linear(['linear'], 'rev')
+
+        output = d_residuals._data
+        assert_rel_error(self, output[1], group.expected_solution[0], 3e-15)
+        assert_rel_error(self, output[5], group.expected_solution[1], 3e-15)
+
     def test_preconditioner_deprecation(self):
 
         group = TestImplicitGroup(lnSolverClass=PetscKSP)
