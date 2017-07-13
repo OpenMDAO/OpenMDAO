@@ -1293,34 +1293,37 @@ class System(object):
                         matches[typ] = {name: name for name in proms[typ]}
                 return True
 
-            found = False
+            found = set()
             names, patterns, renames = split_list(to_match)
             for typ in io_types:
                 pmap = matches[typ]
                 for name in proms[typ]:
                     if name in names:
                         pmap[name] = name
-                        found = True
+                        found.add(name)
                     elif name in renames:
                         pmap[name] = renames[name]
-                        found = True
+                        found.add(name)
                     else:
                         for pattern in patterns:
                             # if name matches, promote that variable to parent
                             if pattern == '*' or fnmatchcase(name, pattern):
                                 pmap[name] = name
-                                found = True
+                                found.add(pattern)
                                 break
                         else:
                             # Default: prepend the parent system's name
                             pmap[name] = gname + name if gname else name
 
-            return found
-
-        def error(type_):
-            names = {'any': 'promotes', 'input': 'promotes_inputs', 'output': 'promotes_outputs'}
-            raise RuntimeError("%s: no variables were promoted based on %s=%s" %
-                               (self.pathname, names[type_], list(self._var_promotes[type_])))
+            not_found = (set(names).union(renames).union(patterns)) - found
+            if not_found:
+                if len(io_types) == 2:
+                    call = 'promotes'
+                else:
+                    call = 'promotes_%ss' % io_types[0]
+                raise RuntimeError("%s: '%s' failed to find any matches for the following "
+                                   "names or patterns: %s." %
+                                   (self.pathname, call, sorted(not_found)))
 
         maps = {'input': {}, 'output': {}}
 
@@ -1328,13 +1331,10 @@ class System(object):
             if self._var_promotes['any']:
                 raise RuntimeError("%s: 'promotes' cannot be used at the same time as "
                                    "'promotes_inputs' or 'promotes_outputs'." % self.pathname)
-            if not resolve(self._var_promotes['input'], ('input',), maps, prom_names):
-                error('input')
-            if not resolve(self._var_promotes['output'], ('output',), maps, prom_names):
-                error('output')
+            resolve(self._var_promotes['input'], ('input',), maps, prom_names)
+            resolve(self._var_promotes['output'], ('output',), maps, prom_names)
         else:
-            if not resolve(self._var_promotes['any'], ('input', 'output',), maps, prom_names):
-                error('any')
+            resolve(self._var_promotes['any'], ('input', 'output',), maps, prom_names)
 
         return maps
 
