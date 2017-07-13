@@ -81,7 +81,6 @@ class Recording(object):
 
         Parameters
         ----------
-
         name : str
             Name of object getting recorded.
         iter_count : int

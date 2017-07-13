@@ -382,8 +382,8 @@ class TestSqliteCaseReader(unittest.TestCase):
                 sorted(['root.LinearRunOnce', 'root.NonlinearBlockGS', 'd1.NonlinearBlockGS'])
         )
         self.assertEqual(cr.solver_metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
-        self.assertEqual(cr.solver_metadata['root.NonlinearBlockGS']['solver_options']['maxiter'], 10)
-        self.assertEqual(cr.solver_metadata['root.LinearRunOnce']['solver_class'], 'LinearRunOnce')
+        self.assertEqual(cr.solver_metadata['root.NonlinearBlockGS']['solver_options']['maxiter'],10)
+        self.assertEqual(cr.solver_metadata['root.LinearRunOnce']['solver_class'],'LinearRunOnce')
 
 if __name__ == "__main__":
     unittest.main()
