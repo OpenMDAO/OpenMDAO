@@ -193,39 +193,19 @@ def _get_out_of_order_subs(group, input_srcs):
         source Systems that execute after them.
     """
     subsystems = group._subsystems_allprocs
+    sub2i = {sub.name: i for i, sub in enumerate(subsystems)}
+    glen = len(group.pathname.split('.')) if group.pathname else 0
 
-    i_start = group._ext_num_vars['input'][0]
-    i_end = group._ext_num_vars['input'][0] + group._num_var['input']
-    o_start = group._ext_num_vars['output'][0]
-    o_end = group._ext_num_vars['output'][0] + group._num_var['output']
-
-    # mapping arrays to find the system ID given the variable ID
-    invar2sys = np.empty(i_end - i_start, dtype=int)
-    outvar2sys = np.empty(o_end - o_start, dtype=int)
-
-    for i, s in enumerate(subsystems):
-        start = s._ext_num_vars['input'][0]
-        end = s._ext_num_vars['input'][0] + s._num_var['input']
-        invar2sys[start - i_start:end - i_start] = i
-
-        start = s._ext_num_vars['output'][0]
-        end = s._ext_num_vars['output'][0] + s._num_var['output']
-        outvar2sys[start - o_start:end - o_start] = i
-
-    indices = group._var_allprocs_abs2idx
     ubcs = defaultdict(list)
     for in_abs, src_abs in iteritems(input_srcs):
         if src_abs is not None:
-            src_id = indices['output'][src_abs] + group._ext_num_vars['output'][0]
-            in_id = indices['input'][in_abs] + group._ext_num_vars['input'][0]
-            if ((o_start <= src_id < o_end) and (i_start <= in_id < i_end)):
-                # offset the ids to index into our var2sys arrays
-                src_sysID = outvar2sys[src_id - o_start]
-                tgt_sysID = invar2sys[in_id - i_start]
-                if (src_sysID > tgt_sysID):
-                    src_sys = subsystems[src_sysID].pathname
-                    tgt_sys = subsystems[tgt_sysID].pathname
-                    ubcs[tgt_sys].append(src_sys)
+            iparts = in_abs.split('.')
+            oparts = src_abs.split('.')
+            src_sys = oparts[glen]
+            tgt_sys = iparts[glen]
+            if (src_sys in sub2i and tgt_sys in sub2i and
+                    (sub2i[src_sys] > sub2i[tgt_sys])):
+                ubcs['.'.join(iparts[:glen + 1])].append('.'.join(oparts[:glen + 1]))
 
     return ubcs
 
