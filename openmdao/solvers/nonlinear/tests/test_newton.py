@@ -203,14 +203,10 @@ class TestNewton(unittest.TestCase):
     def test_sellar_state_connection_fd_system(self):
         # Sellar model closes loop with state connection instead of a cycle.
         # This test is just fd.
-
-        raise unittest.SkipTest("FD not implemented yet")
-
         prob = Problem()
         prob.model = SellarStateConnection(nonlinear_solver=NewtonSolver())
 
-        # TODO - Specify FD for group.
-        # prob.model.deriv_options['type'] = 'fd'
+        prob.model.approx_total_derivs(method='fd')
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -690,7 +686,7 @@ class TestNewton(unittest.TestCase):
         # Verifying subsolvers ran
         self.assertEqual(g1.nonlinear_solver.total_count, 2)
         self.assertEqual(g2.nonlinear_solver.total_count, 2)
-        self.assertEqual(g1.linear_solver.lin_count, 3)
+        self.assertEqual(g1.linear_solver.lin_count, 2)
 
         prob = Problem()
         model = prob.model = DoubleSellar()
@@ -723,7 +719,7 @@ class TestNewton(unittest.TestCase):
         # Verifying subsolvers ran
         self.assertEqual(g1.nonlinear_solver.total_count, 5)
         self.assertEqual(g2.nonlinear_solver.total_count, 5)
-        self.assertEqual(g1.linear_solver.lin_count, 8)
+        self.assertEqual(g1.linear_solver.lin_count, 5)
 
         prob = Problem()
         model = prob.model = DoubleSellar()
@@ -756,7 +752,7 @@ class TestNewton(unittest.TestCase):
         # Verifying subsolvers ran
         self.assertEqual(g1.nonlinear_solver.total_count, 4)
         self.assertEqual(g2.nonlinear_solver.total_count, 4)
-        self.assertEqual(g1.linear_solver.lin_count, 6)
+        self.assertEqual(g1.linear_solver.lin_count, 4)
 
     def test_maxiter_one(self):
         # Fix bug when maxiter was set to 1.

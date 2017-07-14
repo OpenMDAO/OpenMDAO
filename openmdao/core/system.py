@@ -160,12 +160,22 @@ class System(object):
     _linear_solver : <LinearSolver>
         Linear solver to be used for solve_linear; not the Newton system.
     #
+    _approx_schemes : OrderedDict
+        A mapping of approximation types to the associated ApproximationScheme.
     _jacobian : <Jacobian>
         <Jacobian> object to be used in apply_linear.
     _jacobian_changed : bool
         If True, the jacobian has changed since the last call to setup.
     _owns_assembled_jac : bool
         If True, we are owners of the AssembledJacobian in self._jacobian.
+    _owns_approx_jac : bool
+        If True, this system approximated its Jacobian
+    _owns_approx_jac_meta : dict
+        Stores approximation metadata (e.g., step_size) from calls to approx_total_derivs
+    _owns_approx_wrt : set or None
+        Overrides aproximation inputs.
+    _owns_approx_of : set or None
+        Overrides aproximation outputs.
     _subjacs_info : OrderedDict of dict
         Sub-jacobian metadata for each (output, input) pair added using
         declare_partials. Members of each pair may be glob patterns.
@@ -272,8 +282,14 @@ class System(object):
         self._jacobian = DictionaryJacobian()
         self._jacobian._system = self
         self._jacobian_changed = True
+        self._approx_schemes = OrderedDict()
         self._owns_assembled_jac = False
         self._subjacs_info = {}
+
+        self._owns_approx_jac = False
+        self._owns_approx_jac_meta = {}
+        self._owns_approx_wrt = None
+        self._owns_approx_of = None
 
         self._design_vars = {}
         self._responses = {}
@@ -440,7 +456,7 @@ class System(object):
             }
             return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
-    def _get_root_vectors(self, vector_class, initial):
+    def _get_root_vectors(self, vector_class, initial, force_alloc_complex=False):
         """
         Get the root vectors for the nonlinear and linear vectors for the model.
 
@@ -450,6 +466,10 @@ class System(object):
             The Vector class used to instantiate the root vectors.
         initial : bool
             Whether we are reconfiguring - i.e., whether the model has been previously setup.
+        force_alloc_complex : bool
+            Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
+            detect when you need to do this, but in some cases (e.g., complex step is used
+            after a reconfiguration) you may need to set this to True.
 
         Returns
         -------
@@ -468,7 +488,19 @@ class System(object):
                 if not initial:
                     root_vectors[key][vec_name] = self._vectors[key][vec_name]._root_vector
                 else:
-                    root_vectors[key][vec_name] = vector_class(vec_name, type_, self)
+
+                    # Check for complex step to set vectors up appropriately.
+                    # If any subsystem needs complex step, then we need to allocate it everywhere.
+                    alloc_complex = force_alloc_complex
+                    if vec_name == 'nonlinear':
+                        alloc_complex = 'cs' in self._approx_schemes
+                        for sub in self.system_iter(include_self=True, recurse=True):
+                            if alloc_complex:
+                                break
+                            alloc_complex = 'cs' in sub._approx_schemes
+
+                    root_vectors[key][vec_name] = vector_class(vec_name, type_, self,
+                                                               alloc_complex=alloc_complex)
 
         if not initial:
             excl_out = self._excluded_vars_out
@@ -557,7 +589,7 @@ class System(object):
         """
         self._setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
 
-    def _setup(self, comm, vector_class, setup_mode):
+    def _setup(self, comm, vector_class, setup_mode, force_alloc_complex=False):
         """
         Perform setup for this system and its descendant systems.
 
@@ -574,6 +606,10 @@ class System(object):
             reference to an actual <Vector> class; not an instance.
         setup_mode : str
             Must be one of 'full', 'reconf', or 'update'.
+        force_alloc_complex : bool
+            Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
+            detect when you need to do this, but in some cases (e.g., complex step is used
+            after a reconfiguration) you may need to set this to True.
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
@@ -609,7 +645,9 @@ class System(object):
         # For vector-related, setup, recursion is always necessary, even for updating.
         # For reconfiguration setup, we resize the vectors once, only in the current system.
         self._setup_global(*self._get_initial_global(initial))
-        self._setup_vectors(*self._get_root_vectors(vector_class, initial), resize=resize)
+        self._setup_vectors(*self._get_root_vectors(vector_class, initial,
+                                                    force_alloc_complex=force_alloc_complex),
+                            resize=resize)
         self._setup_bounds(*self._get_bounds_root_vectors(vector_class, initial), resize=resize)
         self._setup_scaling(self._get_scaling_root_vectors(vector_class, initial), resize=resize)
 
@@ -821,7 +859,7 @@ class System(object):
         self._ext_sizes = ext_sizes
         self._ext_sizes_byset = ext_sizes_byset
 
-    def _setup_vectors(self, root_vectors, excl_out, excl_in, resize=False):
+    def _setup_vectors(self, root_vectors, excl_out, excl_in, resize=False, alloc_complex=False):
         """
         Compute all vectors for all vec names and assign excluded variables lists.
 
@@ -835,10 +873,22 @@ class System(object):
             Dictionary of sets of excluded input variable absolute names, keyed by vec_name.
         resize : bool
             Whether to resize the root vectors - i.e, because this system is initiating a reconf.
+        alloc_complex : bool
+            Whether to allocate any imaginary storage to perform complex step. Default is False.
         """
         self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._excluded_vars_out = excl_out
         self._excluded_vars_in = excl_in
+
+        # Allocate complex if root vector was allocated complex.
+        alloc_complex = root_vectors['output']['nonlinear']._alloc_complex
+
+        # This happens if you reconfigure and switch to 'cs' without forcing the vectors to be
+        # initially allocated as complex.
+        if not alloc_complex and 'cs' in self._approx_schemes:
+            msg = 'In order to activate complex step during reconfiguration, you need to set ' + \
+                '"force_alloc_complex" to True during setup.'
+            raise RuntimeError(msg)
 
         for vec_name in self._vec_names:
             vector_class = root_vectors['output'][vec_name].__class__
@@ -847,14 +897,15 @@ class System(object):
                 type_ = 'output' if key is 'residual' else key
 
                 vectors[key][vec_name] = vector_class(
-                    vec_name, type_, self, root_vectors[key][vec_name], resize=resize)
+                    vec_name, type_, self, root_vectors[key][vec_name], resize=resize,
+                    alloc_complex=alloc_complex and vec_name == 'nonlinear')
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
         self._residuals = vectors['residual']['nonlinear']
 
         for subsys in self._subsystems_myproc:
-            subsys._setup_vectors(root_vectors, excl_out, excl_in)
+            subsys._setup_vectors(root_vectors, excl_out, excl_in, alloc_complex=alloc_complex)
 
     def _setup_bounds(self, root_lower, root_upper, resize=False):
         """
@@ -1370,8 +1421,19 @@ class System(object):
         yield
 
         for vec in outputs:
+
+            # Process any complex views if under complex step.
+            if vec._vector_info._under_complex_step:
+                vec._remove_complex_views()
+
             self._scale_vec(vec, 'output', 'norm')
+
         for vec in residuals:
+
+            # Process any complex views if under complex step.
+            if vec._vector_info._under_complex_step:
+                vec._remove_complex_views()
+
             self._scale_vec(vec, 'residual', 'norm')
 
     @contextmanager

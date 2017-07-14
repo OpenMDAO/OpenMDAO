@@ -85,6 +85,7 @@ class ApproximationScheme(object):
         # TODO: Grab only results of interest
         cache = results_vec._clone()
         run_model()
+
         results = results_vec._clone()
         results_vec.set_vec(cache)
 
