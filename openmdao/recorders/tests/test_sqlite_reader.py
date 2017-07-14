@@ -35,9 +35,7 @@ except ImportError:
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-
-# optimizers = {'scipy': ScipyOptimizer, }
-optimizers = {'pyoptsparse': pyOptSparseDriver}
+    optimizers = {'pyoptsparse': pyOptSparseDriver}
 
 
 class TestSqliteCaseReader(unittest.TestCase):
@@ -111,6 +109,12 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_constraint('con2', upper=0.0)
 
     def setUp(self):
+        if OPT is None:
+            raise unittest.SkipTest("pyoptsparse is not installed")
+
+        if OPTIMIZER is None:
+            raise unittest.SkipTest("pyoptsparse is not providing SLSQP")
+
         self.dir = mkdtemp()
         self.filename = os.path.join(self.dir, "sqlite_test")
         self.recorder = SqliteRecorder(self.filename)
