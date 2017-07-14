@@ -134,7 +134,7 @@ class AssembledJacobian(Jacobian):
                 if res_offset < min_res_offset:
                     min_res_offset = res_offset
 
-                # only need to collect subjac info for compnents, not subgroups
+                # only need to collect subjac info for components, not subgroups
                 if not isinstance(s, Component):
                     continue
 

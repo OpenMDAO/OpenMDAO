@@ -13,6 +13,8 @@ sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 # start off running the monkeypatch to keep options/parameters
 # usable in docstring for autodoc.
+
+
 def __init__(self, docstring, config={}):
     """
     init

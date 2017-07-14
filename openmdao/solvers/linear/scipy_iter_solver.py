@@ -132,7 +132,8 @@ class ScipyIterativeSolver(LinearSolver):
         scope_out, scope_in = system._get_scope()
         system._apply_linear([vec_name], self._mode, scope_out, scope_in)
 
-        # self._mpi_print(b_vec.get_data())
+        # print('in', in_vec)
+        # print('out', b_vec.get_data())
         return b_vec.get_data()
 
     def _monitor(self, res):

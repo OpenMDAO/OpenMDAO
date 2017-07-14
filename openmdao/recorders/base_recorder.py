@@ -48,6 +48,20 @@ class BaseRecorder(object):
         Patterns for variables to include in recording.
     options['excludes'] :  list of strings('')
         Patterns for variables to exclude in recording (processed after includes).
+
+    Attributes
+    ----------
+    out : StringIO
+        Output to the recorder.
+    _counter : int
+        A global counter for execution order, used in iteration coordinate.
+    _filtered_driver : dict
+        Filtered subset of driver variables to record, based on includes/excludes.
+    _filtered_solver : dict
+        Filtered subset of solver variables to record, based on includes/excludes.
+    _filtered_system : dict
+        Filtered subset of system variables to record, based on includes/excludes.
+
     """
 
     def __init__(self):
@@ -128,12 +142,12 @@ class BaseRecorder(object):
             self.options['record_inputs'] = True
 
         if self.options['record_unknowns']:
-            warn_deprecation("record_ is deprecated, please use record_inputs.")
+            warn_deprecation("record_ is deprecated, please use record_outputs.")
             # set option to what the user intended.
             self.options['record_outputs'] = True
 
         if self.options['record_resids']:
-            warn_deprecation("record_params is deprecated, please use record_inputs.")
+            warn_deprecation("record_params is deprecated, please use record_residuals.")
             # set option to what the user intended.
             self.options['record_residuals'] = True
 
@@ -146,18 +160,18 @@ class BaseRecorder(object):
 
             if self.options['record_inputs']:
                 if object_requesting_recording._inputs:
-                    myinputs = [n for n in object_requesting_recording._inputs._names
-                                if self._check_path(n, incl, excl)]
+                    myinputs = {n for n in object_requesting_recording._inputs._names
+                                if self._check_path(n, incl, excl)}
             if self.options['record_outputs']:
                 if object_requesting_recording._outputs:
-                    myoutputs = [n for n in object_requesting_recording._outputs._names
-                                 if self._check_path(n, incl, excl)]
+                    myoutputs = {n for n in object_requesting_recording._outputs._names
+                                 if self._check_path(n, incl, excl)}
                 if self.options['record_residuals']:
                     myresiduals = myoutputs  # outputs and residuals have same names
             elif self.options['record_residuals']:
                 if object_requesting_recording._residuals:
-                    myresiduals = [n for n in object_requesting_recording._residuals._names
-                                   if self._check_path(n, incl, excl)]
+                    myresiduals = {n for n in object_requesting_recording._residuals._names
+                                   if self._check_path(n, incl, excl)}
 
             self._filtered_system = {
                 'i': myinputs,
@@ -171,20 +185,20 @@ class BaseRecorder(object):
             excl = self.options['excludes']
 
             if self.options['record_desvars']:
-                mydesvars = [n for n in object_requesting_recording._designvars
-                             if self._check_path(n, incl, excl)]
+                mydesvars = {n for n in object_requesting_recording._designvars
+                             if self._check_path(n, incl, excl)}
 
             if self.options['record_objectives']:
-                myobjectives = [n for n in object_requesting_recording._objs
-                                if self._check_path(n, incl, excl)]
+                myobjectives = {n for n in object_requesting_recording._objs
+                                if self._check_path(n, incl, excl)}
 
             if self.options['record_constraints']:
-                myconstraints = [n for n in object_requesting_recording._cons
-                                 if self._check_path(n, incl, excl)]
+                myconstraints = {n for n in object_requesting_recording._cons
+                                 if self._check_path(n, incl, excl)}
 
             if self.options['record_responses']:
-                myresponses = [n for n in object_requesting_recording._responses
-                               if self._check_path(n, incl, excl)]
+                myresponses = {n for n in object_requesting_recording._responses
+                               if self._check_path(n, incl, excl)}
 
             self._filtered_driver = {
                 'des': mydesvars,
@@ -203,16 +217,16 @@ class BaseRecorder(object):
                     residuals = object_requesting_recording._system._residuals
                 else:  # it's a LinearSolver
                     residuals = object_requesting_recording._system._vectors['residual']['linear']
-                myresiduals = [n for n in residuals
-                               if self._check_path(n, incl, excl)]
+                myresiduals = {n for n in residuals
+                               if self._check_path(n, incl, excl)}
 
             if self.options['record_solver_output']:
                 if isinstance(object_requesting_recording, NonlinearSolver):
                     outputs = object_requesting_recording._system._outputs
                 else:  # it's a LinearSolver
                     outputs = object_requesting_recording._system._vectors['output']['linear']
-                myoutputs = [n for n in outputs
-                             if self._check_path(n, incl, excl)]
+                myoutputs = {n for n in outputs
+                             if self._check_path(n, incl, excl)}
 
             self._filtered_solver = {
                 'out': myoutputs,
@@ -234,8 +248,8 @@ class BaseRecorder(object):
 
         Returns
         -------
-            boolean
-                True if path should be recorded, False if it's been excluded.
+        boolean
+            True if path should be recorded, False if it's been excluded.
         """
         # First see if it's included
         for pattern in includes:
@@ -266,17 +280,12 @@ class BaseRecorder(object):
 
         Parameters
         ----------
-        inputs : dict
-            Dictionary containing inputs.
-
-        outputs : dict
-            Dictionary containing outputs and states.
-
-        residuals : dict
-            Dictionary containing residuals.
-
+        object_requesting_recording : object
+            System, Solver, Driver in need of recording.
         metadata : dict, optional
             Dictionary containing execution metadata (e.g. iteration coordinate).
+        **kwargs : keyword args
+            Some implementations of record_iteration need additional args.
         """
         self._counter += 1
 

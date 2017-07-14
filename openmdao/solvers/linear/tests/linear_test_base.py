@@ -7,13 +7,12 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Group, IndepVarComp, Problem, AssembledJacobian, ImplicitComponent
+from openmdao.api import Group, IndepVarComp, Problem
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
-     SellarStateConnection, SellarDerivatives, SellarImplicitDis1, SellarImplicitDis2
+     SellarStateConnection, SellarDerivatives
 
-from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.test_suite.groups.parallel_groups import FanIn, FanInGrouped, \

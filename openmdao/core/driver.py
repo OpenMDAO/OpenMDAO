@@ -1,4 +1,6 @@
 """Define a base class for all Drivers in OpenMDAO."""
+from six import iteritems
+
 import numpy as np
 
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
@@ -6,8 +8,6 @@ from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
-
-from six import iteritems
 
 
 class Driver(object):
@@ -18,6 +18,10 @@ class Driver(object):
     ----------
     fail : bool
         Reports whether the driver ran successfully.
+    iter_count : int
+        Keep track of iterations for case recording.
+    metadata : list
+        List of metadata
     options : <OptionsDictionary>
         Dictionary with general pyoptsparse options.
     _problem : <Problem>
@@ -33,13 +37,9 @@ class Driver(object):
     _responses : dict
         Contains all response info.
     _rec_mgr : <RecordingManager>
-        object that manages all recorders added to this driver
+        Object that manages all recorders added to this driver.
     _model_viewer_data : dict
-        structure of model, used to make n2 diagram.
-    iter_count : int
-        keep track of iterations for case recording
-    metadata : list
-        list of metadata
+        Structure of model, used to make n2 diagram.
     """
 
     def __init__(self):
@@ -127,8 +127,7 @@ class Driver(object):
         Parameters
         ----------
         filter : list
-            List of desvar names used by recorders to
-            filter by includes/excludes.
+            List of desvar names used by recorders.
 
         Returns
         -------
@@ -201,8 +200,7 @@ class Driver(object):
         Parameters
         ----------
         filter : list
-            List of response names used by recorders to
-            filter by includes/excludes.
+            List of response names used by recorders.
 
         Returns
         -------
@@ -219,8 +217,7 @@ class Driver(object):
         Parameters
         ----------
         filter : list
-            List of objective names used by recorders to
-            filter by includes/excludes.
+            List of objective names used by recorders.
 
         Returns
         -------
@@ -274,8 +271,7 @@ class Driver(object):
             with 'linear' or the nonlinear constraints with 'nonlinear'.
 
         filter : list
-            List of objective names used by recorders to
-            filter by includes/excludes.
+            List of objective names used by recorders.
 
         Returns
         -------
