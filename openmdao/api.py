@@ -7,6 +7,7 @@ from openmdao.core.parallel_group import ParallelGroup
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
+from openmdao.core.system import AnalysisError
 
 # Components
 from openmdao.components.deprecated_component import Component
