@@ -214,9 +214,17 @@ class FiniteDifference(ApproximationScheme):
                 else:
                     result.set_const(0.)
 
+                # Run the Finite Difference
                 for delta, coeff in zip(deltas, coeffs):
                     input_delta = [(wrt, idx, delta)]
                     result.add_scal_vec(coeff, self._run_point(system, input_delta, deriv_type))
+
+                if deriv_type == 'total':
+                    # Sign difference between output and resids. This arises from the definitions
+                    # in the unified derivatives equations.
+                    # For ExplicitComponent: resid = output(n-1) - output(n)
+                    # so dresid/d* = - doutput/d*
+                    result *= -1.0
 
                 for of, subjac in outputs:
                     subjac[:, idx] = result._views_flat[of]
