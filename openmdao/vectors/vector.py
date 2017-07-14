@@ -9,6 +9,23 @@ from openmdao.utils.general_utils import ensure_compatible
 from openmdao.utils.name_maps import name2abs_name
 
 
+class VectorInfo(object):
+    """
+    Communal object for storing some global information in the vectors.
+
+    Attributes
+    ----------
+    _under_complex_step : bool
+        When this is True, the vectors operate with complex numbers.
+    """
+
+    def __init__(self):
+        """
+        Initialize.
+        """
+        self._under_complex_step = False
+
+
 class Vector(object):
     """
     Base Vector class.
@@ -40,14 +57,30 @@ class Vector(object):
         Set of variables that are relevant in the current context.
     _root_vector : Vector
         Pointer to the vector owned by the root system.
+    _alloc_complex : Bool
+        If True, then space for the imaginary part is also allocated.
     _data : {}
         Dict of the actual allocated data (depends on implementation), keyed
         by varset name.
     _indices : list
         List of indices mapping the varset-grouped data to the global vector.
+    _vector_info : <VectorInfo>
+        Object to store some global info, such as complex step state.
+    _imag_views : dict
+        Dictionary mapping absolute variable names to the ndarray views for the imaginary part.
+    _imag_views_flat : dict
+        Dictionary mapping absolute variable names to the flattened ndarray views for the imaginary
+        part.
+    _imag_data : {}
+        Dict of the actual allocated data (depends on implementation) for the imaginary part, keyed
+        by varset name.
+    _complex_view_cache : {}
+        Temporary storage of complex views used by in-place numpy operations.
     """
 
-    def __init__(self, name, typ, system, root_vector=None, resize=False):
+    _vector_info = VectorInfo()
+
+    def __init__(self, name, typ, system, root_vector=None, resize=False, alloc_complex=False):
         """
         Initialize all attributes.
 
@@ -63,6 +96,8 @@ class Vector(object):
             Pointer to the vector owned by the root system.
         resize : bool
             If true, resize the root vector.
+        alloc_complex : bool
+            Whether to allocate any imaginary storage to perform complex step. Default is False.
         """
         self._name = name
         self._typ = typ
@@ -80,6 +115,14 @@ class Vector(object):
         self._root_vector = None
         self._data = {}
         self._indices = {}
+
+        # Support for Complex Step
+        self._imag_data = {}
+        self._imag_views = {}
+        self._complex_view_cache = {}
+        self._imag_views_flat = {}
+        self._alloc_complex = alloc_complex
+
         if root_vector is None:
             self._root_vector = self
         else:
@@ -126,8 +169,8 @@ class Vector(object):
         <Vector>
             instance of the clone; the data is copied.
         """
-        vec = self.__class__(self._name, self._typ, self._system,
-                             self._root_vector)
+        vec = self.__class__(self._name, self._typ, self._system, self._root_vector,
+                             alloc_complex=self._alloc_complex)
         vec._clone_data()
         if initialize_views:
             vec._initialize_views()
@@ -249,6 +292,15 @@ class Vector(object):
         """
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
+            if self._vector_info._under_complex_step:
+                if self._typ == 'input':
+                    return self._views[abs_name] + 1j * self._imag_views[abs_name]
+                else:
+                    if abs_name not in self._complex_view_cache:
+                        self._complex_view_cache[abs_name] = self._views[abs_name] + \
+                            1j * self._imag_views[abs_name]
+                    return self._complex_view_cache[abs_name]
+
             return self._views[abs_name]
         else:
             msg = 'Variable name "{}" not found.'
@@ -268,7 +320,18 @@ class Vector(object):
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
             value, shape = ensure_compatible(name, value, self._views[abs_name].shape)
-            self._views[abs_name][:] = value
+            if self._vector_info._under_complex_step:
+
+                # setitem overwrites anything you may have done with numpy indexing
+                try:
+                    del self._complex_view_cache[abs_name]
+                except KeyError:
+                    pass
+
+                self._views[abs_name][:] = value.real
+                self._imag_views[abs_name][:] = value.imag
+            else:
+                self._views[abs_name][:] = value
         else:
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
@@ -475,6 +538,15 @@ class Vector(object):
             Upper bounds vector.
         """
         pass
+
+    def _remove_complex_views(self):
+        """
+        Remove temporary complex view and migrate its values into real and imaginary views.
+        """
+        for abs_name, value in iteritems(self._complex_view_cache):
+            self._views[abs_name][:] = value.real
+            self._imag_views[abs_name][:] = value.imag
+        self._complex_view_cache = {}
 
     def print_variables(self):
         """

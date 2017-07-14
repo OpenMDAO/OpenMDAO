@@ -213,8 +213,7 @@ class pyOptSparseDriver(Driver):
 
         # Calculate and save derivatives for any linear constraints.
         con_meta = self._cons
-        lcons = OrderedDict((key, con) for (key, con) in iteritems(con_meta)
-                            if con['linear'] is True)
+        lcons = [key for (key, con) in iteritems(con_meta) if con['linear'] is True]
         if len(lcons) > 0:
             _lin_jacs = problem._compute_total_derivs(of=lcons, wrt=indep_list,
                                                       return_format='dict')

@@ -1,10 +1,12 @@
 """Define the default Vector and Transfer classes."""
 from __future__ import division
-import numpy as np
-
+from copy import deepcopy
 import numbers
+
 from six import iteritems, itervalues
 from six.moves import range, zip
+
+import numpy as np
 
 from openmdao.vectors.vector import Vector, Transfer
 
@@ -58,6 +60,13 @@ class DefaultTransfer(Transfer):
                 in_set_name, out_set_name = key
                 in_vec._data[in_set_name][in_inds[key]] = \
                     out_vec._data[out_set_name][out_inds[key]]
+
+                # Imaginary transfer
+                # (for CS, so only need in fwd)
+                if in_vec._vector_info._under_complex_step and out_vec._alloc_complex:
+                    in_vec._imag_data[in_set_name][in_inds[key]] = \
+                        out_vec._imag_data[out_set_name][out_inds[key]]
+
         elif mode == 'rev':
             for key in in_inds:
                 in_set_name, out_set_name = key
@@ -188,6 +197,7 @@ class DefaultVector(Vector):
         offset = system._ext_sizes[type_][0]
 
         data = {}
+        imag_data = {}
         indices = {}
         for set_name in system._var_set2iset[type_]:
             offset_byset = system._ext_sizes_byset[type_][set_name][0]
@@ -197,7 +207,15 @@ class DefaultVector(Vector):
             data[set_name] = root_vec._data[set_name][ind_byset1:ind_byset2]
             indices[set_name] = root_vec._indices[set_name][ind_byset1:ind_byset2] - offset
 
-        return data, indices
+            # Extract view for imaginary part too
+            if self._alloc_complex:
+                if root_vec._alloc_complex:
+                    imag_data[set_name] = root_vec._imag_data[set_name][ind_byset1:ind_byset2]
+                else:
+                    shape = root_vec._data[set_name][ind_byset1:ind_byset2].shape
+                    imag_data[set_name] = np.zeros(shape)
+
+        return data, imag_data, indices
 
     def _initialize_data(self, root_vector):
         """
@@ -214,8 +232,13 @@ class DefaultVector(Vector):
         """
         if root_vector is None:
             self._data, self._indices = self._create_data()
+
+            # Allocate imaginary for complex step
+            if self._alloc_complex:
+                self._imag_data = deepcopy(self._data)
+
         else:
-            self._data, self._indices = self._extract_data()
+            self._data, self._imag_data, self._indices = self._extract_data()
 
     def _initialize_views(self):
         """
@@ -241,6 +264,10 @@ class DefaultVector(Vector):
         views = {}
         views_flat = {}
 
+        if self._alloc_complex:
+            imag_views = {}
+            imag_views_flat = {}
+
         for abs_name in system._var_abs_names[type_]:
             idx_byset = allprocs_abs2idx_byset_t[abs_name]
             set_name = abs2meta_t[abs_name]['var_set']
@@ -253,6 +280,11 @@ class DefaultVector(Vector):
             views[abs_name] = self._data[set_name][ind_byset1:ind_byset2]
             views[abs_name].shape = shape
 
+            if self._alloc_complex:
+                imag_views_flat[abs_name] = self._imag_data[set_name][ind_byset1:ind_byset2]
+                imag_views[abs_name] = self._imag_data[set_name][ind_byset1:ind_byset2]
+                imag_views[abs_name].shape = shape
+
             # The shape entry overrides value's shape, which is why we don't
             # use the shape of val as the reference
             if np.prod(shape) == 1:
@@ -263,12 +295,20 @@ class DefaultVector(Vector):
         self._views = self._names = views
         self._views_flat = views_flat
 
+        if self._alloc_complex:
+            self._imag_views = imag_views
+            self._imag_views_flat = imag_views_flat
+
     def _clone_data(self):
         """
         For each item in _data, replace it with a copy of the data.
         """
         for set_name, data in iteritems(self._data):
             self._data[set_name] = np.array(data)
+
+        if self._vector_info._under_complex_step:
+            for set_name, data in iteritems(self._imag_data):
+                self._imag_data[set_name] = np.array(data)
 
     def __iadd__(self, vec):
         """
@@ -286,6 +326,10 @@ class DefaultVector(Vector):
         """
         for set_name, data in iteritems(self._data):
             data += vec._data[set_name]
+
+        if self._vector_info._under_complex_step and vec._alloc_complex:
+            for set_name, data in iteritems(self._imag_data):
+                data += vec._imag_data[set_name]
         return self
 
     def __isub__(self, vec):
@@ -304,6 +348,9 @@ class DefaultVector(Vector):
         """
         for set_name, data in iteritems(self._data):
             data -= vec._data[set_name]
+        if self._vector_info._under_complex_step and vec._alloc_complex:
+            for set_name, data in iteritems(self._imag_data):
+                data -= vec._imag_data[set_name]
         return self
 
     def __imul__(self, val):
@@ -320,8 +367,17 @@ class DefaultVector(Vector):
         <Vector>
             self * val
         """
-        for data in itervalues(self._data):
-            data *= val
+        if self._vector_info._under_complex_step:
+            r_val = np.real(val)
+            i_val = np.imag(val)
+            for key in self._data:
+                r_data = self._data[key]
+                i_data = self._imag_data[key]
+                r_data = r_val * r_data + i_val * i_data
+                i_data = r_val * i_data + i_val * r_data
+        else:
+            for data in itervalues(self._data):
+                data *= val
         return self
 
     def add_scal_vec(self, val, vec):
@@ -335,8 +391,16 @@ class DefaultVector(Vector):
         vec : <Vector>
             this vector times val is added to self.
         """
-        for set_name, data in iteritems(self._data):
-            data += val * vec._data[set_name]
+        if self._vector_info._under_complex_step:
+            r_val = np.real(val)
+            i_val = np.imag(val)
+            for set_name, data in iteritems(self._data):
+                data += r_val * vec._data[set_name] + i_val * vec._imag_data[set_name]
+            for set_name, data in iteritems(self._imag_data):
+                data += i_val * vec._data[set_name] + r_val * vec._imag_data[set_name]
+        else:
+            for set_name, data in iteritems(self._data):
+                data += val * vec._data[set_name]
 
     def elem_mult(self, vec):
         """
@@ -373,6 +437,9 @@ class DefaultVector(Vector):
         """
         for set_name, data in iteritems(self._data):
             data[:] = vec._data[set_name]
+        if self._vector_info._under_complex_step:
+            for set_name, data in iteritems(self._imag_data):
+                data[:] = vec._imag_data[set_name][:]
 
     def set_const(self, val):
         """
