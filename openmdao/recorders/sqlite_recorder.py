@@ -115,7 +115,7 @@ class SqliteRecorder(BaseRecorder):
             self.record_iteration_driver(object_requesting_recording, metadata)
 
         elif isinstance(object_requesting_recording, System):
-            self.record_iteration_system(object_requesting_recording, metadata, kwargs['method'])
+            self.record_iteration_system(object_requesting_recording, metadata)
 
         elif isinstance(object_requesting_recording, Solver):
             self.record_iteration_solver(object_requesting_recording, metadata, **kwargs)
