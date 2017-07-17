@@ -19,7 +19,7 @@ import scipy as sp
 from pyoptsparse import Optimization
 
 from openmdao.core.driver import Driver
-from openmdao.core.system import AnalysisError
+from openmdao.core.analysis_error import AnalysisError
 
 # names of optimizers that use gradients
 grad_drivers = {'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',

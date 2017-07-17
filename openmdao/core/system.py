@@ -24,17 +24,6 @@ from openmdao.utils.units import convert_units
 from openmdao.utils.array_utils import convert_neg
 
 
-class AnalysisError(Exception):
-    """
-    Analysis Error.
-
-    This exception indicates that a possibly recoverable numerical error occurred in an analysis
-    code or a subsolver.
-    """
-
-    pass
-
-
 class System(object):
     """
     Base class for all systems in OpenMDAO.

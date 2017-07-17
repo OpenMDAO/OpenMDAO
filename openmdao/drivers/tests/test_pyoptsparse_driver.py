@@ -1052,10 +1052,11 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
 
         prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = OPTIMIZER
 
-        if OPTIMIZER == 'SLSQP':
-            prob.driver.opt_settings['ACC'] = 1e-9
+        # SNOPT has a weird cleanup problem when this fails, so we use SLSQP. For the
+        # regular failure, it doesn't matter which opt we choose since they all fail through.
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.opt_settings['ACC'] = 1e-9
 
         prob.driver.options['print_results'] = False
         model.add_design_var('x', lower=-50.0, upper=50.0)
@@ -1137,10 +1138,11 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
 
         prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = OPTIMIZER
 
-        if OPTIMIZER == 'SLSQP':
-            prob.driver.opt_settings['ACC'] = 1e-9
+        # SNOPT has a weird cleanup problem when this fails, so we use SLSQP. For the
+        # regular failure, it doesn't matter which opt we choose since they all fail through.
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.opt_settings['ACC'] = 1e-9
 
         prob.driver.options['print_results'] = False
         model.add_design_var('x', lower=-50.0, upper=50.0)
