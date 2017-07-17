@@ -56,7 +56,7 @@ def check_config(problem, logger=None):
             _check_dataflow(system, logger)
 
 
-def compute_sys_graph(group, input_srcs, comps_only=False):
+def compute_sys_graph(group, input_srcs, comps_only=False, save_vars=False):
     """
     Compute a dependency graph for subsystems in the given group.
 
@@ -74,6 +74,10 @@ def compute_sys_graph(group, input_srcs, comps_only=False):
         a graph containing only direct children (both Components and Groups)
         of the group will be returned.
 
+    save_vars : bool (False)
+        If True, store var connection information in each edge in the system
+        graph.
+
     Returns
     -------
     DiGraph
@@ -87,14 +91,31 @@ def compute_sys_graph(group, input_srcs, comps_only=False):
     else:
         subsystems = group._subsystems_allprocs
 
+    if save_vars:
+        edge_data = defaultdict(lambda: defaultdict(list))
+
     for in_abs, src_abs in iteritems(input_srcs):
         if src_abs is not None:
             iparts = in_abs.split('.')
             oparts = src_abs.split('.')
             if comps_only:
-                graph.add_edge('.'.join(oparts[glen:-1]), '.'.join(iparts[glen:-1]))
+                src = '.'.join(oparts[glen:-1])
+                tgt = '.'.join(iparts[glen:-1])
             else:
-                graph.add_edge(oparts[glen], iparts[glen])
+                src = oparts[glen]
+                tgt = iparts[glen]
+
+            if save_vars:
+                # store var connection data in each system to system edge for later
+                # use in relevance calculation.
+                edge_data[(src, tgt)][src_abs].append(in_abs)
+            else:
+                graph.add_edge(src, tgt)
+
+    if save_vars:
+        for key in edge_data:
+            src_sys, tgt_sys = key
+            graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
 
     return graph
 
@@ -128,6 +149,90 @@ def get_sccs(group, comps_only=False):
     sccs = list(nx.strongly_connected_components(graph))
     sccs.reverse()
     return sccs
+
+
+def all_connected_edges(graph, start):
+    """
+
+    Yield all downstream edges starting at the given node.
+
+    Parameters
+    ----------
+    graph : network.DiGraph
+        Graph being traversed.
+    start : hashable object
+        Identifier of the starting node.
+
+    Yields
+    ------
+    list
+        A list of all edges found when traversal starts at start.
+    """
+    visited = set()
+    stack = [start]
+    while stack:
+        src = stack.pop()
+        for tgt in graph[src]:
+            yield src, tgt
+            if tgt not in visited:
+                visited.add(tgt)
+                stack.append(tgt)
+
+
+def get_relevant_vars(graph, desvars, responses):
+    """
+    Find all relevant vars between desvars and responses.
+
+    Both vars are assumed to be outputs (either design vars or responses).
+
+    Parameters
+    ----------
+    graph : networkx.DiGraph
+        System graph with var connection info on the edges.
+    desvars : list of str
+        Names of design variables.
+    responses : list of str
+        Names of response variables.
+
+    Returns
+    -------
+    dict
+        Dict of (dep_outputs, dep_inputs, dep_systems) keyed by design vars and responses.
+    """
+    relevant = defaultdict(dict)
+    edge_cache = {}
+
+    grev = graph.reverse()
+
+    for desvar in desvars:
+        start_sys = desvar.rsplit('.', 1)[0]
+        if start_sys not in edge_cache:
+            edge_cache[start_sys] = set(all_connected_edges(graph, start_sys))
+        start_edges = edge_cache[start_sys]
+
+        for response in responses:
+            end_sys = response.rsplit('.', 1)[0]
+            if end_sys not in edge_cache:
+                edge_cache[end_sys] = set((v, u) for u, v in
+                                          all_connected_edges(grev, end_sys))
+            end_edges = edge_cache[end_sys]
+
+            common_edges = start_edges.intersection(end_edges)
+
+            input_deps = set()
+            output_deps = set([desvar, response])
+            sys_deps = set()
+            for u, v in common_edges:
+                sys_deps.add(u)
+                sys_deps.add(v)
+                conns = graph[u][v]['conns']
+                output_deps.update(conns)
+                for inputs in conns.values():
+                    input_deps.update(inputs)
+
+            relevant[desvar][response] = (input_deps, output_deps, sys_deps)
+
+    return relevant
 
 
 def _check_dataflow(group, logger):
