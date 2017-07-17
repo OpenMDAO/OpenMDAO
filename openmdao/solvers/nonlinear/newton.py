@@ -139,7 +139,6 @@ class NewtonSolver(NonlinearSolver):
         float
             norm.
         """
-
         recording_iteration_stack.append(('_iter_get_norm', 0))
 
         system = self._system
@@ -156,8 +155,6 @@ class NewtonSolver(NonlinearSolver):
         system._owns_approx_jac = approx_status
 
         return system._residuals.get_norm()
-
-
 
     def _linearize_children(self):
         """

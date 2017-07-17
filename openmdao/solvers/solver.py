@@ -379,7 +379,6 @@ class NonlinearSolver(Solver):
         return self._system._residuals.get_norm()
 
 
-
 class LinearSolver(Solver):
     """
     Base class for linear solvers.

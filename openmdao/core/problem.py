@@ -19,7 +19,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
-
+from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.vectors.default_vector import DefaultVector
@@ -637,13 +637,7 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-
-
-        from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
         recording_iteration_stack.append(('_compute_total_derivs', 0))
-
-
-
         model = self.model
         mode = self._mode
         vec_dinput = model._vectors['input']

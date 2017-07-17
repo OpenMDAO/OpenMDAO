@@ -13,7 +13,8 @@ from openmdao.core.driver import Driver
 from openmdao.core.system import System
 from openmdao.recorders.base_recorder import BaseRecorder
 from openmdao.solvers.solver import Solver, NonlinearSolver
-from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate, recording_iteration_stack
+from openmdao.recorders.recording_iteration_stack import \
+    get_formatted_iteration_coordinate, recording_iteration_stack
 
 
 def array_to_blob(array):
@@ -259,7 +260,6 @@ class SqliteRecorder(BaseRecorder):
             '_apply_nonlinear,' '_solve_nonlinear'. Behavior varies based on from which function
             record_iteration was called.
         """
-
         stack_top = recording_iteration_stack[-1][0]
         method = stack_top.split('.')[-1]
 
