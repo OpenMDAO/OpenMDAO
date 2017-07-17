@@ -632,6 +632,13 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
+
+
+        from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
+        recording_iteration_stack.append(('_compute_total_derivs', 0))
+
+
+
         model = self.model
         mode = self._mode
         vec_dinput = model._vectors['input']
@@ -848,6 +855,8 @@ class Problem(object):
 
                             else:
                                 raise RuntimeError("unsupported return format")
+
+        recording_iteration_stack.pop()
 
         return totals
 

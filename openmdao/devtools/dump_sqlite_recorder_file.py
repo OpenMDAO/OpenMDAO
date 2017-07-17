@@ -1,5 +1,5 @@
 from __future__ import print_function
-import pickle
+from six.moves import cPickle as pickle
 import sqlite3
 import sys
 from openmdao.recorders.sqlite_recorder import blob_to_array
@@ -37,26 +37,35 @@ filename = sys.argv[1]
 con = sqlite3.connect(filename)
 cur = con.cursor()
 
+from six import PY2, PY3
+
+if PY2:
+    def pickle_load(pickled_item):
+        return pickle.loads(str(pickled_item))
+if PY3:
+    def pickle_load(pickled_item):
+        return pickle.loads(pickled_item)
+
 # Driver metadata
 print_header('Driver Metadata', '=')
 cur.execute("SELECT model_viewer_data FROM driver_metadata")
 for row in cur:
-    driver_metadata = pickle.loads(str(row[0]))
+    driver_metadata = pickle_load(row[0])
     print('driver_metadata', driver_metadata)
 
-print_header('System Metadata', '=')
-cur.execute("SELECT id, scaling_factors FROM system_metadata")
-for row in cur:
-    id = row[0]
-    scaling_factors = pickle.loads(str(row[1]))
-    print('id = ', id)
-    print('scaling_factors', scaling_factors)
+# print_header('System Metadata', '=')
+# cur.execute("SELECT id, scaling_factors FROM system_metadata")
+# for row in cur:
+#     id = row[0]
+#     scaling_factors = pickle_load(row[1])
+#     print('id = ', id)
+#     print('scaling_factors', scaling_factors)
 
 print_header('Solver Metadata', '=')
 cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")
 for row in cur:
     id = row[0]
-    solver_options = pickle.loads(str(row[1]))
+    solver_options = pickle_load(row[1])
     solver_class = row[2]
     print('id = ', id)
     print('solver_options', solver_options)

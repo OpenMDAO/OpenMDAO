@@ -2627,4 +2627,5 @@ class System(object):
         metadata = create_local_meta(self.pathname)
         # Send the calling method name into record_iteration, e.g. 'solve_nonlinear'.
         self._rec_mgr.record_iteration(self, metadata, method=inspect.stack()[2][3])
+        # self._rec_mgr.record_iteration(self, metadata, method='_solve_nonlinear')
         self.iter_count += 1

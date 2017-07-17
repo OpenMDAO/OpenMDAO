@@ -13,7 +13,7 @@ from openmdao.core.driver import Driver
 from openmdao.core.system import System
 from openmdao.recorders.base_recorder import BaseRecorder
 from openmdao.solvers.solver import Solver, NonlinearSolver
-from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate
+from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate, recording_iteration_stack
 
 
 def array_to_blob(array):
@@ -244,7 +244,7 @@ class SqliteRecorder(BaseRecorder):
         self.con.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
                          ('driver', self.cursor.lastrowid))
 
-    def record_iteration_system(self, object_requesting_recording, metadata, method):
+    def record_iteration_system(self, object_requesting_recording, metadata):
         """
         Record an iteration using system options.
 
@@ -259,6 +259,10 @@ class SqliteRecorder(BaseRecorder):
             '_apply_nonlinear,' '_solve_nonlinear'. Behavior varies based on from which function
             record_iteration was called.
         """
+
+        stack_top = recording_iteration_stack[-1][0]
+        method = stack_top.split('.')[-1]
+
         if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear',
                           '_solve_nonlinear']:
             raise ValueError("method must be one of: '_apply_linear, "
