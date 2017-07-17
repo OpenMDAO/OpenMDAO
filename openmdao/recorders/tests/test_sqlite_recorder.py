@@ -29,14 +29,12 @@ if PY2:
 if PY3:
     import pickle
 
-# check that pyoptsparse is installed
-# if it is, try to use SNOPT but fall back to SLSQP
+# check that pyoptsparse is installed. if it is, try to use SLSQP.
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
+
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-
-# optimizers = {'scipy': ScipyOptimizer, }
-optimizers = {'pyoptsparse': pyOptSparseDriver}
+    optimizers = {'pyoptsparse': pyOptSparseDriver}
 
 
 def run_driver(problem):
@@ -257,6 +255,12 @@ def _assertDriverMetadataRecorded(test, db_cur, expected):
 
 class TestSqliteRecorder(unittest.TestCase):
     def setUp(self):
+        if OPT is None:
+            raise unittest.SkipTest("pyoptsparse is not installed")
+
+        if OPTIMIZER is None:
+            raise unittest.SkipTest("pyoptsparse is not providing SLSQP")
+
         self.dir = mkdtemp()
         self.filename = os.path.join(self.dir, "sqlite_test")
         self.recorder = SqliteRecorder(self.filename)

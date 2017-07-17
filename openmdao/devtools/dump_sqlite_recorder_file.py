@@ -1,8 +1,14 @@
 from __future__ import print_function
-from six.moves import cPickle as pickle
 import sqlite3
 import sys
+from six import PY2, PY3
+
 from openmdao.recorders.sqlite_recorder import blob_to_array
+
+if PY2:
+    import cPickle as pickle
+if PY3:
+    import pickle
 
 indent = 4 * ' '
 
@@ -53,13 +59,13 @@ for row in cur:
     driver_metadata = pickle_load(row[0])
     print('driver_metadata', driver_metadata)
 
-# print_header('System Metadata', '=')
-# cur.execute("SELECT id, scaling_factors FROM system_metadata")
-# for row in cur:
-#     id = row[0]
-#     scaling_factors = pickle_load(row[1])
-#     print('id = ', id)
-#     print('scaling_factors', scaling_factors)
+print_header('System Metadata', '=')
+cur.execute("SELECT id, scaling_factors FROM system_metadata")
+for row in cur:
+    id = row[0]
+    scaling_factors = pickle_load(row[1])
+    print('id = ', id)
+    print('scaling_factors', scaling_factors)
 
 print_header('Solver Metadata', '=')
 cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")

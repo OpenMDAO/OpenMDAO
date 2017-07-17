@@ -74,6 +74,14 @@ class PETScTransfer(DefaultTransfer):
                 in_petsc = self._in_vec._petsc[in_set_name]
                 out_petsc = self._out_vec._petsc[out_set_name]
                 self._transfers[key].scatter(out_petsc, in_petsc, addv=False, mode=False)
+
+                # Imaginary transfer
+                # (for CS, so only need in fwd)
+                if in_vec._vector_info._under_complex_step and out_vec._alloc_complex:
+                    in_petsc = self._in_vec._imag_petsc[in_set_name]
+                    out_petsc = self._out_vec._imag_petsc[out_set_name]
+                    self._transfers[key].scatter(out_petsc, in_petsc, addv=False, mode=False)
+
         elif mode == 'rev':
             for key in self._transfers:
                 in_set_name, out_set_name = key
@@ -107,8 +115,15 @@ class PETScVector(DefaultVector):
         super(PETScVector, self)._initialize_data(root_vector)
 
         self._petsc = {}
+        self._imag_petsc = {}
         for set_name, data in iteritems(self._data):
             self._petsc[set_name] = PETSc.Vec().createWithArray(data, comm=self._system.comm)
+
+            # Allocate imaginary for complex step
+            if self._alloc_complex:
+                for set_name, data in iteritems(self._imag_data):
+                    self._imag_petsc[set_name] = PETSc.Vec().createWithArray(data,
+                                                                             comm=self._system.comm)
 
     def get_norm(self):
         """
