@@ -150,25 +150,44 @@ class TestCheckConfig(unittest.TestCase):
         g = compute_sys_graph(p.model, p.model._conn_global_abs_in2out, comps_only=True, save_vars=True)
         relevant = get_relevant_vars(g, ['indep1.x', 'indep2.x'], ['C8.y'])
 
+        indep1_ins = set(['C3.b', 'C3.c', 'C8.b', 'G1.C1.a', 'G2.C5.a', 'G2.C5.b'])
+        indep1_outs = set(['C3.y', 'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'])
+        indep1_sys = set(['C3', 'C8', 'G1.C1', 'G2.C5', 'indep1'])
+        
         inputs, outputs, systems = relevant['indep1.x']['C8.y']
-        self.assertEqual(inputs, set(['C3.b',
-                                      'C3.c',
-                                      'C8.b',
-                                      'G1.C1.a',
-                                      'G2.C5.a',
-                                      'G2.C5.b']))
-        self.assertEqual(outputs, set(['C3.y',
-                                       'C8.y',
-                                       'G1.C1.z',
-                                       'G2.C5.x',
-                                       'indep1.x']))
-        self.assertEqual(systems, set(['C3', 'C8', 'G1.C1', 'G2.C5', 'indep1']))
+        
+        self.assertEqual(inputs, indep1_ins)
+        self.assertEqual(outputs, indep1_outs)
+        self.assertEqual(systems, indep1_sys)
+
+        inputs, outputs, systems = relevant['C8.y']['indep1.x']
+        
+        self.assertEqual(inputs, indep1_ins)
+        self.assertEqual(outputs, indep1_outs)
+        self.assertEqual(systems, indep1_sys)
+        
+        indep2_ins = set(['C8.a', 'G2.C6.a', 'G2.C7.b'])
+        indep2_outs = set(['C8.y', 'G2.C6.y', 'G2.C7.x', 'indep2.x'])
+        indep2_sys = set(['C8', 'G2.C6', 'G2.C7', 'indep2'])
         
         inputs, outputs, systems = relevant['indep2.x']['C8.y']
         
-        self.assertEqual(inputs, set(['C8.a', 'G2.C6.a', 'G2.C7.b']))
-        self.assertEqual(outputs, set(['C8.y', 'G2.C6.y', 'G2.C7.x', 'indep2.x']))
-        self.assertEqual(systems, set(['C8', 'G2.C6', 'G2.C7', 'indep2']))
+        self.assertEqual(inputs, indep2_ins)
+        self.assertEqual(outputs, indep2_outs)
+        self.assertEqual(systems, indep2_sys)
+        
+        inputs, outputs, systems = relevant['C8.y']['indep2.x']
+        
+        self.assertEqual(inputs, indep2_ins)
+        self.assertEqual(outputs, indep2_outs)
+        self.assertEqual(systems, indep2_sys)
+        
+        inputs, outputs, systems = relevant['C8.y']['@all']
+
+        self.assertEqual(inputs, indep1_ins | indep2_ins)
+        self.assertEqual(outputs, indep1_outs | indep2_outs)
+        self.assertEqual(systems, indep1_sys | indep2_sys)
+
 
     def test_multi_cycles(self):
         p = Problem(model=Group())

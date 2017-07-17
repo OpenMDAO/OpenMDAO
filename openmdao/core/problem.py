@@ -18,7 +18,8 @@ from openmdao.core.driver import Driver
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
-from openmdao.error_checking.check_config import check_config
+from openmdao.error_checking.check_config import check_config, compute_sys_graph, \
+    get_relevant_vars
 
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.mpi import MPI, FakeComm
@@ -277,6 +278,8 @@ class Problem(object):
         model._setup(comm, vector_class, 'full')
         self.driver._setup_driver(self)
 
+        self._relevant = self._compute_relevance()
+
         # Now that setup has been called, we can set the iprints.
         for items in self._solver_print_cache:
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
@@ -285,6 +288,13 @@ class Problem(object):
             check_config(self, logger)
 
         return self
+
+    def _compute_relevance(self):
+        sys_graph = compute_sys_graph(self.model, self.model._conn_global_abs_in2out,
+                                      comps_only=True, save_vars=True)
+        return get_relevant_vars(sys_graph,
+                                 self.driver._designvars,
+                                 self.driver._responses)
 
     def check_partials(self, out_stream=sys.stdout, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6, global_options=None,
@@ -635,6 +645,7 @@ class Problem(object):
         nproc = self.comm.size
         iproc = model.comm.rank
         sizes = model._var_sizes['output']
+        relevant = self._relevant
 
         # TODO - Pull 'of' and 'wrt' from driver if unspecified.
         if wrt is None:

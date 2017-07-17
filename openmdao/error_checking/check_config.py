@@ -231,6 +231,24 @@ def get_relevant_vars(graph, desvars, responses):
                     input_deps.update(inputs)
 
             relevant[desvar][response] = (input_deps, output_deps, sys_deps)
+            relevant[response][desvar] = relevant[desvar][response]
+
+    # TODO: if we knew mode here, we would only need to compute for fwd or rev,
+    # instead of both.
+
+    # now calculate dependencies between each VOI and all other VOIs of the
+    # other type, e.g for each input VOI wrt all output VOIs.
+    for outer, inner in [(desvars, responses), (responses, desvars)]:
+        for inp in outer:
+            total_inps = set()
+            total_outs = set()
+            total_systems = set()
+            for out in inner:
+                inps, outs, systems = relevant[inp][out]
+                total_inps.update(inps)
+                total_outs.update(outs)
+                total_systems.update(systems)
+            relevant[inp]['@all'] = (total_inps, total_outs, total_systems)
 
     return relevant
 
