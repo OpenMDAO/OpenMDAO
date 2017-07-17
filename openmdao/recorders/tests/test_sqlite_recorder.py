@@ -1179,7 +1179,7 @@ class TestSqliteRecorder(unittest.TestCase):
             self.prob.driver.opt_settings['ACC'] = 1e-2  # to speed the test up
             self.prob.driver.opt_settings['ACC'] = 1e-9
 
-        self.recorder.options['record_metadata'] = False
+        self.recorder.options['record_metadata'] = True
 
         # Add recorders
         # Driver

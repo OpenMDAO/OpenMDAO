@@ -1,4 +1,5 @@
 from __future__ import print_function
+import pprint
 import sqlite3
 import sys
 from six import PY2, PY3
@@ -57,7 +58,9 @@ print_header('Driver Metadata', '=')
 cur.execute("SELECT model_viewer_data FROM driver_metadata")
 for row in cur:
     driver_metadata = pickle_load(row[0])
-    print('driver_metadata', driver_metadata)
+    print('driver_metadata')
+    pprint.pprint(driver_metadata, indent=4)
+
 
 print_header('System Metadata', '=')
 cur.execute("SELECT id, scaling_factors FROM system_metadata")
@@ -65,16 +68,18 @@ for row in cur:
     id = row[0]
     scaling_factors = pickle_load(row[1])
     print('id = ', id)
-    print('scaling_factors', scaling_factors)
+    print('scaling_factors')
+    pprint.pprint(scaling_factors, indent=16)
 
 print_header('Solver Metadata', '=')
 cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")
 for row in cur:
     id = row[0]
-    solver_options = pickle_load(row[1])
+    solver_options = pickle_load(row[1])._dict
     solver_class = row[2]
     print('id = ', id)
-    print('solver_options', solver_options)
+    print('solver_options = ')
+    pprint.pprint(solver_options, indent=16)
     print('solver_class', solver_class)
 
 #  Driver recordings: inputs, outputs, residuals
