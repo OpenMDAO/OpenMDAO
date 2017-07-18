@@ -114,4 +114,12 @@ Control Options
   In the `ArmijoGoldsteinLS`, the "c" option is a multiplier on the slope check. Setting it to a smaller value means a more
   gentle slope will satisfy the condition and terminate.
 
+- print_bound_enforce
+
+  When the "print_bound_enforce" option is set to True, the linesearch will print the name and values of any variables
+  that exceeded their lower or upper bounds and were drawn back during bounds enforcement.
+
+.. embed-test::
+    openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_print_bound_enforce
+
 .. tags:: linesearch, backtracking

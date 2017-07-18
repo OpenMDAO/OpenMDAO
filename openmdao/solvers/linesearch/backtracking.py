@@ -5,16 +5,39 @@ BoundsEnforceLS - Only checks bounds and enforces them by one of three methods.
 ArmijoGoldsteinLS -- Like above, but terminates with the ArmijoGoldsteinLS condition.
 
 """
+from __future__ import print_function
 
 from math import isnan
+from six import iteritems
 
 import numpy as np
 
 from openmdao.solvers.solver import NonlinearSolver
 
 
-def print_violations(unknowns, lower, upper):
-    pass
+def _print_violations(unknowns, lower, upper):
+    """
+    Print out which variables exceed their bounds.
+
+    Parameters
+    ----------
+    unknowns : <Vector>
+        Vector containing the unknowns.
+    lower : <Vector>
+        Vector containing the lower bounds.
+    upper : <Vector>
+        Vector containing the upper bounds.
+    """
+    for name, val in iteritems(unknowns._views_flat):
+        if any(val > upper._views_flat[name]):
+            print("'%s' exceeds upper bounds" % name)
+            print("  Val:", val)
+            print("  Upper:", upper._views_flat[name], '\n')
+
+        if any(val < lower._views_flat[name]):
+            print("'%s' exceeds lower bounds" % name)
+            print("  Val:", val)
+            print("  Lower:", lower._views_flat[name], '\n')
 
 
 class BoundsEnforceLS(NonlinearSolver):
@@ -89,7 +112,7 @@ class BoundsEnforceLS(NonlinearSolver):
         u += du
 
         if self.options['print_bound_enforce']:
-            print_violations(u, system._lower_bounds, system._upper_bounds)
+            _print_violations(u, system._lower_bounds, system._upper_bounds)
 
         if self.options['bound_enforcement'] == 'vector':
             u._enforce_bounds_vector(du, 1.0, system._lower_bounds, system._upper_bounds)
@@ -157,6 +180,9 @@ class ArmijoGoldsteinLS(NonlinearSolver):
             norm0 = 1.0
 
         u.add_scal_vec(self.alpha, du)
+
+        if self.options['print_bound_enforce']:
+            _print_violations(u, system._lower_bounds, system._upper_bounds)
 
         if self.options['bound_enforcement'] == 'vector':
             u._enforce_bounds_vector(du, self.alpha, system._lower_bounds, system._upper_bounds)
