@@ -86,4 +86,11 @@ GMRES iterations is lower when using the preconditioner.
 .. embed-test::
     openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_specify_precon
 
+While the default preconditioning "side" is right-preconditioning, you can also use left-preconditioning provided that you choose
+a "ksp_type" that supports it. Here we solve the same problem with left-preconditioning using the Richardson method and a `DirectSolver`.
+
+.. embed-test::
+    openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_specify_precon_left
+
+
 .. tags:: Solver, LinearSolver

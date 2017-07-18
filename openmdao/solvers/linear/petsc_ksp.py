@@ -214,6 +214,9 @@ class PetscKSP(LinearSolver):
                              desc='Number of iterations between restarts. Larger values increase '
                              'iteration cost, but may be necessary for convergence')
 
+        self.options.declare('precon_side', default='right', values=['left', 'right'],
+                             desc='Preconditioner side, default is right.')
+
         # changing the default maxiter from the base class
         self.options['maxiter'] = 100
 
@@ -457,7 +460,10 @@ class PetscKSP(LinearSolver):
         ksp.setOperators(jac_mat)
         ksp.setType(self.options['ksp_type'])
         ksp.setGMRESRestart(self.options['restart'])
-        ksp.setPCSide(PETSc.PC.Side.RIGHT)
+        if self.options['precon_side'] == 'left':
+            ksp.setPCSide(PETSc.PC.Side.LEFT)
+        else:
+            ksp.setPCSide(PETSc.PC.Side.RIGHT)
         ksp.setMonitor(Monitor(self))
 
         pc_mat = ksp.getPC()
