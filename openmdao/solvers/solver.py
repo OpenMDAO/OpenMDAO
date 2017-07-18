@@ -1,6 +1,9 @@
 """Define the base Solver, NonlinearSolver, and LinearSolver classes."""
 
 from __future__ import division, print_function
+
+import os
+
 import numpy as np
 
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -178,24 +181,27 @@ class Solver(object):
         self._iter_count = 0
         norm0, norm = self._iter_initialize()
         self._mpi_print(self._iter_count, norm, norm / norm0)
+
         while self._iter_count < maxiter and \
                 norm > atol and norm / norm0 > rtol:
             self._iter_execute()
             self._iter_count += 1
             norm = self._iter_get_norm()
             self._mpi_print(self._iter_count, norm, norm / norm0)
+
         fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
 
-        if fail:
-            if iprint > -1:
-                msg = ' Failed to Converge in {} iterations'.format(self._iter_count)
-                print(self._solver_info.prefix + self.SOLVER + msg)
-        elif iprint == 1:
-            print(self._solver_info.prefix + self.SOLVER +
-                  ' Converged in {} iterations'.format(self._iter_count))
-        elif iprint == 2:
-            print(self._solver_info.prefix + self.SOLVER + ' Converged')
+        if self._system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
+            if fail:
+                if iprint > -1:
+                    msg = ' Failed to Converge in {} iterations'.format(self._iter_count)
+                    print(self._solver_info.prefix + self.SOLVER + msg)
+            elif iprint == 1:
+                print(self._solver_info.prefix + self.SOLVER +
+                      ' Converged in {} iterations'.format(self._iter_count))
+            elif iprint == 2:
+                print(self._solver_info.prefix + self.SOLVER + ' Converged')
 
         return fail, norm, norm / norm0
 

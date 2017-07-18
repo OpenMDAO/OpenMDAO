@@ -2,11 +2,11 @@
 
 from __future__ import division
 from collections import OrderedDict, defaultdict, namedtuple
+from itertools import product
 import sys
 
-from six import string_types, iteritems, iterkeys
+from six import iteritems, iterkeys
 from six.moves import range
-from itertools import product
 
 import numpy as np
 import scipy.sparse as sparse
@@ -235,7 +235,8 @@ class Problem(object):
 
         return self.run_driver()
 
-    def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='auto'):
+    def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='auto',
+              force_alloc_complex=False):
         """
         Set up everything.
 
@@ -251,6 +252,10 @@ class Problem(object):
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'auto', which lets OpenMDAO choose
             the best mode for your problem.
+        force_alloc_complex : bool
+            Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
+            detect when you need to do this, but in some cases (e.g., complex step is used
+            after a reconfiguration) you may need to set this to True.
 
         Returns
         -------
@@ -275,7 +280,7 @@ class Problem(object):
             mode = 'rev'
         self._mode = mode
 
-        model._setup(comm, vector_class, 'full')
+        model._setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex)
         self.driver._setup_driver(self)
 
         self._relevant = self._compute_relevance()
@@ -641,11 +646,12 @@ class Problem(object):
         vec_dinput = model._vectors['input']
         vec_doutput = model._vectors['output']
         vec_dresid = model._vectors['residual']
-        fwd = mode == 'fwd'
         nproc = self.comm.size
         iproc = model.comm.rank
         sizes = model._var_sizes['output']
         relevant = self._relevant
+        approx = model._owns_approx_jac
+        fwd = (mode == 'fwd') or approx
 
         # TODO - Pull 'of' and 'wrt' from driver if unspecified.
         if wrt is None:
@@ -659,13 +665,9 @@ class Problem(object):
         # TODO: Support parallel adjoint and parallel forward derivatives
         #       Aside: how are they specified, and do we have to pick up any
         #       that are missed?
-        # TODO: Handle driver scaling.
-        # TODO: Support for any other return_format we need.
         # TODO: Support constraint sparsity (i.e., skip in/out that are not
         #       relevant for this constraint) (desvars too?)
         # TODO: Don't calculate for inactive constraints
-        # TODO: Support full-model FD. Don't know how this'll work, but we
-        #       used to need a separate function for that.
         # -------------------------------------------------------------------
 
         # Prepare model for calculation by cleaning out the derivatives
@@ -724,6 +726,45 @@ class Problem(object):
             input_vois = self.driver._responses
             output_vois = self.driver._designvars
 
+        # Solve for derivs with the approximation_scheme.
+        # This cuts out the middleman by grabbing the Jacobian directly after linearization.
+        if approx:
+
+            # Re-initialize so that it is clean.
+            if model._approx_schemes:
+                method = list(model._approx_schemes.keys())[0]
+                model.approx_total_derivs(method=method)
+            else:
+                model.approx_total_derivs(method='fd')
+
+            # Initialization based on driver (or user) -requested "of" and "wrt".
+            if not model._owns_approx_jac or model._owns_approx_of != set(of) \
+               or model._owns_approx_wrt != set(wrt):
+                model._owns_approx_of = set(of)
+                model._owns_approx_wrt = set(wrt)
+
+            model._setup_jacobians(recurse=False)
+
+            model._linearize()
+            approx_jac = model._jacobian._subjacs
+
+            if return_format == 'flat_dict':
+                for icount, input_name in enumerate(input_list):
+                    for ocount, output_name in enumerate(output_list):
+                        okey = old_output_list[ocount]
+                        ikey = old_input_list[icount]
+                        totals[okey, ikey] = -approx_jac[output_name, input_name]
+
+            elif return_format == 'dict':
+                for icount, input_name in enumerate(input_list):
+                    for ocount, output_name in enumerate(output_list):
+                        okey = old_output_list[ocount]
+                        ikey = old_input_list[icount]
+                        totals[okey][ikey] = -approx_jac[output_name, input_name]
+
+            return totals
+
+        # Solve for derivs using linear solver.
         voi_lists = defaultdict(list)
         v2rhs_name = {}
         for i, name in enumerate(input_list):
@@ -818,7 +859,7 @@ class Problem(object):
                 for input_name, old_input_name in vois:
                     dinputs, doutputs, irange, loc_size, start, end, dup = voi_info[input_name]
                     idx = irange[i]
-                    # the 'store' flag is here so that we properly initialize
+
                     # totals to zeros instead of None in those cases when none
                     # of the specified indices are within the range of interest
                     # for this proc.
@@ -867,7 +908,6 @@ class Problem(object):
                                     totals[key] = np.zeros((len_val, loc_size))
                                 if store:
                                     totals[key][:, loc_idx] = deriv_val
-
                             else:
                                 key = (old_input_name, old_output_list[ocount])
 
@@ -884,7 +924,6 @@ class Problem(object):
                                     totals[okey][old_input_name] = np.zeros((len_val, loc_size))
                                 if store:
                                     totals[okey][old_input_name][:, loc_idx] = deriv_val
-
                             else:
                                 ikey = old_output_list[ocount]
 
@@ -892,7 +931,6 @@ class Problem(object):
                                     totals[old_input_name][ikey] = np.zeros((loc_size, len_val))
                                 if store:
                                     totals[old_input_name][ikey][loc_idx, :] = deriv_val
-
                         else:
                             raise RuntimeError("unsupported return format")
 

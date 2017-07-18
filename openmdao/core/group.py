@@ -1,21 +1,25 @@
 """Define the Group class."""
 from __future__ import division
 
-from six import iteritems, string_types
-from six.moves import range
+from collections import Iterable, Counter, OrderedDict, defaultdict
 from itertools import product, chain
-from collections import Iterable, Counter
-
-import numpy as np
 import warnings
 
+from six import iteritems, string_types, itervalues
+from six.moves import range
+
+import numpy as np
+
+from openmdao.approximation_schemes.complex_step import ComplexStep
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
+from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
+from openmdao.proc_allocators.proc_allocator import ProcAllocationError
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
+from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.units import is_compatible
-from openmdao.utils.array_utils import convert_neg
-from openmdao.proc_allocators.proc_allocator import ProcAllocationError
 
 
 class Group(System):
@@ -382,7 +386,7 @@ class Group(System):
 
         self._setup_global_shapes()
 
-    def _setup_global_connections(self, recurse=True):
+    def _setup_global_connections(self, recurse=True, conns=None):
         """
         Compute dict of all connections between this system's inputs and outputs.
 
@@ -396,6 +400,8 @@ class Group(System):
         ----------
         recurse : bool
             Whether to call this method in subsystems.
+        conns : dict
+            Dictionary of connections passed down from parent group.
         """
         super(Group, self)._setup_global_connections()
         global_abs_in2out = self._conn_global_abs_in2out
@@ -409,8 +415,25 @@ class Group(System):
 
         if pathname == '':
             path_len = 0
+            nparts = 0
         else:
             path_len = len(pathname) + 1
+            nparts = len(pathname.split('.'))
+
+        new_conns = defaultdict(dict)
+
+        if conns is not None:
+            for abs_in, abs_out in iteritems(conns):
+                inparts = abs_in.split('.')
+                outparts = abs_out.split('.')
+
+                if inparts[:nparts] == outparts[:nparts]:
+                    global_abs_in2out[abs_in] = abs_out
+
+                    # if connection is contained in a subgroup, add to conns
+                    # to pass down to subsystems.
+                    if inparts[:nparts + 1] == outparts[:nparts + 1]:
+                        new_conns[inparts[nparts]][abs_in] = abs_out
 
         # Add implicit connections (only ones owned by this group)
         for prom_name in allprocs_prom2abs_list_out:
@@ -441,9 +464,11 @@ class Group(System):
             # (not traceable to a connect statement, so provide context)
             # and check if src_indices is defined in both connect and add_input.
             abs_out = allprocs_prom2abs_list_out[prom_out][0]
-            out_subsys = abs_out.rsplit('.', 1)[0]
+            outparts = abs_out.split('.')
+            out_subsys = outparts[:-1]
             for abs_in in allprocs_prom2abs_list_in[prom_in]:
-                in_subsys = abs_in.rsplit('.', 1)[0]
+                inparts = abs_in.split('.')
+                in_subsys = inparts[:-1]
                 if out_subsys == in_subsys:
                     raise RuntimeError("Output and input are in the same System " +
                                        "for connection in '%s' from '%s' to '%s'." %
@@ -460,6 +485,10 @@ class Group(System):
                     meta['src_indices'] = np.atleast_1d(src_indices)
 
                 abs_in2out[abs_in] = abs_out
+
+                # if connection is contained in a subgroup, add to conns to pass down to subsystems.
+                if inparts[:nparts + 1] == outparts[:nparts + 1]:
+                    new_conns[inparts[nparts]][abs_in] = abs_out
 
         # Now that both implicit & explicit connections have been added,
         # check unit compatibility, but only for connections that are either
@@ -489,20 +518,14 @@ class Group(System):
         # Recursion
         if recurse:
             for subsys in self._subsystems_myproc:
-                subsys._conn_parents_abs_in2out = abs_in2out
-                subsys._setup_global_connections(recurse)
+                if subsys.name in new_conns:
+                    subsys._setup_global_connections(recurse=recurse, conns=new_conns[subsys.name])
+                else:
+                    subsys._setup_global_connections(recurse=recurse)
 
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
         global_abs_in2out.update(abs_in2out)
-
-        # This will only be used if we enter the following loop, in which case pathname != ''
-        path_dot = pathname + '.'
-
-        for abs_in, abs_out in iteritems(self._conn_parents_abs_in2out):
-            # We need to check the period as well because only the first part might match
-            if abs_in[:path_len] == path_dot and abs_out[:path_len] == path_dot:
-                global_abs_in2out[abs_in] = abs_out
 
         for subsys in self._subsystems_myproc:
             global_abs_in2out.update(subsys._conn_global_abs_in2out)
@@ -1121,7 +1144,7 @@ class Group(System):
         """
         with self.jacobian_context() as J:
             # Use global Jacobian
-            if self._owns_assembled_jac or self._views_assembled_jac:
+            if self._owns_assembled_jac or self._views_assembled_jac or self._owns_approx_jac:
                 for vec_name in rhs_names:
                     with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                         d_inputs, d_outputs, d_residuals = vecs
@@ -1182,12 +1205,136 @@ class Group(System):
             for subsys in self._subsystems_myproc:
                 subsys._linearize(do_nl=sub_do_nl, do_ln=sub_do_ln)
 
+            # Group finite difference
+            if self._owns_approx_jac:
+                with self._unscaled_context(outputs=[self._outputs]):
+                    for approximation in itervalues(self._approx_schemes):
+                        approximation.compute_approximations(self, jac=J, deriv_type='total')
+
+                J._update()
+
             # Update jacobian
-            if self._owns_assembled_jac or self._views_assembled_jac:
+            elif self._owns_assembled_jac or self._views_assembled_jac:
                 J._update()
 
         if self._nonlinear_solver is not None and do_nl:
             self._nonlinear_solver._linearize()
 
-        if self._linear_solver is not None and do_nl:
+        if self._linear_solver is not None and do_ln:
             self._linear_solver._linearize()
+
+    def approx_total_derivs(self, method='fd', **kwargs):
+        """
+        Approximate derivatives for a Group using the specified approximation method.
+
+        Parameters
+        ----------
+        method : str
+            The type of approximation that should be used. Valid options include:
+                - 'fd': Finite Difference, 'cs': Complex Step
+        **kwargs : dict
+            Keyword arguments for controlling the behavior of the approximation.
+        """
+        self._approx_schemes = OrderedDict()
+        supported_methods = {'fd': FiniteDifference,
+                             'cs': ComplexStep}
+
+        if method not in supported_methods:
+            msg = 'Method "{}" is not supported, method must be one of {}'
+            raise ValueError(msg.format(method, supported_methods.keys()))
+
+        if method not in self._approx_schemes:
+            self._approx_schemes[method] = supported_methods[method]()
+
+        self._owns_approx_jac = True
+        self._owns_approx_jac_meta = dict(kwargs)
+
+    def _setup_jacobians(self, jacobian=None, recurse=True):
+        """
+        Set and populate jacobians down through the system tree.
+
+        In <Group>, we only need to prepare for Group finite difference. However, to be efficient,
+        we need to find the minimum set of inputs and outputs to approximate.
+
+        Parameters
+        ----------
+        jacobian : <AssembledJacobian> or None
+            The global jacobian to populate for this system.
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        self._jacobian_changed = False
+
+        # Group finite difference or complex step.
+        # TODO: Does this work under or over an AssembledJacobian (and does that make sense)
+        if self._owns_approx_jac:
+            method = list(self._approx_schemes.keys())[0]
+            approx = self._approx_schemes[method]
+            pro2abs = self._var_allprocs_prom2abs_list
+
+            if self._owns_approx_of:
+                of = self._owns_approx_of
+            else:
+                of = set(var[0] for var in pro2abs['output'].values())
+
+            if self._owns_approx_wrt:
+                candidate_wrt = self._owns_approx_wrt
+            else:
+                candidate_wrt = list(var[0] for var in pro2abs['input'].values())
+
+            from openmdao.core.indepvarcomp import IndepVarComp
+            wrt = set()
+            ivc = []
+            for var in candidate_wrt:
+                src = self._conn_abs_in2out.get(var)
+
+                if src is None:
+                    wrt.add(var)
+
+                # Weed out inputs connected to anything inside our system unless the source is an
+                # indepvarcomp.
+                else:
+                    compname = src.rsplit('.', 1)[0]
+                    comp = self.get_subsystem(compname)
+                    if isinstance(comp, IndepVarComp):
+                        wrt.add(src)
+                        ivc.append(src)
+
+            with self.jacobian_context() as J:
+                for key in product(of, wrt.union(of)):
+                    meta_changes = {
+                        'method': method,
+                    }
+                    if key[0] == key[1]:
+                        size = self._outputs._views_flat[key[0]].shape[0]
+                        meta_changes['rows'] = np.arange(size)
+                        meta_changes['cols'] = np.arange(size)
+                        meta_changes['value'] = np.ones(size)
+
+                    meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+                    meta.update(meta_changes)
+                    meta.update(self._owns_approx_jac_meta)
+                    self._subjacs_info[key] = meta
+
+                    # Create Jacobian stub for every key pair
+                    J._set_partials_meta(key, meta)
+
+                    # Create approximations, but only for the ones we need.
+                    if meta['dependent']:
+
+                        # Skip indepvarcomp res wrt other srcs
+                        if key[0] in ivc:
+                            continue
+
+                        # Skip explicit res wrt outputs
+                        if key[1] in of and key[1] not in ivc:
+                            continue
+
+                        approx.add_approximation(key, meta)
+
+            approx._init_approximations()
+
+            self._jacobian._system = self
+            self._jacobian._initialize()
+
+        super(Group, self)._setup_jacobians(jacobian, recurse)

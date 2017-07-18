@@ -648,9 +648,6 @@ class TestPyoptSparse(unittest.TestCase):
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_desvars_fd(self):
-        # Finite difference not supported yet.
-        raise unittest.SkipTest("Full model FD not supported yet.")
-
         prob = Problem()
         model = prob.model = Group()
 
@@ -672,7 +669,37 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=10.0, upper=11.0)
 
-        model.deriv_options['type'] = 'fd'
+        model.approx_total_derivs(method='fd')
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+
+    def test_simple_paraboloid_scaled_desvars_cs(self):
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SNOPT':
+            prob.driver.opt_settings['Verify level'] = 3
+        prob.driver.options['print_results'] = False
+
+        model.add_design_var('x', lower=-50.0, upper=50.0, ref=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0, ref=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=10.0, upper=11.0)
+
+        model.approx_total_derivs(method='cs')
 
         prob.setup(check=False)
         prob.run_driver()
@@ -739,9 +766,6 @@ class TestPyoptSparse(unittest.TestCase):
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_constraint_fd(self):
-        # Finite difference not supported yet.
-        raise unittest.SkipTest("Full model FD not supported yet.")
-
         prob = Problem()
         model = prob.model = Group()
 
@@ -763,7 +787,37 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=10.0, upper=11.0, ref=10.)
 
-        model.deriv_options['type'] = 'fd'
+        model.approx_total_derivs(method='fd')
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+
+    def test_simple_paraboloid_scaled_constraint_cs(self):
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SNOPT':
+            prob.driver.opt_settings['Verify level'] = 3
+        prob.driver.options['print_results'] = False
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=10.0, upper=11.0, ref=10.)
+
+        model.approx_total_derivs(method='cs')
 
         prob.setup(check=False)
         prob.run_driver()
