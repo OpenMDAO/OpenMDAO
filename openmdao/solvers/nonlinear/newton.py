@@ -192,22 +192,18 @@ class NewtonSolver(NonlinearSolver):
         system._owns_approx_jac = False
 
         # Hybrid newton support.
-        if do_subsolve:
+        with Recording('Newton_subsolve', 0, self):
+            if do_subsolve:
+                self._solver_info.prefix += '+  '
 
-            self._solver_info.prefix += '+  '
+                for isub, subsys in enumerate(system._subsystems_allprocs):
+                    system._transfer('nonlinear', 'fwd', isub)
 
-            for isub, subsys in enumerate(system._subsystems_allprocs):
-                system._transfer('nonlinear', 'fwd', isub)
-
-                with Recording('Newton_subsolve', self._iter_count, self) as rec:
                     if subsys in system._subsystems_myproc:
                         subsys._solve_nonlinear()
-                rec.abs = 0.0
-                rec.rel = 0.0
 
-            self._solver_info.prefix = self._solver_info.prefix[:-3]
+                self._solver_info.prefix = self._solver_info.prefix[:-3]
 
-            with Recording('Newton', self._iter_count, self):
                 system._apply_nonlinear()
 
         system._vectors['residual']['linear'].set_vec(system._residuals)

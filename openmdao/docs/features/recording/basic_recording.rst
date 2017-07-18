@@ -77,7 +77,9 @@ How To Attach a Recorder to an Object
 So you have a recorder created, and you've set the options you'd like.  Next, you need to attach the recorder to an
 object or objects using the `add_recorder` command.
 
-Here's an example of adding a recorder to the top-level problem's driver:
+.. note::  It is imperative to only use `add_recorder` once `setup` is finished. Before that time, an `add_recorder` call may mistakenly attach a recorder to an unintended object.  For example, attaching a recorder to a `Group`'s `nonlinear_solver` before setup might mistakenly attach it to the `NLRunOnce`, but `NewtonSolver` is assigned (and intended for recorder attachment) in `setup`.
+
+Here's an example of adding a recorder to the top-level `Problem`'s driver:
 
 .. code-block:: console
 
