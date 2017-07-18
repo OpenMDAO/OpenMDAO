@@ -1,7 +1,7 @@
 """Define the Group class."""
 from __future__ import division
 
-from collections import Iterable, Counter, OrderedDict
+from collections import Iterable, Counter, OrderedDict, defaultdict
 from itertools import product, chain
 import warnings
 
@@ -386,7 +386,7 @@ class Group(System):
 
         self._setup_global_shapes()
 
-    def _setup_global_connections(self, recurse=True):
+    def _setup_global_connections(self, recurse=True, conns=None):
         """
         Compute dict of all connections between this system's inputs and outputs.
 
@@ -400,6 +400,8 @@ class Group(System):
         ----------
         recurse : bool
             Whether to call this method in subsystems.
+        conns : dict
+            Dictionary of connections passed down from parent group.
         """
         super(Group, self)._setup_global_connections()
         global_abs_in2out = self._conn_global_abs_in2out
@@ -413,8 +415,25 @@ class Group(System):
 
         if pathname == '':
             path_len = 0
+            nparts = 0
         else:
             path_len = len(pathname) + 1
+            nparts = len(pathname.split('.'))
+
+        new_conns = defaultdict(dict)
+
+        if conns is not None:
+            for abs_in, abs_out in iteritems(conns):
+                inparts = abs_in.split('.')
+                outparts = abs_out.split('.')
+
+                if inparts[:nparts] == outparts[:nparts]:
+                    global_abs_in2out[abs_in] = abs_out
+
+                    # if connection is contained in a subgroup, add to conns
+                    # to pass down to subsystems.
+                    if inparts[:nparts + 1] == outparts[:nparts + 1]:
+                        new_conns[inparts[nparts]][abs_in] = abs_out
 
         # Add implicit connections (only ones owned by this group)
         for prom_name in allprocs_prom2abs_list_out:
@@ -445,9 +464,11 @@ class Group(System):
             # (not traceable to a connect statement, so provide context)
             # and check if src_indices is defined in both connect and add_input.
             abs_out = allprocs_prom2abs_list_out[prom_out][0]
-            out_subsys = abs_out.rsplit('.', 1)[0]
+            outparts = abs_out.split('.')
+            out_subsys = outparts[:-1]
             for abs_in in allprocs_prom2abs_list_in[prom_in]:
-                in_subsys = abs_in.rsplit('.', 1)[0]
+                inparts = abs_in.split('.')
+                in_subsys = inparts[:-1]
                 if out_subsys == in_subsys:
                     raise RuntimeError("Output and input are in the same System " +
                                        "for connection in '%s' from '%s' to '%s'." %
@@ -464,6 +485,10 @@ class Group(System):
                     meta['src_indices'] = np.atleast_1d(src_indices)
 
                 abs_in2out[abs_in] = abs_out
+
+                # if connection is contained in a subgroup, add to conns to pass down to subsystems.
+                if inparts[:nparts + 1] == outparts[:nparts + 1]:
+                    new_conns[inparts[nparts]][abs_in] = abs_out
 
         # Now that both implicit & explicit connections have been added,
         # check unit compatibility, but only for connections that are either
@@ -493,20 +518,14 @@ class Group(System):
         # Recursion
         if recurse:
             for subsys in self._subsystems_myproc:
-                subsys._conn_parents_abs_in2out = abs_in2out
-                subsys._setup_global_connections(recurse)
+                if subsys.name in new_conns:
+                    subsys._setup_global_connections(recurse=recurse, conns=new_conns[subsys.name])
+                else:
+                    subsys._setup_global_connections(recurse=recurse)
 
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
         global_abs_in2out.update(abs_in2out)
-
-        # This will only be used if we enter the following loop, in which case pathname != ''
-        path_dot = pathname + '.'
-
-        for abs_in, abs_out in iteritems(self._conn_parents_abs_in2out):
-            # We need to check the period as well because only the first part might match
-            if abs_in[:path_len] == path_dot and abs_out[:path_len] == path_dot:
-                global_abs_in2out[abs_in] = abs_out
 
         for subsys in self._subsystems_myproc:
             global_abs_in2out.update(subsys._conn_global_abs_in2out)

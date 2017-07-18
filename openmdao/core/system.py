@@ -112,8 +112,6 @@ class System(object):
     _conn_global_abs_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections owned by this system
         or any descendant system. The data is the same across all processors.
-    _conn_parents_abs_in2out : {'abs_in': 'abs_out'}
-        Dictionary containing all explicit & implicit connections from systems above.
     _conn_abs_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections owned
         by this system only. The data is the same across all processors.
@@ -246,7 +244,6 @@ class System(object):
 
         self._manual_connections = {}
         self._conn_global_abs_in2out = {}
-        self._conn_parents_abs_in2out = {}
         self._conn_abs_in2out = {}
 
         self._ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
@@ -811,7 +808,7 @@ class System(object):
                 global_shape = (global_size,)
             mymeta['global_shape'] = global_shape
 
-    def _setup_global_connections(self, recurse=True):
+    def _setup_global_connections(self, recurse=True, conns=None):
         """
         Compute dict of all connections between this system's inputs and outputs.
 
@@ -825,6 +822,8 @@ class System(object):
         ----------
         recurse : bool
             Whether to call this method in subsystems.
+        conns : dict
+            Dictionary of connections passed down from parent group.
         """
         self._conn_global_abs_in2out = {}
 
