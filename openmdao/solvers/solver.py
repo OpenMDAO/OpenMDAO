@@ -6,8 +6,10 @@ import os
 
 import numpy as np
 
-from openmdao.utils.options_dictionary import OptionsDictionary
+
+from openmdao.core.analysis_error import AnalysisError
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
+from openmdao.utils.options_dictionary import OptionsDictionary
 
 
 class SolverInfo(object):
@@ -82,6 +84,8 @@ class Solver(object):
                              desc='relative error tolerance')
         self.options.declare('iprint', type_=int, default=1,
                              desc='whether to print output')
+        self.options.declare('err_on_maxiter', type_=bool, default=False,
+                             desc="When True, AnlysisError will be raised if we don't convege.")
 
         # What the solver supports.
         self.supports = OptionsDictionary()
@@ -197,6 +201,12 @@ class Solver(object):
                 if iprint > -1:
                     msg = ' Failed to Converge in {} iterations'.format(self._iter_count)
                     print(self._solver_info.prefix + self.SOLVER + msg)
+
+                # Raise AnalysisError if requested.
+                if self.options['err_on_maxiter']:
+                    msg = "Solver '{}' on system '{}' failed to converge."
+                    raise AnalysisError(msg.format(self.SOLVER, self._system.pathname))
+
             elif iprint == 1:
                 print(self._solver_info.prefix + self.SOLVER +
                       ' Converged in {} iterations'.format(self._iter_count))

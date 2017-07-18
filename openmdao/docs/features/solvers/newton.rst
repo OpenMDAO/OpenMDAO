@@ -78,6 +78,17 @@ Options
   .. embed-test::
       openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_max_sub_solves
 
+- err_on_maxiter
+
+  If you set this to True, then when the solver hits the iteration limit without meeting the tolerance criteria, it
+  will raise an AnalysisError exception. This is mainly important when coupled with a higher level solver or
+  driver (e.g., `pyOptSparseDriver`)that can handle the AnalysisError by adapting the stepsize and retrying.
+
+  .. embed-test::
+      openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_err_on_maxiter
+
+  This feature can be set on any iterative nonlinear or linear solver.
+
 Specifying a Linear Solver
 --------------------------
 
