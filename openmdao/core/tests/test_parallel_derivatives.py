@@ -32,7 +32,7 @@ class MatMatTestCase(unittest.TestCase):
         prob.model.add_design_var('iv.x2')
         prob.model.add_objective('c3.y')
 
-        prob.setup(vector_class=vector_class, check=False, mode='rev', )
+        prob.setup(vector_class=vector_class, check=False, mode='rev')
         prob.run_driver()
 
         indep_list = ['iv.x1', 'iv.x2']
@@ -336,8 +336,8 @@ class IndicesTestCase2(unittest.TestCase):
 
         prob.model.add_design_var('G1.par1.p.x', indices=[1, 2])
         prob.model.add_design_var('G1.par2.p.x', indices=[1, 2])
-        prob.model.add_constraint('G1.par1.c4.y', upper=0.0, indices=[1])#, rhs_group='par_resp')
-        prob.model.add_constraint('G1.par2.c5.y', upper=0.0, indices=[2])#, rhs_group='par_resp')
+        prob.model.add_constraint('G1.par1.c4.y', upper=0.0, indices=[1], rhs_group='par_resp')
+        prob.model.add_constraint('G1.par2.c5.y', upper=0.0, indices=[2], rhs_group='par_resp')
 
         root.connect('G1.par1.p.x', 'G1.par1.c2.x')
         root.connect('G1.par2.p.x', 'G1.par2.c3.x')
@@ -351,10 +351,10 @@ class IndicesTestCase2(unittest.TestCase):
 
     def test_indices_fwd(self):
         prob = self.setup_model('fwd')
-        
+
         dvs = prob.model.get_design_vars()
         self.assertEqual(set(dvs), set(['G1.par1.p.x', 'G1.par2.p.x']))
-        
+
         responses = prob.model.get_responses()
         self.assertEqual(set(responses), set(['G1.par1.c4.y', 'G1.par2.c5.y']))
 
@@ -373,44 +373,6 @@ class IndicesTestCase2(unittest.TestCase):
 
         assert_rel_error(self, J['G1.par2.c5.y', 'G1.par2.p.x'][0], np.array([20., 25.]), 1e-6)
         assert_rel_error(self, J['G1.par1.c4.y', 'G1.par1.p.x'][0], np.array([8., 0.]), 1e-6)
-
-
-class BasicTC(unittest.TestCase):
-    def setup_model(self, mode):
-        prob = Problem()
-        root = prob.model
-
-        root.linear_solver = LinearBlockGS()
-
-        p1 = root.add_subsystem('p', IndepVarComp('x', 1.0))
-
-        G1 = root.add_subsystem('G1', Group())
-        G1.linear_solver = LinearBlockGS()
-
-        par1 = G1.add_subsystem('par1', Group())
-        par1.linear_solver = LinearBlockGS()
-        
-        c2 = par1.add_subsystem('c2', ExecComp('y = x * 2.0'))
-        c4 = par1.add_subsystem('c4', ExecComp('y = x * 4.0'))
-
-        prob.model.add_design_var('p.x')
-        prob.model.add_constraint('G1.par1.c4.y', upper=0.0)
-
-        root.connect('p.x', 'G1.par1.c2.x')
-        root.connect('G1.par1.c2.y', 'G1.par1.c4.x')
-
-        prob.setup(vector_class=vector_class, check=False)
-        prob.run_driver()
-        
-        from openmdao.devtools.debug import dump_dist_idxs
-        dump_dist_idxs(prob)
-
-        return prob
-    
-    def test_indices_fwd(self):
-        prob = self.setup_model('fwd')
-        
-        assert_rel_error(self, prob['G1.par1.c4.y'], 8.0)
 
 
 if __name__ == "__main__":
