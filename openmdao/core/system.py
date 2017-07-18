@@ -465,14 +465,17 @@ class System(object):
         dict of set
             Dictionary of sets of excluded input variable absolute names, keyed by vec_name.
         """
-        root_vectors = {'input': OrderedDict(), 'output': OrderedDict(), 'residual': OrderedDict()}
+        root_vectors = {'input': OrderedDict(),
+                        'output': OrderedDict(),
+                        'residual': OrderedDict()}
 
         # get all rhs_names.  We don't know mode here, so for now, retrieve names
         # from both dvs and responses and use both.
         # TODO: fix this
         in_rhs_names = _get_rhs_names(self.get_design_vars(recurse=True))
         out_rhs_names = _get_rhs_names(self.get_responses(recurse=True))
-        rhs_names = sorted(in_rhs_names | out_rhs_names)
+        rhs_names = ['nonlinear', 'linear']
+        rhs_names.extend(sorted(in_rhs_names | out_rhs_names))
 
         for key in ['input', 'output', 'residual']:
             type_ = 'output' if key is 'residual' else key
@@ -482,12 +485,12 @@ class System(object):
                 else:
                     root_vectors[key][vec_name] = vector_class(vec_name, type_, self)
 
-        if not initial:
-            excl_out = self._excluded_vars_out
-            excl_in = self._excluded_vars_in
-        else:
+        if initial:
             excl_out = {vec_name: set() for vec_name in root_vectors['output']}
             excl_in = {vec_name: set() for vec_name in root_vectors['output']}
+        else:
+            excl_out = self._excluded_vars_out
+            excl_in = self._excluded_vars_in
 
         return root_vectors, excl_out, excl_in
 
@@ -2595,9 +2598,5 @@ class System(object):
 
 
 def _get_rhs_names(voi_dict):
-    names = set(['nonlinear', 'linear'])
-    for voi, data in iteritems(voi_dict):
-        rhs_name = data['rhs_group']
-        if rhs_name is not None:
-            names.add(rhs_name)
-    return names
+    return set(voi for voi, data in iteritems(voi_dict)
+               if data['rhs_group'] is not None)

@@ -1137,7 +1137,6 @@ class Group(System):
 
                 if mode == 'rev':
                     for vec_name in rhs_names:
-                        print("%s: %s transfers" % (self.pathname, vec_name))
                         self._transfer(vec_name, mode)
 
     def _solve_linear(self, rhs_names, mode):

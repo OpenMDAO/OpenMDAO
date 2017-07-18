@@ -725,7 +725,7 @@ class Problem(object):
             output_vois = self.driver._designvars
 
         voi_lists = defaultdict(list)
-        v2rhs_group = {}
+        v2rhs_name = {}
         for i, name in enumerate(input_list):
             if name in input_vois:
                 grp = input_vois[name]['rhs_group']
@@ -736,12 +736,12 @@ class Problem(object):
                     raise RuntimeError("Variable name '%s' matches an rhs_group name." %
                                        name)
                 voi_lists[name].append((name, old_input_list[i]))
-                v2rhs_group[name] = 'linear'
+                v2rhs_name[name] = 'linear'
             else:
                 voi_lists[grp].append((name, old_input_list[i]))
-                v2rhs_group[name] = grp
+                v2rhs_name[name] = name
 
-        rhs_groups = sorted(set(v2rhs_group.values()))
+        rhs_groups = sorted(set(v2rhs_name.values()))
 
         for rhs_name, vois in iteritems(voi_lists):
             voi_info = {}
@@ -750,7 +750,7 @@ class Problem(object):
             # If Forward mode, solve linear system for each 'wrt'
             # If Adjoint mode, solve linear system for each 'of'
             for input_name, old_input_name in vois:
-                vecname = v2rhs_group[input_name]
+                vecname = v2rhs_name[input_name]
                 dinputs = input_vec[vecname]
                 doutputs = output_vec[vecname]
 
