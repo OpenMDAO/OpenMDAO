@@ -497,10 +497,7 @@ class System(object):
         for key in ['input', 'output', 'residual']:
             type_ = 'output' if key is 'residual' else key
             for vec_name in rhs_names:
-                if not initial:
-                    root_vectors[key][vec_name] = self._vectors[key][vec_name]._root_vector
-                else:
-
+                if initial:
                     # Check for complex step to set vectors up appropriately.
                     # If any subsystem needs complex step, then we need to allocate it everywhere.
                     alloc_complex = force_alloc_complex
@@ -513,6 +510,8 @@ class System(object):
 
                     root_vectors[key][vec_name] = vector_class(vec_name, type_, self,
                                                                alloc_complex=alloc_complex)
+                else:
+                    root_vectors[key][vec_name] = self._vectors[key][vec_name]._root_vector
 
         if initial:
             excl_out = {vec_name: set() for vec_name in root_vectors['output']}

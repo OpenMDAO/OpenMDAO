@@ -276,14 +276,19 @@ class Problem(object):
             msg = "Unsupported mode: '%s'" % mode
             raise ValueError(msg)
 
+        model._setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex)
+        self.driver._setup_driver(self)
+
+        # TODO: fix this so it computes the proper type based on sizes of VOIs
         if mode == 'auto':
             mode = 'rev'
         self._mode = mode
 
-        model._setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex)
-        self.driver._setup_driver(self)
-
-        self._relevant = self._compute_relevance()
+        sys_graph = compute_sys_graph(model, model._conn_global_abs_in2out,
+                                      comps_only=True, save_vars=True)
+        self._relevant = get_relevant_vars(sys_graph,
+                                           self.driver._designvars,
+                                           self.driver._responses)
 
         # Now that setup has been called, we can set the iprints.
         for items in self._solver_print_cache:
@@ -293,13 +298,6 @@ class Problem(object):
             check_config(self, logger)
 
         return self
-
-    def _compute_relevance(self):
-        sys_graph = compute_sys_graph(self.model, self.model._conn_global_abs_in2out,
-                                      comps_only=True, save_vars=True)
-        return get_relevant_vars(sys_graph,
-                                 self.driver._designvars,
-                                 self.driver._responses)
 
     def check_partials(self, out_stream=sys.stdout, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6, global_options=None,
@@ -782,7 +780,7 @@ class Problem(object):
                 voi_lists[grp].append((name, old_input_list[i]))
                 v2rhs_name[name] = name
 
-        rhs_groups = sorted(set(v2rhs_name.values()))
+        rhs_names = sorted(set(v2rhs_name.values()))
 
         for rhs_name, vois in iteritems(voi_lists):
             voi_info = {}
@@ -854,7 +852,7 @@ class Problem(object):
                         # need a vector for clean code, so use _views_flat.
                         dinputs._views_flat[input_name][idx - start] = 1.0
 
-                model._solve_linear(rhs_groups, mode)
+                model._solve_linear(rhs_names, mode)
 
                 for input_name, old_input_name in vois:
                     dinputs, doutputs, irange, loc_size, start, end, dup = voi_info[input_name]
