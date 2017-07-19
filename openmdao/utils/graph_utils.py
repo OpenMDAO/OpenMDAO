@@ -42,8 +42,8 @@ def all_connected_edges(graph, start):
     list
         A list of all edges found when traversal starts at start.
     """
-    visited = set()
     stack = [start]
+    visited = set(stack)
     while stack:
         src = stack.pop()
         for tgt in graph[src]:

@@ -182,10 +182,6 @@ class System(object):
         dict of all driver design vars added to the system.
     _responses : dict of dict
         dict of all driver responses added to the system.
-    _design_vars_cache : dict of dict
-        dict of all driver design vars added to the system or any of its descendants.
-    _responses_cache : dict of dict
-        dict of all driver responses added to the system or any of its descendants.
     #
     _static_mode : bool
         If true, we are outside of setup.
@@ -293,8 +289,6 @@ class System(object):
 
         self._design_vars = {}
         self._responses = {}
-        self._design_vars_cache = None
-        self._responses_cache = None
 
         self._static_mode = True
         self._static_subsystems_allprocs = []
@@ -2130,35 +2124,33 @@ class System(object):
             recurse=True, its subsystems.
 
         """
-        if self._design_vars_cache is None:
-            pro2abs = self._var_allprocs_prom2abs_list['output']
+        pro2abs = self._var_allprocs_prom2abs_list['output']
 
-            # Human readable error message during Driver setup.
-            try:
-                out = {pro2abs[name][0]: data for name, data in iteritems(self._design_vars)}
-            except KeyError as err:
-                msg = "Output not found for design variable {0} in system '{1}'."
-                raise RuntimeError(msg.format(str(err), self.pathname))
+        # Human readable error message during Driver setup.
+        try:
+            out = {pro2abs[name][0]: data for name, data in iteritems(self._design_vars)}
+        except KeyError as err:
+            msg = "Output not found for design variable {0} in system '{1}'."
+            raise RuntimeError(msg.format(str(err), self.pathname))
 
-            # Size them all
-            iproc = self.comm.rank
-            for name, data in iteritems(out):
-                if 'size' not in data:
-                    data['size'] = \
-                        self._var_sizes['output'][iproc,
-                                                  self._var_allprocs_abs2idx['output'][name]]
+        # Size them all
+        iproc = self.comm.rank
+        for name, data in iteritems(out):
+            if 'size' not in data:
+                data['size'] = \
+                    self._var_sizes['output'][iproc,
+                                              self._var_allprocs_abs2idx['output'][name]]
 
-            if recurse:
-                for subsys in self._subsystems_myproc:
-                    out.update(subsys.get_design_vars(recurse=recurse))
+        if recurse:
+            for subsys in self._subsystems_myproc:
+                out.update(subsys.get_design_vars(recurse=recurse))
 
-                if self.comm.size > 1 and self._subsystems_allprocs:
-                    for rank, all_out in enumerate(self.comm.allgather(out)):
-                        if rank != iproc:
-                            out.update(all_out)
-            self._design_vars_cache = out
+            if self.comm.size > 1 and self._subsystems_allprocs:
+                for rank, all_out in enumerate(self.comm.allgather(out)):
+                    if rank != iproc:
+                        out.update(all_out)
 
-        return self._design_vars_cache
+        return out
 
     def get_responses(self, recurse=True):
         """
@@ -2180,36 +2172,33 @@ class System(object):
             recurse=True, its subsystems.
 
         """
-        if self._responses_cache is None:
-            prom2abs = self._var_allprocs_prom2abs_list['output']
+        prom2abs = self._var_allprocs_prom2abs_list['output']
 
-            # Human readable error message during Driver setup.
-            try:
-                out = {prom2abs[name][0]: data for name, data in iteritems(self._responses)}
-            except KeyError as err:
-                msg = "Output not found for response {0} in system '{1}'."
-                raise RuntimeError(msg.format(str(err), self.pathname))
+        # Human readable error message during Driver setup.
+        try:
+            out = {prom2abs[name][0]: data for name, data in iteritems(self._responses)}
+        except KeyError as err:
+            msg = "Output not found for response {0} in system '{1}'."
+            raise RuntimeError(msg.format(str(err), self.pathname))
 
-            # Size them all
-            iproc = self.comm.rank
-            for name in out:
-                if 'size' not in out[name]:
-                    out[name]['size'] = \
-                        self._var_sizes['output'][iproc,
-                                                  self._var_allprocs_abs2idx['output'][name]]
+        # Size them all
+        iproc = self.comm.rank
+        for name in out:
+            if 'size' not in out[name]:
+                out[name]['size'] = \
+                    self._var_sizes['output'][iproc,
+                                              self._var_allprocs_abs2idx['output'][name]]
 
-            if recurse:
-                for subsys in self._subsystems_myproc:
-                    out.update(subsys.get_responses(recurse=recurse))
+        if recurse:
+            for subsys in self._subsystems_myproc:
+                out.update(subsys.get_responses(recurse=recurse))
 
-                if self.comm.size > 1 and self._subsystems_allprocs:
-                    for rank, all_out in enumerate(self.comm.allgather(out)):
-                        if rank != iproc:
-                            out.update(all_out)
+            if self.comm.size > 1 and self._subsystems_allprocs:
+                for rank, all_out in enumerate(self.comm.allgather(out)):
+                    if rank != iproc:
+                        out.update(all_out)
 
-            self._responses_cache = out
-
-        return self._responses_cache
+        return out
 
     def get_constraints(self, recurse=True):
         """
