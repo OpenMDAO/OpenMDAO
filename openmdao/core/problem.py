@@ -580,6 +580,25 @@ class Problem(object):
 
         return partials_data
 
+    def check_total_derivatives(self, of=None, wrt=None, out_stream=sys.stdout,
+                                compact_print=False):
+        """
+        Check total derivatives for the model vs. finite difference.
+
+        Parameters
+        ----------
+        of : list of variable name strings or None
+            Variables whose derivatives will be computed. Default is None, which
+            uses the driver's objectives and constraints.
+        wrt : list of variable name strings or None
+            Variables with respect to which the derivatives will be computed.
+            Default is None, which uses the driver's desvars.
+        out_stream : file_like
+            Where to send human readable output. Default is sys.stdout. Set to None to suppress.
+        compact_print : bool
+            Set to True to just print the essentials, one line per unknown-param pair.
+        """
+
     def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
