@@ -1216,7 +1216,7 @@ def get_relevant_vars(graph, desvars, responses):
             common_edges = start_edges.intersection(end_edges)
 
             input_deps = set()
-            output_deps = set([desvar, response])
+            output_deps = set()
             sys_deps = set()
             for u, v in common_edges:
                 sys_deps.add(u)
@@ -1227,8 +1227,9 @@ def get_relevant_vars(graph, desvars, responses):
                     input_deps.update(inputs)
 
             if sys_deps:
-                relevant[desvar][response] = rel = (input_deps, output_deps, sys_deps)
-                relevant[response][desvar] = rel
+                output_deps.update((desvar, response))
+                relevant[desvar][response] = relevant[response][desvar] = \
+                    (input_deps, output_deps, sys_deps)
 
     # TODO: if we knew mode here, we would only need to compute for fwd or rev,
     # instead of both.
@@ -1237,8 +1238,8 @@ def get_relevant_vars(graph, desvars, responses):
     # other type, e.g for each input VOI wrt all output VOIs.
     for inputs, outputs in [(desvars, responses), (responses, desvars)]:
         for inp in inputs:
-            if inp in relevant:
-                relinp = relevant[inp]
+            relinp = relevant[inp]
+            if relinp:
                 total_inps = set()
                 total_outs = set()
                 total_systems = set()
