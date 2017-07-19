@@ -125,7 +125,7 @@ class TestCheckConfig(unittest.TestCase):
         G1 = model.add_subsystem('G1', Group())
         G1.add_subsystem('C1', ExecComp(['x=2.0*a', 'y=2.0*b', 'z=2.0*a']))
         G1.add_subsystem('C2', ExecComp(['x=2.0*a', 'y=2.0*b', 'z=2.0*b']))
-        model.add_subsystem("C3", ExecComp(['x=2.0*a', 'y=2.0*b+3,0*c']))
+        model.add_subsystem("C3", ExecComp(['x=2.0*a', 'y=2.0*b+3.0*c']))
         model.add_subsystem("C4", ExecComp(['x=2.0*a', 'y=2.0*b']))
         indep2 = model.add_subsystem("indep2", IndepVarComp('x', 1.0))
         G2 = model.add_subsystem('G2', Group())

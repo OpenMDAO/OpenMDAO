@@ -228,8 +228,9 @@ def get_relevant_vars(graph, desvars, responses):
                 for inputs in conns.values():
                     input_deps.update(inputs)
 
-            relevant[desvar][response] = rel = (input_deps, output_deps, sys_deps)
-            relevant[response][desvar] = rel
+            if sys_deps:
+                relevant[desvar][response] = rel = (input_deps, output_deps, sys_deps)
+                relevant[response][desvar] = rel
 
     # TODO: if we knew mode here, we would only need to compute for fwd or rev,
     # instead of both.
@@ -238,15 +239,18 @@ def get_relevant_vars(graph, desvars, responses):
     # other type, e.g for each input VOI wrt all output VOIs.
     for inputs, outputs in [(desvars, responses), (responses, desvars)]:
         for inp in inputs:
-            total_inps = set()
-            total_outs = set()
-            total_systems = set()
-            for out in outputs:
-                inps, outs, systems = relevant[inp][out]
-                total_inps.update(inps)
-                total_outs.update(outs)
-                total_systems.update(systems)
-            relevant[inp]['@all'] = (total_inps, total_outs, total_systems)
+            if inp in relevant:
+                relinp = relevant[inp]
+                total_inps = set()
+                total_outs = set()
+                total_systems = set()
+                for out in outputs:
+                    if out in relinp:
+                        inps, outs, systems = relinp[out]
+                        total_inps.update(inps)
+                        total_outs.update(outs)
+                        total_systems.update(systems)
+                relinp['@all'] = (total_inps, total_outs, total_systems)
 
     return relevant
 

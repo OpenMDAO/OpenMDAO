@@ -229,8 +229,9 @@ class ExecComp(ExplicitComponent):
         outputs : `Vector`
             `Vector` containing outputs.
         """
+        iod = _IODict(outputs, inputs)
         for expr in self._codes:
-            exec(expr, _expr_dict, _IODict(outputs, inputs))
+            exec(expr, _expr_dict, iod)
 
     def compute_partials(self, inputs, outputs, partials):
         """

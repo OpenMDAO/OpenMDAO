@@ -284,9 +284,9 @@ class Problem(object):
             mode = 'rev'
         self._mode = mode
 
-        sys_graph = compute_sys_graph(model, model._conn_global_abs_in2out,
-                                      comps_only=True, save_vars=True)
-        self._relevant = get_relevant_vars(sys_graph,
+        self._sys_graph = compute_sys_graph(model, model._conn_global_abs_in2out,
+                                            comps_only=True, save_vars=True)
+        self._relevant = get_relevant_vars(self._sys_graph,
                                            self.driver._designvars,
                                            self.driver._responses)
 
@@ -765,11 +765,16 @@ class Problem(object):
         # Solve for derivs using linear solver.
         voi_lists = defaultdict(list)
         v2rhs_name = {}
+        # if not all inputs are VOIs, then this is a test where most likely
+        # design vars, constraints, and objectives were not specified, so
+        # don't do relevance checking.
+        test_mode = False
         for i, name in enumerate(input_list):
             if name in input_vois:
                 grp = input_vois[name]['rhs_group']
             else:
                 grp = None
+                test_mode = True
             if grp is None:
                 if name in voi_lists:
                     raise RuntimeError("Variable name '%s' matches an rhs_group name." %
@@ -868,33 +873,41 @@ class Problem(object):
 
                     # Pull out the answers and pack into our data structure.
                     for ocount, output_name in enumerate(output_list):
-                        out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
-                        if output_name in doutputs._views_flat:
-                            deriv_val = doutputs._views_flat[output_name]
-                            size = deriv_val.size
-                        else:
-                            deriv_val = None
-
                         out_idxs = None
                         if output_name in output_vois:
                             out_voi_meta = output_vois[output_name]
                             if 'indices' in out_voi_meta:
                                 out_idxs = out_voi_meta['indices']
 
-                        if out_idxs is not None:
-                            size = out_idxs.size
-                            if deriv_val is not None:
-                                deriv_val = deriv_val[out_idxs]
+                        if not test_mode and input_name not in relevant[output_name]:
+                            # irrelevant output, just give zeros
+                            if out_idxs is None:
+                                out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
+                                deriv_val = np.zeros(sizes[iproc, out_var_idx])
+                            else:
+                                deriv_val = np.zeros(len(out_idxs))
+                        else:  # relevant output
+                            if output_name in doutputs._views_flat:
+                                deriv_val = doutputs._views_flat[output_name]
+                                size = deriv_val.size
+                            else:
+                                deriv_val = None
 
-                        if dup and nproc > 1:
-                            root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
-                            if deriv_val is None:
-                                if out_idxs is not None:
-                                    sz = size
-                                else:
-                                    sz = sizes[root, out_var_idx]
-                                deriv_val = np.empty(sz, dtype=float)
-                            self.comm.Bcast(deriv_val, root=root)
+                            if out_idxs is not None:
+                                size = out_idxs.size
+                                if deriv_val is not None:
+                                    deriv_val = deriv_val[out_idxs]
+
+                            if dup and nproc > 1:
+                                out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
+                                root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
+                                if deriv_val is None:
+                                    if out_idxs is not None:
+                                        sz = size
+                                    else:
+                                        sz = sizes[root, out_var_idx]
+                                    deriv_val = np.empty(sz, dtype=float)
+                                self.comm.Bcast(deriv_val, root=root)
 
                         len_val = len(deriv_val)
 
