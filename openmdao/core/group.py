@@ -1127,13 +1127,13 @@ class Group(System):
 
         return self._nonlinear_solver.solve()
 
-    def _apply_linear(self, rhs_names, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        rhs_names : [str, ...]
+        vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -1147,30 +1147,30 @@ class Group(System):
         with self.jacobian_context() as J:
             # Use global Jacobian
             if self._owns_assembled_jac or self._views_assembled_jac or self._owns_approx_jac:
-                for vec_name in rhs_names:
+                for vec_name in vec_names:
                     with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                         d_inputs, d_outputs, d_residuals = vecs
                         J._apply(d_inputs, d_outputs, d_residuals, mode)
             # Apply recursion
             else:
                 if mode == 'fwd':
-                    for vec_name in rhs_names:
+                    for vec_name in vec_names:
                         self._transfer(vec_name, mode)
 
                 for subsys in self._subsystems_myproc:
-                    subsys._apply_linear(rhs_names, mode, scope_out, scope_in)
+                    subsys._apply_linear(vec_names, mode, scope_out, scope_in)
 
                 if mode == 'rev':
-                    for vec_name in rhs_names:
+                    for vec_name in vec_names:
                         self._transfer(vec_name, mode)
 
-    def _solve_linear(self, rhs_names, mode):
+    def _solve_linear(self, vec_names, mode):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        rhs_names : [str, ...]
+        vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -1184,7 +1184,7 @@ class Group(System):
         float
             absolute error.
         """
-        return self._linear_solver.solve(rhs_names, mode)
+        return self._linear_solver.solve(vec_names, mode)
 
     def _linearize(self, do_nl=True, do_ln=True):
         """

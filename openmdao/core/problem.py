@@ -785,7 +785,7 @@ class Problem(object):
                 voi_lists[grp].append((name, old_input_list[i]))
                 v2rhs_name[name] = name
 
-        rhs_names = sorted(set(v2rhs_name.values()))
+        vec_names = sorted(set(v2rhs_name.values()))
 
         for rhs_name, vois in iteritems(voi_lists):
             voi_info = {}
@@ -857,7 +857,7 @@ class Problem(object):
                         # need a vector for clean code, so use _views_flat.
                         dinputs._views_flat[input_name][idx - start] = 1.0
 
-                model._solve_linear(rhs_names, mode)
+                model._solve_linear(vec_names, mode)
 
                 for input_name, old_input_name in vois:
                     dinputs, doutputs, irange, loc_size, start, end, dup = voi_info[input_name]

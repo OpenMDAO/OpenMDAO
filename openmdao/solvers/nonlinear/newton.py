@@ -25,7 +25,7 @@ class NewtonSolver(NonlinearSolver):
         pointer to the owning system.
     _depth : int
         how many subsolvers deep this solver is (0 means not a subsolver).
-    _rhs_names : [str, ...]
+    _vec_names : [str, ...]
         list of right-hand-side (RHS) vector names.
     _mode : str
         'fwd' or 'rev', applicable to linear solvers only.

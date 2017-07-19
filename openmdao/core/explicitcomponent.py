@@ -204,13 +204,13 @@ class ExplicitComponent(Component):
 
         return bool(failed), 0., 0.
 
-    def _apply_linear(self, rhs_names, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        rhs_names : [str, ...]
+        vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -221,7 +221,7 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        for vec_name in rhs_names:
+        for vec_name in vec_names:
             with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
 
@@ -237,13 +237,13 @@ class ExplicitComponent(Component):
                                                 d_inputs, d_residuals, mode)
                     d_residuals *= -1.0
 
-    def _solve_linear(self, rhs_names, mode):
+    def _solve_linear(self, vec_names, mode):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        rhs_names : [str, ...]
+        vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -257,7 +257,7 @@ class ExplicitComponent(Component):
         float
             relative error.
         """
-        for vec_name in rhs_names:
+        for vec_name in vec_names:
             d_outputs = self._vectors['output'][vec_name]
             d_residuals = self._vectors['residual'][vec_name]
 

@@ -125,7 +125,7 @@ class System(object):
     _ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
         Same as above, but by var_set name.
     #
-    _rhs_names : [str, ...]
+    _vec_names : [str, ...]
         List of names of the vectors (i.e., the right-hand sides).
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         Dictionaries of vectors keyed by vec_name.
@@ -486,17 +486,17 @@ class System(object):
                         'output': OrderedDict(),
                         'residual': OrderedDict()}
 
-        # get all rhs_names.  We don't know mode here, so for now, retrieve names
+        # get all vec_names.  We don't know mode here, so for now, retrieve names
         # from both dvs and responses and use both.
         # TODO: fix this
-        in_rhs_names = _get_rhs_names(self.get_design_vars(recurse=True))
-        out_rhs_names = _get_rhs_names(self.get_responses(recurse=True))
-        rhs_names = ['nonlinear', 'linear']
-        rhs_names.extend(sorted(in_rhs_names | out_rhs_names))
+        in_vec_names = _get_vec_names(self.get_design_vars(recurse=True))
+        out_vec_names = _get_vec_names(self.get_responses(recurse=True))
+        vec_names = ['nonlinear', 'linear']
+        vec_names.extend(sorted(in_vec_names | out_vec_names))
 
         for key in ['input', 'output', 'residual']:
             type_ = 'output' if key is 'residual' else key
-            for vec_name in rhs_names:
+            for vec_name in vec_names:
                 if initial:
                     # Check for complex step to set vectors up appropriately.
                     # If any subsystem needs complex step, then we need to allocate it everywhere.
@@ -2489,7 +2489,7 @@ class System(object):
 
         return result
 
-    def run_apply_linear(self, rhs_names, mode, scope_out=None, scope_in=None):
+    def run_apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product.
 
@@ -2497,7 +2497,7 @@ class System(object):
 
         Parameters
         ----------
-        rhs_names : [str, ...]
+        vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -2509,9 +2509,9 @@ class System(object):
             If None, all are in the scope.
         """
         with self._scaled_context_all():
-            self._apply_linear(rhs_names, mode, scope_out, scope_in)
+            self._apply_linear(vec_names, mode, scope_out, scope_in)
 
-    def run_solve_linear(self, rhs_names, mode):
+    def run_solve_linear(self, vec_names, mode):
         """
         Apply inverse jac product.
 
@@ -2519,7 +2519,7 @@ class System(object):
 
         Parameters
         ----------
-        rhs_names : [str, ...]
+        vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -2534,7 +2534,7 @@ class System(object):
             absolute error.
         """
         with self._scaled_context_all():
-            result = self._solve_linear(rhs_names, mode)
+            result = self._solve_linear(vec_names, mode)
 
         return result
 
@@ -2590,13 +2590,13 @@ class System(object):
         """
         pass
 
-    def _apply_linear(self, rhs_names, mode, var_inds=None):
+    def _apply_linear(self, vec_names, mode, var_inds=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        rhs_names : [str, ...]
+        vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -2606,13 +2606,13 @@ class System(object):
         """
         pass
 
-    def _solve_linear(self, rhs_names, mode):
+    def _solve_linear(self, vec_names, mode):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        rhs_names : [str, ...]
+        vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -2657,6 +2657,6 @@ class System(object):
         return states
 
 
-def _get_rhs_names(voi_dict):
+def _get_vec_names(voi_dict):
     return set(voi for voi, data in iteritems(voi_dict)
                if data['rhs_group'] is not None)

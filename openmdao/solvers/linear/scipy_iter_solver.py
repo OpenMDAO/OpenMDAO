@@ -153,13 +153,13 @@ class ScipyIterativeSolver(LinearSolver):
         self._mpi_print(self._iter_count, norm, norm / self._norm0)
         self._iter_count += 1
 
-    def solve(self, rhs_names, mode):
+    def solve(self, vec_names, mode):
         """
         Run the solver.
 
         Parameters
         ----------
-        rhs_names : [str, ...]
+        vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
@@ -173,7 +173,7 @@ class ScipyIterativeSolver(LinearSolver):
         float
             relative error.
         """
-        self._rhs_names = rhs_names
+        self._vec_names = vec_names
         self._mode = mode
 
         system = self._system
@@ -184,7 +184,7 @@ class ScipyIterativeSolver(LinearSolver):
         rtol = self.options['rtol']
         restart = self.options['restart']
 
-        for vec_name in self._rhs_names:
+        for vec_name in self._vec_names:
             self._vec_name = vec_name
 
             if self._mode == 'fwd':

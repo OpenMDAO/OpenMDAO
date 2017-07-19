@@ -317,7 +317,7 @@ class PetscKSP(LinearSolver):
         if self.precon is not None:
             self.precon._linearize()
 
-    def solve(self, rhs_names, mode):
+    def solve(self, vec_names, mode):
         """
         Solve the linear system for the problem in self._system.
 
@@ -325,7 +325,7 @@ class PetscKSP(LinearSolver):
 
         Parameters
         ----------
-        rhs_names : list
+        vec_names : list
             list of vector names.
         mode : string
             Derivative mode, can be 'fwd' or 'rev'.
@@ -339,7 +339,7 @@ class PetscKSP(LinearSolver):
         float
             relative error.
         """
-        self._rhs_names = rhs_names
+        self._vec_names = vec_names
         self._mode = mode
 
         system = self._system
@@ -349,7 +349,7 @@ class PetscKSP(LinearSolver):
         atol = options['atol']
         rtol = options['rtol']
 
-        for vec_name in self._rhs_names:
+        for vec_name in self._vec_names:
             self._vec_name = vec_name
 
             # assign x and b vectors based on mode
