@@ -18,10 +18,11 @@ from openmdao.core.driver import Driver
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
-from openmdao.error_checking.check_config import check_config, get_relevant_vars
+from openmdao.error_checking.check_config import check_config
 
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.mpi import MPI, FakeComm
+from openmdao.utils.graph_utils import all_connected_edges
 from openmdao.vectors.default_vector import DefaultVector
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -1172,3 +1173,81 @@ def _format_error(error, tol):
     if np.isnan(error) or error < tol:
         return '{:.6e}'.format(error)
     return '{:.6e} *'.format(error)
+
+
+def get_relevant_vars(graph, desvars, responses):
+    """
+    Find all relevant vars between desvars and responses.
+
+    Both vars are assumed to be outputs (either design vars or responses).
+
+    Parameters
+    ----------
+    graph : networkx.DiGraph
+        System graph with var connection info on the edges.
+    desvars : list of str
+        Names of design variables.
+    responses : list of str
+        Names of response variables.
+
+    Returns
+    -------
+    dict
+        Dict of (dep_outputs, dep_inputs, dep_systems) keyed by design vars and responses.
+    """
+    relevant = defaultdict(dict)
+    edge_cache = {}
+
+    grev = graph.reverse()
+
+    for desvar in desvars:
+        start_sys = desvar.rsplit('.', 1)[0]
+        if start_sys not in edge_cache:
+            edge_cache[start_sys] = set(all_connected_edges(graph, start_sys))
+        start_edges = edge_cache[start_sys]
+
+        for response in responses:
+            end_sys = response.rsplit('.', 1)[0]
+            if end_sys not in edge_cache:
+                edge_cache[end_sys] = set((v, u) for u, v in
+                                          all_connected_edges(grev, end_sys))
+            end_edges = edge_cache[end_sys]
+
+            common_edges = start_edges.intersection(end_edges)
+
+            input_deps = set()
+            output_deps = set([desvar, response])
+            sys_deps = set()
+            for u, v in common_edges:
+                sys_deps.add(u)
+                sys_deps.add(v)
+                conns = graph[u][v]['conns']
+                output_deps.update(conns)
+                for inputs in conns.values():
+                    input_deps.update(inputs)
+
+            if sys_deps:
+                relevant[desvar][response] = rel = (input_deps, output_deps, sys_deps)
+                relevant[response][desvar] = rel
+
+    # TODO: if we knew mode here, we would only need to compute for fwd or rev,
+    # instead of both.
+
+    # now calculate dependencies between each VOI and all other VOIs of the
+    # other type, e.g for each input VOI wrt all output VOIs.
+    for inputs, outputs in [(desvars, responses), (responses, desvars)]:
+        for inp in inputs:
+            if inp in relevant:
+                relinp = relevant[inp]
+                total_inps = set()
+                total_outs = set()
+                total_systems = set()
+                for out in outputs:
+                    if out in relinp:
+                        inps, outs, systems = relinp[out]
+                        total_inps.update(inps)
+                        total_outs.update(outs)
+                        total_systems.update(systems)
+                relinp['@all'] = (total_inps, total_outs, total_systems)
+
+    return relevant
