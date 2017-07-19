@@ -476,9 +476,7 @@ class System(object):
         dict of set
             Dictionary of sets of excluded input variable absolute names, keyed by vec_name.
         """
-        root_vectors = {'input': OrderedDict(),
-                        'output': OrderedDict(),
-                        'residual': OrderedDict()}
+        root_vectors = {'input': {}, 'output': {}, 'residual': {}}
 
         # get all vec_names.  We don't know mode here, so for now, retrieve names
         # from both dvs and responses and use both.
@@ -883,9 +881,7 @@ class System(object):
         alloc_complex : bool
             Whether to allocate any imaginary storage to perform complex step. Default is False.
         """
-        self._vectors = vectors = {'input': OrderedDict(),
-                                   'output': OrderedDict(),
-                                   'residual': OrderedDict()}
+        self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
         self._excluded_vars_out = excl_out
         self._excluded_vars_in = excl_in
 
