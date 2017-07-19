@@ -1371,14 +1371,12 @@ class Group(System):
 
         for in_abs, src_abs in iteritems(input_srcs):
             if src_abs is not None:
-                iparts = in_abs.split('.')
-                oparts = src_abs.split('.')
                 if comps_only:
-                    src = '.'.join(oparts[glen:-1])
-                    tgt = '.'.join(iparts[glen:-1])
+                    src = src_abs.rsplit('.', 1)[0]
+                    tgt = in_abs.rsplit('.', 1)[0]
                 else:
-                    src = oparts[glen]
-                    tgt = iparts[glen]
+                    src = src_abs.split('.')[glen]
+                    tgt = in_abs.split('.')[glen]
 
                 if save_vars:
                     # store var connection data in each system to system edge for later
