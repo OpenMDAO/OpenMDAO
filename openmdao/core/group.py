@@ -9,10 +9,12 @@ from six import iteritems, string_types, itervalues
 from six.moves import range
 
 import numpy as np
+import networkx as nx
 
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
+from openmdao.core.component import Component
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.proc_allocators.proc_allocator import ProcAllocationError
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
@@ -1338,3 +1340,61 @@ class Group(System):
             self._jacobian._initialize()
 
         super(Group, self)._setup_jacobians(jacobian, recurse)
+
+    def compute_sys_graph(self, comps_only=False, save_vars=False):
+        """
+        Compute a dependency graph for subsystems in this group.
+
+        Parameters
+        ----------
+        comps_only : bool (False)
+            If True, return a graph of all components within this group
+            or any of its descendants. No sub-groups will be included. Otherwise,
+            a graph containing only direct children (both Components and Groups)
+            of this group will be returned.
+
+        save_vars : bool (False)
+            If True, store variable connection information in each edge in
+            the system graph.
+
+        Returns
+        -------
+        DiGraph
+            A directed graph containing names of subsystems and their connections.
+        """
+        input_srcs = self._conn_global_abs_in2out
+        glen = len(self.pathname.split('.')) if self.pathname else 0
+        graph = nx.DiGraph()
+
+        if comps_only:
+            subsystems = list(self.system_iter(recurse=True, typ=Component))
+        else:
+            subsystems = self._subsystems_allprocs
+
+        if save_vars:
+            edge_data = defaultdict(lambda: defaultdict(list))
+
+        for in_abs, src_abs in iteritems(input_srcs):
+            if src_abs is not None:
+                iparts = in_abs.split('.')
+                oparts = src_abs.split('.')
+                if comps_only:
+                    src = '.'.join(oparts[glen:-1])
+                    tgt = '.'.join(iparts[glen:-1])
+                else:
+                    src = oparts[glen]
+                    tgt = iparts[glen]
+
+                if save_vars:
+                    # store var connection data in each system to system edge for later
+                    # use in relevance calculation.
+                    edge_data[(src, tgt)][src_abs].append(in_abs)
+                else:
+                    graph.add_edge(src, tgt)
+
+        if save_vars:
+            for key in edge_data:
+                src_sys, tgt_sys = key
+                graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
+
+        return graph

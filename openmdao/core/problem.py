@@ -18,8 +18,7 @@ from openmdao.core.driver import Driver
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
-from openmdao.error_checking.check_config import check_config, compute_sys_graph, \
-    get_relevant_vars
+from openmdao.error_checking.check_config import check_config, get_relevant_vars
 
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.mpi import MPI, FakeComm
@@ -284,11 +283,11 @@ class Problem(object):
             mode = 'rev'
         self._mode = mode
 
-        self._sys_graph = compute_sys_graph(model, model._conn_global_abs_in2out,
-                                            comps_only=True, save_vars=True)
-        self._relevant = get_relevant_vars(self._sys_graph,
-                                           self.driver._designvars,
-                                           self.driver._responses)
+        if isinstance(model, Group):
+            self._sys_graph = model.compute_sys_graph(comps_only=True, save_vars=True)
+            self._relevant = get_relevant_vars(self._sys_graph,
+                                               self.driver._designvars,
+                                               self.driver._responses)
 
         # Now that setup has been called, we can set the iprints.
         for items in self._solver_print_cache:

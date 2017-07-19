@@ -11,6 +11,7 @@ from six import iteritems
 
 from openmdao.core.group import Group
 from openmdao.core.component import Component
+from openmdao.utils.graph_utils import get_sccs_topo, all_connected_edges
 
 # when setup is called multiple times, we need this to prevent adding
 # another handler to the config_check logger each time (if logger arg to check_config is None)
@@ -52,129 +53,6 @@ def check_config(problem, logger=None):
         # check dataflow within Group
         if isinstance(system, Group):
             _check_dataflow(system, logger)
-
-
-def compute_sys_graph(group, input_srcs, comps_only=False, save_vars=False):
-    """
-    Compute a dependency graph for subsystems in the given group.
-
-    Parameters
-    ----------
-    group : <Group>
-        The Group we're computing the graph for.
-
-    input_srcs : {}
-        dict containing global variable abs names for sources of the inputs.
-
-    comps_only : bool (False)
-        If True, return a graph of all Components within the given group
-        or any of its descendants. No sub-groups will be included. Otherwise,
-        a graph containing only direct children (both Components and Groups)
-        of the group will be returned.
-
-    save_vars : bool (False)
-        If True, store var connection information in each edge in the system
-        graph.
-
-    Returns
-    -------
-    DiGraph
-        A directed graph containing names of subsystems and their connections.
-    """
-    glen = len(group.pathname.split('.')) if group.pathname else 0
-    graph = nx.DiGraph()
-
-    if comps_only:
-        subsystems = list(group.system_iter(recurse=True, typ=Component))
-    else:
-        subsystems = group._subsystems_allprocs
-
-    if save_vars:
-        edge_data = defaultdict(lambda: defaultdict(list))
-
-    for in_abs, src_abs in iteritems(input_srcs):
-        if src_abs is not None:
-            iparts = in_abs.split('.')
-            oparts = src_abs.split('.')
-            if comps_only:
-                src = '.'.join(oparts[glen:-1])
-                tgt = '.'.join(iparts[glen:-1])
-            else:
-                src = oparts[glen]
-                tgt = iparts[glen]
-
-            if save_vars:
-                # store var connection data in each system to system edge for later
-                # use in relevance calculation.
-                edge_data[(src, tgt)][src_abs].append(in_abs)
-            else:
-                graph.add_edge(src, tgt)
-
-    if save_vars:
-        for key in edge_data:
-            src_sys, tgt_sys = key
-            graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
-
-    return graph
-
-
-def get_sccs(group, comps_only=False):
-    """
-    Return strongly connected subsystems of the given Group.
-
-    Parameters
-    ----------
-    group : <Group>
-        The strongly connected components will be computed for this Group.
-
-    comps_only : bool (False)
-        If True, the graph used to compute strongly connected components
-        will contain all Components within the given group or any of its
-        descendants and no sub-groups will be included. Otherwise, the graph
-        used will contain only direct children (both Components and Groups)
-        of the given group.
-
-    Returns
-    -------
-    list of sets of str
-        A list of strongly connected components in topological order.
-    """
-    graph = compute_sys_graph(group, group._conn_global_abs_in2out,
-                              comps_only=comps_only)
-
-    # Tarjan's algorithm returns SCCs in reverse topological order, so
-    # the list returned here is reversed.
-    sccs = list(nx.strongly_connected_components(graph))
-    sccs.reverse()
-    return sccs
-
-
-def all_connected_edges(graph, start):
-    """
-
-    Yield all downstream edges starting at the given node.
-
-    Parameters
-    ----------
-    graph : network.DiGraph
-        Graph being traversed.
-    start : hashable object
-        Identifier of the starting node.
-
-    Yields
-    ------
-    list
-        A list of all edges found when traversal starts at start.
-    """
-    visited = set()
-    stack = [start]
-    while stack:
-        src = stack.pop()
-        for tgt in graph[src]:
-            yield src, tgt
-            if tgt not in visited:
-                visited.add(tgt)
-                stack.append(tgt)
 
 
 def get_relevant_vars(graph, desvars, responses):
@@ -267,7 +145,8 @@ def _check_dataflow(group, logger):
     logger : object
         The object that manages logging output.
     """
-    sccs = get_sccs(group)
+    graph = group.compute_sys_graph(comps_only=False)
+    sccs = get_sccs_topo(graph)
     cycles = [sorted(s) for s in sccs if len(s) > 1]
     cycle_idxs = {}
 
