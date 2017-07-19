@@ -973,5 +973,27 @@ class TestConnect(unittest.TestCase):
 
         self.assertEqual(str(context.exception), "src: 'promotes' cannot be used at the same time as 'promotes_inputs' or 'promotes_outputs'.")
 
+    def test_nested_nested_conn(self):
+        prob = Problem()
+        root = prob.model
+
+        p1 = root.add_subsystem('p', IndepVarComp('x', 1.0))
+        G1 = root.add_subsystem('G1', Group())
+        par1 = G1.add_subsystem('par1', Group())
+
+        c2 = par1.add_subsystem('c2', ExecComp('y = x * 2.0'))
+        c4 = par1.add_subsystem('c4', ExecComp('y = x * 4.0'))
+
+        prob.model.add_design_var('p.x')
+        prob.model.add_constraint('G1.par1.c4.y', upper=0.0)
+
+        root.connect('p.x', 'G1.par1.c2.x')
+        root.connect('G1.par1.c2.y', 'G1.par1.c4.x')
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        assert_rel_error(self, prob['G1.par1.c4.y'], 8.0)
+
 if __name__ == "__main__":
     unittest.main()
