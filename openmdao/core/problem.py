@@ -808,7 +808,7 @@ class Problem(object):
 
         for rhs_name, vois in iteritems(voi_lists):
             voi_info = {}
-            old_size = None
+            max_len = 0
 
             # If Forward mode, solve linear system for each 'wrt'
             # If Adjoint mode, solve linear system for each 'of'
@@ -831,18 +831,10 @@ class Problem(object):
                 dup = not in_var_meta['distributed']
                 if in_idxs is not None:
                     irange = in_idxs
-                    loc_size = new_size = len(in_idxs)
+                    loc_size = len(in_idxs)
                 else:
-                    new_size = in_var_meta['global_size']
-                    irange = list(range(new_size))
+                    irange = list(range(in_var_meta['global_size']))
                     loc_size = end - start
-
-                if old_size is None:
-                    old_size = new_size
-                elif old_size != new_size:
-                    raise RuntimeError("Indices within the same VOI group must be "
-                                       "the same size, but in the group %s, %d != %d" %
-                                       (vecname, old_size, new_size))
 
                 if loc_size == 0:
                     # var is not local. get size of var in owned proc
@@ -851,6 +843,9 @@ class Problem(object):
                         if sz > 0:
                             loc_size = sz
                             break
+
+                if max_len < len(irange):
+                    max_len = len(irange)
 
                 voi_info[input_name] = (dinputs, doutputs, irange, loc_size, start, end, dup)
 
@@ -861,13 +856,16 @@ class Problem(object):
             # over the *size* of the indices and use the loop index to look
             # up the actual indices for the current members of the group
             # of interest.
-            for i in range(len(irange)):
+            for i in range(max_len):
                 # this sets dinputs for the current rhs_group to 0
                 voi_info[vois[0][0]][0].set_const(0.0)
 
                 for input_name, old_input_name in vois:
                     dinputs, doutputs, idxs, loc_size, start, end, dup = voi_info[input_name]
-                    idx = idxs[i]
+                    if i >= len(idxs):
+                        idx = idxs[-1]  # reuse the last index
+                    else:
+                        idx = idxs[i]
 
                     if idx < 0:
                         idx += end
@@ -879,15 +877,20 @@ class Problem(object):
                 model._solve_linear(vec_names, mode)
 
                 for input_name, old_input_name in vois:
-                    dinputs, doutputs, irange, loc_size, start, end, dup = voi_info[input_name]
-                    idx = irange[i]
+                    dinputs, doutputs, idxs, loc_size, start, end, dup = voi_info[input_name]
+                    if i >= len(idxs):
+                        idx = idxs[-1]  # reuse the last index
+                        delta_loc_idx = 0  # don't increment local_idx
+                    else:
+                        idx = idxs[i]
+                        delta_loc_idx = 1
 
                     # totals to zeros instead of None in those cases when none
                     # of the specified indices are within the range of interest
                     # for this proc.
                     store = True if start <= idx < end else dup
                     if store:
-                        loc_idxs[input_name] += 1
+                        loc_idxs[input_name] += delta_loc_idx
                     loc_idx = loc_idxs[input_name]
 
                     # Pull out the answers and pack into our data structure.

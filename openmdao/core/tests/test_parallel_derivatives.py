@@ -151,22 +151,23 @@ class MatMatTestCase(unittest.TestCase):
 
 class DecoupledTestCase(unittest.TestCase):
     N_PROCS = 2
+    asize = 3
 
     def setup_model(self):
-        asize = 3
+        asize = self.asize
         prob = Problem()
         root = prob.model
         root.linear_solver = LinearBlockGS()
 
         p1 = root.add_subsystem('p1', IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
-        p2 = root.add_subsystem('p2', IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
+        p2 = root.add_subsystem('p2', IndepVarComp('x', np.arange(asize+2, dtype=float)+1.0))
         G1 = root.add_subsystem('G1', ParallelGroup())
         G1.linear_solver = LinearBlockGS()
 
         c1 = G1.add_subsystem('c1', ExecComp('y = numpy.ones(3).T*x.dot(numpy.arange(3.,6.))',
                                                   x=np.zeros(asize), y=np.zeros(asize)))
-        c2 = G1.add_subsystem('c2', ExecComp('y = x * 2.0',
-                                        x=np.zeros(asize), y=np.zeros(asize)))
+        c2 = G1.add_subsystem('c2', ExecComp('y = x[:%d] * 2.0' % asize,
+                                        x=np.zeros(asize+2), y=np.zeros(asize)))
 
         c3 = root.add_subsystem('c3', ExecComp('y = x * 5.0',
                                           x=np.zeros(asize), y=np.zeros(asize)))
@@ -180,6 +181,7 @@ class DecoupledTestCase(unittest.TestCase):
         return prob
 
     def test_serial_fwd(self):
+        asize = self.asize
         prob = self.setup_model()
 
         prob.model.add_design_var('p1.x')
@@ -194,9 +196,12 @@ class DecoupledTestCase(unittest.TestCase):
                                       return_format='flat_dict')
 
         assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
-        assert_rel_error(self, J['c4.y', 'p2.x'], np.eye(3)*8.0, 1e-6)
+        expected = np.zeros((asize, asize+2))
+        expected[:,:asize] = np.eye(asize)*8.0
+        assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
 
     def test_parallel_fwd(self):
+        asize = self.asize
         prob = self.setup_model()
 
         prob.model.add_design_var('p1.x', rhs_group='pardv')
@@ -211,9 +216,12 @@ class DecoupledTestCase(unittest.TestCase):
                                       return_format='flat_dict')
 
         assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
-        assert_rel_error(self, J['c4.y', 'p2.x'], np.eye(3)*8.0, 1e-6)
+        expected = np.zeros((asize, asize+2))
+        expected[:,:asize] = np.eye(asize)*8.0
+        assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
 
     def test_serial_rev(self):
+        asize = self.asize
         prob = self.setup_model()
 
         prob.model.add_design_var('p1.x')
@@ -228,9 +236,12 @@ class DecoupledTestCase(unittest.TestCase):
                                       return_format='flat_dict')
 
         assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
-        assert_rel_error(self, J['c4.y', 'p2.x'], np.eye(3)*8.0, 1e-6)
+        expected = np.zeros((asize, asize+2))
+        expected[:,:asize] = np.eye(asize)*8.0
+        assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
 
     def test_parallel_rev(self):
+        asize = self.asize
         prob = self.setup_model()
 
         prob.model.add_design_var('p1.x')
@@ -245,8 +256,9 @@ class DecoupledTestCase(unittest.TestCase):
                                       return_format='flat_dict')
 
         assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
-        assert_rel_error(self, J['c4.y', 'p2.x'], np.eye(3)*8.0, 1e-6)
-
+        expected = np.zeros((asize, asize+2))
+        expected[:,:asize] = np.eye(asize)*8.0
+        assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
 
 class IndicesTestCase(unittest.TestCase):
 
