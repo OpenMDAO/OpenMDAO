@@ -1,8 +1,10 @@
 """Define the Problem class and a FakeComm class for non-MPI users."""
 
 from __future__ import division
+
 from collections import OrderedDict, defaultdict, namedtuple
 from itertools import product
+import logging
 import sys
 
 from six import iteritems, iterkeys
@@ -580,9 +582,9 @@ class Problem(object):
 
         return partials_data
 
-    def check_total_derivatives(self, of=None, wrt=None, out_stream=sys.stdout,
-                                compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
-                                method='fd', step=1e-6, form='forward', step_calc='abs'):
+    def check_total_derivatives(self, of=None, wrt=None, logger=None, compact_print=False,
+                                abs_err_tol=1e-6, rel_err_tol=1e-6, method='fd', step=1e-6,
+                                form='forward', step_calc='abs'):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -594,8 +596,8 @@ class Problem(object):
         wrt : list of variable name strings or None
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
-        out_stream : file_like
-            Where to send human readable output. Default is sys.stdout. Set to None to suppress.
+        logger : object
+            Logging object.
         compact_print : bool
             Set to True to just print the essentials, one line per unknown-param pair.
         abs_err_tol : float
@@ -628,6 +630,16 @@ class Problem(object):
         """
         model = self.model
         global_names = False
+
+        if logger is None:
+            logger = logging.getLogger("check_total_derivatives")
+            console = logging.StreamHandler(sys.stdout)
+            # set a format which is simpler for console use
+            #formatter = logging.Formatter('%(levelname)s: %(message)s')
+            ## tell the handler to use this format
+            #console.setFormatter(formatter)
+            console.setLevel(logging.INFO)
+            logger.addHandler(console)
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -662,9 +674,9 @@ class Problem(object):
             data[''][key]['J_fd'] = Jfd[key]
         fd_args['method'] = 'fd'
 
-        _assemble_derivative_data(data, rel_err_tol, abs_err_tol, out_stream, compact_print,
+        _assemble_derivative_data(data, rel_err_tol, abs_err_tol, logger, compact_print,
                                   [model], fd_args, totals=True)
-
+        logger.handlers[0].flush()
         return data['']
 
     def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
@@ -984,10 +996,10 @@ class Problem(object):
         self.model._set_solver_print(level=level, depth=depth, type_=type_)
 
 
-def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
+def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, logger,
                               compact_print, system_list, global_options, totals=False):
     """
-    Compute the relative and absolute errors in the given derivatives and print to `out_stream`.
+    Compute the relative and absolute errors in the given derivatives and print to the logger.
 
     Parameters
     ----------
@@ -997,8 +1009,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         Relative error tolerance.
     abs_error_tol : float
         Absolute error tolerance.
-    out_stream : File-like
-        File-like stream (or None) to which results are written.
+    logger : object
+        Logging object.
     compact_print : bool
         If results should be printed verbosely or in a table.
     system_list : Iterable
@@ -1041,44 +1053,42 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
         derivatives = derivative_data[sys_name]
 
-        if out_stream:
+        if totals:
+            sys_name = 'Full Model'
 
+        logger.info('-' * (len(sys_name) + 15) + '\n')
+        logger.info("{}: '{}'{}\n".format(sys_type, sys_name, check_desc))
+        logger.info('-' * (len(sys_name) + 15) + '\n')
+
+        if compact_print:
+            # Error Header
             if totals:
-                sys_name = 'Full Model'
-
-            out_stream.write('-' * (len(sys_name) + 15) + '\n')
-            out_stream.write("{}: '{}'{}\n".format(sys_type, sys_name, check_desc))
-            out_stream.write('-' * (len(sys_name) + 15) + '\n')
-
-            if compact_print:
-                # Error Header
-                if totals:
-                    header = "{0} wrt {1} | {2} | {3} | {4} | {5}\n"\
-                        .format(
-                            _pad_name('<output>', 30, True),
-                            _pad_name('<variable>', 30, True),
-                            _pad_name('calc mag.'),
-                            _pad_name('check mag.'),
-                            _pad_name('a(cal-chk)'),
-                            _pad_name('r(cal-chk)'),
-                        )
-                else:
-                    header = "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}\n"\
-                        .format(
-                            _pad_name('<output>', 13, True),
-                            _pad_name('<variable>', 13, True),
-                            _pad_name('fwd mag.'),
-                            _pad_name('rev mag.'),
-                            _pad_name('check mag.'),
-                            _pad_name('a(fwd-chk)'),
-                            _pad_name('a(rev-chk)'),
-                            _pad_name('a(fwd-rev)'),
-                            _pad_name('r(fwd-chk)'),
-                            _pad_name('r(rev-chk)'),
-                            _pad_name('r(fwd-rev)')
-                        )
-                out_stream.write(header)
-                out_stream.write('-' * len(header) + '\n')
+                header = "{0} wrt {1} | {2} | {3} | {4} | {5}\n"\
+                    .format(
+                        _pad_name('<output>', 30, True),
+                        _pad_name('<variable>', 30, True),
+                        _pad_name('calc mag.'),
+                        _pad_name('check mag.'),
+                        _pad_name('a(cal-chk)'),
+                        _pad_name('r(cal-chk)'),
+                    )
+            else:
+                header = "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}\n"\
+                    .format(
+                        _pad_name('<output>', 13, True),
+                        _pad_name('<variable>', 13, True),
+                        _pad_name('fwd mag.'),
+                        _pad_name('rev mag.'),
+                        _pad_name('check mag.'),
+                        _pad_name('a(fwd-chk)'),
+                        _pad_name('a(rev-chk)'),
+                        _pad_name('a(fwd-rev)'),
+                        _pad_name('r(fwd-chk)'),
+                        _pad_name('r(rev-chk)'),
+                        _pad_name('r(fwd-rev)')
+                    )
+            logger.info(header)
+            logger.info('-' * len(header) + '\n')
 
         # Sorted keys ensures deterministic ordering
         sorted_keys = sorted(iterkeys(derivatives))
@@ -1119,71 +1129,70 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                                                         rev_error / fd_norm,
                                                                         fwd_rev_error / fd_norm)
 
-            if out_stream:
-                if compact_print:
-                    if totals:
-                        out_stream.write(deriv_line.format(
-                            _pad_name(of, 30, True),
-                            _pad_name(wrt, 30, True),
-                            magnitude.forward,
-                            magnitude.fd,
-                            abs_err.forward,
-                            rel_err.forward,
-                        ))
-                    else:
-                        out_stream.write(deriv_line.format(
-                            _pad_name(of, 13, True),
-                            _pad_name(wrt, 13, True),
-                            magnitude.forward,
-                            magnitude.reverse,
-                            magnitude.fd,
-                            abs_err.forward,
-                            abs_err.reverse,
-                            abs_err.forward_reverse,
-                            rel_err.forward,
-                            rel_err.reverse,
-                            rel_err.forward_reverse,
-                        ))
+            if compact_print:
+                if totals:
+                    logger.info(deriv_line.format(
+                        _pad_name(of, 30, True),
+                        _pad_name(wrt, 30, True),
+                        magnitude.forward,
+                        magnitude.fd,
+                        abs_err.forward,
+                        rel_err.forward,
+                    ))
                 else:
-                    # Magnitudes
-                    out_stream.write("  {}: '{}' wrt '{}'\n\n".format(sys_name, of, wrt))
-                    out_stream.write('    Forward Magnitude : {:.6e}\n'.format(magnitude.forward))
-                    if not totals:
-                        txt = '    Reverse Magnitude : {:.6e}\n'
-                        out_stream.write(txt.format(magnitude.reverse))
-                    out_stream.write('         Fd Magnitude : {:.6e} ({})\n\n'.format(magnitude.fd,
-                                                                                      fd_desc))
-                    # Absolute Errors
-                    if totals:
-                        error_descs = ('(Jfor  - Jfd) ', )
-                    else:
-                        error_descs = ('(Jfor  - Jfd) ', '(Jrev  - Jfd) ', '(Jfor  - Jrev)')
-                    for error, desc in zip(abs_err, error_descs):
-                        error_str = _format_error(error, abs_error_tol)
-                        out_stream.write('    Absolute Error {}: {}\n'.format(desc, error_str))
-                    out_stream.write('\n')
+                    logger.info(deriv_line.format(
+                        _pad_name(of, 13, True),
+                        _pad_name(wrt, 13, True),
+                        magnitude.forward,
+                        magnitude.reverse,
+                        magnitude.fd,
+                        abs_err.forward,
+                        abs_err.reverse,
+                        abs_err.forward_reverse,
+                        rel_err.forward,
+                        rel_err.reverse,
+                        rel_err.forward_reverse,
+                    ))
+            else:
+                # Magnitudes
+                logger.info("  {}: '{}' wrt '{}'\n\n".format(sys_name, of, wrt))
+                logger.info('    Forward Magnitude : {:.6e}\n'.format(magnitude.forward))
+                if not totals:
+                    txt = '    Reverse Magnitude : {:.6e}\n'
+                    logger.info(txt.format(magnitude.reverse))
+                logger.info('         Fd Magnitude : {:.6e} ({})\n\n'.format(magnitude.fd,
+                                                                                  fd_desc))
+                # Absolute Errors
+                if totals:
+                    error_descs = ('(Jfor  - Jfd) ', )
+                else:
+                    error_descs = ('(Jfor  - Jfd) ', '(Jrev  - Jfd) ', '(Jfor  - Jrev)')
+                for error, desc in zip(abs_err, error_descs):
+                    error_str = _format_error(error, abs_error_tol)
+                    logger.info('    Absolute Error {}: {}\n'.format(desc, error_str))
+                logger.info('\n')
 
-                    # Relative Errors
-                    for error, desc in zip(rel_err, error_descs):
-                        error_str = _format_error(error, rel_error_tol)
-                        out_stream.write('    Relative Error {}: {}\n'.format(desc, error_str))
-                    out_stream.write('\n')
+                # Relative Errors
+                for error, desc in zip(rel_err, error_descs):
+                    error_str = _format_error(error, rel_error_tol)
+                    logger.info('    Relative Error {}: {}\n'.format(desc, error_str))
+                logger.info('\n')
 
-                    # Raw Derivatives
-                    out_stream.write('    Raw Forward Derivative (Jfor)\n\n')
-                    out_stream.write(str(forward))
-                    out_stream.write('\n\n')
+                # Raw Derivatives
+                logger.info('    Raw Forward Derivative (Jfor)\n\n')
+                logger.info(str(forward))
+                logger.info('\n\n')
 
-                    if not totals:
-                        out_stream.write('    Raw Reverse Derivative (Jfor)\n\n')
-                        out_stream.write(str(reverse))
-                        out_stream.write('\n\n')
+                if not totals:
+                    logger.info('    Raw Reverse Derivative (Jfor)\n\n')
+                    logger.info(str(reverse))
+                    logger.info('\n\n')
 
-                    out_stream.write('    Raw FD Derivative (Jfd)\n\n')
-                    out_stream.write(str(fd))
-                    out_stream.write('\n\n')
+                logger.info('    Raw FD Derivative (Jfd)\n\n')
+                logger.info(str(fd))
+                logger.info('\n\n')
 
-                    out_stream.write(' -' * 30 + '\n')
+                logger.info(' -' * 30 + '\n')
 
 
 def _pad_name(name, pad_num=10, quotes=False):
