@@ -489,7 +489,7 @@ class System(object):
                     # Check for complex step to set vectors up appropriately.
                     # If any subsystem needs complex step, then we need to allocate it everywhere.
                     alloc_complex = force_alloc_complex
-                    if vec_name == 'nonlinear':
+                    if vec_name == 'nonlinear' and not alloc_complex:
                         alloc_complex = 'cs' in self._approx_schemes
                         for sub in self.system_iter(include_self=True, recurse=True):
                             if alloc_complex:

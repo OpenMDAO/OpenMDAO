@@ -7,10 +7,11 @@ from six.moves import cStringIO as StringIO
 import numpy as np
 
 from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NonLinearRunOnce, \
-                         ImplicitComponent
+                         ImplicitComponent, NonlinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
+from openmdao.test_suite.components.sellar import SellarDerivatives
 
 
 class TestProblemCheckPartials(unittest.TestCase):
@@ -453,6 +454,32 @@ class TestProblemCheckPartials(unittest.TestCase):
         assert_rel_error(self, data['comp']['y', 'dummy']['J_fwd'], np.zeros((2, 2)))
         assert_rel_error(self, data['comp']['y', 'dummy']['J_rev'], np.zeros((2, 2)))
 
+
+class TestProblemCheckTotals(unittest.TestCase):
+
+    def test_cs(self):
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0.0)
+        prob.model.add_constraint('con2', upper=0.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(force_alloc_complex=True)
+
+        # We don't call run_driver() here because we don't
+        # actually want the optimizer to run
+        prob.run_model()
+
+        string_stream = StringIO()
+
+        # check derivatives with complex step and a larger step size.
+        totals = prob.check_total_derivatives(method='cs', step=1.0e-1, out_stream=string_stream)
 
 if __name__ == "__main__":
     unittest.main()
