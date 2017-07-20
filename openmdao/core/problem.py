@@ -763,29 +763,48 @@ class Problem(object):
             return totals
 
         # Solve for derivs using linear solver.
+
+        # this maps either an rhs_group to a list of tuples of (absname, oldname)
+        # of variables in that group, or, for variables that aren't in an
+        # rhs_group, it maps the variable name to a one entry list containing
+        # the tuple (absname, oldname) for that variable.  oldname will be
+        # the promoted name if the 'global_names' arg is False, else it will
+        # be the same as absname (the absolute variable name).
         voi_lists = defaultdict(list)
-        v2rhs_name = {}
+
+        # this maps the names from input_list to the corresponding names
+        # of the RHS vectors.  For any variables that are not part of an
+        # rhs_group, they will map to 'linear'.  All rhs_group'ed variables
+        # will just map to their own name.
+        inp2rhs_name = {}
+
         # if not all inputs are VOIs, then this is a test where most likely
         # design vars, constraints, and objectives were not specified, so
-        # don't do relevance checking.
+        # don't do relevance checking (because we only want to analyze the
+        # dependency graph for VOIs rather than for every input/output
+        # in the model)
         test_mode = False
+
         for i, name in enumerate(input_list):
             if name in input_vois:
-                grp = input_vois[name]['rhs_group']
+                rhs_group = input_vois[name]['rhs_group']
             else:
-                grp = None
+                rhs_group = None
                 test_mode = True
-            if grp is None:
+            if rhs_group is None:  # variable is not in an rhs_group
                 if name in voi_lists:
                     raise RuntimeError("Variable name '%s' matches an rhs_group name." %
                                        name)
+                # store the absolute name along with the original name, which
+                # can be either promoted or absolute depending on the value
+                # of the 'global_names' flag.
                 voi_lists[name].append((name, old_input_list[i]))
-                v2rhs_name[name] = 'linear'
+                inp2rhs_name[name] = 'linear'
             else:
-                voi_lists[grp].append((name, old_input_list[i]))
-                v2rhs_name[name] = name
+                voi_lists[rhs_group].append((name, old_input_list[i]))
+                inp2rhs_name[name] = name
 
-        vec_names = sorted(set(v2rhs_name.values()))
+        vec_names = sorted(set(inp2rhs_name.values()))
 
         for rhs_name, vois in iteritems(voi_lists):
             voi_info = {}
@@ -794,7 +813,7 @@ class Problem(object):
             # If Forward mode, solve linear system for each 'wrt'
             # If Adjoint mode, solve linear system for each 'of'
             for input_name, old_input_name in vois:
-                vecname = v2rhs_name[input_name]
+                vecname = inp2rhs_name[input_name]
                 dinputs = input_vec[vecname]
                 doutputs = output_vec[vecname]
 
