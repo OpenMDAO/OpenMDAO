@@ -29,9 +29,7 @@ addons:
 
 notifications:
   email: false
-  slack:
-    on_success: never
-    secure: c8xi/sAb5QJPR7CrFPdL/sXOhPFdyR3E9lv9Z2h2CxGQWINyRN6Xj7/rF6bW0PfINvqFAHL4+iPM+0bmM0+Av9AW3Dg2fXZuN3XueMwNTFnnpO2g1NKJ44cFsGXCPytLTvg+zZqxzR+Fz13DcrdHQEhfSKcuZ3akbp3OIAdAYmpaiqZPz9NBX3M7LvDOnWa9TNxznltR1LHtdP3RGOm/xput0dvGuY8zJSTYCxusnZNYBz5IQuNSoyBfqOFztLl6MGcqT5+/cE+T2AXEPLOKGJXahOdk3d/UXEb/vRGc19oPU/ORZZvde7IuAK1GJhjXPUhgmqLIlFTRlOpLBcllUW8asKHeRIHOvNbzMrYKngq7JLe97cshabNvvXH3MYG5HJKkqOWD6boe5JXxpkruE4oF3JCIgSs888YWC4bdAvOmxU8rxtBp4N5S+PXgqzOPDu10klcNOfSI3DYP/4tbZ25/RCrmwJbj6H1+Foi+oxkjDQnxabg6rUcB0ILykue5bogSKSk6HsIp0jU2zwpv7b5w4r1pMgZD6L+mlR5N16X4qFwQAbxWaxQYADywzbWRshEPkHCaMriHCWi3IOU/ESrbKfCT9h66uGMrkv/5qEHoYFn3TZaLHSTOKRnT5SYHd9BiKmBBUKiOxI1Gf6tyxeG/ndowWFQrz8HLESFNRO4=
+  slack: openmdao:tCKLdNLHLyyg52pQpR0sJMaP
 
 before_install:
 - OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux"; fi)
