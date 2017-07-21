@@ -10,7 +10,8 @@ omit =
     */python?.?/*
     */site-packages/nose/*
     */test/*
+    */tests/*
     openmdao/code_review/*
     openmdao/devtools/*
+    openmdao/docs/*
     openmdao/test_suite/*
-    openmado/utils/*

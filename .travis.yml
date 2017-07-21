@@ -71,6 +71,7 @@ install:
 - pip install redbaron
 - pip install git+https://github.com/OpenMDAO/testflo.git
 - pip install coverage
+- pip install coveralls
 - pip install .
 
 script:
