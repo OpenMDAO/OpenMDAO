@@ -57,7 +57,7 @@ def setup(methods=None):
     """
     global _registered, _trace_calls
     if not _registered:
-        if methods is None:
+        if methods is None or methods not in func_group:
             methods = func_group['openmdao']
         elif isinstance(methods, string_types):
             methods = func_group[methods]

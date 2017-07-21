@@ -1,10 +1,10 @@
 """Define the base System class."""
 from __future__ import division
 
+import sys
 from contextlib import contextmanager
 from collections import OrderedDict, Iterable
 from fnmatch import fnmatchcase
-import sys
 from itertools import product
 
 from six import iteritems, string_types
