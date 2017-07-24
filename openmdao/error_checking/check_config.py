@@ -1,19 +1,13 @@
 """A module containing various configuration checks for an OpenMDAO Problem."""
 
-import sys
-import logging
-
-import numpy as np
+from six import iteritems
 
 import networkx as nx
-from six import iteritems
+import numpy as np
 
 from openmdao.core.group import Group
 from openmdao.core.component import Component
-
-# when setup is called multiple times, we need this to prevent adding
-# another handler to the config_check logger each time (if logger arg to check_config is None)
-_set_logger = None
+from openmdao.utils.logger_utils import get_default_logger
 
 
 def check_config(problem, logger=None):
@@ -28,20 +22,7 @@ def check_config(problem, logger=None):
     logger : object
         Logging object.
     """
-    global _set_logger
-    if logger is None:
-        if _set_logger is None:
-            logger = logging.getLogger("config_check")
-            _set_logger = logger
-            console = logging.StreamHandler(sys.stdout)
-            # set a format which is simpler for console use
-            formatter = logging.Formatter('%(levelname)s: %(message)s')
-            # tell the handler to use this format
-            console.setFormatter(formatter)
-            console.setLevel(logging.INFO)
-            logger.addHandler(console)
-        else:
-            logger = _set_logger
+    logger = get_default_logger(logger, 'check_config', use_format=True)
 
     _check_hanging_inputs(problem, logger)
 

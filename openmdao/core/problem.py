@@ -5,7 +5,6 @@ from __future__ import division
 from collections import OrderedDict, defaultdict, namedtuple
 from itertools import product
 import logging
-import sys
 
 from six import iteritems, iterkeys
 from six.moves import range
@@ -23,6 +22,7 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
 
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.logger_utils import get_default_logger
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.vectors.default_vector import DefaultVector
 try:
@@ -34,10 +34,6 @@ from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
-
-# when setup is called multiple times, we need this to prevent adding
-# another handler to the config_check logger each time (if logger arg to check_config is None)
-_set_logger = None
 
 
 class Problem(object):
@@ -350,18 +346,7 @@ class Problem(object):
             raise ValueError('Unrecognized method: "{}"'.format(global_options['method']))
 
         model = self.model
-
-        # Log to stdout on info channel if no logger is passed in.
-        if logger is None:
-            global _set_logger
-            if _set_logger is None:
-                logger = logging.getLogger("check_total_derivatives")
-                _set_logger = logger
-                console = logging.StreamHandler(sys.stdout)
-                console.setLevel(logging.INFO)
-                logger.addHandler(console)
-            else:
-                logger = _set_logger
+        logger = get_default_logger(logger, 'check_partials')
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -647,18 +632,7 @@ class Problem(object):
         """
         model = self.model
         global_names = False
-
-        # Log to stdout on info channel if no logger is passed in.
-        if logger is None:
-            global _set_logger
-            if _set_logger is None:
-                logger = logging.getLogger("check_total_derivatives")
-                _set_logger = logger
-                console = logging.StreamHandler(sys.stdout)
-                console.setLevel(logging.INFO)
-                logger.addHandler(console)
-            else:
-                logger = _set_logger
+        logger = get_default_logger(logger, 'check_total_derivatives')
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
