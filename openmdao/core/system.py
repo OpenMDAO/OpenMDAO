@@ -560,12 +560,12 @@ class System(object):
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
         root_vectors = OrderedDict([
-            (('input', 'phys0'), {}), (('input', 'phys1'), {}),
-            (('input', 'norm0'), {}), (('input', 'norm1'), {}),
-            (('output', 'phys0'), {}), (('output', 'phys1'), {}),
-            (('output', 'norm0'), {}), (('output', 'norm1'), {}),
-            (('residual', 'phys0'), {}), (('residual', 'phys1'), {}),
-            (('residual', 'norm0'), {}), (('residual', 'norm1'), {}),
+            (('input', 'phys0'), OrderedDict()), (('input', 'phys1'), OrderedDict()),
+            (('input', 'norm0'), OrderedDict()), (('input', 'norm1'), OrderedDict()),
+            (('output', 'phys0'), OrderedDict()), (('output', 'phys1'), OrderedDict()),
+            (('output', 'norm0'), OrderedDict()), (('output', 'norm1'), OrderedDict()),
+            (('residual', 'phys0'), OrderedDict()), (('residual', 'phys1'), OrderedDict()),
+            (('residual', 'norm0'), OrderedDict()), (('residual', 'norm1'), OrderedDict()),
         ])
 
         for key in root_vectors:
@@ -972,12 +972,12 @@ class System(object):
             Whether to resize the root vectors - i.e, because this system is initiating a reconf.
         """
         self._scaling_vecs = vecs = OrderedDict([
-            (('input', 'phys0'), {}), (('input', 'phys1'), {}),
-            (('input', 'norm0'), {}), (('input', 'norm1'), {}),
-            (('output', 'phys0'), {}), (('output', 'phys1'), {}),
-            (('output', 'norm0'), {}), (('output', 'norm1'), {}),
-            (('residual', 'phys0'), {}), (('residual', 'phys1'), {}),
-            (('residual', 'norm0'), {}), (('residual', 'norm1'), {}),
+            (('input', 'phys0'), OrderedDict()), (('input', 'phys1'), OrderedDict()),
+            (('input', 'norm0'), OrderedDict()), (('input', 'norm1'), OrderedDict()),
+            (('output', 'phys0'), OrderedDict()), (('output', 'phys1'), OrderedDict()),
+            (('output', 'norm0'), OrderedDict()), (('output', 'norm1'), OrderedDict()),
+            (('residual', 'phys0'), OrderedDict()), (('residual', 'phys1'), OrderedDict()),
+            (('residual', 'norm0'), OrderedDict()), (('residual', 'norm1'), OrderedDict()),
         ])
 
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
