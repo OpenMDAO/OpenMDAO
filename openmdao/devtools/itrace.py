@@ -4,9 +4,11 @@ import os
 import sys
 import argparse
 from contextlib import contextmanager
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 from six import string_types
+from six.moves import cStringIO
+from numpy import ndarray
 
 from openmdao.devtools.iprof_utils import _create_profile_callback, find_qualified_name, \
                                          func_group, _collect_methods
@@ -14,6 +16,30 @@ from openmdao.devtools.iprof_utils import _create_profile_callback, find_qualifi
 
 _trace_calls = None  # pointer to function that implements the trace
 _registered = False  # prevents multiple atexit registrations
+
+MAXLINE = 80
+tab = '    '
+
+def _indented_print(f_locals, d, indent, excludes=('__init__',), file=sys.stdout):
+    sindent = tab * indent
+    sep = '=' if d is f_locals else ':'
+
+    for name in d:
+        if name not in excludes:
+            if isinstance(d[name], (dict, OrderedDict)):
+                f = cStringIO()
+                _indented_print(f_locals, d[name], 0, file=f)
+                s = "  %s%s%s{%s}" % (sindent, name, sep, f.getvalue())
+            else:
+                s = "  %s%s%s%s" % (sindent, name, sep, d[name])
+            if ' object at ' not in s:
+                linelen = len(s)
+                leneq = len(s.split(sep, 1)[0])
+                if linelen > MAXLINE:
+                    if '\n' in s:
+                        # change indent
+                        s = s.replace("\n", "\n%s" % (' '*leneq))
+                print(s, file=file)
 
 
 def _trace_call(frame, arg, stack, context):
@@ -37,13 +63,10 @@ def _trace_call(frame, arg, stack, context):
     fullname = '.'.join((sname, funcname))
     method_counts[fullname] += 1
 
-    indent = '    ' * (len(stack)-1)
+    indent = tab * (len(stack)-1)
     print("%s%s (%d)" % (indent, fullname, method_counts[fullname]))
-    for name in frame.f_locals:
-        if frame.f_code.co_name != '__init__':
-            s = "%s  %s=%s" % (indent, name, frame.f_locals[name])
-            if ' object at ' not in s:
-                print(s)
+    _indented_print(frame.f_locals, frame.f_locals, len(stack)-1)
+    sys.stdout.flush()
 
 def setup(methods=None):
     """
