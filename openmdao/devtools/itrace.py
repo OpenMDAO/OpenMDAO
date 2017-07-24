@@ -21,7 +21,7 @@ _registered = False  # prevents multiple atexit registrations
 MAXLINE = 80
 tab = '    '
 
-addr_regex = re.compile(" at 0x[0-9a-z]+")
+addr_regex = re.compile(" at 0x[0-9a-fA-F]+")
 
 def _indented_print(f_locals, d, indent, excludes=('__init__',), file=sys.stdout):
     sindent = tab * indent
