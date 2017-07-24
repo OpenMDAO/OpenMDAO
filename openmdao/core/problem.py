@@ -35,6 +35,10 @@ from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
+# when setup is called multiple times, we need this to prevent adding
+# another handler to the config_check logger each time (if logger arg to check_config is None)
+_set_logger = None
+
 
 class Problem(object):
     """
@@ -293,7 +297,7 @@ class Problem(object):
 
         return self
 
-    def check_partials(self, out_stream=sys.stdout, comps=None, compact_print=False,
+    def check_partials(self, logger=None, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6, global_options=None,
                        force_dense=True):
         """
@@ -301,8 +305,8 @@ class Problem(object):
 
         Parameters
         ----------
-        out_stream : file_like
-            Where to send human readable output. Default is sys.stdout. Set to None to suppress.
+        logger : object
+            Logging object to capture output. All output is at logging.INFO level.
         comps : None or list_like
             List of component names to check the partials of (all others will be skipped). Set to
              None (default) to run all components.
@@ -346,6 +350,18 @@ class Problem(object):
             raise ValueError('Unrecognized method: "{}"'.format(global_options['method']))
 
         model = self.model
+
+        # Log to stdout on info channel if no logger is passed in.
+        if logger is None:
+            global _set_logger
+            if _set_logger is None:
+                logger = logging.getLogger("check_total_derivatives")
+                _set_logger = logger
+                console = logging.StreamHandler(sys.stdout)
+                console.setLevel(logging.INFO)
+                logger.addHandler(console)
+            else:
+                logger = _set_logger
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -577,7 +593,8 @@ class Problem(object):
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
 
-        _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
+        logging.getLogger().setLevel(logging.INFO)
+        _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, logger,
                                   compact_print, comps, global_options)
 
         return partials_data
@@ -597,7 +614,7 @@ class Problem(object):
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
         logger : object
-            Logging object.
+            Logging object to capture output. All output is at logging.INFO level.
         compact_print : bool
             Set to True to just print the essentials, one line per unknown-param pair.
         abs_err_tol : float
@@ -631,15 +648,17 @@ class Problem(object):
         model = self.model
         global_names = False
 
+        # Log to stdout on info channel if no logger is passed in.
         if logger is None:
-            logger = logging.getLogger("check_total_derivatives")
-            console = logging.StreamHandler(sys.stdout)
-            # set a format which is simpler for console use
-            #formatter = logging.Formatter('%(levelname)s: %(message)s')
-            ## tell the handler to use this format
-            #console.setFormatter(formatter)
-            console.setLevel(logging.INFO)
-            logger.addHandler(console)
+            global _set_logger
+            if _set_logger is None:
+                logger = logging.getLogger("check_total_derivatives")
+                _set_logger = logger
+                console = logging.StreamHandler(sys.stdout)
+                console.setLevel(logging.INFO)
+                logger.addHandler(console)
+            else:
+                logger = _set_logger
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -674,9 +693,9 @@ class Problem(object):
             data[''][key]['J_fd'] = Jfd[key]
         fd_args['method'] = 'fd'
 
+        logging.getLogger().setLevel(logging.INFO)
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, logger, compact_print,
                                   [model], fd_args, totals=True)
-        logger.handlers[0].flush()
         return data['']
 
     def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
@@ -1027,10 +1046,10 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
     if compact_print:
         check_desc = "    (Check Type: {})".format(fd_desc)
         if totals:
-            deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}\n"
+            deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
         else:
             deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e} | {6:.4e} | {7:.4e}"\
-                         " | {8:.4e} | {9:.4e} | {10:.4e}\n"
+                         " | {8:.4e} | {9:.4e} | {10:.4e}"
     else:
         check_desc = ""
 
@@ -1056,14 +1075,14 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
         if totals:
             sys_name = 'Full Model'
 
-        logger.info('-' * (len(sys_name) + 15) + '\n')
-        logger.info("{}: '{}'{}\n".format(sys_type, sys_name, check_desc))
-        logger.info('-' * (len(sys_name) + 15) + '\n')
+        logger.info('-' * (len(sys_name) + 15))
+        logger.info("{}: '{}'{}".format(sys_type, sys_name, check_desc))
+        logger.info('-' * (len(sys_name) + 15))
 
         if compact_print:
             # Error Header
             if totals:
-                header = "{0} wrt {1} | {2} | {3} | {4} | {5}\n"\
+                header = "{0} wrt {1} | {2} | {3} | {4} | {5}"\
                     .format(
                         _pad_name('<output>', 30, True),
                         _pad_name('<variable>', 30, True),
@@ -1073,7 +1092,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
                         _pad_name('r(cal-chk)'),
                     )
             else:
-                header = "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}\n"\
+                header = "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}"\
                     .format(
                         _pad_name('<output>', 13, True),
                         _pad_name('<variable>', 13, True),
@@ -1155,13 +1174,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
                     ))
             else:
                 # Magnitudes
-                logger.info("  {}: '{}' wrt '{}'\n\n".format(sys_name, of, wrt))
-                logger.info('    Forward Magnitude : {:.6e}\n'.format(magnitude.forward))
+                logger.info("  {}: '{}' wrt '{}'\n".format(sys_name, of, wrt))
+                logger.info('    Forward Magnitude : {:.6e}'.format(magnitude.forward))
                 if not totals:
-                    txt = '    Reverse Magnitude : {:.6e}\n'
+                    txt = '    Reverse Magnitude : {:.6e}'
                     logger.info(txt.format(magnitude.reverse))
-                logger.info('         Fd Magnitude : {:.6e} ({})\n\n'.format(magnitude.fd,
-                                                                                  fd_desc))
+                logger.info('         Fd Magnitude : {:.6e} ({})\n'.format(magnitude.fd,
+                                                                           fd_desc))
                 # Absolute Errors
                 if totals:
                     error_descs = ('(Jfor  - Jfd) ', )
@@ -1169,30 +1188,30 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
                     error_descs = ('(Jfor  - Jfd) ', '(Jrev  - Jfd) ', '(Jfor  - Jrev)')
                 for error, desc in zip(abs_err, error_descs):
                     error_str = _format_error(error, abs_error_tol)
-                    logger.info('    Absolute Error {}: {}\n'.format(desc, error_str))
-                logger.info('\n')
+                    logger.info('    Absolute Error {}: {}'.format(desc, error_str))
+                logger.info('')
 
                 # Relative Errors
                 for error, desc in zip(rel_err, error_descs):
                     error_str = _format_error(error, rel_error_tol)
-                    logger.info('    Relative Error {}: {}\n'.format(desc, error_str))
-                logger.info('\n')
+                    logger.info('    Relative Error {}: {}'.format(desc, error_str))
+                logger.info('')
 
                 # Raw Derivatives
-                logger.info('    Raw Forward Derivative (Jfor)\n\n')
+                logger.info('    Raw Forward Derivative (Jfor)\n')
                 logger.info(str(forward))
-                logger.info('\n\n')
+                logger.info('')
 
                 if not totals:
-                    logger.info('    Raw Reverse Derivative (Jfor)\n\n')
+                    logger.info('    Raw Reverse Derivative (Jfor)\n')
                     logger.info(str(reverse))
-                    logger.info('\n\n')
+                    logger.info('')
 
-                logger.info('    Raw FD Derivative (Jfd)\n\n')
+                logger.info('    Raw FD Derivative (Jfd)\n')
                 logger.info(str(fd))
-                logger.info('\n\n')
+                logger.info('')
 
-                logger.info(' -' * 30 + '\n')
+                logger.info(' -' * 30)
 
 
 def _pad_name(name, pad_num=10, quotes=False):
