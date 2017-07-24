@@ -476,7 +476,9 @@ class System(object):
         dict of set
             Dictionary of sets of excluded input variable absolute names, keyed by vec_name.
         """
-        root_vectors = {'input': {}, 'output': {}, 'residual': {}}
+        root_vectors = {'input': OrderedDict(),
+                        'output': OrderedDict(),
+                        'residual': OrderedDict()}
 
         # get all vec_names.  We don't know mode here, so for now, retrieve names
         # from both dvs and responses and use both.
