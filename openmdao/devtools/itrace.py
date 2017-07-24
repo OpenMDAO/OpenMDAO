@@ -68,7 +68,35 @@ def _trace_call(frame, arg, stack, context):
     _indented_print(frame.f_locals, frame.f_locals, len(stack)-1)
     sys.stdout.flush()
 
-def setup(methods=None):
+
+def _trace_return(frame, arg, stack, context):
+    """
+    This is called when a matched function returns.
+
+    This only happens if show_return is True when setup() is called.
+    """
+    qual_cache, method_counts, class_counts = context
+    funcname = find_qualified_name(frame.f_code.co_filename,
+                                   frame.f_code.co_firstlineno, qual_cache)
+
+    self = frame.f_locals['self']
+    try:
+        pname = "(%s)" % self.pathname
+    except AttributeError:
+        pname = ""
+
+    cname = self.__class__.__name__
+    class_counts[cname].add(id(self))
+    sname = "%s#%d%s" % (self.__class__.__name__, len(class_counts[cname]), pname)
+
+    indent = tab * (len(stack)-1)
+    print("%s<-- %s" % (indent, '.'.join((sname, funcname))))
+    if arg is not None:
+        print("%s     %s" % (indent, arg))
+    sys.stdout.flush()
+
+
+def setup(methods=None, show_return=False):
     """
     Setup call tracing.
 
@@ -89,8 +117,13 @@ def setup(methods=None):
         qual_cache = {}
         method_counts = defaultdict(int)
         class_counts = defaultdict(set)
+        if show_return:
+            do_ret = _trace_return
+        else:
+            do_ret = None
         _trace_calls = _create_profile_callback(call_stack, _collect_methods(methods),
                                                 do_call=_trace_call,
+                                                do_ret=do_ret,
                                                 context=(qual_cache, method_counts, class_counts))
 
 
