@@ -770,7 +770,7 @@ class Problem(object):
         # the tuple (absname, oldname) for that variable.  oldname will be
         # the promoted name if the 'global_names' arg is False, else it will
         # be the same as absname (the absolute variable name).
-        voi_lists = defaultdict(list)
+        voi_lists = OrderedDict()
 
         # this maps the names from input_list to the corresponding names
         # of the RHS vectors.  For any variables that are not part of an
@@ -795,12 +795,15 @@ class Problem(object):
                 if name in voi_lists:
                     raise RuntimeError("Variable name '%s' matches an rhs_group name." %
                                        name)
-                # store the absolute name along with the original name, which
-                # can be either promoted or absolute depending on the value
-                # of the 'global_names' flag.
-                voi_lists[name].append((name, old_input_list[i]))
-                inp2rhs_name[name] = 'linear'
+                else:
+                    # store the absolute name along with the original name, which
+                    # can be either promoted or absolute depending on the value
+                    # of the 'global_names' flag.
+                    voi_lists[name] = [(name, old_input_list[i])]
+                    inp2rhs_name[name] = 'linear'
             else:
+                if rhs_group not in voi_lists:
+                    voi_lists[rhs_group] = []
                 voi_lists[rhs_group].append((name, old_input_list[i]))
                 inp2rhs_name[name] = name
 

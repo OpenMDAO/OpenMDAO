@@ -226,7 +226,7 @@ class System(object):
 
         self._num_var = {'input': 0, 'output': 0}
         self._num_var_byset = {'input': {}, 'output': {}}
-        self._var_set2iset = {'input': {}, 'output': {}}
+        self._var_set2iset = OrderedDict([('input', {}), ('output', {})])
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_allprocs_abs_names = {'input': [], 'output': []}
