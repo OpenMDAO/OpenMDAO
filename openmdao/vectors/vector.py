@@ -152,7 +152,10 @@ class Vector(object):
         str
             String rep of this object.
         """
-        return str(self.get_data())
+        try:
+            return str(self.get_data())
+        except Exception as err:
+            return "<error during call to Vector.__str__>: %s" % err
 
     def __len__(self):
         """
@@ -645,7 +648,10 @@ class Transfer(object):
         str
             String rep of this object.
         """
-        return "%s(in=%s, out=%s" % (self.__class__.__name__, self._in_inds, self._out_inds)
+        try:
+            return "%s(in=%s, out=%s" % (self.__class__.__name__, self._in_inds, self._out_inds)
+        except Exception as err:
+            return "<error during call to Transfer.__str__: %s" % err
 
     def _initialize_transfer(self):
         """
