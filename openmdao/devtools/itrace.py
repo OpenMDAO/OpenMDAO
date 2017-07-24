@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import os
 import sys
+import re
 import argparse
 from contextlib import contextmanager
 from collections import defaultdict, OrderedDict
@@ -20,11 +21,13 @@ _registered = False  # prevents multiple atexit registrations
 MAXLINE = 80
 tab = '    '
 
+addr_regex = re.compile(" at 0x[0-9a-z]+")
+
 def _indented_print(f_locals, d, indent, excludes=('__init__',), file=sys.stdout):
     sindent = tab * indent
     sep = '=' if d is f_locals else ':'
 
-    for name in d:
+    for name in sorted(d):
         if name not in excludes:
             if isinstance(d[name], (dict, OrderedDict)):
                 f = cStringIO()
@@ -32,14 +35,15 @@ def _indented_print(f_locals, d, indent, excludes=('__init__',), file=sys.stdout
                 s = "  %s%s%s{%s}" % (sindent, name, sep, f.getvalue())
             else:
                 s = "  %s%s%s%s" % (sindent, name, sep, d[name])
-            if ' object at ' not in s:
-                linelen = len(s)
-                leneq = len(s.split(sep, 1)[0])
-                if linelen > MAXLINE:
-                    if '\n' in s:
-                        # change indent
-                        s = s.replace("\n", "\n%s" % (' '*leneq))
-                print(s, file=file)
+            if ' object at ' in s:
+                s = addr_regex.sub('', s)
+            linelen = len(s)
+            leneq = len(s.split(sep, 1)[0])
+            if linelen > MAXLINE:
+                if '\n' in s:
+                    # change indent
+                    s = s.replace("\n", "\n%s" % (' '*leneq))
+            print(s, file=file)
 
 
 def _trace_call(frame, arg, stack, context):
@@ -92,7 +96,11 @@ def _trace_return(frame, arg, stack, context):
     indent = tab * (len(stack)-1)
     print("%s<-- %s" % (indent, '.'.join((sname, funcname))))
     if arg is not None:
-        print("%s     %s" % (indent, arg))
+        s = "%s     %s" % (indent, arg)
+        if ' object at ' in s:
+            s = addr_regex.sub('', s)
+        print(s)
+
     sys.stdout.flush()
 
 
