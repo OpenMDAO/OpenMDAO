@@ -881,7 +881,9 @@ class System(object):
         alloc_complex : bool
             Whether to allocate any imaginary storage to perform complex step. Default is False.
         """
-        self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
+        self._vectors = vectors = {'input': OrderedDict(),
+                                   'output': OrderedDict(),
+                                   'residual': OrderedDict()}
         self._excluded_vars_out = excl_out
         self._excluded_vars_in = excl_in
 
