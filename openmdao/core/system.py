@@ -559,14 +559,14 @@ class System(object):
         dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
-        root_vectors = {
-            ('input', 'phys0'): {}, ('input', 'phys1'): {},
-            ('input', 'norm0'): {}, ('input', 'norm1'): {},
-            ('output', 'phys0'): {}, ('output', 'phys1'): {},
-            ('output', 'norm0'): {}, ('output', 'norm1'): {},
-            ('residual', 'phys0'): {}, ('residual', 'phys1'): {},
-            ('residual', 'norm0'): {}, ('residual', 'norm1'): {},
-        }
+        root_vectors = OrderedDict([
+            (('input', 'phys0'), {}), (('input', 'phys1'), {}),
+            (('input', 'norm0'), {}), (('input', 'norm1'), {}),
+            (('output', 'phys0'), {}), (('output', 'phys1'), {}),
+            (('output', 'norm0'), {}), (('output', 'norm1'), {}),
+            (('residual', 'phys0'), {}), (('residual', 'phys1'), {}),
+            (('residual', 'norm0'), {}), (('residual', 'norm1'), {}),
+        ])
 
         for key in root_vectors:
             vec_key, coeff_key = key
@@ -971,14 +971,14 @@ class System(object):
         resize : bool
             Whether to resize the root vectors - i.e, because this system is initiating a reconf.
         """
-        self._scaling_vecs = vecs = {
-            ('input', 'phys0'): {}, ('input', 'phys1'): {},
-            ('input', 'norm0'): {}, ('input', 'norm1'): {},
-            ('output', 'phys0'): {}, ('output', 'phys1'): {},
-            ('output', 'norm0'): {}, ('output', 'norm1'): {},
-            ('residual', 'phys0'): {}, ('residual', 'phys1'): {},
-            ('residual', 'norm0'): {}, ('residual', 'norm1'): {},
-        }
+        self._scaling_vecs = vecs = OrderedDict([
+            (('input', 'phys0'), {}), (('input', 'phys1'), {}),
+            (('input', 'norm0'), {}), (('input', 'norm1'), {}),
+            (('output', 'phys0'), {}), (('output', 'phys1'), {}),
+            (('output', 'norm0'), {}), (('output', 'norm1'), {}),
+            (('residual', 'phys0'), {}), (('residual', 'phys1'), {}),
+            (('residual', 'norm0'), {}), (('residual', 'norm1'), {}),
+        ])
 
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
         abs2meta_in = self._var_abs2meta['input']
