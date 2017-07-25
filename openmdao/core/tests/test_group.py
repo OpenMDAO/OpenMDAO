@@ -105,7 +105,7 @@ class TestGroup(unittest.TestCase):
         self.assertTrue(issubclass(w[0].category, DeprecationWarning))
         self.assertEqual(str(w[0].message),
                          "The 'add' method provides backwards compatibility "
-                         "with OpenMDAO <= 1.x ; use add_subsystem instead.")
+                         "with OpenMDAO <= 1.x ; use 'add_subsystem' instead.")
 
         self.assertTrue(ecomp is comp1)
 
