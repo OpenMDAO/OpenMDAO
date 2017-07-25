@@ -12,6 +12,7 @@ from six import iteritems
 
 import numpy as np
 
+from openmdao.core.analysis_error import AnalysisError
 from openmdao.solvers.solver import NonlinearSolver
 
 
@@ -135,6 +136,8 @@ class ArmijoGoldsteinLS(NonlinearSolver):
 
     Attributes
     ----------
+    _analysis_error_raised : bool
+        Flag is set to True if a subsystem raises an AnalysisError.
     _do_subsolve : bool
         Flag used by parent solver to tell the line search whether to solve subsystems while
         backtracking.
@@ -157,6 +160,8 @@ class ArmijoGoldsteinLS(NonlinearSolver):
 
         # Parent solver sets this to control whether to solve subsystems.
         self._do_subsolve = False
+
+        self._analysis_error_raised = False
 
     def _iter_initialize(self):
         """
@@ -218,11 +223,14 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         opt.declare('print_bound_enforce', default=False,
                     desc="Set to True to print out names and values of variables that are pulled "
                     "back to their bounds.")
+        opt.declare('retry_on_analysis_error', default=True,
+                    desc="Backtrack and retry if an AnalysisError is raised.")
 
     def _iter_execute(self):
         """
         Perform the operations in the iteration loop.
         """
+        self._analysis_error_raised = False
         system = self._system
         u = system._outputs
         du = system._vectors['output']['linear']
@@ -232,15 +240,22 @@ class ArmijoGoldsteinLS(NonlinearSolver):
 
             self._solver_info.prefix += '+  '
 
-            for isub, subsys in enumerate(system._subsystems_allprocs):
-                system._transfer('nonlinear', 'fwd', isub)
+            try:
+                for isub, subsys in enumerate(system._subsystems_allprocs):
+                    system._transfer('nonlinear', 'fwd', isub)
 
-                if subsys in system._subsystems_myproc:
-                    subsys._solve_nonlinear()
+                    if subsys in system._subsystems_myproc:
+                        subsys._solve_nonlinear()
 
-            self._solver_info.prefix = self._solver_info.prefix[:-3]
+                self._solver_info.prefix = self._solver_info.prefix[:-3]
 
-            system._apply_nonlinear()
+                system._apply_nonlinear()
+
+            except AnalysisError as err:
+                if self.options['retry_on_analysis_error']:
+                    self._analysis_error_raised = True
+                else:
+                    raise AnalysisError(str(err))
 
         u.add_scal_vec(-self.alpha, du)
         self.alpha *= self.options['rho']
@@ -273,7 +288,8 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         # We don't have an actual gradient, but we have the Newton vector that should
         # take us to zero, and our "runs" are the same, and we can just compare the
         # "rise".
-        while self._iter_count < maxiter and (norm0 - norm) < c * self.alpha * norm0:
+        while self._iter_count < maxiter and (((norm0 - norm) < c * self.alpha * norm0) or \
+                                              self._analysis_error_raised):
             self._iter_execute()
             self._iter_count += 1
             norm = self._iter_get_norm()
