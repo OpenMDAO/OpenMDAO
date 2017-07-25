@@ -74,7 +74,7 @@ class TestGroup(unittest.TestCase):
 
     def test_same_sys_name(self):
         """Test error checking for the case where we add two subsystems with the same name."""
-        p = Problem(model=Group())
+        p = Problem()
         p.model.add_subsystem('comp1', IndepVarComp('x', 5.0))
         p.model.add_subsystem('comp2', ExecComp('b=2*a'))
 
@@ -86,7 +86,7 @@ class TestGroup(unittest.TestCase):
             self.fail('Exception expected.')
 
     def test_group_simple(self):
-        p = Problem(model=Group())
+        p = Problem()
         p.model.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0))
 
         p.setup()
@@ -97,12 +97,20 @@ class TestGroup(unittest.TestCase):
     def test_group_add(self):
         model=Group()
         ecomp = ExecComp('b=2.0*a', a=3.0, b=6.0)
-        comp1 = model.add('comp1', ecomp)
+
+        with warnings.catch_warnings(record=True) as w:
+            comp1 = model.add('comp1', ecomp)
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message),
+                         "The 'add' method provides backwards compatibility "
+                         "with OpenMDAO <= 1.x ; use add_subsystem instead.")
 
         self.assertTrue(ecomp is comp1)
 
     def test_group_simple_promoted(self):
-        p = Problem(model=Group())
+        p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('a', 3.0),
                               promotes_outputs=['a'])
         p.model.add_subsystem('comp1', ExecComp('b=2.0*a'),
@@ -115,7 +123,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['comp1.b'], 6.0)
 
     def test_group_rename_connect(self):
-        p = Problem(model=Group())
+        p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('aa', 3.0),
                               promotes=['aa'])
         p.model.add_subsystem('comp1', ExecComp('b=2.0*aa'),
@@ -132,12 +140,49 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['comp1.b'], 6.0)
         self.assertEqual(p['comp2.b'], 9.0)
 
+    def test_subsys_attributes(self):
+        p = Problem()
+
+        class MyGroup(Group):
+            def setup(self):
+                # two subsystems added during setup
+                self.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0))
+                self.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0))
+
+        # subsystems become attributes
+        my_group = p.model.add_subsystem('gg', MyGroup())
+        self.assertTrue(p.model.gg is my_group)
+
+        # after calling setup(), MyGroup's subsystems are also attributes
+        p.setup()
+        self.assertTrue(hasattr(p.model.gg, 'comp1'))
+        self.assertTrue(hasattr(p.model.gg, 'comp2'))
+
+        # calling setup() again doesn't break anything
+        p.setup()
+        self.assertTrue(p.model.gg is my_group)
+        self.assertTrue(hasattr(p.model.gg, 'comp1'))
+        self.assertTrue(hasattr(p.model.gg, 'comp2'))
+
+        # name cannot start with an underscore
+        with self.assertRaises(Exception) as err:
+            p.model.add_subsystem('_bad_name', Group())
+        self.assertEqual(str(err.exception),
+                         "'_bad_name' is not a valid system name.")
+
+        # 'name', 'pathname', 'comm' and 'metadata' are reserved names
+        for reserved in ['name', 'pathname', 'comm', 'metadata']:
+            with self.assertRaises(Exception) as err:
+                p.model.add_subsystem(reserved, Group())
+            self.assertEqual(str(err.exception),
+                             "Group '' already has an attribute '%s'." %
+                             reserved)
 
     def test_group_nested(self):
-        p = Problem(model=Group())
-        g1 = p.model.add_subsystem('G1', Group())
-        g1.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0))
-        g1.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0))
+        p = Problem()
+        p.model.add_subsystem('G1', Group())
+        p.model.G1.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0))
+        p.model.G1.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0))
 
         p.setup()
 
@@ -166,7 +211,7 @@ class TestGroup(unittest.TestCase):
 
     def test_group_nested_promoted1(self):
         # promotes from bottom level up 1
-        p = Problem(model=Group())
+        p = Problem()
         g1 = p.model.add_subsystem('G1', Group())
         g1.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0),
                          promotes_inputs=['a'], promotes_outputs=['b'])
@@ -185,7 +230,7 @@ class TestGroup(unittest.TestCase):
 
     def test_group_nested_promoted2(self):
         # promotes up from G1 level
-        p = Problem(model=Group())
+        p = Problem()
         g1 = Group()
         g1.add_subsystem('comp1', ExecComp('b=2.0*a', a=3.0, b=6.0))
         g1.add_subsystem('comp2', ExecComp('b=3.0*a', a=4.0, b=12.0))
@@ -208,7 +253,7 @@ class TestGroup(unittest.TestCase):
 
     def test_group_promotes(self):
         """Promoting a single variable."""
-        p = Problem(model=Group())
+        p = Problem()
         p.model.add_subsystem('comp1', IndepVarComp([
                 ('a', 2.0),
                 ('x', 5.0),
@@ -225,7 +270,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['comp2.y'], 10)
 
     def test_group_renames(self):
-        p = Problem(model=Group())
+        p = Problem()
         p.model.add_subsystem('comp1', IndepVarComp('x', 5.0),
                               promotes_outputs=[('x', 'foo')])
         p.model.add_subsystem('comp2', ExecComp('y=2*foo'), promotes_inputs=['foo'])
@@ -238,7 +283,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['comp2.y'], 10)
 
     def test_group_renames_errors_single_string(self):
-        p = Problem(model=Group())
+        p = Problem()
         with self.assertRaises(Exception) as err:
             p.model.add_subsystem('comp1', IndepVarComp('x', 5.0),
                                   promotes_outputs='x')
@@ -246,7 +291,7 @@ class TestGroup(unittest.TestCase):
                          ": promotes must be an iterator of strings and/or tuples.")
 
     def test_group_renames_errors_not_found(self):
-        p = Problem(model=Group())
+        p = Problem()
         p.model.add_subsystem('comp1', IndepVarComp('x', 5.0),
                               promotes_outputs=[('xx', 'foo')])
         p.model.add_subsystem('comp2', ExecComp('y=2*foo'), promotes_inputs=['foo'])
@@ -257,7 +302,7 @@ class TestGroup(unittest.TestCase):
                          "comp1: 'promotes_outputs' failed to find any matches for the following names or patterns: ['xx'].")
 
     def test_group_renames_errors_bad_tuple(self):
-        p = Problem(model=Group())
+        p = Problem()
         p.model.add_subsystem('comp1', IndepVarComp('x', 5.0),
                               promotes_outputs=[('x', 'foo', 'bar')])
         p.model.add_subsystem('comp2', ExecComp('y=2*foo'), promotes_inputs=['foo'])
@@ -269,7 +314,7 @@ class TestGroup(unittest.TestCase):
 
     def test_group_promotes_multiple(self):
         """Promoting multiple variables."""
-        p = Problem(model=Group())
+        p = Problem()
         p.model.add_subsystem('comp1', IndepVarComp([
                 ('a', 2.0),
                 ('x', 5.0),
@@ -287,7 +332,7 @@ class TestGroup(unittest.TestCase):
 
     def test_group_promotes_all(self):
         """Promoting all variables with asterisk."""
-        p = Problem(model=Group())
+        p = Problem()
         p.model.add_subsystem('comp1', IndepVarComp([
                 ('a', 2.0),
                 ('x', 5.0),
@@ -371,7 +416,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['group2.comp2.b'], 40.0)
 
     def test_reused_output_promoted_names(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
         G1 = prob.model.add_subsystem('G1', Group())
         G1.add_subsystem("C1", ExecComp("y=2.0*x"), promotes=['y'])
@@ -381,7 +426,7 @@ class TestGroup(unittest.TestCase):
             prob.setup(check=False)
 
     def test_basic_connect_units(self):
-        p = Problem(model=Group())
+        p = Problem()
         indep = p.model.add_subsystem('indep', IndepVarComp())
         indep.add_output('x', np.ones(5), units='ft')
         p.model.add_subsystem('C1', ExecComp('y=sum(x)', x={'value': np.zeros(5), 'units': 'inch'},
@@ -395,7 +440,7 @@ class TestGroup(unittest.TestCase):
         assert_rel_error(self, p['C1.y'], 60.)
 
     def test_connect_1_to_many(self):
-        p = Problem(model=Group())
+        p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)))
         p.model.add_subsystem('C1', ExecComp('y=sum(x)*2.0', x=np.zeros(5)))
         p.model.add_subsystem('C2', ExecComp('y=sum(x)*4.0', x=np.zeros(5)))
@@ -417,7 +462,7 @@ class TestGroup(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])*2.0
 
-        p = Problem(model=Group())
+        p = Problem()
 
         p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)))
         p.model.add_subsystem('C1', MyComp1())
@@ -430,7 +475,7 @@ class TestGroup(unittest.TestCase):
                          "connect('indep.x', 'C1.x') and add_input('C1.x', ...).")
 
     def test_connect_src_indices(self):
-        p = Problem(model=Group())
+        p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)))
         p.model.add_subsystem('C1', ExecComp('y=sum(x)*2.0', x=np.zeros(3)))
         p.model.add_subsystem('C2', ExecComp('y=sum(x)*4.0', x=np.zeros(2)))
@@ -451,7 +496,7 @@ class TestGroup(unittest.TestCase):
         assert_rel_error(self, p['C2.y'], 8.)
 
     def test_connect_src_indices_noflat(self):
-        p = Problem(model=Group())
+        p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('x', np.arange(12).reshape((4,3))))
         p.model.add_subsystem('C1', ExecComp('y=numpy.sum(x)*2.0', x=np.zeros((2,2))))
 
@@ -468,7 +513,7 @@ class TestGroup(unittest.TestCase):
         assert_rel_error(self, p['C1.y'], 42.)
 
     def test_promote_not_found1(self):
-        p = Problem(model=Group())
+        p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)),
                               promotes_outputs=['x'])
         p.model.add_subsystem('C1', ExecComp('y=x'), promotes_inputs=['x'])
@@ -480,7 +525,7 @@ class TestGroup(unittest.TestCase):
                          "C2: 'promotes_outputs' failed to find any matches for the following names or patterns: ['x*'].")
 
     def test_promote_not_found2(self):
-        p = Problem(model=Group())
+        p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)),
                               promotes_outputs=['x'])
         p.model.add_subsystem('C1', ExecComp('y=x'), promotes_inputs=['x'])
@@ -492,7 +537,7 @@ class TestGroup(unittest.TestCase):
                          "C2: 'promotes_inputs' failed to find any matches for the following names or patterns: ['xx'].")
 
     def test_promote_not_found3(self):
-        p = Problem(model=Group())
+        p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)),
                               promotes_outputs=['x'])
         p.model.add_subsystem('C1', ExecComp('y=x'), promotes=['x'])
@@ -550,7 +595,7 @@ class TestGroup(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])*4.0
 
-        p = Problem(model=Group())
+        p = Problem()
 
         # by promoting the following output and inputs to 'x', they will
         # be automatically connected
@@ -583,7 +628,7 @@ class TestGroup(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])
 
-        p = Problem(model=Group())
+        p = Problem()
 
         # by promoting the following output and inputs to 'x', they will
         # be automatically connected
@@ -609,7 +654,7 @@ class TestGroup(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = inputs['x']*2.0
 
-        p = Problem(model=Group())
+        p = Problem()
 
         p.model.add_subsystem('indep',
                               IndepVarComp('x', np.arange(12).reshape((4,3))),
@@ -631,7 +676,7 @@ class TestGroup(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])
 
-        p = Problem(model=Group())
+        p = Problem()
 
         p.model.add_subsystem('indep',
                               IndepVarComp('x', np.arange(12).reshape((4,3))),
@@ -679,7 +724,7 @@ class TestGroup(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])
 
-        p = Problem(model=Group())
+        p = Problem()
 
         p.model.add_subsystem('indep',
                               IndepVarComp('x', np.arange(12).reshape(src_shape)),

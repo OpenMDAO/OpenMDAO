@@ -23,7 +23,7 @@ from openmdao.utils.units import is_compatible
 
 # regex to check for valid names.
 import re
-namecheck_rgx = re.compile('[_a-zA-Z][_a-zA-Z0-9]*')
+namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
 
 
 class Group(System):
@@ -841,8 +841,8 @@ class Group(System):
         System
             The System that was passed in.
         """
-        warn_deprecation('This method provides backwards compatibility with '
-                         'OpenMDAO <= 1.x ; use add_subsystem instead.')
+        warn_deprecation("The 'add' method provides backwards compatibility with "
+                         "OpenMDAO <= 1.x ; use add_subsystem instead.")
 
         return self.add_subsystem(name, subsys, promotes=promotes)
 
@@ -885,15 +885,15 @@ class Group(System):
             if name == sub.name:
                 raise RuntimeError("Subsystem name '%s' is already used." %
                                    name)
-        if hasattr(self, name):
-            msg = "Group '%s' already contains an attribute with name '%s'." % \
-                  (self.name, name)
-            raise RuntimeError(msg)
+
+        if hasattr(self, name) and not isinstance(getattr(self, name), System):
+            # replacing a subsystem is ok (e.g. resetup) but no other attribute
+            raise RuntimeError("Group '%s' already has an attribute '%s'." %
+                               (self.name, name))
 
         match = namecheck_rgx.match(name)
         if match is None or match.group() != name:
-            raise NameError("%s: '%s' is not a valid system name." %
-                            (self.pathname, name))
+            raise NameError("'%s' is not a valid system name." % name)
 
         subsys.name = name
 
