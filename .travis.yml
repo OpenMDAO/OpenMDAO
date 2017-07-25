@@ -31,7 +31,7 @@ notifications:
   email: false
   slack:
     on_success: never
-    secure: c8xi/sAb5QJPR7CrFPdL/sXOhPFdyR3E9lv9Z2h2CxGQWINyRN6Xj7/rF6bW0PfINvqFAHL4+iPM+0bmM0+Av9AW3Dg2fXZuN3XueMwNTFnnpO2g1NKJ44cFsGXCPytLTvg+zZqxzR+Fz13DcrdHQEhfSKcuZ3akbp3OIAdAYmpaiqZPz9NBX3M7LvDOnWa9TNxznltR1LHtdP3RGOm/xput0dvGuY8zJSTYCxusnZNYBz5IQuNSoyBfqOFztLl6MGcqT5+/cE+T2AXEPLOKGJXahOdk3d/UXEb/vRGc19oPU/ORZZvde7IuAK1GJhjXPUhgmqLIlFTRlOpLBcllUW8asKHeRIHOvNbzMrYKngq7JLe97cshabNvvXH3MYG5HJKkqOWD6boe5JXxpkruE4oF3JCIgSs888YWC4bdAvOmxU8rxtBp4N5S+PXgqzOPDu10klcNOfSI3DYP/4tbZ25/RCrmwJbj6H1+Foi+oxkjDQnxabg6rUcB0ILykue5bogSKSk6HsIp0jU2zwpv7b5w4r1pMgZD6L+mlR5N16X4qFwQAbxWaxQYADywzbWRshEPkHCaMriHCWi3IOU/ESrbKfCT9h66uGMrkv/5qEHoYFn3TZaLHSTOKRnT5SYHd9BiKmBBUKiOxI1Gf6tyxeG/ndowWFQrz8HLESFNRO4=
+    secure: lwAjQyviKvouLSTm2xO+AqjY3B8/5jkr/1dreeUz60T4E00llatrgZTXX6m04D2PusKvWudYPl8KLqhqawTVpM0CSOJODmbRyrn9MUxV/UlOeFTVwtl6c1EgWxoHTLh47XMnGhUh2z9Otz/2GLfMQteXXmxguX0KgNy+s++hHP8ycPDWjZ7BUVkNT+kJn6l5JYLsIW5dR/06W3Wg32cEzo7kP5tAWY4yH3YAF1tyBe1BSmMLP38IwtQKTBef6QUAaXwBgVBqFBF/h0sWgjKdwzqSMUCA1J6yrpeYHEC6Wvmwl7Yj3Lqgs6y3BNZ6v1dV1NUqPa+PC35QL043Btvv/hOAyCx24Srt1YnNT7bJg+rverIBoKKd6U2cFeBWCDSaKtpMXQyA61D/MReEGND3mtnH1mq7DcvF7cDchMAU5UH9qAHP02wbX7FLdfqs2P+X8+pA+m0ip5xRKFu3AdBUkPG6Eaoyln3a0O9SDep3gF+pgBoemGwawSazHafJjqh/tmFsQARnI8UsAIBNyWT3iK0518r4sGFmRH57csNzICBCn9fPDtQ+MRJk9mu/zLBTNI8ms/2l7mMe74hewtTWaSPvCTZd4Woq1A5Bexd4JlvFOfkyiQZgBNI97qhly9OjqW7M3UiIDlugAR4UZw396DhQ4WVq3xPC5lFD9jAwjfk=
 
 before_install:
 - OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux"; fi)
@@ -70,7 +70,9 @@ install:
   fi
 - pip install redbaron
 - pip install git+https://github.com/OpenMDAO/testflo.git
-- pip install .
+- pip install coverage
+- pip install coveralls
+- pip install -e .
 
 script:
 # make docs first
@@ -78,4 +80,7 @@ script:
 - make all
 # run all openmdao tests
 - testflo -n 1 openmdao -m "ptest*"
-- testflo -n 1 openmdao
+- testflo -n 1 openmdao --coverage --coverpkg openmdao
+
+after_success:
+  coveralls
