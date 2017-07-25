@@ -4,7 +4,8 @@ from six.moves import range
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
 from openmdao.devtools.testutil import TestLogger
-from openmdao.error_checking.check_config import get_sccs
+from openmdao.utils.graph_utils import all_connected_edges
+from openmdao.error_checking.check_config import get_sccs_topo
 
 
 class MyComp(ExecComp):
@@ -114,8 +115,10 @@ class TestCheckConfig(unittest.TestCase):
         self.assertEqual(warnings[2], "System 'G1.C1' executes out-of-order with respect to its source systems ['G1.C2']")
 
         # test comps_only cycle check
-        sccs = [sorted(s) for s in get_sccs(root, comps_only=True) if len(s) > 1]
+        graph = root.compute_sys_graph(comps_only=True)
+        sccs = [sorted(s) for s in get_sccs_topo(graph) if len(s) > 1]
         self.assertEqual([['C4', 'G1.C1', 'G1.C2']], sccs)
+
 
     def test_multi_cycles(self):
         p = Problem(model=Group())

@@ -19,7 +19,6 @@ from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.error_checking.check_config import compute_sys_graph
 #from openmdao.util.record_util import is_valid_sqlite3_db
 import base64
 
@@ -105,7 +104,8 @@ def _get_viewer_data(problem_or_rootgroup):
 
     connections_list = []
     sorted_abs_input2src = OrderedDict(sorted(root_group._conn_global_abs_in2out.items())) # sort to make deterministic for testing
-    G = compute_sys_graph(root_group, sorted_abs_input2src, comps_only=True)
+    root_group._conn_global_abs_in2out = sorted_abs_input2src
+    G = root_group.compute_sys_graph(comps_only=True)
     scc = nx.strongly_connected_components(G)
     scc_list = [s for s in scc if len(s)>1] #list(scc)
     for in_abs, out_abs in iteritems(sorted_abs_input2src):

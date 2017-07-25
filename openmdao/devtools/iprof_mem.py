@@ -41,7 +41,7 @@ def setup(methods=None):
     global _registered, _trace_memory, mem_usage
     if not _registered:
         from openmdao.devtools.debug import mem_usage
-        if methods is None:
+        if methods is None or methods not in func_group:
             methods = func_group['openmdao_all']
 
         mem_changes = {}
