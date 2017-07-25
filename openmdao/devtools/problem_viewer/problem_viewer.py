@@ -5,6 +5,7 @@ import pickle
 import json
 from six import iteritems
 import networkx as nx
+import shutil
 from collections import OrderedDict
 
 from sqlitedict import SqliteDict
@@ -19,7 +20,6 @@ from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
-#from openmdao.util.record_util import is_valid_sqlite3_db
 import base64
 
 
@@ -156,10 +156,9 @@ def view_tree(*args, **kwargs):
     warn_deprecation("view_tree is deprecated. Please switch to view_model.")
     view_model(*args, **kwargs)
 
-def view_model(problem_or_filename, outfile='partition_tree_n2.html', show_browser=True, offline=True, embed=False):
+def view_model(problem_or_filename, outfile_name='visualization', show_browser=True):
     """
-    Generates a self-contained html file containing a tree viewer
-    of the specified type.  Optionally pops up a web browser to
+    Generates a directory containing a tree viewer Optionally pops up a web browser to
     view the file.
 
     Parameters
@@ -168,92 +167,34 @@ def view_model(problem_or_filename, outfile='partition_tree_n2.html', show_brows
         Problem() : The Problem (after problem.setup()) for the desired tree.
         string : The filename of the case recorder file containing the data required to build the tree.
 
-    outfile : str, optional
-        The name of the output html file.  Defaults to 'partition_tree_n2.html'.
+    outfile_name : str, optional
+        The name of the output html file.  Defaults to 'visualization'.
 
     show_browser : bool, optional
         If True, pop up the system default web browser to view the generated html file.
         Defaults to True.
-
-    offline : bool, optional
-        If True, embed the javascript d3 library into the generated html file so that the tree can be viewed
-        offline without an internet connection.  Otherwise if False, have the html request the latest d3 file
-        from https://d3js.org/d3.v4.min.js when opening the html file.
-        Defaults to True.
-
-    embed : bool, optional
-        If True, export only the innerHTML that is between the body tags, used for embedding the viewer into another html file.
-        If False, create a standalone HTML file that has the DOCTYPE, html, head, meta, and body tags.
-        Defaults to False.
     """
-    viewer = 'partition_tree_n2.template'
+    model_data_filename = 'model_data.js'
+    folder_name = outfile_name
 
     code_dir = os.path.dirname(os.path.abspath(__file__))
-
-    with open(os.path.join(code_dir, viewer), "r") as f:
-        template = f.read()
-
-    html_begin_tags = ("<!DOCTYPE html>\n"
-        "<html>\n"
-        "<head>\n"
-        "    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\">\n"
-        "</head>\n"
-        "<body>\n")
-
-    html_end_tags = ("</body>\n"
-        "</html>\n")
-
-    display_none_attr = ""
-
-    if embed:
-        html_begin_tags = html_end_tags = ""
-        display_none_attr = " style=\"display:none\""
-
-    d3_library = "<script src=\"https://d3js.org/d3.v4.min.js\" charset=\"utf-8\"></script>"
-    if offline:
-        with open(os.path.join(code_dir, 'd3.v4.min.js'), "r") as f:
-            d3_library = "<script type=\"text/javascript\"> %s </script>" % (f.read())
-
-    with open(os.path.join(code_dir, "fontello.woff"), "rb") as f:
-        encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
-
-    with open(os.path.join(code_dir, 'awesomplete.css'), "r") as f:
-            awesomplete_css = "%s" % (f.read())
-
-    with open(os.path.join(code_dir, 'awesomplete.js'), "r") as f:
-            awesomplete_js = "%s" % (f.read())
 
     if isinstance(problem_or_filename, Problem):
         model_viewer_data = _get_viewer_data(problem_or_filename)
 
-    # NOTE: Commenting this out because some commits broke this code. With this change, view_model
-    # still works for problems.
-    #else:
-        ## Do not know file type. Try opening to see what works
-        #file_type = None
-        #if is_valid_sqlite3_db(problem_or_filename):
-            #db = SqliteDict(filename=problem_or_filename, flag='r', tablename='metadata')
-            #file_type = "sqlite"
-        #else:
-            #try:
-                #hdf = h5py.File(problem_or_filename, 'r')
-                #file_type = 'hdf5'
-            #except:
-                #raise ValueError("The given filename is not one of the supported file formats: sqlite or hdf5")
+    model_data = json.dumps(model_viewer_data)
 
-        #if file_type == "sqlite":
-            #model_viewer_data = db['model_viewer_data']
-        #elif file_type == "hdf5":
-            #metadata = hdf.get('metadata', None)
-            #model_viewer_data = pickle.loads(metadata.get('model_viewer_data').value)
+    cur_dir = os.getcwd()
+    directory = os.path.dirname(cur_dir + '/' + folder_name)
 
+    if not os.path.exists(directory):
+        os.stat(directory)
 
-    tree_json = json.dumps(model_viewer_data['tree'])
-    conns_json = json.dumps(model_viewer_data['connections_list'])
+    shutil.copytree(src=code_dir + '/visualization', dst=folder_name)
 
-    with open(outfile, 'w') as f:
-        f.write(template % (html_begin_tags, awesomplete_css, encoded_font, display_none_attr, d3_library, awesomplete_js, tree_json, conns_json, html_end_tags))
+    with open(cur_dir + '/' + folder_name + '/' + model_data_filename, 'w') as f:
+        f.write('var modelData = %s' % model_data)
 
     if show_browser:
         from openmdao.devtools.webview import webview
-        webview(outfile)
+        webview(cur_dir + '/' + folder_name + '/index.html')
