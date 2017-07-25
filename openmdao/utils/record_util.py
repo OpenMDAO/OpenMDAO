@@ -21,7 +21,6 @@ def create_local_meta(name):
     """
     local_meta = {
         'name': name,
-         # 'coord': parent_coordinate + [name, (0,)],
         'timestamp': None,
         'success': 1,
         'msg': '',

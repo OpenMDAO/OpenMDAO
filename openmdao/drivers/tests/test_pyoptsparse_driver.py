@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, AnalysisError, ExplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
@@ -18,6 +18,64 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
 
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+
+
+class ParaboloidAE(ExplicitComponent):
+    """ Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
+    This version raises an analysis error 50% of the time.
+    The AE in ParaboloidAE stands for AnalysisError."""
+
+    def __init__(self):
+        super(ParaboloidAE, self).__init__()
+        self.fail_hard = False
+
+    def setup(self):
+        self.add_input('x', val=0.0)
+        self.add_input('y', val=0.0)
+
+        self.add_output('f_xy', val=0.0)
+
+        self.eval_iter_count = 0
+        self.eval_fail_at = 3
+
+        self.grad_iter_count = 0
+        self.grad_fail_at = 100
+
+    def compute(self, inputs, outputs):
+        """f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
+        Optimal solution (minimum): x = 6.6667; y = -7.3333
+        """
+        if self.eval_iter_count == self.eval_fail_at:
+            self.eval_iter_count = 0
+
+            if self.fail_hard:
+                raise RuntimeError('This should error.')
+            else:
+                raise AnalysisError('Try again.')
+
+        x = inputs['x']
+        y = inputs['y']
+
+        outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+        self.eval_iter_count += 1
+
+    def compute_partials(self, inputs, outputs, partials):
+        """ Jacobian for our paraboloid."""
+
+        if self.grad_iter_count == self.grad_fail_at:
+            self.grad_iter_count = 0
+
+            if self.fail_hard:
+                raise RuntimeError('This should error.')
+            else:
+                raise AnalysisError('Try again.')
+
+        x = inputs['x']
+        y = inputs['y']
+
+        partials['f_xy','x'] = 2.0*x - 6.0 + y
+        partials['f_xy','y'] = 2.0*y + 8.0 + x
+        self.grad_iter_count += 1
 
 
 class TestPyoptSparse(unittest.TestCase):
@@ -935,6 +993,175 @@ class TestPyoptSparse(unittest.TestCase):
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
         assert_rel_error(self, prob['x'], 0.0, 1e-3)
+
+    def test_analysis_error_objfunc(self):
+
+        # Component raises an analysis error during some runs, and pyopt
+        # attempts to recover.
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+
+        model.add_subsystem('comp', ParaboloidAE(), promotes=['*'])
+
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
+
+        prob.driver.options['print_results'] = False
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
+        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+
+        # Normally it takes 9 iterations, but takes 13 here because of the
+        # analysis failures. (note SLSQP takes 5 instead of 4)
+        if OPTIMIZER == 'SLSQP':
+            self.assertEqual(prob.driver.iter_count, 5)
+        else:
+            self.assertEqual(prob.driver.iter_count, 13)
+
+    def test_raised_error_objfunc(self):
+
+        # Component fails hard this time during execution, so we expect
+        # pyoptsparse to raise.
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+
+        comp = model.add_subsystem('comp', ParaboloidAE(), promotes=['*'])
+
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.driver = pyOptSparseDriver()
+
+        # SNOPT has a weird cleanup problem when this fails, so we use SLSQP. For the
+        # regular failure, it doesn't matter which opt we choose since they all fail through.
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.opt_settings['ACC'] = 1e-9
+
+        prob.driver.options['print_results'] = False
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        comp.fail_hard = True
+
+        prob.setup(check=False)
+
+        with self.assertRaises(Exception) as err:
+            prob.run_driver()
+
+        # pyopt's failure message differs by platform and is not informative anyway
+
+    def test_analysis_error_sensfunc(self):
+
+        # Component raises an analysis error during some linearize calls, and
+        # pyopt attempts to recover.
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+
+        comp = model.add_subsystem('comp', ParaboloidAE(), promotes=['*'])
+
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
+
+        prob.driver.options['print_results'] = False
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        comp.grad_fail_at = 2
+        comp.eval_fail_at = 100
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        # SLSQP does a bad job recovering from gradient failures
+        if OPTIMIZER == 'SLSQP':
+            tol = 1e-2
+        else:
+            tol = 1e-6
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_rel_error(self, prob['x'], 7.16667, tol)
+        assert_rel_error(self, prob['y'], -7.833334, tol)
+
+        # Normally it takes 9 iterations, but takes 13 here because of the
+        # gradfunc failures. (note SLSQP just doesn't do well)
+        if OPTIMIZER == 'SNOPT':
+            self.assertEqual(prob.driver.iter_count, 13)
+
+    def test_raised_error_sensfunc(self):
+
+        # Component fails hard this time during gradient eval, so we expect
+        # pyoptsparse to raise.
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+
+        comp = model.add_subsystem('comp', ParaboloidAE(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.driver = pyOptSparseDriver()
+
+        # SNOPT has a weird cleanup problem when this fails, so we use SLSQP. For the
+        # regular failure, it doesn't matter which opt we choose since they all fail through.
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.opt_settings['ACC'] = 1e-9
+
+        prob.driver.options['print_results'] = False
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        comp.fail_hard = True
+        comp.grad_fail_at = 2
+        comp.eval_fail_at = 100
+
+        prob.setup(check=False)
+
+        with self.assertRaises(Exception) as err:
+            prob.run_driver()
+
+        # pyopt's failure message differs by platform and is not informative anyway
+        del prob
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,9 +1,12 @@
 """ Test for the Backktracking Line Search"""
 
-import numpy as np
+import sys
 import unittest
 
+from six.moves import cStringIO as StringIO
 from six.moves import range
+
+import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, DirectSolver
 from openmdao.devtools.testutil import assert_rel_error
@@ -142,7 +145,8 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
     def test_linesearch_vector_bound_enforcement(self):
         top = self.top
 
-        top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
+        ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
+        ls.options['print_bound_enforce'] = True
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -159,7 +163,20 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         top['px.x'] = 0.5
         top['comp.y'] = 0.
         top['comp.z'] = 2.4
-        top.run_model()
+
+        stdout = sys.stdout
+        strout = StringIO()
+
+        sys.stdout = strout
+        try:
+            top.run_model()
+        finally:
+            sys.stdout = stdout
+
+        txt = strout.getvalue()
+
+        self.assertTrue("'comp.z' exceeds upper bound" in txt)
+
         for ind in range(3):
             assert_rel_error(self, top['comp.z'][ind], [2.5], 1e-8)
 
@@ -467,6 +484,32 @@ class TestFeatureLineSearch(unittest.TestCase):
         print(top['comp.z'][1])
         print(top['comp.z'][2])
 
+    def test_feature_print_bound_enforce(self):
+        top = Problem()
+        top.model = Group()
+        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
+        top.model.connect('px.x', 'comp.x')
+
+        newt = top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver.options['maxiter'] = 2
+        top.model.linear_solver = ScipyIterativeSolver()
+
+        ls = newt.linesearch = BoundsEnforceLS(bound_enforcement='vector')
+        ls.options['print_bound_enforce'] = True
+
+        top.set_solver_print(level=2)
+        top.setup()
+
+        # Test lower bounds: should go to the lower bound and stall
+        top['px.x'] = 2.0
+        top['comp.y'] = 0.
+        top['comp.z'] = 1.6
+        top.run_model()
+
+        assert_rel_error(self, top['comp.z'][0], [1.5], 1e-8)
+        assert_rel_error(self, top['comp.z'][1], [1.5], 1e-8)
+        assert_rel_error(self, top['comp.z'][2], [1.5], 1e-8)
 
 if __name__ == "__main__":
     unittest.main()
