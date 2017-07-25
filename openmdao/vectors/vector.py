@@ -47,6 +47,8 @@ class Vector(object):
         Pointer to the owning system.
     _iproc : int
         Global processor index.
+    _length : int
+        Length of flattened vector.
     _views : dict
         Dictionary mapping absolute variable names to the ndarray views.
     _views_flat : dict
@@ -117,11 +119,12 @@ class Vector(object):
         self._indices = {}
 
         # Support for Complex Step
-        self._imag_data = {}
-        self._imag_views = {}
-        self._complex_view_cache = {}
-        self._imag_views_flat = {}
         self._alloc_complex = alloc_complex
+        if alloc_complex:
+            self._imag_data = {}
+            self._imag_views = {}
+            self._complex_view_cache = {}
+            self._imag_views_flat = {}
 
         if root_vector is None:
             self._root_vector = self
@@ -137,6 +140,33 @@ class Vector(object):
 
         self._initialize_data(root_vector)
         self._initialize_views()
+
+        self._length = np.sum(self._system._var_sizes[self._typ][self._iproc, :])
+
+    def __str__(self):
+        """
+        Return a string representation of the Vector object.
+
+        Returns
+        -------
+        str
+            String rep of this object.
+        """
+        try:
+            return str(self.get_data())
+        except Exception as err:
+            return "<error during call to Vector.__str__>: %s" % err
+
+    def __len__(self):
+        """
+        Return the flattened length of this Vector.
+
+        Returns
+        -------
+        int
+            Total flattened length of this vector.
+        """
+        return self._length
 
     def _create_subvector(self, system):
         """
@@ -191,8 +221,7 @@ class Vector(object):
             Array combining the data of all the varsets.
         """
         if new_array is None:
-            total_size = np.sum(self._system._var_sizes[self._typ][self._iproc, :])
-            new_array = np.zeros(total_size)
+            new_array = np.zeros(self._length)
 
         for set_name, data in iteritems(self._data):
             new_array[self._indices[set_name]] = data
@@ -609,6 +638,20 @@ class Transfer(object):
         self._comm = comm
 
         self._initialize_transfer()
+
+    def __str__(self):
+        """
+        Return a string representation of the Transfer object.
+
+        Returns
+        -------
+        str
+            String rep of this object.
+        """
+        try:
+            return "%s(in=%s, out=%s" % (self.__class__.__name__, self._in_inds, self._out_inds)
+        except Exception as err:
+            return "<error during call to Transfer.__str__: %s" % err
 
     def _initialize_transfer(self):
         """

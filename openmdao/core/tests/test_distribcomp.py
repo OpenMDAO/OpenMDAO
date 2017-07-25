@@ -45,8 +45,9 @@ class InOutArrayComp(ExplicitComponent):
         self.delay = 0.01
         self.arr_size = arr_size
 
-        self.add_input('invec', np.ones(arr_size, float))
-        self.add_output('outvec', np.ones(arr_size, float))
+    def setup(self):
+        self.add_input('invec', np.ones(self.arr_size, float))
+        self.add_output('outvec', np.ones(self.arr_size, float))
 
     def compute(self, inputs, outputs):
         time.sleep(self.delay)
@@ -60,8 +61,10 @@ class DistribCompSimple(ExplicitComponent):
         super(DistribCompSimple, self).__init__()
 
         self.arr_size = arr_size
-        self.add_input('invec', np.ones(arr_size, float))
-        self.add_output('outvec', np.ones(arr_size, float))
+
+    def setup(self):
+        self.add_input('invec', np.ones(self.arr_size, float))
+        self.add_output('outvec', np.ones(self.arr_size, float))
 
     def compute(self, inputs, outputs):
         if MPI and self.comm != MPI.COMM_NULL:

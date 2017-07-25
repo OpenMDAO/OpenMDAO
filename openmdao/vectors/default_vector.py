@@ -253,18 +253,15 @@ class DefaultVector(Vector):
         type_ = self._typ
         iproc = self._iproc
 
-        allprocs_abs2idx_t = system._var_allprocs_abs2idx[type_]
         allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[type_]
         sizes_byset_t = system._var_sizes_byset[type_]
         abs2meta_t = system._var_abs2meta[type_]
 
-        # idxs contains a 0 index for floats or a slice(None) for arrays so getitem
-        # will return either a float or a properly shaped array respectively.
-        idxs = {}
         views = {}
         views_flat = {}
 
-        if self._alloc_complex:
+        alloc_complex = self._alloc_complex
+        if alloc_complex:
             imag_views = {}
             imag_views_flat = {}
 
@@ -276,21 +273,18 @@ class DefaultVector(Vector):
             ind_byset2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1])
             shape = abs2meta_t[abs_name]['shape']
 
-            views_flat[abs_name] = self._data[set_name][ind_byset1:ind_byset2]
-            views[abs_name] = self._data[set_name][ind_byset1:ind_byset2]
-            views[abs_name].shape = shape
+            views_flat[abs_name] = v = self._data[set_name][ind_byset1:ind_byset2]
+            if shape != v.shape:
+                v = v.view()
+                v.shape = shape
+            views[abs_name] = v
 
-            if self._alloc_complex:
-                imag_views_flat[abs_name] = self._imag_data[set_name][ind_byset1:ind_byset2]
-                imag_views[abs_name] = self._imag_data[set_name][ind_byset1:ind_byset2]
-                imag_views[abs_name].shape = shape
-
-            # The shape entry overrides value's shape, which is why we don't
-            # use the shape of val as the reference
-            if np.prod(shape) == 1:
-                idxs[abs_name] = 0
-            else:
-                idxs[abs_name] = slice(None)
+            if alloc_complex:
+                imag_views_flat[abs_name] = v = self._imag_data[set_name][ind_byset1:ind_byset2]
+                if shape != v.shape:
+                    v = v.view()
+                    v.shape = shape
+                imag_views[abs_name] = v
 
         self._views = self._names = views
         self._views_flat = views_flat
