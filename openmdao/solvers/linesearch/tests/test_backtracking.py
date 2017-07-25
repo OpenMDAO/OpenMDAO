@@ -147,11 +147,10 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
                 x = inputs['x']
                 y = inputs['y']
 
-                if x < 2.0:
+                if x < 1.75:
                     raise AnalysisError('Try Again.')
 
                 outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
-
 
             def compute_partials(self, inputs, outputs, partials):
                 """ Jacobian for our paraboloid."""
@@ -171,25 +170,54 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
         top.model.connect('comp.z', 'par.x')
 
         top.model.nonlinear_solver = NewtonSolver()
-        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.nonlinear_solver.options['maxiter'] = 1
         top.model.linear_solver = ScipyIterativeSolver()
-
-        top.setup(check=False)
 
         ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 1.0
+        top.set_solver_print(level=0)
 
-        # Setup again because we assigned a new linesearch
         top.setup(check=False)
 
-        # Test lower bound: should go to the lower bound and stall
+        # Test lower bound: should go as far as it can without going over. It doesn't do a
+        # great job, so ends up at 1.8 instead of 1.75
         top['px.x'] = 2.0
         top['comp.y'] = 0.0
-        top['comp.z'] = 1.6
+        top['comp.z'] = 2.1
         top.run_model()
-        assert_rel_error(self, top['comp.z'], 1.75, 1e-8)
+        assert_rel_error(self, top['comp.z'], 1.8, 1e-8)
 
+        # Test the behavior with the switch turned off.
+
+        top = Problem()
+        top.model = Group()
+        top.model.add_subsystem('px', IndepVarComp('x', 1.0))
+        top.model.add_subsystem('comp', ImplCompTwoStates())
+        top.model.add_subsystem('par', ParaboloidAE())
+        top.model.connect('px.x', 'comp.x')
+        top.model.connect('comp.z', 'par.x')
+
+        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver.options['maxiter'] = 1
+        top.model.linear_solver = ScipyIterativeSolver()
+
+        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls.options['maxiter'] = 10
+        ls.options['alpha'] = 1.0
+        ls.options['retry_on_analysis_error'] = False
+        top.set_solver_print(level=0)
+
+        top.setup(check=False)
+
+        top['px.x'] = 2.0
+        top['comp.y'] = 0.0
+        top['comp.z'] = 2.1
+
+        with self.assertRaises(AnalysisError) as context:
+            top.run_model()
+
+        self.assertEqual(str(context.exception), 'Try Again.')
 
 class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
 

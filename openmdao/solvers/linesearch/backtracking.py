@@ -196,7 +196,16 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         elif self.options['bound_enforcement'] == 'wall':
             u._enforce_bounds_wall(du, self.alpha, system._lower_bounds, system._upper_bounds)
 
-        norm = self._iter_get_norm()
+        try:
+            norm = self._iter_get_norm()
+
+        except AnalysisError as err:
+            if self.options['retry_on_analysis_error']:
+                self._analysis_error_raised = True
+            else:
+                raise AnalysisError(str(err))
+            norm = np.nan
+
         return norm0, norm
 
     def _declare_options(self):
@@ -292,7 +301,15 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                                               self._analysis_error_raised):
             self._iter_execute()
             self._iter_count += 1
-            norm = self._iter_get_norm()
+            try:
+                norm = self._iter_get_norm()
+
+            except AnalysisError as err:
+                if self.options['retry_on_analysis_error']:
+                    self._analysis_error_raised = True
+                else:
+                    raise AnalysisError(str(err))
+
             self._mpi_print(self._iter_count, norm, norm / norm0)
 
         fail = (np.isinf(norm) or np.isnan(norm) or
