@@ -2,8 +2,6 @@
 
 from __future__ import division
 
-import inspect
-
 from fnmatch import fnmatchcase
 import numpy as np
 from itertools import product
@@ -284,7 +282,7 @@ class Component(System):
         dict
             metadata for added variable
         """
-        if inspect.stack()[1][3] == '__init__':
+        if self._static_mode:
             warn_deprecation("In the future, the 'add_input' method must be "
                              "called from 'setup' rather than "
                              "in the '__init__' function.")
@@ -410,7 +408,7 @@ class Component(System):
         dict
             metadata for added variable
         """
-        if inspect.stack()[1][3] == '__init__':
+        if self._static_mode:
             warn_deprecation("In the future, the 'add_output' method must be "
                              "called from 'setup' rather than "
                              "in the '__init__' function.")
