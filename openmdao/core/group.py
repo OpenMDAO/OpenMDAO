@@ -55,7 +55,13 @@ class Group(System):
 
     def setup(self):
         """
-        Add subsystems to this group.
+        Build this group.
+
+        This method should be overidden by your Group's method.
+
+        You may call 'add_subsystem' to add systems to this group, and you may set the linear
+        and nonlinear solvers for this group level. You cannot safely change anything on children
+        systems; use the 'configure' method instead.
 
         Available attributes:
             name
@@ -64,6 +70,33 @@ class Group(System):
             metadata
         """
         pass
+
+    def configure(self):
+        """
+        Configure this group to assign children settings.
+
+        This method should be overidden by your Group's method.
+
+        You may only use this method to change settings on your children subsystems. This includes
+        setting solvers in cases where you want to override the defaults.
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata
+            system hieararchy with attribute access
+        """
+        pass
+
+    def _configure(self):
+        """
+        Configure our model recursively to assign any children settings.
+        """
+        for subsys in self._subsystems_myproc:
+            subsys._configure()
+
+        self.configure()
 
     def _setup_procs(self, pathname, comm):
         """
