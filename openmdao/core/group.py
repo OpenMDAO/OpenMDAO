@@ -92,6 +92,8 @@ class Group(System):
     def _configure(self):
         """
         Configure our model recursively to assign any children settings.
+
+        Highest system's settings take precedence.
         """
         for subsys in self._subsystems_myproc:
             subsys._configure()

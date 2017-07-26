@@ -510,6 +510,7 @@ class TestProblem(unittest.TestCase):
 
     def test_system_setup_and_configure(self):
         # Test that we can change solver settings on a subsystem in a system's setup method.
+        # Also assures that highest system's settings take precedence.
 
         class ImplSimple(ImplicitComponent):
 
@@ -535,6 +536,10 @@ class TestProblem(unittest.TestCase):
                 # This will not solve it
                 self.nonlinear_solver = NonlinearBlockGS()
 
+            def configure(self):
+                # This will not solve it either.
+                self.nonlinear_solver = NonlinearBlockGS()
+
 
         class Super(Group):
 
@@ -551,7 +556,6 @@ class TestProblem(unittest.TestCase):
         top.model = Super()
 
         top.setup(check=False)
-        top.set_solver_print()
 
         x = -0.5
         a = np.abs(np.exp(0.5 * x) / x)
