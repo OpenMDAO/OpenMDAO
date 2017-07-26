@@ -187,8 +187,8 @@ def view_model(problem_or_filename, outfile_name='visualization', show_browser=T
     cur_dir = os.getcwd()
     directory = os.path.dirname(cur_dir + '/' + folder_name)
 
-    if not os.path.exists(directory):
-        os.stat(directory)
+    if os.path.isdir(folder_name):
+        shutil.rmtree(folder_name)
 
     shutil.copytree(src=code_dir + '/visualization', dst=folder_name)
 
