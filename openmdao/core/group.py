@@ -23,6 +23,10 @@ from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.units import is_compatible
 
+# regex to check for valid names.
+import re
+namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
+
 
 class Group(System):
     """
@@ -883,6 +887,15 @@ class Group(System):
                 raise RuntimeError("Subsystem name '%s' is already used." %
                                    name)
 
+        if hasattr(self, name) and not isinstance(getattr(self, name), System):
+            # replacing a subsystem is ok (e.g. resetup) but no other attribute
+            raise RuntimeError("Group '%s' already has an attribute '%s'." %
+                               (self.name, name))
+
+        match = namecheck_rgx.match(name)
+        if match is None or match.group() != name:
+            raise NameError("'%s' is not a valid system name." % name)
+
         subsys.name = name
 
         if isinstance(promotes, string_types) or \
@@ -904,6 +917,8 @@ class Group(System):
             subsystems_allprocs = self._subsystems_allprocs
 
         subsystems_allprocs.append(subsys)
+
+        setattr(self, name, subsys)
 
         return subsys
 
