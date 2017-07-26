@@ -564,5 +564,47 @@ class TestProblem(unittest.TestCase):
         top.run_model()
         assert_rel_error(self, top['sub.comp.x'], x)
 
+    def test_feature_system_configure(self):
+
+        class ImplSimple(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('a', val=1.)
+                self.add_output('x', val=0.)
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['x'] = np.exp(outputs['x']) - \
+                    inputs['a']**2 * outputs['x']**2
+
+            def linearize(self, inputs, outputs, jacobian):
+                jacobian['x', 'x'] = np.exp(outputs['x']) - \
+                    2 * inputs['a']**2 * outputs['x']
+                jacobian['x', 'a'] = -2 * inputs['a'] * outputs['x']**2
+
+
+        class Sub(Group):
+            def setup(self):
+                self.add_subsystem('comp', ImplSimple())
+
+
+        class Super(Group):
+            def setup(self):
+                self.add_subsystem('sub', Sub())
+
+            def configure(self):
+                # This will solve it.
+                self.sub.nonlinear_solver = NewtonSolver()
+                self.sub.linear_solver = ScipyIterativeSolver()
+
+
+        top = Problem()
+        top.model = Super()
+
+        top.setup(check=False)
+
+        top['sub.comp.a'] = 1.5576015661428098
+        top.run_model()
+        assert_rel_error(self, top['sub.comp.x'], -0.5)
+
 if __name__ == "__main__":
     unittest.main()

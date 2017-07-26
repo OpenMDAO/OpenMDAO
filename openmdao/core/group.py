@@ -59,9 +59,9 @@ class Group(System):
 
         This method should be overidden by your Group's method.
 
-        You may call 'add_subsystem' to add systems to this group, and you may set the linear
-        and nonlinear solvers for this group level. You cannot safely change anything on children
-        systems; use the 'configure' method instead.
+        You may call 'add_subsystem' to add systems to this group. You may also issue connections,
+        and set the linear and nonlinear solvers for this group level. You cannot safely change
+        anything on children systems; use the 'configure' method instead.
 
         Available attributes:
             name
