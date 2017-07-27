@@ -27,7 +27,6 @@ Here is a list of things that have not yet been fully developed in 2.x:
 * Parallel Finite Difference
 * File-wrapping utilities
 * File variables
-* Total Derivatives checking
 * Group Finite Difference
 * Complex Step approximation for Component/Group derivatives
 * Parallel Adjoint and Parallel Forward derivative calculation performance speedup
