@@ -488,20 +488,27 @@ class System(object):
         vec_names = ['nonlinear', 'linear']
         vec_names.extend(sorted(in_vec_names | out_vec_names))
 
-        for key in ['input', 'output', 'residual']:
-            type_ = 'output' if key is 'residual' else key
-            for vec_name in vec_names:
-                if initial:
-                    # Check for complex step to set vectors up appropriately.
-                    # If any subsystem needs complex step, then we need to allocate it everywhere.
-                    alloc_complex = force_alloc_complex
-                    if vec_name == 'nonlinear':
-                        alloc_complex = 'cs' in self._approx_schemes
-                        for sub in self.system_iter(include_self=True, recurse=True):
-                            if alloc_complex:
-                                break
-                            alloc_complex = 'cs' in sub._approx_schemes
+        _alloc_complex = force_alloc_complex
+        if initial:
+            # Check for complex step to set vectors up appropriately.
+            # If any subsystem needs complex step, then we need to allocate it everywhere.
+            nl_alloc_complex = force_alloc_complex
+            for sub in self.system_iter(include_self=True, recurse=True):
+                nl_alloc_complex = 'cs' in sub._approx_schemes
+                if nl_alloc_complex:
+                    break
 
+        for vec_name in vec_names:
+            # Check for complex step to set vectors up appropriately.
+            # If any subsystem needs complex step, then we need to allocate it everywhere.
+            if initial and vec_name is 'nonlinear':
+                alloc_complex = nl_alloc_complex
+            else:
+                alloc_complex = _alloc_complex
+
+            for key in ['input', 'output', 'residual']:
+                type_ = 'output' if key is 'residual' else key
+                if initial:
                     root_vectors[key][vec_name] = vector_class(vec_name, type_, self,
                                                                alloc_complex=alloc_complex)
                 else:
@@ -1371,12 +1378,12 @@ class System(object):
             scope_out = set(self._var_abs_names['output'])
 
             # All myproc inputs connected to an output in this system
-            scope_in = set(self._conn_global_abs_in2out.keys()) \
+            scope_in = set(self._conn_global_abs_in2out) \
                 & set(self._var_abs_names['input'])
         else:
             # All myproc outputs not in excl_sub
-            scope_out = set(self._var_abs_names['output']) \
-                - set(excl_sub._var_abs_names['output'])
+            scope_out = set(self._var_abs_names['output']).difference(
+                excl_sub._var_abs_names['output'])
 
             # All myproc inputs connected to an output in this system but not in excl_sub
             scope_in = []

@@ -96,10 +96,6 @@ class DefaultVector(Vector):
         iproc = self._iproc
 
         sizes_byset_t = system._var_sizes_byset[type_]
-        sizes_t = system._var_sizes[type_]
-        allprocs_abs2idx_t = system._var_allprocs_abs2idx[type_]
-        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[type_]
-        abs2meta_t = system._var_abs2meta[type_]
 
         data = {}
         indices = {}
@@ -108,17 +104,20 @@ class DefaultVector(Vector):
             data[set_name] = np.zeros(size)
             indices[set_name] = np.zeros(size, int)
 
+        sizes_t = system._var_sizes[type_]
+        abs2meta_t = system._var_abs2meta[type_]
+        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[type_]
+        allprocs_abs2idx_t = system._var_allprocs_abs2idx[type_]
         for abs_name in system._var_abs_names[type_]:
-            idx = allprocs_abs2idx_t[abs_name]
-            idx_byset = allprocs_abs2idx_byset_t[abs_name]
             set_name = abs2meta_t[abs_name]['var_set']
 
-            ind1 = np.sum(sizes_t[iproc, :idx])
-            ind2 = np.sum(sizes_t[iproc, :idx + 1])
+            idx_byset = allprocs_abs2idx_byset_t[abs_name]
             ind_byset1 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset])
             ind_byset2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1])
 
-            set_name = abs2meta_t[abs_name]['var_set']
+            idx = allprocs_abs2idx_t[abs_name]
+            ind1 = np.sum(sizes_t[iproc, :idx])
+            ind2 = np.sum(sizes_t[iproc, :idx + 1])
             indices[set_name][ind_byset1:ind_byset2] = np.arange(ind1, ind2)
 
         return data, indices
@@ -253,10 +252,6 @@ class DefaultVector(Vector):
         type_ = self._typ
         iproc = self._iproc
 
-        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[type_]
-        sizes_byset_t = system._var_sizes_byset[type_]
-        abs2meta_t = system._var_abs2meta[type_]
-
         views = {}
         views_flat = {}
 
@@ -265,6 +260,9 @@ class DefaultVector(Vector):
             imag_views = {}
             imag_views_flat = {}
 
+        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[type_]
+        sizes_byset_t = system._var_sizes_byset[type_]
+        abs2meta_t = system._var_abs2meta[type_]
         for abs_name in system._var_abs_names[type_]:
             idx_byset = allprocs_abs2idx_byset_t[abs_name]
             set_name = abs2meta_t[abs_name]['var_set']
