@@ -483,5 +483,64 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_rel_error(self, totals['con_cmp2.con2', 'px.x']['J_fwd'], [[0.09692762]], 1e-5)
         assert_rel_error(self, totals['con_cmp2.con2', 'px.x']['J_fd'], [[0.09692762]], 1e-5)
 
+    def test_desvar_and_response_with_indices(self):
+
+        class ArrayComp2D(ExplicitComponent):
+            """
+            A fairly simple array component.
+            """
+
+            def setup(self):
+
+                self.JJ = np.array([[1.0, 3.0, -2.0, 7.0],
+                                    [6.0, 2.5, 2.0, 4.0],
+                                    [-1.0, 0.0, 8.0, 1.0],
+                                    [1.0, 4.0, -5.0, 6.0]])
+
+                # Params
+                self.add_input('x1', np.zeros([4]))
+
+                # Unknowns
+                self.add_output('y1', np.zeros([4]))
+
+            def compute(self, inputs, outputs):
+                """
+                Execution.
+                """
+                outputs['y1'] = self.JJ.dot(inputs['x1'])
+
+            def compute_partials(self, inputs, outputs, partials):
+                """
+                Analytical derivatives.
+                """
+                partials[('y1', 'x1')] = self.JJ
+
+        prob = Problem()
+        prob.model = model = Group()
+        model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
+                            promotes=['x1'])
+        model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
+
+        model.add_design_var('x1', indices=[1, 3])
+        model.add_constraint('y1', indices=[0, 2])
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False, mode='fwd')
+        prob.run_model()
+
+        Jbase = model.get_subsystem('mycomp').JJ
+        of = ['y1']
+        wrt = ['x1']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['y1', 'x1'][0][0], Jbase[0, 1], 1e-8)
+        assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[0, 3], 1e-8)
+        assert_rel_error(self, J['y1', 'x1'][1][0], Jbase[2, 1], 1e-8)
+        assert_rel_error(self, J['y1', 'x1'][1][1], Jbase[2, 3], 1e-8)
+
+        totals = prob.check_total_derivatives()
+        print('hey')
+
 if __name__ == "__main__":
     unittest.main()
