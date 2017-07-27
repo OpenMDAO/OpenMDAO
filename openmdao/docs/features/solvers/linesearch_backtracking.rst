@@ -116,15 +116,15 @@ Control Options
 
 - print_bound_enforce
 
-  When the "print_bound_enforce" option is set to True, the linesearch will print the name and values of any variables
+  When the "print_bound_enforce" option is set to True, the line-search will print the name and values of any variables
   that exceeded their lower or upper bounds and were drawn back during bounds enforcement.
 
 .. embed-test::
     openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_print_bound_enforce
 
-.. retry_on_analysis_error
+- retry_on_analysis_error
 
-  By default, the ArmijoGoldsteinLS linesearch will backtrack if the model raises an AnalysisError, which can happen if
+  By default, the ArmijoGoldsteinLS line-search will backtrack if the model raises an AnalysisError, which can happen if
   the component explicity raises it, or a subsolver hits its iteration limit with the 'err_on_maxiter' option set to True.
   If you would rather terminate on an AnalysisError, you can set this option to False.
 
