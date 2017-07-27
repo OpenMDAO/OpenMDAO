@@ -7,8 +7,9 @@ ArmijoGoldsteinLS -- Like above, but terminates with the ArmijoGoldsteinLS condi
 """
 from __future__ import print_function
 
+import sys
 from math import isnan
-from six import iteritems
+from six import iteritems, reraise
 
 import numpy as np
 
@@ -203,7 +204,9 @@ class ArmijoGoldsteinLS(NonlinearSolver):
             if self.options['retry_on_analysis_error']:
                 self._analysis_error_raised = True
             else:
-                raise AnalysisError(str(err))
+                exc = sys.exc_info()
+                reraise(exc[0], exc[1], exc[2])
+
             norm = np.nan
 
         return norm0, norm
@@ -264,7 +267,8 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                 if self.options['retry_on_analysis_error']:
                     self._analysis_error_raised = True
                 else:
-                    raise AnalysisError(str(err))
+                    exc = sys.exc_info()
+                    reraise(exc[0], exc[1], exc[2])
 
         u.add_scal_vec(-self.alpha, du)
         self.alpha *= self.options['rho']
@@ -308,7 +312,8 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                 if self.options['retry_on_analysis_error']:
                     self._analysis_error_raised = True
                 else:
-                    raise AnalysisError(str(err))
+                    exc = sys.exc_info()
+                    reraise(exc[0], exc[1], exc[2])
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
 
