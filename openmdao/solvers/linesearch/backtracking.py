@@ -297,7 +297,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         # We don't have an actual gradient, but we have the Newton vector that should
         # take us to zero, and our "runs" are the same, and we can just compare the
         # "rise".
-        while self._iter_count < maxiter and (((norm0 - norm) < c * self.alpha * norm0) or \
+        while self._iter_count < maxiter and (((norm0 - norm) < c * self.alpha * norm0) or
                                               self._analysis_error_raised):
             self._iter_execute()
             self._iter_count += 1

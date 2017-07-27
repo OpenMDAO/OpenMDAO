@@ -180,8 +180,8 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
 
         top.setup(check=False)
 
-        # Test lower bound: should go as far as it can without going over. It doesn't do a
-        # great job, so ends up at 1.8 instead of 1.75
+        # Test lower bound: should go as far as it can without going past 1.75 and triggering an
+        # AnalysisError. It doesn't do a great job, so ends up at 1.8 instead of 1.75
         top['px.x'] = 2.0
         top['comp.y'] = 0.0
         top['comp.z'] = 2.1

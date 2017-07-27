@@ -122,4 +122,10 @@ Control Options
 .. embed-test::
     openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_print_bound_enforce
 
+.. retry_on_analysis_error
+
+  By default, the ArmijoGoldsteinLS linesearch will backtrack if the model raises an AnalysisError, which can happen if
+  the component explicity raises it, or a subsolver hits its iteration limit with the 'err_on_maxiter' option set to True.
+  If you would rather terminate on an AnalysisError, you can set this option to False.
+
 .. tags:: linesearch, backtracking
