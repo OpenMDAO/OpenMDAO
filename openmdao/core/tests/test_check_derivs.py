@@ -2,15 +2,15 @@
 
 import unittest
 from six import iteritems
-from six.moves import cStringIO as StringIO
 
 import numpy as np
 
 from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NonLinearRunOnce, \
-                         ImplicitComponent
-from openmdao.devtools.testutil import assert_rel_error
+                         ImplicitComponent, NonlinearBlockGS
+from openmdao.devtools.testutil import assert_rel_error, TestLogger
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
+from openmdao.test_suite.components.sellar import SellarDerivatives
 
 
 class TestProblemCheckPartials(unittest.TestCase):
@@ -48,19 +48,18 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        string_stream = StringIO()
+        testlogger = TestLogger()
+        data = prob.check_partials(logger=testlogger)
 
-        data = prob.check_partials(out_stream=string_stream)
+        lines = testlogger.get('info')
 
-        lines = string_stream.getvalue().split("\n")
+        y_wrt_x1_line = lines.index("  comp: 'y' wrt 'x1'\n")
 
-        y_wrt_x1_line = lines.index("  comp: 'y' wrt 'x1'")
-
-        self.assertTrue(lines[y_wrt_x1_line+6].endswith('*'),
+        self.assertTrue(lines[y_wrt_x1_line+4].endswith('*'),
                         msg='Error flag expected in output but not displayed')
-        self.assertTrue(lines[y_wrt_x1_line+7].endswith('*'),
+        self.assertTrue(lines[y_wrt_x1_line+5].endswith('*'),
                         msg='Error flag expected in output but not displayed')
-        self.assertFalse(lines[y_wrt_x1_line+8].endswith('*'),
+        self.assertFalse(lines[y_wrt_x1_line+6].endswith('*'),
                         msg='Error flag not expected in output but displayed')
 
     def test_feature_incorrect_jacobian(self):
@@ -96,7 +95,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials()
 
         x1_error = data['comp']['y', 'x1']['abs error']
         assert_rel_error(self, x1_error.forward, 1., 1e-8)
@@ -132,19 +131,18 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        string_stream = StringIO()
+        testlogger = TestLogger()
+        data = prob.check_partials(logger=testlogger)
 
-        data = prob.check_partials(out_stream=string_stream)
+        lines = testlogger.get('info')
 
-        lines = string_stream.getvalue().split("\n")
+        y_wrt_x1_line = lines.index("  : 'y' wrt 'x1'\n")
 
-        y_wrt_x1_line = lines.index("  : 'y' wrt 'x1'")
-
-        self.assertTrue(lines[y_wrt_x1_line+6].endswith('*'),
+        self.assertTrue(lines[y_wrt_x1_line+4].endswith('*'),
                         msg='Error flag expected in output but not displayed')
-        self.assertTrue(lines[y_wrt_x1_line+7].endswith('*'),
+        self.assertTrue(lines[y_wrt_x1_line+5].endswith('*'),
                         msg='Error flag expected in output but not displayed')
-        self.assertFalse(lines[y_wrt_x1_line+8].endswith('*'),
+        self.assertFalse(lines[y_wrt_x1_line+6].endswith('*'),
                         msg='Error flag not expected in output but displayed')
 
     def test_missing_entry(self):
@@ -178,9 +176,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        stream = StringIO()
-
-        data = prob.check_partials(out_stream=stream)
+        data = prob.check_partials()
 
         abs_error = data['comp']['y', 'x1']['abs error']
         rel_error = data['comp']['y', 'x1']['rel error']
@@ -226,7 +222,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         units = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
 
         p.setup()
-        data = p.check_partials(out_stream=None)
+        data = p.check_partials()
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -269,7 +265,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         model.nonlinear_solver = NonLinearRunOnce()
 
         p.setup()
-        data = p.check_partials(out_stream=None)
+        data = p.check_partials()
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -338,7 +334,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        data = p.check_partials(out_stream=None)
+        data = p.check_partials()
         identity = np.eye(4)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_fwd'], identity, 1e-15)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_rev'], identity, 1e-15)
@@ -364,7 +360,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials()
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -396,7 +392,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials()
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -446,13 +442,46 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials()
 
         assert_rel_error(self, data['comp']['y', 'extra']['J_fwd'], np.zeros((2, 2)))
         assert_rel_error(self, data['comp']['y', 'extra']['J_rev'], np.zeros((2, 2)))
         assert_rel_error(self, data['comp']['y', 'dummy']['J_fwd'], np.zeros((2, 2)))
         assert_rel_error(self, data['comp']['y', 'dummy']['J_rev'], np.zeros((2, 2)))
 
+
+class TestProblemCheckTotals(unittest.TestCase):
+
+    def test_cs(self):
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0.0)
+        prob.model.add_constraint('con2', upper=0.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(force_alloc_complex=True)
+
+        # We don't call run_driver() here because we don't
+        # actually want the optimizer to run
+        prob.run_model()
+
+        # check derivatives with complex step and a larger step size.
+        testlogger = TestLogger()
+        totals = prob.check_total_derivatives(method='cs', step=1.0e-1, logger=testlogger)
+
+        lines = testlogger.get('info')
+
+        self.assertTrue('9.80614' in lines[4])
+        self.assertTrue('9.80614' in lines[5])
+
+        assert_rel_error(self, totals['con_cmp2.con2', 'px.x']['J_fwd'], [[0.09692762]], 1e-5)
+        assert_rel_error(self, totals['con_cmp2.con2', 'px.x']['J_fd'], [[0.09692762]], 1e-5)
 
 if __name__ == "__main__":
     unittest.main()

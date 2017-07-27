@@ -203,8 +203,6 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['f_xy'], 214.0, 1e-6)
 
     def test_feature_check_total_derivatives_manual(self):
-        raise unittest.SkipTest("check_total_derivatives not implemented yet")
-
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = NonlinearBlockGS()
@@ -213,28 +211,39 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         # manually specify which derivatives to check
-        # TODO: need a decorator to capture this output and put it into the doc,
-        #       or maybe just a new kind of assert?
         prob.check_total_derivatives(of=['obj', 'con1'], wrt=['x', 'z'])
-        # TODO: Need to devlop the group FD/CS api, so user can control how this
-        #       happens by chaninging settings on the root node
 
-    def test_feature_check_total_derivatives_from_driver(self):
-        raise unittest.SkipTest("check_total_derivatives not implemented yet")
-
+    def test_feature_check_total_derivatives_from_driver_compact(self):
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = NonlinearBlockGS()
 
-        prob.setup()
-
-        prob.model.options['method'] = 'slsqp'
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
         prob.model.add_objective('obj')
-        prob.model.add_design_var('con1')
-        prob.model.add_design_var('con2')
-        # re-do setup since we changed the driver and problem inputs/outputs
+        prob.model.add_constraint('con1', upper=0.0)
+        prob.model.add_constraint('con2', upper=0.0)
+
+        prob.setup()
+
+        # We don't call run_driver() here because we don't
+        # actually want the optimizer to run
+        prob.run_model()
+
+        # check derivatives of all obj+constraints w.r.t all design variables
+        prob.check_total_derivatives(compact_print=True)
+
+    def test_feature_check_total_derivatives_from_driver(self):
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0.0)
+        prob.model.add_constraint('con2', upper=0.0)
+
         prob.setup()
 
         # We don't call run_driver() here because we don't
@@ -243,8 +252,26 @@ class TestProblem(unittest.TestCase):
 
         # check derivatives of all obj+constraints w.r.t all design variables
         prob.check_total_derivatives()
-        # TODO: need a decorator to capture this output and put it into the doc,
-        #       or maybe just a new kind of assert?
+
+    def test_feature_check_total_derivatives_cs(self):
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0.0)
+        prob.model.add_constraint('con2', upper=0.0)
+
+        prob.setup(force_alloc_complex=True)
+
+        # We don't call run_driver() here because we don't
+        # actually want the optimizer to run
+        prob.run_model()
+
+        # check derivatives with complex step and a larger step size.
+        prob.check_total_derivatives(method='cs', step=1.0e-1)
 
     def test_feature_run_driver(self):
         prob = Problem()

@@ -127,7 +127,7 @@ class TestUnitConversion(unittest.TestCase):
         assert_rel_error(self, J['tgtK.x3', 'px1.x1'][0][0], 1.0, 1e-6)
 
         # Make sure check partials handles conversion
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials()
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):
@@ -260,7 +260,7 @@ class TestUnitConversion(unittest.TestCase):
         assert_rel_error(self, J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
         # Make sure check partials handles conversion
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials()
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):
