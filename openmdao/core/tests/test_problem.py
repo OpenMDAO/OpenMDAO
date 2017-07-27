@@ -6,8 +6,9 @@ from six import assertRaisesRegex
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, PETScVector, NonlinearBlockGS, \
-     ScipyOptimizer
+from openmdao.core.problem import Problem, get_relevant_vars
+from openmdao.api import Group, IndepVarComp, PETScVector, NonlinearBlockGS, \
+     ScipyOptimizer, ExecComp
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
@@ -462,6 +463,76 @@ class TestProblem(unittest.TestCase):
         self.assertEqual(str(w[0].message), "The 'root' argument provides backwards "
                          "compatibility with OpenMDAO <= 1.x ; use 'model' instead.")
 
+    def test_relevance(self):
+        p = Problem()
+        model = p.model
+
+        indep1 = model.add_subsystem("indep1", IndepVarComp('x', 1.0))
+        G1 = model.add_subsystem('G1', Group())
+        G1.add_subsystem('C1', ExecComp(['x=2.0*a', 'y=2.0*b', 'z=2.0*a']))
+        G1.add_subsystem('C2', ExecComp(['x=2.0*a', 'y=2.0*b', 'z=2.0*b']))
+        model.add_subsystem("C3", ExecComp(['x=2.0*a', 'y=2.0*b+3.0*c']))
+        model.add_subsystem("C4", ExecComp(['x=2.0*a', 'y=2.0*b']))
+        indep2 = model.add_subsystem("indep2", IndepVarComp('x', 1.0))
+        G2 = model.add_subsystem('G2', Group())
+        G2.add_subsystem('C5', ExecComp(['x=2.0*a', 'y=2.0*b+3.0*c']))
+        G2.add_subsystem('C6', ExecComp(['x=2.0*a', 'y=2.0*b+3.0*c']))
+        G2.add_subsystem('C7', ExecComp(['x=2.0*a', 'y=2.0*b']))
+        model.add_subsystem("C8", ExecComp(['y=1.5*a+2.0*b']))
+
+        model.connect('indep1.x', 'G1.C1.a')
+        model.connect('indep2.x', 'G2.C6.a')
+        model.connect('G1.C1.x', 'G1.C2.b')
+        model.connect('G1.C2.z', 'C4.b')
+        model.connect('G1.C1.z', ('C3.b', 'C3.c', 'G2.C5.a'))
+        model.connect('C3.y', 'G2.C5.b')
+        model.connect('C3.x', 'C4.a')
+        model.connect('G2.C6.y', 'G2.C7.b')
+        model.connect('G2.C5.x', 'C8.b')
+        model.connect('G2.C7.x', 'C8.a')
+
+        p.setup(check=False)
+
+        g = p.model.compute_sys_graph(comps_only=True, save_vars=True)
+        relevant = get_relevant_vars(g, ['indep1.x', 'indep2.x'], ['C8.y'])
+
+        indep1_ins = set(['C3.b', 'C3.c', 'C8.b', 'G1.C1.a', 'G2.C5.a', 'G2.C5.b'])
+        indep1_outs = set(['C3.y', 'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'])
+        indep1_sys = set(['C3', 'C8', 'G1.C1', 'G2.C5', 'indep1'])
+
+        inputs, outputs, systems = relevant['indep1.x']['C8.y']
+
+        self.assertEqual(inputs, indep1_ins)
+        self.assertEqual(outputs, indep1_outs)
+        self.assertEqual(systems, indep1_sys)
+
+        inputs, outputs, systems = relevant['C8.y']['indep1.x']
+
+        self.assertEqual(inputs, indep1_ins)
+        self.assertEqual(outputs, indep1_outs)
+        self.assertEqual(systems, indep1_sys)
+
+        indep2_ins = set(['C8.a', 'G2.C6.a', 'G2.C7.b'])
+        indep2_outs = set(['C8.y', 'G2.C6.y', 'G2.C7.x', 'indep2.x'])
+        indep2_sys = set(['C8', 'G2.C6', 'G2.C7', 'indep2'])
+
+        inputs, outputs, systems = relevant['indep2.x']['C8.y']
+
+        self.assertEqual(inputs, indep2_ins)
+        self.assertEqual(outputs, indep2_outs)
+        self.assertEqual(systems, indep2_sys)
+
+        inputs, outputs, systems = relevant['C8.y']['indep2.x']
+
+        self.assertEqual(inputs, indep2_ins)
+        self.assertEqual(outputs, indep2_outs)
+        self.assertEqual(systems, indep2_sys)
+
+        inputs, outputs, systems = relevant['C8.y']['@all']
+
+        self.assertEqual(inputs, indep1_ins | indep2_ins)
+        self.assertEqual(outputs, indep1_outs | indep2_outs)
+        self.assertEqual(systems, indep1_sys | indep2_sys)
 
 if __name__ == "__main__":
     unittest.main()

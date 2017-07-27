@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/OpenMDAO/blue.svg?branch=master)](https://travis-ci.org/OpenMDAO/blue)   [![Build status](https://ci.appveyor.com/api/projects/status/33kct0irhbgcg8m1?svg=true
+)](https://ci.appveyor.com/project/OpenMDAO/blue/branch/master)  [![Documentation Status](https://readthedocs.org/projects/blue/badge/?version=latest   )](http://blue.readthedocs.org/en/latest/) [![Coverage Status](https://coveralls.io/repos/github/OpenMDAO/blue/badge.svg?branch=master)](https://coveralls.io/github/OpenMDAO/blue?branch=master)
+
 # blue
 This is the PRE-ALPHA version of OpenMDAO 2.0
 (we have codenamed it 'blue').
@@ -24,7 +27,6 @@ Here is a list of things that have not yet been fully developed in 2.x:
 * Parallel Finite Difference
 * File-wrapping utilities
 * File variables
-* Total Derivatives checking
 * Group Finite Difference
 * Complex Step approximation for Component/Group derivatives
 * Parallel Adjoint and Parallel Forward derivative calculation performance speedup
