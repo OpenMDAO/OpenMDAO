@@ -20,7 +20,7 @@ from openmdao.proc_allocators.proc_allocator import ProcAllocationError
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.general_utils import warn_deprecation, ensure_compatible
 from openmdao.utils.units import is_compatible
 
 # regex to check for valid names.
@@ -409,12 +409,14 @@ class Group(System):
         conns : dict
             Dictionary of connections passed down from parent group.
         """
+        print(self.pathname, 'Group.setup_globalconnections()')
         super(Group, self)._setup_global_connections()
         global_abs_in2out = self._conn_global_abs_in2out
 
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
         allprocs_prom2abs_list_out = self._var_allprocs_prom2abs_list['output']
         abs2meta_in = self._var_abs2meta['input']
+        abs2meta_out = self._var_abs2meta['output']
         pathname = self.pathname
 
         abs_in2out = {}
@@ -451,6 +453,8 @@ class Group(System):
                     if out_subsys != in_subsys:
                         abs_in2out[abs_in] = abs_out
 
+        print(self.pathname, '_manual_connections:', self._manual_connections)
+
         # Add explicit connections (only ones declared by this group)
         for prom_in, (prom_out, src_indices) in iteritems(self._manual_connections):
 
@@ -470,9 +474,16 @@ class Group(System):
             # (not traceable to a connect statement, so provide context)
             # and check if src_indices is defined in both connect and add_input.
             abs_out = allprocs_prom2abs_list_out[prom_out][0]
+            meta_out = abs2meta_out[abs_out]
+            print()
+            print("meta_out:", meta_out)
+            print()
             outparts = abs_out.split('.')
             out_subsys = outparts[:-1]
             for abs_in in allprocs_prom2abs_list_in[prom_in]:
+                meta_in = abs2meta_in[abs_in]
+                print("meta_in:", meta_in)
+                print()
                 inparts = abs_in.split('.')
                 in_subsys = inparts[:-1]
                 if out_subsys == in_subsys:
@@ -481,14 +492,28 @@ class Group(System):
                                        (self.pathname, prom_out, prom_in))
 
                 if src_indices is not None and abs_in in abs2meta_in:
-                    meta = abs2meta_in[abs_in]
-                    if meta['src_indices'] is not None:
+                    if meta_in['src_indices'] is not None:
                         raise RuntimeError("%s: src_indices has been defined "
                                            "in both connect('%s', '%s') "
                                            "and add_input('%s', ...)." %
                                            (self.pathname, prom_out,
                                             prom_in, prom_in))
-                    meta['src_indices'] = np.atleast_1d(src_indices)
+                    out_shape = meta_out[shape]
+                    for ind in src_indices:
+                        if ind >
+                        raise ValueError("The source and target shapes do not match for the connection "
+                                         "'%s' to '%s' in Group '%s'." % (prom_out, prom_in, self.pathname))
+                    print('check',abs_in, meta_out['value'], meta_in['shape'], src_indices)
+                    val, shape = ensure_compatible(abs_in, meta_out['value'], meta_in['shape'], src_indices)
+                    print('val:', val, 'shape:', shape)
+                    meta_in['src_indices'] = np.atleast_1d(src_indices)
+                else:
+                    if meta_out['shape'] != meta_in['shape']:
+                        raise ValueError("The source and target shapes do not match for the connection "
+                                         "'%s' to '%s' in Group '%s'." % (prom_out, prom_in, self.pathname))
+                    print('check',abs_in, meta_out['value'], meta_in['shape'])
+                    val, shape = ensure_compatible(abs_in, meta_out['value'], meta_in['shape'])
+                    print('val:', val, 'shape:', shape)
 
                 abs_in2out[abs_in] = abs_out
 
@@ -575,7 +600,6 @@ class Group(System):
         for abs_in, abs_out in iteritems(global_abs_in2out):
             # First, check that this system owns both the input and output.
             if abs_in[:len(pathname)] == pathname and abs_out[:len(pathname)] == pathname:
-
                 # Second, check that they are in different subsystems of this system.
                 out_subsys = abs_out[path_len:].split('.', 1)[0]
                 in_subsys = abs_in[path_len:].split('.', 1)[0]
@@ -964,8 +988,8 @@ class Group(System):
         for manual_connections in [self._manual_connections, self._static_manual_connections]:
             if tgt_name in manual_connections:
                 srcname = manual_connections[tgt_name][0]
-                raise RuntimeError(
-                    "Input '%s' is already connected to '%s'." % (tgt_name, srcname))
+                raise RuntimeError("Input '%s' is already connected to '%s'." %
+                                   (tgt_name, srcname))
 
         # source and target should not be in the same system
         if src_name.rsplit('.', 1)[0] == tgt_name.rsplit('.', 1)[0]:

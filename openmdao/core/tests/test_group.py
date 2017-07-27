@@ -844,14 +844,26 @@ class TestGroup(unittest.TestCase):
 
 
 class TestConnect(unittest.TestCase):
+    class ArrayComp(ExplicitComponent):
+        def setup(self):
+            self.add_input('inp', val=np.ones((2)))
+            self.add_output('out', val=np.zeros((2)))
+
+        def compute(self, inputs, outputs):
+            outputs['out'] = inputs['inp'] * 2.
 
     def setUp(self):
         prob = Problem(Group())
 
         sub = prob.model.add_subsystem('sub', Group())
-        sub.add_subsystem('src', IndepVarComp('x', np.zeros(5,)))
+
+        idv = sub.add_subsystem('src', IndepVarComp())
+        idv.add_output('x', np.zeros(5,))  # array
+        idv.add_output('s', 3.)            # scalar
+
         sub.add_subsystem('tgt', ExecComp('y = x'))
         sub.add_subsystem('cmp', ExecComp('z = x'))
+        sub.add_subsystem('arr', self.ArrayComp())
 
         self.sub = sub
         self.prob = prob
@@ -1039,6 +1051,33 @@ class TestConnect(unittest.TestCase):
         prob.run_driver()
 
         assert_rel_error(self, prob['G1.par1.c4.y'], 8.0)
+
+    def test_bad_shapes(self):
+        msg = ("The source and target shapes do not match for the connection " 
+               "'src.s' to 'arr.inp' in Group 'sub'.")
+
+        with assertRaisesRegex(self, ValueError, msg):
+            self.sub.connect('src.s', 'arr.inp')
+            self.prob.setup(check=False)
+
+    def test_bad_indices_size(self):
+        # the length of src_indices is greater than the shape of arr.inp
+        msg = ("Shape of indices does not match shape for 'sub.arr.inp': "
+               "Expected (2,) but got (3,).")
+
+        with assertRaisesRegex(self, ValueError, msg):
+            self.sub.connect('src.s', 'arr.inp', src_indices=[0, 1, 0])
+            self.prob.setup(check=False)
+
+    def test_bad_indices_index(self):
+        # the index value within src_indices is outside the valid range for the source
+        msg = ("The index value for src_indices is outside the valid range for the connection " 
+               "'src.s' to 'arr.inp' in Group 'sub'.")
+
+        with assertRaisesRegex(self, NameError, msg):
+            self.sub.connect('src.x', 'tgt.x', src_indices=[1])
+            self.prob.setup(check=False)
+
 
 if __name__ == "__main__":
     unittest.main()
