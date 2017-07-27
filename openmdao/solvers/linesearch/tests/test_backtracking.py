@@ -8,7 +8,8 @@ from six.moves import range
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, DirectSolver
+from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, AnalysisError, \
+     ExplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.linesearch.backtracking import ArmijoGoldsteinLS, BoundsEnforceLS
 from openmdao.solvers.nonlinear.newton import NewtonSolver
@@ -122,6 +123,101 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
         top.run_model()
         self.assertTrue(2.4 <= top['comp.z'] <= 2.5)
 
+    def test_analysis_error(self):
+
+        class ParaboloidAE(ExplicitComponent):
+            """ Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
+            This version raises an analysis error if x < 2.0
+            The AE in ParaboloidAE stands for AnalysisError."""
+
+            def __init__(self):
+                super(ParaboloidAE, self).__init__()
+                self.fail_hard = False
+
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_input('y', val=0.0)
+
+                self.add_output('f_xy', val=0.0)
+
+            def compute(self, inputs, outputs):
+                """f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
+                Optimal solution (minimum): x = 6.6667; y = -7.3333
+                """
+                x = inputs['x']
+                y = inputs['y']
+
+                if x < 1.75:
+                    raise AnalysisError('Try Again.')
+
+                outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+
+            def compute_partials(self, inputs, outputs, partials):
+                """ Jacobian for our paraboloid."""
+                x = inputs['x']
+                y = inputs['y']
+
+                partials['f_xy','x'] = 2.0*x - 6.0 + y
+                partials['f_xy','y'] = 2.0*y + 8.0 + x
+
+
+        top = Problem()
+        top.model = Group()
+        top.model.add_subsystem('px', IndepVarComp('x', 1.0))
+        top.model.add_subsystem('comp', ImplCompTwoStates())
+        top.model.add_subsystem('par', ParaboloidAE())
+        top.model.connect('px.x', 'comp.x')
+        top.model.connect('comp.z', 'par.x')
+
+        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver.options['maxiter'] = 1
+        top.model.linear_solver = ScipyIterativeSolver()
+
+        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls.options['maxiter'] = 10
+        ls.options['alpha'] = 1.0
+        top.set_solver_print(level=0)
+
+        top.setup(check=False)
+
+        # Test lower bound: should go as far as it can without going over. It doesn't do a
+        # great job, so ends up at 1.8 instead of 1.75
+        top['px.x'] = 2.0
+        top['comp.y'] = 0.0
+        top['comp.z'] = 2.1
+        top.run_model()
+        assert_rel_error(self, top['comp.z'], 1.8, 1e-8)
+
+        # Test the behavior with the switch turned off.
+
+        top = Problem()
+        top.model = Group()
+        top.model.add_subsystem('px', IndepVarComp('x', 1.0))
+        top.model.add_subsystem('comp', ImplCompTwoStates())
+        top.model.add_subsystem('par', ParaboloidAE())
+        top.model.connect('px.x', 'comp.x')
+        top.model.connect('comp.z', 'par.x')
+
+        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver.options['maxiter'] = 1
+        top.model.linear_solver = ScipyIterativeSolver()
+
+        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls.options['maxiter'] = 10
+        ls.options['alpha'] = 1.0
+        ls.options['retry_on_analysis_error'] = False
+        top.set_solver_print(level=0)
+
+        top.setup(check=False)
+
+        top['px.x'] = 2.0
+        top['comp.y'] = 0.0
+        top['comp.z'] = 2.1
+
+        with self.assertRaises(AnalysisError) as context:
+            top.run_model()
+
+        self.assertEqual(str(context.exception), 'Try Again.')
 
 class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
 
