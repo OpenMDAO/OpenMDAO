@@ -94,6 +94,7 @@ class DefaultVector(Vector):
         system = self._system
         type_ = self._typ
         iproc = self._iproc
+        ncol = self._ncol
 
         sizes_byset_t = system._var_sizes_byset[type_]
 
@@ -101,7 +102,7 @@ class DefaultVector(Vector):
         indices = {}
         for set_name in system._var_set2iset[type_]:
             size = np.sum(sizes_byset_t[set_name][iproc, :])
-            data[set_name] = np.zeros(size)
+            data[set_name] = np.zeros((size, ncol)) if ncol > 1 else np.zeros(size)
             indices[set_name] = np.zeros(size, int)
 
         sizes_t = system._var_sizes[type_]

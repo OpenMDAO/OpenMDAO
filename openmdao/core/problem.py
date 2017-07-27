@@ -276,13 +276,14 @@ class Problem(object):
             msg = "Unsupported mode: '%s'" % mode
             raise ValueError(msg)
 
-        model._setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex)
-        self.driver._setup_driver(self)
-
         # TODO: fix this so it computes the proper type based on sizes of VOIs
         if mode == 'auto':
             mode = 'rev'
         self._mode = mode
+
+        model._setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex,
+                     mode=mode)
+        self.driver._setup_driver(self)
 
         if isinstance(model, Group):
             self._sys_graph = model.compute_sys_graph(comps_only=True, save_vars=True)
