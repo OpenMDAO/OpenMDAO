@@ -2,6 +2,7 @@
 
 import sys
 import logging
+from collections import defaultdict
 
 import numpy as np
 
@@ -10,6 +11,7 @@ from six import iteritems
 
 from openmdao.core.group import Group
 from openmdao.core.component import Component
+from openmdao.utils.graph_utils import get_sccs_topo
 
 # when setup is called multiple times, we need this to prevent adding
 # another handler to the config_check logger each time (if logger arg to check_config is None)
@@ -53,97 +55,6 @@ def check_config(problem, logger=None):
             _check_dataflow(system, logger)
 
 
-def compute_sys_graph(group, input_srcs, comps_only=False):
-    """
-    Compute a dependency graph for subsystems in the given group.
-
-    Parameters
-    ----------
-    group : <Group>
-        The Group we're computing the graph for.
-
-    input_srcs : {}
-        dict containing global variable abs names for sources of the inputs.
-
-    comps_only : bool (False)
-        If True, return a graph of all Components within the given group
-        or any of its descendants. No sub-groups will be included. Otherwise,
-        a graph containing only direct children (both Components and Groups)
-        of the group will be returned.
-
-    Returns
-    -------
-    DiGraph
-        A directed graph containing names of subsystems and their connections.
-    """
-    if comps_only:
-        subsystems = list(group.system_iter(recurse=True, typ=Component, local=False))
-    else:
-        subsystems = group._subsystems_allprocs
-
-    i_start = group._ext_num_vars['input'][0]
-    i_end = group._ext_num_vars['input'][0] + group._num_var['input']
-    o_start = group._ext_num_vars['output'][0]
-    o_end = group._ext_num_vars['output'][0] + group._num_var['output']
-
-    # mapping arrays to find the system ID given the variable ID
-    invar2sys = np.empty(group._num_var['input'], dtype=int)
-    outvar2sys = np.empty(group._num_var['output'], dtype=int)
-
-    for i, s in enumerate(subsystems):
-        start = s._ext_num_vars['input'][0]
-        end = s._ext_num_vars['input'][0] + s._num_var['input']
-        invar2sys[start - i_start:end - i_start] = i
-
-        start = s._ext_num_vars['output'][0]
-        end = s._ext_num_vars['output'][0] + s._num_var['output']
-        outvar2sys[start - o_start:end - o_start] = i
-
-    graph = nx.DiGraph()
-
-    indices = group._var_allprocs_abs2idx
-    for in_abs, src_abs in iteritems(input_srcs):
-        if src_abs is not None:
-            src_id = indices['output'][src_abs] + group._ext_num_vars['output'][0]
-            in_id = indices['input'][in_abs] + group._ext_num_vars['input'][0]
-            if ((o_start <= src_id < o_end) and (i_start <= in_id < i_end)):
-                graph.add_edge(subsystems[outvar2sys[src_id - o_start]].pathname,
-                               subsystems[invar2sys[in_id - i_start]].pathname)
-
-    return graph
-
-
-def get_sccs(group, comps_only=False):
-    """
-    Return strongly connected subsystems of the given Group.
-
-    Parameters
-    ----------
-    group : <Group>
-        The strongly connected components will be computed for this Group.
-
-    comps_only : bool (False)
-        If True, the graph used to compute strongly connected components
-        will contain all Components within the given group or any of its
-        descendants and no sub-groups will be included. Otherwise, the graph
-        used will contain only direct children (both Components and Groups)
-        of the given group.
-
-    Returns
-    -------
-    list of sets of str
-        A list of strongly connected components in topological order.
-    """
-    graph = compute_sys_graph(group, group._conn_global_abs_in2out,
-                              comps_only=comps_only)
-
-    # Tarjan's algorithm returns SCCs in reverse topological order, so
-    # the list returned here is reversed.
-    sccs = list(nx.strongly_connected_components(graph))
-    sccs.reverse()
-    return sccs
-
-
 def _check_dataflow(group, logger):
     """
     Report any cycles and out of order Systems to the logger.
@@ -156,7 +67,8 @@ def _check_dataflow(group, logger):
     logger : object
         The object that manages logging output.
     """
-    sccs = get_sccs(group)
+    graph = group.compute_sys_graph(comps_only=False)
+    sccs = get_sccs_topo(graph)
     cycles = [sorted(s) for s in sccs if len(s) > 1]
     cycle_idxs = {}
 
@@ -207,39 +119,19 @@ def _get_out_of_order_subs(group, input_srcs):
         source Systems that execute after them.
     """
     subsystems = group._subsystems_allprocs
+    sub2i = {sub.name: i for i, sub in enumerate(subsystems)}
+    glen = len(group.pathname.split('.')) if group.pathname else 0
 
-    i_start = group._ext_num_vars['input'][0]
-    i_end = group._ext_num_vars['input'][0] + group._num_var['input']
-    o_start = group._ext_num_vars['output'][0]
-    o_end = group._ext_num_vars['output'][0] + group._num_var['output']
-
-    # mapping arrays to find the system ID given the variable ID
-    invar2sys = np.empty(i_end - i_start, dtype=int)
-    outvar2sys = np.empty(o_end - o_start, dtype=int)
-
-    for i, s in enumerate(subsystems):
-        start = s._ext_num_vars['input'][0]
-        end = s._ext_num_vars['input'][0] + s._num_var['input']
-        invar2sys[start - i_start:end - i_start] = i
-
-        start = s._ext_num_vars['output'][0]
-        end = s._ext_num_vars['output'][0] + s._num_var['output']
-        outvar2sys[start - o_start:end - o_start] = i
-
-    indices = group._var_allprocs_abs2idx
-    ubcs = {}
+    ubcs = defaultdict(list)
     for in_abs, src_abs in iteritems(input_srcs):
         if src_abs is not None:
-            src_id = indices['output'][src_abs] + group._ext_num_vars['output'][0]
-            in_id = indices['input'][in_abs] + group._ext_num_vars['input'][0]
-            if ((o_start <= src_id < o_end) and (i_start <= in_id < i_end)):
-                # offset the ids to index into our var2sys arrays
-                src_sysID = outvar2sys[src_id - o_start]
-                tgt_sysID = invar2sys[in_id - i_start]
-                if (src_sysID > tgt_sysID):
-                    src_sys = subsystems[src_sysID].pathname
-                    tgt_sys = subsystems[tgt_sysID].pathname
-                    ubcs.setdefault(tgt_sys, []).append(src_sys)
+            iparts = in_abs.split('.')
+            oparts = src_abs.split('.')
+            src_sys = oparts[glen]
+            tgt_sys = iparts[glen]
+            if (src_sys in sub2i and tgt_sys in sub2i and
+                    (sub2i[src_sys] > sub2i[tgt_sys])):
+                ubcs['.'.join(iparts[:glen + 1])].append('.'.join(oparts[:glen + 1]))
 
     return ubcs
 

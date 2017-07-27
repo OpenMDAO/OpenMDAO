@@ -260,8 +260,10 @@ class SqliteRecorder(BaseRecorder):
             '_apply_nonlinear,' '_solve_nonlinear'. Behavior varies based on from which function
             record_iteration was called.
         """
+        print("Recording STACK:", recording_iteration_stack)
         stack_top = recording_iteration_stack[-1][0]
         method = stack_top.split('.')[-1]
+        print("METHOD: ", method)
 
         if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear',
                           '_solve_nonlinear']:

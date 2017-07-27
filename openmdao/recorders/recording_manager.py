@@ -2,6 +2,7 @@
 RecordingManager class definition.
 """
 import time
+from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
 
 
 class RecordingManager(object):
@@ -83,6 +84,13 @@ class RecordingManager(object):
 
         if metadata is not None:
             metadata['timestamp'] = time.time()
+
+        # from openmdao.core.system import System
+        # if isinstance(object_requesting_recording, System):
+        #     print("STACK is: ", recording_iteration_stack)
+        #     method = recording_iteration_stack[1][0].split('.')[-1]
+        #     print("METHOD CALLING RECORDING IS: ", method)
+        #     kwargs["method"] = method
 
         for recorder in self._recorders:
             recorder.record_iteration(object_requesting_recording, metadata, **kwargs)

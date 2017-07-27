@@ -22,6 +22,7 @@ from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.mpi import MPI, FakeComm
+from openmdao.utils.graph_utils import all_connected_edges
 from openmdao.vectors.default_vector import DefaultVector
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -215,8 +216,8 @@ class Problem(object):
         float
             absolute error.
         """
-        warn_deprecation('This method provides backwards compatibility with '
-                         'OpenMDAO <= 1.x ; use run_driver instead.')
+        warn_deprecation("The 'run_once' method provides backwards compatibility with "
+                         "OpenMDAO <= 1.x ; use 'run_model' instead.")
 
         return self.run_model()
 
@@ -229,8 +230,8 @@ class Problem(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        warn_deprecation('This method provides backwards compatibility with '
-                         'OpenMDAO <= 1.x ; use run_driver instead.')
+        warn_deprecation("The 'run' method provides backwards compatibility with "
+                         "OpenMDAO <= 1.x ; use 'run_driver' instead.")
 
         return self.run_driver()
 
@@ -281,12 +282,19 @@ class Problem(object):
             msg = "Unsupported mode: '%s'" % mode
             raise ValueError(msg)
 
+        model._setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex)
+        self.driver._setup_driver(self)
+
+        # TODO: fix this so it computes the proper type based on sizes of VOIs
         if mode == 'auto':
             mode = 'rev'
         self._mode = mode
 
-        model._setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex)
-        self.driver._setup_driver(self)
+        if isinstance(model, Group):
+            self._sys_graph = model.compute_sys_graph(comps_only=True, save_vars=True)
+            self._relevant = get_relevant_vars(self._sys_graph,
+                                               self.driver._designvars,
+                                               self.driver._responses)
 
         # Now that setup has been called, we can set the iprints.
         for items in self._solver_print_cache:
@@ -645,6 +653,8 @@ class Problem(object):
         vec_dresid = model._vectors['residual']
         nproc = self.comm.size
         iproc = model.comm.rank
+        sizes = model._var_sizes['output']
+        relevant = self._relevant
         approx = model._owns_approx_jac
         fwd = (mode == 'fwd') or approx
 
@@ -689,13 +699,11 @@ class Problem(object):
             for okey in of:
                 for ikey in wrt:
                     totals[(okey, ikey)] = None
-
         elif return_format == 'dict':
             for okey in of:
                 totals[okey] = OrderedDict()
                 for ikey in wrt:
                     totals[okey][ikey] = None
-
         else:
             msg = "Unsupported return format '%s." % return_format
             raise NotImplementedError(msg)
@@ -722,13 +730,6 @@ class Problem(object):
             input_vec, output_vec = vec_doutput, vec_dresid
             input_vois = self.driver._responses
             output_vois = self.driver._designvars
-
-        # TODO : Parallel adjoint setup loop goes here.
-        # NOTE : Until we support it, we will just limit ourselves to the
-        # 'linear' vector.
-        vecname = 'linear'
-        dinputs = input_vec[vecname]
-        doutputs = output_vec[vecname]
 
         # Solve for derivs with the approximation_scheme.
         # This cuts out the middleman by grabbing the Jacobian directly after linearization.
@@ -766,18 +767,70 @@ class Problem(object):
                         ikey = old_input_list[icount]
                         totals[okey][ikey] = -approx_jac[output_name, input_name]
 
+            return totals
+
         # Solve for derivs using linear solver.
-        else:
+
+        # this maps either an rhs_group to a list of tuples of (absname, oldname)
+        # of variables in that group, or, for variables that aren't in an
+        # rhs_group, it maps the variable name to a one entry list containing
+        # the tuple (absname, oldname) for that variable.  oldname will be
+        # the promoted name if the 'global_names' arg is False, else it will
+        # be the same as absname (the absolute variable name).
+        voi_lists = OrderedDict()
+
+        # this maps the names from input_list to the corresponding names
+        # of the RHS vectors.  For any variables that are not part of an
+        # rhs_group, they will map to 'linear'.  All rhs_group'ed variables
+        # will just map to their own name.
+        inp2rhs_name = {}
+
+        # if not all inputs are VOIs, then this is a test where most likely
+        # design vars, constraints, and objectives were not specified, so
+        # don't do relevance checking (because we only want to analyze the
+        # dependency graph for VOIs rather than for every input/output
+        # in the model)
+        test_mode = False
+
+        for i, name in enumerate(input_list):
+            if name in input_vois:
+                rhs_group = input_vois[name]['rhs_group']
+            else:
+                rhs_group = None
+                test_mode = True
+            if rhs_group is None:  # variable is not in an rhs_group
+                if name in voi_lists:
+                    raise RuntimeError("Variable name '%s' matches an rhs_group name." %
+                                       name)
+                else:
+                    # store the absolute name along with the original name, which
+                    # can be either promoted or absolute depending on the value
+                    # of the 'global_names' flag.
+                    voi_lists[name] = [(name, old_input_list[i])]
+                    inp2rhs_name[name] = 'linear'
+            else:
+                if rhs_group not in voi_lists:
+                    voi_lists[rhs_group] = []
+                voi_lists[rhs_group].append((name, old_input_list[i]))
+                inp2rhs_name[name] = name
+
+        vec_names = sorted(set(inp2rhs_name.values()))
+
+        for rhs_name, vois in iteritems(voi_lists):
+            voi_info = {}
+            max_len = 0
+
             # If Forward mode, solve linear system for each 'wrt'
             # If Adjoint mode, solve linear system for each 'of'
-            for icount, input_name in enumerate(input_list):
-                # Dictionary access returns a scaler for 1d input, and we
-                # need a vector for clean code, so use _views_flat.
-                flat_view = dinputs._views_flat[input_name]
+            for input_name, old_input_name in vois:
+                vecname = inp2rhs_name[input_name]
+                dinputs = input_vec[vecname]
+                doutputs = output_vec[vecname]
+
                 in_var_idx = model._var_allprocs_abs2idx['output'][input_name]
                 in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
-                start = np.sum(model._var_sizes['output'][:iproc, in_var_idx])
-                end = np.sum(model._var_sizes['output'][:iproc + 1, in_var_idx])
+                start = np.sum(sizes[:iproc, in_var_idx])
+                end = np.sum(sizes[:iproc + 1, in_var_idx])
 
                 in_idxs = None
                 if input_name in input_vois:
@@ -785,71 +838,121 @@ class Problem(object):
                     if 'indices' in in_voi_meta:
                         in_idxs = in_voi_meta['indices']
 
-                distrib = in_var_meta['distributed']
+                dup = not in_var_meta['distributed']
                 if in_idxs is not None:
                     irange = in_idxs
                     loc_size = len(in_idxs)
-                    dup = False
                 else:
-                    irange = range(in_var_meta['global_size'])
+                    irange = list(range(in_var_meta['global_size']))
                     loc_size = end - start
-                    dup = not distrib
 
-                loc_idx = -1
-                for idx in irange:
+                if loc_size == 0:
+                    # var is not local. get size of var in owned proc
+                    for rank in range(nproc):
+                        sz = sizes[rank, in_var_idx]
+                        if sz > 0:
+                            loc_size = sz
+                            break
 
-                    # Maybe we don't need to clean up so much at the beginning,
-                    # since we clean this every time.
-                    dinputs.set_const(0.0)
+                if max_len < len(irange):
+                    max_len = len(irange)
 
-                    # The 'store' flag is here so that we properly initialize
+                voi_info[input_name] = (dinputs, doutputs, irange, loc_size, start, end, dup)
+
+            loc_idxs = defaultdict(lambda: -1)
+
+            # at this point, we know that for all vars in the current
+            # group of interest, the number of indices is the same. We loop
+            # over the *size* of the indices and use the loop index to look
+            # up the actual indices for the current members of the group
+            # of interest.
+            for i in range(max_len):
+                # this sets dinputs for the current rhs_group to 0
+                voi_info[vois[0][0]][0].set_const(0.0)
+
+                for input_name, old_input_name in vois:
+                    dinputs, doutputs, idxs, loc_size, start, end, dup = voi_info[input_name]
+                    if i >= len(idxs):
+                        idx = idxs[-1]  # reuse the last index
+                    else:
+                        idx = idxs[i]
+
+                    if idx < 0:
+                        idx += end
+                    if start <= idx < end and input_name in dinputs._views_flat:
+                        # Dictionary access returns a scaler for 1d input, and we
+                        # need a vector for clean code, so use _views_flat.
+                        dinputs._views_flat[input_name][idx - start] = 1.0
+
+                model._solve_linear(vec_names, mode)
+
+                for input_name, old_input_name in vois:
+                    dinputs, doutputs, idxs, loc_size, start, end, dup = voi_info[input_name]
+                    if i >= len(idxs):
+                        idx = idxs[-1]  # reuse the last index
+                        delta_loc_idx = 0  # don't increment local_idx
+                    else:
+                        idx = idxs[i]
+                        delta_loc_idx = 1
+
                     # totals to zeros instead of None in those cases when none
                     # of the specified indices are within the range of interest
                     # for this proc.
-                    if idx < 0:
-                        idx += end
-                    if start <= idx < end:
-                        flat_view[idx - start] = 1.0
-                        store = True
-                    else:
-                        store = dup
-
+                    store = True if start <= idx < end else dup
                     if store:
-                        loc_idx += 1
-
-                    model._solve_linear([vecname], mode)
+                        loc_idxs[input_name] += delta_loc_idx
+                    loc_idx = loc_idxs[input_name]
 
                     # Pull out the answers and pack into our data structure.
                     for ocount, output_name in enumerate(output_list):
-                        out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
-                        deriv_val = doutputs._views_flat[output_name]
                         out_idxs = None
                         if output_name in output_vois:
                             out_voi_meta = output_vois[output_name]
                             if 'indices' in out_voi_meta:
                                 out_idxs = out_voi_meta['indices']
 
-                        if out_idxs is not None:
-                            deriv_val = deriv_val[out_idxs]
-                        len_val = len(deriv_val)
+                        if not test_mode and input_name not in relevant[output_name]:
+                            # irrelevant output, just give zeros
+                            if out_idxs is None:
+                                out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
+                                deriv_val = np.zeros(sizes[iproc, out_var_idx])
+                            else:
+                                deriv_val = np.zeros(len(out_idxs))
+                        else:  # relevant output
+                            if output_name in doutputs._views_flat:
+                                deriv_val = doutputs._views_flat[output_name]
+                                size = deriv_val.size
+                            else:
+                                deriv_val = None
 
-                        if dup and nproc > 1:
-                            self.comm.Bcast(deriv_val, root=np.min(np.nonzero(
-                                model._var_sizes['output'][:, out_var_idx])[0][0]))
+                            if out_idxs is not None:
+                                size = out_idxs.size
+                                if deriv_val is not None:
+                                    deriv_val = deriv_val[out_idxs]
+
+                            if dup and nproc > 1:
+                                out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
+                                root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
+                                if deriv_val is None:
+                                    if out_idxs is not None:
+                                        sz = size
+                                    else:
+                                        sz = sizes[root, out_var_idx]
+                                    deriv_val = np.empty(sz, dtype=float)
+                                self.comm.Bcast(deriv_val, root=root)
+
+                        len_val = len(deriv_val)
 
                         if return_format == 'flat_dict':
                             if fwd:
-                                key = (old_output_list[ocount],
-                                       old_input_list[icount])
+                                key = (old_output_list[ocount], old_input_name)
 
                                 if totals[key] is None:
                                     totals[key] = np.zeros((len_val, loc_size))
                                 if store:
                                     totals[key][:, loc_idx] = deriv_val
-
                             else:
-                                key = (old_input_list[icount],
-                                       old_output_list[ocount])
+                                key = (old_input_name, old_output_list[ocount])
 
                                 if totals[key] is None:
                                     totals[key] = np.zeros((loc_size, len_val))
@@ -859,22 +962,18 @@ class Problem(object):
                         elif return_format == 'dict':
                             if fwd:
                                 okey = old_output_list[ocount]
-                                ikey = old_input_list[icount]
 
-                                if totals[okey][ikey] is None:
-                                    totals[okey][ikey] = np.zeros((len_val, loc_size))
+                                if totals[okey][old_input_name] is None:
+                                    totals[okey][old_input_name] = np.zeros((len_val, loc_size))
                                 if store:
-                                    totals[okey][ikey][:, loc_idx] = deriv_val
-
+                                    totals[okey][old_input_name][:, loc_idx] = deriv_val
                             else:
-                                okey = old_input_list[icount]
                                 ikey = old_output_list[ocount]
 
-                                if totals[okey][ikey] is None:
-                                    totals[okey][ikey] = np.zeros((loc_size, len_val))
+                                if totals[old_input_name][ikey] is None:
+                                    totals[old_input_name][ikey] = np.zeros((loc_size, len_val))
                                 if store:
-                                    totals[okey][ikey][loc_idx, :] = deriv_val
-
+                                    totals[old_input_name][ikey][loc_idx, :] = deriv_val
                         else:
                             raise RuntimeError("unsupported return format")
 
@@ -1108,3 +1207,82 @@ def _format_error(error, tol):
     if np.isnan(error) or error < tol:
         return '{:.6e}'.format(error)
     return '{:.6e} *'.format(error)
+
+
+def get_relevant_vars(graph, desvars, responses):
+    """
+    Find all relevant vars between desvars and responses.
+
+    Both vars are assumed to be outputs (either design vars or responses).
+
+    Parameters
+    ----------
+    graph : networkx.DiGraph
+        System graph with var connection info on the edges.
+    desvars : list of str
+        Names of design variables.
+    responses : list of str
+        Names of response variables.
+
+    Returns
+    -------
+    dict
+        Dict of (dep_outputs, dep_inputs, dep_systems) keyed by design vars and responses.
+    """
+    relevant = defaultdict(dict)
+    edge_cache = {}
+
+    grev = graph.reverse()
+
+    for desvar in desvars:
+        start_sys = desvar.rsplit('.', 1)[0]
+        if start_sys not in edge_cache:
+            edge_cache[start_sys] = set(all_connected_edges(graph, start_sys))
+        start_edges = edge_cache[start_sys]
+
+        for response in responses:
+            end_sys = response.rsplit('.', 1)[0]
+            if end_sys not in edge_cache:
+                edge_cache[end_sys] = set((v, u) for u, v in
+                                          all_connected_edges(grev, end_sys))
+            end_edges = edge_cache[end_sys]
+
+            common_edges = start_edges.intersection(end_edges)
+
+            input_deps = set()
+            output_deps = set()
+            sys_deps = set()
+            for u, v in common_edges:
+                sys_deps.add(u)
+                sys_deps.add(v)
+                conns = graph[u][v]['conns']
+                output_deps.update(conns)
+                for inputs in conns.values():
+                    input_deps.update(inputs)
+
+            if sys_deps:
+                output_deps.update((desvar, response))
+                relevant[desvar][response] = relevant[response][desvar] = \
+                    (input_deps, output_deps, sys_deps)
+
+    # TODO: if we knew mode here, we would only need to compute for fwd or rev,
+    # instead of both.
+
+    # now calculate dependencies between each VOI and all other VOIs of the
+    # other type, e.g for each input VOI wrt all output VOIs.
+    for inputs, outputs in [(desvars, responses), (responses, desvars)]:
+        for inp in inputs:
+            relinp = relevant[inp]
+            if relinp:
+                total_inps = set()
+                total_outs = set()
+                total_systems = set()
+                for out in outputs:
+                    if out in relinp:
+                        inps, outs, systems = relinp[out]
+                        total_inps.update(inps)
+                        total_outs.update(outs)
+                        total_systems.update(systems)
+                relinp['@all'] = (total_inps, total_outs, total_systems)
+
+    return relevant

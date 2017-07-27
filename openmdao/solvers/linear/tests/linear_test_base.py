@@ -24,7 +24,6 @@ class LinearSolverTests(object):
     class LinearSolverTestCase(unittest.TestCase):
         linear_solver_class = None
 
-
         def test_solve_linear_maxiter(self):
             """Verify that the linear solver abides by the 'maxiter' option."""
 

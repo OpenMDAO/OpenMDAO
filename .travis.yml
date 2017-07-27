@@ -79,8 +79,8 @@ script:
 - cd openmdao/docs
 - make all
 # run all openmdao tests
-- testflo openmdao --pre_announce  -m "ptest*"
-- testflo openmdao --coverage --coverpkg openmdao
+- testflo -n 1 openmdao -m "ptest*"
+- testflo -n 1 openmdao --coverage --coverpkg openmdao
 
 after_success:
   coveralls

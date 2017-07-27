@@ -264,11 +264,13 @@ class TestSqliteRecorder(unittest.TestCase):
         self.dir = mkdtemp()
         self.filename = os.path.join(self.dir, "sqlite_test")
         self.recorder = SqliteRecorder(self.filename)
-        # print(self.filename)  # comment out to make filename printout go away.
+        print(self.filename)  # comment out to make filename printout go away.
         self.eps = 1e-5
+        from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
+
 
     def tearDown(self):
-        # return  # comment out to allow db file to be removed. TODO_RECORDERS
+        return  # comment out to allow db file to be removed.
         try:
             rmtree(self.dir)
             pass
@@ -471,7 +473,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.cleanup()
 
-        coordinate = [0, 'SLSQP', (3, )]
+        coordinate = [0, 'SLSQP', (2, )]
 
         expected_desvars = {
                             "p1.x": [7.16706813, ],
@@ -605,7 +607,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.cleanup()
 
-        coordinate = [0, 'SLSQP', (3, )]
+        coordinate = [0, 'SLSQP', (2, )]
 
         expected_desvars = {"p1.x": [7.16706813, ]}
 
@@ -664,7 +666,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
                                                  expected_outputs, expected_residuals),), self.eps)
 
-        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
+        coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
                       'pz._solve_nonlinear', (2, )]
 
         expected_inputs = None
@@ -1213,7 +1215,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.cleanup()
 
         # Driver recording test
-        coordinate = [0, 'SLSQP', (5, )]
+        coordinate = [0, 'SLSQP', (4, )]
 
         expected_desvars = {
                             "pz.z": [1.97763888e+00, 0.0],
@@ -1231,7 +1233,7 @@ class TestSqliteRecorder(unittest.TestCase):
                                            expected_objectives, expected_constraints),), self.eps)
 
         # System recording test
-        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
+        coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
                       'pz._solve_nonlinear', (2, )]
 
         expected_inputs = None
@@ -1241,7 +1243,7 @@ class TestSqliteRecorder(unittest.TestCase):
                                                  expected_residuals), ), self.eps)
 
         # Solver recording test
-        coordinate = [0, 'SLSQP', (6, ), 'root._solve_nonlinear', (6, ), 'NLRunOnce', (0, ),
+        coordinate = [0, 'SLSQP', (5, ), 'root._solve_nonlinear', (6, ), 'NLRunOnce', (0, ),
                       'mda._solve_nonlinear', (6, ), 'NonlinearBlockGS', (4, )]
 
         expected_abs_error = 0.0,
