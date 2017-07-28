@@ -75,7 +75,7 @@ class Group(System):
         """
         Configure this group to assign children settings.
 
-        This method should be overidden by your Group's method.
+        This method may optionally be overidden by your Group's method.
 
         You may only use this method to change settings on your children subsystems. This includes
         setting solvers in cases where you want to override the defaults.
