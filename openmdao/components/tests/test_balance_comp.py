@@ -7,7 +7,7 @@ import numpy as np
 from numpy.testing import assert_almost_equal
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, \
     NewtonSolver, DirectSolver, DenseJacobian
-from openmdao.components.balance_comp import BalanceComp
+from openmdao.api import BalanceComp
 
 
 class TestBalanceComp(unittest.TestCase):
