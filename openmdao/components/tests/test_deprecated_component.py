@@ -10,7 +10,7 @@ import numpy as np
 
 from openmdao.api import Problem, IndepVarComp, Component, Group, NewtonSolver, NonLinearRunOnce
 from openmdao.api import ScipyIterativeSolver as ScipyGMRES
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.devtools.testutil import assert_rel_error, TestLogger
 
 
 class Paraboloid(Component):
@@ -224,7 +224,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.f_xy', 'py.y')][0][0], 11.0, 1e-5)
 
         # Check partials
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials()
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):
@@ -266,7 +266,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.f_xy', 'py.y')][0][0], 11.0, 1e-5)
 
         # Check partials
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials()
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):
@@ -311,7 +311,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
         # Check partials
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials()
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):
@@ -386,7 +386,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
         # Check partials
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials()
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):
@@ -433,7 +433,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
         # Check partials
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials()
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):
@@ -479,7 +479,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
         # Check partials
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials()
 
         for key1, val1 in iteritems(data):
             for key2, val2 in iteritems(val1):
