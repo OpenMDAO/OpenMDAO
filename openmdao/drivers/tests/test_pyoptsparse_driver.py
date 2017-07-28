@@ -1032,9 +1032,9 @@ class TestPyoptSparse(unittest.TestCase):
         # Normally it takes 9 iterations, but takes 13 here because of the
         # analysis failures. (note SLSQP takes 5 instead of 4)
         if OPTIMIZER == 'SLSQP':
-            self.assertEqual(prob.driver.iter_count, 5)
+            self.assertEqual(prob.driver.iter_count, 3)
         else:
-            self.assertEqual(prob.driver.iter_count, 13)
+            self.assertEqual(prob.driver.iter_count, 15)
 
     def test_raised_error_objfunc(self):
 
@@ -1121,7 +1121,7 @@ class TestPyoptSparse(unittest.TestCase):
         # Normally it takes 9 iterations, but takes 13 here because of the
         # gradfunc failures. (note SLSQP just doesn't do well)
         if OPTIMIZER == 'SNOPT':
-            self.assertEqual(prob.driver.iter_count, 13)
+            self.assertEqual(prob.driver.iter_count, 15)
 
     def test_raised_error_sensfunc(self):
 
