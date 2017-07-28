@@ -34,7 +34,7 @@ Preamble
     from __future__ import division, print_function
     from openmdao.api import ExplicitComponent
 
-At the top of any script you'll see these lines (or lines very similar to these) which import needed classes and functions. On the first import line the `print_function` is used so the code in the script will work in python 2 or 3. If you want to know whats going on with the division operator, check out this `detailed explanation <https://www.python.org/dev/peps/pep-0238/>`_. The second import line brings in OpenMDAO classes that are needed to build and run a model.
+At the top of any script you'll see these lines (or lines very similar to these) which import needed classes and functions. On the first import line the `print_function` is used so the code in the script will work in Python 2 or 3. If you want to know whats going on with the division operator, check out this `detailed explanation <https://www.python.org/dev/peps/pep-0238/>`_. The second import line brings in OpenMDAO classes that are needed to build and run a model.
 As you progress to more complex models you can expect to import more classes from `openmdao.api`, but for now we only need these 4.
 
 Defining a component
