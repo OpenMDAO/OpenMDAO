@@ -412,7 +412,7 @@ class MetaModelTestCase(unittest.TestCase):
         prob['x'] = 0.125
         prob.run_model()
 
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials()
 
         Jf = data['mm'][('f', 'x')]['J_fwd']
         Jr = data['mm'][('f', 'x')]['J_rev']

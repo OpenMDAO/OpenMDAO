@@ -67,35 +67,6 @@ class TestViewModelData(unittest.TestCase):
         self.assertEqual(self.expected_tree_json, tree_json)
         self.assertEqual(self.expected_conns_json, conns_json)
 
-    def test_view_model_from_problem(self):
-        """
-        Test that an n2 html file is generated from a Problem.
-        """
-        p = Problem()
-        p.model = SellarStateConnection()
-        p.setup(check=False)
-        view_model(p, outfile=self.problem_html_filename, show_browser=False)
-
-        # Check that the html file has been created and has something in it.
-        self.assertTrue(os.path.isfile(self.problem_html_filename))
-        self.assertGreater(os.path.getsize(self.problem_html_filename), 100)
-
-    def test_view_model_from_sqlite(self):
-        """
-        Test that an n2 html file is generated from a sqlite file.
-        """
-        p = Problem()
-        p.model = SellarStateConnection()
-        r = SqliteRecorder(self.sqlite_db_filename2)
-        p.driver.add_recorder(r)
-        p.setup(check=False)
-        r.close()
-        view_model(self.sqlite_db_filename2, outfile=self.sqlite_html_filename, show_browser=False)
-
-        # Check that the html file has been created and has something in it.
-        self.assertTrue(os.path.isfile(self.sqlite_html_filename))
-        self.assertGreater(os.path.getsize(self.sqlite_html_filename), 100)
-
 
 if __name__ == "__main__":
     unittest.main()
