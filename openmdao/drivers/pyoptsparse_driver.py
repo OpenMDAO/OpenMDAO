@@ -194,7 +194,7 @@ class pyOptSparseDriver(Driver):
             model._solve_nonlinear()
             rec.abs = 0.0
             rec.rel = 0.0
-        # self.iter_count += 1
+        self.iter_count += 1
 
         opt_prob = Optimization(self.options['title'], self._objfunc)
 
@@ -318,7 +318,7 @@ class pyOptSparseDriver(Driver):
             model._solve_nonlinear()
             rec.abs = 0.0
             rec.rel = 0.0
-        # self.iter_count += 1
+        self.iter_count += 1
 
         # Save the most recent solution.
         self.pyopt_solution = sol

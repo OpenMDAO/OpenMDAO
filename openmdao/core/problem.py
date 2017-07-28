@@ -767,6 +767,7 @@ class Problem(object):
                         ikey = old_input_list[icount]
                         totals[okey][ikey] = -approx_jac[output_name, input_name]
 
+            recording_iteration_stack.pop()
             return totals
 
         # Solve for derivs using linear solver.
