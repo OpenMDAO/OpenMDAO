@@ -13,9 +13,10 @@ import traceback
 from six import iteritems
 from pyoptsparse import Optimization
 
+from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver
-from openmdao.utils.record_util import create_local_meta
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.utils.record_util import create_local_meta
 
 # names of optimizers that use gradients
 grad_drivers = {'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
@@ -193,8 +194,8 @@ class pyOptSparseDriver(Driver):
             model._solve_nonlinear()
             rec.abs = 0.0
             rec.rel = 0.0
-
         self.iter_count += 1
+
         opt_prob = Optimization(self.options['title'], self._objfunc)
 
         # Add all design variables
@@ -317,7 +318,6 @@ class pyOptSparseDriver(Driver):
             model._solve_nonlinear()
             rec.abs = 0.0
             rec.rel = 0.0
-
         self.iter_count += 1
 
         # Save the most recent solution.
@@ -365,10 +365,17 @@ class pyOptSparseDriver(Driver):
                 self.set_design_var(name, dv_dict[name])
 
             # print("Setting DV")
+            # print(dv_dict)
 
             # Execute the model
             with Recording(self.options['optimizer'], self.iter_count, self) as rec:
-                model._solve_nonlinear()
+                self.iter_count += 1
+                try:
+                    model._solve_nonlinear()
+
+                # Let the optimizer try to handle the error
+                except AnalysisError:
+                    fail = 1
 
                 func_dict = self.get_objective_values()
                 func_dict.update(self.get_constraint_values(lintype='nonlinear'))
@@ -377,7 +384,6 @@ class pyOptSparseDriver(Driver):
                 # been gathered in MPI.
                 rec.abs = 0.0
                 rec.rel = 0.0
-            self.iter_count += 1
 
         except Exception as msg:
             tb = traceback.format_exc()
@@ -389,8 +395,8 @@ class pyOptSparseDriver(Driver):
             fail = 1
             func_dict = {}
 
-            # print("Functions calculated")
-            # print(dv_dict)
+        # print("Functions calculated")
+        # print(dv_dict)
 
         return func_dict, fail
 
@@ -423,9 +429,25 @@ class pyOptSparseDriver(Driver):
 
         try:
 
-            sens_dict = self._compute_total_derivs(of=self._quantities,
-                                                   wrt=self._indep_list,
-                                                   return_format='dict')
+            try:
+                sens_dict = self._compute_total_derivs(of=self._quantities,
+                                                       wrt=self._indep_list,
+                                                       return_format='dict')
+
+            # Let the optimizer try to handle the error
+            except AnalysisError:
+                fail = 1
+
+                # We need to cobble together a sens_dict of the correct size.
+                # Best we can do is return zeros.
+
+                sens_dict = OrderedDict()
+                for okey, oval in iteritems(func_dict):
+                    sens_dict[okey] = OrderedDict()
+                    osize = len(oval)
+                    for ikey, ival in iteritems(dv_dict):
+                        isize = len(ival)
+                        sens_dict[okey][ikey] = np.zeros((osize, isize))
 
         except Exception as msg:
             tb = traceback.format_exc()

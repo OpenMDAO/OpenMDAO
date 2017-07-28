@@ -268,7 +268,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.eps = 1e-5
 
     def tearDown(self):
-        # return  # comment out to allow db file to be removed. TODO_RECORDERS
+        # return  # comment out to allow db file to be removed.
         try:
             rmtree(self.dir)
             pass
@@ -592,8 +592,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.recorder.options['excludes'] = ['p2*']
 
         prob.driver.options['optimizer'] = OPTIMIZER
-        if OPTIMIZER == 'SLSQP':
-            prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.opt_settings['ACC'] = 1e-9
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -605,13 +604,13 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.cleanup()
 
-        coordinate = [0, 'SLSQP', (3, )]
+        coordinate = [0, 'SLSQP', (5, )]
 
-        expected_desvars = {"p1.x": [7.16706813, ]}
+        expected_desvars = {"p1.x": prob["p1.x"]}
 
-        expected_objectives = {"comp.f_xy": [-27.0833, ], }
+        expected_objectives = {"comp.f_xy": prob['comp.f_xy'], }
 
-        expected_constraints = {"con.c": [-15.0, ], }
+        expected_constraints = {"con.c": prob['con.c'], }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
                                            expected_objectives, expected_constraints), ), self.eps)
@@ -1175,9 +1174,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.driver = pyOptSparseDriver()
         self.prob.driver.options['optimizer'] = OPTIMIZER
-        if OPTIMIZER == 'SLSQP':
-            self.prob.driver.opt_settings['ACC'] = 1e-2  # to speed the test up
-            self.prob.driver.opt_settings['ACC'] = 1e-9
+        self.prob.driver.opt_settings['ACC'] = 1e-9
 
         self.recorder.options['record_metadata'] = True
 
@@ -1213,18 +1210,18 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.cleanup()
 
         # Driver recording test
-        coordinate = [0, 'SLSQP', (5, )]
+        coordinate = [0, 'SLSQP', (7, )]
 
         expected_desvars = {
-                            "pz.z": [1.97763888e+00, 0.0],
-                            "px.x": [0.0, ]
+                            "pz.z": self.prob['pz.z'],
+                            "px.x": self.prob['px.x']
         }
 
-        expected_objectives = {"obj_cmp.obj": [3.18342634, ], }
+        expected_objectives = {"obj_cmp.obj": self.prob['obj_cmp.obj'], }
 
         expected_constraints = {
-                                 "con_cmp1.con1": [-3.28210102e-05, ],
-                                 "con_cmp2.con2": [-20.24472223, ],
+                                 "con_cmp1.con1": self.prob['con_cmp1.con1'],
+                                 "con_cmp2.con2": self.prob['con_cmp2.con2'],
         }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,

@@ -115,7 +115,7 @@ class FanInGrouped(Group):
         iv = self.add_subsystem('iv', IndepVarComp())
         iv.add_output('x1', 1.0)
         iv.add_output('x2', 1.0)
-
+        iv.add_output('x3', 1.0)
 
         self.sub = self.add_subsystem('sub', ParallelGroup())
         self.sub.add_subsystem('c1', ExecComp(['y=-2.0*x']))

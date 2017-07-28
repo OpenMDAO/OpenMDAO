@@ -2,6 +2,7 @@
 RecordingManager class definition.
 """
 import time
+from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
 
 
 class RecordingManager(object):

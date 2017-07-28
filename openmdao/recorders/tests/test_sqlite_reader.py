@@ -187,21 +187,22 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Test to see if the access by case keys works:
         seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|6')
-        np.testing.assert_almost_equal(seventh_slsqp_iteration_case.desvars['pz.z'], [ 1.9776389,  0.],
+        np.testing.assert_almost_equal(seventh_slsqp_iteration_case.desvars['pz.z'], [1.9776389,  0.],
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('pz.z'))
-        np.testing.assert_almost_equal(last_case.desvars['pz.z'], [ 1.9776389,  0.],
+        np.testing.assert_almost_equal(last_case.desvars['pz.z'], [1.9776389,  0.],
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('pz.z'))
-        np.testing.assert_almost_equal(last_case.desvars['px.x'], [ 0.0,],
+        np.testing.assert_almost_equal(last_case.desvars['px.x'], [0.0,],
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('px.x'))
 
         # Test to see if the case keys (iteration coords) come back correctly
         case_keys = cr.driver_cases.list_cases()
+        print (case_keys)
         for i, iter_coord in enumerate(case_keys):
             self.assertEqual(iter_coord, 'rank0:SLSQP|{}'.format(i))
 

@@ -7,6 +7,7 @@ from openmdao.core.parallel_group import ParallelGroup
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
+from openmdao.core.analysis_error import AnalysisError
 
 # Components
 from openmdao.components.deprecated_component import Component
@@ -65,3 +66,15 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 
 # Recorders
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
+
+# set up tracing or memory profiling if env vars are set.
+import os
+if os.environ.get('OPENMDAO_TRACE'):
+    from openmdao.devtools.itrace import setup, start
+    ret = bool(os.environ.get('OPENMDAO_TRACE_RETURN'))
+    setup(os.environ['OPENMDAO_TRACE'], show_return=ret)
+    start()
+elif os.environ.get('OPENMDAO_PROF_MEM'):
+    from openmdao.devtools.iprof_mem import setup, start
+    setup(os.environ['OPENMDAO_PROF_MEM'])
+    start()
