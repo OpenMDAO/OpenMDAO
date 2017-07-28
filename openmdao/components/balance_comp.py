@@ -28,7 +28,7 @@ class BalanceComp(ImplicitComponent):
           f_{mult}(x,...) \times f_{lhs}(x,...) = f_{rhs}(x,...)
 
         Where :math:`f_{lhs}` represents the left-hand-side of the equation,
-        :math:`f_{lhs}` represents the right-hand-side, and :math:`f_{mult}`
+        :math:`f_{rhs}` represents the right-hand-side, and :math:`f_{mult}`
         is an optional multiplier on the left hand side.  At least one of these
         quantities should be a function of the associated state variable.  If left
         unconnected the multiplier is simply 1.0.
