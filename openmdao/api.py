@@ -10,6 +10,7 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.analysis_error import AnalysisError
 
 # Components
+from openmdao.components.balance_comp import BalanceComp
 from openmdao.components.deprecated_component import Component
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.linear_system_comp import LinearSystemComp
