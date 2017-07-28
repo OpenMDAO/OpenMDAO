@@ -236,7 +236,7 @@ class Problem(object):
         return self.run_driver()
 
     def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='auto',
-              force_alloc_complex=False):
+              force_alloc_complex=False, multi_vector_class=None):
         """
         Set up everything.
 
@@ -256,6 +256,10 @@ class Problem(object):
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
             after a reconfiguration) you may need to set this to True.
+        multi_vector_class : type
+            reference to an actual <Vector> class; not an instance. This specifies
+            the class to use to perform matrix-matrix derivative operations.  If None,
+            matrix-matrix will not be used.
 
         Returns
         -------
@@ -282,7 +286,7 @@ class Problem(object):
         self._mode = mode
 
         model._setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex,
-                     mode=mode)
+                     mode=mode, multi_vector_class=multi_vector_class)
         self.driver._setup_driver(self)
 
         if isinstance(model, Group):
@@ -611,8 +615,130 @@ class Problem(object):
             Derivatives in form requested by 'return_format'.
         """
         with self.model._scaled_context_all():
-            totals = self._compute_total_derivs(of=of, wrt=wrt, return_format=return_format,
-                                                global_names=False)
+            if self.model._owns_approx_jac:
+                totals = self._compute_total_derivs_approx(of=of, wrt=wrt,
+                                                           return_format=return_format,
+                                                           global_names=False)
+            else:
+                totals = self._compute_total_derivs(of=of, wrt=wrt,
+                                                    return_format=return_format,
+                                                    global_names=False)
+        return totals
+
+    def _compute_total_derivs_approx(self, of=None, wrt=None, return_format='flat_dict',
+                                     global_names=True):
+        """
+        Compute derivatives of desired quantities with respect to desired inputs.
+
+        Parameters
+        ----------
+        of : list of variable name strings or None
+            Variables whose derivatives will be computed. Default is None, which
+            uses the driver's objectives and constraints.
+        wrt : list of variable name strings or None
+            Variables with respect to which the derivatives will be computed.
+            Default is None, which uses the driver's desvars.
+        return_format : string
+            Format to return the derivatives. Default is a 'flat_dict', which
+            returns them in a dictionary whose keys are tuples of form (of, wrt).
+        global_names : bool
+            Set to True when passing in global names to skip some translation steps.
+
+        Returns
+        -------
+        derivs : object
+            Derivatives in form requested by 'return_format'.
+        """
+        model = self.model
+        mode = self._mode
+        vec_dinput = model._vectors['input']
+        vec_doutput = model._vectors['output']
+        vec_dresid = model._vectors['residual']
+        approx = model._owns_approx_jac
+        fwd = (mode == 'fwd') or approx
+
+        # TODO - Pull 'of' and 'wrt' from driver if unspecified.
+        if wrt is None:
+            raise NotImplementedError("Need to specify 'wrt' for now.")
+        if of is None:
+            raise NotImplementedError("Need to specify 'of' for now.")
+
+        # Prepare model for calculation by cleaning out the derivatives
+        # vectors.
+        for subname in vec_dinput:
+
+            # TODO: Do all three deriv vectors have the same keys?
+
+            # Skip nonlinear because we don't need to mess with it?
+            if subname is 'nonlinear':
+                continue
+
+            vec_dinput[subname].set_const(0.0)
+            vec_doutput[subname].set_const(0.0)
+            vec_dresid[subname].set_const(0.0)
+
+        # Linearize Model
+        model._linearize()
+
+        # Convert of and wrt names from promoted to unpromoted
+        # (which is absolute path since we're at the top)
+        oldwrt, oldof = wrt, of
+        if not global_names:
+            of = [model._var_allprocs_prom2abs_list['output'][name][0]
+                  for name in oldof]
+
+            wrt = [model._var_allprocs_prom2abs_list['output'][name][0]
+                   for name in oldwrt]
+
+        if fwd:
+            input_list, output_list = wrt, of
+            old_input_list, old_output_list = oldwrt, oldof
+        else:  # rev
+            input_list, output_list = of, wrt
+            old_input_list, old_output_list = oldof, oldwrt
+
+        # Solve for derivs with the approximation_scheme.
+        # This cuts out the middleman by grabbing the Jacobian directly after linearization.
+
+        # Re-initialize so that it is clean.
+        if model._approx_schemes:
+            method = list(model._approx_schemes.keys())[0]
+            model.approx_total_derivs(method=method)
+        else:
+            model.approx_total_derivs(method='fd')
+
+        # Initialization based on driver (or user) -requested "of" and "wrt".
+        if not model._owns_approx_jac or model._owns_approx_of != set(of) \
+           or model._owns_approx_wrt != set(wrt):
+            model._owns_approx_of = set(of)
+            model._owns_approx_wrt = set(wrt)
+
+        model._setup_jacobians(recurse=False)
+
+        model._linearize()
+        approx_jac = model._jacobian._subjacs
+
+        # Create data structures (and possibly allocate space) for the total
+        # derivatives that we will return.
+        totals = OrderedDict()
+
+        if return_format is 'flat_dict':
+            for ocount, output_name in enumerate(output_list):
+                okey = old_output_list[ocount]
+                for icount, input_name in enumerate(input_list):
+                    ikey = old_input_list[icount]
+                    totals[okey, ikey] = -approx_jac[output_name, input_name]
+
+        elif return_format is 'dict':
+            for ocount, output_name in enumerate(output_list):
+                okey = old_output_list[ocount]
+                totals[okey] = tot = OrderedDict()
+                for icount, input_name in enumerate(input_list):
+                    ikey = old_input_list[icount]
+                    tot[ikey] = -approx_jac[output_name, input_name]
+        else:
+            msg = "Unsupported return format '%s." % return_format
+            raise NotImplementedError(msg)
 
         return totals
 
@@ -676,7 +802,7 @@ class Problem(object):
             # TODO: Do all three deriv vectors have the same keys?
 
             # Skip nonlinear because we don't need to mess with it?
-            if subname == 'nonlinear':
+            if subname is 'nonlinear':
                 continue
 
             vec_dinput[subname].set_const(0.0)
@@ -689,11 +815,11 @@ class Problem(object):
         # Create data structures (and possibly allocate space) for the total
         # derivatives that we will return.
         totals = OrderedDict()
-        if return_format == 'flat_dict':
+        if return_format is 'flat_dict':
             for okey in of:
                 for ikey in wrt:
                     totals[(okey, ikey)] = None
-        elif return_format == 'dict':
+        elif return_format is 'dict':
             for okey in of:
                 totals[okey] = OrderedDict()
                 for ikey in wrt:
@@ -747,14 +873,14 @@ class Problem(object):
             model._linearize()
             approx_jac = model._jacobian._subjacs
 
-            if return_format == 'flat_dict':
+            if return_format is 'flat_dict':
                 for icount, input_name in enumerate(input_list):
                     for ocount, output_name in enumerate(output_list):
                         okey = old_output_list[ocount]
                         ikey = old_input_list[icount]
                         totals[okey, ikey] = -approx_jac[output_name, input_name]
 
-            elif return_format == 'dict':
+            elif return_format is 'dict':
                 for icount, input_name in enumerate(input_list):
                     for ocount, output_name in enumerate(output_list):
                         okey = old_output_list[ocount]
@@ -855,11 +981,6 @@ class Problem(object):
 
             loc_idxs = defaultdict(lambda: -1)
 
-            # at this point, we know that for all vars in the current
-            # group of interest, the number of indices is the same. We loop
-            # over the *size* of the indices and use the loop index to look
-            # up the actual indices for the current members of the group
-            # of interest.
             for i in range(max_len):
                 # this sets dinputs for the current rhs_group to 0
                 voi_info[vois[0][0]][0].set_const(0.0)
@@ -867,7 +988,8 @@ class Problem(object):
                 for input_name, old_input_name in vois:
                     dinputs, doutputs, idxs, loc_size, start, end, dup = voi_info[input_name]
                     if i >= len(idxs):
-                        idx = idxs[-1]  # reuse the last index
+                        # reuse the last index if loop iter is larger than current var size
+                        idx = idxs[-1]
                     else:
                         idx = idxs[i]
 
@@ -937,7 +1059,7 @@ class Problem(object):
 
                         len_val = len(deriv_val)
 
-                        if return_format == 'flat_dict':
+                        if return_format is 'flat_dict':
                             if fwd:
                                 key = (old_output_list[ocount], old_input_name)
 
@@ -953,7 +1075,7 @@ class Problem(object):
                                 if store:
                                     totals[key][loc_idx, :] = deriv_val
 
-                        elif return_format == 'dict':
+                        elif return_format is 'dict':
                             if fwd:
                                 okey = old_output_list[ocount]
 

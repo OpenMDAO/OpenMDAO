@@ -5,19 +5,22 @@ from __future__ import print_function
 import unittest
 import numpy as np
 
-from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, DefaultVector, ExecComp
+from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, DefaultVector, \
+    ExecComp, DefaultMultiVector
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped
 from openmdao.devtools.testutil import assert_rel_error
 
 if MPI:
-    from openmdao.api import PETScVector
+    from openmdao.api import PETScVector, PETScMultiVector
     vector_class = PETScVector
+    multivec_class = PETScMultiVector
 else:
     vector_class = DefaultVector
+    multivec_class = DefaultMultiVector
 
 
-class MatMatTestCase(unittest.TestCase):
+class ParDerivTestCase(unittest.TestCase):
 
     N_PROCS = 2
 
@@ -385,6 +388,117 @@ class IndicesTestCase2(unittest.TestCase):
 
         assert_rel_error(self, J['G1.par2.c5.y', 'G1.par2.p.x'][0], np.array([20., 25.]), 1e-6)
         assert_rel_error(self, J['G1.par1.c4.y', 'G1.par1.p.x'][0], np.array([8., 0.]), 1e-6)
+
+
+class MatMatTestCase(unittest.TestCase):
+    N_PROCS = 2
+    asize = 3
+
+    def setup_model(self):
+        asize = self.asize
+        prob = Problem()
+        root = prob.model
+        root.linear_solver = LinearBlockGS()
+
+        p1 = root.add_subsystem('p1', IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
+        p2 = root.add_subsystem('p2', IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
+        G1 = root.add_subsystem('G1', ParallelGroup())
+        G1.linear_solver = LinearBlockGS()
+
+        c1 = G1.add_subsystem('c1', ExecComp('y = numpy.ones(3).T*x.dot(numpy.arange(3.,6.))',
+                                                  x=np.zeros(asize), y=np.zeros(asize)))
+        c2 = G1.add_subsystem('c2', ExecComp('y = x * 2.0',
+                                        x=np.zeros(asize), y=np.zeros(asize)))
+
+        c3 = root.add_subsystem('c3', ExecComp('y = x * 5.0',
+                                          x=np.zeros(asize), y=np.zeros(asize)))
+        c4 = root.add_subsystem('c4', ExecComp('y = x * 4.0',
+                                          x=np.zeros(asize), y=np.zeros(asize)))
+        root.connect('p1.x', 'G1.c1.x')
+        root.connect('p2.x', 'G1.c2.x')
+        root.connect('G1.c1.y', 'c3.x')
+        root.connect('G1.c2.y', 'c4.x')
+
+        return prob
+
+    def test_parallel_fwd(self):
+        asize = self.asize
+        prob = self.setup_model()
+
+        prob.model.add_design_var('p1.x', rhs_group='par')
+        prob.model.add_design_var('p2.x', rhs_group='par')
+        prob.model.add_constraint('c3.y', upper=0.0)
+        prob.model.add_constraint('c4.y', upper=0.0)
+
+        prob.setup(vector_class=vector_class, check=False, mode='fwd')
+        prob.run_driver()
+
+        J = prob.compute_total_derivs(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
+                                      return_format='flat_dict')
+
+        assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
+        expected = np.eye(asize)*8.0
+        assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
+
+    def test_parallel_multi_fwd(self):
+        asize = self.asize
+        prob = self.setup_model()
+
+        prob.model.add_design_var('p1.x', rhs_group='par')
+        prob.model.add_design_var('p2.x', rhs_group='par')
+        prob.model.add_constraint('c3.y', upper=0.0)
+        prob.model.add_constraint('c4.y', upper=0.0)
+
+        prob.setup(vector_class=vector_class, multi_vector_class=multivec_class,
+                   check=False, mode='fwd')
+        prob.run_driver()
+
+        J = prob.compute_total_derivs(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
+                                      return_format='flat_dict')
+
+        assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
+        expected = np.eye(asize)*8.0
+        assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
+
+
+    def test_parallel_rev(self):
+        asize = self.asize
+        prob = self.setup_model()
+
+        prob.model.add_design_var('p1.x')
+        prob.model.add_design_var('p2.x')
+        prob.model.add_constraint('c3.y', upper=0.0, rhs_group='par')
+        prob.model.add_constraint('c4.y', upper=0.0, rhs_group='par')
+
+        prob.setup(vector_class=vector_class, check=False, mode='rev')
+        prob.run_driver()
+
+        J = prob.compute_total_derivs(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
+                                      return_format='flat_dict')
+
+        assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
+        expected = np.eye(asize)*8.0
+        assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
+
+    def test_parallel_multi_rev(self):
+        asize = self.asize
+        prob = self.setup_model()
+
+        prob.model.add_design_var('p1.x')
+        prob.model.add_design_var('p2.x')
+        prob.model.add_constraint('c3.y', upper=0.0, rhs_group='par')
+        prob.model.add_constraint('c4.y', upper=0.0, rhs_group='par')
+
+        prob.setup(vector_class=vector_class, multi_vector_class=multivec_class,
+                   check=False, mode='rev')
+        prob.run_driver()
+
+        J = prob.compute_total_derivs(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
+                                      return_format='flat_dict')
+
+        assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
+        expected = np.eye(asize)*8.0
+        assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
 
 
 if __name__ == "__main__":

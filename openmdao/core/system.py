@@ -15,7 +15,14 @@ import numpy as np
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
+from openmdao.vectors.default_multi_vector import DefaultMultiVector
+try:
+    from openmdao.vectors.petsc_multi_vector import PETScMultiVector
+except ImportError:
+    class PETScMultiVector(object):
+        """Dummy class."""
 
+        pass
 from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array, warn_deprecation
 from openmdao.utils.mpi import MPI
@@ -458,7 +465,8 @@ class System(object):
             }
             return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
-    def _get_root_vectors(self, vector_class, initial, force_alloc_complex=False, mode=None):
+    def _get_root_vectors(self, vector_class, initial, force_alloc_complex=False, mode=None,
+                          multi_vector_class=None):
         """
         Get the root vectors for the nonlinear and linear vectors for the model.
 
@@ -474,6 +482,10 @@ class System(object):
             after a reconfiguration) you may need to set this to True.
         mode : str or None
             Direction of derivatives.  If None, we are reconfiguring.
+        multi_vector_class : type
+            reference to an actual <Vector> class; not an instance. This specifies
+            the class to use to perform matrix-matrix derivative operations.  If None,
+            matrix-matrix will not be used.
 
         Returns
         -------
@@ -518,24 +530,33 @@ class System(object):
                 if nl_alloc_complex:
                     break
 
+            if multi_vector_class is None:
+                multi_vector_class = vector_class
+
             for vec_name in vec_names:
                 ncol = 1
                 if vec_name is 'nonlinear':
                     alloc_complex = nl_alloc_complex
+                    vec_class = vector_class
                 else:
                     alloc_complex = force_alloc_complex
 
-                    if vec_name is not 'linear':
+                    if vec_name is 'linear':
+                        vec_class = vector_class
+                    else:
+                        vec_class = multi_vector_class
                         idxs = vois[vec_name]['indices']
                         if idxs is None:
-                            ncol = vois[vec_name]['size']
+                            if vector_class in (DefaultMultiVector, PETScMultiVector):
+                                ncol = vois[vec_name]['size']
+                            else:
+                                ncol = 1
                         else:
                             ncol = len(idxs)
-
                 for key in ['input', 'output', 'residual']:
-                    root_vectors[key][vec_name] = vector_class(vec_name, _type_map[key], self,
-                                                               alloc_complex=alloc_complex,
-                                                               ncol=ncol)
+                    root_vectors[key][vec_name] = vec_class(vec_name, _type_map[key], self,
+                                                            alloc_complex=alloc_complex,
+                                                            ncol=ncol)
 
             excl_out = {vec_name: set() for vec_name in root_vectors['output']}
             excl_in = {vec_name: set() for vec_name in root_vectors['output']}
@@ -629,7 +650,7 @@ class System(object):
         self._setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
 
     def _setup(self, comm, vector_class, setup_mode, force_alloc_complex=False,
-               mode=None):
+               mode=None, multi_vector_class=None):
         """
         Perform setup for this system and its descendant systems.
 
@@ -652,6 +673,10 @@ class System(object):
             after a reconfiguration) you may need to set this to True.
         mode : str or None
             Derivative direction, either 'fwd', or 'rev', or None
+        multi_vector_class : type
+            reference to an actual <Vector> class; not an instance. This specifies
+            the class to use to perform matrix-matrix derivative operations.  If None,
+            matrix-matrix will not be used.
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
@@ -691,8 +716,9 @@ class System(object):
             self._get_initial_global(initial)
         self._setup_global(ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset)
         root_vectors, excl_out, excl_in = \
-            self._get_root_vectors(vector_class, initial, force_alloc_complex=force_alloc_complex,
-                                   mode=mode)
+            self._get_root_vectors(vector_class, initial,
+                                   force_alloc_complex=force_alloc_complex,
+                                   mode=mode, multi_vector_class=multi_vector_class)
         self._setup_vectors(root_vectors, excl_out, excl_in, resize=resize)
         self._setup_bounds(*self._get_bounds_root_vectors(vector_class, initial), resize=resize)
         self._setup_scaling(self._get_scaling_root_vectors(vector_class, initial), resize=resize)
@@ -944,9 +970,10 @@ class System(object):
             vector_class = root_vectors['output'][vec_name].__class__
 
             for key in ['input', 'output', 'residual']:
+                rootvec = root_vectors[key][vec_name]
                 vectors[key][vec_name] = vector_class(
-                    vec_name, _type_map[key], self, root_vectors[key][vec_name], resize=resize,
-                    alloc_complex=alloc_complex and vec_name == 'nonlinear')
+                    vec_name, _type_map[key], self, rootvec, resize=resize,
+                    alloc_complex=alloc_complex and vec_name == 'nonlinear', ncol=rootvec._ncol)
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
