@@ -630,14 +630,14 @@ class Problem(object):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
+        Uses an approximation method, e.g., fd or cs to calculate the derivatives.
+
         Parameters
         ----------
         of : list of variable name strings or None
-            Variables whose derivatives will be computed. Default is None, which
-            uses the driver's objectives and constraints.
+            Variables whose derivatives will be computed.
         wrt : list of variable name strings or None
             Variables with respect to which the derivatives will be computed.
-            Default is None, which uses the driver's desvars.
         return_format : string
             Format to return the derivatives. Default is a 'flat_dict', which
             returns them in a dictionary whose keys are tuples of form (of, wrt).
@@ -655,7 +655,7 @@ class Problem(object):
         vec_doutput = model._vectors['output']
         vec_dresid = model._vectors['residual']
         approx = model._owns_approx_jac
-        fwd = (mode == 'fwd') or approx
+        prom2abs = model._var_allprocs_prom2abs_list['output']
 
         # TODO - Pull 'of' and 'wrt' from driver if unspecified.
         if wrt is None:
@@ -680,22 +680,14 @@ class Problem(object):
         # Linearize Model
         model._linearize()
 
-        # Convert of and wrt names from promoted to unpromoted
-        # (which is absolute path since we're at the top)
+        # Convert of and wrt names from promoted to bsolute path
         oldwrt, oldof = wrt, of
         if not global_names:
-            of = [model._var_allprocs_prom2abs_list['output'][name][0]
-                  for name in oldof]
+            of = [prom2abs[name][0] for name in oldof]
+            wrt = [prom2abs[name][0] for name in oldwrt]
 
-            wrt = [model._var_allprocs_prom2abs_list['output'][name][0]
-                   for name in oldwrt]
-
-        if fwd:
-            input_list, output_list = wrt, of
-            old_input_list, old_output_list = oldwrt, oldof
-        else:  # rev
-            input_list, output_list = of, wrt
-            old_input_list, old_output_list = oldof, oldwrt
+        input_list, output_list = wrt, of
+        old_input_list, old_output_list = oldwrt, oldof
 
         # Solve for derivs with the approximation_scheme.
         # This cuts out the middleman by grabbing the Jacobian directly after linearization.
@@ -742,6 +734,162 @@ class Problem(object):
 
         return totals
 
+    def _get_voi_info(self, vois, inp2rhs_name, input_vec, output_vec, input_vois):
+        voi_info = {}
+        model = self.model
+        sizes = model._var_sizes['output']
+        nproc = self.comm.size
+        iproc = model.comm.rank
+
+        for input_name, old_input_name in vois:
+            vecname = inp2rhs_name[input_name]
+            dinputs = input_vec[vecname]
+            doutputs = output_vec[vecname]
+
+            in_var_idx = model._var_allprocs_abs2idx['output'][input_name]
+            in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
+            start = np.sum(sizes[:iproc, in_var_idx])
+            end = np.sum(sizes[:iproc + 1, in_var_idx])
+
+            in_idxs = None
+            if input_name in input_vois:
+                in_voi_meta = input_vois[input_name]
+                if 'indices' in in_voi_meta:
+                    in_idxs = in_voi_meta['indices']
+
+            dup = not in_var_meta['distributed']
+            if in_idxs is not None:
+                irange = in_idxs
+                loc_size = len(in_idxs)
+            else:
+                irange = list(range(in_var_meta['global_size']))
+                loc_size = end - start
+
+            if loc_size == 0:
+                # var is not local. get size of var in owned proc
+                for rank in range(nproc):
+                    sz = sizes[rank, in_var_idx]
+                    if sz > 0:
+                        loc_size = sz
+                        break
+
+            voi_info[input_name] = (dinputs, doutputs, irange, loc_size, start, end, dup)
+
+        return voi_info
+
+    def _compute_total_derivs_multi(totals, vois, voi_info):
+        for i in range(max_len):
+            # this sets dinputs for the current rhs_group to 0
+            voi_info[vois[0][0]][0].set_const(0.0)
+
+            for input_name, old_input_name in vois:
+                dinputs, doutputs, idxs, loc_size, start, end, dup = voi_info[input_name]
+                if i >= len(idxs):
+                    # reuse the last index if loop iter is larger than current var size
+                    idx = idxs[-1]
+                else:
+                    idx = idxs[i]
+
+                if idx < 0:
+                    idx += end
+                if start <= idx < end and input_name in dinputs._views_flat:
+                    # Dictionary access returns a scaler for 1d input, and we
+                    # need a vector for clean code, so use _views_flat.
+                    dinputs._views_flat[input_name][idx - start] = 1.0
+
+            model._solve_linear(vec_names, mode)
+
+            for input_name, old_input_name in vois:
+                dinputs, doutputs, idxs, loc_size, start, end, dup = voi_info[input_name]
+                if i >= len(idxs):
+                    idx = idxs[-1]  # reuse the last index
+                    delta_loc_idx = 0  # don't increment local_idx
+                else:
+                    idx = idxs[i]
+                    delta_loc_idx = 1
+
+                # totals to zeros instead of None in those cases when none
+                # of the specified indices are within the range of interest
+                # for this proc.
+                store = True if start <= idx < end else dup
+                if store:
+                    loc_idxs[input_name] += delta_loc_idx
+                loc_idx = loc_idxs[input_name]
+
+                # Pull out the answers and pack into our data structure.
+                for ocount, output_name in enumerate(output_list):
+                    out_idxs = None
+                    if output_name in output_vois:
+                        out_voi_meta = output_vois[output_name]
+                        if 'indices' in out_voi_meta:
+                            out_idxs = out_voi_meta['indices']
+
+                    if not test_mode and input_name not in relevant[output_name]:
+                        # irrelevant output, just give zeros
+                        if out_idxs is None:
+                            out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
+                            deriv_val = np.zeros(sizes[iproc, out_var_idx])
+                        else:
+                            deriv_val = np.zeros(len(out_idxs))
+                    else:  # relevant output
+                        if output_name in doutputs._views_flat:
+                            deriv_val = doutputs._views_flat[output_name]
+                            size = deriv_val.size
+                        else:
+                            deriv_val = None
+
+                        if out_idxs is not None:
+                            size = out_idxs.size
+                            if deriv_val is not None:
+                                deriv_val = deriv_val[out_idxs]
+
+                        if dup and nproc > 1:
+                            out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
+                            root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
+                            if deriv_val is None:
+                                if out_idxs is not None:
+                                    sz = size
+                                else:
+                                    sz = sizes[root, out_var_idx]
+                                deriv_val = np.empty(sz, dtype=float)
+                            self.comm.Bcast(deriv_val, root=root)
+
+                    len_val = len(deriv_val)
+
+                    if return_format is 'flat_dict':
+                        if fwd:
+                            key = (old_output_list[ocount], old_input_name)
+
+                            if totals[key] is None:
+                                totals[key] = np.zeros((len_val, loc_size))
+                            if store:
+                                totals[key][:, loc_idx] = deriv_val
+                        else:
+                            key = (old_input_name, old_output_list[ocount])
+
+                            if totals[key] is None:
+                                totals[key] = np.zeros((loc_size, len_val))
+                            if store:
+                                totals[key][loc_idx, :] = deriv_val
+
+                    elif return_format is 'dict':
+                        if fwd:
+                            okey = old_output_list[ocount]
+
+                            if totals[okey][old_input_name] is None:
+                                totals[okey][old_input_name] = np.zeros((len_val, loc_size))
+                            if store:
+                                totals[okey][old_input_name][:, loc_idx] = deriv_val
+                        else:
+                            ikey = old_output_list[ocount]
+
+                            if totals[old_input_name][ikey] is None:
+                                totals[old_input_name][ikey] = np.zeros((loc_size, len_val))
+                            if store:
+                                totals[old_input_name][ikey][loc_idx, :] = deriv_val
+                    else:
+                        raise RuntimeError("unsupported return format")
+
     def _compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict',
                               global_names=True):
         """
@@ -775,8 +923,8 @@ class Problem(object):
         iproc = model.comm.rank
         sizes = model._var_sizes['output']
         relevant = self._relevant
-        approx = model._owns_approx_jac
-        fwd = (mode == 'fwd') or approx
+        fwd = (mode == 'fwd')
+        prom2abs = model._var_allprocs_prom2abs_list['output']
 
         # TODO - Pull 'of' and 'wrt' from driver if unspecified.
         if wrt is None:
@@ -797,6 +945,7 @@ class Problem(object):
 
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
+        matmat = False
         for subname in vec_dinput:
 
             # TODO: Do all three deriv vectors have the same keys?
@@ -804,6 +953,8 @@ class Problem(object):
             # Skip nonlinear because we don't need to mess with it?
             if subname is 'nonlinear':
                 continue
+            elif subname is not 'linear':
+                matmat |= isinstance(vec_dinput, (DefaultMultiVector, PETScMultiVector))
 
             vec_dinput[subname].set_const(0.0)
             vec_doutput[subname].set_const(0.0)
@@ -815,28 +966,26 @@ class Problem(object):
         # Create data structures (and possibly allocate space) for the total
         # derivatives that we will return.
         totals = OrderedDict()
-        if return_format is 'flat_dict':
-            for okey in of:
-                for ikey in wrt:
-                    totals[(okey, ikey)] = None
-        elif return_format is 'dict':
-            for okey in of:
-                totals[okey] = OrderedDict()
-                for ikey in wrt:
-                    totals[okey][ikey] = None
-        else:
-            msg = "Unsupported return format '%s." % return_format
-            raise NotImplementedError(msg)
+        if not matmat:
+            if return_format is 'flat_dict':
+                for okey in of:
+                    for ikey in wrt:
+                        totals[(okey, ikey)] = None
+            elif return_format is 'dict':
+                for okey in of:
+                    totals[okey] = OrderedDict()
+                    for ikey in wrt:
+                        totals[okey][ikey] = None
+            else:
+                msg = "Unsupported return format '%s." % return_format
+                raise NotImplementedError(msg)
 
         # Convert of and wrt names from promoted to unpromoted
         # (which is absolute path since we're at the top)
         oldwrt, oldof = wrt, of
         if not global_names:
-            of = [model._var_allprocs_prom2abs_list['output'][name][0]
-                  for name in oldof]
-
-            wrt = [model._var_allprocs_prom2abs_list['output'][name][0]
-                   for name in oldwrt]
+            of = [prom2abs[name][0] for name in oldof]
+            wrt = [prom2abs[name][0] for name in oldwrt]
 
         if fwd:
             input_list, output_list = wrt, of
@@ -850,44 +999,6 @@ class Problem(object):
             input_vec, output_vec = vec_doutput, vec_dresid
             input_vois = self.driver._responses
             output_vois = self.driver._designvars
-
-        # Solve for derivs with the approximation_scheme.
-        # This cuts out the middleman by grabbing the Jacobian directly after linearization.
-        if approx:
-
-            # Re-initialize so that it is clean.
-            if model._approx_schemes:
-                method = list(model._approx_schemes.keys())[0]
-                model.approx_total_derivs(method=method)
-            else:
-                model.approx_total_derivs(method='fd')
-
-            # Initialization based on driver (or user) -requested "of" and "wrt".
-            if not model._owns_approx_jac or model._owns_approx_of != set(of) \
-               or model._owns_approx_wrt != set(wrt):
-                model._owns_approx_of = set(of)
-                model._owns_approx_wrt = set(wrt)
-
-            model._setup_jacobians(recurse=False)
-
-            model._linearize()
-            approx_jac = model._jacobian._subjacs
-
-            if return_format is 'flat_dict':
-                for icount, input_name in enumerate(input_list):
-                    for ocount, output_name in enumerate(output_list):
-                        okey = old_output_list[ocount]
-                        ikey = old_input_list[icount]
-                        totals[okey, ikey] = -approx_jac[output_name, input_name]
-
-            elif return_format is 'dict':
-                for icount, input_name in enumerate(input_list):
-                    for ocount, output_name in enumerate(output_list):
-                        okey = old_output_list[ocount]
-                        ikey = old_input_list[icount]
-                        totals[okey][ikey] = -approx_jac[output_name, input_name]
-
-            return totals
 
         # Solve for derivs using linear solver.
 
@@ -937,50 +1048,16 @@ class Problem(object):
         vec_names = sorted(set(inp2rhs_name.values()))
 
         for rhs_name, vois in iteritems(voi_lists):
-            voi_info = {}
-            max_len = 0
-
             # If Forward mode, solve linear system for each 'wrt'
             # If Adjoint mode, solve linear system for each 'of'
-            for input_name, old_input_name in vois:
-                vecname = inp2rhs_name[input_name]
-                dinputs = input_vec[vecname]
-                doutputs = output_vec[vecname]
-
-                in_var_idx = model._var_allprocs_abs2idx['output'][input_name]
-                in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
-                start = np.sum(sizes[:iproc, in_var_idx])
-                end = np.sum(sizes[:iproc + 1, in_var_idx])
-
-                in_idxs = None
-                if input_name in input_vois:
-                    in_voi_meta = input_vois[input_name]
-                    if 'indices' in in_voi_meta:
-                        in_idxs = in_voi_meta['indices']
-
-                dup = not in_var_meta['distributed']
-                if in_idxs is not None:
-                    irange = in_idxs
-                    loc_size = len(in_idxs)
-                else:
-                    irange = list(range(in_var_meta['global_size']))
-                    loc_size = end - start
-
-                if loc_size == 0:
-                    # var is not local. get size of var in owned proc
-                    for rank in range(nproc):
-                        sz = sizes[rank, in_var_idx]
-                        if sz > 0:
-                            loc_size = sz
-                            break
-
-                if max_len < len(irange):
-                    max_len = len(irange)
-
-                voi_info[input_name] = (dinputs, doutputs, irange, loc_size, start, end, dup)
+            voi_info = self._get_voi_info(vois, inp2rhs_name, input_vec, output_vec, input_vois)
+            max_len = max(len(v[2]) for v in voi_info.values())
 
             loc_idxs = defaultdict(lambda: -1)
 
+            if matmat:
+                self._compute_total_derivs_multi(totals, vois, voi_info)
+                continue
             for i in range(max_len):
                 # this sets dinputs for the current rhs_group to 0
                 voi_info[vois[0][0]][0].set_const(0.0)
