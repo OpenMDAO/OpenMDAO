@@ -695,6 +695,9 @@ class System(object):
         self.comm = comm
         self._subsystems_proc_range = []
 
+        # TODO: This version only runs for Components, because it is overriden in Group, so
+        # maybe we should move this to Component?
+
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}
