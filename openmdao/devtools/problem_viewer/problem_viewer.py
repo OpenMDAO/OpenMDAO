@@ -1,8 +1,13 @@
+from six.moves import range
+import numpy as np
 import os
 import json
 from six import iteritems
 import networkx as nx
+import shutil
 from collections import OrderedDict
+
+from sqlitedict import SqliteDict
 
 try:
     import h5py
@@ -11,10 +16,10 @@ except ImportError:
     h5py = None
 
 from openmdao.core.group import Group
+from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.record_util import is_valid_sqlite3_db
-
 import base64
 
 
@@ -33,8 +38,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             if "." in var_prom_name:
                 local_prom_dict[var_abs_name] = var_prom_name
         if(len(local_prom_dict) > 0):
-            # sort to make deterministic for testing
-            tree_dict['promotions'] = OrderedDict(sorted(local_prom_dict.items()))
+            tree_dict['promotions'] = OrderedDict(sorted(local_prom_dict.items())) # sort to make deterministic for testing
 
     if not isinstance(system, Group):
         tree_dict['subsystem_type'] = 'component'
@@ -80,14 +84,12 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
     return tree_dict
 
-
 def _get_viewer_data(problem_or_rootgroup_or_filename):
     """Get the data needed by the N2 viewer as a dictionary."""
-    from openmdao.core.problem import Problem
     if isinstance(problem_or_rootgroup_or_filename, Problem):
         root_group = problem_or_rootgroup_or_filename.model
     elif isinstance(problem_or_rootgroup_or_filename, Group):
-        if not problem_or_rootgroup_or_filename.pathname:  # root group
+        if not problem_or_rootgroup_or_filename.pathname: # root group
             root_group = problem_or_rootgroup_or_filename
         else:
             # this function only makes sense when it is at the root
@@ -100,27 +102,25 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
         model_pickle = cur.fetchone()
         from six import PY2, PY3
         if PY2:
-            import cPickle
-            return cPickle.loads(str(model_pickle[0]))
+            import cpickle
+            return cpickle.loads(str(model_pickle[0]))
         if PY3:
             import pickle
             return pickle.loads(model_pickle[0])
-
     else:
-        raise TypeError('_get_viewer_data only accepts Problems or Groups or sqlite filenames')
+        raise TypeError('get_model_viewer_data only accepts Problems, Groups or filenames')
 
     data_dict = {}
-    component_execution_idx = [0]  # list so pass by ref
+    component_execution_idx = [0] #list so pass by ref
     component_execution_orders = {}
     data_dict['tree'] = _get_tree_dict(root_group, component_execution_orders, component_execution_idx)
 
     connections_list = []
-
     sorted_abs_input2src = OrderedDict(sorted(root_group._conn_global_abs_in2out.items())) # sort to make deterministic for testing
     root_group._conn_global_abs_in2out = sorted_abs_input2src
     G = root_group.compute_sys_graph(comps_only=True)
     scc = nx.strongly_connected_components(G)
-    scc_list = [s for s in scc if len(s) > 1]
+    scc_list = [s for s in scc if len(s)>1] #list(scc)
     for in_abs, out_abs in iteritems(sorted_abs_input2src):
         if out_abs is None:
             continue
@@ -130,19 +130,20 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
         edges_list = []
         for li in scc_list:
             if src_subsystem in li and tgt_subsystem in li:
-                count = count + 1
-                if count > 1:
+                count = count+1
+                if(count > 1):
                     raise ValueError('Count greater than 1')
 
                 exe_tgt = component_execution_orders[tgt_subsystem]
                 exe_src = component_execution_orders[src_subsystem]
-                exe_low = min(exe_tgt, exe_src)
-                exe_high = max(exe_tgt, exe_src)
+                exe_low = min(exe_tgt,exe_src)
+                exe_high = max(exe_tgt,exe_src)
                 subg = G.subgraph(li)
                 for n in subg.nodes():
                     exe_order = component_execution_orders[n]
                     if(exe_order < exe_low or exe_order > exe_high):
                         subg.remove_node(n)
+
 
                 src_to_tgt_str = src_subsystem + ' ' + tgt_subsystem
                 for tup in subg.edges():
@@ -150,17 +151,16 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
                     if edge_str != src_to_tgt_str:
                         edges_list.append(edge_str)
 
-        if len(edges_list) > 0:
-            edges_list.sort()  # make deterministic so same .html file will be produced each run
-            connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs),
-                                                 ('cycle_arrows', edges_list)]))
+        if(len(edges_list) > 0):
+            edges_list.sort() # make deterministic so same .html file will be produced each run
+            connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs), ('cycle_arrows', edges_list)]))
         else:
             connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs)]))
+
 
     data_dict['connections_list'] = connections_list
 
     return data_dict
-
 
 def view_tree(*args, **kwargs):
     """
@@ -169,78 +169,45 @@ def view_tree(*args, **kwargs):
     warn_deprecation("view_tree is deprecated. Please switch to view_model.")
     view_model(*args, **kwargs)
 
-
-def view_model(problem_or_filename, outfile='partition_tree_n2.html', show_browser=True,
-               offline=True, embed=False):
+def view_model(problem_or_filename, outfile='visualization', show_browser=True):
     """
-    Generates a self-contained html file containing a tree viewer
-    of the specified type.  Optionally pops up a web browser to
+    Generates a directory containing a tree viewer Optionally pops up a web browser to
     view the file.
+
     Parameters
     ----------
     problem_or_filename : Either a Problem() or a string
         Problem() : The Problem (after problem.setup()) for the desired tree.
         string : The filename of the case recorder file containing the data required to build the tree.
+
     outfile : str, optional
-        The name of the output html file.  Defaults to 'partition_tree_n2.html'.
+        The path of the output folder.  Defaults to current directory + 'visualization'.
+
     show_browser : bool, optional
         If True, pop up the system default web browser to view the generated html file.
         Defaults to True.
-    offline : bool, optional
-        If True, embed the javascript d3 library into the generated html file so that the tree can be viewed
-        offline without an internet connection.  Otherwise if False, have the html request the latest d3 file
-        from https://d3js.org/d3.v4.min.js when opening the html file.
-        Defaults to True.
-    embed : bool, optional
-        If True, export only the innerHTML that is between the body tags, used for embedding the viewer into another html file.
-        If False, create a standalone HTML file that has the DOCTYPE, html, head, meta, and body tags.
-        Defaults to False.
     """
-    viewer = 'partition_tree_n2.template'
-
+    cur_dir = os.getcwd()
+    if outfile == 'visualization':
+        outfile = os.path.join(cur_dir, outfile)
+        
+    model_data_filename = 'model_data.js'
+    folder_name = outfile
     code_dir = os.path.dirname(os.path.abspath(__file__))
-
-    with open(os.path.join(code_dir, viewer), "r") as f:
-        template = f.read()
-
-    html_begin_tags = ("<!DOCTYPE html>\n"
-        "<html>\n"
-        "<head>\n"
-        "    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\">\n"
-        "</head>\n"
-        "<body>\n")
-
-    html_end_tags = ("</body>\n"
-        "</html>\n")
-
-    display_none_attr = ""
-
-    if embed:
-        html_begin_tags = html_end_tags = ""
-        display_none_attr = " style=\"display:none\""
-
-    d3_library = "<script src=\"https://d3js.org/d3.v4.min.js\" charset=\"utf-8\"></script>"
-    if offline:
-        with open(os.path.join(code_dir, 'd3.v4.min.js'), "r") as f:
-            d3_library = "<script type=\"text/javascript\"> %s </script>" % (f.read())
-
-    with open(os.path.join(code_dir, "fontello.woff"), "rb") as f:
-        encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
-
-    with open(os.path.join(code_dir, 'awesomplete.css'), "r") as f:
-            awesomplete_css = "%s" % (f.read())
-
-    with open(os.path.join(code_dir, 'awesomplete.js'), "r") as f:
-            awesomplete_js = "%s" % (f.read())
-
     model_viewer_data = _get_viewer_data(problem_or_filename)
+    model_data = json.dumps(model_viewer_data)
 
-    tree_json = json.dumps(model_viewer_data['tree'])
-    conns_json = json.dumps(model_viewer_data['connections_list'])
+    if os.path.isdir(folder_name):
+        shutil.rmtree(folder_name)
 
-    with open(outfile, 'w') as f:
-        f.write(template % (html_begin_tags, awesomplete_css, encoded_font, display_none_attr, d3_library, awesomplete_js, tree_json, conns_json, html_end_tags))
+    shutil.copytree(src=code_dir + '/visualization', dst=folder_name)
+
+    model_data_dir = os.path.join(folder_name, model_data_filename)
+    with open(model_data_dir, 'w') as f:
+        f.write('var modelData = %s' % model_data)
 
     if show_browser:
         from openmdao.devtools.webview import webview
-        webview(outfile)
+        view_path = os.path.join(cur_dir, folder_name)
+        view_path = os.path.join(view_path, 'index.html')
+        webview(view_path)
