@@ -4,7 +4,6 @@ from __future__ import division
 from contextlib import contextmanager
 from collections import OrderedDict, Iterable
 from fnmatch import fnmatchcase
-import inspect
 import sys
 from itertools import product
 
@@ -16,7 +15,6 @@ import numpy as np
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
-from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
 from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array, warn_deprecation
 from openmdao.recorders.recording_manager import RecordingManager
@@ -2704,13 +2702,7 @@ class System(object):
         Record an iteration of the current System.
         """
         metadata = create_local_meta(self.pathname)
-        # Send the calling method name into record_iteration, e.g. 'solve_nonlinear'.
-        # method = recording_iteration_stack[1][0].split('.')[-1]
-        # print("STACK:", recording_iteration_stack)
-        # print("METHOD: ", recording_iteration_stack[1][0].split('.')[-1])
-        # self._rec_mgr.record_iteration(self, metadata, method=method)
         self._rec_mgr.record_iteration(self, metadata)
-
         self.iter_count += 1
 
 

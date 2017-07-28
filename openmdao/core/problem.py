@@ -979,7 +979,6 @@ class Problem(object):
                             raise RuntimeError("unsupported return format")
 
         recording_iteration_stack.pop()
-
         return totals
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):

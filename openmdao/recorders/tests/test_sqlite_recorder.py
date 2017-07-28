@@ -264,13 +264,11 @@ class TestSqliteRecorder(unittest.TestCase):
         self.dir = mkdtemp()
         self.filename = os.path.join(self.dir, "sqlite_test")
         self.recorder = SqliteRecorder(self.filename)
-        print(self.filename)  # comment out to make filename printout go away.
+        # print(self.filename)  # comment out to make filename printout go away.
         self.eps = 1e-5
-        from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
-
 
     def tearDown(self):
-        return  # comment out to allow db file to be removed.
+        # return  # comment out to allow db file to be removed.
         try:
             rmtree(self.dir)
             pass
@@ -666,7 +664,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
                                                  expected_outputs, expected_residuals),), self.eps)
 
-        coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
+        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
                       'pz._solve_nonlinear', (2, )]
 
         expected_inputs = None
