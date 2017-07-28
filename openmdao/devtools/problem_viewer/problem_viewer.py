@@ -102,8 +102,8 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
         model_pickle = cur.fetchone()
         from six import PY2, PY3
         if PY2:
-            import cpickle
-            return cpickle.loads(str(model_pickle[0]))
+            import cPickle
+            return cPickle.loads(str(model_pickle[0]))
         if PY3:
             import pickle
             return pickle.loads(model_pickle[0])
