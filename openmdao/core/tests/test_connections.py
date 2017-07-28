@@ -11,7 +11,7 @@ from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitCompone
 class TestConnections(unittest.TestCase):
 
     def setUp(self, c1meta=None, c3meta=None):
-        self.p = Problem()
+        self.p = Problem(model=Group())
         root = self.p.model
 
         if c1meta is None:

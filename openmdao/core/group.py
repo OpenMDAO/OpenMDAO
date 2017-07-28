@@ -474,16 +474,13 @@ class Group(System):
             # (not traceable to a connect statement, so provide context)
             # and check if src_indices is defined in both connect and add_input.
             abs_out = allprocs_prom2abs_list_out[prom_out][0]
-            meta_out = abs2meta_out[abs_out]
-            print()
-            print("meta_out:", meta_out)
-            print()
             outparts = abs_out.split('.')
             out_subsys = outparts[:-1]
+
+            print("abs_out:", abs_out)
+            print("abs2meta_out.keys()", abs2meta_out.keys())
+
             for abs_in in allprocs_prom2abs_list_in[prom_in]:
-                meta_in = abs2meta_in[abs_in]
-                print("meta_in:", meta_in)
-                print()
                 inparts = abs_in.split('.')
                 in_subsys = inparts[:-1]
                 if out_subsys == in_subsys:
@@ -491,29 +488,47 @@ class Group(System):
                                        "for connection in '%s' from '%s' to '%s'." %
                                        (self.pathname, prom_out, prom_in))
 
-                if src_indices is not None and abs_in in abs2meta_in:
-                    if meta_in['src_indices'] is not None:
-                        raise RuntimeError("%s: src_indices has been defined "
-                                           "in both connect('%s', '%s') "
-                                           "and add_input('%s', ...)." %
-                                           (self.pathname, prom_out,
-                                            prom_in, prom_in))
-                    out_shape = meta_out[shape]
-                    for ind in src_indices:
-                        if ind >
-                        raise ValueError("The source and target shapes do not match for the connection "
-                                         "'%s' to '%s' in Group '%s'." % (prom_out, prom_in, self.pathname))
-                    print('check',abs_in, meta_out['value'], meta_in['shape'], src_indices)
-                    val, shape = ensure_compatible(abs_in, meta_out['value'], meta_in['shape'], src_indices)
-                    print('val:', val, 'shape:', shape)
-                    meta_in['src_indices'] = np.atleast_1d(src_indices)
-                else:
-                    if meta_out['shape'] != meta_in['shape']:
-                        raise ValueError("The source and target shapes do not match for the connection "
-                                         "'%s' to '%s' in Group '%s'." % (prom_out, prom_in, self.pathname))
-                    print('check',abs_in, meta_out['value'], meta_in['shape'])
-                    val, shape = ensure_compatible(abs_in, meta_out['value'], meta_in['shape'])
-                    print('val:', val, 'shape:', shape)
+                if abs_in in abs2meta_in:
+                    meta_in = abs2meta_in[abs_in]
+                    if src_indices is not None:
+                        if meta_in['src_indices'] is not None:
+                            raise RuntimeError("%s: src_indices has been defined "
+                                               "in both connect('%s', '%s') "
+                                               "and add_input('%s', ...)." %
+                                               (self.pathname, prom_out,
+                                                prom_in, prom_in))
+                        meta_in['src_indices'] = np.atleast_1d(src_indices)
+
+                        if abs_out in abs2meta_out:
+                            meta_out = abs2meta_out[abs_out]
+                            print()
+                            print("meta_out:", meta_out)
+                            print()
+
+                            if meta_out['value'][src_indices].shape != meta_in['shape']:
+                                raise ValueError("The source and target shapes do not match for the connection "
+                                                 "'%s' to '%s' in Group '%s'.  Expected %s but got %s." %
+                                                 (prom_out, prom_in, self.pathname,
+                                                  meta_in['shape'], meta_out['value'][src_indices].shape))
+                            # print('check',abs_in, meta_out['value'], meta_in['shape'], src_indices)
+                            # val, shape = ensure_compatible(abs_in, meta_out['value'], meta_in['shape'], src_indices)
+                            # print('val:', val, 'shape:', shape)
+
+                    # elif abs_out in abs2meta_out:
+                    #     meta_out = abs2meta_out[abs_out]
+                    #     print()
+                    #     print("meta_out:", meta_out)
+                    #     print()
+                    # 
+                    #     if meta_out['shape'] != meta_in['shape']:
+                    #         raise ValueError("The source and target shapes do not match for the connection "
+                    #                          "'%s' to '%s' in Group '%s'.  Expected %s but got %s." %
+                    #                          (prom_out, prom_in, self.pathname,
+                    #                           meta_in['shape'], meta_out['value'][src_indices].shape))
+
+                        # print('check',abs_in, meta_out['value'], meta_in['shape'])
+                        # val, shape = ensure_compatible(abs_in, meta_out['value'], meta_in['shape'])
+                        # print('val:', val, 'shape:', shape)
 
                 abs_in2out[abs_in] = abs_out
 
