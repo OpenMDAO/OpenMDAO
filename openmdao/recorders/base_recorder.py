@@ -63,7 +63,28 @@ class BaseRecorder(object):
         Filtered subset of solver variables to record, based on includes/excludes.
     _filtered_system : dict
         Filtered subset of system variables to record, based on includes/excludes.
-
+    _desvars_values : dict
+        Driver desvar values, post-filtering, to be used by a derived recorder.
+    _responses_values : dict
+        Driver response values, post-filtering, to be used by a derived recorder.
+    _objectives_values : dict
+        Driver objectives values, post-filtering, to be used by a derived recorder.
+    _constraints_values : dict
+        Driver constraints values, post-filtering, to be used by a derived recorder.
+    _inputs : dict
+        System inputs values, post-filtering, to be used by a derived recorder.
+    _outputs : dict
+        System or Solver output values, post-filtering, to be used by a derived recorder.
+    _resids : dict
+        System or Solver residual values, post-filtering, to be used by a derived recorder.
+    _abs_error : float
+        Solver abs_error value, to be used by a derived recorder.
+    _rel_error : float
+        Solver abs_error value, to be used by a derived recorder.
+    _iteration_coordinate : str
+        The unique iteration coordinate of where an iteration originates.
+    _parallel : bool
+        Designates if the current recorder is parallel-recording-capable.
     """
 
     def __init__(self):
