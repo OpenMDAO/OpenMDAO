@@ -33,7 +33,6 @@ class NonlinearBlockGS(NonlinearSolver):
         system = self._system
 
         self._solver_info.prefix += '|  '
-
         for isub, subsys in enumerate(system._subsystems_myproc):
             system._transfer('nonlinear', 'fwd', isub)
             subsys._solve_nonlinear()
