@@ -374,14 +374,12 @@ class OpenMDAOServerRecorder(BaseRecorder):
                 outs = outputs
 
             if outs:
+                outputs_array = []
                 for name, value in iteritems(outs):
-                    tple = (name, '{}f8'.format(value.shape))
-                    dtype_tuples.append(tple)
-
-                outputs_array = np.zeros((1,), dtype=dtype_tuples)
-
-                for name, value in iteritems(outs):
-                    outputs_array[name] = value
+                    outputs_array.append({
+                        'name': name,
+                        'values': list(value)
+                    })
 
         if self.options['record_solver_residuals']:
             dtype_tuples = []
@@ -399,13 +397,12 @@ class OpenMDAOServerRecorder(BaseRecorder):
                 res = residuals
 
             if res:
-                for name, value in iteritems(res):
-                    tple = (name, '{}f8'.format(value.shape))
-                    dtype_tuples.append(tple)
-
-                residuals_array = np.zeros((1,), dtype=dtype_tuples)
-                for name, value in iteritems(res):
-                    residuals_array[name] = value
+                residuals_array = []
+                for name, value in iteritems(outs):
+                    residuals_array.append({
+                        'name': name,
+                        'values': list(value)
+                    })
 
         iteration_coordinate = get_formatted_iteration_coordinate()
 
