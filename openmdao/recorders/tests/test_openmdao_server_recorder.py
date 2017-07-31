@@ -789,11 +789,11 @@ class TestServerRecorder(unittest.TestCase):
         expected_solver_output = [
             {'name': 'px.x', 'values': [0.0]},
             {'name': 'pz.z', 'values': [0.0, 0.0]},
-            {'name': 'd1.y1', 'values': [0.0]},
-            {'name': 'd2.y2', 'values': [-0.41168147]},
-            {'name': 'obj_cmp.obj', 'values': [-0.48667678]},
-            {'name': 'con_cmp1.con1', 'values': [0.770496]},
-            {'name': 'con_cmp2.con2', 'values': [-2.70578793e-6]},
+            {'name': 'd1.y1', 'values': [-0.05308121]},
+            {'name': 'd2.y2', 'values': [0.47947]},
+            {'name': 'obj_cmp.obj', 'values': [0.603052399]},
+            {'name': 'con_cmp1.con1', 'values': [0.63529905]},
+            {'name': 'con_cmp2.con2', 'values': [0.0032284065]},
         ]
 
         solver_iteration = json.loads(self.solver_iterations)
