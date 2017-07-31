@@ -124,6 +124,12 @@ class BaseRecorder(object):
         self._filtered_system = {}
         self._filtered_solver = {}
 
+        # By default, this is False, but it should be set to True
+        # if the recorder will record data on each process to avoid
+        # unnecessary gathering.
+        self._parallel = False
+
+
     def startup(self, object_requesting_recording):
         """
         Prepare for a new run and calculate inclusion lists.

@@ -113,9 +113,9 @@ class Driver(object):
         self._cons = model.get_constraints(recurse=True)
 
         self._rec_mgr.startup(self)
-        if (self._rec_mgr._recorders):
-            from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
-            self._model_viewer_data = _get_viewer_data(problem)
+        # if (self._rec_mgr._recorders):
+        #     from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
+        #     self._model_viewer_data = _get_viewer_data(problem)
         self._rec_mgr.record_metadata(self)
 
     def get_design_var_values(self, filter=None):
