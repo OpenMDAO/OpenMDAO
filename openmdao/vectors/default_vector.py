@@ -614,3 +614,20 @@ class DefaultVector(Vector):
             # line search by setting the entries of du at the bounds to zero.
             changed_either = change_lower.astype(bool) + change_upper.astype(bool)
             du_data[changed_either] = 0.
+
+    def __getstate__(self):
+        """
+        Return state as a dict.
+
+        For pickling vectors in case recording, we want to get rid of
+        the system contained within Vectors, because MPI Comm objects cannot
+        be pickled using Python3's pickle module.
+
+        Returns
+        -------
+        dict
+            state minus system member.
+        """
+        state = self.__dict__.copy()
+        del state['_system']
+        return state

@@ -3,7 +3,7 @@ from __future__ import division, print_function
 
 import scipy.sparse
 
-from openmdao.api import ExplicitComponent
+from openmdao.core.explicitcomponent import ExplicitComponent
 
 
 class TestExplCompSimple(ExplicitComponent):

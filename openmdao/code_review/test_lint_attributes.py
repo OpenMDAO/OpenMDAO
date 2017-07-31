@@ -131,11 +131,11 @@ class LintAttributesTestCase(unittest.TestCase):
                                     if not found_in_pc:
                                         new_failures.append('Member `{0}` not documented in Attributes section of own class or parent class docstrings'.format(v))
                                 else:
-                                    if(print_info): print("    Documented member `%s`" % (v))
-                        else: #no init section
-                            if(len(classdoc_matches) == 0): # no Attributes section
-                                if(print_info): print('    Skipping Class `%s`... missing Attributes and init' % (class_name))
-                            else: # one Attributes section
+                                    if print_info: print("    Documented member `%s`" % (v))
+                        else:  # no init section
+                            if len(classdoc_matches) == 0: # no Attributes section
+                                if print_info: print('    Skipping Class `%s`... missing Attributes and init' % (class_name))
+                            else:  # one Attributes section
                                 new_failures.append('Attributes section in docstring but no __init__ function')
                         if new_failures:
                             key = '{0}/{1}:{2}'.format(dir_name, file_name, class_name)

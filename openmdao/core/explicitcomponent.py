@@ -10,6 +10,7 @@ from openmdao.core.component import Component
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 class ExplicitComponent(Component):
@@ -169,18 +170,19 @@ class ExplicitComponent(Component):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
-        with self._unscaled_context(
-                outputs=[self._outputs], residuals=[self._residuals]):
-            self._residuals.set_vec(self._outputs)
-            self.compute(self._inputs, self._outputs)
+        with Recording(self.pathname + '._apply_nonlinear', self.iter_count, self):
+            with self._unscaled_context(
+                    outputs=[self._outputs], residuals=[self._residuals]):
+                self._residuals.set_vec(self._outputs)
+                self.compute(self._inputs, self._outputs)
 
-            # Restore any complex views if under complex step.
-            if self._outputs._vector_info._under_complex_step:
-                for vec in [self._outputs, self._residuals]:
-                    vec._remove_complex_views()
+                # Restore any complex views if under complex step.
+                if self._outputs._vector_info._under_complex_step:
+                    for vec in [self._outputs, self._residuals]:
+                        vec._remove_complex_views()
 
-            self._residuals -= self._outputs
-            self._outputs += self._residuals
+                self._residuals -= self._outputs
+                self._outputs += self._residuals
 
     def _solve_nonlinear(self):
         """
@@ -197,11 +199,11 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._solve_nonlinear()
 
-        with self._unscaled_context(
-                outputs=[self._outputs], residuals=[self._residuals]):
-            self._residuals.set_const(0.0)
-            failed = self.compute(self._inputs, self._outputs)
-
+        with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
+            with self._unscaled_context(
+                    outputs=[self._outputs], residuals=[self._residuals]):
+                self._residuals.set_const(0.0)
+                failed = self.compute(self._inputs, self._outputs)
         return bool(failed), 0., 0.
 
     def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
@@ -221,21 +223,22 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        for vec_name in vec_names:
-            with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
-                d_inputs, d_outputs, d_residuals = vecs
+        with Recording(self.pathname + '._apply_linear', self.iter_count, self):
+            for vec_name in vec_names:
+                with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
+                    d_inputs, d_outputs, d_residuals = vecs
 
-                # Jacobian and vectors are all scaled, unitless
-                with self.jacobian_context() as J:
-                    J._apply(d_inputs, d_outputs, d_residuals, mode)
+                    # Jacobian and vectors are all scaled, unitless
+                    with self.jacobian_context() as J:
+                        J._apply(d_inputs, d_outputs, d_residuals, mode)
 
-                # Jacobian and vectors are all unscaled, dimensional
-                with self._unscaled_context(
-                        outputs=[self._outputs], residuals=[d_residuals]):
-                    d_residuals *= -1.0
-                    self.compute_jacvec_product(self._inputs, self._outputs,
-                                                d_inputs, d_residuals, mode)
-                    d_residuals *= -1.0
+                    # Jacobian and vectors are all unscaled, dimensional
+                    with self._unscaled_context(
+                            outputs=[self._outputs], residuals=[d_residuals]):
+                        d_residuals *= -1.0
+                        self.compute_jacvec_product(self._inputs, self._outputs,
+                                                    d_inputs, d_residuals, mode)
+                        d_residuals *= -1.0
 
     def _solve_linear(self, vec_names, mode):
         """
@@ -257,17 +260,17 @@ class ExplicitComponent(Component):
         float
             relative error.
         """
-        for vec_name in vec_names:
-            d_outputs = self._vectors['output'][vec_name]
-            d_residuals = self._vectors['residual'][vec_name]
+        with Recording(self.pathname + '._solve_linear', self.iter_count, self):
+            for vec_name in vec_names:
+                d_outputs = self._vectors['output'][vec_name]
+                d_residuals = self._vectors['residual'][vec_name]
 
-            with self._unscaled_context(
-                    outputs=[d_outputs], residuals=[d_residuals]):
-                if mode == 'fwd':
-                    d_outputs.set_vec(d_residuals)
-                elif mode == 'rev':
-                    d_residuals.set_vec(d_outputs)
-
+                with self._unscaled_context(
+                        outputs=[d_outputs], residuals=[d_residuals]):
+                    if mode == 'fwd':
+                        d_outputs.set_vec(d_residuals)
+                    elif mode == 'rev':
+                        d_residuals.set_vec(d_outputs)
         return False, 0., 0.
 
     def _linearize(self, do_nl=False, do_ln=False):

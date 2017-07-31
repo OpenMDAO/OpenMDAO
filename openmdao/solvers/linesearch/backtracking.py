@@ -15,6 +15,7 @@ import numpy as np
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.solvers.solver import NonlinearSolver
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 def _print_violations(unknowns, lower, upper):
@@ -116,18 +117,25 @@ class BoundsEnforceLS(NonlinearSolver):
         if self.options['print_bound_enforce']:
             _print_violations(u, system._lower_bounds, system._upper_bounds)
 
-        if self.options['bound_enforcement'] == 'vector':
-            u._enforce_bounds_vector(du, 1.0, system._lower_bounds, system._upper_bounds)
-        elif self.options['bound_enforcement'] == 'scalar':
-            u._enforce_bounds_scalar(du, 1.0, system._lower_bounds, system._upper_bounds)
-        elif self.options['bound_enforcement'] == 'wall':
-            u._enforce_bounds_wall(du, 1.0, system._lower_bounds, system._upper_bounds)
+        with Recording('BoundsEnforceLS', self._iter_count, self) as rec:
+            if self.options['bound_enforcement'] == 'vector':
+                u._enforce_bounds_vector(du, 1.0, system._lower_bounds, system._upper_bounds)
+            elif self.options['bound_enforcement'] == 'scalar':
+                u._enforce_bounds_scalar(du, 1.0, system._lower_bounds, system._upper_bounds)
+            elif self.options['bound_enforcement'] == 'wall':
+                u._enforce_bounds_wall(du, 1.0, system._lower_bounds, system._upper_bounds)
 
-        norm = self._iter_get_norm()
+            norm = self._iter_get_norm()
+            # With solvers, we want to record the norm AFTER
+            # the call, but the call needs to
+            # be wrapped in the with for stack purposes,
+            # so we locally assign  norm & norm0 into the class.
+            rec.abs = norm
+            rec.rel = norm / norm0
+
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
         fail = (np.isinf(norm) or np.isnan(norm))
-
         return fail, norm, norm / norm0
 
 
@@ -303,19 +311,30 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         # "rise".
         while self._iter_count < maxiter and (((norm0 - norm) < c * self.alpha * norm0) or
                                               self._analysis_error_raised):
-            self._iter_execute()
-            self._iter_count += 1
-            try:
-                norm = self._iter_get_norm()
+            with Recording('ArmijoGoldsteinLS', self._iter_count, self) as rec:
+                self._iter_execute()
+                self._iter_count += 1
+                try:
+                    norm = self._iter_get_norm()
 
-            except AnalysisError as err:
-                if self.options['retry_on_analysis_error']:
-                    self._analysis_error_raised = True
-                else:
-                    exc = sys.exc_info()
-                    reraise(exc[0], exc[1], exc[2])
+                    # With solvers, we want to report the norm AFTER
+                    # the iter_execute call, but the i_e call needs to
+                    # be wrapped in the with for stack purposes.
+                    rec.abs = norm
+                    rec.rel = norm / norm0
+
+                except AnalysisError as err:
+                    if self.options['retry_on_analysis_error']:
+                        self._analysis_error_raised = True
+                        rec.abs = np.nan
+                        rec.rel = np.nan
+
+                    else:
+                        exc = sys.exc_info()
+                        reraise(exc[0], exc[1], exc[2])
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
+            self._iter_count += 1
 
         fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))

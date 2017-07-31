@@ -284,8 +284,8 @@ class ImplicitCompTestCase(unittest.TestCase):
                 pass
 
             def guess_nonlinear(self, inputs, outputs, resids):
-                # Solution at 1 and 3. Default value takes us to -1 solution. Here
-                # we set it to a value that will tke us to the 3 solution.
+                # Solution at x=1 and x=3. Default value takes us to the x=1 solution. Here
+                # we set it to a value that will take us to the x=3 solution.
                 outputs['x'] = 5.0
 
 
