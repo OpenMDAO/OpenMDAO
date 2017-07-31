@@ -291,7 +291,7 @@ class SqliteRecorder(BaseRecorder):
 
             dtype_tuples = []
             for name, value in iteritems(ins):
-                tple = (name, '({},)f8'.format(len(value)))
+                tple = (name, '{}f8'.format(value.shape))
                 dtype_tuples.append(tple)
 
             inputs_array = np.zeros((1,), dtype=dtype_tuples)
@@ -313,7 +313,7 @@ class SqliteRecorder(BaseRecorder):
 
             dtype_tuples = []
             for name, value in iteritems(outs):
-                tple = (name, '({},)f8'.format(len(value)))
+                tple = (name, '{}f8'.format(value.shape))
                 dtype_tuples.append(tple)
 
             outputs_array = np.zeros((1,), dtype=dtype_tuples)
@@ -336,7 +336,7 @@ class SqliteRecorder(BaseRecorder):
             dtype_tuples = []
             if resids:
                 for name, value in iteritems(resids):
-                    tple = (name, '({},)f8'.format(len(value)))
+                    tple = (name, '{}f8'.format(value.shape))
                     dtype_tuples.append(tple)
 
                 residuals_array = np.zeros((1,), dtype=dtype_tuples)

@@ -271,7 +271,7 @@ class Driver(object):
             with 'linear' or the nonlinear constraints with 'nonlinear'.
 
         filter : list
-            List of objective names used by recorders.
+            List of constraint names used by recorders.
 
         Returns
         -------
