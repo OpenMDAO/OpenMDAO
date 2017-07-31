@@ -49,8 +49,8 @@ def setup(prefix='iprof', methods=None, prof_dir=None, finalize=True):
     """
     Instruments certain important openmdao methods for profiling.
 
-    Args
-    ----
+    Parameters
+    ----------
 
     prefix : str ('iprof')
         Prefix used for the raw profile data. Process rank will be appended

@@ -39,7 +39,6 @@ single:
 clean:
 	rm -rf $(BUILDDIR)/*
 	rm -rf _srcdocs/usr
-	#rm -rf _srcdocs/dev
 	rm -rf tags
 	rm -rf tmp
 	rm -f feature_docs_unit_test_db.sqlite
@@ -54,9 +53,7 @@ redbaron:
 
 all: mock redbaron
 	# Cleaning up previously-generated files before docbuild
-	# rm -rf $(BUILDDIR)/*
 	rm -rf _srcdocs/usr
-	#rm -rf _srcdocs/dev
 
 	# Running things before docbuild
 	python _utils/preprocess_tags.py
@@ -66,17 +63,9 @@ all: mock redbaron
 	#       dev docs get built into tmp/moved into _build later
 	#       to avoid race to create dirs.
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "usr"
-	#$(SPHINXBUILD) -b html -d tmp/doctrees  . tmp/html -t "dev"
-
-	# Making dirs in which to move things, moving things (parallel build prob)
-	#mkdir $(BUILDDIR)/html/_srcdocs/dev
-	#mkdir $(BUILDDIR)/doctrees/_srcdocs/dev
-	#cp -R tmp/html/_srcdocs/dev $(BUILDDIR)/html/_srcdocs
-	#cp -R tmp/doctrees/_srcdocs/dev $(BUILDDIR)/doctrees/_srcdocs
 
 	# post-game clean-up
 	rm feature_docs_unit_test_db.sqlite
-	#rm -rf tmp
 
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."

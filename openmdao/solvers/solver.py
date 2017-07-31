@@ -9,6 +9,9 @@ import numpy as np
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
+from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration_stack
+from openmdao.recorders.recording_manager import RecordingManager
+from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.options_dictionary import OptionsDictionary
 
 
@@ -48,10 +51,14 @@ class Solver(object):
         'fwd' or 'rev', applicable to linear solvers only.
     _iter_count : int
         Number of iterations for the current invocation of the solver.
+    _rec_mgr : <RecordingManager>
+        object that manages all recorders added to this solver
     _solver_info : <SolverInfo>
         Object to store some formatting for iprint that is shared across all solvers.
     options : <OptionsDictionary>
         Options dictionary.
+    metadata : dict
+        Dictionary holding data about this solver.
     supports : <OptionsDictionary>
         Options dictionary describing what features are supported by this
         solver.
@@ -94,6 +101,20 @@ class Solver(object):
         self._declare_options()
         self.options.update(kwargs)
 
+        self.metadata = {}
+        self._rec_mgr = RecordingManager()
+
+    def add_recorder(self, recorder):
+        """
+        Add a recorder to the driver's RecordingManager.
+
+        Parameters
+        ----------
+        recorder : <BaseRecorder>
+           A recorder instance to be added to RecManager.
+        """
+        self._rec_mgr.append(recorder)
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -115,6 +136,8 @@ class Solver(object):
         """
         self._system = system
         self._depth = depth
+        self._rec_mgr.startup(self)
+        self._rec_mgr.record_metadata(self)
 
     def _set_solver_print(self, level=2, type_='all'):
         """
@@ -188,9 +211,18 @@ class Solver(object):
 
         while self._iter_count < maxiter and \
                 norm > atol and norm / norm0 > rtol:
-            self._iter_execute()
-            self._iter_count += 1
-            norm = self._iter_get_norm()
+            with Recording(type(self).__name__, self._iter_count, self) as rec:
+                self._iter_execute()
+                self._iter_count += 1
+                norm = self._iter_get_norm()
+                # With solvers, we want to record the norm AFTER the call, but the call needs to
+                # be wrapped in the with for stack purposes, so we locally assign  norm & norm0
+                # into the class.
+                rec.abs = norm
+                rec.rel = norm / norm0
+
+            if norm0 == 0:
+                norm0 = 1
             self._mpi_print(self._iter_count, norm, norm / norm0)
 
         fail = (np.isinf(norm) or np.isnan(norm) or
@@ -288,6 +320,18 @@ class Solver(object):
         """
         return self.SOLVER
 
+    def record_iteration(self, **kwargs):
+        """
+        Record an iteration of the current Solver.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Keyword arguments (used for abs and rel error).
+        """
+        metadata = create_local_meta(self.SOLVER)
+        self._rec_mgr.record_iteration(self, metadata, **kwargs)
+
 
 class NonlinearSolver(Solver):
     """
@@ -336,7 +380,12 @@ class NonlinearSolver(Solver):
         float
             norm.
         """
+        recording_iteration_stack.append(('_iter_get_norm', 0))
+
         self._system._apply_nonlinear()
+
+        recording_iteration_stack.pop()
+
         return self._system._residuals.get_norm()
 
 
@@ -407,9 +456,13 @@ class LinearSolver(Solver):
         float
             norm.
         """
+        recording_iteration_stack.append(('_iter_get_norm', 0))
+
         system = self._system
         scope_out, scope_in = system._get_scope()
         system._apply_linear(self._vec_names, self._mode, scope_out, scope_in)
+
+        recording_iteration_stack.pop()
 
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']
