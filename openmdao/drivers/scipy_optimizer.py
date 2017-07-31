@@ -17,7 +17,6 @@ from openmdao.core.driver import Driver
 from openmdao.recorders.recording_iteration_stack import Recording
 
 
-
 _optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
                'TNC', 'COBYLA', 'SLSQP']
 _gradient_optimizers = ['CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC',

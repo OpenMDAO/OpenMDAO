@@ -6,6 +6,7 @@ from openmdao.recorders.recording_iteration_stack import recording_iteration_sta
 
 from openmdao.utils.mpi import MPI
 
+
 class RecordingManager(object):
     """
     Object that routes function calls to all attached recorders.
@@ -104,7 +105,6 @@ class RecordingManager(object):
             The object that needs its metadata recorded.
 
         """
-
         for recorder in self._recorders:
             # If the recorder does not support parallel recording
             # we need to make sure we only record on rank 0.

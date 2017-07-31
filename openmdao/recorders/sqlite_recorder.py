@@ -18,7 +18,6 @@ from openmdao.recorders.recording_iteration_stack import \
 from openmdao.utils.mpi import MPI
 
 
-
 def array_to_blob(array):
     """
     Make numpy array in to BLOB type.
@@ -68,7 +67,7 @@ class SqliteRecorder(BaseRecorder):
         """
         super(SqliteRecorder, self).__init__()
 
-        if MPI and MPI.COMM_WORLD.rank > 0 :
+        if MPI and MPI.COMM_WORLD.rank > 0:
             self._open_close_sqlite = False
         else:
             self._open_close_sqlite = True
@@ -87,23 +86,25 @@ class SqliteRecorder(BaseRecorder):
             # used to keep track of the order of the case records across all three tables
             self.cursor.execute("CREATE TABLE global_iterations(id INTEGER PRIMARY KEY, "
                                 "record_type TEXT, rowid INT)")
-            self.cursor.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, counter INT,"
-                                "iteration_coordinate TEXT, timestamp REAL, success INT, msg TEXT, "
-                                "desvars BLOB, responses BLOB, objectives BLOB, constraints BLOB)")
-            self.cursor.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, counter INT, "
-                                "iteration_coordinate TEXT,  timestamp REAL, success INT, msg TEXT, "
-                                "inputs BLOB, outputs BLOB, residuals BLOB)")
-            self.cursor.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, counter INT, "
-                                "iteration_coordinate TEXT, timestamp REAL, success INT, msg TEXT, "
-                                "abs_err REAL, rel_err REAL, solver_output BLOB, "
-                                "solver_residuals BLOB)")
+            self.cursor.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
+                                "counter INT,iteration_coordinate TEXT, timestamp REAL, "
+                                "success INT, msg TEXT, desvars BLOB, responses BLOB, "
+                                "objectives BLOB, constraints BLOB)")
+            self.cursor.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
+                                "counter INT, iteration_coordinate TEXT,  timestamp REAL, "
+                                "success INT, msg TEXT, inputs BLOB, outputs BLOB, "
+                                "residuals BLOB)")
+            self.cursor.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, "
+                                "counter INT, iteration_coordinate TEXT, timestamp REAL, "
+                                "success INT, msg TEXT, abs_err REAL, rel_err REAL, "
+                                "solver_output BLOB, solver_residuals BLOB)")
 
             self.cursor.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
                                 "model_viewer_data BLOB)")
             self.cursor.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY,"
                                 " scaling_factors BLOB)")
-            self.cursor.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, solver_options BLOB,"
-                                " solver_class TEXT)")
+            self.cursor.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
+                                "solver_options BLOB, solver_class TEXT)")
 
     def record_iteration(self, object_requesting_recording, metadata, **kwargs):
         """
@@ -505,10 +506,6 @@ class SqliteRecorder(BaseRecorder):
         object_requesting_recording: <System>
             The System that would like to record its metadata.
         """
-
-        # return # qqq
-
-
         scaling_factors = pickle.dumps(object_requesting_recording._scaling_vecs,
                                        pickle.HIGHEST_PROTOCOL)
 

@@ -129,7 +129,6 @@ class BaseRecorder(object):
         # unnecessary gathering.
         self._parallel = False
 
-
     def startup(self, object_requesting_recording):
         """
         Prepare for a new run and calculate inclusion lists.
