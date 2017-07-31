@@ -11,15 +11,12 @@ from collections import OrderedDict
 import traceback
 
 from six import iteritems
-from six.moves import range
-
-import numpy as np
-import scipy as sp
-
 from pyoptsparse import Optimization
 
-from openmdao.core.driver import Driver
 from openmdao.core.analysis_error import AnalysisError
+from openmdao.core.driver import Driver
+from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.utils.record_util import create_local_meta
 
 # names of optimizers that use gradients
 grad_drivers = {'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
@@ -189,8 +186,15 @@ class pyOptSparseDriver(Driver):
         self.pyopt_solution = None
         self.iter_count = 0
 
-        # Initial Run
-        model._solve_nonlinear()
+        # Metadata Setup
+        self.metadata = create_local_meta(self.options['optimizer'])
+
+        with Recording(self.options['optimizer'], self.iter_count, self) as rec:
+            # Initial Run
+            model._solve_nonlinear()
+            rec.abs = 0.0
+            rec.rel = 0.0
+        self.iter_count += 1
 
         opt_prob = Optimization(self.options['title'], self._objfunc)
 
@@ -310,7 +314,11 @@ class pyOptSparseDriver(Driver):
             val = dv_dict[name]
             self.set_design_var(name, val)
 
-        model._solve_nonlinear()
+        with Recording(self.options['optimizer'], self.iter_count, self) as rec:
+            model._solve_nonlinear()
+            rec.abs = 0.0
+            rec.rel = 0.0
+        self.iter_count += 1
 
         # Save the most recent solution.
         self.pyopt_solution = sol
@@ -360,16 +368,22 @@ class pyOptSparseDriver(Driver):
             # print(dv_dict)
 
             # Execute the model
-            self.iter_count += 1
-            try:
-                model._solve_nonlinear()
+            with Recording(self.options['optimizer'], self.iter_count, self) as rec:
+                self.iter_count += 1
+                try:
+                    model._solve_nonlinear()
 
-            # Let the optimizer try to handle the error
-            except AnalysisError:
-                fail = 1
+                # Let the optimizer try to handle the error
+                except AnalysisError:
+                    fail = 1
 
-            func_dict = self.get_objective_values()
-            func_dict.update(self.get_constraint_values(lintype='nonlinear'))
+                func_dict = self.get_objective_values()
+                func_dict.update(self.get_constraint_values(lintype='nonlinear'))
+
+                # Record after getting obj and constraint to assure they have
+                # been gathered in MPI.
+                rec.abs = 0.0
+                rec.rel = 0.0
 
         except Exception as msg:
             tb = traceback.format_exc()
@@ -383,7 +397,7 @@ class pyOptSparseDriver(Driver):
 
         # print("Functions calculated")
         # print(dv_dict)
-        # print(func_dict)
+
         return func_dict, fail
 
     def _gradfunc(self, dv_dict, func_dict):
@@ -448,3 +462,9 @@ class pyOptSparseDriver(Driver):
         # print(dv_dict)
         # print(sens_dict)
         return sens_dict, fail
+
+    def _get_name(self):
+        """
+        Get name of current driver.
+        """
+        return self.options['optimizer']

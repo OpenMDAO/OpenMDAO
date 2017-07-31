@@ -10,6 +10,7 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.analysis_error import AnalysisError
 
 # Components
+from openmdao.components.balance_comp import BalanceComp
 from openmdao.components.deprecated_component import Component
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.linear_system_comp import LinearSystemComp
@@ -63,6 +64,9 @@ from openmdao.drivers.scipy_optimizer import ScipyOptimizer
 
 # System-Building Tools
 from openmdao.utils.options_dictionary import OptionsDictionary
+
+# Recorders
+from openmdao.recorders.sqlite_recorder import SqliteRecorder
 
 # set up tracing or memory profiling if env vars are set.
 import os

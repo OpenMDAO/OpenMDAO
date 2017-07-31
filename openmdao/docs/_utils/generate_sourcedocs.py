@@ -3,6 +3,8 @@ from openmdao.docs.config_params import IGNORE_LIST
 
 # this function is used to create the entire directory structure
 # of our source docs, as well as writing out each individual rst file.
+
+
 def generate_docs(doctype):
     """
     generate_docs
@@ -50,19 +52,19 @@ OpenMDAO User Source Documentation
 .. toctree::
    :maxdepth: 1
 """
-    elif doctype == "dev":
-        ref_sheet_bottom = """
-   :members:
-   :show-inheritance:
-   :private-members:
-   :special-members: __init__, __contains__, __iter__, __setitem__, __getitem__
-
-.. toctree::
-   :maxdepth: 1
-"""
+#     elif doctype == "dev":
+#         ref_sheet_bottom = """
+#    :members:
+#    :show-inheritance:
+#    :private-members:
+#    :special-members: __init__, __contains__, __iter__, __setitem__, __getitem__
+#
+# .. toctree::
+#    :maxdepth: 1
+# """
 
     # need to set up the _srcdocs directory structure, relative to docs.
-    #docs_dir = os.path.dirname(__file__)
+    # docs_dir = os.path.dirname(__file__)
     docs_dir = os.path.dirname("..")
 
     doc_dir = os.path.join(docs_dir, "_srcdocs", doctype)
@@ -153,7 +155,7 @@ OpenMDAO User Source Documentation
             package_file.write(package_top)
 
             for sub_package in sub_packages:
-                SKIP_SUBPACKAGES = []
+                SKIP_SUBPACKAGES = ['__pycache__']
                 # this line writes subpackage name e.g. "core/component.py"
                 # into the corresponding package index file (e.g. "openmdao.core.rst")
                 if sub_package not in SKIP_SUBPACKAGES:

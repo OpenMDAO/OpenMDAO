@@ -20,7 +20,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
-
+from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.logger_utils import get_default_logger
 from openmdao.utils.mpi import MPI, FakeComm
@@ -236,6 +236,12 @@ class Problem(object):
                          "OpenMDAO <= 1.x ; use 'run_driver' instead.")
 
         return self.run_driver()
+
+    def cleanup(self):
+        """
+        Clean up resources prior to exit.
+        """
+        self.driver.cleanup()
 
     def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='auto',
               force_alloc_complex=False):
@@ -731,6 +737,7 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
+        recording_iteration_stack.append(('_compute_total_derivs', 0))
         model = self.model
         mode = self._mode
         vec_dinput = model._vectors['input']
@@ -853,6 +860,7 @@ class Problem(object):
                         ikey = old_input_list[icount]
                         totals[okey][ikey] = -approx_jac[output_name, input_name]
 
+            recording_iteration_stack.pop()
             return totals
 
         # Solve for derivs using linear solver.
@@ -1063,6 +1071,7 @@ class Problem(object):
                         else:
                             raise RuntimeError("unsupported return format")
 
+        recording_iteration_stack.pop()
         return totals
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):

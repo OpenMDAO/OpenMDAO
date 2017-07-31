@@ -17,6 +17,7 @@ from openmdao.core.system import System
 from openmdao.core.component import Component
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.proc_allocators.proc_allocator import ProcAllocationError
+from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg
@@ -1106,10 +1107,13 @@ class Group(System):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
+        name = self.pathname if self.pathname else 'root'
+
         self._transfer('nonlinear', 'fwd')
         # Apply recursion
-        for subsys in self._subsystems_myproc:
-            subsys._apply_nonlinear()
+        with Recording(name + '._apply_nonlinear', self.iter_count, self):
+            for subsys in self._subsystems_myproc:
+                subsys._apply_nonlinear()
 
     def _solve_nonlinear(self):
         """
@@ -1126,6 +1130,8 @@ class Group(System):
         """
         super(Group, self)._solve_nonlinear()
 
+        name = self.pathname if self.pathname else 'root'
+
         # Execute guess_nonlinear if specified.
         # We need to call this early enough so that any solver that needs initial guesses has
         # them.
@@ -1135,7 +1141,10 @@ class Group(System):
                 with sub._unscaled_context(outputs=[sub._outputs], residuals=[sub._residuals]):
                     sub.guess_nonlinear(sub._inputs, sub._outputs, sub._residuals)
 
-        return self._nonlinear_solver.solve()
+        with Recording(name + '._solve_nonlinear', self.iter_count, self):
+            result = self._nonlinear_solver.solve()
+
+        return result
 
     def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """
@@ -1154,25 +1163,28 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        with self.jacobian_context() as J:
-            # Use global Jacobian
-            if self._owns_assembled_jac or self._views_assembled_jac or self._owns_approx_jac:
-                for vec_name in vec_names:
-                    with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
-                        d_inputs, d_outputs, d_residuals = vecs
-                        J._apply(d_inputs, d_outputs, d_residuals, mode)
-            # Apply recursion
-            else:
-                if mode == 'fwd':
-                    for vec_name in vec_names:
-                        self._transfer(vec_name, mode)
+        name = self.pathname if self.pathname else 'root'
 
-                for subsys in self._subsystems_myproc:
-                    subsys._apply_linear(vec_names, mode, scope_out, scope_in)
-
-                if mode == 'rev':
+        with Recording(name + '._apply_linear', self.iter_count, self):
+            with self.jacobian_context() as J:
+                # Use global Jacobian
+                if self._owns_assembled_jac or self._views_assembled_jac or self._owns_approx_jac:
                     for vec_name in vec_names:
-                        self._transfer(vec_name, mode)
+                        with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
+                            d_inputs, d_outputs, d_residuals = vecs
+                            J._apply(d_inputs, d_outputs, d_residuals, mode)
+                # Apply recursion
+                else:
+                    if mode == 'fwd':
+                        for vec_name in vec_names:
+                            self._transfer(vec_name, mode)
+
+                    for subsys in self._subsystems_myproc:
+                        subsys._apply_linear(vec_names, mode, scope_out, scope_in)
+
+                    if mode == 'rev':
+                        for vec_name in vec_names:
+                            self._transfer(vec_name, mode)
 
     def _solve_linear(self, vec_names, mode):
         """
@@ -1194,7 +1206,12 @@ class Group(System):
         float
             absolute error.
         """
-        return self._linear_solver.solve(vec_names, mode)
+        name = self.pathname if self.pathname else 'root'
+
+        with Recording(name + '._solve_linear', self.iter_count, self):
+            result = self._linear_solver.solve(vec_names, mode)
+
+        return result
 
     def _linearize(self, do_nl=True, do_ln=True):
         """
