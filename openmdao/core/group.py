@@ -409,7 +409,6 @@ class Group(System):
         conns : dict
             Dictionary of connections passed down from parent group.
         """
-        print(self.pathname, 'Group.setup_globalconnections()')
         super(Group, self)._setup_global_connections()
         global_abs_in2out = self._conn_global_abs_in2out
 
@@ -453,8 +452,6 @@ class Group(System):
                     if out_subsys != in_subsys:
                         abs_in2out[abs_in] = abs_out
 
-        print(self.pathname, '_manual_connections:', self._manual_connections)
-
         # Add explicit connections (only ones declared by this group)
         for prom_in, (prom_out, src_indices) in iteritems(self._manual_connections):
 
@@ -477,9 +474,6 @@ class Group(System):
             outparts = abs_out.split('.')
             out_subsys = outparts[:-1]
 
-            print("abs_out:", abs_out)
-            print("abs2meta_out.keys()", abs2meta_out.keys())
-
             for abs_in in allprocs_prom2abs_list_in[prom_in]:
                 inparts = abs_in.split('.')
                 in_subsys = inparts[:-1]
@@ -489,46 +483,15 @@ class Group(System):
                                        (self.pathname, prom_out, prom_in))
 
                 if abs_in in abs2meta_in:
-                    meta_in = abs2meta_in[abs_in]
+                    meta = abs2meta_in[abs_in]
                     if src_indices is not None:
-                        if meta_in['src_indices'] is not None:
+                        if meta['src_indices'] is not None:
                             raise RuntimeError("%s: src_indices has been defined "
                                                "in both connect('%s', '%s') "
                                                "and add_input('%s', ...)." %
                                                (self.pathname, prom_out,
                                                 prom_in, prom_in))
-                        meta_in['src_indices'] = np.atleast_1d(src_indices)
-
-                        if abs_out in abs2meta_out:
-                            meta_out = abs2meta_out[abs_out]
-                            print()
-                            print("meta_out:", meta_out)
-                            print()
-
-                            if meta_out['value'][src_indices].shape != meta_in['shape']:
-                                raise ValueError("The source and target shapes do not match for the connection "
-                                                 "'%s' to '%s' in Group '%s'.  Expected %s but got %s." %
-                                                 (prom_out, prom_in, self.pathname,
-                                                  meta_in['shape'], meta_out['value'][src_indices].shape))
-                            # print('check',abs_in, meta_out['value'], meta_in['shape'], src_indices)
-                            # val, shape = ensure_compatible(abs_in, meta_out['value'], meta_in['shape'], src_indices)
-                            # print('val:', val, 'shape:', shape)
-
-                    # elif abs_out in abs2meta_out:
-                    #     meta_out = abs2meta_out[abs_out]
-                    #     print()
-                    #     print("meta_out:", meta_out)
-                    #     print()
-                    # 
-                    #     if meta_out['shape'] != meta_in['shape']:
-                    #         raise ValueError("The source and target shapes do not match for the connection "
-                    #                          "'%s' to '%s' in Group '%s'.  Expected %s but got %s." %
-                    #                          (prom_out, prom_in, self.pathname,
-                    #                           meta_in['shape'], meta_out['value'][src_indices].shape))
-
-                        # print('check',abs_in, meta_out['value'], meta_in['shape'])
-                        # val, shape = ensure_compatible(abs_in, meta_out['value'], meta_in['shape'])
-                        # print('val:', val, 'shape:', shape)
+                        meta['src_indices'] = np.atleast_1d(src_indices)
 
                 abs_in2out[abs_in] = abs_out
 
@@ -537,12 +500,16 @@ class Group(System):
                     new_conns[inparts[nparts]][abs_in] = abs_out
 
         # Now that both implicit & explicit connections have been added,
-        # check unit compatibility, but only for connections that are either
-        # owned by (implicit) or declared by (explicit) this Group.
+        # check unit/shape compatibility, but only for connections that are
+        # either owned by (implicit) or declared by (explicit) this Group.
         # This way, we don't repeat the error checking in multiple groups
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
         allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
+        print()
+        print('abs_in2out:', abs_in2out)
+        print()
         for abs_in, abs_out in iteritems(abs_in2out):
+            # check unit compatibility
             out_units = allprocs_abs2meta_out[abs_out]['units']
             in_units = allprocs_abs2meta_in[abs_in]['units']
 
@@ -560,6 +527,39 @@ class Group(System):
                 warnings.warn("Input '%s' with units of '%s' is "
                               "connected to output '%s' which has "
                               "no units." % (abs_in, in_units, abs_out))
+
+            # check shape compatibility
+            if abs_in in abs2meta_in and abs_out in abs2meta_out:
+                out_shape = abs2meta_out[abs_out]['shape']
+                in_shape = abs2meta_in[abs_in]['shape']
+                src_indices = abs2meta_in[abs_in].get('src_indices')
+                prom_out = self._var_abs2prom['output'][abs_out]
+                prom_in = self._var_abs2prom['input'][abs_in]
+                print('======================================')
+                print(abs_out, "==>", abs_in)
+                print('out %s:' % abs_out, abs2meta_out[abs_out])
+                print('inp %s:' % abs_in, abs2meta_in[abs_in])
+
+                if src_indices is None and out_shape != in_shape:
+                    raise ValueError("The source and target shapes do not match for the connection "
+                                     "'%s' to '%s' in Group '%s'.  Expected %s but got %s." %
+                                     (prom_out, prom_in, self.pathname, in_shape, out_shape))
+
+                if src_indices is not None:
+                    out_value = abs2meta_out[abs_out]['value']
+                    print('-------------')
+                    print(abs_out, 'value:', out_value)
+                    print('-------------')
+                    for idx in src_indices:
+                        print('index shape:', idx.shape)
+                        print('index:', idx,)
+                        if idx.shape != in_shape:
+                            msg = ("The source index %s does not specify a valid shape for "
+                                   "the connection '%s' to '%s' in Group '%s'. Expected "
+                                   "index with shape %s but got %s.")
+                            raise ValueError(msg % (idx, prom_out, prom_in, self.pathname,
+                                                    in_shape, idx.shape))
+                        print('value:', out_value[idx])
 
         # Recursion
         if recurse:
