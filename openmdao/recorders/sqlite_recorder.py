@@ -506,7 +506,7 @@ class SqliteRecorder(BaseRecorder):
             The System that would like to record its metadata.
         """
 
-        return # qqq
+        # return # qqq
 
 
         scaling_factors = pickle.dumps(object_requesting_recording._scaling_vecs,
