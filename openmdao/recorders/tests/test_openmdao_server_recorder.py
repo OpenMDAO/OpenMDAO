@@ -804,5 +804,321 @@ class TestServerRecorder(unittest.TestCase):
         for o in expected_solver_output:
             self.assert_array_close(o, solver_iteration['solver_output'])
 
+    def test_record_solver_linear_petsc_ksp(self, m):
+        self.setup_endpoints(m)
+        recorder = OpenMDAOServerRecorder(self._accepted_token)
+        self.setup_sellar_model()
+
+        self.prob.model.nonlinear_solver = NewtonSolver()
+        # used for analytic derivatives
+        self.prob.model.nonlinear_solver.linear_solver = PetscKSP()
+
+        recorder.options['record_abs_error'] = True
+        recorder.options['record_rel_error'] = True
+        recorder.options['record_solver_output'] = True
+        recorder.options['record_solver_residuals'] = True
+        self.prob.model.nonlinear_solver.linear_solver.add_recorder(recorder)
+
+        self.prob.setup(check=False)
+        t0, t1 = run_driver(self.prob)
+
+        solver_iteration = json.loads(self.solver_iterations)
+
+        expected_solver_output = [
+            {'name': 'px.x', 'values': [0.0]},
+            {'name': 'pz.z', 'values': [0.0, 0.0]},
+            {'name': 'd1.y1', 'values': [-7.86357118e-07]},
+            {'name': 'd2.y2', 'values': [0.00177091]},
+            {'name': 'obj_cmp.obj', 'values': [0.70719095]},
+            {'name': 'con_cmp1.con1', 'values': [-0.70702038]},
+            {'name': 'con_cmp2.con2', 'values': [3.93178559e-06]},
+        ]
+
+        self.assertAlmostEqual(0.0, solver_iteration['abs_err'])
+        self.assertAlmostEqual(0.0, solver_iteration['rel_err'])
+        
+        for o in expected_solver_output:
+            self.assert_array_close(o, solver_iteration['solver_output'])
+
+    def test_record_solver_linear_block_gs(self, m):
+        self.setup_endpoints(m)
+        recorder = OpenMDAOServerRecorder(self._accepted_token)
+        self.setup_sellar_model()
+
+        self.prob.model.nonlinear_solver = NewtonSolver()
+        # used for analytic derivatives
+        self.prob.model.nonlinear_solver.linear_solver = LinearBlockGS()
+
+        recorder.options['record_abs_error'] = True
+        recorder.options['record_rel_error'] = True
+        recorder.options['record_solver_output'] = True
+        recorder.options['record_solver_residuals'] = True
+        self.prob.model.nonlinear_solver.linear_solver.add_recorder(recorder)
+
+        self.prob.setup(check=False)
+        t0, t1 = run_driver(self.prob)
+
+        solver_iteration = json.loads(self.solver_iterations)
+        expected_abs_error = 9.109083208861876e-11
+        expected_rel_error = 9.114367543620551e-12
+
+        expected_solver_output = [
+            {'name': 'px.x', 'values': [0.0]},
+            {'name': 'pz.z', 'values': [0.0, 0.0]},
+            {'name': 'd1.y1', 'values': [0.00045069]},
+            {'name': 'd2.y2', 'values': [-0.00225346]},
+            {'name': 'obj_cmp.obj', 'values': [0.00045646]},
+            {'name': 'con_cmp1.con1', 'values': [-0.00045069]},
+            {'name': 'con_cmp2.con2', 'values': [-0.00225346]},
+        ]
+
+        self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
+        self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
+
+        for o in expected_solver_output:
+            self.assert_array_close(o, solver_iteration['solver_output'])
+
+    def test_record_solver_linear_linear_run_once(self, m):
+        self.setup_endpoints(m)
+        recorder = OpenMDAOServerRecorder(self._accepted_token)
+        # raise unittest.SkipTest("Linear Solver recording not working yet")
+        self.setup_sellar_model()
+
+        self.prob.model.nonlinear_solver = NewtonSolver()
+        # used for analytic derivatives
+        self.prob.model.nonlinear_solver.linear_solver = LinearRunOnce()
+
+        recorder.options['record_abs_error'] = True
+        recorder.options['record_rel_error'] = True
+        recorder.options['record_solver_output'] = True
+        recorder.options['record_solver_residuals'] = True
+        self.prob.model.nonlinear_solver.linear_solver.add_recorder(recorder)
+
+        self.prob.setup(check=False)
+        t0, t1 = run_driver(self.prob)
+
+        solver_iteration = json.loads(self.solver_iterations)
+        expected_abs_error = 0.0
+        expected_rel_error = 0.0
+
+        expected_solver_output = [
+            {'name': 'px.x', 'values': [0.0]},
+            {'name': 'pz.z', 'values': [0.0, 0.0]},
+            {'name': 'd1.y1', 'values': [-4.15366975e-05]},
+            {'name': 'd2.y2', 'values': [-4.10568454e-06]},
+            {'name': 'obj_cmp.obj', 'values': [-4.15366737e-05]},
+            {'name': 'con_cmp1.con1', 'values': [4.15366975e-05]},
+            {'name': 'con_cmp2.con2', 'values': [-4.10568454e-06]},
+        ]
+
+        self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
+        self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
+
+        for o in expected_solver_output:
+            self.assert_array_close(o, solver_iteration['solver_output'])
+
+    def test_record_solver_linear_block_jac(self, m):
+        self.setup_endpoints(m)
+        recorder = OpenMDAOServerRecorder(self._accepted_token)
+        self.setup_sellar_model()
+
+        self.prob.model.nonlinear_solver = NewtonSolver()
+        # used for analytic derivatives
+        self.prob.model.nonlinear_solver.linear_solver = LinearBlockJac()
+
+        recorder.options['record_abs_error'] = True
+        recorder.options['record_rel_error'] = True
+        recorder.options['record_solver_output'] = True
+        recorder.options['record_solver_residuals'] = True
+        self.prob.model.nonlinear_solver.linear_solver.add_recorder(recorder)
+
+        self.prob.setup(check=False)
+        t0, t1 = run_driver(self.prob)
+
+        solver_iteration = json.loads(self.solver_iterations)
+        expected_abs_error = 9.947388408259769e-11
+        expected_rel_error = 4.330301334141486e-08
+
+        expected_solver_output = [
+            {'name': 'px.x', 'values': [0.0]},
+            {'name': 'pz.z', 'values': [0.0, 0.0]},
+            {'name': 'd1.y1', 'values': [4.55485639e-09]},
+            {'name': 'd2.y2', 'values': [-2.27783334e-08]},
+            {'name': 'obj_cmp.obj', 'values': [-2.28447051e-07]},
+            {'name': 'con_cmp1.con1', 'values': [2.28461863e-07]},
+            {'name': 'con_cmp2.con2', 'values': [-2.27742837e-08]},
+        ]
+
+        self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
+        self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
+
+        for o in expected_solver_output:
+            self.assert_array_close(o, solver_iteration['solver_output'])
+
+    def test_record_driver_system_solver(self, m):
+        # Test what happens when all three types are recorded:
+        #    Driver, System, and Solver
+        self.setup_endpoints(m)
+        recorder = OpenMDAOServerRecorder(self._accepted_token)
+        if OPT is None:
+            raise unittest.SkipTest("pyoptsparse is not installed")
+
+        if OPTIMIZER is None:
+            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
+
+        self.setup_sellar_grouped_model()
+
+        self.prob.driver = pyOptSparseDriver()
+        self.prob.driver.options['optimizer'] = OPTIMIZER
+        self.prob.driver.opt_settings['ACC'] = 1e-9
+
+        recorder.options['record_metadata'] = True
+
+        # Add recorders
+        # Driver
+        self.prob.driver.add_recorder(recorder)
+        # System
+        pz = self.prob.model.get_subsystem('pz')  # IndepVarComp which is an ExplicitComponent
+        pz.add_recorder(recorder)
+        # Solver
+        mda = self.prob.model.get_subsystem('mda')
+        mda.nonlinear_solver.add_recorder(recorder)
+
+        # Driver
+        recorder.options['record_desvars'] = True
+        recorder.options['record_responses'] = True
+        recorder.options['record_objectives'] = True
+        recorder.options['record_constraints'] = True
+
+        # System
+        recorder.options['record_inputs'] = True
+        recorder.options['record_outputs'] = True
+        recorder.options['record_residuals'] = True
+
+        # Solver
+        recorder.options['record_abs_error'] = True
+        recorder.options['record_rel_error'] = True
+        recorder.options['record_solver_output'] = True
+        recorder.options['record_solver_residuals'] = True
+
+        self.prob.setup(check=False, mode='rev')
+        t0, t1 = run_driver(self.prob)
+        self.prob.cleanup()
+
+        # Driver recording test
+        coordinate = [0, 'SLSQP', (7, )]
+
+        expected_desvars = [
+            {'name': 'pz.z', 'values': self.prob['pz.z']},
+            {'name': 'px.x', 'values': self.prob['px.x']}
+        ]
+
+        expected_objectives = [
+            {'name': 'obj_cmp.obj', 'values': self.prob['obj_cmp.obj']}
+        ]
+
+        expected_constraints = [
+            {'name': 'con_cmp1.con1', 'values': self.prob['con_cmp1.con1']},
+            {'name': 'con_cmp2.con2', 'values': self.prob['con_cmp2.con2']}
+        ]
+
+        driver_iteration_data = json.loads(self.driver_iteration_data)
+
+        for d in expected_desvars:
+            self.assert_array_close(d, driver_iteration_data['desvars'])
+
+        for o in expected_objectives:
+            self.assert_array_close(o, driver_iteration_data['objectives'])
+
+        for c in expected_constraints:
+            self.assert_array_close(c, driver_iteration_data['constraints'])
+
+        # System recording test
+        expected_inputs = []
+        expected_outputs = [{'name': 'pz.z', 'values': [1.97764, -1.13287e-15]}]
+        expected_residuals = [{'name': 'pz.z', 'values': [0.0, 0.0]}]
+
+        system_iteration = json.loads(self.system_iterations)
+
+        self.assertEqual(expected_inputs, system_iteration['inputs'])
+
+        for o in expected_outputs:
+            self.assert_array_close(o, system_iteration['outputs'])
+
+        for r in expected_residuals:
+            self.assert_array_close(r, system_iteration['residuals'])
+
+        # Solver recording test
+        expected_abs_error = 3.90598e-11
+        expected_rel_error = 1.037105199e-6
+
+        expected_solver_output = [
+            {'name': 'mda.d2.y2', 'values': [3.75527777]},
+            {'name': 'mda.d1.y1', 'values': [3.16]}
+        ]
+
+        expected_solver_residuals = [
+            {'name': 'mda.d2.y2', 'values': [3.7552777]},
+            {'name': 'mda.d1.y1', 'values': [3.160000]}
+        ]
+
+        solver_iteration = json.loads(self.solver_iterations)
+
+        self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
+        self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
+
+        for o in expected_solver_output:
+            self.assert_array_close(o, solver_iteration['solver_output'])
+
+        for r in expected_solver_residuals:
+            self.assert_array_close(r, solver_iteration['solver_residuals'])
+
+    def test_implicit_component(self, m):
+        self.setup_endpoints(m)
+        recorder = OpenMDAOServerRecorder(self._accepted_token)
+        from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
+        group = Group()
+        group.add_subsystem('comp1', IndepVarComp([('a', 1.0), ('b', 1.0), ('c', 1.0)]))
+        group.add_subsystem('comp2', QuadraticLinearize())
+        group.add_subsystem('comp3', QuadraticJacVec())
+        group.connect('comp1.a', 'comp2.a')
+        group.connect('comp1.b', 'comp2.b')
+        group.connect('comp1.c', 'comp2.c')
+        group.connect('comp1.a', 'comp3.a')
+        group.connect('comp1.b', 'comp3.b')
+        group.connect('comp1.c', 'comp3.c')
+
+        prob = Problem(model=group)
+        prob.setup(check=False)
+
+        prob['comp1.a'] = 1.
+        prob['comp1.b'] = -4.
+        prob['comp1.c'] = 3.
+
+        comp2 = prob.model.get_subsystem('comp2')  # ImplicitComponent
+        comp2.add_recorder(recorder)
+
+        t0, t1 = run_driver(prob)
+        prob.cleanup()
+
+        expected_inputs = [
+            {'name': 'comp2.a', 'values': [1.0]},
+            {'name': 'comp2.b', 'values': [-4.0]},
+            {'name': 'comp2.c', 'values': [3.0]}
+        ]
+        expected_outputs = [{'name': 'comp2.x', 'values': [3.0]}]
+        expected_residuals= [{'name': 'comp2.x', 'values': [0.0]}]
+
+        system_iteration = json.loads(self.system_iterations)
+
+        for i in expected_inputs:
+            self.assert_array_close(i, system_iteration['inputs'])
+        
+        for r in expected_residuals:
+            self.assert_array_close(r, system_iteration['residuals'])
+
+        for o in expected_outputs:
+            self.assert_array_close(o, system_iteration['outputs'])
+
 if __name__ == "__main__":
     unittest.main()
