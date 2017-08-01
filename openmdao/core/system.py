@@ -547,10 +547,8 @@ class System(object):
                         vec_class = multi_vector_class
                         idxs = vois[vec_name]['indices']
                         if idxs is None:
-                            if vector_class in (DefaultMultiVector, PETScMultiVector):
+                            if vec_class in (DefaultMultiVector, PETScMultiVector):
                                 ncol = vois[vec_name]['size']
-                            else:
-                                ncol = 1
                         else:
                             ncol = len(idxs)
                 for key in ['input', 'output', 'residual']:

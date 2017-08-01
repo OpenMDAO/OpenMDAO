@@ -206,7 +206,7 @@ class Vector(object):
             instance of the clone; the data is copied.
         """
         vec = self.__class__(self._name, self._typ, self._system, self._root_vector,
-                             alloc_complex=self._alloc_complex)
+                             alloc_complex=self._alloc_complex, ncol=self._ncol)
         vec._clone_data()
         if initialize_views:
             vec._initialize_views()
