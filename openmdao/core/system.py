@@ -537,7 +537,7 @@ class System(object):
             # If any subsystem needs complex step, then we need to allocate it everywhere.
             nl_alloc_complex = force_alloc_complex
             for sub in self.system_iter(include_self=True, recurse=True):
-                nl_alloc_complex = 'cs' in sub._approx_schemes
+                nl_alloc_complex |= 'cs' in sub._approx_schemes
                 if nl_alloc_complex:
                     break
 
