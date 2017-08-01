@@ -121,39 +121,24 @@ class TestCheckConfig(unittest.TestCase):
 
     def test_out_of_order_repeat_bug(self):
         p = Problem(model=Group())
-        root = p.model
+        indep = p.model.add_subsystem("indep", IndepVarComp('x', 1.0))
+        C1 = p.model.add_subsystem("C1", ExecComp(["y = 2.0*a", "z = 3.0*b"]))
+        C2 = p.model.add_subsystem("C2", ExecComp("y = 2.0*a"))
 
-        indep = root.add_subsystem("indep", IndepVarComp('x', 1.0))
-
-        G1 = root.add_subsystem("G1", Group())
-
-        C1 = G1.add_subsystem("C1", MyComp())
-        C2 = G1.add_subsystem("C2", MyComp())
-
-        C3 = root.add_subsystem("C3", ExecComp(["y = 2.0*a", "z = 3.0*b", "x = 5.0*c"]))
-        C4 = root.add_subsystem("C4", MyComp())
-
-        root.connect("C4.y", "G1.C2.a")
-        root.connect("C4.y", "C3.a")
-        root.connect("C4.z", "C3.c")
-        root.connect("G1.C2.y", "G1.C1.a")
-        root.connect("G1.C1.y", "C4.a")
+        # create 2 out of order connections from C2 to C1
+        p.model.connect("C2.y", "C1.a")
+        p.model.connect("C2.y", "C1.b")
 
         # make sure no system has dangling inputs so we avoid that warning
-        root.connect("indep.x", "G1.C1.b")
-        root.connect("indep.x", "G1.C2.b")
-        root.connect("indep.x", "C3.b")
-        root.connect("indep.x", "C4.b")
+        p.model.connect("indep.x", "C2.a")
 
         testlogger = TestLogger()
         p.setup(logger=testlogger)
 
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 3)
+        self.assertEqual(len(warnings), 1)
 
-        self.assertEqual(warnings[0], "Group '' has the following cycles: [['C4', 'G1']]")
-        self.assertEqual(warnings[1], "System 'C3' executes out-of-order with respect to its source systems ['C4']")
-        self.assertEqual(warnings[2], "System 'G1.C1' executes out-of-order with respect to its source systems ['G1.C2']")
+        self.assertEqual(warnings[0], "System 'C1' executes out-of-order with respect to its source systems ['C2']")
 
     def test_multi_cycles(self):
         p = Problem(model=Group())
