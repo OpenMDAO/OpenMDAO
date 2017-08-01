@@ -94,7 +94,6 @@ class DefaultVector(Vector):
         system = self._system
         type_ = self._typ
         iproc = self._iproc
-        ncol = self._ncol
 
         sizes_byset_t = system._var_sizes_byset[type_]
 
@@ -102,7 +101,7 @@ class DefaultVector(Vector):
         indices = {}
         for set_name in system._var_set2iset[type_]:
             size = np.sum(sizes_byset_t[set_name][iproc, :])
-            data[set_name] = np.zeros((size, ncol)) if ncol > 1 else np.zeros(size)
+            data[set_name] = np.zeros(size)
             indices[set_name] = np.zeros(size, int)
 
         sizes_t = system._var_sizes[type_]
@@ -119,6 +118,7 @@ class DefaultVector(Vector):
             idx = allprocs_abs2idx_t[abs_name]
             ind1 = np.sum(sizes_t[iproc, :idx])
             ind2 = np.sum(sizes_t[iproc, :idx + 1])
+
             indices[set_name][ind_byset1:ind_byset2] = np.arange(ind1, ind2)
 
         return data, indices

@@ -159,6 +159,7 @@ class DecoupledTestCase(unittest.TestCase):
     def setup_model(self):
         asize = self.asize
         prob = Problem()
+        #import wingdbstub
         root = prob.model
         root.linear_solver = LinearBlockGS()
 
