@@ -483,6 +483,7 @@ class Group(System):
                                        (self.pathname, prom_out, prom_in))
 
                 if src_indices is not None and abs_in in abs2meta_in:
+                    meta = abs2meta_in[abs_in]
                     if meta['src_indices'] is not None:
                         raise RuntimeError("%s: src_indices has been defined "
                                            "in both connect('%s', '%s') "
@@ -539,31 +540,60 @@ class Group(System):
                 print('inp %s:' % abs_in, abs2meta_in[abs_in])
 
                 if src_indices is None and out_shape != in_shape:
-                    raise ValueError("The source and target shapes do not match for the connection "
-                                     "'%s' to '%s' in Group '%s'.  Expected %s but got %s." %
-                                     (prom_out, prom_in, self.pathname, in_shape, out_shape))
+                    raise ValueError("The source and target shapes do not match"
+                                     " for the connection '%s' to '%s' in Group"
+                                     " '%s'.  Expected %s but got %s." %
+                                     (prom_out, prom_in, self.pathname,
+                                      in_shape, out_shape))
 
                 if src_indices is not None:
+                    src_indices = np.atleast_1d(src_indices)
                     out_value = abs2meta_out[abs_out]['value']
                     print('-------------')
+                    print('src_indices:', src_indices.shape, '\n', src_indices)
                     print(abs_out, 'value:', out_value)
                     print('-------------')
-                    for idx in src_indices:
-                        print('index shape:', idx.shape)
-                        print('index:', idx,)
-                        if idx.shape != in_shape:
-                            msg = ("The source index %s does not specify a valid shape for "
-                                   "the connection '%s' to '%s' in Group '%s'. Expected "
-                                   "index with shape %s but got %s.")
-                            raise ValueError(msg % (idx, prom_out, prom_in, self.pathname,
-                                                    in_shape, idx.shape))
+                    if len(src_indices.shape) == 1:
+                        print('1d index', src_indices.shape, in_shape)
+                        if src_indices.shape != in_shape:
+                            msg = ("The source index %s does not specify a "
+                                   "valid shape for the connection '%s' to "
+                                   "'%s' in Group '%s'. Expected index with "
+                                   "shape %s but got %s.")
+                            raise ValueError(msg % (src_indices, prom_out, prom_in,
+                                                    self.pathname,
+                                                    in_shape, src_indices.shape))
+                    else:
+                        for idx in src_indices:
+                            print('index shape:', idx.shape)
+                            print('index:', idx,)
+                            if idx.shape != in_shape:
+                                msg = ("The source index %s does not specify a "
+                                       "valid shape for the connection '%s' to "
+                                       "'%s' in Group '%s'. Expected index with "
+                                       "shape %s but got %s.")
+                                raise ValueError(msg % (idx, prom_out, prom_in,
+                                                        self.pathname,
+                                                        in_shape, idx.shape))
+                            for d1, d2 in zip(idx, out_shape):
+                                print('checking', d1, d2)
+                                if abs(d1) > (d2 - 1):
+                                    msg = ("The source index %s does not specify a "
+                                           "valid index for the connection '%s' to "
+                                           "'%s' in Group '%s'. It is out of range "
+                                           "for source shape of %s.")
+                                    raise ValueError(msg % (idx, prom_out, prom_in,
+                                                            self.pathname, out_shape))
+
                         print('value:', out_value[idx])
+
 
         # Recursion
         if recurse:
             for subsys in self._subsystems_myproc:
                 if subsys.name in new_conns:
-                    subsys._setup_global_connections(recurse=recurse, conns=new_conns[subsys.name])
+                    subsys._setup_global_connections(recurse=recurse,
+                                                     conns=new_conns[subsys.name])
                 else:
                     subsys._setup_global_connections(recurse=recurse)
 

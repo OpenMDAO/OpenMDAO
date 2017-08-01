@@ -501,9 +501,9 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('C1', ExecComp('y=numpy.sum(x)*2.0', x=np.zeros((2,2))))
 
         # connect C1.x to entries (0,0), (-1,1), (2,1), (1,1) of indep.x
-        p.model.connect('indep.x', 'C1.x', src_indices=[(1,1)])
-                        # src_indices=[[(0,0), (-1,1)],
-                        #              [(2,1), (1,1)]])
+        p.model.connect('indep.x', 'C1.x',
+                        src_indices=[[(0,0), (-1,1)],
+                                     [(2,1), (1,1)]])
 
         p.set_solver_print(level=0)
         p.setup()
@@ -844,13 +844,6 @@ class TestGroup(unittest.TestCase):
 
 
 class TestConnect(unittest.TestCase):
-    class ArrayComp(ExplicitComponent):
-        def setup(self):
-            self.add_input('inp', val=np.ones((2)))
-            self.add_output('out', val=np.zeros((2)))
-
-        def compute(self, inputs, outputs):
-            outputs['out'] = inputs['inp'] * 2.
 
     def setUp(self):
         prob = Problem(Group())
@@ -863,7 +856,7 @@ class TestConnect(unittest.TestCase):
 
         sub.add_subsystem('tgt', ExecComp('y = x'))
         sub.add_subsystem('cmp', ExecComp('z = x'))
-        sub.add_subsystem('arr', self.ArrayComp())
+        sub.add_subsystem('arr', ExecComp('a = x', x=np.zeros(2)))
 
         self.sub = sub
         self.prob = prob
@@ -1053,24 +1046,25 @@ class TestConnect(unittest.TestCase):
         assert_rel_error(self, prob['G1.par1.c4.y'], 8.0)
 
     def test_bad_shapes(self):
-        self.sub.connect('src.s', 'arr.inp')
+        self.sub.connect('src.s', 'arr.x')
 
-        msg = ("The source and target shapes do not match for the connection " 
-               "'src.s' to 'arr.inp' in Group 'sub'.")
+        msg = ("The source and target shapes do not match for the connection "
+               "'src.s' to 'arr.x' in Group 'sub'.")
 
         with assertRaisesRegex(self, ValueError, msg):
             self.prob.setup(check=False)
 
     def test_bad_indices_shape(self):
         p = Problem()
-        p.model.add_subsystem('indep', IndepVarComp('x', np.arange(12).reshape((4,3))))
+        p.model.add_subsystem('IV', IndepVarComp('x', np.arange(12).reshape((4,3))))
         p.model.add_subsystem('C1', ExecComp('y=numpy.sum(x)*2.0', x=np.zeros((2,2))))
 
-        p.model.connect('indep.x', 'C1.x', src_indices=[(1, 1)])
+        p.model.connect('IV.x', 'C1.x', src_indices=[(1, 1)])
 
         msg = ("The source index [1 1] does not specify a valid shape for "
-               "the connection 'indep.x' to 'C1.x' in Group ''. Expected "
+               "the connection 'IV.x' to 'C1.x' in Group ''. Expected "
                "index with shape (2, 2) but got (2,).")
+
         try:
             p.setup()
         except Exception as err:
@@ -1080,21 +1074,19 @@ class TestConnect(unittest.TestCase):
 
     def test_bad_indices_index(self):
         # the index value within src_indices is outside the valid range for the source
-        msg = ("The index value for src_indices is outside the valid range for the connection " 
-               "'src.s' to 'arr.inp' in Group 'sub'.")
+        self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1), (4, 4)])
 
-        with assertRaisesRegex(self, NameError, msg):
-            self.sub.connect('src.x', 'tgt.x', src_indices=[(4,4)])
+        msg = ("The source index [4 4] does not specify a "
+               "valid index for the connection 'src.x' to "
+               "'arr.x' in Group 'sub'. It is out of range "
+               "for source shape of (5, 3).")
+
+        try:
             self.prob.setup(check=False)
-
-    def test_bad_indices_index2d(self):
-        # the index value within src_indices is outside the valid range for the source
-        msg = ("The index value for src_indices is outside the valid range for the connection " 
-               "'src.s' to 'arr.inp' in Group 'sub'.")
-
-        with assertRaisesRegex(self, NameError, msg):
-            self.sub.connect('src.x', 'tgt.x', src_indices=[6])
-            self.prob.setup(check=False)
+        except Exception as err:
+            self.assertEqual(str(err), msg)
+        else:
+            self.fail('Exception expected.')
 
 
 if __name__ == "__main__":
