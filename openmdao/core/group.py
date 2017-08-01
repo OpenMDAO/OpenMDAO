@@ -482,16 +482,14 @@ class Group(System):
                                        "for connection in '%s' from '%s' to '%s'." %
                                        (self.pathname, prom_out, prom_in))
 
-                if abs_in in abs2meta_in:
-                    meta = abs2meta_in[abs_in]
-                    if src_indices is not None:
-                        if meta['src_indices'] is not None:
-                            raise RuntimeError("%s: src_indices has been defined "
-                                               "in both connect('%s', '%s') "
-                                               "and add_input('%s', ...)." %
-                                               (self.pathname, prom_out,
-                                                prom_in, prom_in))
-                        meta['src_indices'] = np.atleast_1d(src_indices)
+                if src_indices is not None and abs_in in abs2meta_in:
+                    if meta['src_indices'] is not None:
+                        raise RuntimeError("%s: src_indices has been defined "
+                                           "in both connect('%s', '%s') "
+                                           "and add_input('%s', ...)." %
+                                           (self.pathname, prom_out,
+                                            prom_in, prom_in))
+                    meta['src_indices'] = np.atleast_1d(src_indices)
 
                 abs_in2out[abs_in] = abs_out
 
