@@ -15,6 +15,7 @@ from openmdao.recorders.base_recorder import BaseRecorder
 from openmdao.solvers.solver import Solver, NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import \
     get_formatted_iteration_coordinate, recording_iteration_stack
+from openmdao.utils.mpi import MPI
 
 
 def array_to_blob(array):
@@ -66,6 +67,11 @@ class SqliteRecorder(BaseRecorder):
         """
         super(SqliteRecorder, self).__init__()
 
+        if MPI and MPI.COMM_WORLD.rank > 0:
+            self._open_close_sqlite = False
+        else:
+            self._open_close_sqlite = True
+
         self.model_viewer_data = None
 
         # isolation_level=None causes autocommit
@@ -73,29 +79,32 @@ class SqliteRecorder(BaseRecorder):
 
         self.cursor = self.con.cursor()
 
-        self.cursor.execute("CREATE TABLE metadata( format_version INT)")
-        self.cursor.execute("INSERT INTO metadata(format_version) VALUES(?)", (format_version,))
+        if self._open_close_sqlite:
+            self.cursor.execute("CREATE TABLE metadata( format_version INT)")
+            self.cursor.execute("INSERT INTO metadata(format_version) VALUES(?)", (format_version,))
 
-        # used to keep track of the order of the case records across all three tables
-        self.cursor.execute("CREATE TABLE global_iterations(id INTEGER PRIMARY KEY, "
-                            "record_type TEXT, rowid INT)")
-        self.cursor.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, counter INT,"
-                            "iteration_coordinate TEXT, timestamp REAL, success INT, msg TEXT, "
-                            "desvars BLOB, responses BLOB, objectives BLOB, constraints BLOB)")
-        self.cursor.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, counter INT, "
-                            "iteration_coordinate TEXT,  timestamp REAL, success INT, msg TEXT, "
-                            "inputs BLOB, outputs BLOB, residuals BLOB)")
-        self.cursor.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, counter INT, "
-                            "iteration_coordinate TEXT, timestamp REAL, success INT, msg TEXT, "
-                            "abs_err REAL, rel_err REAL, solver_output BLOB, "
-                            "solver_residuals BLOB)")
+            # used to keep track of the order of the case records across all three tables
+            self.cursor.execute("CREATE TABLE global_iterations(id INTEGER PRIMARY KEY, "
+                                "record_type TEXT, rowid INT)")
+            self.cursor.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
+                                "counter INT,iteration_coordinate TEXT, timestamp REAL, "
+                                "success INT, msg TEXT, desvars BLOB, responses BLOB, "
+                                "objectives BLOB, constraints BLOB)")
+            self.cursor.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
+                                "counter INT, iteration_coordinate TEXT,  timestamp REAL, "
+                                "success INT, msg TEXT, inputs BLOB, outputs BLOB, "
+                                "residuals BLOB)")
+            self.cursor.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, "
+                                "counter INT, iteration_coordinate TEXT, timestamp REAL, "
+                                "success INT, msg TEXT, abs_err REAL, rel_err REAL, "
+                                "solver_output BLOB, solver_residuals BLOB)")
 
-        self.cursor.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
-                            "model_viewer_data BLOB)")
-        self.cursor.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY,"
-                            " scaling_factors BLOB)")
-        self.cursor.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, solver_options BLOB,"
-                            " solver_class TEXT)")
+            self.cursor.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
+                                "model_viewer_data BLOB)")
+            self.cursor.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY,"
+                                " scaling_factors BLOB)")
+            self.cursor.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
+                                "solver_options BLOB, solver_class TEXT)")
 
     def record_iteration(self, object_requesting_recording, metadata, **kwargs):
         """
@@ -144,10 +153,7 @@ class SqliteRecorder(BaseRecorder):
         #                                      ('throughput', 'f')], (2,))
         #                       ])
 
-        desvars_array = None
-        responses_array = None
-        objectives_array = None
-        constraints_array = None
+        super(SqliteRecorder, self).record_iteration_driver(object_requesting_recording, metadata)
 
         # Just an example of the syntax for creating a numpy structured array
         # arr = np.zeros((1,), dtype=[('dv_x','(5,)f8'),('dv_y','(10,)f8')])
@@ -155,89 +161,67 @@ class SqliteRecorder(BaseRecorder):
         # This returns a dict of names and values. Use this to build up the tuples of
         # used for the dtypes in the creation of the numpy structured array
         # we want to write to sqlite
-        if self.options['record_desvars']:
-            if self._filtered_driver:
-                desvars_values = \
-                    object_requesting_recording.get_design_var_values(self._filtered_driver['des'])
-            else:
-                desvars_values = object_requesting_recording.get_design_var_values()
+        if self._desvars_values:
+            dtype_tuples = []
+            for name, value in iteritems(self._desvars_values):
+                tple = (name, '{}f8'.format(value.shape))
+                dtype_tuples.append(tple)
 
-            if desvars_values:
-                dtype_tuples = []
-                for name, value in iteritems(desvars_values):
-                    tple = (name, '{}f8'.format(value.shape))
-                    dtype_tuples.append(tple)
+            desvars_array = np.zeros((1,), dtype=dtype_tuples)
 
-                desvars_array = np.zeros((1,), dtype=dtype_tuples)
+            for name, value in iteritems(self._desvars_values):
+                desvars_array[name] = value
+        else:
+            desvars_array = None
 
-                for name, value in iteritems(desvars_values):
-                    desvars_array[name] = value
+        if self._responses_values:
+            dtype_tuples = []
+            for name, value in iteritems(self._responses_values):
+                tple = (name, '{}f8'.format(value.shape))
+                dtype_tuples.append(tple)
 
-        if self.options['record_responses']:
-            if self._filtered_driver:
-                responses_values = \
-                    object_requesting_recording.get_response_values(self._filtered_driver['res'])
-            else:
-                responses_values = object_requesting_recording.get_response_values()
+            responses_array = np.zeros((1,), dtype=dtype_tuples)
 
-            if responses_values:
-                dtype_tuples = []
-                for name, value in iteritems(responses_values):
-                    tple = (name, '{}f8'.format(value.shape))
-                    dtype_tuples.append(tple)
+            for name, value in iteritems(self._responses_values):
+                responses_array[name] = value
+        else:
+            responses_array = None
 
-                responses_array = np.zeros((1,), dtype=dtype_tuples)
+        if self._objectives_values:
+            dtype_tuples = []
+            for name, value in iteritems(self._objectives_values):
+                tple = (name, '{}f8'.format(value.shape))
+                dtype_tuples.append(tple)
 
-                for name, value in iteritems(responses_values):
-                    responses_array[name] = value
+            objectives_array = np.zeros((1,), dtype=dtype_tuples)
 
-        if self.options['record_objectives']:
-            if self._filtered_driver:
-                objectives_values = \
-                    object_requesting_recording.get_objective_values(self._filtered_driver['obj'])
-            else:
-                objectives_values = object_requesting_recording.get_objective_values()
+            for name, value in iteritems(self._objectives_values):
+                objectives_array[name] = value
+        else:
+            objectives_array = None
 
-            if objectives_values:
-                dtype_tuples = []
-                for name, value in iteritems(objectives_values):
-                    tple = (name, '{}f8'.format(value.shape))
-                    dtype_tuples.append(tple)
+        if self._constraints_values:
+            dtype_tuples = []
+            for name, value in iteritems(self._constraints_values):
+                tple = (name, '{}f8'.format(value.shape))
+                dtype_tuples.append(tple)
 
-                objectives_array = np.zeros((1,), dtype=dtype_tuples)
+            constraints_array = np.zeros((1,), dtype=dtype_tuples)
 
-                for name, value in iteritems(objectives_values):
-                    objectives_array[name] = value
-
-        if self.options['record_constraints']:
-            if self._filtered_driver:
-                constraints_values = \
-                    object_requesting_recording.get_constraint_values(self._filtered_driver['con'])
-            else:
-                constraints_values = object_requesting_recording.get_constraint_values()
-
-            if constraints_values:
-                dtype_tuples = []
-                for name, value in iteritems(constraints_values):
-                    tple = (name, '{}f8'.format(value.shape))
-                    dtype_tuples.append(tple)
-
-                constraints_array = np.zeros((1,), dtype=dtype_tuples)
-
-                for name, value in iteritems(constraints_values):
-                    constraints_array[name] = value
+            for name, value in iteritems(self._constraints_values):
+                constraints_array[name] = value
+        else:
+            constraints_array = None
 
         desvars_blob = array_to_blob(desvars_array)
         responses_blob = array_to_blob(responses_array)
         objectives_blob = array_to_blob(objectives_array)
         constraints_blob = array_to_blob(constraints_array)
 
-        iteration_coordinate = get_formatted_iteration_coordinate()
-
         self.cursor.execute("INSERT INTO driver_iterations(counter, iteration_coordinate, "
                             "timestamp, success, msg, desvars , responses , objectives , "
                             "constraints ) VALUES(?,?,?,?,?,?,?,?,?)",
-                            (self._counter, iteration_coordinate,
+                            (self._counter, self._iteration_coordinate,
                              metadata['timestamp'], metadata['success'],
                              metadata['msg'], desvars_blob,
                              responses_blob, objectives_blob,
@@ -260,99 +244,55 @@ class SqliteRecorder(BaseRecorder):
             '_apply_nonlinear,' '_solve_nonlinear'. Behavior varies based on from which function
             record_iteration was called.
         """
-        print("Recording STACK:", recording_iteration_stack)
-        stack_top = recording_iteration_stack[-1][0]
-        method = stack_top.split('.')[-1]
-        print("METHOD: ", method)
-
-        if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear',
-                          '_solve_nonlinear']:
-            raise ValueError("method must be one of: '_apply_linear, "
-                             "_apply_nonlinear, _solve_linear, _solve_nonlinear'")
-
-        if 'nonlinear' in method:
-            inputs, outputs, residuals = object_requesting_recording.get_nonlinear_vectors()
-        else:
-            inputs, outputs, residuals = object_requesting_recording.get_linear_vectors()
-
-        inputs_array = outputs_array = residuals_array = None
+        super(SqliteRecorder, self).record_iteration_system(object_requesting_recording, metadata)
 
         # Inputs
-        if self.options['record_inputs'] and inputs._names:
-            ins = {}
-            if 'i' in self._filtered_system:
-                # use filtered inputs
-                for inp in self._filtered_system['i']:
-                    if inp in inputs._names:
-                        ins[inp] = inputs._names[inp]
-            else:
-                # use all the inputs
-                ins = inputs._names
-
+        if self._inputs:
             dtype_tuples = []
-            for name, value in iteritems(ins):
-                tple = (name, '({},)f8'.format(len(value)))
+            for name, value in iteritems(self._inputs):
+                tple = (name, '{}f8'.format(value.shape))
                 dtype_tuples.append(tple)
 
             inputs_array = np.zeros((1,), dtype=dtype_tuples)
-            for name, value in iteritems(ins):
+            for name, value in iteritems(self._inputs):
                 inputs_array[name] = value
+        else:
+            inputs_array = None
 
         # Outputs
-        if self.options['record_outputs'] and outputs._names:
-            outs = {}
-
-            if 'o' in self._filtered_system:
-                # use outputs from filtered list.
-                for out in self._filtered_system['o']:
-                    if out in outputs._names:
-                        outs[out] = outputs._names[out]
-            else:
-                # use all the outputs
-                outs = outputs._names
-
+        if self._outputs:
             dtype_tuples = []
-            for name, value in iteritems(outs):
-                tple = (name, '({},)f8'.format(len(value)))
+            for name, value in iteritems(self._outputs):
+                tple = (name, '{}f8'.format(value.shape))
                 dtype_tuples.append(tple)
 
             outputs_array = np.zeros((1,), dtype=dtype_tuples)
-            for name, value in iteritems(outs):
+            for name, value in iteritems(self._outputs):
                 outputs_array[name] = value
+        else:
+            outputs_array = None
 
         # Residuals
-        if self.options['record_residuals'] and residuals._names:
-            resids = {}
-
-            if 'r' in self._filtered_system:
-                # use filtered residuals
-                for res in self._filtered_system['r']:
-                    if res in residuals._names:
-                        resids[res] = residuals._names[res]
-            else:
-                # use all the residuals
-                resids = residuals._names
-
+        if self._resids:
             dtype_tuples = []
-            if resids:
-                for name, value in iteritems(resids):
-                    tple = (name, '({},)f8'.format(len(value)))
-                    dtype_tuples.append(tple)
+            for name, value in iteritems(self._resids):
+                tple = (name, '{}f8'.format(value.shape))
+                dtype_tuples.append(tple)
 
-                residuals_array = np.zeros((1,), dtype=dtype_tuples)
-                for name, value in iteritems(resids):
-                    residuals_array[name] = value
+            residuals_array = np.zeros((1,), dtype=dtype_tuples)
+            for name, value in iteritems(self._resids):
+                residuals_array[name] = value
+        else:
+            residuals_array = None
 
         inputs_blob = array_to_blob(inputs_array)
         outputs_blob = array_to_blob(outputs_array)
         residuals_blob = array_to_blob(residuals_array)
 
-        iteration_coordinate = get_formatted_iteration_coordinate()
-
         self.cursor.execute("INSERT INTO system_iterations(counter, iteration_coordinate, "
                             "timestamp, success, msg, inputs , outputs , residuals ) "
                             "VALUES(?,?,?,?,?,?,?,?)",
-                            (self._counter, iteration_coordinate,
+                            (self._counter, self._iteration_coordinate,
                              metadata['timestamp'], metadata['success'],
                              metadata['msg'], inputs_blob,
                              outputs_blob, residuals_blob))
@@ -376,80 +316,44 @@ class SqliteRecorder(BaseRecorder):
             The relative error of the Solver requesting recording. It is not cached in
             the Solver object, so we pass it in here.
         """
-        outputs_array = residuals_array = None
+        super(SqliteRecorder, self).record_iteration_solver(object_requesting_recording,
+                                                            metadata, **kwargs)
 
-        # Go through the recording options of Solver to construct the entry to be inserted.
-        if self.options['record_abs_error']:
-            abs_error = kwargs.get('abs')
-        else:
-            abs_error = None
-
-        if self.options['record_rel_error']:
-            rel_error = kwargs.get('rel')
-        else:
-            rel_error = None
-
-        if self.options['record_solver_output']:
+        if self._outputs:
             dtype_tuples = []
+            for name, value in iteritems(self._outputs):
+                tple = (name, '{}f8'.format(value.shape))
+                dtype_tuples.append(tple)
 
-            if isinstance(object_requesting_recording, NonlinearSolver):
-                outputs = object_requesting_recording._system._outputs
-            else:  # it's a LinearSolver
-                outputs = object_requesting_recording._system._vectors['output']['linear']
+            outputs_array = np.zeros((1,), dtype=dtype_tuples)
 
-            outs = {}
-            if 'out' in self._filtered_solver:
-                for outp in outputs._names:
-                    outs[outp] = outputs._names[outp]
-            else:
-                outs = outputs
+            for name, value in iteritems(self._outputs):
+                outputs_array[name] = value
+        else:
+            outputs_array = None
 
-            if outs:
-                for name, value in iteritems(outs):
-                    tple = (name, '{}f8'.format(value.shape))
-                    dtype_tuples.append(tple)
-
-                outputs_array = np.zeros((1,), dtype=dtype_tuples)
-
-                for name, value in iteritems(outs):
-                    outputs_array[name] = value
-
-        if self.options['record_solver_residuals']:
+        if self._resids:
             dtype_tuples = []
+            for name, value in iteritems(self._resids):
+                tple = (name, '{}f8'.format(value.shape))
+                dtype_tuples.append(tple)
 
-            if isinstance(object_requesting_recording, NonlinearSolver):
-                residuals = object_requesting_recording._system._residuals
-            else:  # it's a LinearSolver
-                residuals = object_requesting_recording._system._vectors['residual']['linear']
-
-            res = {}
-            if 'res' in self._filtered_solver:
-                for rez in residuals._names:
-                    res[rez] = residuals._names[rez]
-            else:
-                res = residuals
-
-            if res:
-                for name, value in iteritems(res):
-                    tple = (name, '{}f8'.format(value.shape))
-                    dtype_tuples.append(tple)
-
-                residuals_array = np.zeros((1,), dtype=dtype_tuples)
-                for name, value in iteritems(res):
-                    residuals_array[name] = value
+            residuals_array = np.zeros((1,), dtype=dtype_tuples)
+            for name, value in iteritems(self._resids):
+                residuals_array[name] = value
+        else:
+            residuals_array = None
 
         outputs_blob = array_to_blob(outputs_array)
         residuals_blob = array_to_blob(residuals_array)
 
-        iteration_coordinate = get_formatted_iteration_coordinate()
-
         self.cursor.execute("INSERT INTO solver_iterations(counter, iteration_coordinate, "
                             "timestamp, success, msg, abs_err, rel_err, solver_output, "
                             "solver_residuals) VALUES(?,?,?,?,?,?,?,?,?)",
-                            (self._counter, iteration_coordinate,
+                            (self._counter, self._iteration_coordinate,
                              metadata['timestamp'],
                              metadata['success'], metadata['msg'],
-                             abs_error, rel_error,
+                             self._abs_error, self._rel_error,
                              outputs_blob, residuals_blob))
 
         self.cursor.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
