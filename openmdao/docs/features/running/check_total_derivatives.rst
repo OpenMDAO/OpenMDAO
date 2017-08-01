@@ -12,8 +12,8 @@ before calling this method.
     You should probably **not** use this method until you've used :code:`check_partials()` to verify the
     partials for each component in your model. :code:`check_total_derivatives()` is a very blunt instrument, since it can only tell you that there is a problem, but will not give you much insight into which component or group is causing the problem.
 
-TODO: add this line ".. automethod:: openmdao.core.problem.Problem.check_total_derivatives
-    :noindex:"
+.. automethod:: openmdao.core.problem.Problem.check_total_derivatives
+    :noindex:
 
 Examples
 -----------
@@ -29,6 +29,21 @@ Check the all the derivatives that the driver will need:
 
 .. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_check_total_derivatives_from_driver
+
+----
+
+Display the results in a compact format:
+
+.. embed-test::
+    openmdao.core.tests.test_problem.TestProblem.test_feature_check_total_derivatives_from_driver_compact
+
+----
+
+Use complex step instead of finite difference for a more accurate check. We also change to a larger
+step size to trigger the nonlinear Gauss-Seidel solver to try to converge after the step.
+
+.. embed-test::
+    openmdao.core.tests.test_problem.TestProblem.test_feature_check_total_derivatives_cs
 
 
 Related Features

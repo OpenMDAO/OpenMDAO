@@ -1,5 +1,6 @@
 """Define the NonlinearBlockJac class."""
 from openmdao.solvers.solver import NonlinearSolver
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 class NonlinearBlockJac(NonlinearSolver):
@@ -14,11 +15,14 @@ class NonlinearBlockJac(NonlinearSolver):
         Perform the operations in the iteration loop.
         """
         self._solver_info.prefix += '|  '
-
         self._system._transfer('nonlinear', 'fwd')
-        for subsys in self._system._subsystems_myproc:
-            subsys._solve_nonlinear()
-        self._system._check_reconf_update()
+
+        with Recording('NonlinearBlockJac', 0, self) as rec:
+            for subsys in self._system._subsystems_myproc:
+                subsys._solve_nonlinear()
+            self._system._check_reconf_update()
+            rec.abs = 0.0
+            rec.rel = 0.0
 
         self._solver_info.prefix = self._solver_info.prefix[:-3]
 

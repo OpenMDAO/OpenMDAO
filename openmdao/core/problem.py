@@ -1,9 +1,10 @@
 """Define the Problem class and a FakeComm class for non-MPI users."""
 
 from __future__ import division
+
 from collections import OrderedDict, defaultdict, namedtuple
 from itertools import product
-import sys
+import logging
 
 from six import iteritems, iterkeys
 from six.moves import range
@@ -19,8 +20,9 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
-
+from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.logger_utils import get_default_logger
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.graph_utils import all_connected_edges
 from openmdao.vectors.default_vector import DefaultVector
@@ -237,6 +239,12 @@ class Problem(object):
 
         return self.run_driver()
 
+    def cleanup(self):
+        """
+        Clean up resources prior to exit.
+        """
+        self.driver.cleanup()
+
     def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='auto',
               force_alloc_complex=False, multi_vector_class=None):
         """
@@ -306,7 +314,7 @@ class Problem(object):
 
         return self
 
-    def check_partials(self, out_stream=sys.stdout, comps=None, compact_print=False,
+    def check_partials(self, logger=None, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6, global_options=None,
                        force_dense=True):
         """
@@ -314,8 +322,8 @@ class Problem(object):
 
         Parameters
         ----------
-        out_stream : file_like
-            Where to send human readable output. Default is sys.stdout. Set to None to suppress.
+        logger : object
+            Logging object to capture output. All output is at logging.INFO level.
         comps : None or list_like
             List of component names to check the partials of (all others will be skipped). Set to
              None (default) to run all components.
@@ -359,6 +367,7 @@ class Problem(object):
             raise ValueError('Unrecognized method: "{}"'.format(global_options['method']))
 
         model = self.model
+        logger = get_default_logger(logger, 'check_partials')
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -590,10 +599,99 @@ class Problem(object):
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
 
-        _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
+        logging.getLogger().setLevel(logging.INFO)
+        _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, logger,
                                   compact_print, comps, global_options)
 
         return partials_data
+
+    def check_total_derivatives(self, of=None, wrt=None, logger=None, compact_print=False,
+                                abs_err_tol=1e-6, rel_err_tol=1e-6, method='fd', step=1e-6,
+                                form='forward', step_calc='abs'):
+        """
+        Check total derivatives for the model vs. finite difference.
+
+        Parameters
+        ----------
+        of : list of variable name strings or None
+            Variables whose derivatives will be computed. Default is None, which
+            uses the driver's objectives and constraints.
+        wrt : list of variable name strings or None
+            Variables with respect to which the derivatives will be computed.
+            Default is None, which uses the driver's desvars.
+        logger : object
+            Logging object to capture output. All output is at logging.INFO level.
+        compact_print : bool
+            Set to True to just print the essentials, one line per unknown-param pair.
+        abs_err_tol : float
+            Threshold value for absolute error.  Errors about this value will have a '*' displayed
+            next to them in output, making them easy to search for. Default is 1.0E-6.
+        rel_err_tol : float
+            Threshold value for relative error.  Errors about this value will have a '*' displayed
+            next to them in output, making them easy to search for. Note at times there may be a
+            significant relative error due to a minor absolute error.  Default is 1.0E-6.
+        method : str
+            Method, 'fd' for finite difference or 'cs' for complex step.
+        step : float
+            Step size for approximation.
+        form : string
+            Form for finite difference, can be 'forward', 'backward', or 'central'.
+        step_calc : string
+            Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
+
+        Returns
+        -------
+        Dict of Dicts of Tuples of Floats
+
+            First key:
+                is the (output, input) tuple of strings;
+            Second key:
+                is one of ['rel error', 'abs error', 'magnitude', 'fdstep'];
+
+            For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
+                forward - fd, adjoint - fd, forward - adjoint.
+        """
+        model = self.model
+        global_names = False
+        logger = get_default_logger(logger, 'check_total_derivatives')
+
+        # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
+
+        if wrt is None:
+            wrt = list(self.driver._designvars)
+            global_names = True
+        if of is None:
+            of = list(self.driver._objs)
+            of.extend(list(self.driver._cons))
+            global_names = True
+
+        with self.model._scaled_context_all():
+
+            # Calculate Total Derivatives
+            Jcalc = self._compute_total_derivs(of=of, wrt=wrt, global_names=global_names)
+
+            # Approximate FD
+            fd_args = {
+                'step': step,
+                'form': form,
+                'step_calc': step_calc,
+            }
+            model.approx_total_derivs(method=method, **fd_args)
+            Jfd = self._compute_total_derivs_approx(of=of, wrt=wrt, global_names=global_names)
+
+        # Assemble and Return all metrics.
+        data = {}
+        data[''] = {}
+        for key, val in iteritems(Jcalc):
+            data[''][key] = {}
+            data[''][key]['J_fwd'] = Jcalc[key]
+            data[''][key]['J_fd'] = Jfd[key]
+        fd_args['method'] = 'fd'
+
+        logging.getLogger().setLevel(logging.INFO)
+        _assemble_derivative_data(data, rel_err_tol, abs_err_tol, logger, compact_print,
+                                  [model], fd_args, totals=True)
+        return data['']
 
     def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
         """
@@ -651,6 +749,7 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
+        recording_iteration_stack.append(('_compute_total_derivs', 0))
         model = self.model
         mode = self._mode
         vec_dinput = model._vectors['input']
@@ -697,7 +796,8 @@ class Problem(object):
         # Re-initialize so that it is clean.
         if model._approx_schemes:
             method = list(model._approx_schemes.keys())[0]
-            model.approx_total_derivs(method=method)
+            kwargs = model._owns_approx_jac_meta
+            model.approx_total_derivs(method=method, **kwargs)
         else:
             model.approx_total_derivs(method='fd')
 
@@ -734,6 +834,7 @@ class Problem(object):
             msg = "Unsupported return format '%s." % return_format
             raise NotImplementedError(msg)
 
+        recording_iteration_stack.pop()
         return totals
 
     def _get_voi_info(self, vois, inp2rhs_name, input_vec, output_vec, input_vois):
@@ -924,6 +1025,7 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
+        recording_iteration_stack.append(('_compute_total_derivs', 0))
         model = self.model
         mode = self._mode
         vec_dinput = model._vectors['input']
@@ -936,11 +1038,11 @@ class Problem(object):
         fwd = (mode == 'fwd')
         prom2abs = model._var_allprocs_prom2abs_list['output']
 
-        # TODO - Pull 'of' and 'wrt' from driver if unspecified.
         if wrt is None:
-            raise NotImplementedError("Need to specify 'wrt' for now.")
+            wrt = list(self.driver._designvars)
         if of is None:
-            raise NotImplementedError("Need to specify 'of' for now.")
+            of = list(self.driver._objs)
+            of.extend(list(self.driver._cons))
 
         # A number of features will need to be supported here as development
         # goes forward.
@@ -1185,6 +1287,7 @@ class Problem(object):
                         else:
                             raise RuntimeError("unsupported return format")
 
+        recording_iteration_stack.pop()
         return totals
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
@@ -1210,10 +1313,10 @@ class Problem(object):
         self.model._set_solver_print(level=level, depth=depth, type_=type_)
 
 
-def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
-                              compact_print, system_list, global_options):
+def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, logger,
+                              compact_print, system_list, global_options, totals=False):
     """
-    Compute the relative and absolute errors in the given derivatives and print to `out_stream`.
+    Compute the relative and absolute errors in the given derivatives and print to the logger.
 
     Parameters
     ----------
@@ -1223,21 +1326,28 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         Relative error tolerance.
     abs_error_tol : float
         Absolute error tolerance.
-    out_stream : File-like
-        File-like stream (or None) to which results are written.
+    logger : object
+        Logging object.
     compact_print : bool
         If results should be printed verbosely or in a table.
     system_list : Iterable
         The systems (in the proper order) that were checked.0
     global_options : dict
         Dictionary containing the options for the approximation.
+    totals : bool
+        Set to True if we are doing check_total_derivs to skip a bunch of stuff.
     """
     fd_desc = "{}:{}".format(global_options['method'],
                              global_options['form'])
+    nan = float('nan')
+
     if compact_print:
         check_desc = "    (Check Type: {})".format(fd_desc)
-        deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e} | {6:.4e} | {7:.4e}"\
-                     " | {8:.4e} | {9:.4e} | {10:.4e}\n"
+        if totals:
+            deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
+        else:
+            deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e} | {6:.4e} | {7:.4e}"\
+                         " | {8:.4e} | {9:.4e} | {10:.4e}"
     else:
         check_desc = ""
 
@@ -1260,14 +1370,27 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
         derivatives = derivative_data[sys_name]
 
-        if out_stream:
-            out_stream.write('-' * (len(sys_name) + 15) + '\n')
-            out_stream.write("{}: '{}'{}\n".format(sys_type, sys_name, check_desc))
-            out_stream.write('-' * (len(sys_name) + 15) + '\n')
+        if totals:
+            sys_name = 'Full Model'
 
-            if compact_print:
-                # Error Header
-                header = "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}\n"\
+        logger.info('-' * (len(sys_name) + 15))
+        logger.info("{}: '{}'{}".format(sys_type, sys_name, check_desc))
+        logger.info('-' * (len(sys_name) + 15))
+
+        if compact_print:
+            # Error Header
+            if totals:
+                header = "{0} wrt {1} | {2} | {3} | {4} | {5}"\
+                    .format(
+                        _pad_name('<output>', 30, True),
+                        _pad_name('<variable>', 30, True),
+                        _pad_name('calc mag.'),
+                        _pad_name('check mag.'),
+                        _pad_name('a(cal-chk)'),
+                        _pad_name('r(cal-chk)'),
+                    )
+            else:
+                header = "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}"\
                     .format(
                         _pad_name('<output>', 13, True),
                         _pad_name('<variable>', 13, True),
@@ -1281,8 +1404,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         _pad_name('r(rev-chk)'),
                         _pad_name('r(fwd-rev)')
                     )
-                out_stream.write(header)
-                out_stream.write('-' * len(header) + '\n')
+            logger.info(header)
+            logger.info('-' * len(header) + '\n')
 
         # Sorted keys ensures deterministic ordering
         sorted_keys = sorted(iterkeys(derivatives))
@@ -1290,31 +1413,51 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         for of, wrt in sorted_keys:
             derivative_info = derivatives[of, wrt]
             forward = derivative_info['J_fwd']
-            reverse = derivative_info['J_rev']
+            if not totals:
+                reverse = derivative_info.get('J_rev')
             fd = derivative_info['J_fd']
 
             fwd_error = np.linalg.norm(forward - fd)
-            rev_error = np.linalg.norm(reverse - fd)
-            fwd_rev_error = np.linalg.norm(forward - reverse)
+            if totals:
+                rev_error = fwd_rev_error = None
+            else:
+                rev_error = np.linalg.norm(reverse - fd)
+                fwd_rev_error = np.linalg.norm(forward - reverse)
 
             fwd_norm = np.linalg.norm(forward)
-            rev_norm = np.linalg.norm(reverse)
+            if totals:
+                rev_norm = None
+            else:
+                rev_norm = np.linalg.norm(reverse)
             fd_norm = np.linalg.norm(fd)
 
             derivative_info['abs error'] = abs_err = ErrorTuple(fwd_error, rev_error, fwd_rev_error)
             derivative_info['magnitude'] = magnitude = MagnitudeTuple(fwd_norm, rev_norm, fd_norm)
 
             if fd_norm == 0.:
-                nan = float('nan')
                 derivative_info['rel error'] = rel_err = ErrorTuple(nan, nan, nan)
             else:
-                derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fd_norm,
-                                                                    rev_error / fd_norm,
-                                                                    fwd_rev_error / fd_norm)
+                if totals:
+                    derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fd_norm,
+                                                                        nan,
+                                                                        nan)
+                else:
+                    derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fd_norm,
+                                                                        rev_error / fd_norm,
+                                                                        fwd_rev_error / fd_norm)
 
-            if out_stream:
-                if compact_print:
-                    out_stream.write(deriv_line.format(
+            if compact_print:
+                if totals:
+                    logger.info(deriv_line.format(
+                        _pad_name(of, 30, True),
+                        _pad_name(wrt, 30, True),
+                        magnitude.forward,
+                        magnitude.fd,
+                        abs_err.forward,
+                        rel_err.forward,
+                    ))
+                else:
+                    logger.info(deriv_line.format(
                         _pad_name(of, 13, True),
                         _pad_name(wrt, 13, True),
                         magnitude.forward,
@@ -1327,40 +1470,46 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         rel_err.reverse,
                         rel_err.forward_reverse,
                     ))
+            else:
+                # Magnitudes
+                logger.info("  {}: '{}' wrt '{}'\n".format(sys_name, of, wrt))
+                logger.info('    Forward Magnitude : {:.6e}'.format(magnitude.forward))
+                if not totals:
+                    txt = '    Reverse Magnitude : {:.6e}'
+                    logger.info(txt.format(magnitude.reverse))
+                logger.info('         Fd Magnitude : {:.6e} ({})\n'.format(magnitude.fd,
+                                                                           fd_desc))
+                # Absolute Errors
+                if totals:
+                    error_descs = ('(Jfor  - Jfd) ', )
                 else:
-                    # Magnitudes
-                    out_stream.write("  {}: '{}' wrt '{}'\n\n".format(sys_name, of, wrt))
-                    out_stream.write('    Forward Magnitude : {:.6e}\n'.format(magnitude.forward))
-                    out_stream.write('    Reverse Magnitude : {:.6e}\n'.format(magnitude.reverse))
-                    out_stream.write('         Fd Magnitude : {:.6e} ({})\n\n'.format(magnitude.fd,
-                                                                                      fd_desc))
-                    # Absolute Errors
                     error_descs = ('(Jfor  - Jfd) ', '(Jrev  - Jfd) ', '(Jfor  - Jrev)')
-                    for error, desc in zip(abs_err, error_descs):
-                        error_str = _format_error(error, abs_error_tol)
-                        out_stream.write('    Absolute Error {}: {}\n'.format(desc, error_str))
-                    out_stream.write('\n')
+                for error, desc in zip(abs_err, error_descs):
+                    error_str = _format_error(error, abs_error_tol)
+                    logger.info('    Absolute Error {}: {}'.format(desc, error_str))
+                logger.info('')
 
-                    # Relative Errors
-                    for error, desc in zip(rel_err, error_descs):
-                        error_str = _format_error(error, rel_error_tol)
-                        out_stream.write('    Relative Error {}: {}\n'.format(desc, error_str))
-                    out_stream.write('\n')
+                # Relative Errors
+                for error, desc in zip(rel_err, error_descs):
+                    error_str = _format_error(error, rel_error_tol)
+                    logger.info('    Relative Error {}: {}'.format(desc, error_str))
+                logger.info('')
 
-                    # Raw Derivatives
-                    out_stream.write('    Raw Forward Derivative (Jfor)\n\n')
-                    out_stream.write(str(forward))
-                    out_stream.write('\n\n')
+                # Raw Derivatives
+                logger.info('    Raw Forward Derivative (Jfor)\n')
+                logger.info(str(forward))
+                logger.info('')
 
-                    out_stream.write('    Raw Reverse Derivative (Jfor)\n\n')
-                    out_stream.write(str(reverse))
-                    out_stream.write('\n\n')
+                if not totals:
+                    logger.info('    Raw Reverse Derivative (Jfor)\n')
+                    logger.info(str(reverse))
+                    logger.info('')
 
-                    out_stream.write('    Raw FD Derivative (Jfd)\n\n')
-                    out_stream.write(str(fd))
-                    out_stream.write('\n\n')
+                logger.info('    Raw FD Derivative (Jfd)\n')
+                logger.info(str(fd))
+                logger.info('')
 
-                    out_stream.write(' -' * 30 + '\n')
+                logger.info(' -' * 30)
 
 
 def _pad_name(name, pad_num=10, quotes=False):

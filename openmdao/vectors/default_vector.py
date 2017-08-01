@@ -253,13 +253,12 @@ class DefaultVector(Vector):
         type_ = self._typ
         iproc = self._iproc
 
-        views = {}
-        views_flat = {}
+        self._views = self._names = views = {}
+        self._views_flat = views_flat = {}
 
         alloc_complex = self._alloc_complex
-        if alloc_complex:
-            imag_views = {}
-            imag_views_flat = {}
+        self._imag_views = imag_views = {}
+        self._imag_views_flat = imag_views_flat = {}
 
         allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[type_]
         sizes_byset_t = system._var_sizes_byset[type_]
@@ -284,13 +283,6 @@ class DefaultVector(Vector):
                     v = v.view()
                     v.shape = shape
                 imag_views[abs_name] = v
-
-        self._views = self._names = views
-        self._views_flat = views_flat
-
-        if self._alloc_complex:
-            self._imag_views = imag_views
-            self._imag_views_flat = imag_views_flat
 
     def _clone_data(self):
         """
@@ -613,3 +605,20 @@ class DefaultVector(Vector):
             # line search by setting the entries of du at the bounds to zero.
             changed_either = change_lower.astype(bool) + change_upper.astype(bool)
             du_data[changed_either] = 0.
+
+    def __getstate__(self):
+        """
+        Return state as a dict.
+
+        For pickling vectors in case recording, we want to get rid of
+        the system contained within Vectors, because MPI Comm objects cannot
+        be pickled using Python3's pickle module.
+
+        Returns
+        -------
+        dict
+            state minus system member.
+        """
+        state = self.__dict__.copy()
+        del state['_system']
+        return state
