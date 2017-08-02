@@ -1,15 +1,20 @@
 branches:
   only:
-  - master
+   - master
+
 sudo: false
+
 os:
-- linux
+   - linux
+
 language: generic
+
 env:
 - PY=2.7 MPI=1
 - PY=3.4 MPI=1
 - PY=2.7 MPI=
 - PY=3.4 MPI=
+
 addons:
   apt:
     sources:
@@ -20,14 +25,13 @@ addons:
     - liblapack-dev
     - libopenmpi-dev
     - openmpi-bin
+
 notifications:
   email: false
   slack:
+    on_success: never
     rooms:
       openmdao:GRr0MeNdmks2i7qCTWGLoOj7#testing
-
-#  slack:
-#    secure: "NinDployvCGG9DiQy8niMlBo2Sl0Xqd3YI3qlFzrX+yWIOqO9b1KUn0lPanPwb6qKx6trSV+tjqbrHlwpft7Gb2C0pOAV9oxa3u/ELBxhlTZVkE8MsNOsT/+HtGxJqnAsFTu3Yhft+OSCONAGMT9oebBuwjn8czwIHEAmDa86jEg0yNJ2TRLd5Owwcxa6qjpCwqIUVbvYa9OW0UEBKBDbe3vdvH/FdWi3jEvvw+Pfb4dL2K0nikpiT8TFn+cCJTWG1ixbvQkismnoOG6geFQPZONhXbj8uBmXfVdAIsjNboxK2njLw/X75ohPlTot0WQk/SOTTG9VB43whYLQ5NItUzaqMZlSEf+rDaLsc+Fg0nnSHeyQm0G0QRsDSW5nfgq+6URw3wjmldkZbX3YJZuSJXhjMjZiJw4K7mBgD0TMPxS610RJbiBwR7OFAOk7vtKTnP3exlVJkKDnXumLdzuVhCHLJ80VFHak7zuZu9Ni+l0IY5NxI2sPzW7L191OMjJ9WZKo4aZahGd9hpV5k2RmeqZTdy89MP9GkMnTIrZtl++JPw/mRt8GW32CqoqHQvspHj0Z6ejKXWXnXWqJchpUrY0lmuOVbyy9IWnMCJH2houlRtS9l9e4Xb13wnPEhH966Td5X5eghGZaGX/m0A4Y21s0hdXZ0Azt2wi9Bw0EuU="
 
 before_install:
 - OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux";
@@ -35,30 +39,50 @@ before_install:
 - if [ "$OS" = "MacOSX" ] && [ "$MPI" ]; then brew install openmpi; fi
 - wget "https://repo.continuum.io/miniconda/Miniconda-latest-$OS-x86_64.sh" -O miniconda.sh
 - chmod +x miniconda.sh
-- if [ "$OS" = "Linux" ]; then ./miniconda.sh -b  -p /home/travis/miniconda; fi
-- if [ "$OS" = "MacOSX" ]; then ./miniconda.sh -b  -p /Users/travis/miniconda; fi
+- if [ "$OS" = "Linux" ]; then
+    ./miniconda.sh -b  -p /home/travis/miniconda;
+  fi
+- if [ "$OS" = "MacOSX" ]; then
+    ./miniconda.sh -b  -p /Users/travis/miniconda;
+  fi
 - PATHPREFIX=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "/Users/travis/miniconda/bin";
   else echo "/home/travis/miniconda/bin"; fi)
 - export PATH=$PATHPREFIX:$PATH
 - export OPENMDAO_TEST_DOCS=1
+
 install:
 - conda install --yes python=$PY numpy==1.11.2 scipy nose sphinx mock swig
-- if [ "$OS" = "Linux" ]; then if [ "$PY" = "2.7" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp27-none-linux_x86_64.whl;
-  elif [ "$PY" = "3.4" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py3-none-linux_x86_64.whl;
-  fi fi
-- if [ "$OS" = "MacOSX" ]; then if [ "$PY" = "2.7" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py2-none-macosx_10_5_x86_64.whl;
-  elif [ "$PY" = "3.4" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp34-none-macosx_10_5_x86_64.whl;
-  fi fi
-- if [ "$MPI" ]; then pip install mpi4py; pip install git+https://bitbucket.org/petsc/petsc4py@3.7.0;
+- if [ "$OS" = "Linux" ]; then
+    if [ "$PY" = "2.7" ]; then
+        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp27-none-linux_x86_64.whl;
+    elif [ "$PY" = "3.4" ]; then
+        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py3-none-linux_x86_64.whl;
+    fi
+  fi
+- if [ "$OS" = "MacOSX" ]; then
+    if [ "$PY" = "2.7" ]; then
+        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py2-none-macosx_10_5_x86_64.whl;
+    elif [ "$PY" = "3.4" ]; then
+        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp34-none-macosx_10_5_x86_64.whl;
+    fi
+  fi
+- if [ "$MPI" ]; then
+    pip install mpi4py;
+    pip install git+https://bitbucket.org/petsc/petsc4py@3.7.0;
   fi
 - pip install redbaron
 - pip install git+https://github.com/OpenMDAO/testflo.git
 - pip install coverage
 - pip install coveralls
 - pip install -e .
+
 script:
+# make docs first
 - cd openmdao/docs
 - make all
+# run all openmdao tests
 - testflo -n 1 openmdao -m "ptest*"
 - testflo -n 1 openmdao --coverage --coverpkg openmdao
-after_success: coveralls
+
+after_success:
+  coveralls
