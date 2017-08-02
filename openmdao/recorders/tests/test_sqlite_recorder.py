@@ -1351,6 +1351,46 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
                                                  expected_outputs, expected_residuals),), self.eps)
 
+    def test_multidimensional_arrays(self):
+        # component TestExplCompArray, put in a model and run it; its outputs are multi-d-arrays.
+        from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
+        comp = TestExplCompArray(thickness=1.)
+        prob = Problem(comp).setup(check=False)
+
+        prob['lengths'] = 3.
+        prob['widths'] = 2.
+
+        comp.add_recorder(self.recorder)
+        self.recorder.options['record_inputs'] = True
+        self.recorder.options['record_outputs'] = True
+        self.recorder.options['record_residuals'] = True
+        self.recorder.options['record_metadata'] = True
+
+        t0, t1 = run_driver(prob)
+
+        prob.run_model()
+
+        # coordinate = rank0:._solve_nonlinear | 0
+        coordinate = [0, 'Driver', (0,), '._solve_nonlinear', (0,)]
+
+        expected_inputs = {
+            'lengths': [[3.,  3.], [3., 3.]],
+            'widths': [[2.,  2.], [2., 2.]],
+        }
+
+        expected_outputs = {
+            'total_volume': [24.],
+            'areas': [[6., 6.], [6., 6.]],
+        }
+
+        expected_residuals = {
+            'total_volume': [0.],
+            'areas': [[0., 0.], [0., 0.]],
+        }
+
+        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
+                                                 expected_outputs, expected_residuals),), self.eps)
+
 
 if __name__ == "__main__":
     unittest.main()

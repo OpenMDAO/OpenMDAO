@@ -309,7 +309,7 @@ class Problem(object):
 
     def check_partials(self, logger=None, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6, global_options=None,
-                       force_dense=True):
+                       force_dense=True, suppress_output=False):
         """
         Check partial derivatives comprehensively for all components in your model.
 
@@ -334,6 +334,8 @@ class Problem(object):
             'form', 'step', 'step_calc', and 'method' can be specified in this way.
         force_dense : bool
             If True, analytic derivatives will be coerced into arrays.
+        suppress_output : bool
+            Set to True to suppress all output.
 
         Returns
         -------
@@ -593,14 +595,15 @@ class Problem(object):
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
 
         logging.getLogger().setLevel(logging.INFO)
-        _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, logger,
-                                  compact_print, comps, global_options)
+        if not suppress_output:
+            _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, logger,
+                                      compact_print, comps, global_options)
 
         return partials_data
 
     def check_total_derivatives(self, of=None, wrt=None, logger=None, compact_print=False,
                                 abs_err_tol=1e-6, rel_err_tol=1e-6, method='fd', step=1e-6,
-                                form='forward', step_calc='abs'):
+                                form='forward', step_calc='abs', suppress_output=False):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -631,6 +634,8 @@ class Problem(object):
             Form for finite difference, can be 'forward', 'backward', or 'central'.
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
+        suppress_output : bool
+            Set to True to suppress all output.
 
         Returns
         -------
@@ -682,8 +687,9 @@ class Problem(object):
         fd_args['method'] = 'fd'
 
         logging.getLogger().setLevel(logging.INFO)
-        _assemble_derivative_data(data, rel_err_tol, abs_err_tol, logger, compact_print,
-                                  [model], fd_args, totals=True)
+        if not suppress_output:
+            _assemble_derivative_data(data, rel_err_tol, abs_err_tol, logger, compact_print,
+                                      [model], fd_args, totals=True)
         return data['']
 
     def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):

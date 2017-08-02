@@ -45,6 +45,13 @@ step size to trigger the nonlinear Gauss-Seidel solver to try to converge after 
 .. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_check_total_derivatives_cs
 
+----
+
+Turn off standard output and just view the derivatives in the return:
+
+.. embed-test::
+    openmdao.core.tests.test_problem.TestProblem.test_feature_check_total_derivatives_suppress
+
 
 Related Features
 -----------------

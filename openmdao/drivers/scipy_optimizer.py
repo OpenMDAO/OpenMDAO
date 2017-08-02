@@ -14,6 +14,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 from openmdao.core.driver import Driver
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 _optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -284,8 +285,9 @@ class ScipyOptimizer(Driver):
                 self.set_design_var(name, x_new[i:i + size])
                 i += size
 
-            self.iter_count += 1
-            model._solve_nonlinear()
+            with Recording(self.options['optimizer'], self.iter_count, self) as rec:
+                self.iter_count += 1
+                model._solve_nonlinear()
 
             # Get the objective function evaluations
             for name, obj in iteritems(self.get_objective_values()):

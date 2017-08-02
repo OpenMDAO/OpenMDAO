@@ -20,3 +20,14 @@ Usage
 
 .. embed-test::
     openmdao.core.tests.test_check_derivs.TestProblemCheckPartials.test_feature_incorrect_jacobian
+
+----
+
+Turn off standard output and just view the derivatives in the return:
+
+.. embed-test::
+    openmdao.core.tests.test_check_derivs.TestProblemCheckPartials.test_feature_check_partials_suppress
+
+Related Features
+-----------------
+check-total-derivatives
