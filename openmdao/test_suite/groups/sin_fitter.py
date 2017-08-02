@@ -4,14 +4,9 @@
 
 from __future__ import print_function, division, absolute_import
 
-from collections import Callable
-from numbers import Number
-
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ScipyOptimizer
-
-from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
 
 
 def lgl(n, tol=np.finfo(float).eps):
