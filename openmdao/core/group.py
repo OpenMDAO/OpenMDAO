@@ -592,14 +592,14 @@ class Group(System):
                             d_size = out_shape[d]
                             print("checking", d, src_indices[..., d])
                             for i in src_indices[..., d].flat:
-                                print("checking", i,"<", d_size)
+                                print("checking", i, "<", d_size)
                                 if abs(i) >= d_size:
                                     msg = ("The source indices do not specify a "
                                            "valid index for the connection '%s' to "
                                            "'%s' in Group '%s'. Index %d is out of "
                                            "range for source dimension %d.")
                                     raise ValueError(msg % (prom_out, prom_in,
-                                                                self.pathname, i, d_size))
+                                                            self.pathname, i, d_size))
 
         # Recursion
         if recurse:
