@@ -329,6 +329,7 @@ class ScipyOptimizer(Driver):
         float
             Value of the constraint function.
         """
+        print('desvar', x_new)
         if name.startswith('2bl-'):
             name = name[4:]
             dbl_side = True
@@ -343,10 +344,12 @@ class ScipyOptimizer(Driver):
         if equals is not None:
             if isinstance(equals, np.ndarray):
                 equals = equals[idx]
-            return -(equals - cons[name][idx])
+            print('con', name, idx, cons[name][idx] - equals)
+            return (cons[name][idx] - equals)
 
         # Note, scipy defines constraints to be satisfied when positive,
         # which is the opposite of OpenMDAO.
+        print('con', name, idx, cons[name][idx])
         upper = meta['upper']
         lower = meta['lower']
         if lower is None or dbl_side:
@@ -430,7 +433,9 @@ class ScipyOptimizer(Driver):
         # print(name, idx, grad[grad_idx, :])
 
         # Equality constraints
+        print('congrad', name, idx, grad[grad_idx, :])
         if meta['equals'] is not None:
+            #print('congrad', name, idx, grad[grad_idx, :])
             return grad[grad_idx, :]
 
         # Note, scipy defines constraints to be satisfied when positive,
