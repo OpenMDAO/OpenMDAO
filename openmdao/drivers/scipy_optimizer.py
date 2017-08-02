@@ -243,7 +243,6 @@ class ScipyOptimizer(Driver):
                 self._con_idx[name] = i
                 i += size
 
-
         # Provide gradients for optimizers that support it
         if opt in _gradient_optimizers:
             jac = self._gradfunc

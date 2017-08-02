@@ -10,6 +10,7 @@ from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDens
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.test_suite.components.simple_comps import NonSquareArrayComp
+from openmdao.test_suite.groups.sin_fitter import SineFitter
 
 
 class TestScipyOptimizer(unittest.TestCase):
@@ -356,8 +357,8 @@ class TestScipyOptimizer(unittest.TestCase):
         prob.setup(check=False)
         prob.run_driver()
 
-        obj = prob['o']
-        assert_rel_error(self, obj, 20.0, 1e-6)
+        con = prob['areas']
+        assert_rel_error(self, con, np.array([[24.0, 21.0], [3.5, 17.5]]), 1e-6)
 
     def test_simple_array_comp2D_dbl_sided_con_array(self):
 
@@ -577,6 +578,18 @@ class TestScipyOptimizer(unittest.TestCase):
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
         assert_rel_error(self, prob['x'], 0.0, 1e-3)
+
+    def test_bug_in_eq_constraints(self):
+        # We were getting extra constraints created because lower and upper are maxfloat instead of
+        # None when unused.
+        p = Problem(model=SineFitter())
+        p.driver = ScipyOptimizer()
+
+        p.setup(check=False)
+        p.run_driver()
+
+        max_defect = np.max(np.abs(p['defect.defect']))
+        assert_rel_error(self, max_defect, 0.0, 1e-10)
 
 
 class TestScipyOptimizerFeatures(unittest.TestCase):
