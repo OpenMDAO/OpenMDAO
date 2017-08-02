@@ -2,13 +2,10 @@ from __future__ import print_function, division, absolute_import
 
 import unittest
 
-from collections import Callable
-from numbers import Number
-
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ScipyOptimizer, DefaultMultiVector
-from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, \
+                         ScipyOptimizer, DefaultMultiVector
 from openmdao.devtools.testutil import assert_rel_error
 
 def lgl(n, tol=np.finfo(float).eps):
@@ -279,7 +276,7 @@ class Phase(Group):
         # Step 2:  Make an indep var comp that provides the 'truth' values at the midpoint nodes.
         x_lgl, _ = lgl(n)
         x_lgl = x_lgl * np.pi # put x_lgl on [-pi, pi]
-        x_mid = (x_lgl[1:] + x_lgl[:-1])/2.0 # midpoints on [-pi, pi]
+        x_mid = (x_lgl[1:] + x_lgl[:-1]) * 0.5 # midpoints on [-pi, pi]
         self.add_subsystem('truth', IndepVarComp('y_mid',
                                                  val=np.sin(x_mid),
                                                  desc='truth values at midpoint nodes'))
@@ -309,20 +306,16 @@ class Summer(ExplicitComponent):
         self.metadata.declare('n_phases', type_=int, required=True)
 
     def setup(self):
-        n_p = self.metadata['n_phases']
-
         self.add_output('total_arc_length')
 
-        for i in range(n_p):
+        for i in range(self.metadata['n_phases']):
             i_name = 'arc_length:p%d' % i
             self.add_input(i_name)
             self.declare_partials('total_arc_length', i_name, val=1.)
 
     def compute(self, inputs, outputs):
-        n_p = self.metadata['n_phases']
-
         outputs['total_arc_length'] = 0
-        for i in range(n_p):
+        for i in range(self.metadata['n_phases']):
             outputs['total_arc_length'] += inputs['arc_length:p%d' % i]
 
 
@@ -383,8 +376,6 @@ class MatMatTestCase(unittest.TestCase):
         y_lgl = p['y_lgl']
         sinfunc = np.sin(x_lgl)
         assert_rel_error(self, sinfunc, y_lgl, 1.e-5)
-        # np.set_printoptions(linewidth=1024)
-        # p.check_partials()
 
     def test_phases(self):
         N_PHASES = 4
@@ -409,21 +400,15 @@ class MatMatTestCase(unittest.TestCase):
         p.model.add_objective('sum.total_arc_length')
         p.driver = ScipyOptimizer()
 
-        # p.driver = pyOptSparseDriver()
-        # p.driver.options['optimizer'] = 'SNOPT'
-        # p.driver.opt_settings['iSumm'] = 6
-        # p.driver.opt_settings['Major iterations limit'] = 20
-
         p.setup(mode='fwd', multi_vector_class=DefaultMultiVector)
 
         p.run_driver()
-
-        # import matplotlib.pyplot as plt
 
         x_lgl, _ = lgl(n)
         x_lgl = x_lgl * np.pi # put x_lgl on [-pi, pi]
         x_mid = (x_lgl[1:] + x_lgl[:-1])/2.0 # midpoints on [-pi, pi]
 
+        # import matplotlib.pyplot as plt
         # for i in range(N_PHASES):
         #     offset = i*2*np.pi
         #     p_name = 'p%d' % i
@@ -435,9 +420,6 @@ class MatMatTestCase(unittest.TestCase):
         sinfunc = np.sin(x_lgl)
         for i in range(N_PHASES):
             assert_rel_error(self, sinfunc, p['p%d.y_lgl' % i], 1.e-5)
-
-        # np.set_printoptions(linewidth=1024)
-        # p.check_partials()
 
 if __name__ == '__main__':
     unittest.main()
