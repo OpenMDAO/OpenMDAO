@@ -542,11 +542,20 @@ class Group(System):
                 print('inp %s:' % abs_in, abs2meta_in[abs_in])
 
                 if src_indices is None and out_shape != in_shape:
-                    raise ValueError("The source and target shapes do not match"
-                                     " for the connection '%s' to '%s' in Group"
-                                     " '%s'.  Expected %s but got %s." %
-                                     (prom_out, prom_in, self.pathname,
-                                      in_shape, out_shape))
+                    if abs2meta_out[abs_out].get('distributed'):
+                        # TODO: would have to do a gather on the output
+                        #       shapes to get the combined shape to match
+                        #       against the input
+                        # ALSO: it requires that the distributed attribute
+                        #       be set, which is not always the case??
+                        pass
+                    else:
+                        msg = ("The source and target shapes do not match"
+                               " for the connection '%s' to '%s' in Group"
+                               " '%s'.  Expected %s but got %s.")
+                        raise ValueError(msg % (prom_out, prom_in,
+                                                self.pathname,
+                                                in_shape, out_shape))
 
                 if src_indices is not None:
                     src_indices = np.atleast_1d(src_indices)
