@@ -213,7 +213,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                 self._analysis_error_raised = True
             else:
                 exc = sys.exc_info()
-                reraise(exc[0], exc[1], exc[2])
+                reraise(*exc)
 
             norm = np.nan
 
@@ -276,7 +276,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                     self._analysis_error_raised = True
                 else:
                     exc = sys.exc_info()
-                    reraise(exc[0], exc[1], exc[2])
+                    reraise(*exc)
 
         u.add_scal_vec(-self.alpha, du)
         self.alpha *= self.options['rho']
@@ -331,7 +331,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
 
                     else:
                         exc = sys.exc_info()
-                        reraise(exc[0], exc[1], exc[2])
+                        reraise(*exc)
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
             self._iter_count += 1
