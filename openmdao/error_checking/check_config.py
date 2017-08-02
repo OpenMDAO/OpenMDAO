@@ -96,7 +96,7 @@ def _get_out_of_order_subs(group, input_srcs):
     Returns
     -------
     dict
-        A dict mapping names of target Systems to a list of names of their
+        A dict mapping names of target Systems to a set of names of their
         source Systems that execute after them.
     """
     subsystems = group._subsystems_allprocs
