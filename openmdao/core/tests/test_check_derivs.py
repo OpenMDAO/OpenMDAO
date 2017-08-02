@@ -105,6 +105,42 @@ class TestProblemCheckPartials(unittest.TestCase):
         assert_rel_error(self, x2_error.forward, 9., 1e-8)
         assert_rel_error(self, x2_error.reverse, 9., 1e-8)
 
+    def test_feature_check_partials_suppress(self):
+        class MyComp(ExplicitComponent):
+            def setup(self):
+                self.add_input('x1', 3.0)
+                self.add_input('x2', 5.0)
+
+                self.add_output('y', 5.5)
+
+            def compute(self, inputs, outputs):
+                """ Doesn't do much. """
+                outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
+
+            def compute_partials(self, inputs, outputs, partials):
+                """Intentionally incorrect derivative."""
+                J = partials
+                J['y', 'x1'] = np.array([4.0])
+                J['y', 'x2'] = np.array([40])
+
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('x2', 5.0))
+        prob.model.add_subsystem('comp', MyComp())
+
+        prob.model.connect('p1.x1', 'comp.x1')
+        prob.model.connect('p2.x2', 'comp.x2')
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partials(suppress_output=True)
+        print(data)
+
     def test_component_only(self):
         class MyComp(ExplicitComponent):
             def setup(self):
@@ -144,6 +180,38 @@ class TestProblemCheckPartials(unittest.TestCase):
                         msg='Error flag expected in output but not displayed')
         self.assertFalse(lines[y_wrt_x1_line+6].endswith('*'),
                         msg='Error flag not expected in output but displayed')
+
+    def test_component_only_suppress(self):
+        class MyComp(ExplicitComponent):
+            def setup(self):
+                self.add_input('x1', 3.0)
+                self.add_input('x2', 5.0)
+
+                self.add_output('y', 5.5)
+
+            def compute(self, inputs, outputs):
+                """ Doesn't do much. """
+                outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
+
+            def compute_partials(self, inputs, outputs, partials):
+                """Intentionally incorrect derivative."""
+                J = partials
+                J['y', 'x1'] = np.array([4.0])
+                J['y', 'x2'] = np.array([40])
+
+        prob = Problem()
+        prob.model = MyComp()
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        testlogger = TestLogger()
+        data = prob.check_partials(logger=testlogger, suppress_output=True)
+
+        lines = testlogger.get('info')
+        self.assertEqual(len(lines), 0)
 
     def test_missing_entry(self):
         class MyComp(ExplicitComponent):
@@ -541,6 +609,34 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         totals = prob.check_total_derivatives()
         print('hey')
+
+    def test_cs_suppress(self):
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0.0)
+        prob.model.add_constraint('con2', upper=0.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(force_alloc_complex=True)
+
+        # We don't call run_driver() here because we don't
+        # actually want the optimizer to run
+        prob.run_model()
+
+        # check derivatives with complex step and a larger step size.
+        testlogger = TestLogger()
+        totals = prob.check_total_derivatives(method='cs', step=1.0e-1, logger=testlogger,
+                                              suppress_output=True)
+
+        lines = testlogger.get('info')
+
+        self.assertEqual(len(lines), 0)
 
 if __name__ == "__main__":
     unittest.main()
