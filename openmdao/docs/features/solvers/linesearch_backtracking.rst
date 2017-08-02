@@ -15,7 +15,7 @@ help alleviate these problems and improve robustness of your Newton solve.
 There are two different backtracking line-search algorithms in OpenMDAO:
 
 BoundsEnforceLS
-  Only checks bounds and backtracks to point that satisfies them.
+  Only checks bounds and backtracks to a point that satisfies them.
 
 ArmijoGoldsteinLS
   Checks bounds and backtracks to point that satisfies them. From there, further backtracking is performed until the termination criteria are satisfied.
