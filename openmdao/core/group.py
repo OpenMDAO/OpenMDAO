@@ -505,9 +505,7 @@ class Group(System):
         # This way, we don't repeat the error checking in multiple groups
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
         allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
-        print()
-        print('abs_in2out:', abs_in2out)
-        print()
+
         for abs_in, abs_out in iteritems(abs_in2out):
             # check unit compatibility
             out_units = allprocs_abs2meta_out[abs_out]['units']
