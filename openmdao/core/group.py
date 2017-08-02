@@ -534,6 +534,7 @@ class Group(System):
                 src_indices = abs2meta_in[abs_in].get('src_indices')
                 prom_out = self._var_abs2prom['output'][abs_out]
                 prom_in = self._var_abs2prom['input'][abs_in]
+
                 print('======================================')
                 print(abs_out, "==>", abs_in)
                 print('out %s:' % abs_out, abs2meta_out[abs_out])
@@ -549,44 +550,56 @@ class Group(System):
                 if src_indices is not None:
                     src_indices = np.atleast_1d(src_indices)
                     out_value = abs2meta_out[abs_out]['value']
-                    print('-------------')
+                    print('---------------------------------------------------')
                     print('src_indices:', src_indices.shape, '\n', src_indices)
-                    print(abs_out, 'value:', out_value)
+                    print(abs_out, 'value:', out_value.shape, '\n', out_value)
+                    print(abs_in, 'absin shape:', in_shape)
                     print('-------------')
-                    if len(src_indices.shape) == 1:
-                        print('1d index', src_indices.shape, in_shape)
-                        if src_indices.shape != in_shape:
-                            msg = ("The source index %s does not specify a "
+                    print('out_shape:', out_shape)
+                    print('in_shape:', in_shape)
+
+                    if len(src_indices.shape) < len(in_shape):
+                        raise ValueError("Unexpected indices shape: %s vs %s" %
+                                         (src_indices.shape, in_shape))
+
+                    # initial dimensions of indices shape must be same shape as target
+                    for idx_d, inp_d in zip(src_indices.shape, in_shape):
+                        print("check", idx_d, "vs", inp_d)
+                        if idx_d != inp_d:
+                            msg = ("The source indices %s do not specify a "
                                    "valid shape for the connection '%s' to "
-                                   "'%s' in Group '%s'. Expected index with "
-                                   "shape %s but got %s.")
+                                   "'%s' in Group '%s'. The target shape is "
+                                   "%s but indices are %s.")
                             raise ValueError(msg % (src_indices, prom_out, prom_in,
                                                     self.pathname,
                                                     in_shape, src_indices.shape))
-                    else:
-                        for idx in src_indices:
-                            print('index shape:', idx.shape)
-                            print('index:', idx,)
-                            if idx.shape != in_shape:
-                                msg = ("The source index %s does not specify a "
-                                       "valid shape for the connection '%s' to "
-                                       "'%s' in Group '%s'. Expected index with "
-                                       "shape %s but got %s.")
-                                raise ValueError(msg % (idx, prom_out, prom_in,
-                                                        self.pathname,
-                                                        in_shape, idx.shape))
-                            for d1, d2 in zip(idx, out_shape):
-                                print('checking', d1, d2)
-                                if abs(d1) > (d2 - 1):
-                                    msg = ("The source index %s does not specify a "
+
+                    # remaining dimension of indices must match shape of source
+                    if len(src_indices.shape) > len(in_shape):
+                        source_dimensions = src_indices.shape[len(in_shape)]
+                        print("source_dimensions:", source_dimensions)
+                        if source_dimensions != len(out_shape):
+                            msg = ("The source indices %s do not specify a "
+                                   "valid shape for the connection '%s' to "
+                                   "'%s' in Group '%s'. The source has %d "
+                                   "dimenions but the indices expect %d.")
+                            raise ValueError(msg % (src_indices, prom_out, prom_in,
+                                                    self.pathname,
+                                                    len(out_shape), source_dimensions))
+
+                        # check all indices are in range of the source dimensions
+                        for d in range(source_dimensions):
+                            d_size = out_shape[d]
+                            print("checking", d, src_indices[..., d])
+                            for i in src_indices[..., d].flat:
+                                print("checking", i,"<", d_size)
+                                if abs(i) >= d_size:
+                                    msg = ("The source indices do not specify a "
                                            "valid index for the connection '%s' to "
-                                           "'%s' in Group '%s'. It is out of range "
-                                           "for source shape of %s.")
-                                    raise ValueError(msg % (idx, prom_out, prom_in,
-                                                            self.pathname, out_shape))
-
-                        print('value:', out_value[idx])
-
+                                           "'%s' in Group '%s'. Index %d is out of "
+                                           "range for source dimension %d.")
+                                    raise ValueError(msg % (prom_out, prom_in,
+                                                                self.pathname, i, d_size))
 
         # Recursion
         if recurse:
