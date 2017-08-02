@@ -528,27 +528,23 @@ class Group(System):
 
             # check shape compatibility
             if abs_in in abs2meta_in and abs_out in abs2meta_out:
-                out_shape = abs2meta_out[abs_out]['shape']
+                # get output shape from allprocs meta dict, since it may
+                # be distributed (we want global shape)
+                out_shape = allprocs_abs2meta_out[abs_out]['global_shape']
+                # get input shape and src_indices from the local meta dict
+                # (input is always local)
                 in_shape = abs2meta_in[abs_in]['shape']
                 src_indices = abs2meta_in[abs_in].get('src_indices')
                 prom_out = self._var_abs2prom['output'][abs_out]
                 prom_in = self._var_abs2prom['input'][abs_in]
 
                 if src_indices is None and out_shape != in_shape:
-                    if abs2meta_out[abs_out].get('distributed'):
-                        # TODO: would have to do a gather on the output
-                        #       shapes to get the combined shape to match
-                        #       against the input
-                        # ALSO: it requires that the distributed attribute
-                        #       be set, which it SHOULD be but may not be?
-                        pass
-                    else:
-                        msg = ("The source and target shapes do not match"
-                               " for the connection '%s' to '%s' in Group"
-                               " '%s'.  Expected %s but got %s.")
-                        raise ValueError(msg % (prom_out, prom_in,
-                                                self.pathname,
-                                                in_shape, out_shape))
+                    msg = ("The source and target shapes do not match"
+                           " for the connection '%s' to '%s' in Group"
+                           " '%s'.  Expected %s but got %s.")
+                    raise ValueError(msg % (prom_out, prom_in,
+                                            self.pathname,
+                                            in_shape, out_shape))
 
                 if src_indices is not None:
                     src_indices = np.atleast_1d(src_indices)
@@ -575,7 +571,7 @@ class Group(System):
                             msg = ("The source indices %s do not specify a "
                                    "valid shape for the connection '%s' to "
                                    "'%s' in Group '%s'. The source has %d "
-                                   "dimenions but the indices expect %d.")
+                                   "dimensions but the indices expect %d.")
                             raise ValueError(msg % (src_indices, prom_out, prom_in,
                                                     self.pathname,
                                                     len(out_shape), source_dimensions))
