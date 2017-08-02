@@ -1,10 +1,10 @@
 """Define the base System class."""
 from __future__ import division
 
-import sys
 from contextlib import contextmanager
 from collections import OrderedDict, Iterable
 from fnmatch import fnmatchcase
+import sys
 from itertools import product
 
 from six import iteritems, string_types
@@ -15,13 +15,14 @@ import numpy as np
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
-
 from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array, warn_deprecation
+from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils.array_utils import convert_neg
+from openmdao.utils.record_util import create_local_meta
 
 
 class System(object):
@@ -49,6 +50,9 @@ class System(object):
         MPI communicator object.
     metadata : <OptionsDictionary>
         Dictionary of user-defined arguments.
+    iter_count : int
+        Int that holds the number of times this system has iterated
+        in a recording run.
     #
     _mpi_proc_allocator : <ProcAllocator>
         Object that distributes procs among subsystems.
@@ -151,7 +155,7 @@ class System(object):
         Vector of upper bounds, scaled and dimensionless.
     #
     _scaling_vecs : dict of dict of Vectors
-        First key is indicates vector type and coefficient, second key is vec_name.
+        First key indicates vector type and coefficient, second key is vec_name.
     #
     _nonlinear_solver : <NonlinearSolver>
         Nonlinear solver to be used for solve_nonlinear.
@@ -182,6 +186,8 @@ class System(object):
         dict of all driver design vars added to the system.
     _responses : dict of dict
         dict of all driver responses added to the system.
+    _rec_mgr : <RecordingManager>
+        object that manages all recorders added to this system.
     #
     _static_mode : bool
         If true, we are outside of setup.
@@ -214,6 +220,8 @@ class System(object):
         self.pathname = ''
         self.comm = None
         self.metadata = OptionsDictionary()
+
+        self.iter_count = 0
 
         self._mpi_proc_allocator = DefaultAllocator()
 
@@ -289,6 +297,7 @@ class System(object):
 
         self._design_vars = {}
         self._responses = {}
+        self._rec_mgr = RecordingManager()
 
         self._static_mode = True
         self._static_subsystems_allprocs = []
@@ -668,6 +677,10 @@ class System(object):
         # If full or reconf setup, reset this system's variables to initial values.
         if setup_mode in ('full', 'reconf'):
             self.set_initial_values()
+
+        self._rec_mgr.startup(self)
+        for sub in self.system_iter(recurse=True, include_self=True):
+            sub._rec_mgr.record_metadata(sub)
 
     def _setup_procs(self, pathname, comm):
         """
@@ -2630,6 +2643,43 @@ class System(object):
         """
         pass
 
+    def initialize_processors(self):
+        """
+        Run after repartitioning/rebalancing. (Optional user-defined method).
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata (local and global)
+        """
+        pass
+
+    def initialize_variables(self):
+        """
+        Declare inputs and outputs. (Required method for components).
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata (local and global)
+        """
+        pass
+
+    def initialize_partials(self):
+        """
+        Declare Jacobian structure/approximations. (Optional method for components).
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata (local and global)
+            variable names
+        """
+        pass
+
     def _list_states(self):
         """
         Return list of all states at and below this system.
@@ -2644,6 +2694,25 @@ class System(object):
             states.extend(subsys._list_states())
 
         return states
+
+    def add_recorder(self, recorder):
+        """
+        Add a recorder to the driver.
+
+        Parameters
+        ----------
+        recorder : <BaseRecorder>
+           A recorder instance.
+        """
+        self._rec_mgr.append(recorder)
+
+    def record_iteration(self):
+        """
+        Record an iteration of the current System.
+        """
+        metadata = create_local_meta(self.pathname)
+        self._rec_mgr.record_iteration(self, metadata)
+        self.iter_count += 1
 
 
 def _get_vec_names(voi_dict):

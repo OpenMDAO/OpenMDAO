@@ -1,14 +1,11 @@
 from six.moves import range
 import numpy as np
 import os
-import pickle
 import json
 from six import iteritems
 import networkx as nx
 import shutil
 from collections import OrderedDict
-
-from sqlitedict import SqliteDict
 
 try:
     import h5py
@@ -20,7 +17,7 @@ from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
-import base64
+from openmdao.utils.record_util import is_valid_sqlite3_db
 
 
 def _get_tree_dict(system, component_execution_orders, component_execution_index):
@@ -84,18 +81,31 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
     return tree_dict
 
-def _get_viewer_data(problem_or_rootgroup):
+def _get_viewer_data(problem_or_rootgroup_or_filename):
     """Get the data needed by the N2 viewer as a dictionary."""
-    if isinstance(problem_or_rootgroup, Problem):
-        root_group = problem_or_rootgroup.model
-    elif isinstance(problem_or_rootgroup, Group):
-        if not problem_or_rootgroup.pathname: # root group
-            root_group = problem_or_rootgroup
+    if isinstance(problem_or_rootgroup_or_filename, Problem):
+        root_group = problem_or_rootgroup_or_filename.model
+    elif isinstance(problem_or_rootgroup_or_filename, Group):
+        if not problem_or_rootgroup_or_filename.pathname: # root group
+            root_group = problem_or_rootgroup_or_filename
         else:
             # this function only makes sense when it is at the root
             return {}
+    elif is_valid_sqlite3_db(problem_or_rootgroup_or_filename):
+        import sqlite3
+        con = sqlite3.connect(problem_or_rootgroup_or_filename, detect_types=sqlite3.PARSE_DECLTYPES)
+        cur = con.cursor()
+        cur.execute("SELECT model_viewer_data FROM driver_metadata;")
+        model_pickle = cur.fetchone()
+        from six import PY2, PY3
+        if PY2:
+            import cPickle
+            return cPickle.loads(str(model_pickle[0]))
+        if PY3:
+            import pickle
+            return pickle.loads(model_pickle[0])
     else:
-        raise TypeError('get_model_viewer_data only accepts Problems or Groups')
+        raise TypeError('get_model_viewer_data only accepts Problems, Groups or filenames')
 
     data_dict = {}
     component_execution_idx = [0] #list so pass by ref
@@ -156,7 +166,8 @@ def view_tree(*args, **kwargs):
     warn_deprecation("view_tree is deprecated. Please switch to view_model.")
     view_model(*args, **kwargs)
 
-def view_model(problem_or_filename, outfile_name='visualization', show_browser=True):
+
+def view_model(problem_or_filename, outfile='visualization', show_browser=True):
     """
     Generates a directory containing a tree viewer Optionally pops up a web browser to
     view the file.
@@ -167,34 +178,34 @@ def view_model(problem_or_filename, outfile_name='visualization', show_browser=T
         Problem() : The Problem (after problem.setup()) for the desired tree.
         string : The filename of the case recorder file containing the data required to build the tree.
 
-    outfile_name : str, optional
-        The name of the output html file.  Defaults to 'visualization'.
+    outfile : str, optional
+        The path of the output folder.  Defaults to current directory + 'visualization'.
 
     show_browser : bool, optional
         If True, pop up the system default web browser to view the generated html file.
         Defaults to True.
     """
-    model_data_filename = 'model_data.js'
-    folder_name = outfile_name
-
-    code_dir = os.path.dirname(os.path.abspath(__file__))
-
-    if isinstance(problem_or_filename, Problem):
-        model_viewer_data = _get_viewer_data(problem_or_filename)
-
-    model_data = json.dumps(model_viewer_data)
-
     cur_dir = os.getcwd()
-    directory = os.path.dirname(cur_dir + '/' + folder_name)
+    if outfile == 'visualization':
+        outfile = os.path.join(cur_dir, outfile)
+        
+    model_data_filename = 'model_data.js'
+    folder_name = outfile
+    code_dir = os.path.dirname(os.path.abspath(__file__))
+    model_viewer_data = _get_viewer_data(problem_or_filename)
+    model_data = json.dumps(model_viewer_data)
 
     if os.path.isdir(folder_name):
         shutil.rmtree(folder_name)
 
     shutil.copytree(src=code_dir + '/visualization', dst=folder_name)
 
-    with open(cur_dir + '/' + folder_name + '/' + model_data_filename, 'w') as f:
+    model_data_dir = os.path.join(folder_name, model_data_filename)
+    with open(model_data_dir, 'w') as f:
         f.write('var modelData = %s' % model_data)
 
     if show_browser:
         from openmdao.devtools.webview import webview
-        webview(cur_dir + '/' + folder_name + '/index.html')
+        view_path = os.path.join(cur_dir, folder_name)
+        view_path = os.path.join(view_path, 'index.html')
+        webview(view_path)

@@ -20,7 +20,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
-
+from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.logger_utils import get_default_logger
 from openmdao.utils.mpi import MPI, FakeComm
@@ -237,6 +237,12 @@ class Problem(object):
 
         return self.run_driver()
 
+    def cleanup(self):
+        """
+        Clean up resources prior to exit.
+        """
+        self.driver.cleanup()
+
     def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='auto',
               force_alloc_complex=False):
         """
@@ -303,7 +309,7 @@ class Problem(object):
 
     def check_partials(self, logger=None, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6, global_options=None,
-                       force_dense=True):
+                       force_dense=True, suppress_output=False):
         """
         Check partial derivatives comprehensively for all components in your model.
 
@@ -328,6 +334,8 @@ class Problem(object):
             'form', 'step', 'step_calc', and 'method' can be specified in this way.
         force_dense : bool
             If True, analytic derivatives will be coerced into arrays.
+        suppress_output : bool
+            Set to True to suppress all output.
 
         Returns
         -------
@@ -587,14 +595,15 @@ class Problem(object):
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
 
         logging.getLogger().setLevel(logging.INFO)
-        _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, logger,
-                                  compact_print, comps, global_options)
+        if not suppress_output:
+            _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, logger,
+                                      compact_print, comps, global_options)
 
         return partials_data
 
     def check_total_derivatives(self, of=None, wrt=None, logger=None, compact_print=False,
                                 abs_err_tol=1e-6, rel_err_tol=1e-6, method='fd', step=1e-6,
-                                form='forward', step_calc='abs'):
+                                form='forward', step_calc='abs', suppress_output=False):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -625,6 +634,8 @@ class Problem(object):
             Form for finite difference, can be 'forward', 'backward', or 'central'.
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
+        suppress_output : bool
+            Set to True to suppress all output.
 
         Returns
         -------
@@ -676,8 +687,9 @@ class Problem(object):
         fd_args['method'] = 'fd'
 
         logging.getLogger().setLevel(logging.INFO)
-        _assemble_derivative_data(data, rel_err_tol, abs_err_tol, logger, compact_print,
-                                  [model], fd_args, totals=True)
+        if not suppress_output:
+            _assemble_derivative_data(data, rel_err_tol, abs_err_tol, logger, compact_print,
+                                      [model], fd_args, totals=True)
         return data['']
 
     def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
@@ -731,6 +743,7 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
+        recording_iteration_stack.append(('_compute_total_derivs', 0))
         model = self.model
         mode = self._mode
         vec_dinput = model._vectors['input']
@@ -853,6 +866,7 @@ class Problem(object):
                         ikey = old_input_list[icount]
                         totals[okey][ikey] = -approx_jac[output_name, input_name]
 
+            recording_iteration_stack.pop()
             return totals
 
         # Solve for derivs using linear solver.
@@ -1063,6 +1077,7 @@ class Problem(object):
                         else:
                             raise RuntimeError("unsupported return format")
 
+        recording_iteration_stack.pop()
         return totals
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):

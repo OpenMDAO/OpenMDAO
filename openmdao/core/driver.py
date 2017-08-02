@@ -1,10 +1,12 @@
 """Define a base class for all Drivers in OpenMDAO."""
-
 from six import iteritems
 
 import numpy as np
 
+from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.recorders.recording_manager import RecordingManager
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 class Driver(object):
@@ -15,6 +17,10 @@ class Driver(object):
     ----------
     fail : bool
         Reports whether the driver ran successfully.
+    iter_count : int
+        Keep track of iterations for case recording.
+    metadata : list
+        List of metadata
     options : <OptionsDictionary>
         Dictionary with general pyoptsparse options.
     _problem : <Problem>
@@ -29,12 +35,18 @@ class Driver(object):
         Contains all objective info.
     _responses : dict
         Contains all response info.
+    _rec_mgr : <RecordingManager>
+        Object that manages all recorders added to this driver.
+    _model_viewer_data : dict
+        Structure of model, used to make n2 diagram.
     """
 
     def __init__(self):
         """
         Initialize the driver.
         """
+        self._rec_mgr = RecordingManager()
+
         self._problem = None
         self._designvars = None
         self._cons = None
@@ -53,10 +65,31 @@ class Driver(object):
         self.supports.declare('gradients', type_=bool, default=False)
         self.supports.declare('active_set', type_=bool, default=False)
 
+        self.iter_count = 0
+        self.metadata = None
+        self._model_viewer_data = None
+
         # TODO, support these in Openmdao blue
         self.supports.declare('integer_design_vars', type_=bool, default=False)
 
         self.fail = False
+
+    def add_recorder(self, recorder):
+        """
+        Add a recorder to the driver.
+
+        Parameters
+        ----------
+        recorder : BaseRecorder
+           A recorder instance.
+        """
+        self._rec_mgr.append(recorder)
+
+    def cleanup(self):
+        """
+        Clean up resources prior to exit.
+        """
+        self._rec_mgr.close()
 
     def _setup_driver(self, problem):
         """
@@ -79,20 +112,47 @@ class Driver(object):
         self._objs = model.get_objectives(recurse=True)
         self._cons = model.get_constraints(recurse=True)
 
-    def get_design_var_values(self):
+        self._rec_mgr.startup(self)
+
+        # Only do this for now in serial. Parallel does not work yet.
+        from openmdao.utils.mpi import MPI
+
+        if not MPI:
+            if (self._rec_mgr._recorders):
+                from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
+                self._model_viewer_data = _get_viewer_data(problem)
+        self._rec_mgr.record_metadata(self)
+
+    def get_design_var_values(self, filter=None):
         """
         Return the design variable values.
 
         This is called to gather the initial design variable state.
+
+        Parameters
+        ----------
+        filter : list
+            List of desvar names used by recorders.
 
         Returns
         -------
         dict
            Dictionary containing values of each design variable.
         """
+        designvars = {}
+
+        if filter:
+            # pull out designvars of those names into filtered dict.
+            for inc in filter:
+                designvars[inc] = self._designvars[inc]
+
+        else:
+            # use all the designvars
+            designvars = self._designvars
+
         vec = self._problem.model._outputs._views_flat
         dv_dict = {}
-        for name, meta in iteritems(self._designvars):
+        for name, meta in iteritems(designvars):
             scaler = meta['scaler']
             adder = meta['adder']
             indices = meta['indices']
@@ -138,9 +198,14 @@ class Driver(object):
         if adder is not None:
             desvar[indices] -= adder
 
-    def get_response_values(self):
+    def get_response_values(self, filter=None):
         """
         Return response values.
+
+        Parameters
+        ----------
+        filter : list
+            List of response names used by recorders.
 
         Returns
         -------
@@ -150,18 +215,34 @@ class Driver(object):
         # TODO: finish this method when we have a driver that requires it.
         pass
 
-    def get_objective_values(self):
+    def get_objective_values(self, filter=None):
         """
         Return objective values.
+
+        Parameters
+        ----------
+        filter : list
+            List of objective names used by recorders.
 
         Returns
         -------
         dict
            Dictionary containing values of each objective.
         """
+        objectives = {}
+
+        if filter:
+            # pull out objectives of those names into filtered dict.
+            for inc in filter:
+                objectives[inc] = self._objs[inc]
+
+        else:
+            # use all the objectives
+            objectives = self._objs
+
         vec = self._problem.model._outputs._views_flat
         obj_dict = {}
-        for name, meta in iteritems(self._objs):
+        for name, meta in iteritems(objectives):
             scaler = meta['scaler']
             adder = meta['adder']
             indices = meta['indices']
@@ -180,7 +261,7 @@ class Driver(object):
 
         return obj_dict
 
-    def get_constraint_values(self, ctype='all', lintype='all'):
+    def get_constraint_values(self, ctype='all', lintype='all', filter=None):
         """
         Return constraint values.
 
@@ -194,15 +275,29 @@ class Driver(object):
             Default is 'all'. Optionally return just the linear constraints
             with 'linear' or the nonlinear constraints with 'nonlinear'.
 
+        filter : list
+            List of constraint names used by recorders.
+
         Returns
         -------
         dict
            Dictionary containing values of each constraint.
         """
+        constraints = {}
+
+        if filter is not None:
+            # pull out objectives of those names into filtered dict.
+            for inc in filter:
+                constraints[inc] = self._cons[inc]
+
+        else:
+            # use all the objectives
+            constraints = self._cons
+
         vec = self._problem.model._outputs._views_flat
         con_dict = {}
 
-        for name, meta in iteritems(self._cons):
+        for name, meta in iteritems(constraints):
 
             if lintype == 'linear' and meta['linear'] is False:
                 continue
@@ -234,7 +329,6 @@ class Driver(object):
             # TODO: Need to get the allgathered values? Like:
             # cons[name] = self._get_distrib_var(name, meta, 'constraint')
             con_dict[name] = val
-
         return con_dict
 
     def run(self):
@@ -249,7 +343,11 @@ class Driver(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        return self._problem.model._solve_nonlinear()
+        with Recording(self._get_name(), self.iter_count, self) as rec:
+            failure_flag = self._problem.model._solve_nonlinear()
+
+        self.iter_count += 1
+        return failure_flag
 
     def _compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict',
                               global_names=True):
@@ -376,3 +474,21 @@ class Driver(object):
             max_procs can be None, indicating all available procs can be used.
         """
         return model.get_req_procs()
+
+    def record_iteration(self):
+        """
+        Record an iteration of the current Driver.
+        """
+        metadata = create_local_meta(self._get_name())
+        self._rec_mgr.record_iteration(self, metadata)
+
+    def _get_name(self):
+        """
+        Get name of current Driver.
+
+        Returns
+        -------
+        str
+            Name of current Driver.
+        """
+        return "Driver"
