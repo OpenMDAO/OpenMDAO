@@ -351,6 +351,33 @@ class TestScipyOptimizer(unittest.TestCase):
 
         model.add_design_var('widths', lower=-50.0, upper=50.0)
         model.add_objective('o')
+        model.add_constraint('areas', lower=np.array([24.0, 21.0, 3.5, 17.5]), upper=np.array([24.0, 21.0, 3.5, 17.5]))
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        obj = prob['o']
+        assert_rel_error(self, obj, 20.0, 1e-6)
+
+    def test_simple_array_comp2D_dbl_sided_con_array(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
+        model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
+        model.add_subsystem('obj', ExecComp('o = areas[0, 0]', areas=np.zeros((2, 2))),
+                            promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizer()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('widths', lower=-50.0, upper=50.0)
+        model.add_objective('o')
         model.add_constraint('areas', lower=20.0, upper=20.0)
 
         prob.setup(check=False)
