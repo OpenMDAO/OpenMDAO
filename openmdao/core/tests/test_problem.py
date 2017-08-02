@@ -605,12 +605,8 @@ class TestProblem(unittest.TestCase):
 
         top.setup(check=False)
 
-        x = -0.5
-        a = np.abs(np.exp(0.5 * x) / x)
-
-        top['sub.comp.a'] = a
-        top.run_model()
-        assert_rel_error(self, top['sub.comp.x'], x)
+        self.assertTrue(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
+        self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
 
     def test_feature_system_configure(self):
 
@@ -655,9 +651,8 @@ class TestProblem(unittest.TestCase):
 
         top.setup(check=False)
 
-        top['sub.comp.a'] = 1.5576015661428098
-        top.run_model()
-        assert_rel_error(self, top['sub.comp.x'], -0.5)
+        print(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
+        print(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
 
 if __name__ == "__main__":
     unittest.main()
