@@ -253,6 +253,27 @@ class TestProblem(unittest.TestCase):
         # check derivatives of all obj+constraints w.r.t all design variables
         prob.check_total_derivatives()
 
+    def test_feature_check_total_derivatives_suppress(self):
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0.0)
+        prob.model.add_constraint('con2', upper=0.0)
+
+        prob.setup()
+
+        # We don't call run_driver() here because we don't
+        # actually want the optimizer to run
+        prob.run_model()
+
+        # check derivatives of all obj+constraints w.r.t all design variables
+        totals = prob.check_total_derivatives(suppress_output=True)
+        print(totals)
+
     def test_feature_check_total_derivatives_cs(self):
         prob = Problem()
         prob.model = SellarDerivatives()
