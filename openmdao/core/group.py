@@ -536,18 +536,13 @@ class Group(System):
                 prom_out = self._var_abs2prom['output'][abs_out]
                 prom_in = self._var_abs2prom['input'][abs_in]
 
-                print('======================================')
-                print(abs_out, "==>", abs_in)
-                print('out %s:' % abs_out, abs2meta_out[abs_out])
-                print('inp %s:' % abs_in, abs2meta_in[abs_in])
-
                 if src_indices is None and out_shape != in_shape:
                     if abs2meta_out[abs_out].get('distributed'):
                         # TODO: would have to do a gather on the output
                         #       shapes to get the combined shape to match
                         #       against the input
                         # ALSO: it requires that the distributed attribute
-                        #       be set, which is not always the case??
+                        #       be set, which it SHOULD be but may not be?
                         pass
                     else:
                         msg = ("The source and target shapes do not match"
@@ -559,14 +554,6 @@ class Group(System):
 
                 if src_indices is not None:
                     src_indices = np.atleast_1d(src_indices)
-                    out_value = abs2meta_out[abs_out]['value']
-                    print('---------------------------------------------------')
-                    print('src_indices:', src_indices.shape, '\n', src_indices)
-                    print(abs_out, 'value:', out_value.shape, '\n', out_value)
-                    print(abs_in, 'absin shape:', in_shape)
-                    print('-------------')
-                    print('out_shape:', out_shape)
-                    print('in_shape:', in_shape)
 
                     if len(src_indices.shape) < len(in_shape):
                         raise ValueError("Unexpected indices shape: %s vs %s" %
@@ -574,7 +561,6 @@ class Group(System):
 
                     # initial dimensions of indices shape must be same shape as target
                     for idx_d, inp_d in zip(src_indices.shape, in_shape):
-                        print("check", idx_d, "vs", inp_d)
                         if idx_d != inp_d:
                             msg = ("The source indices %s do not specify a "
                                    "valid shape for the connection '%s' to "
@@ -587,7 +573,6 @@ class Group(System):
                     # remaining dimension of indices must match shape of source
                     if len(src_indices.shape) > len(in_shape):
                         source_dimensions = src_indices.shape[len(in_shape)]
-                        print("source_dimensions:", source_dimensions)
                         if source_dimensions != len(out_shape):
                             msg = ("The source indices %s do not specify a "
                                    "valid shape for the connection '%s' to "
@@ -600,9 +585,7 @@ class Group(System):
                         # check all indices are in range of the source dimensions
                         for d in range(source_dimensions):
                             d_size = out_shape[d]
-                            print("checking", d, src_indices[..., d])
                             for i in src_indices[..., d].flat:
-                                print("checking", i, "<", d_size)
                                 if abs(i) >= d_size:
                                     msg = ("The source indices do not specify a "
                                            "valid index for the connection '%s' to "
