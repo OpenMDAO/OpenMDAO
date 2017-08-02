@@ -15,7 +15,8 @@ class BalanceComp(ImplicitComponent):
     A simple equation balance for solving implicit equations.
     """
 
-    def __init__(self, name=None, eq_units=None, **kwargs):
+    def __init__(self, name=None, eq_units=None, lhs_name=None,
+                 rhs_name=None, mult_name=None, mult_val=1.0, **kwargs):
         r"""
         Initialize a BalanceComp, optionally creating a new implicit state variable.
 
@@ -101,6 +102,15 @@ class BalanceComp(ImplicitComponent):
             The name of the state variable to be created.
         eq_units : str or None
             Units for the left-hand-side and right-hand-side of the equation to be balanced.
+        lhs_name : str or None
+            Optional name for the LHS variable associated with the implicit state variable.  If
+            None, the default will be used:  'lhs:{name}'.
+        rhs_name : str or None
+            Optional name for the RHS variable associated with the implicit state variable.  If
+            None, the default will be used:  'rhs:{name}'.
+        mult_name : str or None
+            Optional name for the LHS multiplier variable associated with the implicit state
+            variable. If None, the default will be used: 'mult:{name}'.
         mult_val : int, float, or np.array
             Default value for the LHS multiplier of the given state.  Must be compatible
             with the shape (optionally) given by the val option in kwargs.
@@ -110,7 +120,7 @@ class BalanceComp(ImplicitComponent):
         super(BalanceComp, self).__init__()
         self._state_vars = {}
         if name is not None:
-            self.add_balance(name, **kwargs)
+            self.add_balance(name, eq_units, lhs_name, rhs_name, mult_name, mult_val, **kwargs)
 
     def setup(self):
         """
@@ -120,13 +130,21 @@ class BalanceComp(ImplicitComponent):
 
         for name, options in iteritems(self._state_vars):
 
-            lhs_name = 'lhs:{0}'.format(name)
-            rhs_name = 'rhs:{0}'.format(name)
-            mult_name = 'mult:{0}'.format(name)
+            for s in ('lhs', 'rhs', 'mult'):
+                if options['{0}_name'.format(s)] is None:
+                    options['{0}_name'.format(s)] = '{0}:{1}'.format(s,name)
 
-            self._state_vars[name]['lhs_name'] = lhs_name
-            self._state_vars[name]['rhs_name'] = rhs_name
-            self._state_vars[name]['mult_name'] = mult_name
+            # if options['lhs_name'] is None:
+            #     lhs_name = 'lhs:{0}'.format(name)
+            #     self._state_vars[name]['lhs_name'] = lhs_name
+            #
+            # if options['rhs_name'] is None:
+            #     rhs_name = 'rhs:{0}'.format(name)
+            #     self._state_vars[name]['rhs_name'] = rhs_name
+            #
+            # if options['mult_name'] is None:
+            #     mult_name = 'mult:{0}'.format(name)
+            #     self._state_vars[name]['mult_name'] = mult_name
 
             val = options['kwargs'].get('val', np.ones(1))
             if isinstance(val, Number):
@@ -136,17 +154,16 @@ class BalanceComp(ImplicitComponent):
             self._state_vars[name]['size'] = n
 
             self.add_output(name, **options['kwargs'])
-            self.add_input(lhs_name, val=np.ones(n), units=options['eq_units'])
-            self.add_input(rhs_name, val=np.ones(n), units=options['eq_units'])
-            self.add_input(mult_name, val=options['mult_val'] * np.ones(n), units=None)
+            self.add_input(options['lhs_name'], val=np.ones(n), units=options['eq_units'])
+            self.add_input(options['rhs_name'], val=np.ones(n), units=options['eq_units'])
+            self.add_input(options['mult_name'], val=options['mult_val'] * np.ones(n), units=None)
             self._scale_factor = np.ones(n)
             self._dscale_drhs = np.ones(n)
 
-            arange = np.arange(n)
-
-            self.declare_partials(of=name, wrt=lhs_name, rows=arange, cols=arange, val=1.0)
-            self.declare_partials(of=name, wrt=rhs_name, rows=arange, cols=arange, val=1.0)
-            self.declare_partials(of=name, wrt=mult_name, rows=arange, cols=arange, val=1.0)
+            ar = np.arange(n)
+            self.declare_partials(of=name, wrt=options['lhs_name'], rows=ar, cols=ar, val=1.0)
+            self.declare_partials(of=name, wrt=options['rhs_name'], rows=ar, cols=ar, val=1.0)
+            self.declare_partials(of=name, wrt=options['mult_name'], rows=ar, cols=ar, val=1.0)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
@@ -205,7 +222,8 @@ class BalanceComp(ImplicitComponent):
             # Partials of residual wrt mult
             jacobian[name, mult_name] = lhs * self._scale_factor
 
-    def add_balance(self, name, eq_units=None, mult_val=1.0, **kwargs):
+    def add_balance(self, name, eq_units=None, lhs_name=None,
+                    rhs_name=None, mult_name=None, mult_val=1.0, **kwargs):
         """
         Add a new state variable and associated equation to be balanced.
 
@@ -219,6 +237,15 @@ class BalanceComp(ImplicitComponent):
             The name of the state variable to be created.
         eq_units : str or None
             Units for the left-hand-side and right-hand-side of the equation to be balanced.
+        lhs_name : str or None
+            Optional name for the LHS variable associated with the implicit state variable.  If
+            None, the default will be used:  'lhs:{name}'.
+        rhs_name : str or None
+            Optional name for the RHS variable associated with the implicit state variable.  If
+            None, the default will be used:  'rhs:{name}'.
+        mult_name : str or None
+            Optional name for the LHS multiplier variable associated with the implicit state
+            variable. If None, the default will be used: 'mult:{name}'.
         mult_val : int, float, or np.array
             Default value for the LHS multiplier.  Must be compatible with the shape (optionally)
             given by the val option in kwargs.
@@ -227,4 +254,7 @@ class BalanceComp(ImplicitComponent):
         """
         self._state_vars[name] = {'kwargs': kwargs,
                                   'eq_units': eq_units,
+                                  'lhs_name': lhs_name,
+                                  'rhs_name': rhs_name,
+                                  'mult_name': mult_name,
                                   'mult_val': mult_val}

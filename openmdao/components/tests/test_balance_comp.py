@@ -186,53 +186,10 @@ class TestBalanceComp(unittest.TestCase):
             assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_vectorized_with_default_mult(self):
-
-        n = 100
-
-        prob = Problem(model=Group())
-
-        bal = BalanceComp()
-
-        bal.add_balance('x', val=np.ones(n), mult_val=2.0)
-
-        tgt = IndepVarComp(name='y_tgt', val=4 * np.ones(n))
-
-        exec_comp = ExecComp('y=x**2', x={'value': np.ones(n)}, y={'value': np.ones(n)})
-
-        prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
-
-        prob.model.add_subsystem(name='exec', subsys=exec_comp)
-
-        prob.model.add_subsystem(name='balance', subsys=bal)
-
-        prob.model.connect('y_tgt', 'balance.rhs:x')
-        prob.model.connect('balance.x', 'exec.x')
-        prob.model.connect('exec.y', 'balance.lhs:x')
-
-        prob.model.linear_solver = DirectSolver()
-
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
-
-        prob.model.jacobian = DenseJacobian()
-
-        prob.setup()
-
-        prob['balance.x'] = np.random.rand(n)
-
-        prob.run_model()
-
-        assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
-
-        np.set_printoptions(linewidth=1024)
-
-        cpd = prob.check_partials()
-
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
-
-    def test_vectorized_with_default_mult(self):
+        """
+        solve:  2 * x**2 = 4
+        expected solution:  x=sqrt(2)
+        """
 
         n = 100
 
@@ -351,6 +308,57 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('mult', 'balance.mult:x')
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
+
+        prob.model.linear_solver = DirectSolver()
+
+        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.nonlinear_solver.options['maxiter'] = 100
+        prob.model.nonlinear_solver.options['iprint'] = 0
+
+        prob.model.jacobian = DenseJacobian()
+
+        prob.setup()
+
+        prob['balance.x'] = np.random.rand(n)
+
+        prob.run_model()
+
+        assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
+
+        np.set_printoptions(linewidth=1024)
+
+        cpd = prob.check_partials()
+
+        for (of, wrt) in cpd['balance']:
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+
+    def test_renamed_vars(self):
+
+        n = 1
+
+        prob = Problem(model=Group())
+
+        bal = BalanceComp()
+
+        bal.add_balance('x', mult_name='MULX', lhs_name='XSQ', rhs_name='TARGETXSQ')
+
+        tgt = IndepVarComp(name='y_tgt', val=4)
+
+        mult_ivc = IndepVarComp(name='mult', val=2.0)
+
+        exec_comp = ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
+
+        prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
+        prob.model.add_subsystem(name='mult_comp', subsys=mult_ivc, promotes_outputs=['mult'])
+
+        prob.model.add_subsystem(name='exec', subsys=exec_comp)
+
+        prob.model.add_subsystem(name='balance', subsys=bal)
+
+        prob.model.connect('y_tgt', 'balance.TARGETXSQ')
+        prob.model.connect('mult', 'balance.MULX')
+        prob.model.connect('balance.x', 'exec.x')
+        prob.model.connect('exec.y', 'balance.XSQ')
 
         prob.model.linear_solver = DirectSolver()
 
