@@ -81,6 +81,9 @@ class Group(System):
         You may only use this method to change settings on your children subsystems. This includes
         setting solvers in cases where you want to override the defaults.
 
+        You can assume that the full hierarchy below your level has been instantiated and has
+        already called its own configure methods.
+
         Available attributes:
             name
             pathname
