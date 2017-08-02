@@ -340,7 +340,7 @@ class TestBalanceComp(unittest.TestCase):
 
         bal = BalanceComp()
 
-        bal.add_balance('x', mult_name='MULX', lhs_name='XSQ', rhs_name='TARGETXSQ')
+        bal.add_balance('x', mult_name='MUL', lhs_name='XSQ', rhs_name='TARGETXSQ')
 
         tgt = IndepVarComp(name='y_tgt', val=4)
 
@@ -356,7 +356,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.add_subsystem(name='balance', subsys=bal)
 
         prob.model.connect('y_tgt', 'balance.TARGETXSQ')
-        prob.model.connect('mult', 'balance.MULX')
+        prob.model.connect('mult', 'balance.MUL')
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.XSQ')
 
