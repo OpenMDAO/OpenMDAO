@@ -49,7 +49,7 @@ def run_driver(problem):
 
 @requests_mock.Mocker()
 class TestServerRecorder(unittest.TestCase):
-    _endpoint_base = 'http://127.0.0.1:8000/case'
+    _endpoint_base = 'http://www.openmdao.org/visualization/case'
     _default_case_id = '123456'
     _accepted_token = 'test'
     recorded_metadata          = False

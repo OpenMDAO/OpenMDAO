@@ -31,7 +31,7 @@ class OpenMDAOServerRecorder(BaseRecorder):
         Dict that holds the data needed to generate N2 diagram.
     """
 
-    def __init__(self, token, case_name='Case Recording', endpoint='http://127.0.0.1', port='8000'):
+    def __init__(self, token, case_name='Case Recording', endpoint='http://www.openmdao.org/visualization', port=''):
         """
         Initialize the OpenMDAOServerRecorder.
 
@@ -42,15 +42,18 @@ class OpenMDAOServerRecorder(BaseRecorder):
         case_name: <string>
             The name this case should be stored under. Default: 'Case Recording'
         endpoint: <string>
-            The URL (minus port) where the server is hosted
+            The URL (minus port, if not 80) where the server is hosted
         port: <string>
-            The port which the server is listening on
+            The port which the server is listening on. Default to empty string (port 80)
         """
         super(OpenMDAOServerRecorder, self).__init__()
 
         self.model_viewer_data = None
         self._headers = {'token': token}
-        self._endpoint = endpoint + ':' + port + '/case'
+        if port != '':
+            self._endpoint = endpoint + ':' + port + '/case'
+        else:
+            self._endpoint = endpoint + '/case'
 
         case_data_dict = {
             'case_name': case_name,
