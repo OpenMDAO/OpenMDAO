@@ -34,7 +34,9 @@ except ImportError:
     PETScVector = None
 
     class PETScMultiVector(object):
-        """A dummy class so we can do isinstance checks."""
+        """
+        A dummy class so we can do isinstance checks.
+        """
 
         pass
 
