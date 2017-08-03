@@ -31,7 +31,7 @@ class OpenMDAOServerRecorder(BaseRecorder):
         Dict that holds the data needed to generate N2 diagram.
     """
 
-    def __init__(self, token, case_name='Case Recording', endpoint='http://www.openmdao.org/visualization', port=''):
+    def __init__(self, token, case_name='Case Recording', endpoint='http://www.openmdao.org/visualization', port='', suppress_output = False):
         """
         Initialize the OpenMDAOServerRecorder.
 
@@ -45,6 +45,8 @@ class OpenMDAOServerRecorder(BaseRecorder):
             The URL (minus port, if not 80) where the server is hosted
         port: <string>
             The port which the server is listening on. Default to empty string (port 80)
+        suppress_output: <bool>
+            Indicates if any printing should occur (including printing indicating the visualization URL)
         """
         super(OpenMDAOServerRecorder, self).__init__()
 
@@ -62,18 +64,21 @@ class OpenMDAOServerRecorder(BaseRecorder):
 
         case_data = json.dumps(case_data_dict)
 
+        # Post case and get Case ID
         case_request = requests.post(self._endpoint, data=case_data, headers=self._headers)
         response = case_request.json()
         if response['status'] != 'Failed':
             self._case_id = str(response['case_id'])
-            print("Visualization at: http://openmdao.org/visualization/case/" + self._case_id)
+            if not suppress_output:
+                print("Visualization at: http://openmdao.org/visualization/case/" + self._case_id)
         else:
             self._case_id = '-1'
-            print("Failed to initialize case on server. No messages will be accepted from server for this case.")
+            if not suppress_output:
+                print("Failed to initialize case on server. No messages will be accepted from server for this case.")
 
             if 'reasoning' in response:
-                print("Failure reasoning: " + response['reasoning'])
-                pass
+                if not suppress_output:
+                    print("Failure reasoning: " + response['reasoning'])
 
     def record_iteration(self, object_requesting_recording, metadata, **kwargs):
         """
@@ -219,82 +224,35 @@ class OpenMDAOServerRecorder(BaseRecorder):
             The method that called record_iteration. One of '_apply_linear', '_solve_linear',
             '_apply_nonlinear,' '_solve_nonlinear'. Behavior varies based on from which function
             record_iteration was called.
-        """
-        stack_top = recording_iteration_stack[-1][0]
-        method = stack_top.split('.')[-1]
+        """        
+        super(OpenMDAOServerRecorder, self).record_iteration_system(object_requesting_recording, metadata)
 
-        if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear',
-                          '_solve_nonlinear']:
-            raise ValueError("method must be one of: '_apply_linear, "
-                             "_apply_nonlinear, _solve_linear, _solve_nonlinear'")
-
-        if 'nonlinear' in method:
-            inputs, outputs, residuals = object_requesting_recording.get_nonlinear_vectors()
-        else:
-            inputs, outputs, residuals = object_requesting_recording.get_linear_vectors()
-
-        inputs_array = outputs_array = residuals_array = None
-
-        # Inputs
-        if self.options['record_inputs'] and inputs._names:
-            ins = {}
-            if 'i' in self._filtered_system:
-                # use filtered inputs
-                for inp in self._filtered_system['i']:
-                    if inp in inputs._names:
-                        ins[inp] = inputs._names[inp]
-            else:
-                # use all the inputs
-                ins = inputs._names
-
-            inputs_array = []
-            for name, value in iteritems(ins):
+        #Inputs
+        inputs_array = []
+        if self._inputs:
+            for name, value in iteritems(self._inputs):
                 inputs_array.append({
                     'name': name,
                     'values': list(value)
                 })
 
         # Outputs
-        if self.options['record_outputs'] and outputs._names:
-            outs = {}
-
-            if 'o' in self._filtered_system:
-                # use outputs from filtered list.
-                for out in self._filtered_system['o']:
-                    if out in outputs._names:
-                        outs[out] = outputs._names[out]
-            else:
-                # use all the outputs
-                outs = outputs._names
-
-            outputs_array = []
-            for name, value in iteritems(outs):
+        outputs_array = []
+        if self._outputs:
+            for name, value in iteritems(self._outputs):
                 outputs_array.append({
                     'name': name,
                     'values': list(value)
                 })
 
         # Residuals
-        if self.options['record_residuals'] and residuals._names:
-            resids = {}
-
-            if 'r' in self._filtered_system:
-                # use filtered residuals
-                for res in self._filtered_system['r']:
-                    if res in residuals._names:
-                        resids[res] = residuals._names[res]
-            else:
-                # use all the residuals
-                resids = residuals._names
-
-            dtype_tuples = []
-            if resids:
-                residuals_array = []
-                for name, value in iteritems(resids):
-                    residuals_array.append({
-                        'name': name,
-                        'values': list(value)
-                    })
+        residuals_array = []
+        if self._resids:
+            for name, value in iteritems(self._resids):
+                residuals_array.append({
+                    'name': name,
+                    'values': list(value)
+                })
 
         iteration_coordinate = get_formatted_iteration_coordinate()
         system_iteration_dict = {
@@ -335,64 +293,25 @@ class OpenMDAOServerRecorder(BaseRecorder):
             The relative error of the Solver requesting recording. It is not cached in
             the Solver object, so we pass it in here.
         """
-        outputs_array = residuals_array = None
+        super(OpenMDAOServerRecorder, self).record_iteration_solver(object_requesting_recording,
+                                                            metadata, **kwargs)
 
-        # Go through the recording options of Solver to construct the entry to be inserted.
-        if self.options['record_abs_error']:
-            abs_error = kwargs.get('abs')
-        else:
-            abs_error = None
+        outputs_array = []
+        if self._outputs:
+            for name, value in iteritems(self._outputs):
+                outputs_array.append({
+                    'name': name,
+                    'values': list(value)
+                })
 
-        if self.options['record_rel_error']:
-            rel_error = kwargs.get('rel')
-        else:
-            rel_error = None
 
-        if self.options['record_solver_output']:
-            dtype_tuples = []
-
-            if isinstance(object_requesting_recording, NonlinearSolver):
-                outputs = object_requesting_recording._system._outputs
-            else:  # it's a LinearSolver
-                outputs = object_requesting_recording._system._vectors['output']['linear']
-
-            outs = {}
-            if 'out' in self._filtered_solver:
-                for outp in outputs._names:
-                    outs[outp] = outputs._names[outp]
-            else:
-                outs = outputs
-
-            if outs:
-                outputs_array = []
-                for name, value in iteritems(outs):
-                    outputs_array.append({
-                        'name': name,
-                        'values': list(value)
-                    })
-
-        if self.options['record_solver_residuals']:
-            dtype_tuples = []
-
-            if isinstance(object_requesting_recording, NonlinearSolver):
-                residuals = object_requesting_recording._system._residuals
-            else:  # it's a LinearSolver
-                residuals = object_requesting_recording._system._vectors['residual']['linear']
-
-            res = {}
-            if 'res' in self._filtered_solver:
-                for rez in residuals._names:
-                    res[rez] = residuals._names[rez]
-            else:
-                res = residuals
-
-            if res:
-                residuals_array = []
-                for name, value in iteritems(outs):
-                    residuals_array.append({
-                        'name': name,
-                        'values': list(value)
-                    })
+        residuals_array = []
+        if self._resids:
+            for name, value in iteritems(self._resids):
+                residuals_array.append({
+                    'name': name,
+                    'values': list(value)
+                })
 
         iteration_coordinate = get_formatted_iteration_coordinate()
 
@@ -401,8 +320,8 @@ class OpenMDAOServerRecorder(BaseRecorder):
             'iteration_coordinate': iteration_coordinate,
             'success': metadata['success'],
             'msg': metadata['msg'],
-            'abs_err': abs_error,
-            'rel_err': rel_error,
+            'abs_err': self._abs_error,
+            'rel_err': self._rel_error,
             'solver_output': self.convert_to_list(outputs_array),
             'solver_residuals': self.convert_to_list(residuals_array)
         }
