@@ -546,13 +546,13 @@ class System(object):
 
             for vec_name in vec_names:
                 ncol = 1
-                if vec_name is 'nonlinear':
+                if vec_name == 'nonlinear':
                     alloc_complex = nl_alloc_complex
                     vec_class = vector_class
                 else:
                     alloc_complex = force_alloc_complex
 
-                    if vec_name is 'linear':
+                    if vec_name == 'linear':
                         vec_class = vector_class
                     else:
                         vec_class = multi_vector_class

@@ -771,7 +771,7 @@ class Problem(object):
             # TODO: Do all three deriv vectors have the same keys?
 
             # Skip nonlinear because we don't need to mess with it?
-            if subname is 'nonlinear':
+            if subname == 'nonlinear':
                 continue
 
             vec_dinput[subname].set_const(0.0)
@@ -816,14 +816,14 @@ class Problem(object):
         # derivatives that we will return.
         totals = OrderedDict()
 
-        if return_format is 'flat_dict':
+        if return_format == 'flat_dict':
             for ocount, output_name in enumerate(output_list):
                 okey = old_output_list[ocount]
                 for icount, input_name in enumerate(input_list):
                     ikey = old_input_list[icount]
                     totals[okey, ikey] = -approx_jac[output_name, input_name]
 
-        elif return_format is 'dict':
+        elif return_format == 'dict':
             for ocount, output_name in enumerate(output_list):
                 okey = old_output_list[ocount]
                 totals[okey] = tot = OrderedDict()
@@ -890,7 +890,7 @@ class Problem(object):
                                     test_mode, return_format):
         # this sets dinputs for the current rhs_group to 0
         voi_info[vois[0][0]][0].set_const(0.0)
-        fwd = mode is 'fwd'
+        fwd = mode == 'fwd'
         model = self.model
         nproc = model.comm.size
         iproc = model.comm.rank
@@ -972,7 +972,7 @@ class Problem(object):
 
                 len_val = len(deriv_val)
 
-                if return_format is 'flat_dict':
+                if return_format == 'flat_dict':
                     if fwd:
                         key = (old_output_list[ocount], old_input_name)
 
@@ -988,7 +988,7 @@ class Problem(object):
                         if store:
                             totals[key][loc_idxs, :] = deriv_val.T
 
-                elif return_format is 'dict':
+                elif return_format == 'dict':
                     if fwd:
                         okey = old_output_list[ocount]
 
@@ -1068,9 +1068,9 @@ class Problem(object):
             # TODO: Do all three deriv vectors have the same keys?
 
             # Skip nonlinear because we don't need to mess with it?
-            if subname is 'nonlinear':
+            if subname == 'nonlinear':
                 continue
-            elif subname is not 'linear':
+            elif subname != 'linear':
                 matmat |= isinstance(vec_doutput[subname], (DefaultMultiVector, PETScMultiVector))
 
             vec_dinput[subname].set_const(0.0)
@@ -1084,11 +1084,11 @@ class Problem(object):
         # derivatives that we will return.
         totals = OrderedDict()
 
-        if return_format is 'flat_dict':
+        if return_format == 'flat_dict':
             for okey in of:
                 for ikey in wrt:
                     totals[(okey, ikey)] = None
-        elif return_format is 'dict':
+        elif return_format == 'dict':
             for okey in of:
                 totals[okey] = OrderedDict()
                 for ikey in wrt:
@@ -1258,7 +1258,7 @@ class Problem(object):
 
                         len_val = len(deriv_val)
 
-                        if return_format is 'flat_dict':
+                        if return_format == 'flat_dict':
                             if fwd:
                                 key = (old_output_list[ocount], old_input_name)
 
@@ -1274,7 +1274,7 @@ class Problem(object):
                                 if store:
                                     totals[key][loc_idx, :] = deriv_val
 
-                        elif return_format is 'dict':
+                        elif return_format == 'dict':
                             if fwd:
                                 okey = old_output_list[ocount]
 
