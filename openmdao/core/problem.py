@@ -103,6 +103,8 @@ class Problem(object):
 
         self._mode = None  # mode is assigned in setup()
 
+        recording_iteration_stack = []
+
     def __getitem__(self, name):
         """
         Get an output/input variable.
