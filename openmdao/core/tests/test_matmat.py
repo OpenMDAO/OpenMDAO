@@ -319,79 +319,80 @@ class Summer(ExplicitComponent):
         for i in range(self.metadata['n_phases']):
             outputs['total_arc_length'] += inputs['arc_length:p%d' % i]
 
+def simple_model(order, dvgroup='pardv', congroup='parc'):
+    n = order + 1
+
+    p = Problem(model=Group())
+
+    # Step 1:  Make an indep var comp that provides the approximated values at the LGL nodes.
+    p.model.add_subsystem('y_lgl_ivc', IndepVarComp('y_lgl', val=np.zeros(n),
+                          desc='values at LGL nodes'),
+                          promotes_outputs=['y_lgl'])
+
+    # Step 2:  Make an indep var comp that provides the 'truth' values at the midpoint nodes.
+    x_lgl, _ = lgl(n)
+    x_lgl = x_lgl * np.pi # put x_lgl on [-pi, pi]
+    x_mid = (x_lgl[1:] + x_lgl[:-1])/2.0 # midpoints on [-pi, pi]
+    p.model.add_subsystem('truth', IndepVarComp('y_mid',
+                                                val=np.sin(x_mid),
+                                                desc='truth values at midpoint nodes'))
+
+    # Step 3: Make a polynomial fitting component
+    p.model.add_subsystem('lgl_fit', LGLFit(num_nodes=n))
+
+    # Step 4: Add the defect component
+    p.model.add_subsystem('defect', DefectComp(num_nodes=n))
+
+    # Step 5: Compute the integrand of the arclength function then quadrature it
+    p.model.add_subsystem('arclength_func', ArcLengthFunction(num_nodes=n))
+    p.model.add_subsystem('arclength_quad', ArcLengthQuadrature(num_nodes=n))
+
+    p.model.connect('y_lgl', 'lgl_fit.y_lgl')
+    p.model.connect('truth.y_mid', 'defect.y_truth')
+    p.model.connect('lgl_fit.y_mid', 'defect.y_approx')
+    p.model.connect('lgl_fit.yp_lgl', 'arclength_func.yp_lgl')
+    p.model.connect('arclength_func.f_arclength', 'arclength_quad.f_arclength')
+
+    p.model.add_design_var('y_lgl', lower=-1000.0, upper=1000.0, rhs_group=dvgroup)
+    p.model.add_constraint('defect.defect', lower=-1e-6, upper=1e-6, rhs_group=congroup)
+    p.model.add_objective('arclength_quad.arclength')
+    p.driver = ScipyOptimizer()
+    return p, np.sin(x_lgl)
+
+def phase_model(order, nphases, dvgroup='pardv', congroup='parc'):
+    N_PHASES = nphases
+    PHASE_ORDER = order
+
+    n = PHASE_ORDER + 1
+
+    p = Problem()
+
+    # Step 1:  Make an indep var comp that provides the approximated values at the LGL nodes.
+    for i in range(N_PHASES):
+        p_name = 'p%d' % i
+        p.model.add_subsystem(p_name, Phase(order=PHASE_ORDER))
+        p.model.connect('%s.arclength_quad.arclength' % p_name, 'sum.arc_length:%s' % p_name)
+
+        p.model.add_design_var('%s.y_lgl' % p_name, lower=-1000.0, upper=1000.0, rhs_group=dvgroup)
+        p.model.add_constraint('%s.defect.defect' % p_name, lower=-1e-6, upper=1e-6, rhs_group=congroup)
+
+    p.model.add_subsystem('sum', Summer(n_phases=N_PHASES))
+
+    p.model.add_objective('sum.total_arc_length')
+    p.driver = ScipyOptimizer()
+
+    x_lgl, _ = lgl(n)
+    x_lgl = x_lgl * np.pi # put x_lgl on [-pi, pi]
+    x_mid = (x_lgl[1:] + x_lgl[:-1])/2.0 # midpoints on [-pi, pi]
+
+    return p, np.sin(x_lgl)
+
+
 
 class MatMatTestCase(unittest.TestCase):
 
-    def simple_model(self, order, dvgroup='pardv', congroup='parc'):
-        n = order + 1
-
-        p = Problem(model=Group())
-
-        # Step 1:  Make an indep var comp that provides the approximated values at the LGL nodes.
-        p.model.add_subsystem('y_lgl_ivc', IndepVarComp('y_lgl', val=np.zeros(n),
-                              desc='values at LGL nodes'),
-                              promotes_outputs=['y_lgl'])
-
-        # Step 2:  Make an indep var comp that provides the 'truth' values at the midpoint nodes.
-        x_lgl, _ = lgl(n)
-        x_lgl = x_lgl * np.pi # put x_lgl on [-pi, pi]
-        x_mid = (x_lgl[1:] + x_lgl[:-1])/2.0 # midpoints on [-pi, pi]
-        p.model.add_subsystem('truth', IndepVarComp('y_mid',
-                                                    val=np.sin(x_mid),
-                                                    desc='truth values at midpoint nodes'))
-
-        # Step 3: Make a polynomial fitting component
-        p.model.add_subsystem('lgl_fit', LGLFit(num_nodes=n))
-
-        # Step 4: Add the defect component
-        p.model.add_subsystem('defect', DefectComp(num_nodes=n))
-
-        # Step 5: Compute the integrand of the arclength function then quadrature it
-        p.model.add_subsystem('arclength_func', ArcLengthFunction(num_nodes=n))
-        p.model.add_subsystem('arclength_quad', ArcLengthQuadrature(num_nodes=n))
-
-        p.model.connect('y_lgl', 'lgl_fit.y_lgl')
-        p.model.connect('truth.y_mid', 'defect.y_truth')
-        p.model.connect('lgl_fit.y_mid', 'defect.y_approx')
-        p.model.connect('lgl_fit.yp_lgl', 'arclength_func.yp_lgl')
-        p.model.connect('arclength_func.f_arclength', 'arclength_quad.f_arclength')
-
-        p.model.add_design_var('y_lgl', lower=-1000.0, upper=1000.0, rhs_group=dvgroup)
-        p.model.add_constraint('defect.defect', lower=-1e-6, upper=1e-6, rhs_group=congroup)
-        p.model.add_objective('arclength_quad.arclength')
-        p.driver = ScipyOptimizer()
-        return p, np.sin(x_lgl)
-
-    def phase_model(self, order, nphases, dvgroup='pardv', congroup='parc'):
-        N_PHASES = nphases
-        PHASE_ORDER = order
-
-        n = PHASE_ORDER + 1
-
-        p = Problem()
-
-        # Step 1:  Make an indep var comp that provides the approximated values at the LGL nodes.
-        for i in range(N_PHASES):
-            p_name = 'p%d' % i
-            p.model.add_subsystem(p_name, Phase(order=PHASE_ORDER))
-            p.model.connect('%s.arclength_quad.arclength' % p_name, 'sum.arc_length:%s' % p_name)
-
-            p.model.add_design_var('%s.y_lgl' % p_name, lower=-1000.0, upper=1000.0, rhs_group=dvgroup)
-            p.model.add_constraint('%s.defect.defect' % p_name, lower=-1e-6, upper=1e-6, rhs_group=congroup)
-
-        p.model.add_subsystem('sum', Summer(n_phases=N_PHASES))
-
-        p.model.add_objective('sum.total_arc_length')
-        p.driver = ScipyOptimizer()
-
-        x_lgl, _ = lgl(n)
-        x_lgl = x_lgl * np.pi # put x_lgl on [-pi, pi]
-        x_mid = (x_lgl[1:] + x_lgl[:-1])/2.0 # midpoints on [-pi, pi]
-
-        return p, np.sin(x_lgl)
-
     def test_simple_multi_fwd(self):
-        p, expected = self.simple_model(order=20)
+        p, expected = simple_model(order=20)
 
         p.setup(check=False, mode='fwd', multi_vector_class=DefaultMultiVector)
 
@@ -407,7 +408,7 @@ class MatMatTestCase(unittest.TestCase):
         assert_rel_error(self, expected, y_lgl, 1.e-5)
 
     def test_simple_multi_rev(self):
-        p, expected = self.simple_model(order=20)
+        p, expected = simple_model(order=20)
 
         p.setup(check=False, mode='rev', multi_vector_class=DefaultMultiVector)
 
@@ -418,7 +419,7 @@ class MatMatTestCase(unittest.TestCase):
 
     def test_phases_multi_fwd(self):
         N_PHASES = 4
-        p, expected = self.phase_model(order=20, nphases=N_PHASES)
+        p, expected = phase_model(order=20, nphases=N_PHASES)
 
         p.setup(check=False, mode='fwd', multi_vector_class=DefaultMultiVector)
 
@@ -438,7 +439,7 @@ class MatMatTestCase(unittest.TestCase):
 
     def test_phases_multi_rev(self):
         N_PHASES = 4
-        p, expected = self.phase_model(order=20, nphases=N_PHASES)
+        p, expected = phase_model(order=20, nphases=N_PHASES)
 
         p.setup(check=False, mode='rev', multi_vector_class=DefaultMultiVector)
 
@@ -449,7 +450,7 @@ class MatMatTestCase(unittest.TestCase):
 
     def test_phases_multi_dense_fwd(self):
         N_PHASES = 4
-        p, expected = self.phase_model(order=20, nphases=N_PHASES)
+        p, expected = phase_model(order=20, nphases=N_PHASES)
 
         p.model.jacobian = DenseJacobian()
         p.model.linear_solver = DirectSolver()
@@ -463,7 +464,7 @@ class MatMatTestCase(unittest.TestCase):
 
     def test_phases_multi_dense_rev(self):
         N_PHASES = 4
-        p, expected = self.phase_model(order=20, nphases=N_PHASES)
+        p, expected = phase_model(order=20, nphases=N_PHASES)
 
         p.model.jacobian = DenseJacobian()
         p.model.linear_solver = DirectSolver()
