@@ -132,19 +132,7 @@ class BalanceComp(ImplicitComponent):
 
             for s in ('lhs', 'rhs', 'mult'):
                 if options['{0}_name'.format(s)] is None:
-                    options['{0}_name'.format(s)] = '{0}:{1}'.format(s,name)
-
-            # if options['lhs_name'] is None:
-            #     lhs_name = 'lhs:{0}'.format(name)
-            #     self._state_vars[name]['lhs_name'] = lhs_name
-            #
-            # if options['rhs_name'] is None:
-            #     rhs_name = 'rhs:{0}'.format(name)
-            #     self._state_vars[name]['rhs_name'] = rhs_name
-            #
-            # if options['mult_name'] is None:
-            #     mult_name = 'mult:{0}'.format(name)
-            #     self._state_vars[name]['mult_name'] = mult_name
+                    options['{0}_name'.format(s)] = '{0}:{1}'.format(s, name)
 
             val = options['kwargs'].get('val', np.ones(1))
             if isinstance(val, Number):

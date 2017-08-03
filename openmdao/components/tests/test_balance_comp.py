@@ -86,7 +86,6 @@ class TestBalanceComp(unittest.TestCase):
         for (of, wrt) in cpd['balance']:
             assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
-
     def test_vectorized(self):
 
         n = 100
