@@ -7,7 +7,6 @@ import requests
 
 import base64
 import json
-import bson
 import numpy as np
 from six import iteritems
 from six.moves import cPickle as pickle
