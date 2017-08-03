@@ -899,12 +899,17 @@ class Problem(object):
         for input_name, old_input_name in vois:
             dinputs, doutputs, idxs, max_i, min_i, loc_size, start, end, dup = voi_info[input_name]
             if input_name in dinputs:
+                vec = dinputs._views_flat[input_name]
                 for i, idx in enumerate(idxs):
                     if idx < 0:
                         idx += end
 
                     if start <= idx < end:
-                        dinputs._views_flat[input_name][idx - start, i] = 1.0
+                        # not all vars will be matrix-matrix, so we have to check here
+                        if len(vec.shape) > 1:
+                            dinputs._views_flat[input_name][idx - start, i] = 1.0
+                        else:
+                            dinputs._views_flat[input_name][idx - start] = 1.0
 
         model._solve_linear(vec_names, mode)
 

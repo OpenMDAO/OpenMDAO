@@ -5,7 +5,8 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, \
-                         ScipyOptimizer, DefaultMultiVector
+                         ScipyOptimizer, DefaultMultiVector, DefaultVector, \
+                         DenseJacobian, DirectSolver
 from openmdao.devtools.testutil import assert_rel_error
 
 def lgl(n, tol=np.finfo(float).eps):
@@ -321,16 +322,14 @@ class Summer(ExplicitComponent):
 
 class MatMatTestCase(unittest.TestCase):
 
-    def test_simple(self):
-        # change this number for more compute points
-        ORDER = 20
-
-        n = ORDER + 1
+    def simple_model(self, order, dvgroup='pardv', congroup='parc'):
+        n = order + 1
 
         p = Problem(model=Group())
 
         # Step 1:  Make an indep var comp that provides the approximated values at the LGL nodes.
-        p.model.add_subsystem('y_lgl_ivc', IndepVarComp('y_lgl', val=np.zeros(n), desc='values at LGL nodes'),
+        p.model.add_subsystem('y_lgl_ivc', IndepVarComp('y_lgl', val=np.zeros(n),
+                              desc='values at LGL nodes'),
                               promotes_outputs=['y_lgl'])
 
         # Step 2:  Make an indep var comp that provides the 'truth' values at the midpoint nodes.
@@ -357,29 +356,15 @@ class MatMatTestCase(unittest.TestCase):
         p.model.connect('lgl_fit.yp_lgl', 'arclength_func.yp_lgl')
         p.model.connect('arclength_func.f_arclength', 'arclength_quad.f_arclength')
 
-        p.model.add_design_var('y_lgl', lower=-1000.0, upper=1000.0, rhs_group='pardv')
-        p.model.add_constraint('defect.defect', lower=-1e-6, upper=1e-6, rhs_group='parc') # works
-        # p.model.add_constraint('defect.defect', equals=0.) # does not work
+        p.model.add_design_var('y_lgl', lower=-1000.0, upper=1000.0, rhs_group=dvgroup)
+        p.model.add_constraint('defect.defect', lower=-1e-6, upper=1e-6, rhs_group=congroup)
         p.model.add_objective('arclength_quad.arclength')
         p.driver = ScipyOptimizer()
+        return p, np.sin(x_lgl)
 
-        p.setup(mode='fwd', multi_vector_class=DefaultMultiVector)
-
-        p.run_driver()
-
-        #import matplotlib.pyplot as plt
-
-        #plt.plot(x_mid, p['truth.y_mid'], 'ro')
-        #plt.plot(x_lgl, p['y_lgl'], 'bo')
-        #plt.show()
-
-        y_lgl = p['y_lgl']
-        sinfunc = np.sin(x_lgl)
-        assert_rel_error(self, sinfunc, y_lgl, 1.e-5)
-
-    def test_phases(self):
-        N_PHASES = 4
-        PHASE_ORDER = 20
+    def phase_model(self, order, nphases, dvgroup='pardv', congroup='parc'):
+        N_PHASES = nphases
+        PHASE_ORDER = order
 
         n = PHASE_ORDER + 1
 
@@ -391,22 +376,53 @@ class MatMatTestCase(unittest.TestCase):
             p.model.add_subsystem(p_name, Phase(order=PHASE_ORDER))
             p.model.connect('%s.arclength_quad.arclength' % p_name, 'sum.arc_length:%s' % p_name)
 
-            p.model.add_design_var('%s.y_lgl' % p_name, lower=-1000.0, upper=1000.0, rhs_group='pardv')
-            p.model.add_constraint('%s.defect.defect' % p_name, lower=-1e-6, upper=1e-6, rhs_group='parc')
-
+            p.model.add_design_var('%s.y_lgl' % p_name, lower=-1000.0, upper=1000.0, rhs_group=dvgroup)
+            p.model.add_constraint('%s.defect.defect' % p_name, lower=-1e-6, upper=1e-6, rhs_group=congroup)
 
         p.model.add_subsystem('sum', Summer(n_phases=N_PHASES))
 
         p.model.add_objective('sum.total_arc_length')
         p.driver = ScipyOptimizer()
 
-        p.setup(mode='fwd', multi_vector_class=DefaultMultiVector)
-
-        p.run_driver()
-
         x_lgl, _ = lgl(n)
         x_lgl = x_lgl * np.pi # put x_lgl on [-pi, pi]
         x_mid = (x_lgl[1:] + x_lgl[:-1])/2.0 # midpoints on [-pi, pi]
+
+        return p, np.sin(x_lgl)
+
+    def test_simple_multi_fwd(self):
+        p, expected = self.simple_model(order=20)
+
+        p.setup(check=False, mode='fwd', multi_vector_class=DefaultMultiVector)
+
+        p.run_driver()
+
+        #import matplotlib.pyplot as plt
+
+        #plt.plot(x_mid, p['truth.y_mid'], 'ro')
+        #plt.plot(x_lgl, p['y_lgl'], 'bo')
+        #plt.show()
+
+        y_lgl = p['y_lgl']
+        assert_rel_error(self, expected, y_lgl, 1.e-5)
+
+    def test_simple_multi_rev(self):
+        p, expected = self.simple_model(order=20)
+
+        p.setup(check=False, mode='rev', multi_vector_class=DefaultMultiVector)
+
+        p.run_driver()
+
+        y_lgl = p['y_lgl']
+        assert_rel_error(self, expected, y_lgl, 1.e-5)
+
+    def test_phases_multi_fwd(self):
+        N_PHASES = 4
+        p, expected = self.phase_model(order=20, nphases=N_PHASES)
+
+        p.setup(check=False, mode='fwd', multi_vector_class=DefaultMultiVector)
+
+        p.run_driver()
 
         # import matplotlib.pyplot as plt
         # for i in range(N_PHASES):
@@ -417,9 +433,47 @@ class MatMatTestCase(unittest.TestCase):
         #
         # plt.show()
 
-        sinfunc = np.sin(x_lgl)
         for i in range(N_PHASES):
-            assert_rel_error(self, sinfunc, p['p%d.y_lgl' % i], 1.e-5)
+            assert_rel_error(self, expected, p['p%d.y_lgl' % i], 1.e-5)
+
+    def test_phases_multi_rev(self):
+        N_PHASES = 4
+        p, expected = self.phase_model(order=20, nphases=N_PHASES)
+
+        p.setup(check=False, mode='rev', multi_vector_class=DefaultMultiVector)
+
+        p.run_driver()
+
+        for i in range(N_PHASES):
+            assert_rel_error(self, expected, p['p%d.y_lgl' % i], 1.e-5)
+
+    def test_phases_multi_dense_fwd(self):
+        N_PHASES = 4
+        p, expected = self.phase_model(order=20, nphases=N_PHASES)
+
+        p.model.jacobian = DenseJacobian()
+        p.model.linear_solver = DirectSolver()
+
+        p.setup(check=False, mode='fwd', multi_vector_class=DefaultMultiVector)
+
+        p.run_driver()
+
+        for i in range(N_PHASES):
+            assert_rel_error(self, expected, p['p%d.y_lgl' % i], 1.e-5)
+
+    def test_phases_multi_dense_rev(self):
+        N_PHASES = 4
+        p, expected = self.phase_model(order=20, nphases=N_PHASES)
+
+        p.model.jacobian = DenseJacobian()
+        p.model.linear_solver = DirectSolver()
+
+        p.setup(check=False, mode='rev', multi_vector_class=DefaultMultiVector)
+
+        p.run_driver()
+
+        for i in range(N_PHASES):
+            assert_rel_error(self, expected, p['p%d.y_lgl' % i], 1.e-5)
 
 if __name__ == '__main__':
     unittest.main()
