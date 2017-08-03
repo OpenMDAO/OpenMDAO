@@ -19,6 +19,7 @@ from openmdao.vectors.default_multi_vector import DefaultMultiVector
 try:
     from openmdao.vectors.petsc_multi_vector import PETScMultiVector
 except ImportError:
+
     class PETScMultiVector(object):
         """
         A dummy class so we can do isinstance checks.
