@@ -28,11 +28,7 @@ addons:
     - openmpi-bin
 
 notifications:
-  email: false
-  slack:
-    on_success: never
-    rooms:
-      openmdao:GRr0MeNdmks2i7qCTWGLoOj7#testing
+  slack: 'openmdao:GRr0MeNdmks2i7qCTWGLoOj7#testing'
 
 before_install:
 - OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux"; fi)
