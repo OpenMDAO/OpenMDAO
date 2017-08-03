@@ -411,6 +411,7 @@ class Group(System):
             Dictionary of connections passed down from parent group.
         """
         super(Group, self)._setup_global_connections()
+
         global_abs_in2out = self._conn_global_abs_in2out
 
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
@@ -549,10 +550,6 @@ class Group(System):
                 if src_indices is not None:
                     src_indices = np.atleast_1d(src_indices)
 
-                    if len(src_indices.shape) < len(in_shape):
-                        raise ValueError("Unexpected indices shape: %s vs %s" %
-                                         (src_indices.shape, in_shape))
-
                     # initial dimensions of indices shape must be same shape as target
                     for idx_d, inp_d in zip(src_indices.shape, in_shape):
                         if idx_d != inp_d:
@@ -560,11 +557,12 @@ class Group(System):
                                    "valid shape for the connection '%s' to "
                                    "'%s' in Group '%s'. The target shape is "
                                    "%s but indices are %s.")
-                            raise ValueError(msg % (src_indices, prom_out, prom_in,
+                            raise ValueError(msg % (str(src_indices).replace('\n', ''),
+                                                    prom_out, prom_in,
                                                     self.pathname,
                                                     in_shape, src_indices.shape))
 
-                    # remaining dimension of indices must match shape of source
+                    # any remaining dimension of indices must match shape of source
                     if len(src_indices.shape) > len(in_shape):
                         source_dimensions = src_indices.shape[len(in_shape)]
                         if source_dimensions != len(out_shape):
@@ -572,24 +570,25 @@ class Group(System):
                                    "valid shape for the connection '%s' to "
                                    "'%s' in Group '%s'. The source has %d "
                                    "dimensions but the indices expect %d.")
-                            raise ValueError(msg % (src_indices,
-                                                    prom_out, prom_in,
-                                                    self.pathname,
-                                                    len(out_shape),
-                                                    source_dimensions))
+                            raise ValueError(msg % (str(src_indices).replace('\n', ''),
+                                                    prom_out, prom_in, self.pathname,
+                                                    len(out_shape), source_dimensions))
+                    else:
+                        source_dimensions = 1
 
-                        # check all indices are in range of the source dimensions
-                        for d in range(source_dimensions):
-                            d_size = out_shape[d]
-                            for i in src_indices[..., d].flat:
-                                if abs(i) >= d_size:
-                                    msg = ("The source indices do not specify "
-                                           "a valid index for the connection "
-                                           "'%s' to '%s' in Group '%s'. Index "
-                                           "'%d' is out of range for source " 
-                                           "dimension %d.")
-                                    raise ValueError(msg % (prom_out, prom_in,
-                                                            self.pathname, i, d_size))
+                    # check all indices are in range of the source dimensions
+                    for d in range(source_dimensions):
+                        # when running under MPI, there is a value for each proc
+                        d_size = out_shape[d] * self.comm.size
+                        for i in src_indices[..., d].flat:
+                            if abs(i) >= d_size:
+                                msg = ("The source indices do not specify "
+                                       "a valid index for the connection "
+                                       "'%s' to '%s' in Group '%s'. Index "
+                                       "'%d' is out of range for source "
+                                       "dimension of size %d.")
+                                raise ValueError(msg % (prom_out, prom_in,
+                                                 self.pathname, i, d_size))
 
         # Recursion
         if recurse:
