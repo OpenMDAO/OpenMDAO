@@ -96,14 +96,14 @@ def _get_out_of_order_subs(group, input_srcs):
     Returns
     -------
     dict
-        A dict mapping names of target Systems to a list of names of their
+        A dict mapping names of target Systems to a set of names of their
         source Systems that execute after them.
     """
     subsystems = group._subsystems_allprocs
     sub2i = {sub.name: i for i, sub in enumerate(subsystems)}
     glen = len(group.pathname.split('.')) if group.pathname else 0
 
-    ubcs = defaultdict(list)
+    ubcs = defaultdict(set)
     for in_abs, src_abs in iteritems(input_srcs):
         if src_abs is not None:
             iparts = in_abs.split('.')
@@ -112,7 +112,7 @@ def _get_out_of_order_subs(group, input_srcs):
             tgt_sys = iparts[glen]
             if (src_sys in sub2i and tgt_sys in sub2i and
                     (sub2i[src_sys] > sub2i[tgt_sys])):
-                ubcs['.'.join(iparts[:glen + 1])].append('.'.join(oparts[:glen + 1]))
+                ubcs['.'.join(iparts[:glen + 1])].add('.'.join(oparts[:glen + 1]))
 
     return ubcs
 
