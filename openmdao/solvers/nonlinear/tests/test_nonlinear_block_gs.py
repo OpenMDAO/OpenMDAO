@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, NonlinearBlockGS, Group, ScipyIterativeSolver, IndepVarComp, \
-     ExecComp
+     ExecComp, AnalysisError
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives, \
@@ -199,8 +199,6 @@ class TestNLBGaussSeidel(unittest.TestCase):
     def test_sellar_analysis_error(self):
         # Tests Sellar behavior when AnalysisError is raised.
 
-        raise unittest.SkipTest("AnalysisError not implemented yet")
-
         prob = Problem()
         model = prob.model = Group()
 
@@ -227,7 +225,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         try:
             prob.run_model()
         except AnalysisError as err:
-            self.assertEqual(str(err), "Solve in '': NLGaussSeidel FAILED to converge after 2 iterations")
+            self.assertEqual(str(err), "Solver 'NL: NLBGS' on system '' failed to converge.")
         else:
             self.fail("expected AnalysisError")
 
