@@ -1,6 +1,5 @@
 """
-Class definition for OpenMDAOServerRecorder, which provides access
- to the OpenMDAO server endpoints.
+Class definition for OpenMDAOServerRecorder, which records to an HTTP server.
 """
 
 import json
@@ -22,7 +21,7 @@ format_version = 1
 
 class OpenMDAOServerRecorder(BaseRecorder):
     """
-    Recorder that saves cases to the OpenMDAO server
+    Recorder that saves cases to the OpenMDAO server.
 
     Attributes
     ----------
@@ -311,7 +310,6 @@ class OpenMDAOServerRecorder(BaseRecorder):
                     'name': name,
                     'values': list(value)
                 })
-
 
         residuals_array = []
         if self._resids:

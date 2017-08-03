@@ -794,42 +794,6 @@ class TestServerRecorder(unittest.TestCase):
         for o in expected_solver_output:
             self.assert_array_close(o, solver_iteration['solver_output'])
 
-    def test_record_solver_linear_petsc_ksp(self, m):
-        self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
-        self.setup_sellar_model()
-
-        self.prob.model.nonlinear_solver = NewtonSolver()
-        # used for analytic derivatives
-        self.prob.model.nonlinear_solver.linear_solver = PetscKSP()
-
-        recorder.options['record_abs_error'] = True
-        recorder.options['record_rel_error'] = True
-        recorder.options['record_solver_output'] = True
-        recorder.options['record_solver_residuals'] = True
-        self.prob.model.nonlinear_solver.linear_solver.add_recorder(recorder)
-
-        self.prob.setup(check=False)
-        t0, t1 = run_driver(self.prob)
-
-        solver_iteration = json.loads(self.solver_iterations)
-
-        expected_solver_output = [
-            {'name': 'px.x', 'values': [0.0]},
-            {'name': 'pz.z', 'values': [0.0, 0.0]},
-            {'name': 'd1.y1', 'values': [-7.86357118e-07]},
-            {'name': 'd2.y2', 'values': [0.00177091]},
-            {'name': 'obj_cmp.obj', 'values': [0.70719095]},
-            {'name': 'con_cmp1.con1', 'values': [-0.70702038]},
-            {'name': 'con_cmp2.con2', 'values': [3.93178559e-06]},
-        ]
-
-        self.assertAlmostEqual(0.0, solver_iteration['abs_err'])
-        self.assertAlmostEqual(0.0, solver_iteration['rel_err'])
-
-        for o in expected_solver_output:
-            self.assert_array_close(o, solver_iteration['solver_output'])
-
     def test_record_solver_linear_block_gs(self, m):
         self.setup_endpoints(m)
         recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
