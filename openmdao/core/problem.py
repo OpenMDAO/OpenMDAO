@@ -32,8 +32,10 @@ try:
     from openmdao.vectors.petsc_multi_vector import PETScMultiVector
 except ImportError:
     PETScVector = None
-    # define a dummy class so we can do isinstance checks
+
     class PETScMultiVector(object):
+        """A dummy class so we can do isinstance checks."""
+
         pass
 
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
