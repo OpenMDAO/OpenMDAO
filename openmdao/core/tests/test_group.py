@@ -1061,16 +1061,12 @@ class TestConnect(unittest.TestCase):
 
         p.model.connect('IV.x', 'C1.x', src_indices=[(1, 1)])
 
-        msg = ("The source indices [[1 1]] do not specify a valid shape for "
+        msg = ("The source indices \[\[1 1\]\] do not specify a valid shape for "
                "the connection 'IV.x' to 'C1.x' in Group ''. The target "
-               "shape is (2, 2) but indices are (1, 2).")
+               "shape is \(2.*, 2.*\) but indices are \(1.*, 2.*\).")
 
-        try:
-            p.setup()
-        except Exception as err:
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail('Exception expected.')
+        with assertRaisesRegex(self, ValueError, msg):
+            p.setup(check=False)
 
     def test_bad_indices_dimensions(self):
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1, 2), (2, 2, 2)])
@@ -1081,7 +1077,7 @@ class TestConnect(unittest.TestCase):
 
         try:
             self.prob.setup(check=False)
-        except Exception as err:
+        except ValueError as err:
             self.assertEqual(str(err), msg)
         else:
             self.fail('Exception expected.')
@@ -1096,7 +1092,7 @@ class TestConnect(unittest.TestCase):
 
         try:
             self.prob.setup(check=False)
-        except Exception as err:
+        except ValueError as err:
             self.assertEqual(str(err), msg)
         else:
             self.fail('Exception expected.')

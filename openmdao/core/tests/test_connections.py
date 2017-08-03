@@ -2,8 +2,9 @@
 
 import unittest
 import numpy as np
-from six import text_type, PY3
+
 from six.moves import cStringIO, range
+from six import assertRaisesRegex
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
 
@@ -425,30 +426,22 @@ class TestConnectionsIndices(unittest.TestCase):
 
         expected = ("The source and target shapes do not match for the "
                     "connection 'idvp.blammo' to 'arraycomp.inp' in Group ''. "
-                    " Expected (2,) but got (1,).")
+                    " Expected \(2.*,\) but got \(1.*,\).")
 
-        try:
+        with assertRaisesRegex(self, ValueError, expected):
             self.prob.setup(check=False)
-        except ValueError as err:
-            self.assertEqual(str(err), expected)
-        else:
-            self.fail('Exception expected.')
 
     def test_bad_length(self):
         # Should not be allowed because the length of src_indices is greater than
         # the shape of arraycomp.inp
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 1, 0])
 
-        expected = ("The source indices [0 1 0] do not specify a valid shape "
+        expected = ("The source indices \[0 1 0\] do not specify a valid shape "
                     "for the connection 'idvp.blammo' to 'arraycomp.inp' in "
-                    "Group ''. The target shape is (2,) but indices are (3,).")
+                    "Group ''. The target shape is \(2.*,\) but indices are \(3.*,\).")
 
-        try:
+        with assertRaisesRegex(self, ValueError, expected):
             self.prob.setup(check=False)
-        except ValueError as err:
-            self.assertEqual(str(err), expected)
-        else:
-            self.fail('Exception expected.')
 
     def test_bad_value(self):
         # Should not be allowed because the index value within src_indices is outside
