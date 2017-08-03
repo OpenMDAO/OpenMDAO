@@ -113,9 +113,14 @@ class Driver(object):
         self._cons = model.get_constraints(recurse=True)
 
         self._rec_mgr.startup(self)
-        if (self._rec_mgr._recorders):
-            from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
-            self._model_viewer_data = _get_viewer_data(problem)
+
+        # Only do this for now in serial. Parallel does not work yet.
+        from openmdao.utils.mpi import MPI
+
+        if not MPI:
+            if (self._rec_mgr._recorders):
+                from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
+                self._model_viewer_data = _get_viewer_data(problem)
         self._rec_mgr.record_metadata(self)
 
     def get_design_var_values(self, filter=None):
@@ -271,7 +276,7 @@ class Driver(object):
             with 'linear' or the nonlinear constraints with 'nonlinear'.
 
         filter : list
-            List of objective names used by recorders.
+            List of constraint names used by recorders.
 
         Returns
         -------
