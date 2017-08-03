@@ -588,7 +588,7 @@ class Group(System):
                                        "'%d' is out of range for source "
                                        "dimension of size %d.")
                                 raise ValueError(msg % (prom_out, prom_in,
-                                                    self.pathname, i, d_size))
+                                                 self.pathname, i, d_size))
 
         # Recursion
         if recurse:
