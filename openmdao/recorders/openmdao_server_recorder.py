@@ -66,12 +66,13 @@ class OpenMDAOServerRecorder(BaseRecorder):
         response = case_request.json()
         if response['status'] != 'Failed':
             self._case_id = str(response['case_id'])
+            print("Visualization at: http://openmdao.org/visualization/case/" + self._case_id)
         else:
             self._case_id = '-1'
-            # print("Failed to initialize case on server. No messages will be accepted from server for this case.")
+            print("Failed to initialize case on server. No messages will be accepted from server for this case.")
 
             if 'reasoning' in response:
-                # print("Failure reasoning: " + response['reasoning'])
+                print("Failure reasoning: " + response['reasoning'])
                 pass
 
     def record_iteration(self, object_requesting_recording, metadata, **kwargs):
@@ -111,16 +112,6 @@ class OpenMDAOServerRecorder(BaseRecorder):
         metadata : dict
             Dictionary containing execution metadata (e.g. iteration coordinate).
         """
-        # make a nested numpy named array using the example
-        #   http://stackoverflow.com/questions/19201868/how-to-set-dtype-for-nested-numpy-ndarray
-        # e.g.
-        # table = np.array(data, dtype=[('instrument', 'S32'),
-        #                        ('filter', 'S64'),
-        #                        ('response', [('linenumber', 'i'),
-        #                                      ('wavelength', 'f'),
-        #                                      ('throughput', 'f')], (2,))
-        #                       ])
-
         desvars_array = None
         responses_array = None
         objectives_array = None
@@ -130,12 +121,6 @@ class OpenMDAOServerRecorder(BaseRecorder):
         objectives_values = None
         constraints_values = None
 
-        # Just an example of the syntax for creating a numpy structured array
-        # arr = np.zeros((1,), dtype=[('dv_x','(5,)f8'),('dv_y','(10,)f8')])
-
-        # This returns a dict of names and values. Use this to build up the tuples of
-        # used for the dtypes in the creation of the numpy structured array
-        # we want to write to the OpenMDAO server
         if self.options['record_desvars']:
             if self._filtered_driver:
                 desvars_values = \
@@ -529,6 +514,14 @@ class OpenMDAOServerRecorder(BaseRecorder):
         pass
 
     def convert_to_list(self, obj):
+        """
+        Convert object to list (so that it may be sent as JSON).
+
+        Parameters
+        ----------
+        obj <Object>
+            the object to be converted to a list
+        """
         if isinstance(obj, np.ndarray):
             return self.convert_to_list(obj.tolist())
         elif isinstance(obj, (list, tuple)):
