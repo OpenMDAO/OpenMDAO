@@ -51,13 +51,11 @@ class Test(unittest.TestCase):
         prob.model.add_subsystem('Cx0', IndepVarComp('x0'), promotes=['x0'])
         prob.model.add_subsystem('Cx1', IndepVarComp('x1'), promotes=['x1'])
         prob.model.add_subsystem('g', ReconfGroup(), promotes=['*'])
-        print("========= SETUP =============")
         prob.setup(vector_class=PETScVector, check=False)
 
         # First, run with full setup, so ReconfGroup should be a parallel group
         prob['x0'] = 6.
         prob['x1'] = 4.
-        print("========= RUN MODEL =============")
         prob.run_model()
         if prob.comm.rank == 0:
             assert_rel_error(self, prob['C1.z'], 8.0)
@@ -67,11 +65,8 @@ class Test(unittest.TestCase):
             print(prob['C2.z'])
 
         # Now, reconfigure so ReconfGroup is not parallel, and x0, x1 should be preserved
-        print("========= G RECONF =============")
         prob.model.get_subsystem('g').resetup('reconf')
-        print("========= SETUP UPDATE =============")
         prob.model.resetup('update')
-        print("========= RERUN MODEL =============")
         prob.run_model()
         assert_rel_error(self, prob['C1.z'], 8.0, 1e-8)
         assert_rel_error(self, prob['C2.z'], 6.0, 1e-8)

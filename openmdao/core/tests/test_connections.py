@@ -451,7 +451,7 @@ class TestConnectionsIndices(unittest.TestCase):
             self.fail('Exception expected.')
 
     def test_bad_value(self):
-        # Should not be allowed because the index value wtihin src_indices is outside
+        # Should not be allowed because the index value within src_indices is outside
         # the valid range for the source
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp1', src_indices=[100000])
 
