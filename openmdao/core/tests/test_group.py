@@ -1076,10 +1076,9 @@ class TestConnect(unittest.TestCase):
         # the index value within src_indices is outside the valid range for the source
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1), (4, 4)])
 
-        msg = ("The source indices do not specify a "
-               "valid index for the connection 'src.x' to "
-               "'arr.x' in Group 'sub'. Index 4 is out of "
-               "range for source dimension 3.")
+        msg = ("The source indices do not specify a valid index for the "
+               "connection 'src.x' to 'arr.x' in Group 'sub'. Index '4' "
+               "is out of range for source dimension 3.")
 
         try:
             self.prob.setup(check=False)

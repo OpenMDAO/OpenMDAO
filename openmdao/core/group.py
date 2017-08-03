@@ -572,19 +572,22 @@ class Group(System):
                                    "valid shape for the connection '%s' to "
                                    "'%s' in Group '%s'. The source has %d "
                                    "dimensions but the indices expect %d.")
-                            raise ValueError(msg % (src_indices, prom_out, prom_in,
+                            raise ValueError(msg % (src_indices,
+                                                    prom_out, prom_in,
                                                     self.pathname,
-                                                    len(out_shape), source_dimensions))
+                                                    len(out_shape),
+                                                    source_dimensions))
 
                         # check all indices are in range of the source dimensions
                         for d in range(source_dimensions):
                             d_size = out_shape[d]
                             for i in src_indices[..., d].flat:
                                 if abs(i) >= d_size:
-                                    msg = ("The source indices do not specify a "
-                                           "valid index for the connection '%s' to "
-                                           "'%s' in Group '%s'. Index %d is out of "
-                                           "range for source dimension %d.")
+                                    msg = ("The source indices do not specify "
+                                           "a valid index for the connection "
+                                           "'%s' to '%s' in Group '%s'. Index "
+                                           "'%d' is out of range for source " 
+                                           "dimension %d.")
                                     raise ValueError(msg % (prom_out, prom_in,
                                                             self.pathname, i, d_size))
 
