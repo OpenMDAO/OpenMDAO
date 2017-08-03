@@ -27,7 +27,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 """Intentionally incorrect derivative."""
                 J = partials
                 J['y', 'x1'] = np.array([4.0])
@@ -74,7 +74,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 """Intentionally incorrect derivative."""
                 J = partials
                 J['y', 'x1'] = np.array([4.0])
@@ -117,7 +117,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 """Intentionally incorrect derivative."""
                 J = partials
                 J['y', 'x1'] = np.array([4.0])
@@ -153,7 +153,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 """Intentionally incorrect derivative."""
                 J = partials
                 J['y', 'x1'] = np.array([4.0])
@@ -193,7 +193,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 """Intentionally incorrect derivative."""
                 J = partials
                 J['y', 'x1'] = np.array([4.0])
@@ -225,7 +225,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 """Intentionally left out derivative."""
                 J = partials
                 J['y', 'x1'] = np.array([3.0])
@@ -311,7 +311,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
                 self.run_count = 0
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 partials['flow:T', 'T'] = 1.
                 partials['flow:P', 'P'] = 1.
 

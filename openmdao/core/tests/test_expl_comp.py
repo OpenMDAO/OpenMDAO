@@ -27,7 +27,7 @@ class RectangleComp(ExplicitComponent):
 
 class RectanglePartial(RectangleComp):
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         partials['area', 'length'] = inputs['width']
         partials['area', 'width'] = inputs['length']
 
