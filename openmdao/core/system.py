@@ -391,6 +391,12 @@ class System(object):
         """
         pass
 
+    def _configure(self):
+        """
+        Configure this system to assign children settings.
+        """
+        pass
+
     def _get_initial_procs(self, comm, initial):
         """
         Get initial values for pathname and comm.
@@ -706,7 +712,11 @@ class System(object):
         # If we're only updating and not recursing, processors don't need to be redistributed
         if recurse:
             pathname, comm = self._get_initial_procs(comm, initial)
+            # Besides setting up the processors, this method also builds the model hierarchy.
             self._setup_procs(pathname, comm)
+
+        # Recurse model from the bottom to the top for configuring.
+        self._configure()
 
         # For updating variable and connection data, setup needs to be performed only
         # in the current system, by gathering data from immediate subsystems,
@@ -763,6 +773,24 @@ class System(object):
         self.pathname = pathname
         self.comm = comm
         self._subsystems_proc_range = []
+
+        # TODO: This version only runs for Components, because it is overriden in Group, so
+        # maybe we should move this to Component?
+
+        # Clear out old variable information so that we can call setup on the component.
+        self._var_rel_names = {'input': [], 'output': []}
+        self._var_rel2data_io = {}
+        self._design_vars = {}
+        self._responses = {}
+
+        self._static_mode = False
+        self._var_rel2data_io.update(self._static_var_rel2data_io)
+        for type_ in ['input', 'output']:
+            self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
+        self._design_vars.update(self._static_design_vars)
+        self._responses.update(self._static_responses)
+        self.setup()
+        self._static_mode = True
 
         minp, maxp = self.get_req_procs()
         if MPI and comm is not None and comm != MPI.COMM_NULL and comm.size < minp:
