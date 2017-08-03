@@ -5,6 +5,8 @@ from collections import Iterable, Counter, OrderedDict, defaultdict
 from itertools import product, chain
 import warnings
 
+from datetime import datetime
+
 from six import iteritems, string_types, itervalues
 from six.moves import range
 
@@ -411,6 +413,8 @@ class Group(System):
             Dictionary of connections passed down from parent group.
         """
         super(Group, self)._setup_global_connections()
+        print(datetime.now(), self.pathname, "_setup_global_connections()")
+
         global_abs_in2out = self._conn_global_abs_in2out
 
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
@@ -538,6 +542,9 @@ class Group(System):
                 prom_out = self._var_abs2prom['output'][abs_out]
                 prom_in = self._var_abs2prom['input'][abs_in]
 
+                print("====================================================================")
+                print(datetime.now(), "connection:", abs_out, out_shape, "->", abs_in, in_shape, src_indices)
+
                 if src_indices is None and out_shape != in_shape:
                     msg = ("The source and target shapes do not match"
                            " for the connection '%s' to '%s' in Group"
@@ -549,47 +556,59 @@ class Group(System):
                 if src_indices is not None:
                     src_indices = np.atleast_1d(src_indices)
 
-                    if len(src_indices.shape) < len(in_shape):
-                        raise ValueError("Unexpected indices shape: %s vs %s" %
-                                         (src_indices.shape, in_shape))
-
                     # initial dimensions of indices shape must be same shape as target
                     for idx_d, inp_d in zip(src_indices.shape, in_shape):
+                        print("checking target dim", idx_d, 'vs', inp_d)
                         if idx_d != inp_d:
                             msg = ("The source indices %s do not specify a "
                                    "valid shape for the connection '%s' to "
                                    "'%s' in Group '%s'. The target shape is "
                                    "%s but indices are %s.")
-                            raise ValueError(msg % (src_indices, prom_out, prom_in,
+                            raise ValueError(msg % (str(src_indices).replace('\n', ''),
+                                                    prom_out, prom_in,
                                                     self.pathname,
                                                     in_shape, src_indices.shape))
 
-                    # remaining dimension of indices must match shape of source
+                    # any remaining dimension of indices must match shape of source
                     if len(src_indices.shape) > len(in_shape):
                         source_dimensions = src_indices.shape[len(in_shape)]
+                        print("checking source_dimensions:", source_dimensions, out_shape)
                         if source_dimensions != len(out_shape):
                             msg = ("The source indices %s do not specify a "
                                    "valid shape for the connection '%s' to "
                                    "'%s' in Group '%s'. The source has %d "
                                    "dimensions but the indices expect %d.")
-                            raise ValueError(msg % (src_indices,
+                            raise ValueError(msg % (str(src_indices).replace('\n', ''),
                                                     prom_out, prom_in,
                                                     self.pathname,
                                                     len(out_shape),
                                                     source_dimensions))
+                    else:
+                        source_dimensions = 1
 
-                        # check all indices are in range of the source dimensions
-                        for d in range(source_dimensions):
-                            d_size = out_shape[d]
-                            for i in src_indices[..., d].flat:
-                                if abs(i) >= d_size:
-                                    msg = ("The source indices do not specify "
-                                           "a valid index for the connection "
-                                           "'%s' to '%s' in Group '%s'. Index "
-                                           "'%d' is out of range for source " 
-                                           "dimension %d.")
-                                    raise ValueError(msg % (prom_out, prom_in,
-                                                            self.pathname, i, d_size))
+                    # check all indices are in range of the source dimensions
+                    print("checking index values for source_dimensions:", source_dimensions, out_shape)
+                    for d in range(source_dimensions):
+                        print("checking source dim", d, "of", source_dimensions, "out_shape:", out_shape)
+                        d_size = out_shape[d]
+                        print("d_size:", d_size)
+                        print("src_indices:", src_indices)
+                        # print("src_indices[..., d]:", list(src_indices[..., d]))
+                        # print("src_indices[..., d].flat:", list(src_indices[..., d].flat))
+                        for i in src_indices[..., d].flat:
+                            print("checking index value", i, "vs d_size:", d_size)
+                            if abs(i) >= d_size:
+                                msg = ("The source indices do not specify "
+                                       "a valid index for the connection "
+                                       "'%s' to '%s' in Group '%s'. Index "
+                                       "'%d' is out of range for source "
+                                       "dimension of size %d.")
+                                raise ValueError(msg % (prom_out, prom_in,
+                                                        self.pathname, i, d_size))
+                    print("index value checks complete")
+
+                print("connection checks complete")
+                print("====================================================================")
 
         # Recursion
         if recurse:

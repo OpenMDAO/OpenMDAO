@@ -411,7 +411,7 @@ class TestConnectionsIndices(unittest.TestCase):
 
         indep_var_comp = IndepVarComp()
         indep_var_comp.add_output('blammo', val=3.)
-        indep_var_comp.add_output('arrout', val=np.ones(3))
+        indep_var_comp.add_output('arrout', val=np.ones(5))
 
         prob = Problem()
         prob.model.add_subsystem('idvp', indep_var_comp)
@@ -455,7 +455,10 @@ class TestConnectionsIndices(unittest.TestCase):
         # the valid range for the source
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp1', src_indices=[100000])
 
-        expected = ("")
+        expected = ("The source indices do not specify a valid index for the "
+                    "connection 'idvp.arrout' to 'arraycomp.inp1' in Group ''. "
+                    "Index '100000' is out of range for source dimension of "
+                    "size 5.")
 
         try:
             self.prob.setup(check=False)

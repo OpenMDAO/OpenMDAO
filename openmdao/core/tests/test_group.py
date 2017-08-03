@@ -1072,13 +1072,27 @@ class TestConnect(unittest.TestCase):
         else:
             self.fail('Exception expected.')
 
+    def test_bad_indices_dimensions(self):
+        self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1, 2), (2, 2, 2)])
+
+        msg = ("The source indices [[ 2 -1  2] [ 2  2  2]] do not specify a "
+               "valid shape for the connection 'src.x' to 'arr.x' in Group 'sub'. "
+               "The source has 2 dimensions but the indices expect 3.")
+
+        try:
+            self.prob.setup(check=False)
+        except Exception as err:
+            self.assertEqual(str(err), msg)
+        else:
+            self.fail('Exception expected.')
+
     def test_bad_indices_index(self):
         # the index value within src_indices is outside the valid range for the source
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1), (4, 4)])
 
         msg = ("The source indices do not specify a valid index for the "
                "connection 'src.x' to 'arr.x' in Group 'sub'. Index '4' "
-               "is out of range for source dimension 3.")
+               "is out of range for source dimension of size 3.")
 
         try:
             self.prob.setup(check=False)
