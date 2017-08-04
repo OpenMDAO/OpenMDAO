@@ -29,11 +29,10 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self).__init__(**kwargs)
 
-        self.matrix_free = overrides_method('compute_jacvec_product',
-                                            self, ExplicitComponent)
         self.supports_multivecs = overrides_method('compute_multi_jacvec_product',
                                                    self, ExplicitComponent)
-        self.matrix_free |= self.supports_multivecs
+        self.matrix_free = self.supports_multivecs or overrides_method('compute_jacvec_product',
+                                                                       self, ExplicitComponent)
 
     def _setup_partials(self, recurse=True):
         """
@@ -235,13 +234,27 @@ class ExplicitComponent(Component):
                     with self.jacobian_context() as J:
                         J._apply(d_inputs, d_outputs, d_residuals, mode)
 
+                    # TODO: the entire following block should be skipped unless
+                    #       self.matrix_free is True, since the call to
+                    #       compute_jacvec_product does nothing otherwise.
                     # Jacobian and vectors are all unscaled, dimensional
                     with self._unscaled_context(
                             outputs=[self._outputs], residuals=[d_residuals]):
                         d_residuals *= -1.0
-                        if d_inputs._ncol > 1 and self.supports_multivecs:
-                            self._compute_multi_jacvec_product(self._inputs, self._outputs,
-                                                               d_inputs, d_residuals, mode)
+                        if d_inputs._ncol > 1:
+                            if self.supports_multivecs:
+                                self._compute_multi_jacvec_product(self._inputs, self._outputs,
+                                                                   d_inputs, d_residuals, mode)
+                            else:
+                                for i in range(self._ncol):
+                                    # need to make the multivecs look like regular single vecs
+                                    # since the component doesn't know about multivecs.
+                                    d_inputs._icol = i
+                                    d_residuals._icol = i
+                                    self.compute_jacvec_product(self._inputs, self._outputs,
+                                                                d_inputs, d_residuals, mode)
+                                d_inputs._icol = None
+                                d_residuals._icol = None
                         else:
                             self.compute_jacvec_product(self._inputs, self._outputs,
                                                         d_inputs, d_residuals, mode)
