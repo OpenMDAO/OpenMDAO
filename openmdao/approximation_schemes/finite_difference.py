@@ -1,10 +1,11 @@
 """Finite difference derivative approximations."""
 from __future__ import division, print_function
 
-import numpy as np
 from collections import namedtuple
 from itertools import groupby
 from six.moves import range
+
+import numpy as np
 
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
 from openmdao.utils.name_maps import abs_key2rel_key
