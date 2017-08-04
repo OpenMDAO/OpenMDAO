@@ -122,6 +122,11 @@ class DefaultMultiVector(DefaultVector):
         ----------
         name : str
             The name of the variable being accessed.
+
+        Returns
+        -------
+        float or ndarray
+            The value of the named variable.
         """
         return self.__save_getitem(name)[:, self._icol]
 

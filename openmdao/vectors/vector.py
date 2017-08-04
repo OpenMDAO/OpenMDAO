@@ -109,7 +109,6 @@ class Vector(object):
         self._name = name
         self._typ = typ
         self._ncol = ncol
-        self._icol = None
 
         self._system = system
 

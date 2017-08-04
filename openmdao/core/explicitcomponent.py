@@ -246,15 +246,15 @@ class ExplicitComponent(Component):
                                 self._compute_multi_jacvec_product(self._inputs, self._outputs,
                                                                    d_inputs, d_residuals, mode)
                             else:
-                                for i in range(self._ncol):
+                                for i in range(d_inputs._ncol):
                                     # need to make the multivecs look like regular single vecs
                                     # since the component doesn't know about multivecs.
-                                    d_inputs._icol = i
-                                    d_residuals._icol = i
+                                    d_inputs._use_column(i)
+                                    d_residuals._use_column(i)
                                     self.compute_jacvec_product(self._inputs, self._outputs,
                                                                 d_inputs, d_residuals, mode)
-                                d_inputs._icol = None
-                                d_residuals._icol = None
+                                d_inputs._use_column(None)
+                                d_residuals._use_column(None)
                         else:
                             self.compute_jacvec_product(self._inputs, self._outputs,
                                                         d_inputs, d_residuals, mode)
