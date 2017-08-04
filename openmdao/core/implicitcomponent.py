@@ -26,8 +26,10 @@ class ImplicitComponent(Component):
         """
         super(ImplicitComponent, self).__init__(**kwargs)
 
-        if overrides_method('apply_linear', self, ImplicitComponent):
-            self.matrix_free = True
+        self.matrix_free = overrides_method('apply_linear', self, ImplicitComponent)
+        self.supports_multivecs = overrides_method('apply_multi_linear',
+                                                   self, ImplicitComponent)
+        self.matrix_free |= self.supports_multivecs
 
     def _apply_nonlinear(self):
         """

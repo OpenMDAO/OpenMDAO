@@ -223,6 +223,10 @@ class System(object):
     #
     _reconfigured : bool
         If True, this system has reconfigured, and the immediate parent should update.
+    #
+    supports_multivecs : bool
+        If True, this system overrides compute_multi_jacvec_product (if an ExplicitComponent),
+        or solve_multi_linear/apply_multi_linear (if an ImplicitComponent).
     """
 
     def __init__(self, **kwargs):
@@ -324,6 +328,7 @@ class System(object):
         self._static_responses = {}
 
         self._reconfigured = False
+        self.supports_multivecs = False
 
         self.initialize()
         self.metadata.update(kwargs)

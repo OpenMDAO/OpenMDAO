@@ -94,6 +94,7 @@ class DefaultVector(Vector):
         system = self._system
         type_ = self._typ
         iproc = self._iproc
+        ncol = self._ncol
 
         sizes_byset_t = system._var_sizes_byset[type_]
 
@@ -101,7 +102,7 @@ class DefaultVector(Vector):
         indices = {}
         for set_name in system._var_set2iset[type_]:
             size = np.sum(sizes_byset_t[set_name][iproc, :])
-            data[set_name] = np.zeros(size)
+            data[set_name] = np.zeros((size, ncol)) if ncol > 1 else np.zeros(size)
             indices[set_name] = np.zeros(size, int)
 
         sizes_t = system._var_sizes[type_]
@@ -252,6 +253,7 @@ class DefaultVector(Vector):
         system = self._system
         type_ = self._typ
         iproc = self._iproc
+        ncol = self._ncol
 
         self._views = self._names = views = {}
         self._views_flat = views_flat = {}
@@ -270,6 +272,10 @@ class DefaultVector(Vector):
             ind_byset1 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset])
             ind_byset2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1])
             shape = abs2meta_t[abs_name]['shape']
+            if ncol > 1:
+                if not isinstance(shape, tuple):
+                    shape = (shape,)
+                shape = tuple(list(shape) + [ncol])
 
             views_flat[abs_name] = v = self._data[set_name][ind_byset1:ind_byset2]
             if shape != v.shape:

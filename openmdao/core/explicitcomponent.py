@@ -29,8 +29,11 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self).__init__(**kwargs)
 
-        if overrides_method('compute_jacvec_product', self, ExplicitComponent):
-            self.matrix_free = True
+        self.matrix_free = overrides_method('compute_jacvec_product',
+                                            self, ExplicitComponent)
+        self.supports_multivecs = overrides_method('compute_multi_jacvec_product',
+                                                   self, ExplicitComponent)
+        self.matrix_free |= self.supports_multivecs
 
     def _setup_partials(self, recurse=True):
         """
@@ -236,8 +239,12 @@ class ExplicitComponent(Component):
                     with self._unscaled_context(
                             outputs=[self._outputs], residuals=[d_residuals]):
                         d_residuals *= -1.0
-                        self.compute_jacvec_product(self._inputs, self._outputs,
-                                                    d_inputs, d_residuals, mode)
+                        if d_inputs._ncol > 1 and self.supports_multivecs:
+                            self._compute_multi_jacvec_product(self._inputs, self._outputs,
+                                                               d_inputs, d_residuals, mode)
+                        else:
+                            self.compute_jacvec_product(self._inputs, self._outputs,
+                                                        d_inputs, d_residuals, mode)
                         d_residuals *= -1.0
 
     def _solve_linear(self, vec_names, mode):
