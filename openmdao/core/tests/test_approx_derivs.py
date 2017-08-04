@@ -153,7 +153,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         class DoubleArrayFD(DoubleArrayComp):
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 """
                 Override deriv calculation.
                 """
@@ -493,7 +493,7 @@ class TestGroupComplexStep(unittest.TestCase):
 
         class DoubleArrayFD(DoubleArrayComp):
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 """
                 Override deriv calculation.
                 """

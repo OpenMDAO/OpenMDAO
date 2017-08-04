@@ -16,7 +16,7 @@ class SrcComp(ExplicitComponent):
         """ Pass through."""
         outputs['x2'] = inputs['x1']
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """ Derivative is 1.0"""
         partials['x2', 'x1'] = 1.0
 
@@ -28,7 +28,7 @@ class SrcCompFD(SrcComp):
         super(SrcCompFD, self).setup()
         self.approx_partials('*', '*')
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """ Override"""
         pass
 
@@ -44,7 +44,7 @@ class TgtCompF(ExplicitComponent):
         """ Pass through."""
         outputs['x3'] = inputs['x2']
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """ Derivative is 1.0"""
         partials['x3', 'x2'] = 1.0
 
@@ -56,7 +56,7 @@ class TgtCompFFD(TgtCompF):
         super(TgtCompFFD, self).setup()
         self.approx_partials('*', '*')
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """ Override"""
         pass
 
@@ -72,7 +72,7 @@ class TgtCompC(ExplicitComponent):
         """ Pass through."""
         outputs['x3'] = inputs['x2']
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """ Derivative is 1.0"""
         partials['x3', 'x2'] = 1.0
 
@@ -84,7 +84,7 @@ class TgtCompCFD(TgtCompC):
         super(TgtCompCFD, self).setup()
         self.approx_partials('*', '*')
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """ Override"""
         pass
 
@@ -100,7 +100,7 @@ class TgtCompK(ExplicitComponent):
         """ Pass through."""
         outputs['x3'] = inputs['x2']
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """ Derivative is 1.0"""
         partials['x3', 'x2'] = 1.0
 
@@ -112,7 +112,7 @@ class TgtCompKFD(TgtCompK):
         super(TgtCompKFD, self).setup()
         self.approx_partials('*', '*')
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """ Override"""
         pass
 
@@ -132,7 +132,7 @@ class TgtCompFMulti(ExplicitComponent):
         """ Pass through."""
         outputs['x3'] = inputs['x2']
 
-    def compute_partials(self, inputs, outputs, J):
+    def compute_partials(self, inputs, J):
         """ Derivative is 1.0"""
         J['_x3', 'x2'] = np.array([1.0])
         J['_x3', '_x2'] = 0.0
