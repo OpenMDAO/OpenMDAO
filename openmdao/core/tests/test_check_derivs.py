@@ -614,7 +614,40 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_rel_error(self, J['y1', 'x1'][1][1], Jbase[2, 3], 1e-8)
 
         totals = prob.check_total_derivatives()
-        print('hey')
+        jac = totals[('mycomp.y1', 'x_param1.x1')]['J_fd']
+        assert_rel_error(self, jac[0][0], Jbase[0, 1], 1e-8)
+        assert_rel_error(self, jac[0][1], Jbase[0, 3], 1e-8)
+        assert_rel_error(self, jac[1][0], Jbase[2, 1], 1e-8)
+        assert_rel_error(self, jac[1][1], Jbase[2, 3], 1e-8)
+
+        # Objective instead
+
+        prob = Problem()
+        prob.model = model = Group()
+        model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
+                            promotes=['x1'])
+        model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
+
+        model.add_design_var('x1', indices=[1, 3])
+        model.add_objective('y1', index=1)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False, mode='fwd')
+        prob.run_model()
+
+        Jbase = model.get_subsystem('mycomp').JJ
+        of = ['y1']
+        wrt = ['x1']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['y1', 'x1'][0][0], Jbase[1, 1], 1e-8)
+        assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[1, 3], 1e-8)
+
+        totals = prob.check_total_derivatives()
+        jac = totals[('mycomp.y1', 'x_param1.x1')]['J_fd']
+        assert_rel_error(self, jac[0][0], Jbase[1, 1], 1e-8)
+        assert_rel_error(self, jac[0][1], Jbase[1, 3], 1e-8)
 
     def test_cs_suppress(self):
         prob = Problem()

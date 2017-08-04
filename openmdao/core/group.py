@@ -1378,6 +1378,13 @@ class Group(System):
                         meta_changes['cols'] = np.arange(size)
                         meta_changes['value'] = np.ones(size)
 
+                    # This suppports desvar and constraint indices.
+                    if key[0] in self._owns_approx_of_idx:
+                        meta_changes['idx_of'] = self._owns_approx_of_idx[key[0]]
+
+                    if key[1] in self._owns_approx_wrt_idx:
+                        meta_changes['idx_wrt'] = self._owns_approx_wrt_idx[key[1]]
+
                     meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
                     meta.update(meta_changes)
                     meta.update(self._owns_approx_jac_meta)

@@ -191,10 +191,14 @@ class System(object):
         If True, this system approximated its Jacobian
     _owns_approx_jac_meta : dict
         Stores approximation metadata (e.g., step_size) from calls to approx_total_derivs
-    _owns_approx_wrt : set or None
-        Overrides aproximation inputs.
     _owns_approx_of : set or None
         Overrides aproximation outputs.
+    _owns_approx_of_idx : dict
+        Index for override 'of' approximations if declared.
+    _owns_approx_wrt : set or None
+        Overrides aproximation inputs.
+    _owns_approx_wrt_idx : dict
+        Index for override 'wrt' approximations if declared.
     _subjacs_info : OrderedDict of dict
         Sub-jacobian metadata for each (output, input) pair added using
         declare_partials. Members of each pair may be glob patterns.
@@ -311,6 +315,8 @@ class System(object):
         self._owns_approx_jac_meta = {}
         self._owns_approx_wrt = None
         self._owns_approx_of = None
+        self._owns_approx_wrt_idx = {}
+        self._owns_approx_of_idx = {}
 
         self._design_vars = {}
         self._responses = {}

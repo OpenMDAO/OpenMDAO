@@ -820,9 +820,27 @@ class Problem(object):
             model._owns_approx_of = set(of)
             model._owns_approx_wrt = set(wrt)
 
+            # Support for indices defined on driver vars.
+            dvs = self.driver._designvars
+            cons = self.driver._cons
+            objs = self.driver._objs
+
+            response_idx = {key: val['indices'] for key, val in iteritems(cons)
+                            if val['indices'] is not None}
+            for key, val in iteritems(objs):
+                if val['indices'] is not None:
+                    response_idx[key] = val['indices']
+
+            model._owns_approx_of_idx = response_idx
+
+            model._owns_approx_wrt_idx = {key: val['indices'] for key, val in iteritems(dvs)
+                                          if val['indices'] is not None}
+
         model._setup_jacobians(recurse=False)
 
+        model.jacobian._override_checks = True
         model._linearize()
+        model.jacobian._override_checks = False
         approx_jac = model._jacobian._subjacs
 
         # Create data structures (and possibly allocate space) for the total
