@@ -7,11 +7,11 @@ from six import assertRaisesRegex
 import numpy as np
 
 from openmdao.core.problem import Problem, get_relevant_vars
-from openmdao.api import Group, IndepVarComp, PETScVector, NonlinearBlockGS, \
-     ScipyOptimizer, ExecComp
+from openmdao.api import Group, IndepVarComp, PETScVector, NonlinearBlockGS, ScipyOptimizer, \
+     ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyIterativeSolver
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.test_suite.components.paraboloid import Paraboloid
 
+from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesConnected
 
 
@@ -554,6 +554,104 @@ class TestProblem(unittest.TestCase):
         self.assertEqual(inputs, indep1_ins | indep2_ins)
         self.assertEqual(outputs, indep1_outs | indep2_outs)
         self.assertEqual(systems, indep1_sys | indep2_sys)
+
+    def test_system_setup_and_configure(self):
+        # Test that we can change solver settings on a subsystem in a system's setup method.
+        # Also assures that highest system's settings take precedence.
+
+        class ImplSimple(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('a', val=1.)
+                self.add_output('x', val=0.)
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['x'] = np.exp(outputs['x']) - \
+                    inputs['a']**2 * outputs['x']**2
+
+            def linearize(self, inputs, outputs, jacobian):
+                jacobian['x', 'x'] = np.exp(outputs['x']) - \
+                    2 * inputs['a']**2 * outputs['x']
+                jacobian['x', 'a'] = -2 * inputs['a'] * outputs['x']**2
+
+
+        class Sub(Group):
+
+            def setup(self):
+                self.add_subsystem('comp', ImplSimple())
+
+                # This will not solve it
+                self.nonlinear_solver = NonlinearBlockGS()
+
+            def configure(self):
+                # This will not solve it either.
+                self.nonlinear_solver = NonlinearBlockGS()
+
+
+        class Super(Group):
+
+            def setup(self):
+                self.add_subsystem('sub', Sub())
+
+            def configure(self):
+                # This will solve it.
+                self.sub.nonlinear_solver = NewtonSolver()
+                self.sub.linear_solver = ScipyIterativeSolver()
+
+
+        top = Problem()
+        top.model = Super()
+
+        top.setup(check=False)
+
+        self.assertTrue(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
+        self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
+
+    def test_feature_system_configure(self):
+
+        class ImplSimple(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('a', val=1.)
+                self.add_output('x', val=0.)
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['x'] = np.exp(outputs['x']) - \
+                    inputs['a']**2 * outputs['x']**2
+
+            def linearize(self, inputs, outputs, jacobian):
+                jacobian['x', 'x'] = np.exp(outputs['x']) - \
+                    2 * inputs['a']**2 * outputs['x']
+                jacobian['x', 'a'] = -2 * inputs['a'] * outputs['x']**2
+
+
+        class Sub(Group):
+            def setup(self):
+                self.add_subsystem('comp', ImplSimple())
+
+            def configure(self):
+                # This solver won't solve the sytem. We want
+                # to override it in the parent.
+                self.nonlinear_solver = NonlinearBlockGS()
+
+
+        class Super(Group):
+            def setup(self):
+                self.add_subsystem('sub', Sub())
+
+            def configure(self):
+                # This will solve it.
+                self.sub.nonlinear_solver = NewtonSolver()
+                self.sub.linear_solver = ScipyIterativeSolver()
+
+
+        top = Problem()
+        top.model = Super()
+
+        top.setup(check=False)
+
+        print(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
+        print(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
 
 if __name__ == "__main__":
     unittest.main()

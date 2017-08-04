@@ -210,6 +210,12 @@ class TestProblemCheckPartials(unittest.TestCase):
         testlogger = TestLogger()
         data = prob.check_partials(logger=testlogger, suppress_output=True)
 
+        subheads = data[''][('y', 'x1')]
+        self.assertTrue('J_fwd' in subheads)
+        self.assertTrue('rel error' in subheads)
+        self.assertTrue('abs error' in subheads)
+        self.assertTrue('magnitude' in subheads)
+
         lines = testlogger.get('info')
         self.assertEqual(len(lines), 0)
 
@@ -634,8 +640,13 @@ class TestProblemCheckTotals(unittest.TestCase):
         totals = prob.check_total_derivatives(method='cs', step=1.0e-1, logger=testlogger,
                                               suppress_output=True)
 
-        lines = testlogger.get('info')
+        data = totals['con_cmp2.con2', 'px.x']
+        self.assertTrue('J_fwd' in data)
+        self.assertTrue('rel error' in data)
+        self.assertTrue('abs error' in data)
+        self.assertTrue('magnitude' in data)
 
+        lines = testlogger.get('info')
         self.assertEqual(len(lines), 0)
 
 if __name__ == "__main__":
