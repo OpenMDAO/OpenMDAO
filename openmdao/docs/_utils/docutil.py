@@ -300,8 +300,13 @@ def get_unit_test_source_and_run_outputs(method_path):
     method_name = method_path.split('.')[-1]
     test_module = importlib.import_module(module_path)
     cls = getattr(test_module, class_name)
-    N_PROCS = getattr(cls, 'N_PROCS', 1)
-    use_mpi =  N_PROCS > 1
+    try:
+        import mpi4py
+    except ImportError:
+        use_mpi = False
+    else:
+        N_PROCS = getattr(cls, 'N_PROCS', 1)
+        use_mpi =  N_PROCS > 1
     meth = getattr(cls, method_name)
     class_source_code = inspect.getsource(cls)
 
@@ -539,8 +544,13 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
         pass
     test_module = importlib.import_module(module_path)
     cls = getattr(test_module, class_name)
-    N_PROCS = getattr(cls, 'N_PROCS', 1)
-    use_mpi =  N_PROCS > 1
+    try:
+        import mpi4py
+    except ImportError:
+        use_mpi = False
+    else:
+        N_PROCS = getattr(cls, 'N_PROCS', 1)
+        use_mpi =  N_PROCS > 1
     meth = getattr(cls, method_name)
     class_source_code = inspect.getsource(cls)
 
