@@ -12,7 +12,7 @@ from openmdao.utils.general_utils import warn_deprecation
 
 class IndepVarComp(ExplicitComponent):
     """
-    Class to inherit from when all output variables are independent.
+    Class to use when all output variables are independent.
 
     Attributes
     ----------
