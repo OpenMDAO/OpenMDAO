@@ -1,10 +1,13 @@
 """
 RecordingManager class definition.
 """
+from six import iteritems
 import time
-from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
+
+import numpy as np
 
 from openmdao.utils.mpi import MPI
+
 
 
 class RecordingManager(object):
@@ -23,6 +26,14 @@ class RecordingManager(object):
         """
         init.
         """
+
+        self._vars_to_record = {
+            'desvarnames': set(),
+            'responsenames': set(),
+            'objectivenames': set(),
+            'constraintnames': set(),
+            }
+
         self._recorders = []
         self._has_serial_recorders = False
 
@@ -80,14 +91,43 @@ class RecordingManager(object):
         """
         Run startup on each recorder in the manager.
         """
-        pathname = object_requesting_recording.pathname
-        if MPI and root.is_active():
-            rrank = root.comm.rank
-            rowned = root._owning_ranks
+        #qqq pathname = object_requesting_recording.pathname
+        # have to check to see if a given system is in the `_subsystems_myproc` list to see if it's active
 
-        if isinstance(object_requesting_recording,Driver):
-            self._record_desvars = self._record_responses = False
-            self._record_objectives = self._record_constraints = False
+        # Only the root will have _subsystems_myproc
+        # Will only add parallel code for Drivers. Use the old method for System and Solver
+        from openmdao.core.driver import Driver
+        if not isinstance(object_requesting_recording,Driver):
+            for recorder in self._recorders:
+                recorder.startup(object_requesting_recording)
+            return
+
+        # object_requesting_recording._problem exists, which has these attributes:
+        #   comm
+        #   driver
+        #   model ( aka root )
+
+        # object_requesting_recording._problem.model has
+        #      _subsystems_myproc
+        #      _subsystems_allprocs
+        model = object_requesting_recording._problem.model
+        # if MPI:
+        if MPI and model.is_active():
+            rrank = object_requesting_recording._problem.comm.rank # root ( aka model ) rank. So this only works for
+                # Driver recording
+            # rowned = object_requesting_recording._problem._owning_ranks
+            # in clippy, rowned is supposed to map variables to the ranks that own them.
+            # qqq = model._var_allprocs_abs2idx['output']
+            # out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
+            # root = np.min(np.nonzero(model._var_sizes[:, out_var_idx])[0][0])
+
+            # Compute owning ranks
+            rowned = {}
+            for varname, out_var_idx in iteritems(model._var_allprocs_abs2idx['output']):
+                rowned[varname] = np.min(np.nonzero(model._var_sizes['output'][:, out_var_idx])[0][0])
+
+        self._record_desvars = self._record_responses = False
+        self._record_objectives = self._record_constraints = False
 
 
         for recorder in self._recorders:
@@ -96,10 +136,15 @@ class RecordingManager(object):
             if not recorder._parallel:
                 self._has_serial_recorders = True
 
-            desvarnames = recorder._filtered[pathname]['desvars']
-            responsenames = recorder._filtered[pathname]['responses']
-            objectivenames = recorder._filtered[pathname]['objectives']
-            constraintnames = recorder._filtered[pathname]['constraints']
+            # desvarnames = recorder._filtered[pathname]['desvars']
+            # responsenames = recorder._filtered[pathname]['responses']
+            # objectivenames = recorder._filtered[pathname]['objectives']
+            # constraintnames = recorder._filtered[pathname]['constraints']
+
+            desvarnames = recorder._filtered_driver['des']
+            responsenames = recorder._filtered_driver['res']
+            objectivenames = recorder._filtered_driver['obj']
+            constraintnames = recorder._filtered_driver['con']
 
             if desvarnames:
                 self._record_desvars = True
@@ -109,6 +154,10 @@ class RecordingManager(object):
                 self._record_objectives = True
             if constraintnames:
                 self._record_constraints = True
+
+
+
+            # return # qqq
 
             # now localize the lists to only
             # include local vars.  We need to do this after determining
@@ -124,10 +173,10 @@ class RecordingManager(object):
                 # reduce the filter set for any parallel recorders to only
                 # those variables that are owned by that rank
                 if recorder._parallel:
-                    recorder._filtered[pathname]['desvars'] = desvarnames
-                    recorder._filtered[pathname]['responses'] = responsenames
-                    recorder._filtered[pathname]['objectives'] = objectivenames
-                    recorder._filtered[pathname]['constraints'] = constraintnames
+                    recorder._filtered_driver['des'] = desvarnames
+                    recorder._filtered_driver['res'] = responsenames
+                    recorder._filtered_driver['obj'] = objectivenames
+                    recorder._filtered_driver['con'] = constraintnames
 
             self._vars_to_record['desvarnames'].update(desvarnames)
             self._vars_to_record['responsenames'].update(responsenames)
@@ -163,8 +212,55 @@ class RecordingManager(object):
         if metadata is not None:
             metadata['timestamp'] = time.time()
 
+        from openmdao.core.driver import Driver
+
+        if isinstance(object_requesting_recording, Driver):
+            root = model = object_requesting_recording._problem.model
+
+            desvars = object_requesting_recording.get_design_var_values()
+            responses = object_requesting_recording.get_response_values()
+            objectives = object_requesting_recording.get_objective_values()
+            constraints = object_requesting_recording.get_constraint_values()
+
+            if MPI:
+                desvarnames = self._vars_to_record['desvarnames']
+                responsenames = self._vars_to_record['responsenames']
+                objectivenames = self._vars_to_record['objectivenames']
+                constraintnames = self._vars_to_record['constraintnames']
+
+                # get names and values of all locally owned variables
+                if desvars:
+                    desvars = {d: desvars[d] for d in desvarnames}
+                if responses:
+                    responses = {r: responses[r] for r in responsenames}
+                if objectives:
+                    objectives = {o: objectives[o] for o in objectivenames}
+                if constraints:
+                    constraints = {c: constraints[c] for c in constraintnames}
+
+                if self._has_serial_recorders:
+                    desvars = self._gather_vars(root, desvars) if self._record_desvars else {}
+                    responses = self._gather_vars(root, responses) if self._record_responses else {}
+                    objectives = self._gather_vars(root, objectives) if self._record_objectives else {}
+                    constraints = self._gather_vars(root, constraints) if self._record_constraints else {}
+
+        # If the recorder does not support parallel recording
+        # we need to make sure we only record on rank 0.
+        # for params, unknowns, resids, meta in cases:
+        #     if params is None: # dummy cases have None in place of params, etc.
+        #         continue
         for recorder in self._recorders:
-            recorder.record_iteration(object_requesting_recording, metadata, **kwargs)
+            if recorder._parallel or MPI is None or self.rank == 0:
+                # recorder.record_iteration(params, unknowns, resids, meta)
+                if isinstance(object_requesting_recording, Driver):
+                    recorder.record_iteration_driver_passing_vars(object_requesting_recording, desvars, responses, objectives, constraints, metadata)
+                else:
+                    recorder.record_iteration(object_requesting_recording, metadata, **kwargs)
+
+        # Old serial way
+        # for recorder in self._recorders:
+        #     if recorder._parallel or MPI is None or self.rank == 0:
+        #         recorder.record_iteration(object_requesting_recording, metadata, **kwargs)
 
     def record_metadata(self, object_requesting_recording):
         """

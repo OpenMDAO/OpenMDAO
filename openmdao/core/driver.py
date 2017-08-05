@@ -213,7 +213,7 @@ class Driver(object):
            Dictionary containing values of each response.
         """
         # TODO: finish this method when we have a driver that requires it.
-        pass
+        return {}
 
     def get_objective_values(self, filter=None):
         """

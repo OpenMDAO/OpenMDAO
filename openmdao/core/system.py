@@ -2704,6 +2704,8 @@ class System(object):
         recorder : <BaseRecorder>
            A recorder instance.
         """
+        if MPI:
+            RuntimeError("Recording of Systems when running parallel code is not supported yet")
         self._rec_mgr.append(recorder)
 
     def record_iteration(self):
@@ -2714,6 +2716,16 @@ class System(object):
         self._rec_mgr.record_iteration(self, metadata)
         self.iter_count += 1
 
+    def is_active(self):
+        """
+        Returns
+        -------
+        bool
+            If running under MPI, returns True if this `System` has a valid
+            communicator. Always returns True if not running under MPI.
+        """
+        return MPI is None or not (self.comm is None or
+                                   self.comm == MPI.COMM_NULL)
 
 def _get_vec_names(voi_dict):
     return set(voi for voi, data in iteritems(voi_dict)

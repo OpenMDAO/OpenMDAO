@@ -285,6 +285,8 @@ class ScipyOptimizer(Driver):
                 self.set_design_var(name, x_new[i:i + size])
                 i += size
 
+
+            print("rank self._problem['des_vars.FPR']", self._problem.comm.rank, self._problem['des_vars.FPR'])
             with Recording(self.options['optimizer'], self.iter_count, self) as rec:
                 self.iter_count += 1
                 model._solve_nonlinear()

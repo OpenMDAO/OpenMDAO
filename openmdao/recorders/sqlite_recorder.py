@@ -74,12 +74,12 @@ class SqliteRecorder(BaseRecorder):
 
         self.model_viewer_data = None
 
-        # isolation_level=None causes autocommit
-        self.con = sqlite3.connect(out, isolation_level=None)
-
-        self.cursor = self.con.cursor()
-
         if self._open_close_sqlite:
+            # isolation_level=None causes autocommit
+            self.con = sqlite3.connect(out, isolation_level=None)
+
+            self.cursor = self.con.cursor()
+
             self.cursor.execute("CREATE TABLE metadata( format_version INT)")
             self.cursor.execute("INSERT INTO metadata(format_version) VALUES(?)", (format_version,))
 
@@ -131,6 +131,104 @@ class SqliteRecorder(BaseRecorder):
             self.record_iteration_solver(object_requesting_recording, metadata, **kwargs)
         else:
             raise ValueError("Recorders must be attached to Drivers, Systems, or Solvers.")
+
+    def record_iteration_driver_passing_vars(self, object_requesting_recording, desvars, responses, objectives,
+                                             constraints, metadata):
+        """
+        Record an iteration using the driver options.
+
+        Parameters
+        ----------
+        object_requesting_recording: <Driver>
+            The Driver object that wants to record an iteration.
+        metadata : dict
+            Dictionary containing execution metadata (e.g. iteration coordinate).
+        """
+        # make a nested numpy named array using the example
+        #   http://stackoverflow.com/questions/19201868/how-to-set-dtype-for-nested-numpy-ndarray
+        # e.g.
+        # table = np.array(data, dtype=[('instrument', 'S32'),
+        #                        ('filter', 'S64'),
+        #                        ('response', [('linenumber', 'i'),
+        #                                      ('wavelength', 'f'),
+        #                                      ('throughput', 'f')], (2,))
+        #                       ])
+
+        super(SqliteRecorder, self).record_iteration(object_requesting_recording, metadata)
+
+        # Just an example of the syntax for creating a numpy structured array
+        # arr = np.zeros((1,), dtype=[('dv_x','(5,)f8'),('dv_y','(10,)f8')])
+
+        # This returns a dict of names and values. Use this to build up the tuples of
+        # used for the dtypes in the creation of the numpy structured array
+        # we want to write to sqlite
+        if desvars:
+            dtype_tuples = []
+            for name, value in iteritems(desvars):
+                tple = (name, '{}f8'.format(value.shape))
+                dtype_tuples.append(tple)
+
+            desvars_array = np.zeros((1,), dtype=dtype_tuples)
+
+            for name, value in iteritems(desvars):
+                desvars_array[name] = value
+        else:
+            desvars_array = None
+
+        if responses:
+            dtype_tuples = []
+            for name, value in iteritems(responses):
+                tple = (name, '{}f8'.format(value.shape))
+                dtype_tuples.append(tple)
+
+            responses_array = np.zeros((1,), dtype=dtype_tuples)
+
+            for name, value in iteritems(responses):
+                responses_array[name] = value
+        else:
+            responses_array = None
+
+        if objectives:
+            dtype_tuples = []
+            for name, value in iteritems(objectives):
+                tple = (name, '{}f8'.format(value.shape))
+                dtype_tuples.append(tple)
+
+            objectives_array = np.zeros((1,), dtype=dtype_tuples)
+
+            for name, value in iteritems(objectives):
+                objectives_array[name] = value
+        else:
+            objectives_array = None
+
+        if constraints:
+            dtype_tuples = []
+            for name, value in iteritems(constraints):
+                tple = (name, '{}f8'.format(value.shape))
+                dtype_tuples.append(tple)
+
+            constraints_array = np.zeros((1,), dtype=dtype_tuples)
+
+            for name, value in iteritems(constraints):
+                constraints_array[name] = value
+        else:
+            constraints_array = None
+
+        desvars_blob = array_to_blob(desvars_array)
+        responses_blob = array_to_blob(responses_array)
+        objectives_blob = array_to_blob(objectives_array)
+        constraints_blob = array_to_blob(constraints_array)
+
+        self.cursor.execute("INSERT INTO driver_iterations(counter, iteration_coordinate, "
+                            "timestamp, success, msg, desvars , responses , objectives , "
+                            "constraints ) VALUES(?,?,?,?,?,?,?,?,?)",
+                            (self._counter, self._iteration_coordinate,
+                             metadata['timestamp'], metadata['success'],
+                             metadata['msg'], desvars_blob,
+                             responses_blob, objectives_blob,
+                             constraints_blob))
+        self.con.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
+                         ('driver', self.cursor.lastrowid))
 
     def record_iteration_driver(self, object_requesting_recording, metadata):
         """
@@ -401,6 +499,11 @@ class SqliteRecorder(BaseRecorder):
         object_requesting_recording: <System>
             The System that would like to record its metadata.
         """
+
+        from openmdao.api import PETScVector
+        if isinstance(object_requesting_recording._scaling_vecs[('input','norm0')]['linear'], PETScVector):
+            return # Cannot handle PETScVector yet
+
         scaling_factors = pickle.dumps(object_requesting_recording._scaling_vecs,
                                        pickle.HIGHEST_PROTOCOL)
 
@@ -435,4 +538,5 @@ class SqliteRecorder(BaseRecorder):
         """
         Close `out`.
         """
-        self.con.close()
+        if self._open_close_sqlite:
+            self.con.close()

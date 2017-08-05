@@ -12,6 +12,7 @@ from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver, NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import recording_iteration_stack, \
     get_formatted_iteration_coordinate
+from openmdao.utils.mpi import MPI
 
 
 class BaseRecorder(object):
@@ -313,9 +314,18 @@ class BaseRecorder(object):
         **kwargs : keyword args
             Some implementations of record_iteration need additional args.
         """
+        if not self._parallel:
+            if MPI and MPI.COMM_WORLD.rank > 0 :
+                raise RuntimeError("not rank 0")
+
         self._counter += 1
 
         self._iteration_coordinate = get_formatted_iteration_coordinate()
+
+    def record_iteration_driver_passing_vars(self, object_requesting_recording, desvars, responses,
+                                             objectives, constraints, metadata):
+        raise NotImplementedError()
+
 
     def record_iteration_driver(self, object_requesting_recording, metadata):
         """
