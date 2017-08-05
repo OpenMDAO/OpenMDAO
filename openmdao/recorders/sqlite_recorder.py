@@ -132,8 +132,8 @@ class SqliteRecorder(BaseRecorder):
         else:
             raise ValueError("Recorders must be attached to Drivers, Systems, or Solvers.")
 
-    def record_iteration_driver_passing_vars(self, object_requesting_recording, desvars, responses, objectives,
-                                             constraints, metadata):
+    def record_iteration_driver_passing_vars(self, object_requesting_recording, desvars,
+                                             responses, objectives, constraints, metadata):
         """
         Record an iteration using the driver options.
 
@@ -156,60 +156,64 @@ class SqliteRecorder(BaseRecorder):
 
         super(SqliteRecorder, self).record_iteration(object_requesting_recording, metadata)
 
+        super(SqliteRecorder, self).record_iteration_driver_passing_vars(object_requesting_recording,
+                                                                         desvars, responses,
+                                                                         objectives, constraints, metadata)
+
         # Just an example of the syntax for creating a numpy structured array
         # arr = np.zeros((1,), dtype=[('dv_x','(5,)f8'),('dv_y','(10,)f8')])
 
         # This returns a dict of names and values. Use this to build up the tuples of
         # used for the dtypes in the creation of the numpy structured array
         # we want to write to sqlite
-        if desvars:
+        if self._desvars_values:
             dtype_tuples = []
-            for name, value in iteritems(desvars):
+            for name, value in iteritems(self._desvars_values):
                 tple = (name, '{}f8'.format(value.shape))
                 dtype_tuples.append(tple)
 
             desvars_array = np.zeros((1,), dtype=dtype_tuples)
 
-            for name, value in iteritems(desvars):
+            for name, value in iteritems(self._desvars_values):
                 desvars_array[name] = value
         else:
             desvars_array = None
 
-        if responses:
+        if self._responses_values:
             dtype_tuples = []
-            for name, value in iteritems(responses):
+            for name, value in iteritems(self._responses_values):
                 tple = (name, '{}f8'.format(value.shape))
                 dtype_tuples.append(tple)
 
             responses_array = np.zeros((1,), dtype=dtype_tuples)
 
-            for name, value in iteritems(responses):
+            for name, value in iteritems(self._responses_values):
                 responses_array[name] = value
         else:
             responses_array = None
 
-        if objectives:
+        if self._objectives_values:
             dtype_tuples = []
-            for name, value in iteritems(objectives):
+            for name, value in iteritems(self._objectives_values):
                 tple = (name, '{}f8'.format(value.shape))
                 dtype_tuples.append(tple)
 
             objectives_array = np.zeros((1,), dtype=dtype_tuples)
 
-            for name, value in iteritems(objectives):
+            for name, value in iteritems(self._objectives_values):
                 objectives_array[name] = value
         else:
             objectives_array = None
 
-        if constraints:
+        if self._constraints_values:
             dtype_tuples = []
-            for name, value in iteritems(constraints):
+            for name, value in iteritems(self._constraints_values):
                 tple = (name, '{}f8'.format(value.shape))
                 dtype_tuples.append(tple)
 
             constraints_array = np.zeros((1,), dtype=dtype_tuples)
 
-            for name, value in iteritems(constraints):
+            for name, value in iteritems(self._constraints_values):
                 constraints_array[name] = value
         else:
             constraints_array = None

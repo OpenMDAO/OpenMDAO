@@ -316,7 +316,7 @@ class BaseRecorder(object):
         """
         if not self._parallel:
             if MPI and MPI.COMM_WORLD.rank > 0 :
-                raise RuntimeError("not rank 0")
+                raise RuntimeError("Non-parallel recorders should not be recording on ranks > 0")
 
         self._counter += 1
 
@@ -324,7 +324,39 @@ class BaseRecorder(object):
 
     def record_iteration_driver_passing_vars(self, object_requesting_recording, desvars, responses,
                                              objectives, constraints, metadata):
-        raise NotImplementedError()
+        if self.options['record_desvars']:
+            if self._filtered_driver:
+                self._desvars_values = {name: desvars[name] for name in self._filtered_driver['des']}
+            else:
+                self._desvars_values = desvars
+        else:
+            self._desvars_values = None
+
+        # Cannot handle responses yet
+        # if self.options['record_responses']:
+        #     if self._filtered_driver:
+        #         self._responses_values = {name: responses[name] for name in self._filtered_driver['res']}
+        #     else:
+        #         self._responses_values = responses
+        # else:
+        #     self._responses_values = None
+
+        if self.options['record_objectives']:
+            if self._filtered_driver:
+                self._objectives_values = {name: objectives[name] for name in self._filtered_driver['obj']}
+            else:
+                self._objectives_values = objectives
+        else:
+            self._objectives_values = None
+
+        if self.options['record_constraints']:
+            if self._filtered_driver:
+                self._constraints_values = {name: constraints[name] for name in self._filtered_driver['con']}
+            else:
+                self._constraints_values = constraints
+        else:
+            self._constraints_values = None
+
 
 
     def record_iteration_driver(self, object_requesting_recording, metadata):

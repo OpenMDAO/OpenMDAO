@@ -178,6 +178,8 @@ class RecordingManager(object):
                     recorder._filtered_driver['obj'] = objectivenames
                     recorder._filtered_driver['con'] = constraintnames
 
+            # These are cumulative lists of vars to record across all recorders that are
+            #     managed by this recording manager
             self._vars_to_record['desvarnames'].update(desvarnames)
             self._vars_to_record['responsenames'].update(responsenames)
             self._vars_to_record['objectivenames'].update(objectivenames)
@@ -246,14 +248,12 @@ class RecordingManager(object):
 
         # If the recorder does not support parallel recording
         # we need to make sure we only record on rank 0.
-        # for params, unknowns, resids, meta in cases:
-        #     if params is None: # dummy cases have None in place of params, etc.
-        #         continue
         for recorder in self._recorders:
             if recorder._parallel or MPI is None or self.rank == 0:
                 # recorder.record_iteration(params, unknowns, resids, meta)
                 if isinstance(object_requesting_recording, Driver):
-                    recorder.record_iteration_driver_passing_vars(object_requesting_recording, desvars, responses, objectives, constraints, metadata)
+                    recorder.record_iteration_driver_passing_vars(object_requesting_recording, desvars, responses,
+                                                                  objectives, constraints, metadata)
                 else:
                     recorder.record_iteration(object_requesting_recording, metadata, **kwargs)
 
