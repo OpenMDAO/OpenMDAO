@@ -2705,7 +2705,7 @@ class System(object):
            A recorder instance.
         """
         if MPI:
-            RuntimeError("Recording of Systems when running parallel code is not supported yet")
+            raise RuntimeError("Recording of Systems when running parallel code is not supported yet")
         self._rec_mgr.append(recorder)
 
     def record_iteration(self):
