@@ -315,7 +315,7 @@ class BaseRecorder(object):
             Some implementations of record_iteration need additional args.
         """
         if not self._parallel:
-            if MPI and MPI.COMM_WORLD.rank > 0 :
+            if MPI and MPI.COMM_WORLD.rank > 0:
                 raise RuntimeError("Non-parallel recorders should not be recording on ranks > 0")
 
         self._counter += 1
@@ -326,7 +326,8 @@ class BaseRecorder(object):
                                              objectives, constraints, metadata):
         if self.options['record_desvars']:
             if self._filtered_driver:
-                self._desvars_values = {name: desvars[name] for name in self._filtered_driver['des']}
+                self._desvars_values = \
+                    {name: desvars[name] for name in self._filtered_driver['des']}
             else:
                 self._desvars_values = desvars
         else:
@@ -335,7 +336,8 @@ class BaseRecorder(object):
         # Cannot handle responses yet
         # if self.options['record_responses']:
         #     if self._filtered_driver:
-        #         self._responses_values = {name: responses[name] for name in self._filtered_driver['res']}
+        #         self._responses_values = \
+        #             {name: responses[name] for name in self._filtered_driver['res']}
         #     else:
         #         self._responses_values = responses
         # else:
@@ -343,7 +345,8 @@ class BaseRecorder(object):
 
         if self.options['record_objectives']:
             if self._filtered_driver:
-                self._objectives_values = {name: objectives[name] for name in self._filtered_driver['obj']}
+                self._objectives_values = \
+                    {name: objectives[name] for name in self._filtered_driver['obj']}
             else:
                 self._objectives_values = objectives
         else:
@@ -351,12 +354,12 @@ class BaseRecorder(object):
 
         if self.options['record_constraints']:
             if self._filtered_driver:
-                self._constraints_values = {name: constraints[name] for name in self._filtered_driver['con']}
+                self._constraints_values = \
+                    {name: constraints[name] for name in self._filtered_driver['con']}
             else:
                 self._constraints_values = constraints
         else:
             self._constraints_values = None
-
 
 
     def record_iteration_driver(self, object_requesting_recording, metadata):

@@ -9,7 +9,6 @@ import numpy as np
 from openmdao.utils.mpi import MPI
 
 
-
 class RecordingManager(object):
     """
     Object that routes function calls to all attached recorders.
@@ -91,17 +90,14 @@ class RecordingManager(object):
         """
         Run startup on each recorder in the manager.
         """
-        #qqq pathname = object_requesting_recording.pathname
-        # have to check to see if a given system is in the `_subsystems_myproc` list to see if it's active
-
-        # Only the root will have _subsystems_myproc
         # Will only add parallel code for Drivers. Use the old method for System and Solver
         from openmdao.core.driver import Driver
-        if not isinstance(object_requesting_recording,Driver):
+        if not isinstance(object_requesting_recording, Driver):
             for recorder in self._recorders:
                 recorder.startup(object_requesting_recording)
             return
 
+        # Some notes for doing is_active in blue. Not sure if I need them though!
         # object_requesting_recording._problem exists, which has these attributes:
         #   comm
         #   driver
@@ -110,11 +106,14 @@ class RecordingManager(object):
         # object_requesting_recording._problem.model has
         #      _subsystems_myproc
         #      _subsystems_allprocs
+        # have to check to see if a given system is in the `_subsystems_myproc` list to see if it's active
+        # Only the root will have _subsystems_myproc
+
         model = object_requesting_recording._problem.model
         # if MPI:
         if MPI and model.is_active():
-            rrank = object_requesting_recording._problem.comm.rank # root ( aka model ) rank. So this only works for
-                # Driver recording
+            rrank = object_requesting_recording._problem.comm.rank  # root ( aka model ) rank. So this only works for
+            # Driver recording
             # rowned = object_requesting_recording._problem._owning_ranks
             # in clippy, rowned is supposed to map variables to the ranks that own them.
             # qqq = model._var_allprocs_abs2idx['output']
@@ -128,7 +127,6 @@ class RecordingManager(object):
 
         self._record_desvars = self._record_responses = False
         self._record_objectives = self._record_constraints = False
-
 
         for recorder in self._recorders:
             recorder.startup(object_requesting_recording)
@@ -155,20 +153,16 @@ class RecordingManager(object):
             if constraintnames:
                 self._record_constraints = True
 
-
-
-            # return # qqq
-
             # now localize the lists to only
             # include local vars.  We need to do this after determining
             # if any mpi procs need to record each of params, unknowns,
             # and resids.  If none of them do, we can skip the mpi gather
             # for that group of vars.
             if MPI:
-                desvarnames = [n for n in desvarnames if rrank==rowned[n]]
-                responsenames = [n for n in responsenames if rrank==rowned[n]]
-                objectivenames = [n for n in objectivenames if rrank==rowned[n]]
-                constraintnames = [n for n in constraintnames if rrank==rowned[n]]
+                desvarnames = [n for n in desvarnames if rrank == rowned[n]]
+                responsenames = [n for n in responsenames if rrank == rowned[n]]
+                objectivenames = [n for n in objectivenames if rrank == rowned[n]]
+                constraintnames = [n for n in constraintnames if rrank == rowned[n]]
 
                 # reduce the filter set for any parallel recorders to only
                 # those variables that are owned by that rank
@@ -184,9 +178,6 @@ class RecordingManager(object):
             self._vars_to_record['responsenames'].update(responsenames)
             self._vars_to_record['objectivenames'].update(objectivenames)
             self._vars_to_record['constraintnames'].update(constraintnames)
-
-
-
 
     def close(self):
         """

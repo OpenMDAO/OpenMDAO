@@ -118,7 +118,6 @@ class Driver(object):
             self._model_viewer_data = _get_viewer_data(problem)
         self._rec_mgr.record_metadata(self)
 
-
     def get_design_var_values(self, filter=None):
         """
         Return the design variable values.

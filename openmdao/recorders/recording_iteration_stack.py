@@ -28,7 +28,7 @@ def get_formatted_iteration_coordinate():
     for name, iter_count in recording_iteration_stack:
         iteration_coord_list.append('{}{}{}'.format(name, separator, iter_count))
 
-    if MPI and MPI.COMM_WORLD.rank > 0 :
+    if MPI and MPI.COMM_WORLD.rank > 0:
         rank = MPI.COMM_WORLD.rank
     else:
         rank = 0
