@@ -224,7 +224,7 @@ class ArcLengthFunction(ExplicitComponent):
         outputs['f_arclength'] = np.sqrt(1 + inputs['yp_lgl']**2)
 
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         partials['f_arclength', 'yp_lgl'] = inputs['yp_lgl'] / np.sqrt(1 + inputs['yp_lgl']**2)
 
 
