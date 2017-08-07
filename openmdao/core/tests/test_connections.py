@@ -2,8 +2,9 @@
 
 import unittest
 import numpy as np
-from six import text_type, PY3
+
 from six.moves import cStringIO, range
+from six import assertRaisesRegex
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
 
@@ -395,6 +396,69 @@ class TestConnectionsPromoted(unittest.TestCase):
         model.connect('g1a.c.y', 'g1.c.x')
 
         prob.setup(check=True)
+
+
+class TestConnectionsIndices(unittest.TestCase):
+
+    def setUp(self):
+        class ArrayComp(ExplicitComponent):
+            def setup(self):
+                self.add_input('inp', val=np.ones((2)))
+                self.add_input('inp1', val=0)
+                self.add_output('out', val=np.zeros((2)))
+
+            def compute(self, inputs, outputs):
+                outputs['out'] = inputs['inp'] * 2.
+
+        indep_var_comp = IndepVarComp()
+        indep_var_comp.add_output('blammo', val=3.)
+        indep_var_comp.add_output('arrout', val=np.ones(5))
+
+        prob = Problem()
+        prob.model.add_subsystem('idvp', indep_var_comp)
+        prob.model.add_subsystem('arraycomp', ArrayComp())
+
+        self.prob = prob
+
+    def test_bad_shapes(self):
+        # Should not be allowed because the source and target shapes do not match
+        self.prob.model.connect('idvp.blammo', 'arraycomp.inp')
+
+        expected = ("The source and target shapes do not match for the "
+                    "connection 'idvp.blammo' to 'arraycomp.inp' in Group ''. "
+                    " Expected \(2.*,\) but got \(1.*,\).")
+
+        with assertRaisesRegex(self, ValueError, expected):
+            self.prob.setup(check=False)
+
+    def test_bad_length(self):
+        # Should not be allowed because the length of src_indices is greater than
+        # the shape of arraycomp.inp
+        self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 1, 0])
+
+        expected = ("The source indices \[0 1 0\] do not specify a valid shape "
+                    "for the connection 'idvp.blammo' to 'arraycomp.inp' in "
+                    "Group ''. The target shape is \(2.*,\) but indices are \(3.*,\).")
+
+        with assertRaisesRegex(self, ValueError, expected):
+            self.prob.setup(check=False)
+
+    def test_bad_value(self):
+        # Should not be allowed because the index value within src_indices is outside
+        # the valid range for the source
+        self.prob.model.connect('idvp.arrout', 'arraycomp.inp1', src_indices=[100000])
+
+        expected = ("The source indices do not specify a valid index for the "
+                    "connection 'idvp.arrout' to 'arraycomp.inp1' in Group ''. "
+                    "Index '100000' is out of range for source dimension of "
+                    "size 5.")
+
+        try:
+            self.prob.setup(check=False)
+        except ValueError as err:
+            self.assertEqual(str(err), expected)
+        else:
+            self.fail('Exception expected.')
 
 
 #class TestUBCS(unittest.TestCase):
