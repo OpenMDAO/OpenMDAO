@@ -131,12 +131,18 @@ class TestGetSetVariables(unittest.TestCase):
         # inputs
         with assertRaisesRegex(self, KeyError, msg.format('x')):
             p['x'] = 5.0
+            p.final_setup()
+        p._initial_condition_cache = {}
+
         with assertRaisesRegex(self, KeyError, msg.format('x')):
             self.assertEqual(p['x'], 5.0)
 
         # outputs
         with assertRaisesRegex(self, KeyError, msg.format('y')):
             p['y'] = 5.0
+            p.final_setup()
+        p._initial_condition_cache = {}
+
         with assertRaisesRegex(self, KeyError, msg.format('y')):
             self.assertEqual(p['y'], 5.0)
 
@@ -275,6 +281,9 @@ class TestGetSetVariables(unittest.TestCase):
         # inputs (g.x is not connected)
         with assertRaisesRegex(self, KeyError, msg1.format('g.x')):
             p['g.x'] = 5.0
+            p.final_setup()
+        p._initial_condition_cache = {}
+
         with assertRaisesRegex(self, KeyError, msg1.format('g.x')):
             self.assertEqual(p['g.x'], 5.0)
 
@@ -300,6 +309,9 @@ class TestGetSetVariables(unittest.TestCase):
         # inputs (g.x is connected to x)
         with assertRaisesRegex(self, KeyError, msg2.format('g.x', 'x')):
             p['g.x'] = 5.0
+            p.final_setup()
+        p._initial_condition_cache = {}
+
         with assertRaisesRegex(self, KeyError, msg2.format('g.x', 'x')):
             self.assertEqual(p['g.x'], 5.0)
 

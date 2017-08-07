@@ -66,6 +66,9 @@ class Problem(object):
         If True, allocate vectors to store ref. values.
     _solver_print_cache : list
         Allows solver iprints to be set to requested values after setup calls.
+    _initial_condition_cache : dict
+        Any initial conditions that are set at the problem level via setitem are cached here
+        until they can be processed.
     """
 
     def __init__(self, model=None, comm=None, use_ref_vector=True, root=None):
@@ -114,6 +117,8 @@ class Problem(object):
 
         recording_iteration_stack = []
 
+        self._initial_condition_cache = {}
+
     def __getitem__(self, name):
         """
         Get an output/input variable.
@@ -128,13 +133,20 @@ class Problem(object):
         float or ndarray
             the requested output/input variable.
         """
+        if name in self._initial_condition_cache:
+            return self._initial_condition_cache[name]
         if name in self.model._outputs:
-            return self.model._outputs[name]
+            val = self.model._outputs[name]
         elif name in self.model._inputs:
-            return self.model._inputs[name]
+            val = self.model._inputs[name]
         else:
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
+
+        # Need to cache the "get" in case the user calls in-place numpy operations.
+        self._initial_condition_cache[name] = val
+
+        return val
 
     def __setitem__(self, name, value):
         """
@@ -147,13 +159,23 @@ class Problem(object):
         value : float or ndarray or list
             value to set this variable to.
         """
-        if name in self.model._outputs:
-            self.model._outputs[name] = value
-        elif name in self.model._inputs:
-            self.model._inputs[name] = value
-        else:
-            msg = 'Variable name "{}" not found.'
-            raise KeyError(msg.format(name))
+        self._initial_condition_cache[name] = value
+
+    def _set_initial_conditions(self):
+        """
+        Set all initial conditions that have been saved in cache after setup.
+        """
+        for name, value in iteritems(self._initial_condition_cache):
+            if name in self.model._outputs:
+                self.model._outputs[name] = value
+            elif name in self.model._inputs:
+                self.model._inputs[name] = value
+            else:
+                msg = 'Variable name "{}" not found.'
+                raise KeyError(msg.format(name))
+
+        # Clean up cache
+        self._initial_condition_cache = {}
 
     @property
     def root(self):
@@ -199,6 +221,7 @@ class Problem(object):
         if self._mode is None:
             raise RuntimeError("The `setup` method must be called before `run_model`.")
 
+        self.final_setup()
         return self.model.run_solve_nonlinear()
 
     def run_driver(self):
@@ -213,6 +236,7 @@ class Problem(object):
         if self._mode is None:
             raise RuntimeError("The `setup` method must be called before `run_driver`.")
 
+        self.final_setup()
         with self.model._scaled_context_all():
             return self.driver.run()
 
@@ -322,6 +346,16 @@ class Problem(object):
             check_config(self, logger)
 
         return self
+
+    def final_setup(self):
+        """
+        Perform final setup on problem before run.
+
+        This is called at the start of `run_driver` or `run_model`.
+
+        Right now, it just loads and sets the initial conditions from cache.
+        """
+        self._set_initial_conditions()
 
     def check_partials(self, logger=None, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6, global_options=None,

@@ -37,6 +37,8 @@ class TestConnections(unittest.TestCase):
         self.p['G3.G4.C3.x'] = 222.
         self.p['G3.G4.C4.x'] = 333.
 
+        self.p.final_setup()
+
         self.assertEqual(self.C1._inputs['x'], 111.)
         self.assertEqual(self.C3._inputs['x'], 222.)
         self.assertEqual(self.C4._inputs['x'], 333.)

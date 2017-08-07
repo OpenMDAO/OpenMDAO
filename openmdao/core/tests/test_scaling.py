@@ -233,6 +233,8 @@ class TestScaling(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         prob['sys1.old_length'] = 3.e5
+        prob.final_setup()
+
         assert_rel_error(self, prob['sys1.old_length'], 3.e5)
         assert_rel_error(self, prob.model._outputs['sys1.old_length'], 3.e5)
         prob.run_model()

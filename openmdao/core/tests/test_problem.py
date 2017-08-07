@@ -27,10 +27,14 @@ class TestProblem(unittest.TestCase):
 
         new_val = -5*np.ones((3, 1))
         prob['indeps.X_c'] = new_val
+        prob.final_setup()
+
         assert_rel_error(self, prob['indeps.X_c'], new_val, 1e-10)
 
         new_val = 2.5*np.ones(3)
         prob['indeps.X_c'][:, 0] = new_val
+        prob.final_setup()
+
         assert_rel_error(self, prob['indeps.X_c'], new_val.reshape((3,1)), 1e-10)
         assert_rel_error(self, prob['indeps.X_c'][:, 0], new_val, 1e-10)
 
@@ -54,12 +58,15 @@ class TestProblem(unittest.TestCase):
 
         # check bad scalar value
         bad_val = -10*np.ones((10))
+        prob['indep.num'] = bad_val
         with assertRaisesRegex(self, ValueError, msg):
-            prob['indep.num'] = bad_val
+            prob.final_setup()
+        prob._initial_condition_cache = {}
 
         # check assign scalar to array
         arr_val = new_val*np.ones((10, 1))
         prob['indep.arr'] = new_val
+        prob.final_setup()
         assert_rel_error(self, prob['indep.arr'], arr_val, 1e-10)
 
         # check valid array value
@@ -69,8 +76,10 @@ class TestProblem(unittest.TestCase):
 
         # check bad array value
         bad_val = -10*np.ones((10))
+        prob['indep.arr'] = bad_val
         with assertRaisesRegex(self, ValueError, msg):
-            prob['indep.arr'] = bad_val
+            prob.final_setup()
+        prob._initial_condition_cache = {}
 
         # check valid list value
         new_val = new_val.tolist()
@@ -79,8 +88,9 @@ class TestProblem(unittest.TestCase):
 
         # check bad list value
         bad_val = bad_val.tolist()
+        prob['indep.arr'] = bad_val
         with assertRaisesRegex(self, ValueError, msg):
-            prob['indep.arr'] = bad_val
+            prob.final_setup()
 
     def test_compute_total_derivs_basic(self):
         # Basic test for the method using default solvers on simple model.
@@ -327,9 +337,10 @@ class TestProblem(unittest.TestCase):
         prob.setup()
 
         prob['x'] = 2.75
-        assert_rel_error(self, prob['x'], 2.75, 1e-6)
 
         prob.run_model()
+
+        assert_rel_error(self, prob['x'], 2.75, 1e-6)
 
         assert_rel_error(self, prob['y1'], 27.3049178437, 1e-6)
 
@@ -342,9 +353,10 @@ class TestProblem(unittest.TestCase):
         prob.setup()
 
         prob['px.x'] = 2.75
-        assert_rel_error(self, prob['px.x'], 2.75, 1e-6)
 
         prob.run_model()
+
+        assert_rel_error(self, prob['px.x'], 2.75, 1e-6)
 
         assert_rel_error(self, prob['d1.y1'], 27.3049178437, 1e-6)
 
@@ -357,9 +369,10 @@ class TestProblem(unittest.TestCase):
         prob.setup()
 
         prob['x'] = 2.75
-        assert_rel_error(self, prob['x'], 2.75, 1e-6)
 
         prob.run_model()
+
+        assert_rel_error(self, prob['x'], 2.75, 1e-6)
 
         # the output variable, referenced by the promoted name
         assert_rel_error(self, prob['y1'], 27.3049178437, 1e-6)
