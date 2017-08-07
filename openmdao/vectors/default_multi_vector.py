@@ -160,6 +160,24 @@ class DefaultMultiVector(DefaultVector):
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
 
+    def _init_array(self, size, ncol):
+        """
+        Return an array of zeros of specified size and number of columns.
+
+        Parameters
+        ----------
+        size : int
+            Number of entries in the array.
+        ncol : int
+            Number of columns in the array.
+
+        Returns
+        -------
+        ndarray
+            The array of zeros.
+        """
+        return np.zeros((size, ncol))
+
     def get_data(self, new_array=None):
         """
         Get the array combining the data of all the varsets.

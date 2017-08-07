@@ -875,11 +875,10 @@ class Problem(object):
                 if 'indices' in in_voi_meta:
                     in_idxs = in_voi_meta['indices']
 
-            dup = not in_var_meta['distributed']
             if in_idxs is not None:
                 irange = in_idxs
-                max_i = max(in_idxs)
-                min_i = min(in_idxs)
+                max_i = np.max(in_idxs)
+                min_i = np.min(in_idxs)
                 loc_size = len(in_idxs)
             else:
                 irange = list(range(in_var_meta['global_size']))
@@ -895,8 +894,19 @@ class Problem(object):
                         loc_size = sz
                         break
 
-            voi_info[input_name] = (dinputs, doutputs, irange, max_i, min_i,
-                                    loc_size, start, end, dup)
+            dup = not in_var_meta['distributed']
+
+            # set totals to zeros instead of None in those cases when none
+            # of the specified indices are within the range of interest
+            # for this proc.
+            store = True if ((start <= min_i < end) or (start <= max_i < end)) else dup
+
+            if store:
+                offset = start + min_i
+                loc_idxs = irange - offset
+
+            voi_info[input_name] = (dinputs, doutputs, irange, loc_idxs, max_i, min_i,
+                                    loc_size, start, end, dup, store)
 
         return voi_info
 
@@ -912,7 +922,8 @@ class Problem(object):
         sizes = model._var_sizes['output']
 
         for input_name, old_input_name in vois:
-            dinputs, doutputs, idxs, max_i, min_i, loc_size, start, end, dup = voi_info[input_name]
+            dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
+                dup, store = voi_info[input_name]
             if input_name in dinputs:
                 vec = dinputs._views_flat[input_name]
                 for i, idx in enumerate(idxs):
@@ -929,16 +940,9 @@ class Problem(object):
         model._solve_linear(vec_names, mode)
 
         for input_name, old_input_name in vois:
-            dinputs, doutputs, idxs, max_i, min_i, loc_size, start, end, dup = voi_info[input_name]
+            dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
+                dup, store = voi_info[input_name]
             ncol = dinputs._ncol
-
-            # totals to zeros instead of None in those cases when none
-            # of the specified indices are within the range of interest
-            # for this proc.
-            store = True if ((start <= min_i < end) or (start <= max_i < end)) else dup
-
-            if store:
-                loc_idxs = idxs - start
 
             # Pull out the answers and pack into our data structure.
             for ocount, output_name in enumerate(output_list):
@@ -986,6 +990,9 @@ class Problem(object):
                         self.comm.Bcast(deriv_val, root=root)
 
                 len_val = len(deriv_val)
+
+                if store and len(deriv_val.shape) == 1:
+                    deriv_val = np.atleast_2d(deriv_val).T
 
                 if return_format == 'flat_dict':
                     if fwd:
@@ -1198,7 +1205,7 @@ class Problem(object):
                 voi_info[vois[0][0]][0].set_const(0.0)
 
                 for input_name, old_input_name in vois:
-                    dinputs, doutputs, idxs, max_i, min_i, loc_size, start, end, dup = \
+                    dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
                         voi_info[input_name]
                     if i >= len(idxs):
                         # reuse the last index if loop iter is larger than current var size
@@ -1216,7 +1223,7 @@ class Problem(object):
                 model._solve_linear(vec_names, mode)
 
                 for input_name, old_input_name in vois:
-                    dinputs, doutputs, idxs, max_i, min_i, loc_size, start, end, dup = \
+                    dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
                         voi_info[input_name]
                     if i >= len(idxs):
                         idx = idxs[-1]  # reuse the last index

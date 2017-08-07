@@ -82,6 +82,24 @@ class DefaultVector(Vector):
 
     TRANSFER = DefaultTransfer
 
+    def _init_array(self, size, ncol):
+        """
+        Return an array of zeros of specified size.
+
+        Parameters
+        ----------
+        size : int
+            Number of entries in the array.
+        ncol : int
+            Number of columns in the array.
+
+        Returns
+        -------
+        ndarray
+            The array of zeros.
+        """
+        return np.zeros(size)
+
     def _create_data(self):
         """
         Allocate list of arrays, one for each var_set.
@@ -102,7 +120,7 @@ class DefaultVector(Vector):
         indices = {}
         for set_name in system._var_set2iset[type_]:
             size = np.sum(sizes_byset_t[set_name][iproc, :])
-            data[set_name] = np.zeros((size, ncol)) if ncol > 1 else np.zeros(size)
+            data[set_name] = self._init_array(size, ncol)
             indices[set_name] = np.zeros(size, int)
 
         sizes_t = system._var_sizes[type_]

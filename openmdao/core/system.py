@@ -560,15 +560,13 @@ class System(object):
 
             for vec_name in vec_names:
                 ncol = 1
+                vec_class = vector_class
                 if vec_name == 'nonlinear':
                     alloc_complex = nl_alloc_complex
-                    vec_class = vector_class
                 else:
                     alloc_complex = force_alloc_complex
 
-                    if vec_name == 'linear':
-                        vec_class = vector_class
-                    else:
+                    if vec_name != 'linear' and not (multi_vector_class is vector_class):
                         vec_class = multi_vector_class
                         idxs = vois[vec_name]['indices']
                         if idxs is None:
