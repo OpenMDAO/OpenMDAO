@@ -16,7 +16,7 @@ class BalanceComp(ImplicitComponent):
     """
 
     def __init__(self, name=None, eq_units=None, lhs_name=None,
-                 rhs_name=None, mult_name=None, mult_val=1.0, **kwargs):
+                 rhs_name=None, rhs_val=0.0, mult_name=None, mult_val=1.0, **kwargs):
         r"""
         Initialize a BalanceComp, optionally creating a new implicit state variable.
 
@@ -108,6 +108,9 @@ class BalanceComp(ImplicitComponent):
         rhs_name : str or None
             Optional name for the RHS variable associated with the implicit state variable.  If
             None, the default will be used:  'rhs:{name}'.
+        rhs_val : int, float, or np.array
+            Default value for the RHS of the given state.  Must be compatible
+            with the shape (optionally) given by the val option in kwargs.
         mult_name : str or None
             Optional name for the LHS multiplier variable associated with the implicit state
             variable. If None, the default will be used: 'mult:{name}'.
@@ -120,7 +123,8 @@ class BalanceComp(ImplicitComponent):
         super(BalanceComp, self).__init__()
         self._state_vars = {}
         if name is not None:
-            self.add_balance(name, eq_units, lhs_name, rhs_name, mult_name, mult_val, **kwargs)
+            self.add_balance(name, eq_units, lhs_name, rhs_name, rhs_val,
+                             mult_name, mult_val, **kwargs)
 
     def setup(self):
         """
@@ -142,9 +146,19 @@ class BalanceComp(ImplicitComponent):
             self._state_vars[name]['size'] = n
 
             self.add_output(name, **options['kwargs'])
-            self.add_input(options['lhs_name'], val=np.ones(n), units=options['eq_units'])
-            self.add_input(options['rhs_name'], val=np.ones(n), units=options['eq_units'])
-            self.add_input(options['mult_name'], val=options['mult_val'] * np.ones(n), units=None)
+
+            self.add_input(options['lhs_name'],
+                           val=np.ones(n),
+                           units=options['eq_units'])
+
+            self.add_input(options['rhs_name'],
+                           val=options['rhs_val'] * np.ones(n),
+                           units=options['eq_units'])
+
+            self.add_input(options['mult_name'],
+                           val=options['mult_val'] * np.ones(n),
+                           units=None)
+
             self._scale_factor = np.ones(n)
             self._dscale_drhs = np.ones(n)
 
@@ -211,7 +225,7 @@ class BalanceComp(ImplicitComponent):
             jacobian[name, mult_name] = lhs * self._scale_factor
 
     def add_balance(self, name, eq_units=None, lhs_name=None,
-                    rhs_name=None, mult_name=None, mult_val=1.0, **kwargs):
+                    rhs_name=None, rhs_val=0.0, mult_name=None, mult_val=1.0, **kwargs):
         """
         Add a new state variable and associated equation to be balanced.
 
@@ -231,6 +245,9 @@ class BalanceComp(ImplicitComponent):
         rhs_name : str or None
             Optional name for the RHS variable associated with the implicit state variable.  If
             None, the default will be used:  'rhs:{name}'.
+        rhs_val : int, float, or np.array
+            Default value for the RHS.  Must be compatible with the shape (optionally)
+            given by the val option in kwargs.
         mult_name : str or None
             Optional name for the LHS multiplier variable associated with the implicit state
             variable. If None, the default will be used: 'mult:{name}'.
@@ -244,5 +261,6 @@ class BalanceComp(ImplicitComponent):
                                   'eq_units': eq_units,
                                   'lhs_name': lhs_name,
                                   'rhs_name': rhs_name,
+                                  'rhs_val': rhs_val,
                                   'mult_name': mult_name,
                                   'mult_val': mult_val}
