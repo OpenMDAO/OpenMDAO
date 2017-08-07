@@ -671,8 +671,10 @@ class TestPyoptSparse(unittest.TestCase):
                    ' but the selected optimizer (SLSQP) does not support' \
                    ' multiple objectives.'
 
+        prob.setup(check=False)
+
         with self.assertRaises(RuntimeError) as cm:
-            prob.setup(check=False)
+            prob.final_setup()
 
         self.assertEqual(str(cm.exception), expected)
 

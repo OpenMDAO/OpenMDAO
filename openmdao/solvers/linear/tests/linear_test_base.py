@@ -34,6 +34,15 @@ class LinearSolverTests(object):
             p.setup(check=False)
             p.set_solver_print(level=0)
 
+            # Conclude setup but don't run model.
+            p.final_setup()
+
+            # Conclude setup but don't run model.
+            p.final_setup()
+
+            # Conclude setup but don't run model.
+            p.final_setup()
+
             d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
             # forward

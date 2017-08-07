@@ -24,6 +24,7 @@ from openmdao.recorders.recording_iteration_stack import recording_iteration_sta
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.logger_utils import get_default_logger
 from openmdao.utils.mpi import MPI, FakeComm
+from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.utils.graph_utils import all_connected_edges
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.vectors.default_multi_vector import DefaultMultiVector
@@ -69,6 +70,11 @@ class Problem(object):
     _initial_condition_cache : dict
         Any initial conditions that are set at the problem level via setitem are cached here
         until they can be processed.
+    _setup_status : int
+        Current status of the setup in _model.
+        0 -- Newly initialized problem or newly added model.
+        1 -- The `setup` method has been called, but vectors not initialized.
+        2 -- The `final_setup` has been run, everything ready to run.
     """
 
     def __init__(self, model=None, comm=None, use_ref_vector=True, root=None):
@@ -119,6 +125,12 @@ class Problem(object):
 
         self._initial_condition_cache = {}
 
+        # Status of the setup of _model.
+        # 0 -- Newly initialized problem or newly added model.
+        # 1 -- The `setup` method has been called, but vectors not initialized.
+        # 2 -- The `final_setup` has been run, everything ready to run.
+        self._setup_status = 0
+
     def __getitem__(self, name):
         """
         Get an output/input variable.
@@ -133,12 +145,53 @@ class Problem(object):
         float or ndarray
             the requested output/input variable.
         """
-        if name in self._initial_condition_cache:
-            return self._initial_condition_cache[name]
-        if name in self.model._outputs:
+        # Caching only needed if vectors aren't allocated yet.
+        if self._setup_status == 1:
+
+            # We have set and cached already
+            if name in self._initial_condition_cache:
+                val = self._initial_condition_cache[name]
+
+            # Vector not setup, so we need to pull values from saved metadata request.
+            else:
+                proms = self.model._var_allprocs_prom2abs_list
+                meta = self.model._var_abs2meta
+                if name in meta['input']:
+                    if name in self.model._conn_abs_in2out:
+                        src_name = self.model._conn_abs_in2out[name]
+                        val = meta['input'][src_name]['value']
+                    else:
+                        val = meta['input'][name]['value']
+
+                elif name in meta['output']:
+                    val = meta['output'][name]['value']
+
+                elif name in proms['input']:
+                    abs_name = proms['input'][name][0]
+                    if abs_name in self.model._conn_abs_in2out:
+                        src_name = self.model._conn_abs_in2out[abs_name]
+                        val = meta['output'][src_name]['value']
+                    else:
+                        # This triggers a check for unconnected non-unique inputs.
+                        abs_name = prom_name2abs_name(self.model, name, 'input')
+                        val = meta['input'][abs_name]['value']
+
+                elif name in proms['output']:
+                    abs_name = prom_name2abs_name(self.model, name, 'output')
+                    val = meta['output'][abs_name]['value']
+
+                else:
+                    msg = 'Variable name "{}" not found.'
+                    raise KeyError(msg.format(name))
+
+                self._initial_condition_cache[name] = val
+
+        elif name in self.model._outputs:
             val = self.model._outputs[name]
+
         elif name in self.model._inputs:
             val = self.model._inputs[name]
+
         else:
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
@@ -159,7 +212,17 @@ class Problem(object):
         value : float or ndarray or list
             value to set this variable to.
         """
-        self._initial_condition_cache[name] = value
+        # Caching only needed if vectors aren't allocated yet.
+        if self._setup_status == 1:
+            self._initial_condition_cache[name] = value
+        else:
+            if name in self.model._outputs:
+                self.model._outputs[name] = value
+            elif name in self.model._inputs:
+                self.model._inputs[name] = value
+            else:
+                msg = 'Variable name "{}" not found.'
+                raise KeyError(msg.format(name))
 
     def _set_initial_conditions(self):
         """
@@ -330,6 +393,41 @@ class Problem(object):
 
         model._setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex,
                      mode=mode, multi_vector_class=multi_vector_class)
+
+        # Cache all args for final setup.
+        self._vector_class = vector_class
+        self._check = check
+        self._logger = logger
+        self._force_alloc_complex = force_alloc_complex
+        self._multi_vector_class = multi_vector_class
+
+        self._setup_status = 1
+        return self
+
+    def final_setup(self):
+        """
+        Perform final setup on problem before run.
+
+        This is called at the start of `run_driver` or `run_model`.
+
+        Right now, it just loads and sets the initial conditions from cache.
+        """
+        vector_class = self._vector_class
+        check = self._check
+        logger = self._logger
+        force_alloc_complex = self._force_alloc_complex
+        multi_vector_class = self._multi_vector_class
+
+        model = self.model
+        comm = self.comm
+        mode = self._mode
+
+        if self._setup_status < 2:
+            model._final_setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex,
+                               mode=mode, multi_vector_class=multi_vector_class)
+
+            self._set_initial_conditions()
+
         self.driver._setup_driver(self)
 
         if isinstance(model, Group):
@@ -345,17 +443,7 @@ class Problem(object):
         if check and comm.rank == 0:
             check_config(self, logger)
 
-        return self
-
-    def final_setup(self):
-        """
-        Perform final setup on problem before run.
-
-        This is called at the start of `run_driver` or `run_model`.
-
-        Right now, it just loads and sets the initial conditions from cache.
-        """
-        self._set_initial_conditions()
+        self._setup_status = 2
 
     def check_partials(self, logger=None, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6, global_options=None,
@@ -402,6 +490,9 @@ class Problem(object):
             For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
                 Jacobian for the three different methods of computation.
         """
+        if self._setup_status < 2:
+            self.final_setup()
+
         if not global_options:
             global_options = DEFAULT_FD_OPTIONS.copy()
             global_options['method'] = 'fd'
@@ -761,6 +852,9 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
+        if self._setup_status < 2:
+            self.final_setup()
+
         with self.model._scaled_context_all():
             if self.model._owns_approx_jac:
                 totals = self._compute_total_derivs_approx(of=of, wrt=wrt,

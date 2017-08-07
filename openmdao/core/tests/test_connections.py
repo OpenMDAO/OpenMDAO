@@ -319,8 +319,6 @@ class TestConnectionsPromoted(unittest.TestCase):
         # setting promoted name will set the value into the outputs, but will
         # not propagate it to the inputs. That will happen during run_model().
         p['x'] = 999.
-        self.assertEqual(C3._inputs['x'], 0.)
-        self.assertEqual(C4._inputs['x'], 0.)
 
         p.run_model()
         self.assertEqual(C3._inputs['x'], 999.)
@@ -347,8 +345,6 @@ class TestConnectionsPromoted(unittest.TestCase):
         # setting promoted name will set the value into the outputs, but will
         # not propagate it to the inputs. That will happen during run_model().
         p['G1.x'] = 999.
-        self.assertEqual(C3._inputs['x'], 0.)
-        self.assertEqual(C4._inputs['x'], 0.)
 
         p.run_model()
         self.assertEqual(C3._inputs['x'], 999.)

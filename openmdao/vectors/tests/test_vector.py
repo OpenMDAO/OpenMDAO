@@ -12,6 +12,7 @@ class TestVector(unittest.TestCase):
         comp.add_output('v2', val=2.0)
         p.model.add_subsystem('des_vars', comp, promotes=['*'])
         p.setup()
+        p.final_setup()
 
         outputs = [n for n in p.model._outputs]
         expected = ['des_vars.v1', 'des_vars.v2']
