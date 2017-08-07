@@ -2,7 +2,6 @@
 Class definition for BaseRecorder, the base class for all recorders.
 """
 from fnmatch import fnmatchcase
-import sys
 from six import StringIO
 
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -312,31 +311,81 @@ class BaseRecorder(object):
 
     def record_metadata(self, object_requesting_recording):
         """
-        Write the metadata of the given object.
+        Route the record_metadata call to the proper method.
 
         Parameters
         ----------
-        object_requesting_recording :
-            System, Solver, Driver in need of recording.
+        object_requesting_recording: <object>
+            The object that would like to record its metadata.
+        """
+        if self.options['record_metadata']:
+            if isinstance(object_requesting_recording, Driver):
+                self.record_metadata_driver(object_requesting_recording)
+            elif isinstance(object_requesting_recording, System):
+                self.record_metadata_system(object_requesting_recording)
+            elif isinstance(object_requesting_recording, Solver):
+                self.record_metadata_solver(object_requesting_recording)
+
+    def record_metadata_driver(self, object_requesting_recording):
+        """
+        Record driver metadata.
+
+        Parameters
+        ----------
+        object_requesting_recording: <Driver>
+            The Driver that would like to record its metadata.
+        """
+        raise NotImplementedError()
+
+    def record_metadata_system(self, object_requesting_recording):
+        """
+        Record system metadata.
+
+        Parameters
+        ----------
+        object_requesting_recording: <System>
+            The System that would like to record its metadata.
+        """
+        raise NotImplementedError()
+
+    def record_metadata_solver(self, object_requesting_recording):
+        """
+        Record solver metadata.
+
+        Parameters
+        ----------
+        object_requesting_recording: <Solver>
+            The Solver that would like to record its metadata.
         """
         raise NotImplementedError()
 
     def record_iteration(self, object_requesting_recording, metadata, **kwargs):
         """
-        Write the provided data.
+        Route the record_iteration call to the proper method.
 
         Parameters
         ----------
         object_requesting_recording : object
             System, Solver, Driver in need of recording.
         metadata : dict, optional
-            Dictionary containing execution metadata (e.g. iteration coordinate).
+            Dictionary containing execution metadata.
         **kwargs : keyword args
             Some implementations of record_iteration need additional args.
         """
         self._counter += 1
 
         self._iteration_coordinate = get_formatted_iteration_coordinate()
+
+        if isinstance(object_requesting_recording, Driver):
+            self.record_iteration_driver(object_requesting_recording, metadata)
+
+        elif isinstance(object_requesting_recording, System):
+            self.record_iteration_system(object_requesting_recording, metadata)
+
+        elif isinstance(object_requesting_recording, Solver):
+            self.record_iteration_solver(object_requesting_recording, metadata, **kwargs)
+        else:
+            raise ValueError("Recorders must be attached to Drivers, Systems, or Solvers.")
 
     def record_iteration_driver(self, object_requesting_recording, metadata):
         """
@@ -347,7 +396,7 @@ class BaseRecorder(object):
         object_requesting_recording: <Driver>
             The Driver object that wants to record an iteration.
         metadata : dict
-            Dictionary containing execution metadata (e.g. iteration coordinate).
+            Dictionary containing execution metadata.
         """
         # make a nested numpy named array using the example
         #   http://stackoverflow.com/questions/19201868/how-to-set-dtype-for-nested-numpy-ndarray
@@ -524,16 +573,3 @@ class BaseRecorder(object):
                 self._resids = residuals
         else:
             self._resids = None
-
-    def close(self):
-        """
-        Close `out` unless it's ``sys.stdout``, ``sys.stderr``, or StringIO.
-
-        Note that a closed recorder will do nothing in :meth:`record`, and
-        closing a closed recorder also does nothing.
-        """
-        # Closing a StringIO deletes its contents.
-        if self.out not in (None, sys.stdout, sys.stderr):
-            if not isinstance(self.out, StringIO):
-                self.out.close()
-            self.out = None
