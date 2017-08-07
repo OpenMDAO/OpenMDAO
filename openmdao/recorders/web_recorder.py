@@ -406,9 +406,3 @@ class WebRecorder(BaseRecorder):
             return []
         else:
             return obj
-
-    def close(self):
-        """
-        Close.
-        """
-        pass

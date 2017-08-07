@@ -578,4 +578,4 @@ class BaseRecorder(object):
         """
         Cleanup the recorder.
         """
-        raise NotImplementedError()
+        pass
