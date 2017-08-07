@@ -13,7 +13,7 @@ from six import iteritems, PY2, PY3
 from tempfile import mkdtemp
 
 from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, NonlinearBlockJac,\
-            NewtonSolver, NonLinearRunOnce, OpenMDAOServerRecorder, Group, IndepVarComp, ExecComp, \
+            NewtonSolver, NonLinearRunOnce, WebRecorder, Group, IndepVarComp, ExecComp, \
             DirectSolver, ScipyIterativeSolver, PetscKSP, LinearBlockGS, LinearRunOnce, \
             LinearBlockJac
 
@@ -21,7 +21,7 @@ from openmdao.core.problem import Problem
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.utils.record_util import format_iteration_coordinate
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.recorders.openmdao_server_recorder import format_version
+from openmdao.recorders.web_recorder import format_version
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
     SellarDis2withDerivatives
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -193,17 +193,17 @@ class TestServerRecorder(unittest.TestCase):
 
     def test_get_case_success(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
         self.assertEqual(recorder._case_id, self._default_case_id)
 
     def test_get_case_fail(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder('', suppress_output=True)
+        recorder = WebRecorder('', suppress_output=True)
         self.assertEqual(recorder._case_id, '-1')
 
     def test_driver_records_metadata(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
 
         self.setup_sellar_model()
 
@@ -230,7 +230,7 @@ class TestServerRecorder(unittest.TestCase):
 
         self.setup_sellar_model()
 
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
         recorder.options['record_metadata'] = False
         self.prob.driver.add_recorder(recorder)
         self.prob.setup(check=False)
@@ -243,7 +243,7 @@ class TestServerRecorder(unittest.TestCase):
     def test_only_desvars_recorded(self, m):
         self.setup_endpoints(m)
 
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
 
         self.setup_sellar_model()
 
@@ -269,7 +269,7 @@ class TestServerRecorder(unittest.TestCase):
 
     def test_only_objectives_recorded(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
 
         self.setup_sellar_model()
 
@@ -293,7 +293,7 @@ class TestServerRecorder(unittest.TestCase):
 
     def test_only_constraints_recorded(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
 
         self.setup_sellar_model()
 
@@ -333,7 +333,7 @@ class TestServerRecorder(unittest.TestCase):
 
     def test_record_system(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
 
         self.setup_sellar_model()
 
@@ -410,7 +410,7 @@ class TestServerRecorder(unittest.TestCase):
 
     def test_simple_driver_recording(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
 
         if OPT is None:
             raise unittest.SkipTest("pyoptsparse is not installed")
@@ -476,7 +476,7 @@ class TestServerRecorder(unittest.TestCase):
 
     def test_record_solver(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
 
         self.setup_sellar_model()
 
@@ -525,7 +525,7 @@ class TestServerRecorder(unittest.TestCase):
 
     def test_record_line_search_armijo_goldstein(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
         self.setup_sellar_model()
 
         model = self.prob.model
@@ -558,7 +558,7 @@ class TestServerRecorder(unittest.TestCase):
 
     def test_record_line_search_bounds_enforce(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
         self.setup_sellar_model()
 
         model = self.prob.model
@@ -588,7 +588,7 @@ class TestServerRecorder(unittest.TestCase):
 
     def test_record_solver_nonlinear_block_gs(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
         self.setup_sellar_model()
 
         self.prob.model.nonlinear_solver = NonlinearBlockGS()
@@ -640,7 +640,7 @@ class TestServerRecorder(unittest.TestCase):
 
     def test_record_solver_nonlinear_block_jac(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
         self.setup_sellar_model()
 
         self.prob.model.nonlinear_solver = NonlinearBlockJac()
@@ -663,7 +663,7 @@ class TestServerRecorder(unittest.TestCase):
 
     def test_record_solver_nonlinear_newton(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
         self.setup_sellar_model()
 
         self.prob.model.nonlinear_solver = NewtonSolver()
@@ -686,7 +686,7 @@ class TestServerRecorder(unittest.TestCase):
 
     def test_record_solver_nonlinear_nonlinear_run_once(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
         self.setup_sellar_model()
 
         self.prob.model.nonlinear_solver = NonLinearRunOnce()
@@ -713,7 +713,7 @@ class TestServerRecorder(unittest.TestCase):
 
     def test_record_solver_linear_direct_solver(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
         self.setup_sellar_model()
 
         self.prob.model.nonlinear_solver = NewtonSolver()
@@ -762,7 +762,7 @@ class TestServerRecorder(unittest.TestCase):
 
     def test_record_solver_linear_scipy_iterative_solver(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
         self.setup_sellar_model()
 
         self.prob.model.nonlinear_solver = NewtonSolver()
@@ -796,7 +796,7 @@ class TestServerRecorder(unittest.TestCase):
 
     def test_record_solver_linear_block_gs(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
         self.setup_sellar_model()
 
         self.prob.model.nonlinear_solver = NewtonSolver()
@@ -834,7 +834,7 @@ class TestServerRecorder(unittest.TestCase):
 
     def test_record_solver_linear_linear_run_once(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
         # raise unittest.SkipTest("Linear Solver recording not working yet")
         self.setup_sellar_model()
 
@@ -873,7 +873,7 @@ class TestServerRecorder(unittest.TestCase):
 
     def test_record_solver_linear_block_jac(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
         self.setup_sellar_model()
 
         self.prob.model.nonlinear_solver = NewtonSolver()
@@ -913,7 +913,7 @@ class TestServerRecorder(unittest.TestCase):
         # Test what happens when all three types are recorded:
         #    Driver, System, and Solver
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
         if OPT is None:
             raise unittest.SkipTest("pyoptsparse is not installed")
 
@@ -1029,7 +1029,7 @@ class TestServerRecorder(unittest.TestCase):
 
     def test_implicit_component(self, m):
         self.setup_endpoints(m)
-        recorder = OpenMDAOServerRecorder(self._accepted_token, suppress_output=True)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
         from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
         group = Group()
         group.add_subsystem('comp1', IndepVarComp([('a', 1.0), ('b', 1.0), ('c', 1.0)]))

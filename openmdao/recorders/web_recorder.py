@@ -19,7 +19,7 @@ from openmdao.recorders.recording_iteration_stack import \
 format_version = 1
 
 
-class OpenMDAOServerRecorder(BaseRecorder):
+class WebRecorder(BaseRecorder):
     """
     Recorder that saves cases to the OpenMDAO server.
 
@@ -49,7 +49,7 @@ class OpenMDAOServerRecorder(BaseRecorder):
             Indicates if any printing should occur (including printing indicating the
             visualization URL)
         """
-        super(OpenMDAOServerRecorder, self).__init__()
+        super(WebRecorder, self).__init__()
 
         self.model_viewer_data = None
         self._headers = {'token': token}
@@ -84,8 +84,8 @@ class OpenMDAOServerRecorder(BaseRecorder):
 
     def record_iteration(self, object_requesting_recording, metadata, **kwargs):
         """
-        Store the provided data in the sqlite file using the iteration coordinate for the key.
-
+        Send provided data to the server
+        
         Parameters
         ----------
         object_requesting_recording: <object>
@@ -95,7 +95,7 @@ class OpenMDAOServerRecorder(BaseRecorder):
         **kwargs :
             Various keyword arguments needed for System or Solver recordings.
         """
-        super(OpenMDAOServerRecorder, self).record_iteration(object_requesting_recording,
+        super(WebRecorder, self).record_iteration(object_requesting_recording,
                                                              metadata)
 
         if isinstance(object_requesting_recording, Driver):
@@ -229,7 +229,7 @@ class OpenMDAOServerRecorder(BaseRecorder):
             '_apply_nonlinear,' '_solve_nonlinear'. Behavior varies based on from which function
             record_iteration was called.
         """
-        super(OpenMDAOServerRecorder, self).record_iteration_system(object_requesting_recording,
+        super(WebRecorder, self).record_iteration_system(object_requesting_recording,
                                                                     metadata)
 
         # Inputs
@@ -300,7 +300,7 @@ class OpenMDAOServerRecorder(BaseRecorder):
             The relative error of the Solver requesting recording. It is not cached in
             the Solver object, so we pass it in here.
         """
-        super(OpenMDAOServerRecorder, self).record_iteration_solver(object_requesting_recording,
+        super(WebRecorder, self).record_iteration_solver(object_requesting_recording,
                                                                     metadata, **kwargs)
 
         outputs_array = []
