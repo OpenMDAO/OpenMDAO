@@ -84,8 +84,8 @@ class WebRecorder(BaseRecorder):
 
     def record_iteration(self, object_requesting_recording, metadata, **kwargs):
         """
-        Send provided data to the server
-        
+        Send provided data to the server.
+
         Parameters
         ----------
         object_requesting_recording: <object>
@@ -96,7 +96,7 @@ class WebRecorder(BaseRecorder):
             Various keyword arguments needed for System or Solver recordings.
         """
         super(WebRecorder, self).record_iteration(object_requesting_recording,
-                                                             metadata)
+                                                  metadata)
 
         if isinstance(object_requesting_recording, Driver):
             self.record_iteration_driver(object_requesting_recording, metadata)
@@ -230,7 +230,7 @@ class WebRecorder(BaseRecorder):
             record_iteration was called.
         """
         super(WebRecorder, self).record_iteration_system(object_requesting_recording,
-                                                                    metadata)
+                                                         metadata)
 
         # Inputs
         inputs_array = []
@@ -301,7 +301,7 @@ class WebRecorder(BaseRecorder):
             the Solver object, so we pass it in here.
         """
         super(WebRecorder, self).record_iteration_solver(object_requesting_recording,
-                                                                    metadata, **kwargs)
+                                                         metadata, **kwargs)
 
         outputs_array = []
         if self._outputs:
