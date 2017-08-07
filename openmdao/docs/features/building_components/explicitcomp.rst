@@ -34,7 +34,6 @@ The implementation of each method will be illustrated using a simple explicit co
 - :code:`compute_partials(inputs, partials)` :
 
   [Optional] Compute the :code:`partials` (partial derivatives) given the :code:`inputs`.
-  The :code:`outputs` are also provided for convenience.
 
   .. embed-code::
       openmdao.core.tests.test_expl_comp.RectanglePartial.compute_partials
