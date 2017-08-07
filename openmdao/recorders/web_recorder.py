@@ -82,33 +82,6 @@ class WebRecorder(BaseRecorder):
                 if not suppress_output:
                     print("Failure reasoning: " + response['reasoning'])
 
-    def record_iteration(self, object_requesting_recording, metadata, **kwargs):
-        """
-        Send provided data to the server.
-
-        Parameters
-        ----------
-        object_requesting_recording: <object>
-            The item, a System, Solver, or Driver that wants to record an iteration.
-        metadata : dict
-            Dictionary containing execution metadata (e.g. iteration coordinate).
-        **kwargs :
-            Various keyword arguments needed for System or Solver recordings.
-        """
-        super(WebRecorder, self).record_iteration(object_requesting_recording,
-                                                  metadata)
-
-        if isinstance(object_requesting_recording, Driver):
-            self.record_iteration_driver(object_requesting_recording, metadata)
-
-        elif isinstance(object_requesting_recording, System):
-            self.record_iteration_system(object_requesting_recording, metadata)
-
-        elif isinstance(object_requesting_recording, Solver):
-            self.record_iteration_solver(object_requesting_recording, metadata, **kwargs)
-        else:
-            raise ValueError("Recorders must be attached to Drivers, Systems, or Solvers.")
-
     def record_iteration_driver(self, object_requesting_recording, metadata):
         """
         Record an iteration using the driver options.
@@ -345,23 +318,6 @@ class WebRecorder(BaseRecorder):
         requests.post(self._endpoint + '/' + self._case_id + '/global_iterations',
                       data=global_iteration, headers=self._headers)
 
-    def record_metadata(self, object_requesting_recording):
-        """
-        Route the record_metadata call to the proper object.
-
-        Parameters
-        ----------
-        object_requesting_recording: <object>
-            The object that would like to record its metadata.
-        """
-        if self.options['record_metadata']:
-            if isinstance(object_requesting_recording, Driver):
-                self.record_metadata_driver(object_requesting_recording)
-            elif isinstance(object_requesting_recording, System):
-                self.record_metadata_system(object_requesting_recording)
-            elif isinstance(object_requesting_recording, Solver):
-                self.record_metadata_solver(object_requesting_recording)
-
     def record_metadata_driver(self, object_requesting_recording):
         """
         Record driver metadata.
@@ -433,12 +389,6 @@ class WebRecorder(BaseRecorder):
         requests.post(self._endpoint + '/' + self._case_id + '/solver_metadata',
                       data=solver_metadata, headers=self._headers)
 
-    def close(self):
-        """
-        Close.
-        """
-        pass
-
     def convert_to_list(self, obj):
         """
         Convert object to list (so that it may be sent as JSON).
@@ -456,3 +406,9 @@ class WebRecorder(BaseRecorder):
             return []
         else:
             return obj
+
+    def close(self):
+        """
+        Close.
+        """
+        pass
