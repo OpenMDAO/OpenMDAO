@@ -16,6 +16,13 @@ ExplicitComponent Methods
 
 The implementation of each method will be illustrated using a simple explicit component that computes the output *area* as a function of inputs *length* and *width*.
 
+::
+
+    class RectangleComp(ExplicitComponent):
+        """
+        A simple Explicit Component that computes the area of a rectangle.
+        """
+
 - :code:`setup()` :
 
   Declare input and output variables via :code:`add_input` and :code:`add_output`.

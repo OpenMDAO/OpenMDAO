@@ -136,6 +136,25 @@ class ExplCompTestCase(unittest.TestCase):
         with assertRaisesRegex(self, RuntimeError, msg):
             prob.model.list_residuals(explicit=False, implicit=False)
 
+class ListFeatureTestCase(unittest.TestCase):
+
+    def setUp(self):
+        prob = Problem(RectangleGroup())
+        prob.setup()
+
+        prob['comp1.length'] = 3.
+        prob['comp1.width'] = 2.
+        prob.run_model()
+
+    def test_list_inputs(self):
+        prob.model.list_inputs()
+
+    def test_list_outputs(self):
+        prob.model.list_outputs()
+
+    def test_list_residuals(self):
+        prob.model.list_residuals()
+
 
 if __name__ == '__main__':
     unittest.main()
