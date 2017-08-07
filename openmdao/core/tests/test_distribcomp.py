@@ -167,7 +167,6 @@ class DistribInputDistribOutputComp(ExplicitComponent):
         self.arr_size = arr_size
         self.distributed = True
 
-
     def compute(self, inputs, outputs):
         outputs['outvec'] = inputs['invec']*2.0
 
@@ -254,8 +253,11 @@ class NonDistribGatherComp(ExplicitComponent):
     """Uses 2 procs gathers a distrib output into a full input"""
     def __init__(self, size):
         super(NonDistribGatherComp, self).__init__()
-        self.add_input('invec', np.ones(size, float))
-        self.add_output('outvec', np.ones(size, float))
+        self.size = size
+
+    def setup(self):
+        self.add_input('invec', np.ones(self.size, float))
+        self.add_output('outvec', np.ones(self.size, float))
 
     def compute(self, inputs, outputs):
         outputs['outvec'] = inputs['invec']

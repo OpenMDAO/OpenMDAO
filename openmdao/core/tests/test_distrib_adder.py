@@ -23,6 +23,7 @@ class DistributedAdder(ExplicitComponent):
 
     def __init__(self, size):
         super(DistributedAdder, self).__init__()
+        self.distributed = True
 
         self.local_size = self.size = size
 
@@ -64,7 +65,7 @@ class DistributedAdder(ExplicitComponent):
 
 class Summer(ExplicitComponent):
     """
-    Agreggation component that collects all the values from the distributed
+    Aggregation component that collects all the values from the distributed
     vector addition and computes a total
     """
 
