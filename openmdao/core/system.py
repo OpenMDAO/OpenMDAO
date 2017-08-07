@@ -1863,7 +1863,7 @@ class System(object):
 
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
-                       rhs_group=None):
+                       parallel_deriv_color=None):
         r"""
         Add a design variable to this system.
 
@@ -1889,9 +1889,9 @@ class System(object):
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-        rhs_group : string
+        parallel_deriv_color : string
             If specified, this design var will be grouped for parallel derivative
-            calculations with other variables sharing the same rhs_group.
+            calculations with other variables sharing the same parallel_deriv_color.
 
         Notes
         -----
@@ -1956,11 +1956,11 @@ class System(object):
             dvs['size'] = len(indices)
             indices = np.atleast_1d(indices)
         dvs['indices'] = indices
-        dvs['rhs_group'] = rhs_group
+        dvs['parallel_deriv_color'] = parallel_deriv_color
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None,
-                     adder=None, scaler=None, linear=False, rhs_group=None):
+                     adder=None, scaler=None, linear=False, parallel_deriv_color=None):
         r"""
         Add a response variable to this system.
 
@@ -1994,9 +1994,9 @@ class System(object):
             is second in precedence.
         linear : bool
             Set to True if constraint is linear. Default is False.
-        rhs_group : string
+        parallel_deriv_color : string
             If specified, this design var will be grouped for parallel derivative
-            calculations with other variables sharing the same rhs_group.
+            calculations with other variables sharing the same parallel_deriv_color.
 
         Notes
         -----
@@ -2111,11 +2111,11 @@ class System(object):
                 resp['size'] = 1
                 index = np.array([index], dtype=int)
             resp['indices'] = index
-        resp['rhs_group'] = rhs_group
+        resp['parallel_deriv_color'] = parallel_deriv_color
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
-                       indices=None, linear=False, rhs_group=None):
+                       indices=None, linear=False, parallel_deriv_color=None):
         r"""
         Add a constraint variable to this system.
 
@@ -2145,9 +2145,9 @@ class System(object):
             negative integers.
         linear : bool
             Set to True if constraint is linear. Default is False.
-        rhs_group : string
+        parallel_deriv_color : string
             If specified, this design var will be grouped for parallel derivative
-            calculations with other variables sharing the same rhs_group.
+            calculations with other variables sharing the same parallel_deriv_color.
 
         Notes
         -----
@@ -2158,10 +2158,10 @@ class System(object):
         self.add_response(name=name, type_='con', lower=lower, upper=upper,
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
                           ref0=ref0, indices=indices, linear=linear,
-                          rhs_group=rhs_group)
+                          parallel_deriv_color=parallel_deriv_color)
 
     def add_objective(self, name, ref=None, ref0=None, index=None,
-                      adder=None, scaler=None, rhs_group=None):
+                      adder=None, scaler=None, parallel_deriv_color=None):
         r"""
         Add a response variable to this system.
 
@@ -2183,9 +2183,9 @@ class System(object):
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-        rhs_group : string
+        parallel_deriv_color : string
             If specified, this design var will be grouped for parallel derivative
-            calculations with other variables sharing the same rhs_group.
+            calculations with other variables sharing the same parallel_deriv_color.
 
         Notes
         -----
@@ -2215,7 +2215,8 @@ class System(object):
         if index is not None and not isinstance(index, int):
             raise TypeError('If specified, index must be an int.')
         self.add_response(name, type_='obj', scaler=scaler, adder=adder,
-                          ref=ref, ref0=ref0, index=index, rhs_group=rhs_group)
+                          ref=ref, ref0=ref0, index=index,
+                          parallel_deriv_color=parallel_deriv_color)
 
     def get_design_vars(self, recurse=True):
         """
@@ -2817,4 +2818,4 @@ class System(object):
 
 def _get_vec_names(voi_dict):
     return set(voi for voi, data in iteritems(voi_dict)
-               if data['rhs_group'] is not None)
+               if data['parallel_deriv_color'] is not None)

@@ -115,8 +115,8 @@ class ParDerivTestCase(unittest.TestCase):
         prob.model.linear_solver = LinearBlockGS()
         prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
 
-        prob.model.add_design_var('iv.x1', rhs_group='par_dv')
-        prob.model.add_design_var('iv.x2', rhs_group='par_dv')
+        prob.model.add_design_var('iv.x1', parallel_deriv_color='par_dv')
+        prob.model.add_design_var('iv.x2', parallel_deriv_color='par_dv')
         prob.model.add_design_var('iv.x3')
         prob.model.add_objective('c3.y')
 
@@ -138,8 +138,8 @@ class ParDerivTestCase(unittest.TestCase):
         prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x')
-        prob.model.add_constraint('c2.y', upper=0.0, rhs_group='par_resp')
-        prob.model.add_constraint('c3.y', upper=0.0, rhs_group='par_resp')
+        prob.model.add_constraint('c2.y', upper=0.0, parallel_deriv_color='par_resp')
+        prob.model.add_constraint('c3.y', upper=0.0, parallel_deriv_color='par_resp')
 
         prob.setup(vector_class=vector_class, check=False, mode='rev')
         prob.run_driver()
@@ -208,8 +208,8 @@ class DecoupledTestCase(unittest.TestCase):
         asize = self.asize
         prob = self.setup_model()
 
-        prob.model.add_design_var('p1.x', rhs_group='pardv')
-        prob.model.add_design_var('p2.x', rhs_group='pardv')
+        prob.model.add_design_var('p1.x', parallel_deriv_color='pardv')
+        prob.model.add_design_var('p2.x', parallel_deriv_color='pardv')
         prob.model.add_constraint('c3.y', upper=0.0)
         prob.model.add_constraint('c4.y', upper=0.0)
 
@@ -250,8 +250,8 @@ class DecoupledTestCase(unittest.TestCase):
 
         prob.model.add_design_var('p1.x')
         prob.model.add_design_var('p2.x')
-        prob.model.add_constraint('c3.y', upper=0.0, rhs_group='parc')
-        prob.model.add_constraint('c4.y', upper=0.0, rhs_group='parc')
+        prob.model.add_constraint('c3.y', upper=0.0, parallel_deriv_color='parc')
+        prob.model.add_constraint('c4.y', upper=0.0, parallel_deriv_color='parc')
 
         prob.setup(vector_class=vector_class, check=False, mode='rev')
         prob.run_driver()
@@ -288,8 +288,8 @@ class IndicesTestCase(unittest.TestCase):
                                           x=np.zeros(asize), y=np.zeros(asize)))
 
         prob.model.add_design_var('p.x', indices=[1, 2])
-        prob.model.add_constraint('c4.y', upper=0.0, indices=[1], rhs_group='par_resp')
-        prob.model.add_constraint('c5.y', upper=0.0, indices=[2], rhs_group='par_resp')
+        prob.model.add_constraint('c4.y', upper=0.0, indices=[1], parallel_deriv_color='par_resp')
+        prob.model.add_constraint('c5.y', upper=0.0, indices=[2], parallel_deriv_color='par_resp')
 
         root.connect('p.x', 'G1.c2.x')
         root.connect('p.x', 'G1.c3.x')
@@ -352,8 +352,8 @@ class IndicesTestCase2(unittest.TestCase):
 
         prob.model.add_design_var('G1.par1.p.x', indices=[1, 2])
         prob.model.add_design_var('G1.par2.p.x', indices=[1, 2])
-        prob.model.add_constraint('G1.par1.c4.y', upper=0.0, indices=[1], rhs_group='par_resp')
-        prob.model.add_constraint('G1.par2.c5.y', upper=0.0, indices=[2], rhs_group='par_resp')
+        prob.model.add_constraint('G1.par1.c4.y', upper=0.0, indices=[1], parallel_deriv_color='par_resp')
+        prob.model.add_constraint('G1.par2.c5.y', upper=0.0, indices=[2], parallel_deriv_color='par_resp')
 
         root.connect('G1.par1.p.x', 'G1.par1.c2.x')
         root.connect('G1.par2.p.x', 'G1.par2.c3.x')
@@ -426,8 +426,8 @@ class MatMatTestCase(unittest.TestCase):
         asize = self.asize
         prob = self.setup_model()
 
-        prob.model.add_design_var('p1.x', rhs_group='par')
-        prob.model.add_design_var('p2.x', rhs_group='par')
+        prob.model.add_design_var('p1.x', parallel_deriv_color='par')
+        prob.model.add_design_var('p2.x', parallel_deriv_color='par')
         prob.model.add_constraint('c3.y', upper=0.0)
         prob.model.add_constraint('c4.y', upper=0.0)
 
@@ -445,8 +445,8 @@ class MatMatTestCase(unittest.TestCase):
         asize = self.asize
         prob = self.setup_model()
 
-        prob.model.add_design_var('p1.x', rhs_group='par')
-        prob.model.add_design_var('p2.x', rhs_group='par')
+        prob.model.add_design_var('p1.x', parallel_deriv_color='par')
+        prob.model.add_design_var('p2.x', parallel_deriv_color='par')
         prob.model.add_constraint('c3.y', upper=0.0)
         prob.model.add_constraint('c4.y', upper=0.0)
 
@@ -468,8 +468,8 @@ class MatMatTestCase(unittest.TestCase):
 
         prob.model.add_design_var('p1.x')
         prob.model.add_design_var('p2.x')
-        prob.model.add_constraint('c3.y', upper=0.0, rhs_group='par')
-        prob.model.add_constraint('c4.y', upper=0.0, rhs_group='par')
+        prob.model.add_constraint('c3.y', upper=0.0, parallel_deriv_color='par')
+        prob.model.add_constraint('c4.y', upper=0.0, parallel_deriv_color='par')
 
         prob.setup(vector_class=vector_class, check=False, mode='rev')
         prob.run_driver()
@@ -487,8 +487,8 @@ class MatMatTestCase(unittest.TestCase):
 
         prob.model.add_design_var('p1.x')
         prob.model.add_design_var('p2.x')
-        prob.model.add_constraint('c3.y', upper=0.0, rhs_group='par')
-        prob.model.add_constraint('c4.y', upper=0.0, rhs_group='par')
+        prob.model.add_constraint('c3.y', upper=0.0, parallel_deriv_color='par')
+        prob.model.add_constraint('c4.y', upper=0.0, parallel_deriv_color='par')
 
         prob.setup(vector_class=vector_class, multi_vector_class=multivec_class,
                    check=False, mode='rev')

@@ -913,7 +913,7 @@ class Problem(object):
     def _compute_total_derivs_multi(self, totals, vois, voi_info, vec_names, mode,
                                     output_list, old_output_list, output_vois,
                                     test_mode, return_format):
-        # this sets dinputs for the current rhs_group to 0
+        # this sets dinputs for the current parallel_deriv_color to 0
         voi_info[vois[0][0]][0].set_const(0.0)
         fwd = mode == 'fwd'
         model = self.model
@@ -1141,9 +1141,9 @@ class Problem(object):
 
         # Solve for derivs using linear solver.
 
-        # this maps either an rhs_group to a list of tuples of (absname, oldname)
+        # this maps either an parallel_deriv_color to a list of tuples of (absname, oldname)
         # of variables in that group, or, for variables that aren't in an
-        # rhs_group, it maps the variable name to a one entry list containing
+        # parallel_deriv_color, it maps the variable name to a one entry list containing
         # the tuple (absname, oldname) for that variable.  oldname will be
         # the promoted name if the 'global_names' arg is False, else it will
         # be the same as absname (the absolute variable name).
@@ -1151,7 +1151,7 @@ class Problem(object):
 
         # this maps the names from input_list to the corresponding names
         # of the RHS vectors.  For any variables that are not part of an
-        # rhs_group, they will map to 'linear'.  All rhs_group'ed variables
+        # parallel_deriv_color, they will map to 'linear'.  All parallel_deriv_color'ed variables
         # will just map to their own name.
         inp2rhs_name = {}
 
@@ -1164,13 +1164,13 @@ class Problem(object):
 
         for i, name in enumerate(input_list):
             if name in input_vois:
-                rhs_group = input_vois[name]['rhs_group']
+                parallel_deriv_color = input_vois[name]['parallel_deriv_color']
             else:
-                rhs_group = None
+                parallel_deriv_color = None
                 test_mode = True
-            if rhs_group is None:  # variable is not in an rhs_group
+            if parallel_deriv_color is None:  # variable is not in an parallel_deriv_color
                 if name in voi_lists:
-                    raise RuntimeError("Variable name '%s' matches an rhs_group name." %
+                    raise RuntimeError("Variable name '%s' matches an parallel_deriv_color name." %
                                        name)
                 else:
                     # store the absolute name along with the original name, which
@@ -1179,9 +1179,9 @@ class Problem(object):
                     voi_lists[name] = [(name, old_input_list[i])]
                     inp2rhs_name[name] = 'linear'
             else:
-                if rhs_group not in voi_lists:
-                    voi_lists[rhs_group] = []
-                voi_lists[rhs_group].append((name, old_input_list[i]))
+                if parallel_deriv_color not in voi_lists:
+                    voi_lists[parallel_deriv_color] = []
+                voi_lists[parallel_deriv_color].append((name, old_input_list[i]))
                 inp2rhs_name[name] = name
 
         vec_names = sorted(set(inp2rhs_name.values()))
@@ -1201,7 +1201,7 @@ class Problem(object):
 
             max_len = max(len(v[2]) for v in voi_info.values())
             for i in range(max_len):
-                # this sets dinputs for the current rhs_group to 0
+                # this sets dinputs for the current parallel_deriv_color to 0
                 voi_info[vois[0][0]][0].set_const(0.0)
 
                 for input_name, old_input_name in vois:

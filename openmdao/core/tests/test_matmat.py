@@ -353,8 +353,8 @@ def simple_model(order, dvgroup='pardv', congroup='parc'):
     p.model.connect('lgl_fit.yp_lgl', 'arclength_func.yp_lgl')
     p.model.connect('arclength_func.f_arclength', 'arclength_quad.f_arclength')
 
-    p.model.add_design_var('y_lgl', lower=-1000.0, upper=1000.0, rhs_group=dvgroup)
-    p.model.add_constraint('defect.defect', lower=-1e-6, upper=1e-6, rhs_group=congroup)
+    p.model.add_design_var('y_lgl', lower=-1000.0, upper=1000.0, parallel_deriv_color=dvgroup)
+    p.model.add_constraint('defect.defect', lower=-1e-6, upper=1e-6, parallel_deriv_color=congroup)
     p.model.add_objective('arclength_quad.arclength')
     p.driver = ScipyOptimizer()
     return p, np.sin(x_lgl)
@@ -373,8 +373,8 @@ def phase_model(order, nphases, dvgroup='pardv', congroup='parc'):
         p.model.add_subsystem(p_name, Phase(order=PHASE_ORDER))
         p.model.connect('%s.arclength_quad.arclength' % p_name, 'sum.arc_length:%s' % p_name)
 
-        p.model.add_design_var('%s.y_lgl' % p_name, lower=-1000.0, upper=1000.0, rhs_group=dvgroup)
-        p.model.add_constraint('%s.defect.defect' % p_name, lower=-1e-6, upper=1e-6, rhs_group=congroup)
+        p.model.add_design_var('%s.y_lgl' % p_name, lower=-1000.0, upper=1000.0, parallel_deriv_color=dvgroup)
+        p.model.add_constraint('%s.defect.defect' % p_name, lower=-1e-6, upper=1e-6, parallel_deriv_color=congroup)
 
     p.model.add_subsystem('sum', Summer(n_phases=N_PHASES))
 
