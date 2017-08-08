@@ -573,3 +573,9 @@ class BaseRecorder(object):
                 self._resids = residuals
         else:
             self._resids = None
+
+    def close(self):
+        """
+        Cleanup the recorder.
+        """
+        pass
