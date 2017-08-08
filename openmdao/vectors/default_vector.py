@@ -410,8 +410,13 @@ class DefaultVector(Vector):
         vec : <Vector>
             The vector to perform element-wise multiplication with.
         """
-        for set_name, data in iteritems(self._data):
-            data[:] *= vec._data[set_name]
+        if self._ncol == 1:
+            for set_name, data in iteritems(self._data):
+                data[:] *= vec._data[set_name]
+        else:
+            for set_name, data in iteritems(self._data):
+                for i in range(data.shape[1]):
+                    data[:, i] *= vec._data[set_name]
 
     def set_vec(self, vec):
         """

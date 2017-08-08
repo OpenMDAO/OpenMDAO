@@ -114,16 +114,3 @@ class DefaultMultiVector(DefaultVector):
         else:
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
-
-    def elem_mult(self, vec):
-        """
-        Perform element-wise multiplication and store the result in this vector.
-
-        Parameters
-        ----------
-        vec : <Vector>
-            The vector to perform element-wise multiplication with.
-        """
-        for set_name, data in iteritems(self._data):
-            for i in range(data.shape[1]):
-                data[:, i] *= vec._data[set_name]
