@@ -34,6 +34,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta
+from openmdao.utils.logger_utils import logging, get_default_logger
 
 _type_map = {
     'input': 'input',
@@ -2364,18 +2365,12 @@ class System(object):
         with self._scaled_context_all():
             self._apply_nonlinear()
 
-    def list_inputs(self, explicit=True, implicit=True, values=True, out_stream=sys.stdout):
+    def list_inputs(self, values=True, out_stream=sys.stdout):
         """
         List inputs.
 
         Parameters
         ----------
-        explicit : bool, optional
-            include inputs from explicit components. Default is True.
-
-        implicit : bool, optional
-            include inputs from implicit components. Default is True.
-
         out_stream : file_like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -2385,67 +2380,33 @@ class System(object):
         list
             list of (name, value) of inputs
         """
-        states = self._list_states()
+        inputs = []
 
-        expl_inputs = []
-        impl_inputs = []
         for name, val in iteritems(self._inputs._views):
-            if name in states:
-                impl_inputs.append((name, val)) if values else impl_inputs.append(name)
-            else:
-                expl_inputs.append((name, val)) if values else expl_inputs.append(name)
+            inputs.append((name, val)) if values else inputs.append(name)
 
         if out_stream:
-            if explicit:
-                self._write_inputs('Explicit', expl_inputs, out_stream)
-            if implicit:
-                self._write_inputs('Implicit', impl_inputs, out_stream)
+            logger = get_default_logger(name='list_inputs', stream=out_stream)
 
-        if explicit and implicit:
-            return expl_inputs + impl_inputs
-        elif explicit:
-            return expl_inputs
-        elif implicit:
-            return impl_inputs
-        else:
-            raise RuntimeError('You have excluded both Explicit and Implicit components.')
+            count = len(inputs)
 
-    def _write_inputs(self, comp_type, inputs, out_stream=sys.stdout):
-        """
-        Write formatted input values to out_stream.
+            pathname = self.pathname if self.pathname else 'model'
 
-        Parameters
-        ----------
-        comp_type : str, 'Explicit' or 'Implicit'
-            the type of component with the input values.
+            header = "%d Input(s) to Components in '%s'\n" % (count, pathname)
+            logger.info(header)
 
-        inputs : list
-            list of (name, value) tuples.
+            if count:
+                logger.info("-" * len(header) + "\n")
+                if isinstance(inputs[0], tuple):
+                    for name, val in sorted(inputs):
+                        logger.info(name)
+                        logger.info("  value:    " + str(val) + "\n")
+                else:
+                    for name in sorted(inputs):
+                        logger.info(name)
+                logger.info('\n')
 
-        out_stream : file_like
-            Where to send human readable output. Default is sys.stdout.
-        """
-        if out_stream is None:
-            return
-
-        count = len(inputs)
-
-        pathname = self.pathname if self.pathname else 'model'
-
-        header = "%d Input(s) to %s Components in '%s'\n" % (count, comp_type, pathname)
-        out_stream.write(header)
-
-        if count:
-            out_stream.write("-" * len(header) + "\n")
-            if isinstance(inputs[0], tuple):
-                for name, val in sorted(inputs):
-                    out_stream.write("%s\n" % name)
-                    out_stream.write("  value:    " + str(val))
-                    out_stream.write('\n\n')
-            else:
-                for name in sorted(inputs):
-                    out_stream.write("%s\n" % name)
-                out_stream.write('\n')
+        return inputs
 
     def list_outputs(self, explicit=True, implicit=True, values=True, out_stream=sys.stdout):
         """
@@ -2556,26 +2517,27 @@ class System(object):
         if out_stream is None:
             return
 
+        logger = get_default_logger(name='list_outputs', stream=out_stream)
+
         count = len(outputs)
 
         pathname = self.pathname if self.pathname else 'model'
 
         header = "%d %s Output(s) in '%s'\n" % (count, comp_type, pathname)
-        out_stream.write(header)
+        logger.info(header)
 
         if count:
-            out_stream.write("-" * len(header) + "\n")
+            logger.info("-" * len(header) + "\n")
             if isinstance(outputs[0], tuple):
                 for name, _ in sorted(outputs):
-                    out_stream.write("%s\n" % name)
-                    out_stream.write("  value:    " + str(self._outputs._views[name]))
-                    out_stream.write('\n')
-                    out_stream.write("  residual: " + str(self._residuals._views[name]))
-                    out_stream.write('\n\n')
+                    logger.info("%s" % name)
+                    logger.info("  value:    " + str(self._outputs._views[name]))
+                    logger.info("  residual: " + str(self._residuals._views[name]))
+                    logger.info('\n')
             else:
                 for name in sorted(outputs):
-                    out_stream.write("%s\n" % name)
-                out_stream.write('\n')
+                    logger.info(name)
+                logger.info('\n')
 
     def run_solve_nonlinear(self):
         """

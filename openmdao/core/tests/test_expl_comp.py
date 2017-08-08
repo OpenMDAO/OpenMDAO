@@ -128,9 +128,6 @@ class ExplCompTestCase(unittest.TestCase):
         msg = "You have excluded both Explicit and Implicit components."
 
         with assertRaisesRegex(self, RuntimeError, msg):
-            prob.model.list_inputs(explicit=False, implicit=False)
-
-        with assertRaisesRegex(self, RuntimeError, msg):
             prob.model.list_outputs(explicit=False, implicit=False)
 
         with assertRaisesRegex(self, RuntimeError, msg):

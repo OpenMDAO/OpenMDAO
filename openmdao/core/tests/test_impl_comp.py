@@ -109,13 +109,13 @@ class QuadraticJacVec(QuadraticComp):
 
 class ImplicitCompTestCase(unittest.TestCase):
 
-    def test_compute_and_list(self):
+    def setUp(self):
         group = Group()
 
         comp1 = group.add_subsystem('comp1', IndepVarComp())
         comp1.add_output('a', 1.0)
-        comp1.add_output('b', 1.0)
-        comp1.add_output('c', 1.0)
+        comp1.add_output('b', -4.0)
+        comp1.add_output('c', 3.0)
 
         group.add_subsystem('comp2', QuadraticLinearize())
         group.add_subsystem('comp3', QuadraticJacVec())
@@ -129,16 +129,16 @@ class ImplicitCompTestCase(unittest.TestCase):
 
         prob = Problem(model=group)
         prob.setup(check=False)
-
-        # run model
-        prob['comp1.a'] = 1.
-        prob['comp1.b'] = -4.
-        prob['comp1.c'] = 3.
         prob.run_model()
+
+        self.prob = prob
+
+    def test_compute_and_derivs(self):
+        prob = self.prob
+
         assert_rel_error(self, prob['comp2.x'], 3.)
         assert_rel_error(self, prob['comp2.x'], 3.)
 
-        # total derivs
         total_derivs = prob.compute_total_derivs(
             wrt=['comp1.a', 'comp1.b', 'comp1.c'],
             of=['comp2.x', 'comp3.x']
@@ -150,9 +150,9 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, total_derivs['comp3.x', 'comp1.b'], [[-1.5]])
         assert_rel_error(self, total_derivs['comp3.x', 'comp1.c'], [[-0.5]])
 
-        # list inputs
+    def test_list_inputs(self):
         stream = cStringIO()
-        inputs = prob.model.list_inputs(out_stream=stream)
+        inputs = self.prob.model.list_inputs(out_stream=stream)
         self.assertEqual(sorted(inputs), [
             ('comp2.a', [1.]),
             ('comp2.b', [-4.]),
@@ -166,9 +166,9 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('comp3.'), 3)
         self.assertEqual(text.count('value:'), 6)
 
-        # list explicit outputs
+    def test_list_explicit_outputs(self):
         stream = cStringIO()
-        outputs = prob.model.list_outputs(implicit=False, out_stream=stream)
+        outputs = self.prob.model.list_outputs(implicit=False, out_stream=stream)
         self.assertEqual(sorted(outputs), [
             ('comp1.a', [1.]),
             ('comp1.b', [-4.]),
@@ -179,9 +179,9 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('value:'), 3)
         self.assertEqual(text.count('residual:'), 3)
 
-        # list states
+    def test_list_implicit_outputs(self):
         stream = cStringIO()
-        states = prob.model.list_outputs(explicit=False, out_stream=stream)
+        states = self.prob.model.list_outputs(explicit=False, out_stream=stream)
         self.assertEqual(sorted(states), [
             ('comp2.x', [3.]),
             ('comp3.x', [3.])
@@ -192,9 +192,9 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('value:'), 2)
         self.assertEqual(text.count('residual:'), 2)
 
-        # list residuals
+    def test_list_residuals(self):
         stream = cStringIO()
-        resids = prob.model.list_residuals(out_stream=stream)
+        resids = self.prob.model.list_residuals(out_stream=stream)
         self.assertEqual(sorted(resids), [
             ('comp1.a', [0.]),
             ('comp1.b', [0.]),
@@ -326,6 +326,14 @@ class ImplicitCompTestCase(unittest.TestCase):
 
 # NOTE: the following TestCase generates output for the feature docs
 #       would be nice if we could suppress it during normal testing
+
+# redirect output from these commands to devnull for the following tests
+# (does not effect documentation)
+import os
+from openmdao.utils.logger_utils import get_default_logger
+get_default_logger(name='list_inputs', stream=os.devnull)
+get_default_logger(name='list_outputs', stream=os.devnull)
+
 
 class ListFeatureTestCase(unittest.TestCase):
 
