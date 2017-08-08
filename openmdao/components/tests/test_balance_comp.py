@@ -423,5 +423,97 @@ class TestBalanceComp(unittest.TestCase):
         for (of, wrt) in cpd['balance']:
             assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
+    def test_feature_scalar(self):
+
+        n = 1
+
+        prob = Problem(model=Group())
+
+        bal = BalanceComp()
+
+        bal.add_balance('x')
+
+        tgt = IndepVarComp(name='y_tgt', val=4)
+
+        mult_ivc = IndepVarComp(name='mult', val=2.0)
+
+        exec_comp = ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
+
+        prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
+        prob.model.add_subsystem(name='mult_comp', subsys=mult_ivc, promotes_outputs=['mult'])
+
+        prob.model.add_subsystem(name='exec', subsys=exec_comp)
+
+        prob.model.add_subsystem(name='balance', subsys=bal)
+
+        prob.model.connect('y_tgt', 'balance.rhs:x')
+        prob.model.connect('mult', 'balance.mult:x')
+        prob.model.connect('balance.x', 'exec.x')
+        prob.model.connect('exec.y', 'balance.lhs:x')
+
+        prob.model.linear_solver = DirectSolver()
+
+        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.nonlinear_solver.options['maxiter'] = 100
+        prob.model.nonlinear_solver.options['iprint'] = 0
+
+        prob.model.jacobian = DenseJacobian()
+
+        prob.setup(check=False)
+
+        # A reasonable initial guess to find the positive root.
+        prob['balance.x'] = 1.0
+
+        prob.run_model()
+
+        print('x = ', prob['balance.x'])
+
+        assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
+
+    def test_feature_vector(self):
+        n = 100
+
+        prob = Problem(model=Group())
+
+        exec_comp = ExecComp('y=b*x+c',
+                             b={'value': np.random.rand(n)},
+                             c={'value': np.random.rand(n)},
+                             x={'value': np.zeros(n)},
+                             y={'value': np.ones(n)})
+
+        prob.model.add_subsystem(name='exec', subsys=exec_comp)
+
+        prob.model.add_subsystem(name='balance', subsys=BalanceComp('x', val=np.ones(n)))
+
+        prob.model.connect('balance.x', 'exec.x')
+        prob.model.connect('exec.y', 'balance.lhs:x')
+
+        prob.model.linear_solver = DirectSolver()
+
+        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.nonlinear_solver.options['maxiter'] = 100
+        prob.model.nonlinear_solver.options['iprint'] = 2
+
+        prob.model.jacobian = DenseJacobian()
+
+        prob.setup()
+
+        prob['balance.x'] = np.random.rand(n)
+
+        prob.run_model()
+
+        b = prob['exec.b']
+        c = prob['exec.c']
+        solution = -c/b
+
+        #assert_almost_equal(prob['balance.x'], -c/b, decimal=6)
+
+        print(prob['balance.x'])
+        print(prob['exec.y'])
+        print(prob['exec.b'])
+        print(prob['exec.c'])
+        print(prob['exec.b']*prob['balance.x']+prob['exec.c'])
+
+
 if __name__ == '__main__':  # pragma: no cover
     unittest.main()
