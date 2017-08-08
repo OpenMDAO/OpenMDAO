@@ -1,0 +1,74 @@
+.. index:: BalanceComp Example
+
+=================
+Balance Component
+=================
+
+`BalanceComp` is a specialized implementation of `ImplicitComponent` that
+is intended to provide a simple way to implement most implicit equations
+without the need to define your own residuals.
+
+`BalanceComp` allows you to add one or more state variables and its associated
+implicit equations.  For each ``balance`` added to the component it
+solves the following equation:
+
+.. math::
+
+    f_{mult}(x) \cdot f_{lhs}(x) = f_{rhs}(x)
+
+The following inputs and outputs are associated with each implicit state.
+
+=========== ======= ====================================================
+Name        I/O     Description
+=========== ======= ====================================================
+{name}      output  implicit state variable
+lhs:{name}  input   left-hand-side of equation to be balanced
+rhs:{name}  input   right-hand-side of equation to be balanced
+mult:{name} input   left-hand-side multiplier of equation to be balanced
+=========== ======= ====================================================
+
+The right-hand-side is optional and will default to zero if not connected.
+The multiplier is optional and will default to 1.0 if not connected. The
+left-hand-side should always be defined and should dependent upon the value
+of the implicit state variable.
+
+The BalanceComp supports vectorized implicit states, simply provide a default
+value or shape when adding the balance that reflects the correct shape.
+
+Example:  Scalar Root Finding
+-----------------------------
+
+The following example uses the Balance Component to implicitly solve the
+equation:
+
+.. math::
+
+    2 \cdot x^2 = 4
+
+Here, our LHS is connected to a computed value for :math:`x^2`, the multiplier is 2, and the RHS
+is 4.  The expected solution is :math:`x=\sqrt{2}`.  We initialize ``x`` with a value of 1 so that
+it finds the positive root.
+
+.. embed-test::
+    openmdao.components.tests.test_balance_comp.TestBalanceComp.test_feature_scalar
+
+Example:  Vectorized Root Finding
+---------------------------------
+
+The following example uses the Balance Component to implicitly solve the
+equation:
+
+.. math::
+
+    a \cdot x^2 + b \cdot x + c  = 0
+
+for various values of ``a``, ``b``, and ``c``.  Here, our LHS is connected to a computed value of
+the quadratic equation, the multiplier is one, and the RHS is zero.  :math:`x^2`, the multiplier is 2, and the RHS
+is 4.  The expected solution is :math:`x=\sqrt{2}`.  We initialize ``x`` with a value of 1 so that
+it typicall finds the positive root.
+
+.. embed-test::
+    openmdao.components.tests.test_balance_comp.TestBalanceComp.test_feature_vector
+
+.. tags:: BalanceComp, Examples
+
