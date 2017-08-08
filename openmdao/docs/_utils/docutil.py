@@ -500,6 +500,11 @@ def clean_up_empty_output_blocks(input_blocks, output_blocks):
             new_output_blocks.append(out_block)
             current_in_block = ''
 
+    # if there was no output, return the one input block and empty output block
+    if current_in_block:
+        new_input_blocks.append(current_in_block)
+        new_output_blocks.append('')
+
     return new_input_blocks, new_output_blocks
 
 def extract_output_blocks(run_output):

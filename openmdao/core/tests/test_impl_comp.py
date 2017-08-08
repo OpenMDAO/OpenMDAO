@@ -430,5 +430,51 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp2.x'], 3.)
 
 
+class ListFeatureTestCase(unittest.TestCase):
+
+    def setUp(self):
+        group = Group()
+
+        comp1 = group.add_subsystem('comp1', IndepVarComp())
+        comp1.add_output('a', 1.0)
+        comp1.add_output('b', 1.0)
+        comp1.add_output('c', 1.0)
+
+        sub = group.add_subsystem('sub', Group())
+        sub.add_subsystem('comp2', QuadraticComp())
+        sub.add_subsystem('comp3', QuadraticComp())
+
+        group.connect('comp1.a', 'sub.comp2.a')
+        group.connect('comp1.b', 'sub.comp2.b')
+        group.connect('comp1.c', 'sub.comp2.c')
+        group.connect('comp1.a', 'sub.comp3.a')
+        group.connect('comp1.b', 'sub.comp3.b')
+        group.connect('comp1.c', 'sub.comp3.c')
+
+        prob = Problem(model=group)
+        prob.setup()
+
+        # run model
+        prob['comp1.a'] = 1.
+        prob['comp1.b'] = -4.
+        prob['comp1.c'] = 3.
+        prob.run_model()
+
+    def test_list_inputs(self):
+        prob.model.list_inputs()
+
+    def test_list_outputs(self):
+        prob.model.list_outputs()
+
+    def test_list_explicit_outputs(self):
+        prob.model.list_outputs(implicit=False)
+
+    def test_list_implicit_outputs(self):
+        prob.model.list_outputs(explicit=False)
+
+    def test_list_residuals(self):
+        prob.model.list_residuals()
+
+
 if __name__ == '__main__':
     unittest.main()
