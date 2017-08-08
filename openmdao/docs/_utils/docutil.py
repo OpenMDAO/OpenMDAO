@@ -583,7 +583,9 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
                 past_header = True
         else:
             newline = line[tab:]
-        new_lines.append(newline)
+        # exclude 'global' directives, not needed the way we are running things
+        if not newline.startswith("global "):
+            new_lines.append(newline)
 
     method_source = '\n'.join(new_lines[counter:])
 
