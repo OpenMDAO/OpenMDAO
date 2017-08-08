@@ -540,7 +540,6 @@ class System(object):
 
             for vec_name in vec_names:
                 ncol = 1
-                vec_class = vector_class
                 if vec_name == 'nonlinear':
                     alloc_complex = nl_alloc_complex
                 else:
@@ -2806,4 +2805,5 @@ class System(object):
 
 def _get_vec_names(voi_dict):
     return set(voi for voi, data in iteritems(voi_dict)
-               if data['parallel_deriv_color'] is not None)
+               if data['parallel_deriv_color'] is not None
+               or data['vectorize_derivs'])

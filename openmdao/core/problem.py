@@ -1149,9 +1149,11 @@ class Problem(object):
 
         matmat = False
         for i, name in enumerate(input_list):
+            varmatmat = False
             if name in input_vois:
-                parallel_deriv_color = input_vois[name]['parallel_deriv_color']
-                matmat |= input_vois[name]['vectorize_derivs']
+                meta = input_vois[name]
+                parallel_deriv_color = meta['parallel_deriv_color']
+                varmatmat |= (meta['vectorize_derivs'] and meta['size'] > 1)
             else:
                 parallel_deriv_color = None
                 test_mode = True
@@ -1164,12 +1166,14 @@ class Problem(object):
                     # can be either promoted or absolute depending on the value
                     # of the 'global_names' flag.
                     voi_lists[name] = [(name, old_input_list[i])]
-                    inp2rhs_name[name] = 'linear'
+                    inp2rhs_name[name] = name if varmatmat else 'linear'
             else:
                 if parallel_deriv_color not in voi_lists:
                     voi_lists[parallel_deriv_color] = []
                 voi_lists[parallel_deriv_color].append((name, old_input_list[i]))
                 inp2rhs_name[name] = name
+
+            matmat |= varmatmat
 
         vec_names = sorted(set(inp2rhs_name.values()))
 
