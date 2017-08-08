@@ -26,7 +26,7 @@ class ReconfComp(ExplicitComponent):
     def compute(self, inputs, outputs):
         outputs['y'] = 2 * inputs['x']
 
-    def compute_partials(self, inputs, outputs, jacobian):
+    def compute_partials(self, inputs, jacobian):
         jacobian['y', 'x'] = 2 * np.ones((self.size, 1))
 
 
@@ -39,7 +39,7 @@ class Comp(ExplicitComponent):
     def compute(self, inputs, outputs):
         outputs['z'] = 3 * inputs['x']
 
-    def compute_partials(self, inputs, outputs, jacobian):
+    def compute_partials(self, inputs, jacobian):
         jacobian['z', 'x'] = 3.0
 
 

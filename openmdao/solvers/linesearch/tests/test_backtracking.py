@@ -152,7 +152,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
 
                 outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 """ Jacobian for our paraboloid."""
                 x = inputs['x']
                 y = inputs['y']

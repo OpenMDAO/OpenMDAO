@@ -27,7 +27,7 @@ class TestExplCompArray(ExplicitComponent):
 
 class TestExplCompArrayDense(TestExplCompArray):
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         thk = self.metadata['thickness']
 
         partials['areas', 'lengths'] = np.diag(inputs['widths'].flatten())
@@ -38,7 +38,7 @@ class TestExplCompArrayDense(TestExplCompArray):
 
 class TestExplCompArraySpmtx(TestExplCompArray):
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         thk = self.metadata['thickness']
 
         inds = np.arange(4)
@@ -54,7 +54,7 @@ class TestExplCompArraySpmtx(TestExplCompArray):
 
 class TestExplCompArraySparse(TestExplCompArray):
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         thk = self.metadata['thickness']
 
         inds = np.arange(4)

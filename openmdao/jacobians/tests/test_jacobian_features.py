@@ -31,7 +31,7 @@ class SimpleComp(ExplicitComponent):
                         + np.outer(np.ones(2), inputs['y2'])
                         + inputs['x']*np.eye(2))
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         partials['f', 'x'] = 1.
         partials['f', 'z'] = np.ones((1, 4))
 
@@ -102,7 +102,7 @@ class SimpleCompConst(ExplicitComponent):
         outputs['f'] = np.sum(inputs['z']) + inputs['x']
         outputs['g'] = np.outer(inputs['y1'] + inputs['y3'], inputs['y2']) + inputs['x'] * np.eye(2)
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         pass
 
 
@@ -119,7 +119,7 @@ class SimpleCompFD(SimpleComp):
 
         self.approx_partials('*', '*', **self.kwargs)
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         pass
 
 
@@ -137,7 +137,7 @@ class SimpleCompMixedFD(SimpleComp):
         self.approx_partials('g', 'x', **self.kwargs)
         self.approx_partials('g', 'y2', **self.kwargs)
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         partials['f', 'x'] = 1.
         partials['f', 'z'] = np.ones((1, 4))
 
@@ -157,7 +157,7 @@ class SimpleCompKwarg(SimpleComp):
 
         self.declare_partials(**self.partial_kwargs)
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         pass
 
 
@@ -408,7 +408,7 @@ class TestJacobianFeatures(unittest.TestCase):
                 self.add_output('z', shape=(3,))
                 self.add_input('x', shape=(3,), units='degF')
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 partials['y', 'x'] = self.A
                 partials['z', 'x'] = self.A
 
@@ -469,7 +469,7 @@ class TestJacobianForDocs(unittest.TestCase):
 
                 self.declare_partials(of='f', wrt='x', rows=[0,1,1,1], cols=[0,1,2,3])
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 pd = partials['f', 'x']
 
                 # Corresponds to the (0, 0) entry
@@ -508,7 +508,7 @@ class TestJacobianForDocs(unittest.TestCase):
 
                 self.declare_partials(of='f', wrt='x', rows=[0, 1, 1, 1], cols=[0, 1, 2, 3])
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 # Corresponds to the [(0,0), (1,1), (1,2), (1,3)] entries.
                 partials['f', 'x'] = [1., 2., 3., 4.]
 
@@ -539,7 +539,7 @@ class TestJacobianForDocs(unittest.TestCase):
                                       val=[1. , 2., 3., 4.])
                 self.declare_partials(of='f', wrt='y', val=sp.sparse.eye(2, format='csc'))
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 pass
 
         model = Group()

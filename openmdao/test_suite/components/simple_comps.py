@@ -36,7 +36,7 @@ class DoubleArrayComp(ExplicitComponent):
         outputs['y2'] = self.JJ[2:4, 0:2].dot(inputs['x1']) + \
                          self.JJ[2:4, 2:4].dot(inputs['x2'])
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """
         Analytical derivatives.
         """
@@ -77,7 +77,7 @@ class NonSquareArrayComp(ExplicitComponent):
         outputs['y2'] = self.JJ[3:4, 0:2].dot(inputs['x1']) + \
                          self.JJ[3:4, 2:4].dot(inputs['x2'])
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """
         Analytical derivatives.
         """
