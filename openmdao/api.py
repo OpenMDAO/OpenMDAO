@@ -42,10 +42,8 @@ from openmdao.surrogate_models.surrogate_model import SurrogateModel, \
 
 # Vectors
 from openmdao.vectors.default_vector import DefaultVector
-from openmdao.vectors.default_multi_vector import DefaultMultiVector
 try:
     from openmdao.vectors.petsc_vector import PETScVector
-    from openmdao.vectors.petsc_multi_vector import PETScMultiVector
 except ImportError:
     PETScVector = None
 

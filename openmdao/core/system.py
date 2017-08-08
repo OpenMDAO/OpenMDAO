@@ -15,18 +15,6 @@ import numpy as np
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
-from openmdao.vectors.default_multi_vector import DefaultMultiVector
-try:
-    from openmdao.vectors.petsc_multi_vector import PETScMultiVector
-except ImportError:
-
-    class PETScMultiVector(object):
-        """
-        A dummy class so we can do isinstance checks.
-        """
-
-        pass
-
 from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array, warn_deprecation
 from openmdao.recorders.recording_manager import RecordingManager
@@ -490,8 +478,7 @@ class System(object):
             }
             return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
-    def _get_root_vectors(self, vector_class, initial, force_alloc_complex=False, mode=None,
-                          multi_vector_class=None):
+    def _get_root_vectors(self, vector_class, initial, force_alloc_complex=False, mode=None):
         """
         Get the root vectors for the nonlinear and linear vectors for the model.
 
@@ -507,10 +494,6 @@ class System(object):
             after a reconfiguration) you may need to set this to True.
         mode : str or None
             Direction of derivatives.  If None, we are reconfiguring.
-        multi_vector_class : type
-            reference to an actual <Vector> class; not an instance. This specifies
-            the class to use to perform matrix-matrix derivative operations.  If None,
-            matrix-matrix will not be used.
 
         Returns
         -------
@@ -555,9 +538,6 @@ class System(object):
                 if nl_alloc_complex:
                     break
 
-            if multi_vector_class is None:
-                multi_vector_class = vector_class
-
             for vec_name in vec_names:
                 ncol = 1
                 vec_class = vector_class
@@ -566,18 +546,16 @@ class System(object):
                 else:
                     alloc_complex = force_alloc_complex
 
-                    if vec_name != 'linear' and not (multi_vector_class is vector_class):
-                        vec_class = multi_vector_class
-                        idxs = vois[vec_name]['indices']
-                        if idxs is None:
-                            if vec_class in (DefaultMultiVector, PETScMultiVector):
+                    if vec_name != 'linear' and vois[vec_name]['vectorize_derivs']:
+                            idxs = vois[vec_name]['indices']
+                            if idxs is None:
                                 ncol = vois[vec_name]['size']
-                        else:
-                            ncol = len(idxs)
+                            else:
+                                ncol = len(idxs)
                 for key in ['input', 'output', 'residual']:
-                    root_vectors[key][vec_name] = vec_class(vec_name, _type_map[key], self,
-                                                            alloc_complex=alloc_complex,
-                                                            ncol=ncol)
+                    root_vectors[key][vec_name] = vector_class(vec_name, _type_map[key], self,
+                                                               alloc_complex=alloc_complex,
+                                                               ncol=ncol)
 
             excl_out = {vec_name: set() for vec_name in root_vectors['output']}
             excl_in = {vec_name: set() for vec_name in root_vectors['output']}
@@ -671,7 +649,7 @@ class System(object):
         self._setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
 
     def _setup(self, comm, vector_class, setup_mode, force_alloc_complex=False,
-               mode=None, multi_vector_class=None):
+               mode=None):
         """
         Perform setup for this system and its descendant systems.
 
@@ -694,10 +672,6 @@ class System(object):
             after a reconfiguration) you may need to set this to True.
         mode : str or None
             Derivative direction, either 'fwd', or 'rev', or None
-        multi_vector_class : type
-            reference to an actual <Vector> class; not an instance. This specifies
-            the class to use to perform matrix-matrix derivative operations.  If None,
-            matrix-matrix will not be used.
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
@@ -742,8 +716,7 @@ class System(object):
         self._setup_global(ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset)
         root_vectors, excl_out, excl_in = \
             self._get_root_vectors(vector_class, initial,
-                                   force_alloc_complex=force_alloc_complex,
-                                   mode=mode, multi_vector_class=multi_vector_class)
+                                   force_alloc_complex=force_alloc_complex, mode=mode)
         self._setup_vectors(root_vectors, excl_out, excl_in, resize=resize)
         self._setup_bounds(*self._get_bounds_root_vectors(vector_class, initial), resize=resize)
         self._setup_scaling(self._get_scaling_root_vectors(vector_class, initial), resize=resize)
@@ -1863,7 +1836,7 @@ class System(object):
 
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
-                       parallel_deriv_color=None):
+                       parallel_deriv_color=None, vectorize_derivs=False):
         r"""
         Add a design variable to this system.
 
@@ -1892,6 +1865,8 @@ class System(object):
         parallel_deriv_color : string
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
+        vectorize_derivs : bool
+            If True, vectorize derivative calculations.
 
         Notes
         -----
@@ -1957,10 +1932,12 @@ class System(object):
             indices = np.atleast_1d(indices)
         dvs['indices'] = indices
         dvs['parallel_deriv_color'] = parallel_deriv_color
+        dvs['vectorize_derivs'] = vectorize_derivs
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None,
-                     adder=None, scaler=None, linear=False, parallel_deriv_color=None):
+                     adder=None, scaler=None, linear=False, parallel_deriv_color=None,
+                     vectorize_derivs=False):
         r"""
         Add a response variable to this system.
 
@@ -1997,6 +1974,8 @@ class System(object):
         parallel_deriv_color : string
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
+        vectorize_derivs : bool
+            If True, vectorize derivative calculations.
 
         Notes
         -----
@@ -2112,10 +2091,12 @@ class System(object):
                 index = np.array([index], dtype=int)
             resp['indices'] = index
         resp['parallel_deriv_color'] = parallel_deriv_color
+        resp['vectorize_derivs'] = vectorize_derivs
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
-                       indices=None, linear=False, parallel_deriv_color=None):
+                       indices=None, linear=False, parallel_deriv_color=None,
+                       vectorize_derivs=False):
         r"""
         Add a constraint variable to this system.
 
@@ -2148,6 +2129,8 @@ class System(object):
         parallel_deriv_color : string
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
+        vectorize_derivs : bool
+            If True, vectorize derivative calculations.
 
         Notes
         -----
@@ -2158,10 +2141,12 @@ class System(object):
         self.add_response(name=name, type_='con', lower=lower, upper=upper,
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
                           ref0=ref0, indices=indices, linear=linear,
-                          parallel_deriv_color=parallel_deriv_color)
+                          parallel_deriv_color=parallel_deriv_color,
+                          vectorize_derivs=vectorize_derivs)
 
     def add_objective(self, name, ref=None, ref0=None, index=None,
-                      adder=None, scaler=None, parallel_deriv_color=None):
+                      adder=None, scaler=None, parallel_deriv_color=None,
+                      vectorize_derivs=False):
         r"""
         Add a response variable to this system.
 
@@ -2186,6 +2171,8 @@ class System(object):
         parallel_deriv_color : string
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
+        vectorize_derivs : bool
+            If True, vectorize derivative calculations.
 
         Notes
         -----
@@ -2216,7 +2203,8 @@ class System(object):
             raise TypeError('If specified, index must be an int.')
         self.add_response(name, type_='obj', scaler=scaler, adder=adder,
                           ref=ref, ref0=ref0, index=index,
-                          parallel_deriv_color=parallel_deriv_color)
+                          parallel_deriv_color=parallel_deriv_color,
+                          vectorize_derivs=vectorize_derivs)
 
     def get_design_vars(self, recurse=True):
         """

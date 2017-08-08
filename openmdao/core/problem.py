@@ -26,19 +26,10 @@ from openmdao.utils.logger_utils import get_default_logger
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.graph_utils import all_connected_edges
 from openmdao.vectors.default_vector import DefaultVector
-from openmdao.vectors.default_multi_vector import DefaultMultiVector
 try:
     from openmdao.vectors.petsc_vector import PETScVector
-    from openmdao.vectors.petsc_multi_vector import PETScMultiVector
 except ImportError:
     PETScVector = None
-
-    class PETScMultiVector(object):
-        """
-        A dummy class so we can do isinstance checks.
-        """
-
-        pass
 
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
@@ -255,7 +246,7 @@ class Problem(object):
         self.driver.cleanup()
 
     def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='auto',
-              force_alloc_complex=False, multi_vector_class=None):
+              force_alloc_complex=False):
         """
         Set up everything.
 
@@ -275,10 +266,6 @@ class Problem(object):
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
             after a reconfiguration) you may need to set this to True.
-        multi_vector_class : type
-            reference to an actual <Vector> class; not an instance. This specifies
-            the class to use to perform matrix-matrix derivative operations.  If None,
-            matrix-matrix will not be used.
 
         Returns
         -------
@@ -305,7 +292,7 @@ class Problem(object):
         self._mode = mode
 
         model._setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex,
-                     mode=mode, multi_vector_class=multi_vector_class)
+                     mode=mode)
         self.driver._setup_driver(self)
 
         if isinstance(model, Group):
@@ -1092,8 +1079,6 @@ class Problem(object):
             # Skip nonlinear because we don't need to mess with it?
             if subname == 'nonlinear':
                 continue
-            elif subname != 'linear':
-                matmat |= isinstance(vec_doutput[subname], (DefaultMultiVector, PETScMultiVector))
 
             vec_dinput[subname].set_const(0.0)
             vec_doutput[subname].set_const(0.0)
@@ -1162,9 +1147,11 @@ class Problem(object):
         # in the model)
         test_mode = False
 
+        matmat = False
         for i, name in enumerate(input_list):
             if name in input_vois:
                 parallel_deriv_color = input_vois[name]['parallel_deriv_color']
+                matmat |= input_vois[name]['vectorize_derivs']
             else:
                 parallel_deriv_color = None
                 test_mode = True

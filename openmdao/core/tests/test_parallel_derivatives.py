@@ -6,18 +6,16 @@ import unittest
 import numpy as np
 
 from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, DefaultVector, \
-    ExecComp, DefaultMultiVector
+    ExecComp
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped
 from openmdao.devtools.testutil import assert_rel_error
 
 if MPI:
-    from openmdao.api import PETScVector, PETScMultiVector
+    from openmdao.api import PETScVector
     vector_class = PETScVector
-    multivec_class = PETScMultiVector
 else:
     vector_class = DefaultVector
-    multivec_class = DefaultMultiVector
 
 
 class ParDerivTestCase(unittest.TestCase):
@@ -210,12 +208,12 @@ class DecoupledTestCase(unittest.TestCase):
 
         #import wingdbstub
 
-        prob.model.add_design_var('p1.x', parallel_deriv_color='pardv')
-        prob.model.add_design_var('p2.x', parallel_deriv_color='pardv')
+        prob.model.add_design_var('p1.x', parallel_deriv_color='pardv', vectorize_derivs=True)
+        prob.model.add_design_var('p2.x', parallel_deriv_color='pardv', vectorize_derivs=True)
         prob.model.add_constraint('c3.y', upper=0.0)
         prob.model.add_constraint('c4.y', upper=0.0)
 
-        prob.setup(vector_class=vector_class, multi_vector_class=multivec_class, check=False, mode='fwd')
+        prob.setup(vector_class=vector_class, check=False, mode='fwd')
         prob.run_driver()
 
         J = prob.compute_total_derivs(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
@@ -447,13 +445,12 @@ class MatMatTestCase(unittest.TestCase):
         asize = self.asize
         prob = self.setup_model()
 
-        prob.model.add_design_var('p1.x', parallel_deriv_color='par')
-        prob.model.add_design_var('p2.x', parallel_deriv_color='par')
+        prob.model.add_design_var('p1.x', parallel_deriv_color='par', vectorize_derivs=True)
+        prob.model.add_design_var('p2.x', parallel_deriv_color='par', vectorize_derivs=True)
         prob.model.add_constraint('c3.y', upper=0.0)
         prob.model.add_constraint('c4.y', upper=0.0)
 
-        prob.setup(vector_class=vector_class, multi_vector_class=multivec_class,
-                   check=False, mode='fwd')
+        prob.setup(vector_class=vector_class, check=False, mode='fwd')
         prob.run_driver()
 
         J = prob.compute_total_derivs(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
@@ -489,11 +486,10 @@ class MatMatTestCase(unittest.TestCase):
 
         prob.model.add_design_var('p1.x')
         prob.model.add_design_var('p2.x')
-        prob.model.add_constraint('c3.y', upper=0.0, parallel_deriv_color='par')
-        prob.model.add_constraint('c4.y', upper=0.0, parallel_deriv_color='par')
+        prob.model.add_constraint('c3.y', upper=0.0, parallel_deriv_color='par', vectorize_derivs=True)
+        prob.model.add_constraint('c4.y', upper=0.0, parallel_deriv_color='par', vectorize_derivs=True)
 
-        prob.setup(vector_class=vector_class, multi_vector_class=multivec_class,
-                   check=False, mode='rev')
+        prob.setup(vector_class=vector_class,  check=False, mode='rev')
         prob.run_driver()
 
         J = prob.compute_total_derivs(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],

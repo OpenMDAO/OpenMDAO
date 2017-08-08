@@ -5,8 +5,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, \
-                         ScipyOptimizer, DefaultMultiVector, DefaultVector, \
-                         DenseJacobian, DirectSolver
+                         ScipyOptimizer, DefaultVector, DenseJacobian, DirectSolver
 from openmdao.devtools.testutil import assert_rel_error
 
 def lgl(n, tol=np.finfo(float).eps):
@@ -319,7 +318,7 @@ class Summer(ExplicitComponent):
         for i in range(self.metadata['n_phases']):
             outputs['total_arc_length'] += inputs['arc_length:p%d' % i]
 
-def simple_model(order, dvgroup='pardv', congroup='parc'):
+def simple_model(order, dvgroup='pardv', congroup='parc', vectorize=False):
     n = order + 1
 
     p = Problem(model=Group())
@@ -353,13 +352,13 @@ def simple_model(order, dvgroup='pardv', congroup='parc'):
     p.model.connect('lgl_fit.yp_lgl', 'arclength_func.yp_lgl')
     p.model.connect('arclength_func.f_arclength', 'arclength_quad.f_arclength')
 
-    p.model.add_design_var('y_lgl', lower=-1000.0, upper=1000.0, parallel_deriv_color=dvgroup)
-    p.model.add_constraint('defect.defect', lower=-1e-6, upper=1e-6, parallel_deriv_color=congroup)
+    p.model.add_design_var('y_lgl', lower=-1000.0, upper=1000.0, parallel_deriv_color=dvgroup, vectorize_derivs=vectorize)
+    p.model.add_constraint('defect.defect', lower=-1e-6, upper=1e-6, parallel_deriv_color=congroup, vectorize_derivs=vectorize)
     p.model.add_objective('arclength_quad.arclength')
     p.driver = ScipyOptimizer()
     return p, np.sin(x_lgl)
 
-def phase_model(order, nphases, dvgroup='pardv', congroup='parc'):
+def phase_model(order, nphases, dvgroup='pardv', congroup='parc', vectorize=False):
     N_PHASES = nphases
     PHASE_ORDER = order
 
@@ -373,8 +372,8 @@ def phase_model(order, nphases, dvgroup='pardv', congroup='parc'):
         p.model.add_subsystem(p_name, Phase(order=PHASE_ORDER))
         p.model.connect('%s.arclength_quad.arclength' % p_name, 'sum.arc_length:%s' % p_name)
 
-        p.model.add_design_var('%s.y_lgl' % p_name, lower=-1000.0, upper=1000.0, parallel_deriv_color=dvgroup)
-        p.model.add_constraint('%s.defect.defect' % p_name, lower=-1e-6, upper=1e-6, parallel_deriv_color=congroup)
+        p.model.add_design_var('%s.y_lgl' % p_name, lower=-1000.0, upper=1000.0, parallel_deriv_color=dvgroup, vectorize_derivs=vectorize)
+        p.model.add_constraint('%s.defect.defect' % p_name, lower=-1e-6, upper=1e-6, parallel_deriv_color=congroup, vectorize_derivs=vectorize)
 
     p.model.add_subsystem('sum', Summer(n_phases=N_PHASES))
 
@@ -392,9 +391,9 @@ def phase_model(order, nphases, dvgroup='pardv', congroup='parc'):
 class MatMatTestCase(unittest.TestCase):
 
     def test_simple_multi_fwd(self):
-        p, expected = simple_model(order=20)
+        p, expected = simple_model(order=20, vectorize=True)
 
-        p.setup(check=False, mode='fwd', multi_vector_class=DefaultMultiVector)
+        p.setup(check=False, mode='fwd')
 
         p.run_driver()
 
@@ -408,9 +407,9 @@ class MatMatTestCase(unittest.TestCase):
         assert_rel_error(self, expected, y_lgl, 1.e-5)
 
     def test_simple_multi_rev(self):
-        p, expected = simple_model(order=20)
+        p, expected = simple_model(order=20, vectorize=True)
 
-        p.setup(check=False, mode='rev', multi_vector_class=DefaultMultiVector)
+        p.setup(check=False, mode='rev')
 
         p.run_driver()
 
@@ -419,9 +418,9 @@ class MatMatTestCase(unittest.TestCase):
 
     def test_phases_multi_fwd(self):
         N_PHASES = 4
-        p, expected = phase_model(order=20, nphases=N_PHASES)
+        p, expected = phase_model(order=20, nphases=N_PHASES, vectorize=True)
 
-        p.setup(check=False, mode='fwd', multi_vector_class=DefaultMultiVector)
+        p.setup(check=False, mode='fwd')
 
         p.run_driver()
 
@@ -439,9 +438,9 @@ class MatMatTestCase(unittest.TestCase):
 
     def test_phases_multi_rev(self):
         N_PHASES = 4
-        p, expected = phase_model(order=20, nphases=N_PHASES)
+        p, expected = phase_model(order=20, nphases=N_PHASES, vectorize=True)
 
-        p.setup(check=False, mode='rev', multi_vector_class=DefaultMultiVector)
+        p.setup(check=False, mode='rev')
 
         p.run_driver()
 
@@ -450,12 +449,12 @@ class MatMatTestCase(unittest.TestCase):
 
     def test_phases_multi_dense_fwd(self):
         N_PHASES = 4
-        p, expected = phase_model(order=20, nphases=N_PHASES)
+        p, expected = phase_model(order=20, nphases=N_PHASES, vectorize=True)
 
         p.model.jacobian = DenseJacobian()
         p.model.linear_solver = DirectSolver()
 
-        p.setup(check=False, mode='fwd', multi_vector_class=DefaultMultiVector)
+        p.setup(check=False, mode='fwd')
 
         p.run_driver()
 
@@ -464,12 +463,12 @@ class MatMatTestCase(unittest.TestCase):
 
     def test_phases_multi_dense_rev(self):
         N_PHASES = 4
-        p, expected = phase_model(order=20, nphases=N_PHASES)
+        p, expected = phase_model(order=20, nphases=N_PHASES, vectorize=True)
 
         p.model.jacobian = DenseJacobian()
         p.model.linear_solver = DirectSolver()
 
-        p.setup(check=False, mode='rev', multi_vector_class=DefaultMultiVector)
+        p.setup(check=False, mode='rev')
 
         p.run_driver()
 
