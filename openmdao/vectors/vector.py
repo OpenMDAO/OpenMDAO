@@ -9,6 +9,9 @@ from openmdao.utils.general_utils import ensure_compatible
 from openmdao.utils.name_maps import name2abs_name
 
 
+_full_slice = slice(None)
+
+
 class VectorInfo(object):
     """
     Communal object for storing some global information in the vectors.
@@ -80,6 +83,9 @@ class Vector(object):
         Temporary storage of complex views used by in-place numpy operations.
     _ncol : int
         Number of columns for multi-vectors.
+    _icol : int or None
+        If not None, specifies the 'active' column of a multivector when interfaceing with
+        a component that does not support multivectors.
     """
 
     _vector_info = VectorInfo()
@@ -109,6 +115,7 @@ class Vector(object):
         self._name = name
         self._typ = typ
         self._ncol = ncol
+        self._icol = None
 
         self._system = system
 
@@ -330,14 +337,27 @@ class Vector(object):
         if abs_name is not None:
             if self._vector_info._under_complex_step:
                 if self._typ == 'input':
-                    return self._views[abs_name] + 1j * self._imag_views[abs_name]
+                    if self._icol is None:
+                        return self._views[abs_name] + 1j * self._imag_views[abs_name]
+                    else:
+                        return self._views[abs_name][:, self._icol] + \
+                            1j * self._imag_views[abs_name][:, self._icol]
                 else:
                     if abs_name not in self._complex_view_cache:
-                        self._complex_view_cache[abs_name] = self._views[abs_name] + \
-                            1j * self._imag_views[abs_name]
+                        if self._icol is None:
+                            self._complex_view_cache[abs_name] = self._views[abs_name] + \
+                                1j * self._imag_views[abs_name]
+                        else:
+                            self._complex_view_cache[abs_name][:, self._icol] = \
+                                self._views[abs_name][:, self._icol] + \
+                                1j * self._imag_views[abs_name][:, self._icol]
+                            return self._complex_view_cache[abs_name][:, self._icol]
                     return self._complex_view_cache[abs_name]
 
-            return self._views[abs_name]
+            if self._icol is None:
+                return self._views[abs_name]
+            else:
+                return self_views[abs_name][:, self._icol]
         else:
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
@@ -356,6 +376,10 @@ class Vector(object):
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
             value, shape = ensure_compatible(name, value, self._views[abs_name].shape)
+            if self._icol is None:
+                slc = _full_slice
+            else:
+                slc = (_full_slice, self._icol)
             if self._vector_info._under_complex_step:
 
                 # setitem overwrites anything you may have done with numpy indexing
@@ -364,10 +388,10 @@ class Vector(object):
                 except KeyError:
                     pass
 
-                self._views[abs_name][:] = value.real
-                self._imag_views[abs_name][:] = value.imag
+                self._views[abs_name][slc] = value.real
+                self._imag_views[abs_name][slc] = value.imag
             else:
-                self._views[abs_name][:] = value
+                self._views[abs_name][slc] = value
         else:
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
