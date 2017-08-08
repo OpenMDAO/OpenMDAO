@@ -44,5 +44,5 @@ Usage
 
 5. Define two independent variables using the :code:`add_output` method with additional options.
 
-  .. embed-test::
-      openmdao.core.tests.test_indep_var_comp.TestIndepVarComp.test_add_output
+.. embed-test::
+    openmdao.core.tests.test_indep_var_comp.TestIndepVarComp.test_add_output

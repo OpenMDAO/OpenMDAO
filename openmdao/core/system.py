@@ -2364,7 +2364,7 @@ class System(object):
         with self._scaled_context_all():
             self._apply_nonlinear()
 
-    def list_inputs(self, explicit=True, implicit=True, out_stream=sys.stdout):
+    def list_inputs(self, explicit=True, implicit=True, values=True, out_stream=sys.stdout):
         """
         List inputs.
 
@@ -2391,9 +2391,9 @@ class System(object):
         impl_inputs = []
         for name, val in iteritems(self._inputs._views):
             if name in states:
-                impl_inputs.append((name, val))
+                impl_inputs.append((name, val)) if values else impl_inputs.append(name)
             else:
-                expl_inputs.append((name, val))
+                expl_inputs.append((name, val)) if values else expl_inputs.append(name)
 
         if out_stream:
             if explicit:
@@ -2437,12 +2437,17 @@ class System(object):
 
         if count:
             out_stream.write("-" * len(header) + "\n")
-            for name, val in sorted(inputs):
-                out_stream.write("%s\n" % name)
-                out_stream.write("  value:    " + str(val))
-                out_stream.write('\n\n')
+            if isinstance(inputs[0], tuple):
+                for name, val in sorted(inputs):
+                    out_stream.write("%s\n" % name)
+                    out_stream.write("  value:    " + str(val))
+                    out_stream.write('\n\n')
+            else:
+                for name in sorted(inputs):
+                    out_stream.write("%s\n" % name)
+                out_stream.write('\n')
 
-    def list_outputs(self, explicit=True, implicit=True, out_stream=sys.stdout):
+    def list_outputs(self, explicit=True, implicit=True, values=True, out_stream=sys.stdout):
         """
         List outputs.
 
@@ -2469,9 +2474,9 @@ class System(object):
         impl_outputs = []
         for name, val in iteritems(self._outputs._views):
             if name in states:
-                impl_outputs.append((name, val))
+                impl_outputs.append((name, val)) if values else impl_outputs.append(name)
             else:
-                expl_outputs.append((name, val))
+                expl_outputs.append((name, val)) if values else expl_outputs.append(name)
 
         if out_stream:
             if explicit:
@@ -2488,7 +2493,7 @@ class System(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def list_residuals(self, explicit=True, implicit=True, out_stream=sys.stdout):
+    def list_residuals(self, explicit=True, implicit=True, values=True, out_stream=sys.stdout):
         """
         List residuals.
 
@@ -2514,9 +2519,9 @@ class System(object):
         impl_resids = []
         for name, val in iteritems(self._residuals._views):
             if name in states:
-                impl_resids.append((name, val))
+                impl_resids.append((name, val)) if values else impl_resids.append(name)
             else:
-                expl_resids.append((name, val))
+                expl_resids.append((name, val)) if values else expl_resids.append(name)
 
         if out_stream:
             if explicit:
@@ -2560,12 +2565,17 @@ class System(object):
 
         if count:
             out_stream.write("-" * len(header) + "\n")
-            for name, _ in sorted(outputs):
-                out_stream.write("%s\n" % name)
-                out_stream.write("  value:    " + str(self._outputs._views[name]))
+            if isinstance(outputs[0], tuple):
+                for name, _ in sorted(outputs):
+                    out_stream.write("%s\n" % name)
+                    out_stream.write("  value:    " + str(self._outputs._views[name]))
+                    out_stream.write('\n')
+                    out_stream.write("  residual: " + str(self._residuals._views[name]))
+                    out_stream.write('\n\n')
+            else:
+                for name in sorted(outputs):
+                    out_stream.write("%s\n" % name)
                 out_stream.write('\n')
-                out_stream.write("  residual: " + str(self._residuals._views[name]))
-                out_stream.write('\n\n')
 
     def run_solve_nonlinear(self):
         """

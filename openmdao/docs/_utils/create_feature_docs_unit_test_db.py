@@ -181,6 +181,7 @@ for suite in suites:
                     method_name = test_method._testMethodName
                     method_path = '.'.join([module_path, class_name, method_name])
                     test_doc = getattr(cls, method_name).__doc__
+                    print(method_path, test_doc)
                     if test_doc:
                         test_doc_numpy = NumpyDocString(test_doc)
                         if test_doc_numpy['Features']:
