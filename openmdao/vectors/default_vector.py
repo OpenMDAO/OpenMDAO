@@ -45,8 +45,8 @@ class DefaultTransfer(Transfer):
         self._in_inds = ins
         self._out_inds = outs
 
-        if in_vec._ncol > 1:
-            self.transfer = self.multi_transfer
+        # if in_vec._ncol > 1:
+        #     self.transfer = self.multi_transfer
 
     def transfer(self, in_vec, out_vec, mode='fwd'):
         """
@@ -86,7 +86,7 @@ class DefaultTransfer(Transfer):
 
     def multi_transfer(self, in_vec, out_vec, mode='fwd'):
         """
-        Perform transfer.
+        Perform transfer for vectors with multiple columns.
 
         Parameters
         ----------
