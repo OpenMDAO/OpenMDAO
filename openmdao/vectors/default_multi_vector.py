@@ -13,51 +13,6 @@ from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
 real_types = tuple([numbers.Real, np.float32, np.float64])
 
 
-class DefaultMultiTransfer(DefaultTransfer):
-    """
-    Default NumPy transfer.
-    """
-
-    def __call__(self, in_vec, out_vec, mode='fwd'):
-        """
-        Perform transfer.
-
-        Parameters
-        ----------
-        in_vec : <Vector>
-            pointer to the input vector.
-        out_vec : <Vector>
-            pointer to the output vector.
-        mode : str
-            'fwd' or 'rev'.
-
-        """
-        in_inds = self._in_inds
-        out_inds = self._out_inds
-        using_complex_step = in_vec._vector_info._under_complex_step and out_vec._alloc_complex
-
-        if mode == 'fwd':
-            for key in in_inds:
-                in_set_name, out_set_name = key
-                for i in range(in_vec._ncol):
-                    in_vec._data[in_set_name][in_inds[key], i] = \
-                        out_vec._data[out_set_name][:, i][out_inds[key]]
-
-                # Imaginary transfer
-                # (for CS, so only need in fwd)
-                if using_complex_step:
-                    in_vec._imag_data[in_set_name][in_inds[key], i] = \
-                        out_vec._imag_data[out_set_name][out_inds[key]]
-
-        elif mode == 'rev':
-            for key in in_inds:
-                in_set_name, out_set_name = key
-                for i in range(out_vec._ncol):
-                    np.add.at(
-                        out_vec._data[out_set_name][:, i], out_inds[key],
-                        in_vec._data[in_set_name][:, i][in_inds[key]])
-
-
 class DefaultMultiVector(DefaultVector):
     """
     Default NumPy vector with multiple columns.
@@ -72,7 +27,7 @@ class DefaultMultiVector(DefaultVector):
         Where the base class version of __setitem__ is saved
     """
 
-    TRANSFER = DefaultMultiTransfer
+    TRANSFER = DefaultTransfer
 
     def __init__(self, name, typ, system, root_vector=None, resize=False, alloc_complex=False,
                  ncol=1):

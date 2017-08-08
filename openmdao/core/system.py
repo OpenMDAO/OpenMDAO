@@ -1361,7 +1361,7 @@ class System(object):
             direction = ('phys', 'norm')
 
         self._scale_vec(vec_inputs, 'input', direction[0])
-        self._transfers[vec_name][mode, isub](vec_inputs, vec_outputs, mode)
+        self._transfers[vec_name][mode, isub].transfer(vec_inputs, vec_outputs, mode)
         self._scale_vec(vec_inputs, 'input', direction[1])
 
     def get_req_procs(self):
