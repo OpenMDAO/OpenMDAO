@@ -232,7 +232,7 @@ class ExecComp(ExplicitComponent):
         for expr in self._codes:
             exec(expr, _expr_dict, _IODict(outputs, inputs))
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """
         Use complex step method to update the given Jacobian.
 
@@ -240,9 +240,6 @@ class ExecComp(ExplicitComponent):
         ----------
         inputs : `VecWrapper`
             `VecWrapper` containing parameters. (p)
-
-        outputs : `VecWrapper`
-            `VecWrapper` containing outputs and states. (u)
 
         partials : `Jacobian`
             Contains sub-jacobians.
@@ -273,7 +270,7 @@ class ExecComp(ExplicitComponent):
                 else:
                     pwrap[param][idx] += step
 
-                uwrap = _TmpDict(outputs, return_complex=True)
+                uwrap = _TmpDict(self._outputs, return_complex=True)
 
                 # solve with complex param value
                 self._residuals.set_const(0.0)

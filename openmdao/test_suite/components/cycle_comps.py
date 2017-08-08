@@ -273,7 +273,7 @@ class ExplicitCycleComp(ExplicitComponent):
         else:
             return {'val': jac}
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         if self.metadata['jacobian_type'] != 'matvec' and not self.metadata['finite_difference']:
             angle_param = self._cycle_names[self.angle_param]
             angle = inputs[angle_param]
@@ -361,7 +361,7 @@ class ExplicitLastComp(ExplicitFirstComp):
         # theta_out has 1/2 the error as theta does to the correct angle.
         outputs[self._cycle_names['theta_out']] = theta / 2 + (self._n * 2 * np.pi - psi) / (2 * k - 2)
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         if self.metadata['jacobian_type'] != 'matvec' and not self.metadata['finite_difference']:
             pd_type = self.metadata['partial_type']
             for i in range(self.metadata['num_var']):
