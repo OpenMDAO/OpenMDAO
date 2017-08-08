@@ -18,11 +18,18 @@ class DefaultTransfer(Transfer):
     Default NumPy transfer.
     """
 
-    def _initialize_transfer(self):
+    def _initialize_transfer(self, in_vec, out_vec):
         """
         Set up the transfer; do any necessary pre-computation.
 
         Optionally implemented by the subclass.
+
+        Parameters
+        ----------
+        in_vec : <Vector>
+            reference to the input vector.
+        out_vec : <Vector>
+            reference to the output vector.
         """
         in_inds = self._in_inds
         out_inds = self._out_inds

@@ -608,10 +608,6 @@ class Transfer(object):
 
     Attributes
     ----------
-    _in_vec : Vector
-        pointer to the input vector.
-    _out_vec : Vector
-        pointer to the output vector.
     _in_inds : int ndarray
         input indices for the transfer.
     _out_inds : int ndarray
@@ -637,13 +633,11 @@ class Transfer(object):
         comm : MPI.Comm or <FakeComm>
             communicator of the system that owns this transfer.
         """
-        self._in_vec = in_vec
-        self._out_vec = out_vec
         self._in_inds = in_inds
         self._out_inds = out_inds
         self._comm = comm
 
-        self._initialize_transfer()
+        self._initialize_transfer(in_vec, out_vec)
 
     def __str__(self):
         """
@@ -659,11 +653,18 @@ class Transfer(object):
         except Exception as err:
             return "<error during call to Transfer.__str__: %s" % err
 
-    def _initialize_transfer(self):
+    def _initialize_transfer(self, in_vec, out_vec):
         """
         Set up the transfer; do any necessary pre-computation.
 
         Optionally implemented by the subclass.
+
+        Parameters
+        ----------
+        in_vec : <Vector>
+            reference to the input vector.
+        out_vec : <Vector>
+            reference to the output vector.
         """
         pass
 

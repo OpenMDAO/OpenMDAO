@@ -15,11 +15,18 @@ class PETScTransfer(DefaultTransfer):
     PETSc Transfer implementation for running in parallel.
     """
 
-    def _initialize_transfer(self):
+    def _initialize_transfer(self, in_vec, out_vec):
         """
         Set up the transfer; do any necessary pre-computation.
 
         Optionally implemented by the subclass.
+
+        Parameters
+        ----------
+        in_vec : <Vector>
+            reference to the input vector.
+        out_vec : <Vector>
+            reference to the output vector.
         """
         self._transfers = transfers = {}
 
@@ -49,8 +56,8 @@ class PETScTransfer(DefaultTransfer):
                 out_indexset = PETSc.IS().createGeneral(
                     np.array(out_inds[key], 'i'), comm=self._comm)
 
-                in_petsc = self._in_vec._petsc[in_set_name]
-                out_petsc = self._out_vec._petsc[out_set_name]
+                in_petsc = in_vec._petsc[in_set_name]
+                out_petsc = out_vec._petsc[out_set_name]
                 transfer = PETSc.Scatter().create(out_petsc, out_indexset, in_petsc, in_indexset)
 
                 transfers[key] = transfer
@@ -71,22 +78,22 @@ class PETScTransfer(DefaultTransfer):
         if mode == 'fwd':
             for key in self._transfers:
                 in_set_name, out_set_name = key
-                in_petsc = self._in_vec._petsc[in_set_name]
-                out_petsc = self._out_vec._petsc[out_set_name]
+                in_petsc = in_vec._petsc[in_set_name]
+                out_petsc = out_vec._petsc[out_set_name]
                 self._transfers[key].scatter(out_petsc, in_petsc, addv=False, mode=False)
 
                 # Imaginary transfer
                 # (for CS, so only need in fwd)
                 if in_vec._vector_info._under_complex_step and out_vec._alloc_complex:
-                    in_petsc = self._in_vec._imag_petsc[in_set_name]
-                    out_petsc = self._out_vec._imag_petsc[out_set_name]
+                    in_petsc = in_vec._imag_petsc[in_set_name]
+                    out_petsc = out_vec._imag_petsc[out_set_name]
                     self._transfers[key].scatter(out_petsc, in_petsc, addv=False, mode=False)
 
         elif mode == 'rev':
             for key in self._transfers:
                 in_set_name, out_set_name = key
-                in_petsc = self._in_vec._petsc[in_set_name]
-                out_petsc = self._out_vec._petsc[out_set_name]
+                in_petsc = in_vec._petsc[in_set_name]
+                out_petsc = out_vec._petsc[out_set_name]
                 self._transfers[key].scatter(in_petsc, out_petsc, addv=True, mode=True)
 
 
