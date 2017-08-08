@@ -11,7 +11,7 @@ _loggers = {}
 
 def _set_handler(logger, stream, level, use_format):
     """
-    Set the StreamHandler for logger. 
+    Set the StreamHandler for logger.
 
     Parameters
     ----------
@@ -39,7 +39,7 @@ def get_default_logger(logger=None, name='default_logger',
                        level=logging.INFO, use_format=False, stream=None):
     """
     Return a logger that prints to an I/O stream.
-    
+
     Parameters
     ----------
     logger : object
@@ -80,7 +80,4 @@ def get_default_logger(logger=None, name='default_logger',
 
             logger.setLevel(level)
 
-
     return logger
-
-
