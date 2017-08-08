@@ -687,8 +687,8 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.cleanup()
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'ArmijoGoldsteinLS', (4,)]
-        expected_abs_error = 1.3660184094987926e-11
-        expected_rel_error = 0.03006678031310114
+        expected_abs_error = model._residuals.get_norm()
+        expected_rel_error = expected_abs_error / 2.9086436370499857e-08
         expected_solver_output = None
         expected_solver_residuals = None
 

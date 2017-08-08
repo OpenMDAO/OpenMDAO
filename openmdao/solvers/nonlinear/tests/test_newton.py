@@ -123,26 +123,6 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, top['comp.z'], 2.5, 1e-8)
 
 
-    def test_sellar_analysis_error(self):
-        # Make sure analysis error is raised.
-
-        raise unittest.SkipTest("AnalysisError not implemented yet")
-
-        prob = Problem()
-        prob.model = SellarNoDerivatives()
-        prob.model.nonlinear_solver = Newton()
-        prob.model.nonlinear_solver.options['err_on_maxiter'] = True
-        prob.model.nonlinear_solver.options['maxiter'] = 2
-
-        prob.setup(check=False)
-
-        try:
-            prob.run_model()
-        except AnalysisError as err:
-            self.assertEqual(str(err), "Solve in '': Newton FAILED to converge after 2 iterations")
-        else:
-            self.fail("expected AnalysisError")
-
     def test_sellar_derivs(self):
         # Test top level Sellar (i.e., not grouped).
         # Also, piggybacked testing that makes sure we only call apply_nonlinear

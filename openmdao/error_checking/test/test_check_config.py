@@ -119,6 +119,26 @@ class TestCheckConfig(unittest.TestCase):
         sccs = [sorted(s) for s in get_sccs_topo(graph) if len(s) > 1]
         self.assertEqual([['C4', 'G1.C1', 'G1.C2']], sccs)
 
+    def test_out_of_order_repeat_bug(self):
+        p = Problem(model=Group())
+        indep = p.model.add_subsystem("indep", IndepVarComp('x', 1.0))
+        C1 = p.model.add_subsystem("C1", ExecComp(["y = 2.0*a", "z = 3.0*b"]))
+        C2 = p.model.add_subsystem("C2", ExecComp("y = 2.0*a"))
+
+        # create 2 out of order connections from C2 to C1
+        p.model.connect("C2.y", "C1.a")
+        p.model.connect("C2.y", "C1.b")
+
+        # make sure no system has dangling inputs so we avoid that warning
+        p.model.connect("indep.x", "C2.a")
+
+        testlogger = TestLogger()
+        p.setup(logger=testlogger)
+
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 1)
+
+        self.assertEqual(warnings[0], "System 'C1' executes out-of-order with respect to its source systems ['C2']")
 
     def test_multi_cycles(self):
         p = Problem(model=Group())
