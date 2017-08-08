@@ -27,10 +27,14 @@ class TestProblem(unittest.TestCase):
 
         new_val = -5*np.ones((3, 1))
         prob['indeps.X_c'] = new_val
+        prob.final_setup()
+
         assert_rel_error(self, prob['indeps.X_c'], new_val, 1e-10)
 
         new_val = 2.5*np.ones(3)
         prob['indeps.X_c'][:, 0] = new_val
+        prob.final_setup()
+
         assert_rel_error(self, prob['indeps.X_c'], new_val.reshape((3,1)), 1e-10)
         assert_rel_error(self, prob['indeps.X_c'][:, 0], new_val, 1e-10)
 
@@ -54,12 +58,15 @@ class TestProblem(unittest.TestCase):
 
         # check bad scalar value
         bad_val = -10*np.ones((10))
+        prob['indep.num'] = bad_val
         with assertRaisesRegex(self, ValueError, msg):
-            prob['indep.num'] = bad_val
+            prob.final_setup()
+        prob._initial_condition_cache = {}
 
         # check assign scalar to array
         arr_val = new_val*np.ones((10, 1))
         prob['indep.arr'] = new_val
+        prob.final_setup()
         assert_rel_error(self, prob['indep.arr'], arr_val, 1e-10)
 
         # check valid array value
@@ -327,9 +334,10 @@ class TestProblem(unittest.TestCase):
         prob.setup()
 
         prob['x'] = 2.75
-        assert_rel_error(self, prob['x'], 2.75, 1e-6)
 
         prob.run_model()
+
+        assert_rel_error(self, prob['x'], 2.75, 1e-6)
 
         assert_rel_error(self, prob['y1'], 27.3049178437, 1e-6)
 
@@ -342,9 +350,10 @@ class TestProblem(unittest.TestCase):
         prob.setup()
 
         prob['px.x'] = 2.75
-        assert_rel_error(self, prob['px.x'], 2.75, 1e-6)
 
         prob.run_model()
+
+        assert_rel_error(self, prob['px.x'], 2.75, 1e-6)
 
         assert_rel_error(self, prob['d1.y1'], 27.3049178437, 1e-6)
 
@@ -357,9 +366,10 @@ class TestProblem(unittest.TestCase):
         prob.setup()
 
         prob['x'] = 2.75
-        assert_rel_error(self, prob['x'], 2.75, 1e-6)
 
         prob.run_model()
+
+        assert_rel_error(self, prob['x'], 2.75, 1e-6)
 
         # the output variable, referenced by the promoted name
         assert_rel_error(self, prob['y1'], 27.3049178437, 1e-6)
@@ -604,6 +614,56 @@ class TestProblem(unittest.TestCase):
         top.model = Super()
 
         top.setup(check=False)
+
+        self.assertTrue(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
+        self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
+
+    def test_post_setup_solver_configure(self):
+        # Test that we can change solver settings after we have instantiated our model.
+
+        class ImplSimple(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('a', val=1.)
+                self.add_output('x', val=0.)
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['x'] = np.exp(outputs['x']) - \
+                    inputs['a']**2 * outputs['x']**2
+
+            def linearize(self, inputs, outputs, jacobian):
+                jacobian['x', 'x'] = np.exp(outputs['x']) - \
+                    2 * inputs['a']**2 * outputs['x']
+                jacobian['x', 'a'] = -2 * inputs['a'] * outputs['x']**2
+
+
+        class Sub(Group):
+
+            def setup(self):
+                self.add_subsystem('comp', ImplSimple())
+
+                # This will not solve it
+                self.nonlinear_solver = NonlinearBlockGS()
+
+            def configure(self):
+                # This will not solve it either.
+                self.nonlinear_solver = NonlinearBlockGS()
+
+
+        class Super(Group):
+
+            def setup(self):
+                self.add_subsystem('sub', Sub())
+
+
+        top = Problem()
+        top.model = Super()
+
+        top.setup(check=False)
+
+        # This will solve it.
+        top.model.sub.nonlinear_solver = NewtonSolver()
+        top.model.sub.linear_solver = ScipyIterativeSolver()
 
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
         self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))

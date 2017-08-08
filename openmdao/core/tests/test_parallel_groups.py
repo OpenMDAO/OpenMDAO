@@ -284,6 +284,7 @@ class TestParallelGroups(unittest.TestCase):
         testlogger = TestLogger()
         prob.setup(vector_class=PETScVector, check=True, mode='fwd',
                    logger=testlogger)
+        prob.final_setup()
 
         if prob.comm.rank > 0:
             self.assertEqual(len(testlogger.get('error')), 0)

@@ -340,6 +340,9 @@ class MPITests(unittest.TestCase):
 
         prob.setup(vector_class=PETScVector, check=False)
 
+        # Conclude setup but don't run model.
+        prob.final_setup()
+
         # if USE_PROC_FILES is not set, solver convergence messages
         # should only appear on proc 0
         output = run_model(prob)

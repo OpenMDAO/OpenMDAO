@@ -32,6 +32,9 @@ class TestCheckConfig(unittest.TestCase):
         testlogger = TestLogger()
         p.setup(logger=testlogger)
 
+        # Conclude setup but don't run model.
+        p.final_setup()
+
         self.assertEqual(len(testlogger.get('warning')), 1)
 
         expected = [
@@ -72,6 +75,9 @@ class TestCheckConfig(unittest.TestCase):
         testlogger = TestLogger()
         p.setup(logger=testlogger)
 
+        # Conclude setup but don't run model.
+        p.final_setup()
+
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 2)
 
@@ -107,6 +113,9 @@ class TestCheckConfig(unittest.TestCase):
         testlogger = TestLogger()
         p.setup(logger=testlogger)
 
+        # Conclude setup but don't run model.
+        p.final_setup()
+
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 3)
 
@@ -134,6 +143,9 @@ class TestCheckConfig(unittest.TestCase):
 
         testlogger = TestLogger()
         p.setup(logger=testlogger)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
 
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 1)
@@ -177,6 +189,9 @@ class TestCheckConfig(unittest.TestCase):
 
         testlogger = TestLogger()
         p.setup(logger=testlogger)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
 
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 4)

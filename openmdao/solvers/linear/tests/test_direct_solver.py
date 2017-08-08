@@ -36,6 +36,9 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         p.set_solver_print(level=0)
 
+        # Conclude setup but don't run model.
+        p.final_setup()
+
         # forward
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
 

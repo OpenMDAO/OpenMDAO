@@ -234,8 +234,12 @@ class TestJacobianFeatures(unittest.TestCase):
         problem = self.problem
         model = problem.model
         model.add_subsystem('simple', comp, promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
+
+        # Some of the tests are expected to fail in setup, and some in final_setup, so put them
+        # both under the assert.
         with self.assertRaises(ValueError) as ex:
             problem.setup(check=False)
+            problem.run_model()
         self.assertRegexpMatches(str(ex.exception), error_msg)
 
     @parameterized.expand([
@@ -249,8 +253,9 @@ class TestJacobianFeatures(unittest.TestCase):
         problem = self.problem
         model = problem.model
         model.add_subsystem('simple', comp, promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
+        problem.setup(check=False)
         with self.assertRaises(ValueError) as ex:
-            problem.setup(check=False)
+            problem.run_model()
         self.assertEquals(str(ex.exception), error_msg)
 
     def test_const_jacobian(self):

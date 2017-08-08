@@ -61,6 +61,7 @@ class TestViewModelData(unittest.TestCase):
         r = SqliteRecorder(self.sqlite_db_filename)
         p.driver.add_recorder(r)
         p.setup(check=False)
+        p.final_setup()
         r.close()
 
         model_viewer_data = _get_viewer_data(self.sqlite_db_filename)
@@ -92,6 +93,7 @@ class TestViewModelData(unittest.TestCase):
         r = SqliteRecorder(self.sqlite_db_filename2)
         p.driver.add_recorder(r)
         p.setup(check=False)
+        p.final_setup()
         r.close()
         view_model(self.sqlite_db_filename2, outfile=self.sqlite_filename, show_browser=False)
 

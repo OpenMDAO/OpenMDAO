@@ -665,6 +665,7 @@ class System(object):
             Must be one of 'full', 'reconf', or 'update'.
         """
         self._setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
+        self._final_setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
 
     def _setup(self, comm, vector_class, setup_mode, force_alloc_complex=False,
                mode=None, multi_vector_class=None):
@@ -730,6 +731,53 @@ class System(object):
         self._setup_var_sizes(recurse=recurse)
         self._setup_global_connections(recurse=recurse)
         self._setup_connections(recurse=recurse)
+
+    def _final_setup(self, comm, vector_class, setup_mode, force_alloc_complex=False,
+                     mode=None, multi_vector_class=None):
+        """
+        Perform final setup for this system and its descendant systems.
+
+        This part of setup is called automatically at the start of run_model or run_driver.
+
+        There are three modes of setup:
+        1. 'full': wipe everything and setup this and all descendant systems from scratch
+        2. 'reconf': don't wipe everything, but reconfigure this and all descendant systems
+        3. 'update': update after one or more immediate systems has done a 'reconf' or 'update'
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm> or None
+            The global communicator.
+        vector_class : type
+            reference to an actual <Vector> class; not an instance.
+        setup_mode : str
+            Must be one of 'full', 'reconf', or 'update'.
+        force_alloc_complex : bool
+            Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
+            detect when you need to do this, but in some cases (e.g., complex step is used
+            after a reconfiguration) you may need to set this to True.
+        mode : str or None
+            Derivative direction, either 'fwd', or 'rev', or None
+        multi_vector_class : type
+            reference to an actual <Vector> class; not an instance. This specifies
+            the class to use to perform matrix-matrix derivative operations.  If None,
+            matrix-matrix will not be used.
+        """
+        # 1. Full setup that must be called in the root system.
+        if setup_mode == 'full':
+            initial = True
+            recurse = True
+            resize = False
+        # 2. Partial setup called in the system initiating the reconfiguration.
+        elif setup_mode == 'reconf':
+            initial = False
+            recurse = True
+            resize = True
+        # 3. Update-mode setup called in all ancestors of the system initiating the reconf.
+        elif setup_mode == 'update':
+            initial = False
+            recurse = False
+            resize = False
 
         # For vector-related, setup, recursion is always necessary, even for updating.
         # For reconfiguration setup, we resize the vectors once, only in the current system.
