@@ -227,7 +227,8 @@ class Vector(object):
             Array combining the data of all the varsets.
         """
         if new_array is None:
-            new_array = np.zeros(self._length)
+            ncol = self._ncol
+            new_array = np.zeros(self._length) if ncol == 1 else np.zeros((self._length, ncol))
 
         for set_name, data in iteritems(self._data):
             new_array[self._indices[set_name]] = data

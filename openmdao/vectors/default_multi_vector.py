@@ -115,47 +115,6 @@ class DefaultMultiVector(DefaultVector):
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
 
-    def _init_array(self, size, ncol):
-        """
-        Return an array of zeros of specified size and number of columns.
-
-        Parameters
-        ----------
-        size : int
-            Number of entries in the array.
-        ncol : int
-            Number of columns in the array.
-
-        Returns
-        -------
-        ndarray
-            The array of zeros.
-        """
-        return np.zeros((size, ncol))
-
-    def get_data(self, new_array=None):
-        """
-        Get the array combining the data of all the varsets.
-
-        Parameters
-        ----------
-        new_array : ndarray or None
-            Array to fill in with the values; otherwise new array created.
-
-        Returns
-        -------
-        ndarray
-            Array combining the data of all the varsets.
-        """
-        if new_array is None:
-            new_array = np.zeros((self._length, self._ncol))
-
-        for set_name, data in iteritems(self._data):
-            for i in range(self._ncol):
-                new_array[:, i][self._indices[set_name]] = data[:, i]
-
-        return new_array
-
     def elem_mult(self, vec):
         """
         Perform element-wise multiplication and store the result in this vector.
