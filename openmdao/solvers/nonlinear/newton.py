@@ -85,6 +85,8 @@ class NewtonSolver(NonlinearSolver):
                              desc='Set to True to turn on sub-solvers (Hybrid Newton).')
         self.options.declare('max_sub_solves', type_=int, default=10,
                              desc='Maximum number of subsystem solves.')
+        self.options.declare('initial_sub_solve', type_=bool, default=False,
+                             desc='Set to True to cycle through sub-solvers once at the start of the problem.')
         self.supports['gradients'] = True
 
     def _setup_solvers(self, system, depth):
@@ -190,6 +192,19 @@ class NewtonSolver(NonlinearSolver):
         # Disable local fd
         approx_status = system._owns_approx_jac
         system._owns_approx_jac = False
+        
+        # This cycles through the solvers of the subsystems once at the start of the problem
+        if do_subsolve == False and self.options['initial_sub_solve'] == True:
+
+            for isub, subsys in enumerate(system._subsystems_allprocs):
+                system._transfer('nonlinear', 'fwd', isub)
+
+                if subsys in system._subsystems_myproc:
+                    subsys._solve_nonlinear()
+
+            system._apply_nonlinear()
+            print("Did initial sub-solve")
+            self.options['initial_sub_solve'] = False
 
         # Hybrid newton support.
         with Recording('Newton_subsolve', 0, self):
