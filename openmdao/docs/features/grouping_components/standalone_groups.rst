@@ -63,8 +63,10 @@ OpenMDAO allows you to do a limited number of things after setup is called. Thes
 
 In previous versions of OpenMDAO, it was not possible to do these things after setup (with the exception of setting initial conditions.)
 In OpenMDAO 2.0, the setup process was redesigned and split into two phases. In the first phase, executed when `setup` is called, the
-model hiearchy is assembled and variables and connections are all assigned. At this point, subsystems are accessible as attributes on their
-parent.
+model hiearchy is assembled, the processors are allocated (for MPI), and variables and connections are all assigned. At this point,
+subsystems are accessible as attributes on their parent. The second phase of setup runs automatically when you call `run_driver` or
+`run_model`. During this phase, the vectors are created and populated, the drivers and solvers are initialized, and the recorders are
+started.
 
 Here, we instantiate a hierarchy of groups, and then change the solver to one that can solve this problem.
 
