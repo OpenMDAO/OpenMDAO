@@ -61,6 +61,11 @@ OpenMDAO allows you to do a limited number of things after setup is called. Thes
  - Set execution order
  - Assign case recorders
 
+In previous versions of OpenMDAO, it was not possible to do these things after setup (with the exception of setting initial conditions.)
+In OpenMDAO 2.0, the setup process was redesigned and split into two phases. In the first phase, executed when `setup` is called, the
+model hiearchy is assembled and variables and connections are all assigned. At this point, subsystems are accessible as attributes on their
+parent.
+
 Here, we instantiate a hierarchy of groups, and then change the solver to one that can solve this problem.
 
 .. embed-test::
