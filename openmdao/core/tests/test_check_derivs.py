@@ -583,7 +583,7 @@ class TestProblemCheckTotals(unittest.TestCase):
                 """
                 outputs['y1'] = self.JJ.dot(inputs['x1'])
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 """
                 Analytical derivatives.
                 """
