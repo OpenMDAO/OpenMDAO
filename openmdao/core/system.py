@@ -2365,7 +2365,7 @@ class System(object):
         with self._scaled_context_all():
             self._apply_nonlinear()
 
-    def list_inputs(self, values=True, out_stream=sys.stdout):
+    def list_inputs(self, values=True, out_stream='stdout'):
         """
         List inputs.
 
@@ -2411,7 +2411,7 @@ class System(object):
 
         return inputs
 
-    def list_outputs(self, explicit=True, implicit=True, values=True, out_stream=sys.stdout):
+    def list_outputs(self, explicit=True, implicit=True, values=True, out_stream='stdout'):
         """
         List outputs.
 
@@ -2460,7 +2460,7 @@ class System(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def list_residuals(self, explicit=True, implicit=True, values=True, out_stream=sys.stdout):
+    def list_residuals(self, explicit=True, implicit=True, values=True, out_stream='stdout'):
         """
         List residuals.
 
@@ -2509,7 +2509,7 @@ class System(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def _write_outputs(self, comp_type, outputs, out_stream=sys.stdout):
+    def _write_outputs(self, comp_type, outputs, out_stream='stdout'):
         """
         Write formatted output values and residuals to out_stream.
 

@@ -1,6 +1,5 @@
 """Miscellaneous utilities related to logging."""
 
-import os
 import sys
 import logging
 
@@ -18,13 +17,17 @@ def _set_handler(logger, stream, level, use_format):
     ----------
     logger : object
         Logger object.
-    stream : file-like
+    stream : 'stdout', 'stderr' or file-like
         output stream to which logger output will be directed.
     level : int
         Logging level for this logger. Default is logging.INFO (level 20).
     use_format : bool
         Set to True to use the openmdao format "Level: message".
     """
+    if stream is 'stdout':
+        stream = sys.stdout
+    elif stream is 'stderr':
+        stream = sys.stderr
     handler = logging.StreamHandler(stream)
 
     # set a format which is simpler for console use
@@ -37,7 +40,7 @@ def _set_handler(logger, stream, level, use_format):
 
 
 def get_logger(name='default_logger', level=logging.INFO, use_format=False,
-               out_stream=sys.stdout, lock=None):
+               out_stream='stdout', lock=None):
     """
     Return a logger that prints to an I/O stream.
 
@@ -51,7 +54,7 @@ def get_logger(name='default_logger', level=logging.INFO, use_format=False,
     use_format : bool
         Set to True to use the openmdao format "Level: message".
         (applied only when creating a new logger or setting a new stream).
-    out_stream : file-like,
+    stream : 'stdout', 'stderr' or file-like
         output stream to which logger output will be directed.
     lock : bool
         if True, do not allow the handler to be changed until unlocked.

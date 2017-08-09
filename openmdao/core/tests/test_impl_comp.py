@@ -324,12 +324,6 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp2.x'], 3.)
 
 
-# redirect output from these commands to devnull
-# from openmdao.utils.logger_utils import get_logger
-# get_logger(name='list_inputs', out_stream=None, lock=True)
-# get_logger(name='list_outputs', out_stream=None, lock=True)
-
-
 class ListFeatureTestCase(unittest.TestCase):
 
     def setUp(self):
