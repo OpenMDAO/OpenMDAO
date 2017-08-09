@@ -2374,8 +2374,8 @@ class System(object):
         values : bool, optioanl
             When True, display/return input values as well as names.
 
-        out_stream : file_like
-            Where to send human readable output. Default is sys.stdout.
+        out_stream : 'stdout', 'stderr' or file-like
+            Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
 
         Returns
@@ -2426,8 +2426,8 @@ class System(object):
         values : bool, optioanl
             When True, display/return output values as well as names.
 
-        out_stream : file_like
-            Where to send human readable output. Default is sys.stdout.
+        out_stream : 'stdout', 'stderr' or file-like
+            Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
 
         Returns
@@ -2475,8 +2475,8 @@ class System(object):
         values : bool, optioanl
             When True, display/return residual values as well as names.
 
-        out_stream : file_like
-            Where to send human readable output. Default is sys.stdout.
+        out_stream : 'stdout', 'stderr' or file-like
+            Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
 
         Returns
@@ -2521,8 +2521,9 @@ class System(object):
         outputs : list
             list of (name, value) tuples.
 
-        out_stream : file_like
-            Where to send human readable output. Default is sys.stdout.
+        out_stream : 'stdout', 'stderr' or file-like
+            Where to send human readable output. Default is 'stdout'.
+            Set to None to suppress.
         """
         if out_stream is None:
             return

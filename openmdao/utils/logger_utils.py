@@ -42,7 +42,7 @@ def _set_handler(logger, stream, level, use_format):
 def get_logger(name='default_logger', level=logging.INFO, use_format=False,
                out_stream='stdout', lock=None):
     """
-    Return a logger that prints to an I/O stream.
+    Return a logger that writes to an I/O stream.
 
     Parameters
     ----------
@@ -63,7 +63,7 @@ def get_logger(name='default_logger', level=logging.INFO, use_format=False,
     Returns
     -------
     <logging.Logger>
-        Logger that writes to stdout and adheres to requested settings.
+        Logger that writes to a stream and adheres to requested settings.
     """
     if name in _loggers:
         # use existing logger
