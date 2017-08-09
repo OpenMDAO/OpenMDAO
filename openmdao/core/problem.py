@@ -237,13 +237,7 @@ class Problem(object):
         Set all initial conditions that have been saved in cache after setup.
         """
         for name, value in iteritems(self._initial_condition_cache):
-            if name in self.model._outputs:
-                self.model._outputs[name] = value
-            elif name in self.model._inputs:
-                self.model._inputs[name] = value
-            else:
-                msg = 'Variable name "{}" not found.'
-                raise KeyError(msg.format(name))
+            self[name] = value
 
         # Clean up cache
         self._initial_condition_cache = {}
@@ -433,8 +427,6 @@ class Problem(object):
             model._final_setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex,
                                mode=mode, multi_vector_class=multi_vector_class)
 
-            self._set_initial_conditions()
-
         self.driver._setup_driver(self)
 
         if isinstance(model, Group):
@@ -450,7 +442,9 @@ class Problem(object):
         if check and comm.rank == 0:
             check_config(self, logger)
 
-        self._setup_status = 2
+        if self._setup_status < 2:
+            self._setup_status = 2
+            self._set_initial_conditions()
 
     def check_partials(self, logger=None, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6, global_options=None,
