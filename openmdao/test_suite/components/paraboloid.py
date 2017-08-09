@@ -27,7 +27,7 @@ class Paraboloid(ExplicitComponent):
 
         outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """
         Jacobian for our paraboloid.
         """
