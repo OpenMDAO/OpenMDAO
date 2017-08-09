@@ -378,7 +378,7 @@ class Problem(object):
             raise ValueError('Unrecognized method: "{}"'.format(global_options['method']))
 
         model = self.model
-        logger = logger if logger else get_logger(logger, 'check_partials')
+        logger = logger if logger else get_logger('check_partials')
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -666,7 +666,7 @@ class Problem(object):
         model = self.model
         global_names = False
 
-        logger = logger if logger else get_logger(logger, 'check_total_derivatives')
+        logger = logger if logger else get_logger('check_total_derivatives')
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 

@@ -36,16 +36,13 @@ def _set_handler(logger, stream, level, use_format):
     logger.addHandler(handler)
 
 
-def get_logger(logger=None, name='default_logger',
-               level=logging.INFO, use_format=False,
+def get_logger(name='default_logger', level=logging.INFO, use_format=False,
                out_stream=sys.stdout, lock=None):
     """
     Return a logger that prints to an I/O stream.
 
     Parameters
     ----------
-    logger : object
-        Logger object. If a valid one is not passed in, then create a new one.
     name : str
         Name of the logger to be returned, will be created if it doesn't exist.
     level : int
@@ -65,39 +62,38 @@ def get_logger(logger=None, name='default_logger',
     <logging.Logger>
         Logger that writes to stdout and adheres to requested settings.
     """
-    if logger is None:
-        if name in _loggers:
-            # use existing logger
-            info = _loggers[name]
-            logger = info['logger']
-            stream = info['stream']
-            locked = info['locked']
+    if name in _loggers:
+        # use existing logger
+        info = _loggers[name]
+        logger = info['logger']
+        stream = info['stream']
+        locked = info['locked']
 
-            unlock = lock is False
+        unlock = lock is False
 
-            # redirect log to new stream (if not locked)
-            if out_stream != stream and (not locked or unlock):
-                for handler in logger.handlers:
-                    logger.removeHandler(handler)
-                if out_stream:
-                    _set_handler(logger, out_stream, level, use_format)
-                info['stream'] = out_stream
-
-            # update locked status
-            info['locked'] = lock
-        else:
-            # create new logger
-            logger = logging.getLogger(name)
-
+        # redirect log to new stream (if not locked)
+        if out_stream != stream and (not locked or unlock):
+            for handler in logger.handlers:
+                logger.removeHandler(handler)
             if out_stream:
                 _set_handler(logger, out_stream, level, use_format)
+            info['stream'] = out_stream
 
-            logger.setLevel(level)
+        # update locked status
+        info['locked'] = lock
+    else:
+        # create new logger
+        logger = logging.getLogger(name)
 
-            _loggers[name] = {
-                'logger': logger,
-                'stream': out_stream,
-                'locked': lock
-            }
+        if out_stream:
+            _set_handler(logger, out_stream, level, use_format)
+
+        logger.setLevel(level)
+
+        _loggers[name] = {
+            'logger': logger,
+            'stream': out_stream,
+            'locked': lock
+        }
 
     return logger

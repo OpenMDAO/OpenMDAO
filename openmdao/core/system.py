@@ -2386,7 +2386,7 @@ class System(object):
             inputs.append((name, val)) if values else inputs.append(name)
 
         if out_stream:
-            logger = get_logger(name='list_inputs', out_stream=out_stream)
+            logger = get_logger('list_inputs', out_stream=out_stream)
 
             count = len(inputs)
 
@@ -2517,7 +2517,7 @@ class System(object):
         if out_stream is None:
             return
 
-        logger = get_logger(name='list_outputs', out_stream=out_stream)
+        logger = get_logger('list_outputs', out_stream=out_stream)
 
         count = len(outputs)
 

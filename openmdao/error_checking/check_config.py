@@ -24,7 +24,7 @@ def check_config(problem, logger=None):
     logger : object
         Logging object.
     """
-    logger = get_logger(logger, 'check_config', use_format=True)
+    logger = logger if logger else get_logger('check_config', use_format=True)
 
     _check_hanging_inputs(problem, logger)
 
