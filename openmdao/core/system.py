@@ -2371,8 +2371,8 @@ class System(object):
 
         Parameters
         ----------
-        values : bool, optioanl
-            When True, display/return input values as well as names.
+        values : bool, optional
+            When True, display/return input values as well as names. Default is True.
 
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
@@ -2423,8 +2423,8 @@ class System(object):
         implicit : bool, optional
             include outputs from implicit components. Default is True.
 
-        values : bool, optioanl
-            When True, display/return output values as well as names.
+        values : bool, optional
+            When True, display/return output values as well as names. Default is True.
 
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
@@ -2472,8 +2472,8 @@ class System(object):
         implicit : bool, optional
             include outputs from implicit components. Default is True.
 
-        values : bool, optioanl
-            When True, display/return residual values as well as names.
+        values : bool, optional
+            When True, display/return residual values as well as names. Default is True.
 
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
