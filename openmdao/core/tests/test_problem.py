@@ -405,7 +405,6 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 9.87161739688, 1e-6)
         assert_rel_error(self, prob['y2'], 8.14191301549, 1e-6)
 
-    @unittest.skip('access via promoted names is not working yet')
     def test_feature_residuals(self):
 
         prob = Problem()
