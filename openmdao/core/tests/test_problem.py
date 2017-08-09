@@ -714,5 +714,54 @@ class TestProblem(unittest.TestCase):
         print(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
         print(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
 
+    def test_feature_post_setup_solver_configure(self):
+
+        class ImplSimple(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('a', val=1.)
+                self.add_output('x', val=0.)
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['x'] = np.exp(outputs['x']) - \
+                    inputs['a']**2 * outputs['x']**2
+
+            def linearize(self, inputs, outputs, jacobian):
+                jacobian['x', 'x'] = np.exp(outputs['x']) - \
+                    2 * inputs['a']**2 * outputs['x']
+                jacobian['x', 'a'] = -2 * inputs['a'] * outputs['x']**2
+
+
+        class Sub(Group):
+
+            def setup(self):
+                self.add_subsystem('comp', ImplSimple())
+
+                # This will not solve it
+                self.nonlinear_solver = NonlinearBlockGS()
+
+            def configure(self):
+                # This will not solve it either.
+                self.nonlinear_solver = NonlinearBlockGS()
+
+
+        class Super(Group):
+
+            def setup(self):
+                self.add_subsystem('sub', Sub())
+
+
+        top = Problem()
+        top.model = Super()
+
+        top.setup(check=False)
+
+        # This will solve it.
+        top.model.sub.nonlinear_solver = NewtonSolver()
+        top.model.sub.linear_solver = ScipyIterativeSolver()
+
+        self.assertTrue(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
+        self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
+
 if __name__ == "__main__":
     unittest.main()

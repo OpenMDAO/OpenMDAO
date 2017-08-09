@@ -49,4 +49,21 @@ Here is a reference on what you can do in each method:
  - Assign Jacobians to subsystems
  - Set execution order in subsystems
 
+Post Setup Configuration
+------------------------
+
+OpenMDAO allows you to do a limited number of things after setup is called. These include the following:
+
+ - Set initial conditions for unconnected inputs or states
+ - Assign linear and nonlinear solvers
+ - Change solver settings
+ - Assign Jacobians
+ - Set execution order
+ - Assign case recorders
+
+Here, we instantiate a hierarchy of groups, and then change the solver to one that can solve this problem.
+
+.. embed-test::
+    openmdao.core.tests.test_problem.TestProblem.test_feature_post_setup_solver_configure
+
 .. tags:: Group, System
