@@ -839,61 +839,62 @@ class Problem(object):
         recording_iteration_stack.pop()
         return totals
 
-    def _get_voi_info(self, vois, inp2rhs_name, input_vec, output_vec, input_vois):
+    def _get_voi_info(self, voi_lists, inp2rhs_name, input_vec, output_vec, input_vois):
         voi_info = {}
         model = self.model
         sizes = model._var_sizes['output']
         nproc = self.comm.size
         iproc = model.comm.rank
 
-        for input_name, old_input_name in vois:
-            vecname = inp2rhs_name[input_name]
-            dinputs = input_vec[vecname]
-            doutputs = output_vec[vecname]
+        for rhs_name, vois in iteritems(voi_lists):
+            for input_name, old_input_name in vois:
+                vecname = inp2rhs_name[input_name]
+                dinputs = input_vec[vecname]
+                doutputs = output_vec[vecname]
 
-            in_var_idx = model._var_allprocs_abs2idx['output'][input_name]
-            in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
-            start = np.sum(sizes[:iproc, in_var_idx])
-            end = np.sum(sizes[:iproc + 1, in_var_idx])
+                in_var_idx = model._var_allprocs_abs2idx['output'][input_name]
+                in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
+                start = np.sum(sizes[:iproc, in_var_idx])
+                end = np.sum(sizes[:iproc + 1, in_var_idx])
 
-            in_idxs = None
-            if input_name in input_vois:
-                in_voi_meta = input_vois[input_name]
-                if 'indices' in in_voi_meta:
-                    in_idxs = in_voi_meta['indices']
+                in_idxs = None
+                if input_name in input_vois:
+                    in_voi_meta = input_vois[input_name]
+                    if 'indices' in in_voi_meta:
+                        in_idxs = in_voi_meta['indices']
 
-            if in_idxs is not None:
-                irange = in_idxs
-                max_i = np.max(in_idxs)
-                min_i = np.min(in_idxs)
-                loc_size = len(in_idxs)
-            else:
-                irange = list(range(in_var_meta['global_size']))
-                max_i = in_var_meta['global_size'] - 1
-                min_i = 0
-                loc_size = end - start
+                if in_idxs is not None:
+                    irange = in_idxs
+                    max_i = np.max(in_idxs)
+                    min_i = np.min(in_idxs)
+                    loc_size = len(in_idxs)
+                else:
+                    irange = list(range(in_var_meta['global_size']))
+                    max_i = in_var_meta['global_size'] - 1
+                    min_i = 0
+                    loc_size = end - start
 
-            if loc_size == 0:
-                # var is not local. get size of var in owned proc
-                for rank in range(nproc):
-                    sz = sizes[rank, in_var_idx]
-                    if sz > 0:
-                        loc_size = sz
-                        break
+                if loc_size == 0:
+                    # var is not local. get size of var in owned proc
+                    for rank in range(nproc):
+                        sz = sizes[rank, in_var_idx]
+                        if sz > 0:
+                            loc_size = sz
+                            break
 
-            dup = not in_var_meta['distributed']
+                dup = not in_var_meta['distributed']
 
-            # set totals to zeros instead of None in those cases when none
-            # of the specified indices are within the range of interest
-            # for this proc.
-            store = True if ((start <= min_i < end) or (start <= max_i < end)) else dup
+                # set totals to zeros instead of None in those cases when none
+                # of the specified indices are within the range of interest
+                # for this proc.
+                store = True if ((start <= min_i < end) or (start <= max_i < end)) else dup
 
-            if store:
-                offset = start + min_i
-                loc_idxs = irange - offset
+                if store:
+                    offset = start + min_i
+                    loc_idxs = irange - offset
 
-            voi_info[input_name] = (dinputs, doutputs, irange, loc_idxs, max_i, min_i,
-                                    loc_size, start, end, dup, store)
+                voi_info[input_name] = (dinputs, doutputs, irange, loc_idxs, max_i, min_i,
+                                        loc_size, start, end, dup, store)
 
         return voi_info
 
@@ -1177,10 +1178,11 @@ class Problem(object):
 
         vec_names = sorted(set(inp2rhs_name.values()))
 
+        voi_info = self._get_voi_info(voi_lists, inp2rhs_name, input_vec, output_vec, input_vois)
+
         for rhs_name, vois in iteritems(voi_lists):
             # If Forward mode, solve linear system for each 'wrt'
             # If Adjoint mode, solve linear system for each 'of'
-            voi_info = self._get_voi_info(vois, inp2rhs_name, input_vec, output_vec, input_vois)
 
             if matmat:
                 self._compute_total_derivs_multi(totals, vois, voi_info, vec_names, mode,

@@ -1131,7 +1131,7 @@ class System(object):
                     if not (np.isscalar(ref) and np.isscalar(ref0)):
                         global_shape_out = meta_out['global_shape']
                         if src_indices.ndim != 1:
-                            if len(shape_out) == 1:
+                            if len(shape_out) == 1 or shape_in == src_indices.shape:
                                 src_indices = src_indices.flatten()
                                 src_indices = convert_neg(src_indices, src_indices.size)
                             else:
@@ -1932,6 +1932,10 @@ class System(object):
         dvs['indices'] = indices
         dvs['parallel_deriv_color'] = parallel_deriv_color
         dvs['vectorize_derivs'] = vectorize_derivs
+        # TODO: figure out why grouping the matmat variables this way
+        #       makes the flat_earth test run faster on one proc.
+        if vectorize_derivs and parallel_deriv_color is None:
+            dvs['parallel_deriv_color'] = '@matmat'
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None,
@@ -2091,6 +2095,8 @@ class System(object):
             resp['indices'] = index
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['vectorize_derivs'] = vectorize_derivs
+        if vectorize_derivs and parallel_deriv_color is None:
+            resp['parallel_deriv_color'] = '@matmat'
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,

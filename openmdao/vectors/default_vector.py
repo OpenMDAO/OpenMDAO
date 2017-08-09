@@ -326,7 +326,7 @@ class DefaultVector(Vector):
         for set_name, data in iteritems(self._data):
             data += vec._data[set_name]
 
-        if self._vector_info._under_complex_step and vec._alloc_complex:
+        if vec._alloc_complex and self._vector_info._under_complex_step:
             for set_name, data in iteritems(self._imag_data):
                 data += vec._imag_data[set_name]
         return self
@@ -347,7 +347,7 @@ class DefaultVector(Vector):
         """
         for set_name, data in iteritems(self._data):
             data -= vec._data[set_name]
-        if self._vector_info._under_complex_step and vec._alloc_complex:
+        if vec._alloc_complex and self._vector_info._under_complex_step:
             for set_name, data in iteritems(self._imag_data):
                 data -= vec._imag_data[set_name]
         return self
@@ -415,8 +415,7 @@ class DefaultVector(Vector):
                 data[:] *= vec._data[set_name]
         else:
             for set_name, data in iteritems(self._data):
-                for i in range(data.shape[1]):
-                    data[:, i] *= vec._data[set_name]
+                data *= vec._data[set_name][:, np.newaxis]
 
     def set_vec(self, vec):
         """
