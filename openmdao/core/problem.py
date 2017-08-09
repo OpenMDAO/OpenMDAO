@@ -22,7 +22,7 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.logger_utils import get_default_logger
+from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.graph_utils import all_connected_edges
 from openmdao.vectors.default_vector import DefaultVector
@@ -378,7 +378,7 @@ class Problem(object):
             raise ValueError('Unrecognized method: "{}"'.format(global_options['method']))
 
         model = self.model
-        logger = get_default_logger(logger, 'check_partials')
+        logger = logger if logger else get_logger('check_partials')
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -610,7 +610,6 @@ class Problem(object):
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
 
-        logging.getLogger().setLevel(logging.INFO)
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, logger, compact_print,
                                   comps, global_options, suppress_output=suppress_output)
 
@@ -666,7 +665,8 @@ class Problem(object):
         """
         model = self.model
         global_names = False
-        logger = get_default_logger(logger, 'check_total_derivatives')
+
+        logger = logger if logger else get_logger('check_total_derivatives')
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -701,7 +701,6 @@ class Problem(object):
             data[''][key]['J_fd'] = Jfd[key]
         fd_args['method'] = 'fd'
 
-        logging.getLogger().setLevel(logging.INFO)
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, logger, compact_print, [model],
                                   fd_args, totals=True, suppress_output=suppress_output)
         return data['']

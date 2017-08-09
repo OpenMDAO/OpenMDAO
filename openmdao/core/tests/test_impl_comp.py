@@ -324,15 +324,10 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp2.x'], 3.)
 
 
-# NOTE: the following TestCase generates output for the feature docs
-#       would be nice if we could suppress it during normal testing
-
-# redirect output from these commands to devnull for the following tests
-# (does not effect documentation)
-import os
-from openmdao.utils.logger_utils import get_default_logger
-get_default_logger(name='list_inputs', stream=os.devnull)
-get_default_logger(name='list_outputs', stream=os.devnull)
+# redirect output from these commands to devnull
+# from openmdao.utils.logger_utils import get_logger
+# get_logger(name='list_inputs', out_stream=None, lock=True)
+# get_logger(name='list_outputs', out_stream=None, lock=True)
 
 
 class ListFeatureTestCase(unittest.TestCase):

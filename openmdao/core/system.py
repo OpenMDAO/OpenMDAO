@@ -34,7 +34,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.logger_utils import logging, get_default_logger
+from openmdao.utils.logger_utils import get_logger
 
 _type_map = {
     'input': 'input',
@@ -2386,7 +2386,7 @@ class System(object):
             inputs.append((name, val)) if values else inputs.append(name)
 
         if out_stream:
-            logger = get_default_logger(name='list_inputs', stream=out_stream)
+            logger = get_logger('list_inputs', out_stream=out_stream)
 
             count = len(inputs)
 
@@ -2517,7 +2517,7 @@ class System(object):
         if out_stream is None:
             return
 
-        logger = get_default_logger(name='list_outputs', stream=out_stream)
+        logger = get_logger('list_outputs', out_stream=out_stream)
 
         count = len(outputs)
 
