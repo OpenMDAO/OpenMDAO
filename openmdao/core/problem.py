@@ -170,9 +170,17 @@ class Problem(object):
                     abs_name = proms['input'][name][0]
                     if abs_name in self.model._conn_abs_in2out:
                         src_name = self.model._conn_abs_in2out[abs_name]
+                        # So, if the inputs and outputs are promoted to the same name, then we
+                        # allow getitem, but if they aren't, then we raise an error due to non
+                        # uniqueness.
+                        if name not in proms['output']:
+                            # This triggers a check for unconnected non-unique inputs, and
+                            # raises the same error as vector access.
+                            abs_name = prom_name2abs_name(self.model, name, 'input')
                         val = meta['output'][src_name]['value']
                     else:
-                        # This triggers a check for unconnected non-unique inputs.
+                        # This triggers a check for unconnected non-unique inputs, and
+                        # raises the same error as vector access.
                         abs_name = prom_name2abs_name(self.model, name, 'input')
                         val = meta['input'][abs_name]['value']
 
