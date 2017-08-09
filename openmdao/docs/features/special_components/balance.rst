@@ -60,12 +60,11 @@ equation:
 
 .. math::
 
-    a \cdot x^2 + b \cdot x + c  = 0
+    b \cdot x + c  = 0
 
-for various values of ``a``, ``b``, and ``c``.  Here, our LHS is connected to a computed value of
-the quadratic equation, the multiplier is one, and the RHS is zero.  :math:`x^2`, the multiplier is 2, and the RHS
-is 4.  The expected solution is :math:`x=\sqrt{2}`.  We initialize ``x`` with a value of 1 so that
-it typicall finds the positive root.
+for various values of ``b``, and ``c``.  Here, our LHS is connected to a computed value of
+the linear equation.  The multiplier is one and the RHS is zero (the defaults) and thus
+they need not be connected.
 
 .. embed-test::
     openmdao.components.tests.test_balance_comp.TestBalanceComp.test_feature_vector

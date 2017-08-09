@@ -476,7 +476,7 @@ class TestBalanceComp(unittest.TestCase):
         prob = Problem(model=Group())
 
         exec_comp = ExecComp('y=b*x+c',
-                             b={'value': np.random.rand(n)},
+                             b={'value': np.random.uniform(0.01,100, size=n)},
                              c={'value': np.random.rand(n)},
                              x={'value': np.zeros(n)},
                              y={'value': np.ones(n)})
@@ -492,11 +492,11 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.nonlinear_solver = NewtonSolver()
         prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 2
+        prob.model.nonlinear_solver.options['iprint'] = 0
 
         prob.model.jacobian = DenseJacobian()
 
-        prob.setup()
+        prob.setup(check=False)
 
         prob['balance.x'] = np.random.rand(n)
 
@@ -504,15 +504,82 @@ class TestBalanceComp(unittest.TestCase):
 
         b = prob['exec.b']
         c = prob['exec.c']
-        solution = -c/b
 
-        #assert_almost_equal(prob['balance.x'], -c/b, decimal=6)
+        assert_almost_equal(prob['balance.x'], -c/b, decimal=6)
 
+        print('solution')
         print(prob['balance.x'])
-        print(prob['exec.y'])
-        print(prob['exec.b'])
-        print(prob['exec.c'])
-        print(prob['exec.b']*prob['balance.x']+prob['exec.c'])
+        print('expected')
+        print(-c/b)
+
+    def test_feature_kepler(self):
+        """
+        Solve Kepler's equation (convert mean anomaly to eccentric anomaly) using a BalanceComp.
+
+        Kepler's equation is:
+
+        ..math:
+
+            E - e * sin(E) = M
+        """
+        n = 100
+
+        prob = Problem(model=Group())
+
+        ivc = IndepVarComp()
+
+        ivc.add_output(name='M',
+                       val=np.random.uniform(0, 2*np.pi, size=n),
+                       units='rad',
+                       desc='Mean anomaly')
+
+        ivc.add_output(name='ecc',
+                       val=0.5*np.random.rand(n),
+                       units=None,
+                       desc='orbit eccentricity')
+
+        bal = BalanceComp(name='E', val=np.zeros(n),
+                          units='rad', rhs_name='M', eq_units='rad')
+
+        # Override the guess_nonlinear method, always initialize E to the value of M
+        def guess_func(inputs, outputs, residuals):
+            outputs['E'] = inputs['M']
+
+        bal.guess_nonlinear = guess_func
+
+        # ExecComp used to compute the LHS of Kepler's equation.
+        lhs_comp = ExecComp('k=E - ecc * sin(E)',
+                            k={'value': np.zeros(n), 'units': 'rad'},
+                            E={'value': np.zeros(n), 'units': 'rad'},
+                            ecc={'value': np.zeros(n)})
+
+        prob.model.add_subsystem(name='ivc', subsys=ivc, promotes_outputs=['M', 'ecc'])
+
+        prob.model.add_subsystem(name='balance', subsys=bal,
+                                 promotes_inputs=['M'],
+                                 promotes_outputs=['E'])
+
+        prob.model.add_subsystem(name='lhs', subsys=lhs_comp,
+                                 promotes_inputs=['E', 'ecc'])
+
+        # Explicit connections
+        prob.model.connect('lhs.k', 'balance.lhs:E')
+
+        # Setup solvers
+        prob.model.linear_solver = DirectSolver()
+        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.nonlinear_solver.options['maxiter'] = 100
+        prob.model.nonlinear_solver.options['iprint'] = 2
+        prob.model.jacobian = DenseJacobian()
+
+        prob.setup()
+
+        prob.run_model()
+
+        print('ecc', prob['ecc'])
+        print('M (deg)', np.degrees(prob['M']))
+        print('E (deg)', np.degrees(prob['E']))
+
 
 
 if __name__ == '__main__':  # pragma: no cover
