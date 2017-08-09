@@ -194,7 +194,7 @@ class NewtonSolver(NonlinearSolver):
         system._owns_approx_jac = False
         
         # This cycles through the solvers of the subsystems once at the start of the problem
-        if do_subsolve == False and self.options['initial_sub_solve'] == True:
+        if self.options['initial_sub_solve'] == True:
 
             for isub, subsys in enumerate(system._subsystems_allprocs):
                 system._transfer('nonlinear', 'fwd', isub)
@@ -205,6 +205,12 @@ class NewtonSolver(NonlinearSolver):
             system._apply_nonlinear()
             print("Did initial sub-solve")
             self.options['initial_sub_solve'] = False
+        
+            if do_subsolve == True:
+                print("WARNING: Both solve_subsystems and initial_sub_solve are set to True.",
+                "Setting solve_subsystems to False and carrying out one initial sub-solve only.")
+                self.options['solve_subsystems'] = False
+                do_subsolve = False
 
         # Hybrid newton support.
         with Recording('Newton_subsolve', 0, self):
