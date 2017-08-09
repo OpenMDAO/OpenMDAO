@@ -399,8 +399,7 @@ class Problem(object):
             mode = 'rev'
         self._mode = mode
 
-        model._setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex,
-                     mode=mode, multi_vector_class=multi_vector_class)
+        model._setup(comm, 'full')
 
         # Cache all args for final setup.
         self._vector_class = vector_class

@@ -664,11 +664,10 @@ class System(object):
         setup_mode : str
             Must be one of 'full', 'reconf', or 'update'.
         """
-        self._setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
+        self._setup(self.comm, setup_mode=setup_mode)
         self._final_setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
 
-    def _setup(self, comm, vector_class, setup_mode, force_alloc_complex=False,
-               mode=None, multi_vector_class=None):
+    def _setup(self, comm, setup_mode):
         """
         Perform setup for this system and its descendant systems.
 
@@ -681,20 +680,8 @@ class System(object):
         ----------
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
-        vector_class : type
-            reference to an actual <Vector> class; not an instance.
         setup_mode : str
             Must be one of 'full', 'reconf', or 'update'.
-        force_alloc_complex : bool
-            Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
-            detect when you need to do this, but in some cases (e.g., complex step is used
-            after a reconfiguration) you may need to set this to True.
-        mode : str or None
-            Derivative direction, either 'fwd', or 'rev', or None
-        multi_vector_class : type
-            reference to an actual <Vector> class; not an instance. This specifies
-            the class to use to perform matrix-matrix derivative operations.  If None,
-            matrix-matrix will not be used.
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
