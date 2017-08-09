@@ -1,5 +1,6 @@
 """Miscellaneous utilities related to logging."""
 
+import os
 import sys
 import logging
 
@@ -17,12 +18,12 @@ def _set_handler(logger, stream, level, use_format):
     ----------
     logger : object
         Logger object.
+    stream : file-like
+        output stream to which logger output will be directed.
     level : int
         Logging level for this logger. Default is logging.INFO (level 20).
     use_format : bool
-        Set to True to use the openmdao format "Level: message"
-    stream : file-like
-        an output stream to which logger output will be directed
+        Set to True to use the openmdao format "Level: message".
     """
     handler = logging.StreamHandler(stream)
 
@@ -35,8 +36,9 @@ def _set_handler(logger, stream, level, use_format):
     logger.addHandler(handler)
 
 
-def get_default_logger(logger=None, name='default_logger',
-                       level=logging.INFO, use_format=False, stream=None):
+def get_logger(logger=None, name='default_logger',
+               level=logging.INFO, use_format=False,
+               out_stream=sys.stdout, lock=None):
     """
     Return a logger that prints to an I/O stream.
 
@@ -48,36 +50,54 @@ def get_default_logger(logger=None, name='default_logger',
         Name of the logger to be returned, will be created if it doesn't exist.
     level : int
         Logging level for this logger. Default is logging.INFO (level 20).
-        (applied only when creating a new logger or setting a new stream)
+        (applied only when creating a new logger or setting a new stream).
     use_format : bool
-        Set to True to use the openmdao format "Level: message"
-        (applied only when creating a new logger or setting a new stream)
-    stream : 'stdout' or file-like,
-        output stream to which logger output will be directed
+        Set to True to use the openmdao format "Level: message".
+        (applied only when creating a new logger or setting a new stream).
+    out_stream : file-like,
+        output stream to which logger output will be directed.
+    lock : bool
+        if True, do not allow the handler to be changed until unlocked.
+        if False, unlock the handler for the logger.
 
     Returns
     -------
     <logging.Logger>
         Logger that writes to stdout and adheres to requested settings.
     """
-    global _loggers
     if logger is None:
         if name in _loggers:
             # use existing logger
-            logger = _loggers[name]
+            info = _loggers[name]
+            logger = info['logger']
+            stream = info['stream']
+            locked = info['locked']
 
-            # log may be getting redirected to a different stream
-            if stream:
+            unlock = lock is False
+
+            # redirect log to new stream (if not locked)
+            if out_stream != stream and (not locked or unlock):
                 for handler in logger.handlers:
                     logger.removeHandler(handler)
-                _set_handler(logger, stream, level, use_format)
+                if out_stream:
+                    _set_handler(logger, out_stream, level, use_format)
+                info['stream'] = out_stream
+
+            # update locked status
+            info['locked'] = lock
         else:
             # create new logger
             logger = logging.getLogger(name)
-            _loggers[name] = logger
 
-            _set_handler(logger, stream, level, use_format)
+            if out_stream:
+                _set_handler(logger, out_stream, level, use_format)
 
             logger.setLevel(level)
+
+            _loggers[name] = {
+                'logger': logger,
+                'stream': out_stream,
+                'locked': lock
+            }
 
     return logger

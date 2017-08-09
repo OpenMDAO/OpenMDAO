@@ -9,7 +9,7 @@ import numpy as np
 from openmdao.core.group import Group
 from openmdao.core.component import Component
 from openmdao.utils.graph_utils import get_sccs_topo
-from openmdao.utils.logger_utils import get_default_logger
+from openmdao.utils.logger_utils import get_logger
 
 
 def check_config(problem, logger=None):
@@ -24,7 +24,7 @@ def check_config(problem, logger=None):
     logger : object
         Logging object.
     """
-    logger = get_default_logger(logger, 'check_config', use_format=True)
+    logger = get_logger(logger, 'check_config', use_format=True)
 
     _check_hanging_inputs(problem, logger)
 
