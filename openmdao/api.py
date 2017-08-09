@@ -42,8 +42,10 @@ from openmdao.surrogate_models.surrogate_model import SurrogateModel, \
 
 # Vectors
 from openmdao.vectors.default_vector import DefaultVector
+from openmdao.vectors.default_multi_vector import DefaultMultiVector
 try:
     from openmdao.vectors.petsc_vector import PETScVector
+    from openmdao.vectors.petsc_multi_vector import PETScMultiVector
 except ImportError:
     PETScVector = None
 
@@ -67,6 +69,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 
 # Recorders
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
+from openmdao.recorders.web_recorder import WebRecorder
 
 # set up tracing or memory profiling if env vars are set.
 import os

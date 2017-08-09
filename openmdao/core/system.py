@@ -15,6 +15,17 @@ import numpy as np
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
+from openmdao.vectors.default_multi_vector import DefaultMultiVector
+try:
+    from openmdao.vectors.petsc_multi_vector import PETScMultiVector
+except ImportError:
+    class PETScMultiVector(object):
+        """
+        A dummy class so we can do isinstance checks.
+        """
+
+        pass
+
 from openmdao.utils.general_utils import \
     determine_adder_scaler, format_as_float_or_array, warn_deprecation
 from openmdao.recorders.recording_manager import RecordingManager
@@ -23,6 +34,12 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta
+
+_type_map = {
+    'input': 'input',
+    'output': 'output',
+    'residual': 'output'
+}
 
 
 class System(object):
@@ -376,6 +393,12 @@ class System(object):
         """
         pass
 
+    def _configure(self):
+        """
+        Configure this system to assign children settings.
+        """
+        pass
+
     def _get_initial_procs(self, comm, initial):
         """
         Get initial values for pathname and comm.
@@ -461,7 +484,8 @@ class System(object):
             }
             return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
-    def _get_root_vectors(self, vector_class, initial, force_alloc_complex=False):
+    def _get_root_vectors(self, vector_class, initial, force_alloc_complex=False, mode=None,
+                          multi_vector_class=None):
         """
         Get the root vectors for the nonlinear and linear vectors for the model.
 
@@ -475,6 +499,12 @@ class System(object):
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
             after a reconfiguration) you may need to set this to True.
+        mode : str or None
+            Direction of derivatives.  If None, we are reconfiguring.
+        multi_vector_class : type
+            reference to an actual <Vector> class; not an instance. This specifies
+            the class to use to perform matrix-matrix derivative operations.  If None,
+            matrix-matrix will not be used.
 
         Returns
         -------
@@ -489,37 +519,71 @@ class System(object):
                         'output': OrderedDict(),
                         'residual': OrderedDict()}
 
-        # get all vec_names.  We don't know mode here, so for now, retrieve names
-        # from both dvs and responses and use both.
-        # TODO: fix this
-        in_vec_names = _get_vec_names(self.get_design_vars(recurse=True))
-        out_vec_names = _get_vec_names(self.get_responses(recurse=True))
-        vec_names = ['nonlinear', 'linear']
-        vec_names.extend(sorted(in_vec_names | out_vec_names))
-
-        for key in ['input', 'output', 'residual']:
-            type_ = 'output' if key is 'residual' else key
-            for vec_name in vec_names:
-                if initial:
-                    # Check for complex step to set vectors up appropriately.
-                    # If any subsystem needs complex step, then we need to allocate it everywhere.
-                    alloc_complex = force_alloc_complex
-                    if vec_name == 'nonlinear' and not alloc_complex:
-                        alloc_complex = 'cs' in self._approx_schemes
-                        for sub in self.system_iter(include_self=True, recurse=True):
-                            if alloc_complex:
-                                break
-                            alloc_complex = 'cs' in sub._approx_schemes
-
-                    root_vectors[key][vec_name] = vector_class(vec_name, type_, self,
-                                                               alloc_complex=alloc_complex)
-                else:
-                    root_vectors[key][vec_name] = self._vectors[key][vec_name]._root_vector
-
         if initial:
+            # get all vec_names.  If we know the  mode, only get vec_names for
+            # one direction.
+            # TODO: during reconfig we currently don't know the mode, so we end
+            # up allocating unnecessary arrays when using parallel derivatives
+            vois = {}
+            if mode is None or mode == 'fwd':
+                desvars = self.get_design_vars(recurse=True)
+                in_vec_names = _get_vec_names(desvars)
+                vois.update(desvars)
+            else:
+                in_vec_names = set()
+
+            if mode is None or mode == 'rev':
+                responses = self.get_responses(recurse=True)
+                out_vec_names = _get_vec_names(responses)
+                vois.update(responses)
+            else:
+                out_vec_names = set()
+            vec_names = ['nonlinear', 'linear']
+            vec_names.extend(sorted(in_vec_names | out_vec_names))
+
+            # Check for complex step to set vectors up appropriately.
+            # If any subsystem needs complex step, then we need to allocate it everywhere.
+            nl_alloc_complex = force_alloc_complex
+            for sub in self.system_iter(include_self=True, recurse=True):
+                nl_alloc_complex |= 'cs' in sub._approx_schemes
+                if nl_alloc_complex:
+                    break
+
+            if multi_vector_class is None:
+                multi_vector_class = vector_class
+
+            for vec_name in vec_names:
+                ncol = 1
+                if vec_name == 'nonlinear':
+                    alloc_complex = nl_alloc_complex
+                    vec_class = vector_class
+                else:
+                    alloc_complex = force_alloc_complex
+
+                    if vec_name == 'linear':
+                        vec_class = vector_class
+                    else:
+                        vec_class = multi_vector_class
+                        idxs = vois[vec_name]['indices']
+                        if idxs is None:
+                            if vec_class in (DefaultMultiVector, PETScMultiVector):
+                                ncol = vois[vec_name]['size']
+                        else:
+                            ncol = len(idxs)
+                for key in ['input', 'output', 'residual']:
+                    root_vectors[key][vec_name] = vec_class(vec_name, _type_map[key], self,
+                                                            alloc_complex=alloc_complex,
+                                                            ncol=ncol)
+
             excl_out = {vec_name: set() for vec_name in root_vectors['output']}
             excl_in = {vec_name: set() for vec_name in root_vectors['output']}
+
         else:
+
+            for key, vardict in iteritems(self._vectors):
+                for vec_name, vec in iteritems(vardict):
+                    root_vectors[key][vec_name] = vec._root_vector
+
             excl_out = self._excluded_vars_out
             excl_in = self._excluded_vars_in
 
@@ -579,16 +643,15 @@ class System(object):
 
         for key in root_vectors:
             vec_key, coeff_key = key
-            type_ = 'output' if vec_key == 'residual' else vec_key
 
             for vec_name in self._vectors['output']:
-                if not initial:
-                    root_vectors[key][vec_name] = self._scaling_vecs[key][vec_name]._root_vector
-                else:
-                    root_vectors[key][vec_name] = vector_class(vec_name, type_, self)
+                if initial:
+                    root_vectors[key][vec_name] = vector_class(vec_name, _type_map[vec_key], self)
 
                     if coeff_key[-1] != '0':
                         root_vectors[key][vec_name].set_const(1.0)
+                else:
+                    root_vectors[key][vec_name] = self._scaling_vecs[key][vec_name]._root_vector
 
         return root_vectors
 
@@ -603,7 +666,8 @@ class System(object):
         """
         self._setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
 
-    def _setup(self, comm, vector_class, setup_mode, force_alloc_complex=False):
+    def _setup(self, comm, vector_class, setup_mode, force_alloc_complex=False,
+               mode=None, multi_vector_class=None):
         """
         Perform setup for this system and its descendant systems.
 
@@ -624,6 +688,12 @@ class System(object):
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
             after a reconfiguration) you may need to set this to True.
+        mode : str or None
+            Derivative direction, either 'fwd', or 'rev', or None
+        multi_vector_class : type
+            reference to an actual <Vector> class; not an instance. This specifies
+            the class to use to perform matrix-matrix derivative operations.  If None,
+            matrix-matrix will not be used.
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
@@ -643,7 +713,12 @@ class System(object):
 
         # If we're only updating and not recursing, processors don't need to be redistributed
         if recurse:
-            self._setup_procs(*self._get_initial_procs(comm, initial))
+            pathname, comm = self._get_initial_procs(comm, initial)
+            # Besides setting up the processors, this method also builds the model hierarchy.
+            self._setup_procs(pathname, comm)
+
+        # Recurse model from the bottom to the top for configuring.
+        self._configure()
 
         # For updating variable and connection data, setup needs to be performed only
         # in the current system, by gathering data from immediate subsystems,
@@ -658,10 +733,14 @@ class System(object):
 
         # For vector-related, setup, recursion is always necessary, even for updating.
         # For reconfiguration setup, we resize the vectors once, only in the current system.
-        self._setup_global(*self._get_initial_global(initial))
-        self._setup_vectors(*self._get_root_vectors(vector_class, initial,
-                                                    force_alloc_complex=force_alloc_complex),
-                            resize=resize)
+        ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset = \
+            self._get_initial_global(initial)
+        self._setup_global(ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset)
+        root_vectors, excl_out, excl_in = \
+            self._get_root_vectors(vector_class, initial,
+                                   force_alloc_complex=force_alloc_complex,
+                                   mode=mode, multi_vector_class=multi_vector_class)
+        self._setup_vectors(root_vectors, excl_out, excl_in, resize=resize)
         self._setup_bounds(*self._get_bounds_root_vectors(vector_class, initial), resize=resize)
         self._setup_scaling(self._get_scaling_root_vectors(vector_class, initial), resize=resize)
 
@@ -696,6 +775,24 @@ class System(object):
         self.pathname = pathname
         self.comm = comm
         self._subsystems_proc_range = []
+
+        # TODO: This version only runs for Components, because it is overriden in Group, so
+        # maybe we should move this to Component?
+
+        # Clear out old variable information so that we can call setup on the component.
+        self._var_rel_names = {'input': [], 'output': []}
+        self._var_rel2data_io = {}
+        self._design_vars = {}
+        self._responses = {}
+
+        self._static_mode = False
+        self._var_rel2data_io.update(self._static_var_rel2data_io)
+        for type_ in ['input', 'output']:
+            self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
+        self._design_vars.update(self._static_design_vars)
+        self._responses.update(self._static_responses)
+        self.setup()
+        self._static_mode = True
 
         minp, maxp = self.get_req_procs()
         if MPI and comm is not None and comm != MPI.COMM_NULL and comm.size < minp:
@@ -916,11 +1013,10 @@ class System(object):
             vector_class = root_vectors['output'][vec_name].__class__
 
             for key in ['input', 'output', 'residual']:
-                type_ = 'output' if key is 'residual' else key
-
+                rootvec = root_vectors[key][vec_name]
                 vectors[key][vec_name] = vector_class(
-                    vec_name, type_, self, root_vectors[key][vec_name], resize=resize,
-                    alloc_complex=alloc_complex and vec_name == 'nonlinear')
+                    vec_name, _type_map[key], self, rootvec, resize=resize,
+                    alloc_complex=alloc_complex and vec_name == 'nonlinear', ncol=rootvec._ncol)
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
@@ -1000,9 +1096,9 @@ class System(object):
             vector_class = root_vectors['residual', 'phys0'][vec_name].__class__
 
             for key in vecs:
-                type_ = 'output' if key[0] == 'residual' else key[0]
                 vecs[key][vec_name] = vector_class(
-                    vec_name, type_, self, root_vectors[key][vec_name], resize=resize)
+                    vec_name, _type_map[key[0]], self, root_vectors[key][vec_name],
+                    resize=resize)
 
                 # This is necessary because scaling will not be set for inputs
                 # whose source is outside of this system. The units and scaling
@@ -1384,12 +1480,12 @@ class System(object):
             scope_out = set(self._var_abs_names['output'])
 
             # All myproc inputs connected to an output in this system
-            scope_in = set(self._conn_global_abs_in2out.keys()) \
+            scope_in = set(self._conn_global_abs_in2out) \
                 & set(self._var_abs_names['input'])
         else:
             # All myproc outputs not in excl_sub
-            scope_out = set(self._var_abs_names['output']) \
-                - set(excl_sub._var_abs_names['output'])
+            scope_out = set(self._var_abs_names['output']).difference(
+                excl_sub._var_abs_names['output'])
 
             # All myproc inputs connected to an output in this system but not in excl_sub
             scope_in = []

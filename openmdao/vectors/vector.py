@@ -78,11 +78,14 @@ class Vector(object):
         by varset name.
     _complex_view_cache : {}
         Temporary storage of complex views used by in-place numpy operations.
+    _ncol : int
+        Number of columns for multi-vectors.
     """
 
     _vector_info = VectorInfo()
 
-    def __init__(self, name, typ, system, root_vector=None, resize=False, alloc_complex=False):
+    def __init__(self, name, typ, system, root_vector=None, resize=False, alloc_complex=False,
+                 ncol=1):
         """
         Initialize all attributes.
 
@@ -100,9 +103,12 @@ class Vector(object):
             If true, resize the root vector.
         alloc_complex : bool
             Whether to allocate any imaginary storage to perform complex step. Default is False.
+        ncol : int
+            Number of columns for multi-vectors.
         """
         self._name = name
         self._typ = typ
+        self._ncol = ncol
 
         self._system = system
 
@@ -200,7 +206,7 @@ class Vector(object):
             instance of the clone; the data is copied.
         """
         vec = self.__class__(self._name, self._typ, self._system, self._root_vector,
-                             alloc_complex=self._alloc_complex)
+                             alloc_complex=self._alloc_complex, ncol=self._ncol)
         vec._clone_data()
         if initialize_views:
             vec._initialize_views()

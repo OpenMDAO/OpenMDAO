@@ -211,7 +211,7 @@ class TestParallelGroups(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = inputs['x'] * self.mult
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 partials['y', 'x'] = numpy.array([self.mult])
 
         prob = Problem()

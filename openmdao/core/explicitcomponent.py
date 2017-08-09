@@ -296,7 +296,7 @@ class ExplicitComponent(Component):
                 # negate constant subjacs (and others that will get overwritten)
                 # back to normal
                 self._negate_jac()
-                self.compute_partials(self._inputs, self._outputs, J)
+                self.compute_partials(self._inputs, J)
 
                 # re-negate the jacobian
                 self._negate_jac()
@@ -322,7 +322,7 @@ class ExplicitComponent(Component):
         """
         pass
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """
         Compute sub-jacobian parts. The model is assumed to be in an unscaled state.
 
@@ -330,8 +330,6 @@ class ExplicitComponent(Component):
         ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """

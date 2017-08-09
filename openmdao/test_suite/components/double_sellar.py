@@ -4,6 +4,9 @@ from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.components.sellar import SellarImplicitDis1
 
+# TODO -- Need to convert these over to use `setup` after we have two setup
+# phases split up and have the ability to change driver settings
+
 
 class SubSellar(Group):
 

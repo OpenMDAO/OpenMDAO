@@ -24,6 +24,7 @@ class DistributedAdder(ExplicitComponent):
 
     def __init__(self, size):
         super(DistributedAdder, self).__init__()
+        self.distributed = True
 
         self.local_size = self.size = size
 
@@ -31,7 +32,7 @@ class DistributedAdder(ExplicitComponent):
         """
         min/max number of procs that this component can use
         """
-        return 1, self.size
+        return (1, self.size)
 
     def setup(self):
         """
@@ -57,15 +58,15 @@ class DistributedAdder(ExplicitComponent):
 
     def compute(self, inputs, outputs):
 
-        # NOTE: Each process will get just its local part of the vector
-        # print('process {0:d}: {1}'.format(self.comm.rank, params['x'].shape))
+        #NOTE: Each process will get just its local part of the vector
+        #print('process {0:d}: {1}'.format(self.comm.rank, params['x'].shape))
 
         outputs['y'] = inputs['x'] + 10.
 
 
 class Summer(ExplicitComponent):
     """
-    Agreggation component that collects all the values from the distributed
+    Aggregation component that collects all the values from the distributed
     vector addition and computes a total
     """
 
@@ -74,13 +75,21 @@ class Summer(ExplicitComponent):
         self.size = size
 
     def setup(self):
-        # NOTE: this component depends on the full y array, so OpenMDAO
+        #NOTE: this component depends on the full y array, so OpenMDAO
         #      will automatically gather all the values for it
         self.add_input('y', val=np.zeros(self.size))
         self.add_output('sum', 0.0, shape=1)
 
     def compute(self, inputs, outputs):
         outputs['sum'] = np.sum(inputs['y'])
+
+
+
+
+
+
+
+
 
 
 @unittest.skipIf(PETScVector is None or os.environ.get("TRAVIS"),

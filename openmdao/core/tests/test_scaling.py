@@ -343,7 +343,7 @@ class TestScaling(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = 2.0*(inputs['x'] + 1.0)
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 """
                 Jacobian for Sellar discipline 1.
                 """
