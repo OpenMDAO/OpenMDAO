@@ -2371,6 +2371,9 @@ class System(object):
 
         Parameters
         ----------
+        values : bool, optioanl
+            When True, display/return input values as well as names.
+
         out_stream : file_like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -2378,7 +2381,7 @@ class System(object):
         Returns
         -------
         list
-            list of (name, value) of inputs
+            list of of input names, or (name, value) if values is True
         """
         inputs = []
 
@@ -2420,6 +2423,9 @@ class System(object):
         implicit : bool, optional
             include outputs from implicit components. Default is True.
 
+        values : bool, optioanl
+            When True, display/return output values as well as names.
+
         out_stream : file_like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -2427,7 +2433,7 @@ class System(object):
         Returns
         -------
         list
-            list of (name, value) of outputs
+            list of of output names, or (name, value) if values is True
         """
         states = self._list_states()
 
@@ -2466,13 +2472,17 @@ class System(object):
         implicit : bool, optional
             include outputs from implicit components. Default is True.
 
+        values : bool, optioanl
+            When True, display/return residual values as well as names.
+
         out_stream : file_like
-            Where to send human readable output. Default is sys.stdout. Set to None to suppress.
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
 
         Returns
         -------
         list
-            list of (name, value) of residuals
+            list of of residual names, or (name, value) if values is True
         """
         states = self._list_states()
 
