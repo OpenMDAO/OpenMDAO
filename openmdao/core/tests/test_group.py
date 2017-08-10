@@ -503,7 +503,7 @@ class TestGroup(unittest.TestCase):
         # connect C1.x to entries (0,0), (-1,1), (2,1), (1,1) of indep.x
         p.model.connect('indep.x', 'C1.x',
                         src_indices=[[(0,0), (-1,1)],
-                                     [(2,1), (1,1)]])
+                                     [(2,1), (1,1)]], flat_src_indices=False)
 
         p.set_solver_print(level=0)
         p.setup()
@@ -617,12 +617,15 @@ class TestGroup(unittest.TestCase):
             def setup(self):
                 # We want to pull the following 4 values out of the source:
                 # [(0,0), (3,1), (2,1), (1,1)].
-                # Because our input is also non-flat we must arrange the
+                # Because our input is also non-flat we arrange the
                 # source index tuples into an array having the same shape
-                # as our input.
+                # as our input.  If we didn't set flat_src_indices to False,
+                # we could specify src_indices as a 1D array of indices into
+                # the flattened source.
                 self.add_input('x', np.ones((2,2)),
                                src_indices=[[(0,0), (3,1)],
-                                            [(2,1), (1,1)]])
+                                            [(2,1), (1,1)]],
+                               flat_src_indices=False)
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
@@ -1099,7 +1102,8 @@ class TestConnect(unittest.TestCase):
             p.setup(check=False)
 
     def test_bad_indices_dimensions(self):
-        self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1, 2), (2, 2, 2)])
+        self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1, 2), (2, 2, 2)],
+                         flat_src_indices=False)
 
         msg = ("The source indices [[ 2 -1  2] [ 2  2  2]] do not specify a "
                "valid shape for the connection 'sub.src.x' to 'sub.arr.x'. "
@@ -1114,7 +1118,8 @@ class TestConnect(unittest.TestCase):
 
     def test_bad_indices_index(self):
         # the index value within src_indices is outside the valid range for the source
-        self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1), (4, 4)])
+        self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1), (4, 4)],
+                         flat_src_indices=False)
 
         msg = ("The source indices do not specify a valid index for the "
                "connection 'sub.src.x' to 'sub.arr.x'. Index '4' "
