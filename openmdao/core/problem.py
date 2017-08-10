@@ -537,6 +537,10 @@ class Problem(object):
         input_cache = model._inputs._clone()
         output_cache = model._outputs._clone()
 
+        # Keep track of derivative keys that are declared dependent so that we don't print them
+        # unless they are in error.
+        indep_key = {}
+
         # Analytic Jacobians
         for mode in ('fwd', 'rev'):
             model._inputs.set_vec(input_cache)
@@ -557,6 +561,7 @@ class Problem(object):
                 deprecated = isinstance(comp, DepComponent)
                 matrix_free = comp.matrix_free
                 c_name = comp.pathname
+                indep_key[c_name] = set()
 
                 # TODO: Check deprecated deriv_options.
 
@@ -656,6 +661,15 @@ class Problem(object):
                             # No need to calculate partials; they are already stored
                             deriv_value = subjacs.get(abs_key)
 
+                            # Testing for pairs that are not dependent so that we suppress printing
+                            # them unless the fd is non zero. Note: subjacs_info is empty for
+                            # undeclared partials on implicit components.
+                            try:
+                                if comp._jacobian._subjacs_info[abs_key][0]['dependent'] is False:
+                                    indep_key[c_name].add(rel_key)
+                            except KeyError:
+                                pass
+
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
                                 try:
@@ -744,7 +758,8 @@ class Problem(object):
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, logger, compact_print,
-                                  comps, global_options, suppress_output=suppress_output)
+                                  comps, global_options, suppress_output=suppress_output,
+                                  indep_key=indep_key)
 
         return partials_data
 
@@ -1486,7 +1501,7 @@ class Problem(object):
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, logger,
                               compact_print, system_list, global_options, totals=False,
-                              suppress_output=False):
+                              suppress_output=False, indep_key=None):
     """
     Compute the relative and absolute errors in the given derivatives and print to the logger.
 
@@ -1510,6 +1525,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
         Set to True if we are doing check_total_derivs to skip a bunch of stuff.
     suppress_output : bool
         Set to True to suppress all output. Just calculate errors and add the keys.
+    indep_key : dict of sets, optional
+        Keyed by component name, contains the of/wrt keys that are declared not dependent.
     """
     fd_desc = "{}:{}".format(global_options['method'],
                              global_options['form'])
@@ -1620,6 +1637,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
                     derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fd_norm,
                                                                         rev_error / fd_norm,
                                                                         fwd_rev_error / fd_norm)
+
+            # Skip printing the dependent keys if the derivatives are fine.
+            if indep_key is not None:
+                rel_key = (of, wrt)
+                if rel_key in indep_key[sys_name] and fd_norm < abs_error_tol:
+                    del derivative_data[sys_name][rel_key]
+                    continue
 
             if not suppress_output:
                 if compact_print:
