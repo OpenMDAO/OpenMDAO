@@ -45,6 +45,7 @@ class Test(unittest.TestCase):
         group.add_subsystems()
         self.p = Problem(group).setup(DefaultVector)
         self.p.set_solver_print(level=0)
+        self.p.final_setup()
 
     def test_subsystems(self):
         root = self.p.model
@@ -116,6 +117,7 @@ class TestPETScVec(Test):
         group.add_subsystems()
         self.p = Problem(group).setup(PETScVector)
         self.p.set_solver_print(level=0)
+        self.p.final_setup()
 
 
 if __name__ == '__main__':

@@ -38,6 +38,8 @@ class TestConnections(unittest.TestCase):
         self.p['G3.G4.C3.x'] = 222.
         self.p['G3.G4.C4.x'] = 333.
 
+        self.p.final_setup()
+
         self.assertEqual(self.C1._inputs['x'], 111.)
         self.assertEqual(self.C3._inputs['x'], 222.)
         self.assertEqual(self.C4._inputs['x'], 333.)
@@ -317,8 +319,6 @@ class TestConnectionsPromoted(unittest.TestCase):
         # setting promoted name will set the value into the outputs, but will
         # not propagate it to the inputs. That will happen during run_model().
         p['x'] = 999.
-        self.assertEqual(C3._inputs['x'], 0.)
-        self.assertEqual(C4._inputs['x'], 0.)
 
         p.run_model()
         self.assertEqual(C3._inputs['x'], 999.)
@@ -345,8 +345,6 @@ class TestConnectionsPromoted(unittest.TestCase):
         # setting promoted name will set the value into the outputs, but will
         # not propagate it to the inputs. That will happen during run_model().
         p['G1.x'] = 999.
-        self.assertEqual(C3._inputs['x'], 0.)
-        self.assertEqual(C4._inputs['x'], 0.)
 
         p.run_model()
         self.assertEqual(C3._inputs['x'], 999.)

@@ -87,6 +87,9 @@ class Test(unittest.TestCase):
         self.p.model.linear_solver = LinearBlockGS()
         self.p.setup(check=False)
 
+        # Conclude setup but don't run model.
+        self.p.final_setup()
+
         #view_model(self.p, show_browser=False)
 
     def test_apply_linear(self):

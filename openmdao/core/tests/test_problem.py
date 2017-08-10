@@ -27,10 +27,14 @@ class TestProblem(unittest.TestCase):
 
         new_val = -5*np.ones((3, 1))
         prob['indeps.X_c'] = new_val
+        prob.final_setup()
+
         assert_rel_error(self, prob['indeps.X_c'], new_val, 1e-10)
 
         new_val = 2.5*np.ones(3)
         prob['indeps.X_c'][:, 0] = new_val
+        prob.final_setup()
+
         assert_rel_error(self, prob['indeps.X_c'], new_val.reshape((3,1)), 1e-10)
         assert_rel_error(self, prob['indeps.X_c'][:, 0], new_val, 1e-10)
 
@@ -54,12 +58,15 @@ class TestProblem(unittest.TestCase):
 
         # check bad scalar value
         bad_val = -10*np.ones((10))
+        prob['indep.num'] = bad_val
         with assertRaisesRegex(self, ValueError, msg):
-            prob['indep.num'] = bad_val
+            prob.final_setup()
+        prob._initial_condition_cache = {}
 
         # check assign scalar to array
         arr_val = new_val*np.ones((10, 1))
         prob['indep.arr'] = new_val
+        prob.final_setup()
         assert_rel_error(self, prob['indep.arr'], arr_val, 1e-10)
 
         # check valid array value
@@ -327,9 +334,10 @@ class TestProblem(unittest.TestCase):
         prob.setup()
 
         prob['x'] = 2.75
-        assert_rel_error(self, prob['x'], 2.75, 1e-6)
 
         prob.run_model()
+
+        assert_rel_error(self, prob['x'], 2.75, 1e-6)
 
         assert_rel_error(self, prob['y1'], 27.3049178437, 1e-6)
 
@@ -342,9 +350,10 @@ class TestProblem(unittest.TestCase):
         prob.setup()
 
         prob['px.x'] = 2.75
-        assert_rel_error(self, prob['px.x'], 2.75, 1e-6)
 
         prob.run_model()
+
+        assert_rel_error(self, prob['px.x'], 2.75, 1e-6)
 
         assert_rel_error(self, prob['d1.y1'], 27.3049178437, 1e-6)
 
@@ -357,9 +366,10 @@ class TestProblem(unittest.TestCase):
         prob.setup()
 
         prob['x'] = 2.75
-        assert_rel_error(self, prob['x'], 2.75, 1e-6)
 
         prob.run_model()
+
+        assert_rel_error(self, prob['x'], 2.75, 1e-6)
 
         # the output variable, referenced by the promoted name
         assert_rel_error(self, prob['y1'], 27.3049178437, 1e-6)
@@ -395,7 +405,6 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 9.87161739688, 1e-6)
         assert_rel_error(self, prob['y2'], 8.14191301549, 1e-6)
 
-    @unittest.skip('access via promoted names is not working yet')
     def test_feature_residuals(self):
 
         prob = Problem()
@@ -501,6 +510,7 @@ class TestProblem(unittest.TestCase):
         G2.add_subsystem('C6', ExecComp(['x=2.0*a', 'y=2.0*b+3.0*c']))
         G2.add_subsystem('C7', ExecComp(['x=2.0*a', 'y=2.0*b']))
         model.add_subsystem("C8", ExecComp(['y=1.5*a+2.0*b']))
+        model.add_subsystem("Unconnected", ExecComp('y=99.*x'))
 
         model.connect('indep1.x', 'G1.C1.a')
         model.connect('indep2.x', 'G2.C6.a')
@@ -516,7 +526,7 @@ class TestProblem(unittest.TestCase):
         p.setup(check=False)
 
         g = p.model.compute_sys_graph(comps_only=True, save_vars=True)
-        relevant = get_relevant_vars(g, ['indep1.x', 'indep2.x'], ['C8.y'])
+        relevant = get_relevant_vars(g, ['indep1.x', 'indep2.x'], ['C8.y', 'Unconnected.y'])
 
         indep1_ins = set(['C3.b', 'C3.c', 'C8.b', 'G1.C1.a', 'G2.C5.a', 'G2.C5.b'])
         indep1_outs = set(['C3.y', 'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'])
@@ -608,6 +618,56 @@ class TestProblem(unittest.TestCase):
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
         self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
 
+    def test_post_setup_solver_configure(self):
+        # Test that we can change solver settings after we have instantiated our model.
+
+        class ImplSimple(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('a', val=1.)
+                self.add_output('x', val=0.)
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['x'] = np.exp(outputs['x']) - \
+                    inputs['a']**2 * outputs['x']**2
+
+            def linearize(self, inputs, outputs, jacobian):
+                jacobian['x', 'x'] = np.exp(outputs['x']) - \
+                    2 * inputs['a']**2 * outputs['x']
+                jacobian['x', 'a'] = -2 * inputs['a'] * outputs['x']**2
+
+
+        class Sub(Group):
+
+            def setup(self):
+                self.add_subsystem('comp', ImplSimple())
+
+                # This will not solve it
+                self.nonlinear_solver = NonlinearBlockGS()
+
+            def configure(self):
+                # This will not solve it either.
+                self.nonlinear_solver = NonlinearBlockGS()
+
+
+        class Super(Group):
+
+            def setup(self):
+                self.add_subsystem('sub', Sub())
+
+
+        top = Problem()
+        top.model = Super()
+
+        top.setup(check=False)
+
+        # This will solve it.
+        top.model.sub.nonlinear_solver = NewtonSolver()
+        top.model.sub.linear_solver = ScipyIterativeSolver()
+
+        self.assertTrue(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
+        self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
+
     def test_feature_system_configure(self):
 
         class ImplSimple(ImplicitComponent):
@@ -653,6 +713,55 @@ class TestProblem(unittest.TestCase):
 
         print(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
         print(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
+
+    def test_feature_post_setup_solver_configure(self):
+
+        class ImplSimple(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('a', val=1.)
+                self.add_output('x', val=0.)
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['x'] = np.exp(outputs['x']) - \
+                    inputs['a']**2 * outputs['x']**2
+
+            def linearize(self, inputs, outputs, jacobian):
+                jacobian['x', 'x'] = np.exp(outputs['x']) - \
+                    2 * inputs['a']**2 * outputs['x']
+                jacobian['x', 'a'] = -2 * inputs['a'] * outputs['x']**2
+
+
+        class Sub(Group):
+
+            def setup(self):
+                self.add_subsystem('comp', ImplSimple())
+
+                # This will not solve it
+                self.nonlinear_solver = NonlinearBlockGS()
+
+            def configure(self):
+                # This will not solve it either.
+                self.nonlinear_solver = NonlinearBlockGS()
+
+
+        class Super(Group):
+
+            def setup(self):
+                self.add_subsystem('sub', Sub())
+
+
+        top = Problem()
+        top.model = Super()
+
+        top.setup(check=False)
+
+        # This will solve it.
+        top.model.sub.nonlinear_solver = NewtonSolver()
+        top.model.sub.linear_solver = ScipyIterativeSolver()
+
+        self.assertTrue(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
+        self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
 
 if __name__ == "__main__":
     unittest.main()

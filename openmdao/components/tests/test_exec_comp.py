@@ -63,6 +63,9 @@ class TestExecComp(unittest.TestCase):
                                                      x=np.arange(10,dtype=float)))
         prob.setup(check=False)
 
+        # Conclude setup but don't run model.
+        prob.final_setup()
+
         self.assertTrue('x' in C1._inputs)
         self.assertTrue('y' in C1._outputs)
 
@@ -77,6 +80,9 @@ class TestExecComp(unittest.TestCase):
 
         prob.setup(check=False)
 
+        # Conclude setup but don't run model.
+        prob.final_setup()
+
         self.assertTrue('x' in C1._inputs)
         self.assertTrue('y' in C1._outputs)
 
@@ -90,6 +96,9 @@ class TestExecComp(unittest.TestCase):
         C1 = prob.model.add_subsystem('C1', ExecComp('y = pi * x', x=2.0))
 
         prob.setup(check=False)
+
+        # Conclude setup but don't run model.
+        prob.final_setup()
 
         self.assertTrue('x' in C1._inputs)
         self.assertTrue('y' in C1._outputs)
@@ -122,6 +131,9 @@ class TestExecComp(unittest.TestCase):
 
         prob.setup(check=False)
 
+        # Conclude setup but don't run model.
+        prob.final_setup()
+
         self.assertTrue('x' in C1._inputs)
         self.assertTrue('y' in C1._outputs)
 
@@ -138,6 +150,9 @@ class TestExecComp(unittest.TestCase):
 
         prob.setup(check=False)
 
+        # Conclude setup but don't run model.
+        prob.final_setup()
+
         self.assertTrue('x' in C1._inputs)
         self.assertTrue('y' in C1._outputs)
 
@@ -153,6 +168,9 @@ class TestExecComp(unittest.TestCase):
                                                      y=np.array([0.,0.])))
 
         prob.setup(check=False)
+
+        # Conclude setup but don't run model.
+        prob.final_setup()
 
         self.assertTrue('x' in C1._inputs)
         self.assertTrue('y' in C1._outputs)
@@ -213,6 +231,9 @@ class TestExecComp(unittest.TestCase):
         C1 = prob.model.add_subsystem('C1', ExecComp(['y=2.0*x+1.'], x=2.0))
 
         prob.setup(check=False)
+
+        # Conclude setup but don't run model.
+        prob.final_setup()
 
         self.assertTrue('x' in C1._inputs)
         self.assertTrue('y' in C1._outputs)

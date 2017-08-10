@@ -48,6 +48,9 @@ class TestDriver(unittest.TestCase):
 
         prob.setup(check=False)
 
+        # Conclude setup but don't run model.
+        prob.final_setup()
+
         dv = prob.driver.get_design_var_values()
         self.assertEqual(dv['pz.z'][0], 1.0)
         self.assertEqual(dv['pz.z'][1], -0.5)
