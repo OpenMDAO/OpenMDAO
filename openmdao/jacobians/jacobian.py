@@ -191,8 +191,8 @@ class Jacobian(object):
 
                 if subjac.shape != rows.shape:
                     raise ValueError("Sub-jacobian for key %s has "
-                                     "the wrong size (%d), expected (%d)." %
-                                     (abs_key, len(subjac), len(rows)))
+                                     "the wrong shape (%s), expected (%s)." %
+                                     (abs_key, subjac.shape, rows.shape))
 
                 if abs_key in self._subjacs and subjac.shape == self._subjacs[abs_key][0].shape:
                     np.copyto(self._subjacs[abs_key][0], subjac)
