@@ -843,6 +843,17 @@ class TestGroup(unittest.TestCase):
         # this test passes if it doesn't raise an exception
 
 
+def src_indices_model(src_shape, tgt_shape, src_indices=None, flat_src_indices=False):
+    prob = Problem()
+    prob.model.add_subsystem('indeps', IndepVarComp('x', shape=src_shape))
+    prob.model.add_subsystem('C1', ExecComp('y=2.0*x', x=np.zeros(tgt_shape),
+                                            y=np.zeros(tgt_shape)))
+    prob.model.connect('indeps.x', 'C1.x', src_indices=src_indices,
+                       flat_src_indices=flat_src_indices)
+    prob.setup(check=False)
+    return prob
+
+
 class TestConnect(unittest.TestCase):
 
     def setUp(self):
@@ -1096,6 +1107,31 @@ class TestConnect(unittest.TestCase):
             self.assertEqual(str(err), msg)
         else:
             self.fail('Exception expected.')
+
+    def test_src_indices_shape(self):
+        prob = src_indices_model(src_shape=(3,3), tgt_shape=(2,2),
+                                 src_indices=[[4,5],[7,8]],
+                                 flat_src_indices=True)
+        
+    def test_src_indices_shape_bad_idx_flat(self):
+        try:
+            prob = src_indices_model(src_shape=(3,3), tgt_shape=(2,2),
+                                     src_indices=[[4,5],[7,9]],
+                                     flat_src_indices=True)
+        except Exception as err:
+            self.assertEqual(str(err), "The source indices do not specify a valid index for the connection 'indeps.x' to 'C1.x' in Group ''. Index '9' is out of range for a flat source of size 9.")
+        else:
+            self.fail("Exception expected.")
+
+    def test_src_indices_shape_bad_idx_flat_neg(self):
+        try:
+            prob = src_indices_model(src_shape=(3,3), tgt_shape=(2,2),
+                                     src_indices=[[-10,5],[7,8]],
+                                     flat_src_indices=True)
+        except Exception as err:
+            self.assertEqual(str(err), "The source indices do not specify a valid index for the connection 'indeps.x' to 'C1.x' in Group ''. Index '-10' is out of range for a flat source of size 9.")
+        else:
+            self.fail("Exception expected.")
 
 
 if __name__ == "__main__":

@@ -493,7 +493,8 @@ class Group(System):
                         abs_in2out[abs_in] = abs_out
 
         # Add explicit connections (only ones declared by this group)
-        for prom_in, (prom_out, src_indices) in iteritems(self._manual_connections):
+        for prom_in, (prom_out, src_indices, flat_src_indices) in \
+                iteritems(self._manual_connections):
 
             # throw an exception if either output or input doesn't exist
             # (not traceable to a connect statement, so provide context)
@@ -531,6 +532,7 @@ class Group(System):
                                            (self.pathname, prom_out,
                                             prom_in, prom_in))
                     meta['src_indices'] = np.atleast_1d(src_indices)
+                    meta['flat_src_indices'] = flat_src_indices
 
                 abs_in2out[abs_in] = abs_out
 
@@ -616,18 +618,37 @@ class Group(System):
                         source_dimensions = 1
 
                     # check all indices are in range of the source dimensions
-                    for d in range(source_dimensions):
-                        # when running under MPI, there is a value for each proc
-                        d_size = out_shape[d] * self.comm.size
-                        for i in src_indices[..., d].flat:
-                            if abs(i) >= d_size:
-                                msg = ("The source indices do not specify "
-                                       "a valid index for the connection "
-                                       "'%s' to '%s' in Group '%s'. Index "
-                                       "'%d' is out of range for source "
-                                       "dimension of size %d.")
-                                raise ValueError(msg % (prom_out, prom_in,
-                                                 self.pathname, i, d_size))
+                    if flat:
+                        out_size = np.prod(out_shape)
+                        mx = np.max(src_indices)
+                        mn = np.min(src_indices)
+                        if mx >= out_size:
+                            bad_idx = mx
+                        elif mn < -out_size:
+                            bad_idx = mn
+                        else:
+                            bad_idx = None
+                        if bad_idx is not None:
+                            msg = ("The source indices do not specify "
+                                   "a valid index for the connection "
+                                   "'%s' to '%s' in Group '%s'. Index "
+                                   "'%d' is out of range for a flat source "
+                                   "of size %d.")
+                            raise ValueError(msg % (prom_out, prom_in,
+                                             self.pathname, bad_idx, out_size))
+                    else:
+                        for d in range(source_dimensions):
+                            # when running under MPI, there is a value for each proc
+                            d_size = out_shape[d] * self.comm.size
+                            for i in src_indices[..., d].flat:
+                                if abs(i) >= d_size:
+                                    msg = ("The source indices do not specify "
+                                           "a valid index for the connection "
+                                           "'%s' to '%s' in Group '%s'. Index "
+                                           "'%d' is out of range for source "
+                                           "dimension of size %d.")
+                                    raise ValueError(msg % (prom_out, prom_in,
+                                                     self.pathname, i, d_size))
 
         # Recursion
         if recurse:
@@ -1089,7 +1110,7 @@ class Group(System):
         else:
             manual_connections = self._manual_connections
 
-        manual_connections[tgt_name] = (src_name, src_indices)
+        manual_connections[tgt_name] = (src_name, src_indices, flat_src_indices)
 
     def set_order(self, new_order):
         """
