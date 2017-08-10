@@ -457,7 +457,6 @@ class TestProblem(unittest.TestCase):
         else:
             self.fail('Expecting RuntimeError')
 
-
     def test_root_deprecated(self):
         # testing the root property
         msg = "The 'root' property provides backwards compatibility " \
