@@ -256,13 +256,8 @@ class Component(System):
             and form of the entries within is determined by the value of 'flat_src_indices'.
         flat_src_indices : bool
             If True, each entry of src_indices is assumed to be an index into the
-            flattened source.  Otherwise it must be a tuple or list of size equal
+            flattened source.  Otherwise each entry must be a tuple or list of size equal
             to the number of dimensions of the source.
-        flat_src_indices : bool
-            The global indices of the source variable to transfer data from.
-            If val is given as an array_like object, the shapes of val and
-            src_indices must match, and entries within must be indices into the
-            flattened source.
         units : str or None
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.
