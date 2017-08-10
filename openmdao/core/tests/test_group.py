@@ -842,14 +842,33 @@ class TestGroup(unittest.TestCase):
 
         # this test passes if it doesn't raise an exception
 
+class MyComp(ExplicitComponent):
+    def __init__(self, input_shape, src_indices=None, flat_src_indices=False):
+        super(MyComp, self).__init__()
+        self._input_shape = input_shape
+        self._src_indices = src_indices
+        self._flat_src_indices = flat_src_indices
 
-def src_indices_model(src_shape, tgt_shape, src_indices=None, flat_src_indices=False):
+    def setup(self):
+        self.add_input('x', val=np.zeros(self._input_shape),
+                       src_indices=self._src_indices, flat_src_indices=self._flat_src_indices)
+        self.add_output('y', val=np.zeros(self._input_shape))
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = 2.0 * inputs['x']
+
+
+def src_indices_model(src_shape, tgt_shape, src_indices=None, flat_src_indices=False,
+                      promotes=None):
     prob = Problem()
-    prob.model.add_subsystem('indeps', IndepVarComp('x', shape=src_shape))
-    prob.model.add_subsystem('C1', ExecComp('y=2.0*x', x=np.zeros(tgt_shape),
-                                            y=np.zeros(tgt_shape)))
-    prob.model.connect('indeps.x', 'C1.x', src_indices=src_indices,
-                       flat_src_indices=flat_src_indices)
+    prob.model.add_subsystem('indeps', IndepVarComp('x', shape=src_shape), promotes=promotes)
+    prob.model.add_subsystem('C1', MyComp(tgt_shape,
+                                          src_indices=src_indices if promotes else None,
+                                          flat_src_indices=flat_src_indices),
+                             promotes=promotes)
+    if promotes is None:
+        prob.model.connect('indeps.x', 'C1.x', src_indices=src_indices,
+                           flat_src_indices=flat_src_indices)
     prob.setup(check=False)
     return prob
 
@@ -1060,7 +1079,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.s', 'arr.x')
 
         msg = ("The source and target shapes do not match for the connection "
-               "'src.s' to 'arr.x' in Group 'sub'.")
+               "'sub.src.s' to 'sub.arr.x'.")
 
         with assertRaisesRegex(self, ValueError, msg):
             self.prob.setup(check=False)
@@ -1073,7 +1092,7 @@ class TestConnect(unittest.TestCase):
         p.model.connect('IV.x', 'C1.x', src_indices=[(1, 1)])
 
         msg = ("The source indices \[\[1 1\]\] do not specify a valid shape for "
-               "the connection 'IV.x' to 'C1.x' in Group ''. The target "
+               "the connection 'IV.x' to 'C1.x'. The target "
                "shape is \(2.*, 2.*\) but indices are \(1.*, 2.*\).")
 
         with assertRaisesRegex(self, ValueError, msg):
@@ -1083,7 +1102,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1, 2), (2, 2, 2)])
 
         msg = ("The source indices [[ 2 -1  2] [ 2  2  2]] do not specify a "
-               "valid shape for the connection 'src.x' to 'arr.x' in Group 'sub'. "
+               "valid shape for the connection 'sub.src.x' to 'sub.arr.x'. "
                "The source has 2 dimensions but the indices expect 3.")
 
         try:
@@ -1098,7 +1117,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1), (4, 4)])
 
         msg = ("The source indices do not specify a valid index for the "
-               "connection 'src.x' to 'arr.x' in Group 'sub'. Index '4' "
+               "connection 'sub.src.x' to 'sub.arr.x'. Index '4' "
                "is out of range for source dimension of size 3.")
 
         try:
@@ -1112,14 +1131,24 @@ class TestConnect(unittest.TestCase):
         prob = src_indices_model(src_shape=(3,3), tgt_shape=(2,2),
                                  src_indices=[[4,5],[7,8]],
                                  flat_src_indices=True)
-        
+
     def test_src_indices_shape_bad_idx_flat(self):
         try:
             prob = src_indices_model(src_shape=(3,3), tgt_shape=(2,2),
                                      src_indices=[[4,5],[7,9]],
                                      flat_src_indices=True)
         except Exception as err:
-            self.assertEqual(str(err), "The source indices do not specify a valid index for the connection 'indeps.x' to 'C1.x' in Group ''. Index '9' is out of range for a flat source of size 9.")
+            self.assertEqual(str(err), "The source indices do not specify a valid index for the connection 'indeps.x' to 'C1.x'. Index '9' is out of range for a flat source of size 9.")
+        else:
+            self.fail("Exception expected.")
+
+    def test_src_indices_shape_bad_idx_flat_promotes(self):
+        try:
+            prob = src_indices_model(src_shape=(3,3), tgt_shape=(2,2),
+                                     src_indices=[[4,5],[7,9]],
+                                     flat_src_indices=True, promotes=['x'])
+        except Exception as err:
+            self.assertEqual(str(err), "The source indices do not specify a valid index for the connection 'indeps.x' to 'C1.x'. Index '9' is out of range for a flat source of size 9.")
         else:
             self.fail("Exception expected.")
 
@@ -1129,7 +1158,7 @@ class TestConnect(unittest.TestCase):
                                      src_indices=[[-10,5],[7,8]],
                                      flat_src_indices=True)
         except Exception as err:
-            self.assertEqual(str(err), "The source indices do not specify a valid index for the connection 'indeps.x' to 'C1.x' in Group ''. Index '-10' is out of range for a flat source of size 9.")
+            self.assertEqual(str(err), "The source indices do not specify a valid index for the connection 'indeps.x' to 'C1.x'. Index '-10' is out of range for a flat source of size 9.")
         else:
             self.fail("Exception expected.")
 

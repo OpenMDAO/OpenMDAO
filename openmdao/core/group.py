@@ -577,15 +577,11 @@ class Group(System):
                 in_shape = abs2meta_in[abs_in]['shape']
                 src_indices = abs2meta_in[abs_in]['src_indices']
                 flat = abs2meta_in[abs_in]['flat_src_indices']
-                prom_out = self._var_abs2prom['output'][abs_out]
-                prom_in = self._var_abs2prom['input'][abs_in]
 
                 if src_indices is None and out_shape != in_shape:
                     msg = ("The source and target shapes do not match"
-                           " for the connection '%s' to '%s' in Group"
-                           " '%s'.  Expected %s but got %s.")
-                    raise ValueError(msg % (prom_out, prom_in,
-                                            self.pathname,
+                           " for the connection '%s' to '%s'. Expected %s but got %s.")
+                    raise ValueError(msg % (abs_out, abs_in,
                                             in_shape, out_shape))
 
                 if src_indices is not None:
@@ -596,11 +592,10 @@ class Group(System):
                         if idx_d != inp_d:
                             msg = ("The source indices %s do not specify a "
                                    "valid shape for the connection '%s' to "
-                                   "'%s' in Group '%s'. The target shape is "
+                                   "'%s'. The target shape is "
                                    "%s but indices are %s.")
                             raise ValueError(msg % (str(src_indices).replace('\n', ''),
-                                                    prom_out, prom_in,
-                                                    self.pathname,
+                                                    abs_out, abs_in,
                                                     in_shape, src_indices.shape))
 
                     # any remaining dimension of indices must match shape of source
@@ -609,10 +604,10 @@ class Group(System):
                         if source_dimensions != len(out_shape):
                             msg = ("The source indices %s do not specify a "
                                    "valid shape for the connection '%s' to "
-                                   "'%s' in Group '%s'. The source has %d "
+                                   "'%s'. The source has %d "
                                    "dimensions but the indices expect %d.")
                             raise ValueError(msg % (str(src_indices).replace('\n', ''),
-                                                    prom_out, prom_in, self.pathname,
+                                                    abs_out, abs_in,
                                                     len(out_shape), source_dimensions))
                     else:
                         source_dimensions = 1
@@ -631,11 +626,11 @@ class Group(System):
                         if bad_idx is not None:
                             msg = ("The source indices do not specify "
                                    "a valid index for the connection "
-                                   "'%s' to '%s' in Group '%s'. Index "
+                                   "'%s' to '%s'. Index "
                                    "'%d' is out of range for a flat source "
                                    "of size %d.")
-                            raise ValueError(msg % (prom_out, prom_in,
-                                             self.pathname, bad_idx, out_size))
+                            raise ValueError(msg % (abs_out, abs_in,
+                                             bad_idx, out_size))
                     else:
                         for d in range(source_dimensions):
                             # when running under MPI, there is a value for each proc
@@ -644,11 +639,15 @@ class Group(System):
                                 if abs(i) >= d_size:
                                     msg = ("The source indices do not specify "
                                            "a valid index for the connection "
-                                           "'%s' to '%s' in Group '%s'. Index "
+                                           "'%s' to '%s'. Index "
                                            "'%d' is out of range for source "
                                            "dimension of size %d.")
-                                    raise ValueError(msg % (prom_out, prom_in,
-                                                     self.pathname, i, d_size))
+                                    raise ValueError(msg % (abs_out, abs_in,
+                                                     i, d_size))
+
+                    if flat and len(src_indices.shape) > 1:
+                        abs2meta_in[abs_in]['src_indices'] = \
+                            abs2meta_in[abs_in]['src_indices'].flatten()
 
         # Recursion
         if recurse:
