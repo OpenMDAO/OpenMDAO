@@ -13,6 +13,7 @@ class TestSellarFeature(unittest.TestCase):
         prob.model = SellarNoDerivatives()
 
         prob.setup(check=False)
+        prob.final_setup()
 
         # no output checking, just make sure no exceptions raised
         view_connections(prob, show_browser=False)

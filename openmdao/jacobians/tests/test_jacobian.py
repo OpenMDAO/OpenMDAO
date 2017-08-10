@@ -397,6 +397,7 @@ class TestJacobian(unittest.TestCase):
         prob.model.jacobian = DenseJacobian()
 
         prob.setup(check=False)
+        prob.final_setup()
 
         prob.model.jacobian = DenseJacobian()
 
@@ -425,6 +426,7 @@ class TestJacobian(unittest.TestCase):
         model.linear_solver = ScipyIterativeSolver()
 
         prob.setup(check=False)
+        prob.final_setup()
 
         d1 = prob.model.get_subsystem('d1')
         d1.jacobian = DenseJacobian()
@@ -501,8 +503,10 @@ class TestJacobian(unittest.TestCase):
         prob.model.connect('indeps.x', 'G1.C1.x')
         prob.model.connect('indeps.x', 'G1.C2.x')
 
+        prob.setup(check=False)
+
         with self.assertRaises(Exception) as context:
-            prob.setup(check=False)
+            prob.run_model()
         self.assertEqual(str(context.exception),
                          "System 'G1' has a solver of type 'NewtonSolver'but a sparse "
                          "AssembledJacobian has been set in a higher level system.")
@@ -539,9 +543,11 @@ class TestJacobian(unittest.TestCase):
 
         model.jacobian = DenseJacobian()
 
+        prob.setup()
+
         msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
-            prob.setup()
+            prob.run_model()
 
         # Nested
 
@@ -559,9 +565,11 @@ class TestJacobian(unittest.TestCase):
 
         model.jacobian = DenseJacobian()
 
+        prob.setup()
+
         msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
-            prob.setup()
+            prob.run_model()
 
         # Try a component that is derived from a matrix-free one
 
@@ -581,9 +589,11 @@ class TestJacobian(unittest.TestCase):
 
         model.jacobian = DenseJacobian()
 
+        prob.setup()
+
         msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
-            prob.setup()
+            prob.run_model()
 
         # Make sure regular comps don't give an error.
 
@@ -600,6 +610,7 @@ class TestJacobian(unittest.TestCase):
         model.jacobian = DenseJacobian()
 
         prob.setup()
+        prob.final_setup()
 
         class ParaboloidJacVec(Paraboloid):
 
@@ -625,9 +636,11 @@ class TestJacobian(unittest.TestCase):
 
         model.jacobian = DenseJacobian()
 
+        prob.setup()
+
         msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
-            prob.setup()
+            prob.run_model()
 
 if __name__ == '__main__':
     unittest.main()

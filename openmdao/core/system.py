@@ -665,12 +665,67 @@ class System(object):
         setup_mode : str
             Must be one of 'full', 'reconf', or 'update'.
         """
-        self._setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
+        self._setup(self.comm, setup_mode=setup_mode)
+        self._final_setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
 
-    def _setup(self, comm, vector_class, setup_mode, force_alloc_complex=False,
-               mode=None, multi_vector_class=None):
+    def _setup(self, comm, setup_mode):
         """
         Perform setup for this system and its descendant systems.
+
+        There are three modes of setup:
+        1. 'full': wipe everything and setup this and all descendant systems from scratch
+        2. 'reconf': don't wipe everything, but reconfigure this and all descendant systems
+        3. 'update': update after one or more immediate systems has done a 'reconf' or 'update'
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm> or None
+            The global communicator.
+        setup_mode : str
+            Must be one of 'full', 'reconf', or 'update'.
+        """
+        # 1. Full setup that must be called in the root system.
+        if setup_mode == 'full':
+            initial = True
+            recurse = True
+            resize = False
+        # 2. Partial setup called in the system initiating the reconfiguration.
+        elif setup_mode == 'reconf':
+            initial = False
+            recurse = True
+            resize = True
+        # 3. Update-mode setup called in all ancestors of the system initiating the reconf.
+        elif setup_mode == 'update':
+            initial = False
+            recurse = False
+            resize = False
+
+        # If we're only updating and not recursing, processors don't need to be redistributed
+        if recurse:
+            pathname, comm = self._get_initial_procs(comm, initial)
+            # Besides setting up the processors, this method also builds the model hierarchy.
+            self._setup_procs(pathname, comm)
+
+        # Recurse model from the bottom to the top for configuring.
+        self._configure()
+
+        # For updating variable and connection data, setup needs to be performed only
+        # in the current system, by gathering data from immediate subsystems,
+        # and no recursion is necessary.
+        self._setup_vars(recurse=recurse)
+        self._setup_var_index_ranges(self._get_initial_var_indices(initial), recurse=recurse)
+        self._setup_var_data(recurse=recurse)
+        self._setup_var_index_maps(recurse=recurse)
+        self._setup_var_sizes(recurse=recurse)
+        self._setup_global_connections(recurse=recurse)
+        self._setup_connections(recurse=recurse)
+
+    def _final_setup(self, comm, vector_class, setup_mode, force_alloc_complex=False,
+                     mode=None, multi_vector_class=None):
+        """
+        Perform final setup for this system and its descendant systems.
+
+        This part of setup is called automatically at the start of run_model or run_driver.
 
         There are three modes of setup:
         1. 'full': wipe everything and setup this and all descendant systems from scratch
@@ -711,26 +766,6 @@ class System(object):
             initial = False
             recurse = False
             resize = False
-
-        # If we're only updating and not recursing, processors don't need to be redistributed
-        if recurse:
-            pathname, comm = self._get_initial_procs(comm, initial)
-            # Besides setting up the processors, this method also builds the model hierarchy.
-            self._setup_procs(pathname, comm)
-
-        # Recurse model from the bottom to the top for configuring.
-        self._configure()
-
-        # For updating variable and connection data, setup needs to be performed only
-        # in the current system, by gathering data from immediate subsystems,
-        # and no recursion is necessary.
-        self._setup_vars(recurse=recurse)
-        self._setup_var_index_ranges(self._get_initial_var_indices(initial), recurse=recurse)
-        self._setup_var_data(recurse=recurse)
-        self._setup_var_index_maps(recurse=recurse)
-        self._setup_var_sizes(recurse=recurse)
-        self._setup_global_connections(recurse=recurse)
-        self._setup_connections(recurse=recurse)
 
         # For vector-related, setup, recursion is always necessary, even for updating.
         # For reconfiguration setup, we resize the vectors once, only in the current system.
