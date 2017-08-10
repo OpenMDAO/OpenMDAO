@@ -98,6 +98,10 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         prob = Problem(model=TestImplicitGroup(lnSolverClass=DirectSolver))
 
         prob.setup(check=False)
+
+        # Conclude setup but don't run model.
+        prob.final_setup()
+
         prob.model.run_linearize()
 
         d_inputs, d_outputs, d_residuals = prob.model.get_linear_vectors()

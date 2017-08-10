@@ -449,11 +449,13 @@ class Group(System):
             Dictionary of connections passed down from parent group.
         """
         super(Group, self)._setup_global_connections()
+
         global_abs_in2out = self._conn_global_abs_in2out
 
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
         allprocs_prom2abs_list_out = self._var_allprocs_prom2abs_list['output']
         abs2meta_in = self._var_abs2meta['input']
+        abs2meta_out = self._var_abs2meta['output']
         pathname = self.pathname
 
         abs_in2out = {}
@@ -511,6 +513,7 @@ class Group(System):
             abs_out = allprocs_prom2abs_list_out[prom_out][0]
             outparts = abs_out.split('.')
             out_subsys = outparts[:-1]
+
             for abs_in in allprocs_prom2abs_list_in[prom_in]:
                 inparts = abs_in.split('.')
                 in_subsys = inparts[:-1]
@@ -536,12 +539,14 @@ class Group(System):
                     new_conns[inparts[nparts]][abs_in] = abs_out
 
         # Now that both implicit & explicit connections have been added,
-        # check unit compatibility, but only for connections that are either
-        # owned by (implicit) or declared by (explicit) this Group.
+        # check unit/shape compatibility, but only for connections that are
+        # either owned by (implicit) or declared by (explicit) this Group.
         # This way, we don't repeat the error checking in multiple groups
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
         allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
+
         for abs_in, abs_out in iteritems(abs_in2out):
+            # check unit compatibility
             out_units = allprocs_abs2meta_out[abs_out]['units']
             in_units = allprocs_abs2meta_in[abs_in]['units']
 
@@ -560,11 +565,75 @@ class Group(System):
                               "connected to output '%s' which has "
                               "no units." % (abs_in, in_units, abs_out))
 
+            # check shape compatibility
+            if abs_in in abs2meta_in and abs_out in abs2meta_out:
+                # get output shape from allprocs meta dict, since it may
+                # be distributed (we want global shape)
+                out_shape = allprocs_abs2meta_out[abs_out]['global_shape']
+                # get input shape and src_indices from the local meta dict
+                # (input is always local)
+                in_shape = abs2meta_in[abs_in]['shape']
+                src_indices = abs2meta_in[abs_in].get('src_indices')
+                prom_out = self._var_abs2prom['output'][abs_out]
+                prom_in = self._var_abs2prom['input'][abs_in]
+
+                if src_indices is None and out_shape != in_shape:
+                    msg = ("The source and target shapes do not match"
+                           " for the connection '%s' to '%s' in Group"
+                           " '%s'.  Expected %s but got %s.")
+                    raise ValueError(msg % (prom_out, prom_in,
+                                            self.pathname,
+                                            in_shape, out_shape))
+
+                if src_indices is not None:
+                    src_indices = np.atleast_1d(src_indices)
+
+                    # initial dimensions of indices shape must be same shape as target
+                    for idx_d, inp_d in zip(src_indices.shape, in_shape):
+                        if idx_d != inp_d:
+                            msg = ("The source indices %s do not specify a "
+                                   "valid shape for the connection '%s' to "
+                                   "'%s' in Group '%s'. The target shape is "
+                                   "%s but indices are %s.")
+                            raise ValueError(msg % (str(src_indices).replace('\n', ''),
+                                                    prom_out, prom_in,
+                                                    self.pathname,
+                                                    in_shape, src_indices.shape))
+
+                    # any remaining dimension of indices must match shape of source
+                    if len(src_indices.shape) > len(in_shape):
+                        source_dimensions = src_indices.shape[len(in_shape)]
+                        if source_dimensions != len(out_shape):
+                            msg = ("The source indices %s do not specify a "
+                                   "valid shape for the connection '%s' to "
+                                   "'%s' in Group '%s'. The source has %d "
+                                   "dimensions but the indices expect %d.")
+                            raise ValueError(msg % (str(src_indices).replace('\n', ''),
+                                                    prom_out, prom_in, self.pathname,
+                                                    len(out_shape), source_dimensions))
+                    else:
+                        source_dimensions = 1
+
+                    # check all indices are in range of the source dimensions
+                    for d in range(source_dimensions):
+                        # when running under MPI, there is a value for each proc
+                        d_size = out_shape[d] * self.comm.size
+                        for i in src_indices[..., d].flat:
+                            if abs(i) >= d_size:
+                                msg = ("The source indices do not specify "
+                                       "a valid index for the connection "
+                                       "'%s' to '%s' in Group '%s'. Index "
+                                       "'%d' is out of range for source "
+                                       "dimension of size %d.")
+                                raise ValueError(msg % (prom_out, prom_in,
+                                                 self.pathname, i, d_size))
+
         # Recursion
         if recurse:
             for subsys in self._subsystems_myproc:
                 if subsys.name in new_conns:
-                    subsys._setup_global_connections(recurse=recurse, conns=new_conns[subsys.name])
+                    subsys._setup_global_connections(recurse=recurse,
+                                                     conns=new_conns[subsys.name])
                 else:
                     subsys._setup_global_connections(recurse=recurse)
 
@@ -614,7 +683,6 @@ class Group(System):
         for abs_in, abs_out in iteritems(global_abs_in2out):
             # First, check that this system owns both the input and output.
             if abs_in[:len(pathname)] == pathname and abs_out[:len(pathname)] == pathname:
-
                 # Second, check that they are in different subsystems of this system.
                 out_subsys = abs_out[path_len:].split('.', 1)[0]
                 in_subsys = abs_in[path_len:].split('.', 1)[0]
@@ -1003,8 +1071,8 @@ class Group(System):
         for manual_connections in [self._manual_connections, self._static_manual_connections]:
             if tgt_name in manual_connections:
                 srcname = manual_connections[tgt_name][0]
-                raise RuntimeError(
-                    "Input '%s' is already connected to '%s'." % (tgt_name, srcname))
+                raise RuntimeError("Input '%s' is already connected to '%s'." %
+                                   (tgt_name, srcname))
 
         # source and target should not be in the same system
         if src_name.rsplit('.', 1)[0] == tgt_name.rsplit('.', 1)[0]:
@@ -1378,6 +1446,13 @@ class Group(System):
                         meta_changes['cols'] = np.arange(size)
                         meta_changes['value'] = np.ones(size)
 
+                    # This suppports desvar and constraint indices.
+                    if key[0] in self._owns_approx_of_idx:
+                        meta_changes['idx_of'] = self._owns_approx_of_idx[key[0]]
+
+                    if key[1] in self._owns_approx_wrt_idx:
+                        meta_changes['idx_wrt'] = self._owns_approx_wrt_idx[key[1]]
+
                     meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
                     meta.update(meta_changes)
                     meta.update(self._owns_approx_jac_meta)
@@ -1431,10 +1506,13 @@ class Group(System):
         glen = len(self.pathname.split('.')) if self.pathname else 0
         graph = nx.DiGraph()
 
+        # add all systems as nodes in the graph so they'll be there even if
+        # unconnected.
         if comps_only:
-            subsystems = list(self.system_iter(recurse=True, typ=Component))
+            graph.add_nodes_from(s.pathname for s in
+                                 self.system_iter(recurse=True, typ=Component))
         else:
-            subsystems = self._subsystems_allprocs
+            graph.add_nodes_from(s.pathname for s in self._subsystems_allprocs)
 
         if save_vars:
             edge_data = defaultdict(lambda: defaultdict(list))

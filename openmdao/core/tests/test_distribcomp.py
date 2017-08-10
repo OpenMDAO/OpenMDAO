@@ -167,7 +167,6 @@ class DistribInputDistribOutputComp(ExplicitComponent):
         self.arr_size = arr_size
         self.distributed = True
 
-
     def compute(self, inputs, outputs):
         outputs['outvec'] = inputs['invec']*2.0
 
@@ -254,8 +253,11 @@ class NonDistribGatherComp(ExplicitComponent):
     """Uses 2 procs gathers a distrib output into a full input"""
     def __init__(self, size):
         super(NonDistribGatherComp, self).__init__()
-        self.add_input('invec', np.ones(size, float))
-        self.add_output('outvec', np.ones(size, float))
+        self.size = size
+
+    def setup(self):
+        self.add_input('invec', np.ones(self.size, float))
+        self.add_output('outvec', np.ones(self.size, float))
 
     def compute(self, inputs, outputs):
         outputs['outvec'] = inputs['invec']
@@ -277,6 +279,9 @@ class MPITests(unittest.TestCase):
 
         p.setup(vector_class=PETScVector, check=False)
 
+        # Conclude setup but don't run model.
+        p.final_setup()
+
         C1._inputs['invec'] = np.ones(size, float) * 5.0
 
         p.run_model()
@@ -292,6 +297,9 @@ class MPITests(unittest.TestCase):
         C2 = top.add_subsystem("C2", DistribInputComp(size))
         top.connect('C1.outvec', 'C2.invec')
         p.setup(vector_class=PETScVector, check=False)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
 
         C1._inputs['invec'] = np.array(range(size, 0, -1), float)
 
@@ -311,6 +319,9 @@ class MPITests(unittest.TestCase):
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
         p.setup(vector_class=PETScVector, check=False)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
 
         C1._inputs['invec'] = np.array(range(size, 0, -1), float)
 
@@ -410,6 +421,9 @@ class MPITests(unittest.TestCase):
         top.connect('C2.outvec', 'C3.invec')
         p.setup(vector_class=PETScVector, check=False)
 
+        # Conclude setup but don't run model.
+        p.final_setup()
+
         C1._inputs['invec'] = np.array(range(size), float)
 
         p.run_model()
@@ -438,6 +452,9 @@ class MPITests(unittest.TestCase):
         top.connect('C1.outvec', 'C2.invec')
         p.setup(vector_class=PETScVector, check=False)
 
+        # Conclude setup but don't run model.
+        p.final_setup()
+
         C1._inputs['invec'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
@@ -462,11 +479,14 @@ class MPITests(unittest.TestCase):
         top.connect('C2.outvec', 'C3.invec')
         p.setup(vector_class=PETScVector, check=False)
 
+        # Conclude setup but don't run model.
+        p.final_setup()
+
         C1._inputs['invec'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
 
-        if self.comm.rank == 0:
+        if MPI and self.comm.rank == 0:
             self.assertTrue(all(C3._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
 

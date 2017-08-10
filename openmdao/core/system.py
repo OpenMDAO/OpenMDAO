@@ -23,6 +23,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta
+from openmdao.utils.logger_utils import get_logger
 
 _type_map = {
     'input': 'input',
@@ -180,10 +181,24 @@ class System(object):
         If True, this system approximated its Jacobian
     _owns_approx_jac_meta : dict
         Stores approximation metadata (e.g., step_size) from calls to approx_total_derivs
-    _owns_approx_wrt : set or None
-        Overrides aproximation inputs.
     _owns_approx_of : set or None
-        Overrides aproximation outputs.
+        Overrides aproximation outputs. This is set when calculating system derivatives, and serves
+        as a way to communicate the driver's output quantities to the approximation objects so that
+        we only take derivatives of variables that the driver needs.
+    _owns_approx_of_idx : dict
+        Index for override 'of' approximations if declared. When the user calls  `add_objective`
+        or `add_constraint`, they may optionally specify an "indices" argument. This argument must
+        also be communicated to the approximations when they are set up so that 1) the Jacobian is
+        the correct size, and 2) we don't perform any extra unnecessary calculations.
+    _owns_approx_wrt : set or None
+        Overrides aproximation inputs. This is set when calculating system derivatives, and serves
+        as a way to communicate the driver's input quantities to the approximation objects so that
+        we only take derivatives with respect to variables that the driver needs.
+    _owns_approx_wrt_idx : dict
+        Index for override 'wrt' approximations if declared. When the user calls  `add_designvar`
+        they may optionally specify an "indices" argument. This argument must also be communicated
+        to the approximations when they are set up so that 1) the Jacobian is the correct size, and
+        2) we don't perform any extra unnecessary calculations.
     _subjacs_info : OrderedDict of dict
         Sub-jacobian metadata for each (output, input) pair added using
         declare_partials. Members of each pair may be glob patterns.
@@ -304,6 +319,8 @@ class System(object):
         self._owns_approx_jac_meta = {}
         self._owns_approx_wrt = None
         self._owns_approx_of = None
+        self._owns_approx_wrt_idx = {}
+        self._owns_approx_of_idx = {}
 
         self._design_vars = {}
         self._responses = {}
@@ -645,10 +662,10 @@ class System(object):
         setup_mode : str
             Must be one of 'full', 'reconf', or 'update'.
         """
-        self._setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
+        self._setup(self.comm, setup_mode=setup_mode)
+        self._final_setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
 
-    def _setup(self, comm, vector_class, setup_mode, force_alloc_complex=False,
-               mode=None):
+    def _setup(self, comm, setup_mode):
         """
         Perform setup for this system and its descendant systems.
 
@@ -661,16 +678,8 @@ class System(object):
         ----------
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
-        vector_class : type
-            reference to an actual <Vector> class; not an instance.
         setup_mode : str
             Must be one of 'full', 'reconf', or 'update'.
-        force_alloc_complex : bool
-            Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
-            detect when you need to do this, but in some cases (e.g., complex step is used
-            after a reconfiguration) you may need to set this to True.
-        mode : str or None
-            Derivative direction, either 'fwd', or 'rev', or None
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
@@ -707,6 +716,53 @@ class System(object):
         self._setup_var_sizes(recurse=recurse)
         self._setup_global_connections(recurse=recurse)
         self._setup_connections(recurse=recurse)
+
+    def _final_setup(self, comm, vector_class, setup_mode, force_alloc_complex=False,
+                     mode=None, multi_vector_class=None):
+        """
+        Perform final setup for this system and its descendant systems.
+
+        This part of setup is called automatically at the start of run_model or run_driver.
+
+        There are three modes of setup:
+        1. 'full': wipe everything and setup this and all descendant systems from scratch
+        2. 'reconf': don't wipe everything, but reconfigure this and all descendant systems
+        3. 'update': update after one or more immediate systems has done a 'reconf' or 'update'
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm> or None
+            The global communicator.
+        vector_class : type
+            reference to an actual <Vector> class; not an instance.
+        setup_mode : str
+            Must be one of 'full', 'reconf', or 'update'.
+        force_alloc_complex : bool
+            Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
+            detect when you need to do this, but in some cases (e.g., complex step is used
+            after a reconfiguration) you may need to set this to True.
+        mode : str or None
+            Derivative direction, either 'fwd', or 'rev', or None
+        multi_vector_class : type
+            reference to an actual <Vector> class; not an instance. This specifies
+            the class to use to perform matrix-matrix derivative operations.  If None,
+            matrix-matrix will not be used.
+        """
+        # 1. Full setup that must be called in the root system.
+        if setup_mode == 'full':
+            initial = True
+            recurse = True
+            resize = False
+        # 2. Partial setup called in the system initiating the reconfiguration.
+        elif setup_mode == 'reconf':
+            initial = False
+            recurse = True
+            resize = True
+        # 3. Update-mode setup called in all ancestors of the system initiating the reconf.
+        elif setup_mode == 'update':
+            initial = False
+            recurse = False
+            resize = False
 
         # For vector-related, setup, recursion is always necessary, even for updating.
         # For reconfiguration setup, we resize the vectors once, only in the current system.
@@ -2362,85 +2418,53 @@ class System(object):
         with self._scaled_context_all():
             self._apply_nonlinear()
 
-    def list_inputs(self, explicit=True, implicit=True, out_stream=sys.stdout):
+    def list_inputs(self, values=True, out_stream='stdout'):
         """
         List inputs.
 
         Parameters
         ----------
-        explicit : bool, optional
-            include inputs from explicit components. Default is True.
+        values : bool, optional
+            When True, display/return input values as well as names. Default is True.
 
-        implicit : bool, optional
-            include inputs from implicit components. Default is True.
-
-        out_stream : file_like
-            Where to send human readable output. Default is sys.stdout.
+        out_stream : 'stdout', 'stderr' or file-like
+            Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
 
         Returns
         -------
         list
-            list of (name, value) of inputs
+            list of of input names, or (name, value) if values is True
         """
-        states = self._list_states()
+        inputs = []
 
-        expl_inputs = []
-        impl_inputs = []
         for name, val in iteritems(self._inputs._views):
-            if name in states:
-                impl_inputs.append((name, val))
-            else:
-                expl_inputs.append((name, val))
+            inputs.append((name, val)) if values else inputs.append(name)
 
         if out_stream:
-            if explicit:
-                self._write_inputs('Explicit', expl_inputs, out_stream)
-            if implicit:
-                self._write_inputs('Implicit', impl_inputs, out_stream)
+            logger = get_logger('list_inputs', out_stream=out_stream)
 
-        if explicit and implicit:
-            return expl_inputs + impl_inputs
-        elif explicit:
-            return expl_inputs
-        elif implicit:
-            return impl_inputs
-        else:
-            raise RuntimeError('You have excluded both Explicit and Implicit components.')
+            count = len(inputs)
 
-    def _write_inputs(self, comp_type, inputs, out_stream=sys.stdout):
-        """
-        Write formatted input values to out_stream.
+            pathname = self.pathname if self.pathname else 'model'
 
-        Parameters
-        ----------
-        comp_type : str, 'Explicit' or 'Implicit'
-            the type of component with the input values.
+            header = "%d Input(s) to Components in '%s'\n" % (count, pathname)
+            logger.info(header)
 
-        inputs : list
-            list of (name, value) tuples.
+            if count:
+                logger.info("-" * len(header) + "\n")
+                if isinstance(inputs[0], tuple):
+                    for name, val in sorted(inputs):
+                        logger.info(name)
+                        logger.info("  value:    " + str(val) + "\n")
+                else:
+                    for name in sorted(inputs):
+                        logger.info(name)
+                logger.info('\n')
 
-        out_stream : file_like
-            Where to send human readable output. Default is sys.stdout.
-        """
-        if out_stream is None:
-            return
+        return inputs
 
-        count = len(inputs)
-
-        pathname = self.pathname if self.pathname else 'model'
-
-        header = "%d Input(s) to %s Components in '%s'\n" % (count, comp_type, pathname)
-        out_stream.write(header)
-
-        if count:
-            out_stream.write("-" * len(header) + "\n")
-            for name, val in sorted(inputs):
-                out_stream.write("%s\n" % name)
-                out_stream.write("  value:    " + str(val))
-                out_stream.write('\n\n')
-
-    def list_outputs(self, explicit=True, implicit=True, out_stream=sys.stdout):
+    def list_outputs(self, explicit=True, implicit=True, values=True, out_stream='stdout'):
         """
         List outputs.
 
@@ -2452,14 +2476,17 @@ class System(object):
         implicit : bool, optional
             include outputs from implicit components. Default is True.
 
-        out_stream : file_like
-            Where to send human readable output. Default is sys.stdout.
+        values : bool, optional
+            When True, display/return output values as well as names. Default is True.
+
+        out_stream : 'stdout', 'stderr' or file-like
+            Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
 
         Returns
         -------
         list
-            list of (name, value) of outputs
+            list of of output names, or (name, value) if values is True
         """
         states = self._list_states()
 
@@ -2467,9 +2494,9 @@ class System(object):
         impl_outputs = []
         for name, val in iteritems(self._outputs._views):
             if name in states:
-                impl_outputs.append((name, val))
+                impl_outputs.append((name, val)) if values else impl_outputs.append(name)
             else:
-                expl_outputs.append((name, val))
+                expl_outputs.append((name, val)) if values else expl_outputs.append(name)
 
         if out_stream:
             if explicit:
@@ -2486,7 +2513,7 @@ class System(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def list_residuals(self, explicit=True, implicit=True, out_stream=sys.stdout):
+    def list_residuals(self, explicit=True, implicit=True, values=True, out_stream='stdout'):
         """
         List residuals.
 
@@ -2498,13 +2525,17 @@ class System(object):
         implicit : bool, optional
             include outputs from implicit components. Default is True.
 
-        out_stream : file_like
-            Where to send human readable output. Default is sys.stdout. Set to None to suppress.
+        values : bool, optional
+            When True, display/return residual values as well as names. Default is True.
+
+        out_stream : 'stdout', 'stderr' or file-like
+            Where to send human readable output. Default is 'stdout'.
+            Set to None to suppress.
 
         Returns
         -------
         list
-            list of (name, value) of residuals
+            list of of residual names, or (name, value) if values is True
         """
         states = self._list_states()
 
@@ -2512,9 +2543,9 @@ class System(object):
         impl_resids = []
         for name, val in iteritems(self._residuals._views):
             if name in states:
-                impl_resids.append((name, val))
+                impl_resids.append((name, val)) if values else impl_resids.append(name)
             else:
-                expl_resids.append((name, val))
+                expl_resids.append((name, val)) if values else expl_resids.append(name)
 
         if out_stream:
             if explicit:
@@ -2531,7 +2562,7 @@ class System(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def _write_outputs(self, comp_type, outputs, out_stream=sys.stdout):
+    def _write_outputs(self, comp_type, outputs, out_stream='stdout'):
         """
         Write formatted output values and residuals to out_stream.
 
@@ -2543,27 +2574,34 @@ class System(object):
         outputs : list
             list of (name, value) tuples.
 
-        out_stream : file_like
-            Where to send human readable output. Default is sys.stdout.
+        out_stream : 'stdout', 'stderr' or file-like
+            Where to send human readable output. Default is 'stdout'.
+            Set to None to suppress.
         """
         if out_stream is None:
             return
+
+        logger = get_logger('list_outputs', out_stream=out_stream)
 
         count = len(outputs)
 
         pathname = self.pathname if self.pathname else 'model'
 
         header = "%d %s Output(s) in '%s'\n" % (count, comp_type, pathname)
-        out_stream.write(header)
+        logger.info(header)
 
         if count:
-            out_stream.write("-" * len(header) + "\n")
-            for name, _ in sorted(outputs):
-                out_stream.write("%s\n" % name)
-                out_stream.write("  value:    " + str(self._outputs._views[name]))
-                out_stream.write('\n')
-                out_stream.write("  residual: " + str(self._residuals._views[name]))
-                out_stream.write('\n\n')
+            logger.info("-" * len(header) + "\n")
+            if isinstance(outputs[0], tuple):
+                for name, _ in sorted(outputs):
+                    logger.info("%s" % name)
+                    logger.info("  value:    " + str(self._outputs._views[name]))
+                    logger.info("  residual: " + str(self._residuals._views[name]))
+                    logger.info('\n')
+            else:
+                for name in sorted(outputs):
+                    logger.info(name)
+                logger.info('\n')
 
     def run_solve_nonlinear(self):
         """

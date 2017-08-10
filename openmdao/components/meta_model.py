@@ -312,7 +312,7 @@ class MetaModel(ExplicitComponent):
 
         return arr
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """
         Compute sub-jacobian parts. The model is assumed to be in an unscaled state.
 
@@ -320,8 +320,6 @@ class MetaModel(ExplicitComponent):
         ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """

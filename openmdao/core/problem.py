@@ -22,8 +22,9 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.logger_utils import get_default_logger
+from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.mpi import MPI, FakeComm
+from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.utils.graph_utils import all_connected_edges
 from openmdao.vectors.default_vector import DefaultVector
 try:
@@ -57,6 +58,14 @@ class Problem(object):
         If True, allocate vectors to store ref. values.
     _solver_print_cache : list
         Allows solver iprints to be set to requested values after setup calls.
+    _initial_condition_cache : dict
+        Any initial conditions that are set at the problem level via setitem are cached here
+        until they can be processed.
+    _setup_status : int
+        Current status of the setup in _model.
+        0 -- Newly initialized problem or newly added model.
+        1 -- The `setup` method has been called, but vectors not initialized.
+        2 -- The `final_setup` has been run, everything ready to run.
     """
 
     def __init__(self, model=None, comm=None, use_ref_vector=True, root=None):
@@ -105,6 +114,14 @@ class Problem(object):
 
         recording_iteration_stack = []
 
+        self._initial_condition_cache = {}
+
+        # Status of the setup of _model.
+        # 0 -- Newly initialized problem or newly added model.
+        # 1 -- The `setup` method has been called, but vectors not initialized.
+        # 2 -- The `final_setup` has been run, everything ready to run.
+        self._setup_status = 0
+
     def __getitem__(self, name):
         """
         Get an output/input variable.
@@ -119,13 +136,69 @@ class Problem(object):
         float or ndarray
             the requested output/input variable.
         """
-        if name in self.model._outputs:
-            return self.model._outputs[name]
+        # Caching only needed if vectors aren't allocated yet.
+        if self._setup_status == 1:
+
+            # We have set and cached already
+            if name in self._initial_condition_cache:
+                val = self._initial_condition_cache[name]
+
+            # Vector not setup, so we need to pull values from saved metadata request.
+            else:
+                proms = self.model._var_allprocs_prom2abs_list
+                meta = self.model._var_abs2meta
+                if name in meta['input']:
+                    if name in self.model._conn_abs_in2out:
+                        src_name = self.model._conn_abs_in2out[name]
+                        val = meta['input'][src_name]['value']
+                    else:
+                        val = meta['input'][name]['value']
+
+                elif name in meta['output']:
+                    val = meta['output'][name]['value']
+
+                elif name in proms['input']:
+                    abs_name = proms['input'][name][0]
+                    if abs_name in self.model._conn_abs_in2out:
+                        src_name = self.model._conn_abs_in2out[abs_name]
+                        # So, if the inputs and outputs are promoted to the same name, then we
+                        # allow getitem, but if they aren't, then we raise an error due to non
+                        # uniqueness.
+                        if name not in proms['output']:
+                            # This triggers a check for unconnected non-unique inputs, and
+                            # raises the same error as vector access.
+                            abs_name = prom_name2abs_name(self.model, name, 'input')
+                        val = meta['output'][src_name]['value']
+                    else:
+                        # This triggers a check for unconnected non-unique inputs, and
+                        # raises the same error as vector access.
+                        abs_name = prom_name2abs_name(self.model, name, 'input')
+                        val = meta['input'][abs_name]['value']
+
+                elif name in proms['output']:
+                    abs_name = prom_name2abs_name(self.model, name, 'output')
+                    val = meta['output'][abs_name]['value']
+
+                else:
+                    msg = 'Variable name "{}" not found.'
+                    raise KeyError(msg.format(name))
+
+                self._initial_condition_cache[name] = val
+
+        elif name in self.model._outputs:
+            val = self.model._outputs[name]
+
         elif name in self.model._inputs:
-            return self.model._inputs[name]
+            val = self.model._inputs[name]
+
         else:
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
+
+        # Need to cache the "get" in case the user calls in-place numpy operations.
+        self._initial_condition_cache[name] = val
+
+        return val
 
     def __setitem__(self, name, value):
         """
@@ -138,13 +211,27 @@ class Problem(object):
         value : float or ndarray or list
             value to set this variable to.
         """
-        if name in self.model._outputs:
-            self.model._outputs[name] = value
-        elif name in self.model._inputs:
-            self.model._inputs[name] = value
+        # Caching only needed if vectors aren't allocated yet.
+        if self._setup_status == 1:
+            self._initial_condition_cache[name] = value
         else:
-            msg = 'Variable name "{}" not found.'
-            raise KeyError(msg.format(name))
+            if name in self.model._outputs:
+                self.model._outputs[name] = value
+            elif name in self.model._inputs:
+                self.model._inputs[name] = value
+            else:
+                msg = 'Variable name "{}" not found.'
+                raise KeyError(msg.format(name))
+
+    def _set_initial_conditions(self):
+        """
+        Set all initial conditions that have been saved in cache after setup.
+        """
+        for name, value in iteritems(self._initial_condition_cache):
+            self[name] = value
+
+        # Clean up cache
+        self._initial_condition_cache = {}
 
     @property
     def root(self):
@@ -190,6 +277,7 @@ class Problem(object):
         if self._mode is None:
             raise RuntimeError("The `setup` method must be called before `run_model`.")
 
+        self.final_setup()
         return self.model.run_solve_nonlinear()
 
     def run_driver(self):
@@ -204,6 +292,7 @@ class Problem(object):
         if self._mode is None:
             raise RuntimeError("The `setup` method must be called before `run_driver`.")
 
+        self.final_setup()
         with self.model._scaled_context_all():
             return self.driver.run()
 
@@ -248,7 +337,12 @@ class Problem(object):
     def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='auto',
               force_alloc_complex=False):
         """
-        Set up everything.
+        Set up the model hierarchy.
+
+        When `setup` is called, the model hierarchy is assembled, the processors are allocated
+        (for MPI), and variables and connections are all assigned. This method traverses down
+        the model hierarchy to call `setup` on each subsystem, and then traverses up te model
+        hierarchy to call `configure` on each subsystem.
 
         Parameters
         ----------
@@ -291,8 +385,40 @@ class Problem(object):
             mode = 'rev'
         self._mode = mode
 
-        model._setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex,
-                     mode=mode)
+        model._setup(comm, 'full')
+
+        # Cache all args for final setup.
+        self._vector_class = vector_class
+        self._check = check
+        self._logger = logger
+        self._force_alloc_complex = force_alloc_complex
+
+        self._setup_status = 1
+        return self
+
+    def final_setup(self):
+        """
+        Perform final setup phase on problem in preparation for run.
+
+        This is the second phase of setup, and is done automatically at the start of `run_driver`
+        and `run_model`. At the beginning of final_setup, we have a model hierarchy with defined
+        variables, solvers, case_recorders, and derivative settings. During this phase, the vectors
+        are created and populated, the drivers and solvers are initialized, and the recorders are
+        started, and the rest of the framework is prepared for execution.
+        """
+        vector_class = self._vector_class
+        check = self._check
+        logger = self._logger
+        force_alloc_complex = self._force_alloc_complex
+
+        model = self.model
+        comm = self.comm
+        mode = self._mode
+
+        if self._setup_status < 2:
+            model._final_setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex,
+                               mode=mode)
+
         self.driver._setup_driver(self)
 
         if isinstance(model, Group):
@@ -308,7 +434,9 @@ class Problem(object):
         if check and comm.rank == 0:
             check_config(self, logger)
 
-        return self
+        if self._setup_status < 2:
+            self._setup_status = 2
+            self._set_initial_conditions()
 
     def check_partials(self, logger=None, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6, global_options=None,
@@ -355,6 +483,9 @@ class Problem(object):
             For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
                 Jacobian for the three different methods of computation.
         """
+        if self._setup_status < 2:
+            self.final_setup()
+
         if not global_options:
             global_options = DEFAULT_FD_OPTIONS.copy()
             global_options['method'] = 'fd'
@@ -365,7 +496,7 @@ class Problem(object):
             raise ValueError('Unrecognized method: "{}"'.format(global_options['method']))
 
         model = self.model
-        logger = get_default_logger(logger, 'check_partials')
+        logger = logger if logger else get_logger('check_partials')
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -597,10 +728,8 @@ class Problem(object):
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
 
-        logging.getLogger().setLevel(logging.INFO)
-        if not suppress_output:
-            _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, logger,
-                                      compact_print, comps, global_options)
+        _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, logger, compact_print,
+                                  comps, global_options, suppress_output=suppress_output)
 
         return partials_data
 
@@ -654,7 +783,8 @@ class Problem(object):
         """
         model = self.model
         global_names = False
-        logger = get_default_logger(logger, 'check_total_derivatives')
+
+        logger = logger if logger else get_logger('check_total_derivatives')
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -689,10 +819,8 @@ class Problem(object):
             data[''][key]['J_fd'] = Jfd[key]
         fd_args['method'] = 'fd'
 
-        logging.getLogger().setLevel(logging.INFO)
-        if not suppress_output:
-            _assemble_derivative_data(data, rel_err_tol, abs_err_tol, logger, compact_print,
-                                      [model], fd_args, totals=True)
+        _assemble_derivative_data(data, rel_err_tol, abs_err_tol, logger, compact_print, [model],
+                                  fd_args, totals=True, suppress_output=suppress_output)
         return data['']
 
     def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
@@ -716,6 +844,9 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
+        if self._setup_status < 2:
+            self.final_setup()
+
         with self.model._scaled_context_all():
             if self.model._owns_approx_jac:
                 totals = self._compute_total_derivs_approx(of=of, wrt=wrt,
@@ -809,9 +940,27 @@ class Problem(object):
             model._owns_approx_of = set(of)
             model._owns_approx_wrt = set(wrt)
 
+            # Support for indices defined on driver vars.
+            dvs = self.driver._designvars
+            cons = self.driver._cons
+            objs = self.driver._objs
+
+            response_idx = {key: val['indices'] for key, val in iteritems(cons)
+                            if val['indices'] is not None}
+            for key, val in iteritems(objs):
+                if val['indices'] is not None:
+                    response_idx[key] = val['indices']
+
+            model._owns_approx_of_idx = response_idx
+
+            model._owns_approx_wrt_idx = {key: val['indices'] for key, val in iteritems(dvs)
+                                          if val['indices'] is not None}
+
         model._setup_jacobians(recurse=False)
 
+        model.jacobian._override_checks = True
         model._linearize()
+        model.jacobian._override_checks = False
         approx_jac = model._jacobian._subjacs
 
         # Create data structures (and possibly allocate space) for the total
@@ -1334,7 +1483,8 @@ class Problem(object):
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, logger,
-                              compact_print, system_list, global_options, totals=False):
+                              compact_print, system_list, global_options, totals=False,
+                              suppress_output=False):
     """
     Compute the relative and absolute errors in the given derivatives and print to the logger.
 
@@ -1356,6 +1506,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
         Dictionary containing the options for the approximation.
     totals : bool
         Set to True if we are doing check_total_derivs to skip a bunch of stuff.
+    suppress_output : bool
+        Set to True to suppress all output. Just calculate errors and add the keys.
     """
     fd_desc = "{}:{}".format(global_options['method'],
                              global_options['form'])
@@ -1393,39 +1545,40 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
         if totals:
             sys_name = 'Full Model'
 
-        logger.info('-' * (len(sys_name) + 15))
-        logger.info("{}: '{}'{}".format(sys_type, sys_name, check_desc))
-        logger.info('-' * (len(sys_name) + 15))
+        if not suppress_output:
+            logger.info('-' * (len(sys_name) + 15))
+            logger.info("{}: '{}'{}".format(sys_type, sys_name, check_desc))
+            logger.info('-' * (len(sys_name) + 15))
 
-        if compact_print:
-            # Error Header
-            if totals:
-                header = "{0} wrt {1} | {2} | {3} | {4} | {5}"\
-                    .format(
-                        _pad_name('<output>', 30, True),
-                        _pad_name('<variable>', 30, True),
-                        _pad_name('calc mag.'),
-                        _pad_name('check mag.'),
-                        _pad_name('a(cal-chk)'),
-                        _pad_name('r(cal-chk)'),
-                    )
-            else:
-                header = "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}"\
-                    .format(
-                        _pad_name('<output>', 13, True),
-                        _pad_name('<variable>', 13, True),
-                        _pad_name('fwd mag.'),
-                        _pad_name('rev mag.'),
-                        _pad_name('check mag.'),
-                        _pad_name('a(fwd-chk)'),
-                        _pad_name('a(rev-chk)'),
-                        _pad_name('a(fwd-rev)'),
-                        _pad_name('r(fwd-chk)'),
-                        _pad_name('r(rev-chk)'),
-                        _pad_name('r(fwd-rev)')
-                    )
-            logger.info(header)
-            logger.info('-' * len(header) + '\n')
+            if compact_print:
+                # Error Header
+                if totals:
+                    header = "{0} wrt {1} | {2} | {3} | {4} | {5}"\
+                        .format(
+                            _pad_name('<output>', 30, True),
+                            _pad_name('<variable>', 30, True),
+                            _pad_name('calc mag.'),
+                            _pad_name('check mag.'),
+                            _pad_name('a(cal-chk)'),
+                            _pad_name('r(cal-chk)'),
+                        )
+                else:
+                    header = "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}"\
+                        .format(
+                            _pad_name('<output>', 13, True),
+                            _pad_name('<variable>', 13, True),
+                            _pad_name('fwd mag.'),
+                            _pad_name('rev mag.'),
+                            _pad_name('check mag.'),
+                            _pad_name('a(fwd-chk)'),
+                            _pad_name('a(rev-chk)'),
+                            _pad_name('a(fwd-rev)'),
+                            _pad_name('r(fwd-chk)'),
+                            _pad_name('r(rev-chk)'),
+                            _pad_name('r(fwd-rev)')
+                        )
+                logger.info(header)
+                logger.info('-' * len(header) + '\n')
 
         # Sorted keys ensures deterministic ordering
         sorted_keys = sorted(iterkeys(derivatives))
@@ -1466,70 +1619,71 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
                                                                         rev_error / fd_norm,
                                                                         fwd_rev_error / fd_norm)
 
-            if compact_print:
-                if totals:
-                    logger.info(deriv_line.format(
-                        _pad_name(of, 30, True),
-                        _pad_name(wrt, 30, True),
-                        magnitude.forward,
-                        magnitude.fd,
-                        abs_err.forward,
-                        rel_err.forward,
-                    ))
+            if not suppress_output:
+                if compact_print:
+                    if totals:
+                        logger.info(deriv_line.format(
+                            _pad_name(of, 30, True),
+                            _pad_name(wrt, 30, True),
+                            magnitude.forward,
+                            magnitude.fd,
+                            abs_err.forward,
+                            rel_err.forward,
+                        ))
+                    else:
+                        logger.info(deriv_line.format(
+                            _pad_name(of, 13, True),
+                            _pad_name(wrt, 13, True),
+                            magnitude.forward,
+                            magnitude.reverse,
+                            magnitude.fd,
+                            abs_err.forward,
+                            abs_err.reverse,
+                            abs_err.forward_reverse,
+                            rel_err.forward,
+                            rel_err.reverse,
+                            rel_err.forward_reverse,
+                        ))
                 else:
-                    logger.info(deriv_line.format(
-                        _pad_name(of, 13, True),
-                        _pad_name(wrt, 13, True),
-                        magnitude.forward,
-                        magnitude.reverse,
-                        magnitude.fd,
-                        abs_err.forward,
-                        abs_err.reverse,
-                        abs_err.forward_reverse,
-                        rel_err.forward,
-                        rel_err.reverse,
-                        rel_err.forward_reverse,
-                    ))
-            else:
-                # Magnitudes
-                logger.info("  {}: '{}' wrt '{}'\n".format(sys_name, of, wrt))
-                logger.info('    Forward Magnitude : {:.6e}'.format(magnitude.forward))
-                if not totals:
-                    txt = '    Reverse Magnitude : {:.6e}'
-                    logger.info(txt.format(magnitude.reverse))
-                logger.info('         Fd Magnitude : {:.6e} ({})\n'.format(magnitude.fd,
-                                                                           fd_desc))
-                # Absolute Errors
-                if totals:
-                    error_descs = ('(Jfor  - Jfd) ', )
-                else:
-                    error_descs = ('(Jfor  - Jfd) ', '(Jrev  - Jfd) ', '(Jfor  - Jrev)')
-                for error, desc in zip(abs_err, error_descs):
-                    error_str = _format_error(error, abs_error_tol)
-                    logger.info('    Absolute Error {}: {}'.format(desc, error_str))
-                logger.info('')
-
-                # Relative Errors
-                for error, desc in zip(rel_err, error_descs):
-                    error_str = _format_error(error, rel_error_tol)
-                    logger.info('    Relative Error {}: {}'.format(desc, error_str))
-                logger.info('')
-
-                # Raw Derivatives
-                logger.info('    Raw Forward Derivative (Jfor)\n')
-                logger.info(str(forward))
-                logger.info('')
-
-                if not totals:
-                    logger.info('    Raw Reverse Derivative (Jfor)\n')
-                    logger.info(str(reverse))
+                    # Magnitudes
+                    logger.info("  {}: '{}' wrt '{}'\n".format(sys_name, of, wrt))
+                    logger.info('    Forward Magnitude : {:.6e}'.format(magnitude.forward))
+                    if not totals:
+                        txt = '    Reverse Magnitude : {:.6e}'
+                        logger.info(txt.format(magnitude.reverse))
+                    logger.info('         Fd Magnitude : {:.6e} ({})\n'.format(magnitude.fd,
+                                                                               fd_desc))
+                    # Absolute Errors
+                    if totals:
+                        error_descs = ('(Jfor  - Jfd) ', )
+                    else:
+                        error_descs = ('(Jfor  - Jfd) ', '(Jrev  - Jfd) ', '(Jfor  - Jrev)')
+                    for error, desc in zip(abs_err, error_descs):
+                        error_str = _format_error(error, abs_error_tol)
+                        logger.info('    Absolute Error {}: {}'.format(desc, error_str))
                     logger.info('')
 
-                logger.info('    Raw FD Derivative (Jfd)\n')
-                logger.info(str(fd))
-                logger.info('')
+                    # Relative Errors
+                    for error, desc in zip(rel_err, error_descs):
+                        error_str = _format_error(error, rel_error_tol)
+                        logger.info('    Relative Error {}: {}'.format(desc, error_str))
+                    logger.info('')
 
-                logger.info(' -' * 30)
+                    # Raw Derivatives
+                    logger.info('    Raw Forward Derivative (Jfor)\n')
+                    logger.info(str(forward))
+                    logger.info('')
+
+                    if not totals:
+                        logger.info('    Raw Reverse Derivative (Jfor)\n')
+                        logger.info(str(reverse))
+                        logger.info('')
+
+                    logger.info('    Raw FD Derivative (Jfd)\n')
+                    logger.info(str(fd))
+                    logger.info('')
+
+                    logger.info(' -' * 30)
 
 
 def _pad_name(name, pad_num=10, quotes=False):

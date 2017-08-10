@@ -79,6 +79,10 @@ class DistribExecComp(ExecComp):
 
 
 class DistribCoordComp(ExplicitComponent):
+    def __init__(self, **kwargs):
+        super(DistribCoordComp, self).__init__(**kwargs)
+        self.distributed = True
+
     def setup(self):
         comm = self.comm
         rank = comm.rank

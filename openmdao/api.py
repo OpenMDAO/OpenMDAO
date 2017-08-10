@@ -67,6 +67,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 
 # Recorders
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
+from openmdao.recorders.web_recorder import WebRecorder
 
 # set up tracing or memory profiling if env vars are set.
 import os

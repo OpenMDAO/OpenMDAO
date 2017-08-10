@@ -16,6 +16,13 @@ ExplicitComponent Methods
 
 The implementation of each method will be illustrated using a simple explicit component that computes the output *area* as a function of inputs *length* and *width*.
 
+::
+
+    class RectangleComp(ExplicitComponent):
+        """
+        A simple Explicit Component that computes the area of a rectangle.
+        """
+
 - :code:`setup()` :
 
   Declare input and output variables via :code:`add_input` and :code:`add_output`.
@@ -31,10 +38,9 @@ The implementation of each method will be illustrated using a simple explicit co
   .. embed-code::
       openmdao.core.tests.test_expl_comp.RectangleComp.compute
 
-- :code:`compute_partials(inputs, outputs, partials)` :
+- :code:`compute_partials(inputs, partials)` :
 
   [Optional] Compute the :code:`partials` (partial derivatives) given the :code:`inputs`.
-  The :code:`outputs` are also provided for convenience.
 
   .. embed-code::
       openmdao.core.tests.test_expl_comp.RectanglePartial.compute_partials

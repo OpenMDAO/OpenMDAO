@@ -105,7 +105,9 @@ class TestSystem(unittest.TestCase):
 
         model = Group()
         model.add_subsystem('G1', g1, promotes=['b', 'y'])
-        model.add_subsystem('Sink', ExecComp(('c=2*b', 'z=2*y')),
+        model.add_subsystem('Sink', ExecComp(('c=2*b', 'z=2*y'),
+                                             y=np.zeros((5, 1)),
+                                             z=np.zeros((5, 1))),
                                              promotes=['b', 'y'])
 
         p = Problem(model=model)

@@ -849,9 +849,14 @@ class TestConnect(unittest.TestCase):
         prob = Problem(Group())
 
         sub = prob.model.add_subsystem('sub', Group())
-        sub.add_subsystem('src', IndepVarComp('x', np.zeros(5,)))
+
+        idv = sub.add_subsystem('src', IndepVarComp())
+        idv.add_output('x', np.arange(15).reshape((5,3)))  # array
+        idv.add_output('s', 3.)                            # scalar
+
         sub.add_subsystem('tgt', ExecComp('y = x'))
         sub.add_subsystem('cmp', ExecComp('z = x'))
+        sub.add_subsystem('arr', ExecComp('a = x', x=np.zeros(2)))
 
         self.sub = sub
         self.prob = prob
@@ -1039,6 +1044,59 @@ class TestConnect(unittest.TestCase):
         prob.run_driver()
 
         assert_rel_error(self, prob['G1.par1.c4.y'], 8.0)
+
+    def test_bad_shapes(self):
+        self.sub.connect('src.s', 'arr.x')
+
+        msg = ("The source and target shapes do not match for the connection "
+               "'src.s' to 'arr.x' in Group 'sub'.")
+
+        with assertRaisesRegex(self, ValueError, msg):
+            self.prob.setup(check=False)
+
+    def test_bad_indices_shape(self):
+        p = Problem()
+        p.model.add_subsystem('IV', IndepVarComp('x', np.arange(12).reshape((4,3))))
+        p.model.add_subsystem('C1', ExecComp('y=numpy.sum(x)*2.0', x=np.zeros((2,2))))
+
+        p.model.connect('IV.x', 'C1.x', src_indices=[(1, 1)])
+
+        msg = ("The source indices \[\[1 1\]\] do not specify a valid shape for "
+               "the connection 'IV.x' to 'C1.x' in Group ''. The target "
+               "shape is \(2.*, 2.*\) but indices are \(1.*, 2.*\).")
+
+        with assertRaisesRegex(self, ValueError, msg):
+            p.setup(check=False)
+
+    def test_bad_indices_dimensions(self):
+        self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1, 2), (2, 2, 2)])
+
+        msg = ("The source indices [[ 2 -1  2] [ 2  2  2]] do not specify a "
+               "valid shape for the connection 'src.x' to 'arr.x' in Group 'sub'. "
+               "The source has 2 dimensions but the indices expect 3.")
+
+        try:
+            self.prob.setup(check=False)
+        except ValueError as err:
+            self.assertEqual(str(err), msg)
+        else:
+            self.fail('Exception expected.')
+
+    def test_bad_indices_index(self):
+        # the index value within src_indices is outside the valid range for the source
+        self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1), (4, 4)])
+
+        msg = ("The source indices do not specify a valid index for the "
+               "connection 'src.x' to 'arr.x' in Group 'sub'. Index '4' "
+               "is out of range for source dimension of size 3.")
+
+        try:
+            self.prob.setup(check=False)
+        except ValueError as err:
+            self.assertEqual(str(err), msg)
+        else:
+            self.fail('Exception expected.')
+
 
 if __name__ == "__main__":
     unittest.main()

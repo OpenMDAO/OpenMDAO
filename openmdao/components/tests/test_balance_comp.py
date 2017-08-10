@@ -280,6 +280,47 @@ class TestBalanceComp(unittest.TestCase):
         for (of, wrt) in cpd['balance']:
             assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
+    def test_rhs_val(self):
+        """ Test solution with a default RHS value and no connected RHS variable. """
+
+        n = 1
+
+        prob = Problem(model=Group())
+
+        bal = BalanceComp('x', rhs_val=4.0)
+
+        exec_comp = ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
+
+        prob.model.add_subsystem(name='exec', subsys=exec_comp)
+
+        prob.model.add_subsystem(name='balance', subsys=bal)
+
+        prob.model.connect('balance.x', 'exec.x')
+        prob.model.connect('exec.y', 'balance.lhs:x')
+
+        prob.model.linear_solver = DirectSolver()
+
+        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.nonlinear_solver.options['maxiter'] = 100
+        prob.model.nonlinear_solver.options['iprint'] = 0
+
+        prob.model.jacobian = DenseJacobian()
+
+        prob.setup()
+
+        prob['balance.x'] = np.random.rand(n)
+
+        prob.run_model()
+
+        assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
+
+        np.set_printoptions(linewidth=1024)
+
+        cpd = prob.check_partials()
+
+        for (of, wrt) in cpd['balance']:
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+
     def test_scalar_with_mult(self):
 
         n = 1

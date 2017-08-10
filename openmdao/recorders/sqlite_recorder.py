@@ -9,12 +9,7 @@ import numpy as np
 from six import iteritems
 from six.moves import cPickle as pickle
 
-from openmdao.core.driver import Driver
-from openmdao.core.system import System
 from openmdao.recorders.base_recorder import BaseRecorder
-from openmdao.solvers.solver import Solver, NonlinearSolver
-from openmdao.recorders.recording_iteration_stack import \
-    get_formatted_iteration_coordinate, recording_iteration_stack
 from openmdao.utils.mpi import MPI
 
 
@@ -105,32 +100,6 @@ class SqliteRecorder(BaseRecorder):
                                 " scaling_factors BLOB)")
             self.cursor.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
                                 "solver_options BLOB, solver_class TEXT)")
-
-    def record_iteration(self, object_requesting_recording, metadata, **kwargs):
-        """
-        Store the provided data in the sqlite file using the iteration coordinate for the key.
-
-        Parameters
-        ----------
-        object_requesting_recording: <object>
-            The item, a System, Solver, or Driver that wants to record an iteration.
-        metadata : dict
-            Dictionary containing execution metadata (e.g. iteration coordinate).
-        **kwargs :
-            Various keyword arguments needed for System or Solver recordings.
-        """
-        super(SqliteRecorder, self).record_iteration(object_requesting_recording, metadata)
-
-        if isinstance(object_requesting_recording, Driver):
-            self.record_iteration_driver(object_requesting_recording, metadata)
-
-        elif isinstance(object_requesting_recording, System):
-            self.record_iteration_system(object_requesting_recording, metadata)
-
-        elif isinstance(object_requesting_recording, Solver):
-            self.record_iteration_solver(object_requesting_recording, metadata, **kwargs)
-        else:
-            raise ValueError("Recorders must be attached to Drivers, Systems, or Solvers.")
 
     def record_iteration_driver(self, object_requesting_recording, metadata):
         """
@@ -358,23 +327,6 @@ class SqliteRecorder(BaseRecorder):
 
         self.cursor.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
                             ('solver', self.cursor.lastrowid))
-
-    def record_metadata(self, object_requesting_recording):
-        """
-        Route the record_metadata call to the proper object.
-
-        Parameters
-        ----------
-        object_requesting_recording: <object>
-            The object that would like to record its metadata.
-        """
-        if self.options['record_metadata']:
-            if isinstance(object_requesting_recording, Driver):
-                self.record_metadata_driver(object_requesting_recording)
-            elif isinstance(object_requesting_recording, System):
-                self.record_metadata_system(object_requesting_recording)
-            elif isinstance(object_requesting_recording, Solver):
-                self.record_metadata_solver(object_requesting_recording)
 
     def record_metadata_driver(self, object_requesting_recording):
         """

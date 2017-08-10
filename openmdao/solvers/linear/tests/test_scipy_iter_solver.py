@@ -39,6 +39,9 @@ class TestScipyIterativeSolver(LinearSolverTests.LinearSolverTestCase):
         p.setup(check=False)
         p.set_solver_print(level=0)
 
+        # Conclude setup but don't run model.
+        p.final_setup()
+
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
         # forward
@@ -66,6 +69,9 @@ class TestScipyIterativeSolver(LinearSolverTests.LinearSolverTestCase):
         p = Problem(group)
         p.setup(check=False)
         p.set_solver_print(level=0)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
 
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
@@ -98,6 +104,9 @@ class TestScipyIterativeSolver(LinearSolverTests.LinearSolverTestCase):
         p.setup(check=False)
 
         p.set_solver_print(level=0)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
 
         # forward
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
