@@ -1504,10 +1504,13 @@ class Group(System):
         glen = len(self.pathname.split('.')) if self.pathname else 0
         graph = nx.DiGraph()
 
+        # add all systems as nodes in the graph so they'll be there even if
+        # unconnected.
         if comps_only:
-            subsystems = list(self.system_iter(recurse=True, typ=Component))
+            graph.add_nodes_from(s.pathname for s in
+                                 self.system_iter(recurse=True, typ=Component))
         else:
-            subsystems = self._subsystems_allprocs
+            graph.add_nodes_from(s.pathname for s in self._subsystems_allprocs)
 
         if save_vars:
             edge_data = defaultdict(lambda: defaultdict(list))
