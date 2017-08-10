@@ -346,7 +346,12 @@ class Problem(object):
     def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='auto',
               force_alloc_complex=False, multi_vector_class=None):
         """
-        Set up everything.
+        Set up the model hierarchy.
+
+        When `setup` is called, the model hierarchy is assembled, the processors are allocated
+        (for MPI), and variables and connections are all assigned. This method traverses down
+        the model hierarchy to call `setup` on each subsystem, and then traverses up te model
+        hierarchy to call `configure` on each subsystem.
 
         Parameters
         ----------
@@ -407,11 +412,13 @@ class Problem(object):
 
     def final_setup(self):
         """
-        Perform final setup on problem before run.
+        Perform final setup phase on problem in preparation for run.
 
-        This is called at the start of `run_driver` or `run_model`.
-
-        Right now, it just loads and sets the initial conditions from cache.
+        This is the second phase of setup, and is done automatically at the start of `run_driver`
+        and `run_model`. At the beginning of final_setup, we have a model hierarchy with defined
+        variables, solvers, case_recorders, and derivative settings. During this phase, the vectors
+        are created and populated, the drivers and solvers are initialized, and the recorders are
+        started, and the rest of the framework is prepared for execution.
         """
         vector_class = self._vector_class
         check = self._check
