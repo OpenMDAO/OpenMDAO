@@ -631,6 +631,9 @@ class Group(System):
                                    "of size %d.")
                             raise ValueError(msg % (abs_out, abs_in,
                                              bad_idx, out_size))
+                        if src_indices.ndim > 1:
+                            abs2meta_in[abs_in]['src_indices'] = \
+                                abs2meta_in[abs_in]['src_indices'].flatten()
                     else:
                         for d in range(source_dimensions):
                             # when running under MPI, there is a value for each proc
@@ -644,10 +647,6 @@ class Group(System):
                                            "dimension of size %d.")
                                     raise ValueError(msg % (abs_out, abs_in,
                                                      i, d_size))
-
-                    if flat and len(src_indices.shape) > 1:
-                        abs2meta_in[abs_in]['src_indices'] = \
-                            abs2meta_in[abs_in]['src_indices'].flatten()
 
         # Recursion
         if recurse:
