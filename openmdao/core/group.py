@@ -573,7 +573,8 @@ class Group(System):
                 # get input shape and src_indices from the local meta dict
                 # (input is always local)
                 in_shape = abs2meta_in[abs_in]['shape']
-                src_indices = abs2meta_in[abs_in].get('src_indices')
+                src_indices = abs2meta_in[abs_in]['src_indices']
+                flat = abs2meta_in[abs_in]['flat_src_indices']
                 prom_out = self._var_abs2prom['output'][abs_out]
                 prom_in = self._var_abs2prom['input'][abs_in]
 
@@ -838,7 +839,7 @@ class Group(System):
                 elif src_indices.ndim == 1:
                     src_indices = convert_neg(src_indices, global_size_out)
                 else:
-                    if len(shape_out) == 1:
+                    if len(shape_out) == 1 or shape_in == src_indices.shape:
                         src_indices = src_indices.flatten()
                         src_indices = convert_neg(src_indices, global_size_out)
                     else:
@@ -1029,7 +1030,7 @@ class Group(System):
 
         return subsys
 
-    def connect(self, src_name, tgt_name, src_indices=None):
+    def connect(self, src_name, tgt_name, src_indices=None, flat_src_indices=None):
         """
         Connect source src_name to target tgt_name in this namespace.
 
@@ -1039,10 +1040,14 @@ class Group(System):
             name of the source variable to connect
         tgt_name : str or [str, ... ] or (str, ...)
             name of the target variable(s) to connect
-        src_indices : collection of int optional
-            When an input variable connects to some subset of an array output
-            variable, you can specify which global indices of the source to be
-            transferred to the input here.  Negative indices are supported.
+        src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
+            The global indices of the source variable to transfer data from.
+            The shapes of the target and src_indices must match, and form of the
+            entries within is determined by the value of 'flat_src_indices'.
+        flat_src_indices : bool
+            If True, each entry of src_indices is assumed to be an index into the
+            flattened source.  Otherwise it must be a tuple or list of size equal
+            to the number of dimensions of the source.
         """
         # if src_indices argument is given, it should be valid
         if isinstance(src_indices, string_types):

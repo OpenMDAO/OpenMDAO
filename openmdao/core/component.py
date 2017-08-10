@@ -234,8 +234,8 @@ class Component(System):
         for of, wrt, method, kwargs in self._approximated_partials:
             self._approx_partials(of, wrt, method=method, **kwargs)
 
-    def add_input(self, name, val=1.0, shape=None, src_indices=None, units=None,
-                  desc='', var_set=0):
+    def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
+                  units=None, desc='', var_set=0):
         """
         Add an input variable to the component.
 
@@ -251,9 +251,18 @@ class Component(System):
             val is not an array. Default is None.
         src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
             The global indices of the source variable to transfer data from.
+            A value of None implies this input depends on all entries of source.
+            Default is None. The shapes of the target and src_indices must match,
+            and form of the entries within is determined by the value of 'flat_src_indices'.
+        flat_src_indices : bool
+            If True, each entry of src_indices is assumed to be an index into the
+            flattened source.  Otherwise it must be a tuple or list of size equal
+            to the number of dimensions of the source.
+        flat_src_indices : bool
+            The global indices of the source variable to transfer data from.
             If val is given as an array_like object, the shapes of val and
-            src_indices must match. A value of None implies this input depends
-            on all entries of source. Default is None.
+            src_indices must match, and entries within must be indices into the
+            flattened source.
         units : str or None
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.
@@ -313,6 +322,7 @@ class Component(System):
             metadata['src_indices'] = None
         else:
             metadata['src_indices'] = np.atleast_1d(src_indices)
+        metadata['flat_src_indices'] = flat_src_indices
 
         # units: taken as is
         metadata['units'] = units
