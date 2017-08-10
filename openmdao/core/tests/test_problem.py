@@ -510,6 +510,7 @@ class TestProblem(unittest.TestCase):
         G2.add_subsystem('C6', ExecComp(['x=2.0*a', 'y=2.0*b+3.0*c']))
         G2.add_subsystem('C7', ExecComp(['x=2.0*a', 'y=2.0*b']))
         model.add_subsystem("C8", ExecComp(['y=1.5*a+2.0*b']))
+        model.add_subsystem("Unconnected", ExecComp('y=99.*x'))
 
         model.connect('indep1.x', 'G1.C1.a')
         model.connect('indep2.x', 'G2.C6.a')
@@ -525,7 +526,7 @@ class TestProblem(unittest.TestCase):
         p.setup(check=False)
 
         g = p.model.compute_sys_graph(comps_only=True, save_vars=True)
-        relevant = get_relevant_vars(g, ['indep1.x', 'indep2.x'], ['C8.y'])
+        relevant = get_relevant_vars(g, ['indep1.x', 'indep2.x'], ['C8.y', 'Unconnected.y'])
 
         indep1_ins = set(['C3.b', 'C3.c', 'C8.b', 'G1.C1.a', 'G2.C5.a', 'G2.C5.b'])
         indep1_outs = set(['C3.y', 'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'])

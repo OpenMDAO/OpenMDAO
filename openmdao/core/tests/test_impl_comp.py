@@ -109,13 +109,13 @@ class QuadraticJacVec(QuadraticComp):
 
 class ImplicitCompTestCase(unittest.TestCase):
 
-    def test_compute_and_list(self):
+    def setUp(self):
         group = Group()
 
         comp1 = group.add_subsystem('comp1', IndepVarComp())
         comp1.add_output('a', 1.0)
-        comp1.add_output('b', 1.0)
-        comp1.add_output('c', 1.0)
+        comp1.add_output('b', -4.0)
+        comp1.add_output('c', 3.0)
 
         group.add_subsystem('comp2', QuadraticLinearize())
         group.add_subsystem('comp3', QuadraticJacVec())
@@ -129,16 +129,16 @@ class ImplicitCompTestCase(unittest.TestCase):
 
         prob = Problem(model=group)
         prob.setup(check=False)
-
-        # run model
-        prob['comp1.a'] = 1.
-        prob['comp1.b'] = -4.
-        prob['comp1.c'] = 3.
         prob.run_model()
+
+        self.prob = prob
+
+    def test_compute_and_derivs(self):
+        prob = self.prob
+
         assert_rel_error(self, prob['comp2.x'], 3.)
         assert_rel_error(self, prob['comp2.x'], 3.)
 
-        # total derivs
         total_derivs = prob.compute_total_derivs(
             wrt=['comp1.a', 'comp1.b', 'comp1.c'],
             of=['comp2.x', 'comp3.x']
@@ -150,9 +150,9 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, total_derivs['comp3.x', 'comp1.b'], [[-1.5]])
         assert_rel_error(self, total_derivs['comp3.x', 'comp1.c'], [[-0.5]])
 
-        # list inputs
+    def test_list_inputs(self):
         stream = cStringIO()
-        inputs = prob.model.list_inputs(out_stream=stream)
+        inputs = self.prob.model.list_inputs(out_stream=stream)
         self.assertEqual(sorted(inputs), [
             ('comp2.a', [1.]),
             ('comp2.b', [-4.]),
@@ -166,9 +166,9 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('comp3.'), 3)
         self.assertEqual(text.count('value:'), 6)
 
-        # list explicit outputs
+    def test_list_explicit_outputs(self):
         stream = cStringIO()
-        outputs = prob.model.list_outputs(implicit=False, out_stream=stream)
+        outputs = self.prob.model.list_outputs(implicit=False, out_stream=stream)
         self.assertEqual(sorted(outputs), [
             ('comp1.a', [1.]),
             ('comp1.b', [-4.]),
@@ -179,9 +179,9 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('value:'), 3)
         self.assertEqual(text.count('residual:'), 3)
 
-        # list states
+    def test_list_implicit_outputs(self):
         stream = cStringIO()
-        states = prob.model.list_outputs(explicit=False, out_stream=stream)
+        states = self.prob.model.list_outputs(explicit=False, out_stream=stream)
         self.assertEqual(sorted(states), [
             ('comp2.x', [3.]),
             ('comp3.x', [3.])
@@ -192,9 +192,9 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('value:'), 2)
         self.assertEqual(text.count('residual:'), 2)
 
-        # list residuals
+    def test_list_residuals(self):
         stream = cStringIO()
-        resids = prob.model.list_residuals(out_stream=stream)
+        resids = self.prob.model.list_residuals(out_stream=stream)
         self.assertEqual(sorted(resids), [
             ('comp1.a', [0.]),
             ('comp1.b', [0.]),
@@ -208,72 +208,6 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('comp3.x'), 1)
         self.assertEqual(text.count('value:'), 5)
         self.assertEqual(text.count('residual:'), 5)
-
-    def test_list_with_subgroup(self):
-        group = Group()
-
-        comp1 = group.add_subsystem('comp1', IndepVarComp())
-        comp1.add_output('a', 1.0)
-        comp1.add_output('b', 1.0)
-        comp1.add_output('c', 1.0)
-
-        sub = group.add_subsystem('sub', Group())
-        sub.add_subsystem('comp2', QuadraticLinearize())
-        sub.add_subsystem('comp3', QuadraticJacVec())
-
-        group.connect('comp1.a', 'sub.comp2.a')
-        group.connect('comp1.b', 'sub.comp2.b')
-        group.connect('comp1.c', 'sub.comp2.c')
-        group.connect('comp1.a', 'sub.comp3.a')
-        group.connect('comp1.b', 'sub.comp3.b')
-        group.connect('comp1.c', 'sub.comp3.c')
-
-        prob = Problem(model=group)
-        prob.setup(check=False)
-
-        # run model
-        prob['comp1.a'] = 1.
-        prob['comp1.b'] = -4.
-        prob['comp1.c'] = 3.
-        prob.run_model()
-        assert_rel_error(self, prob['sub.comp2.x'], 3.)
-        assert_rel_error(self, prob['sub.comp2.x'], 3.)
-
-        # list inputs
-        inputs = prob.model.list_inputs(out_stream=None)
-        self.assertEqual(sorted(inputs), [
-            ('sub.comp2.a', [1.]),
-            ('sub.comp2.b', [-4.]),
-            ('sub.comp2.c', [3.]),
-            ('sub.comp3.a', [1.]),
-            ('sub.comp3.b', [-4.]),
-            ('sub.comp3.c', [3.])
-        ])
-
-        # list explicit outputs
-        outputs = prob.model.list_outputs(implicit=False, out_stream=None)
-        self.assertEqual(sorted(outputs), [
-            ('comp1.a', [1.]),
-            ('comp1.b', [-4.]),
-            ('comp1.c', [3.])
-        ])
-
-        # list states
-        states = prob.model.list_outputs(explicit=False, out_stream=None)
-        self.assertEqual(sorted(states), [
-            ('sub.comp2.x', [3.]),
-            ('sub.comp3.x', [3.])
-        ])
-
-        # list residuals
-        resids = prob.model.list_residuals(out_stream=None)
-        self.assertEqual(sorted(resids), [
-            ('comp1.a', [0.]),
-            ('comp1.b', [0.]),
-            ('comp1.c', [0.]),
-            ('sub.comp2.x', [0.]),
-            ('sub.comp3.x', [0.])
-        ])
 
     def test_guess_nonlinear(self):
 
@@ -388,6 +322,112 @@ class ImplicitCompTestCase(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['comp2.x'], 3.)
+
+
+class ListFeatureTestCase(unittest.TestCase):
+
+    def setUp(self):
+        group = Group()
+
+        comp1 = group.add_subsystem('comp1', IndepVarComp())
+        comp1.add_output('a', 1.0)
+        comp1.add_output('b', 1.0)
+        comp1.add_output('c', 1.0)
+
+        sub = group.add_subsystem('sub', Group())
+        sub.add_subsystem('comp2', QuadraticComp())
+        sub.add_subsystem('comp3', QuadraticComp())
+
+        group.connect('comp1.a', 'sub.comp2.a')
+        group.connect('comp1.b', 'sub.comp2.b')
+        group.connect('comp1.c', 'sub.comp2.c')
+        group.connect('comp1.a', 'sub.comp3.a')
+        group.connect('comp1.b', 'sub.comp3.b')
+        group.connect('comp1.c', 'sub.comp3.c')
+
+        global prob  # so we don't need `self.` in feature doc
+        prob = Problem(model=group)
+        prob.setup()
+
+        prob['comp1.a'] = 1.
+        prob['comp1.b'] = -4.
+        prob['comp1.c'] = 3.
+        prob.run_model()
+
+    def test_list_inputs(self):
+        prob.model.list_inputs()
+
+    def test_list_outputs(self):
+        prob.model.list_outputs()
+
+    def test_list_explicit_outputs(self):
+        prob.model.list_outputs(implicit=False)
+
+    def test_list_implicit_outputs(self):
+        prob.model.list_outputs(explicit=False)
+
+    def test_list_residuals(self):
+        prob.model.list_residuals()
+
+    def test_list_return_value(self):
+        # list inputs
+        inputs = prob.model.list_inputs(out_stream=None)
+        self.assertEqual(sorted(inputs), [
+            ('sub.comp2.a', [1.]),
+            ('sub.comp2.b', [-4.]),
+            ('sub.comp2.c', [3.]),
+            ('sub.comp3.a', [1.]),
+            ('sub.comp3.b', [-4.]),
+            ('sub.comp3.c', [3.])
+        ])
+
+        # list explicit outputs
+        outputs = prob.model.list_outputs(implicit=False, out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('comp1.a', [1.]),
+            ('comp1.b', [-4.]),
+            ('comp1.c', [3.])
+        ])
+
+        # list residuals
+        resids = prob.model.list_residuals(out_stream=None)
+        self.assertEqual(sorted(resids), [
+            ('comp1.a', [0.]),
+            ('comp1.b', [0.]),
+            ('comp1.c', [0.]),
+            ('sub.comp2.x', [0.]),
+            ('sub.comp3.x', [0.])
+        ])
+
+    def test_list_no_values(self):
+        # list inputs
+        inputs = prob.model.list_inputs(values=False)
+        self.assertEqual(sorted(inputs), [
+            'sub.comp2.a',
+            'sub.comp2.b',
+            'sub.comp2.c',
+            'sub.comp3.a',
+            'sub.comp3.b',
+            'sub.comp3.c'
+        ])
+
+        # list explicit outputs
+        outputs = prob.model.list_outputs(implicit=False, values=False)
+        self.assertEqual(sorted(outputs), [
+            'comp1.a',
+            'comp1.b',
+            'comp1.c'
+        ])
+
+        # list residuals
+        resids = prob.model.list_residuals(values=False)
+        self.assertEqual(sorted(resids), [
+            'comp1.a',
+            'comp1.b',
+            'comp1.c',
+            'sub.comp2.x',
+            'sub.comp3.x'
+        ])
 
 
 if __name__ == '__main__':
