@@ -16,6 +16,18 @@ ImplicitComponent Methods
 
 The implementation of each method will be illustrated using a simple implicit component that computes the output :math:`x` implicitly via a quadratic equation, :math:`ax^2 + bx + c =0`, where :math:`a`, :math:`b`, and :math:`c` are inputs to the component.
 
+::
+
+    class QuadraticComp(ImplicitComponent):
+        """
+        A Simple Implicit Component representing a Quadratic Equation.
+
+        R(a, b, c, x) = ax^2 + bx + c
+
+        Solution via Quadratic Formula:
+        x = (-b + sqrt(b^2 - 4ac)) / 2a
+        """
+
 - :code:`setup()` :
 
   Declare input and output variables via :code:`add_input` and :code:`add_output`.

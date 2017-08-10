@@ -49,7 +49,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
 
         testlogger = TestLogger()
-        data = prob.check_partials(logger=testlogger)
+        prob.check_partials(logger=testlogger)
 
         lines = testlogger.get('info')
 
@@ -168,7 +168,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
 
         testlogger = TestLogger()
-        data = prob.check_partials(logger=testlogger)
+        prob.check_partials(logger=testlogger)
 
         lines = testlogger.get('info')
 
@@ -250,7 +250,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials()
+        data = prob.check_partials(suppress_output=True)
 
         abs_error = data['comp']['y', 'x1']['abs error']
         rel_error = data['comp']['y', 'x1']['rel error']
@@ -296,7 +296,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         units = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
 
         p.setup()
-        data = p.check_partials()
+        data = p.check_partials(suppress_output=True)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -339,7 +339,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         model.nonlinear_solver = NonLinearRunOnce()
 
         p.setup()
-        data = p.check_partials()
+        data = p.check_partials(suppress_output=True)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -408,7 +408,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        data = p.check_partials()
+        data = p.check_partials(suppress_output=True)
         identity = np.eye(4)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_fwd'], identity, 1e-15)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_rev'], identity, 1e-15)
@@ -434,7 +434,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials()
+        data = prob.check_partials(suppress_output=True)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -466,7 +466,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials()
+        data = prob.check_partials(suppress_output=True)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -516,7 +516,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials()
+        data = prob.check_partials(suppress_output=True)
 
         assert_rel_error(self, data['comp']['y', 'extra']['J_fwd'], np.zeros((2, 2)))
         assert_rel_error(self, data['comp']['y', 'extra']['J_rev'], np.zeros((2, 2)))
