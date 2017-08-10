@@ -212,6 +212,9 @@ class TestServerRecorder(unittest.TestCase):
         self.prob.driver.add_recorder(recorder)
         self.prob.setup(check=False)
 
+        # Need this since we aren't running the model.
+        self.prob.final_setup()
+
         self.prob.cleanup()
         self.assertTrue(self.recorded_metadata)
         self.recorded_metadata = False

@@ -66,7 +66,7 @@ class ExecComp(ExplicitComponent):
 
         Parameters
         ----------
-        exprs : str or list of str
+        exprs : str, tuple of str or list of str
             An assignment statement or iter of them. These express how the
             outputs are calculated based on the inputs.
 

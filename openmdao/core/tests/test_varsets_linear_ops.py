@@ -19,6 +19,7 @@ class TestVarSets(unittest.TestCase):
         p = Problem(group)
         p.set_solver_print(level=0)
         p.setup(check=False)
+        p.final_setup()
         self.p = p
 
         # now create the same problem with no varsets
@@ -29,6 +30,7 @@ class TestVarSets(unittest.TestCase):
         p = Problem(group)
         p.set_solver_print(level=0)
         p.setup(check=False)
+        p.final_setup()
         self.p_no_varsets = p
 
     def test_apply_linear(self):
