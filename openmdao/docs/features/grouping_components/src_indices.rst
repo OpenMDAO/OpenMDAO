@@ -33,7 +33,7 @@ supported.
 connect it to the (3, 1) entry of the source, then the *add_input*
 call might look like the following if we use flat src_indices:
 
-.. code:
+.. code::
 
     self.add_input('x', 1.0, src_indices=[10], shape=1)
 
