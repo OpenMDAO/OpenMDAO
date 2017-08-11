@@ -24,7 +24,6 @@ class LinearSolverTests(object):
     class LinearSolverTestCase(unittest.TestCase):
         linear_solver_class = None
 
-
         def test_solve_linear_maxiter(self):
             """Verify that the linear solver abides by the 'maxiter' option."""
 
@@ -34,6 +33,9 @@ class LinearSolverTests(object):
             p = Problem(group)
             p.setup(check=False)
             p.set_solver_print(level=0)
+
+            # Conclude setup but don't run model.
+            p.final_setup()
 
             d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
@@ -291,34 +293,6 @@ class LinearSolverTests(object):
 
             J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['c7.y1', 'iv.x'], [[-40.75]], 1e-6)
-
-        def test_analysis_error(self):
-
-            raise unittest.SkipTest("AnalysisError not implemented yet")
-
-            prob = Problem()
-            prob.model = ConvergeDivergeFlat()
-            prob.model.linear_solver = self.linear_solver_class()
-            prob.model.linear_solver.options['maxiter'] = 2
-            prob.model.linear_solver.options['err_on_maxiter'] = True
-
-            prob.setup(check=False)
-            prob.run()
-
-            wrt = ['iv.x']
-            of = ['c7.y1']
-
-            prob.run()
-
-            # Make sure value is fine.
-            assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
-
-            try:
-                prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
-            except AnalysisError as err:
-                self.assertEqual(str(err), "Solve in '': ScipyGMRES failed to converge after 2 iterations")
-            else:
-                self.fail("expected AnalysisError")
 
         def test_converge_diverge_groups(self):
             # Test derivatives for converge-diverge-groups topology.

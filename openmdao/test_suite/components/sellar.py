@@ -86,7 +86,7 @@ class SellarDis1withDerivatives(SellarDis1):
         # Finite difference nothing
         pass
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """
         Jacobian for Sellar discipline 1.
         """
@@ -162,7 +162,7 @@ class SellarDis2withDerivatives(SellarDis2):
         # Finite difference nothing
         pass
 
-    def compute_partials(self, inputs, outputs, J):
+    def compute_partials(self, inputs, J):
         """
         Jacobian for Sellar discipline 2.
         """
@@ -216,11 +216,12 @@ class SellarNoDerivatives(Group):
         if self.metadata['nl_maxiter']:
             self.nonlinear_solver.options['maxiter'] = self.metadata['nl_maxiter']
 
-        cycle.linear_solver = self.metadata['linear_solver']
+    def configure(self):
+        self.cycle.linear_solver = self.metadata['linear_solver']
         if self.metadata['ln_atol']:
-            cycle.linear_solver.options['atol'] = self.metadata['ln_atol']
+            self.cycle.linear_solver.options['atol'] = self.metadata['ln_atol']
         if self.metadata['ln_maxiter']:
-            cycle.linear_solver.options['maxiter'] = self.metadata['ln_maxiter']
+            self.cycle.linear_solver.options['maxiter'] = self.metadata['ln_maxiter']
 
 
 class SellarDerivatives(Group):
@@ -320,7 +321,6 @@ class SellarDerivativesGrouped(Group):
         self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         mda = self.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
-        mda.linear_solver = ScipyIterativeSolver()
         mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -331,7 +331,6 @@ class SellarDerivativesGrouped(Group):
         self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        mda.nonlinear_solver = NonlinearBlockGS()
         self.linear_solver = ScipyIterativeSolver()
 
         self.nonlinear_solver = self.metadata['nonlinear_solver']
@@ -345,6 +344,10 @@ class SellarDerivativesGrouped(Group):
             self.linear_solver.options['atol'] = self.metadata['ln_atol']
         if self.metadata['ln_maxiter']:
             self.linear_solver.options['maxiter'] = self.metadata['ln_maxiter']
+
+    def configure(self):
+        self.mda.linear_solver = ScipyIterativeSolver()
+        self.mda.nonlinear_solver = NonlinearBlockGS()
 
 
 class StateConnection(ImplicitComponent):
@@ -409,10 +412,8 @@ class SellarStateConnection(Group):
         self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         sub = self.add_subsystem('sub', Group(), promotes=['x', 'z', 'y1', 'state_eq.y2_actual', 'state_eq.y2_command', 'd1.y2', 'd2.y2'])
-        sub.linear_solver = ScipyIterativeSolver()
 
         subgrp = sub.add_subsystem('state_eq_group', Group(), promotes=['state_eq.y2_actual', 'state_eq.y2_command'])
-        subgrp.linear_solver = ScipyIterativeSolver()
         subgrp.add_subsystem('state_eq', StateConnection())
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1'])
@@ -441,6 +442,10 @@ class SellarStateConnection(Group):
             self.linear_solver.options['atol'] = self.metadata['ln_atol']
         if self.metadata['ln_maxiter']:
             self.linear_solver.options['maxiter'] = self.metadata['ln_maxiter']
+
+    def configure(self):
+        self.sub.linear_solver = ScipyIterativeSolver()
+        self.sub.state_eq_group.linear_solver = ScipyIterativeSolver()
 
 
 class SellarImplicitDis1(ImplicitComponent):

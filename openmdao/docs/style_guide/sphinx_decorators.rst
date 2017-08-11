@@ -29,7 +29,7 @@ and a method that looks like this and has the decorator applied to it:
    ::
 
     @mydecorator
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """
         Compute sub-jacobian parts / factorization.
 
@@ -37,8 +37,6 @@ and a method that looks like this and has the decorator applied to it:
         ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
@@ -57,7 +55,7 @@ But if we add the call signature of the method to the docstring as the first lin
    ::
 
     @mydecorator
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """
         Compute sub-jacobian parts / factorization.
 
@@ -65,8 +63,6 @@ But if we add the call signature of the method to the docstring as the first lin
         ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """

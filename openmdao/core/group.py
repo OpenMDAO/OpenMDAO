@@ -1,7 +1,7 @@
 """Define the Group class."""
 from __future__ import division
 
-from collections import Iterable, Counter, OrderedDict
+from collections import Iterable, Counter, OrderedDict, defaultdict
 from itertools import product, chain
 import warnings
 
@@ -9,10 +9,12 @@ from six import iteritems, string_types, itervalues
 from six.moves import range
 
 import numpy as np
+import networkx as nx
 
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
+from openmdao.core.component import Component
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.proc_allocators.proc_allocator import ProcAllocationError
 from openmdao.recorders.recording_iteration_stack import Recording
@@ -21,6 +23,10 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.units import is_compatible
+
+# regex to check for valid names.
+import re
+namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
 
 
 class Group(System):
@@ -50,7 +56,13 @@ class Group(System):
 
     def setup(self):
         """
-        Add subsystems to this group.
+        Build this group.
+
+        This method should be overidden by your Group's method.
+
+        You may call 'add_subsystem' to add systems to this group. You may also issue connections,
+        and set the linear and nonlinear solvers for this group level. You cannot safely change
+        anything on children systems; use the 'configure' method instead.
 
         Available attributes:
             name
@@ -59,6 +71,38 @@ class Group(System):
             metadata
         """
         pass
+
+    def configure(self):
+        """
+        Configure this group to assign children settings.
+
+        This method may optionally be overidden by your Group's method.
+
+        You may only use this method to change settings on your children subsystems. This includes
+        setting solvers in cases where you want to override the defaults.
+
+        You can assume that the full hierarchy below your level has been instantiated and has
+        already called its own configure methods.
+
+        Available attributes:
+            name
+            pathname
+            comm
+            metadata
+            system hieararchy with attribute access
+        """
+        pass
+
+    def _configure(self):
+        """
+        Configure our model recursively to assign any children settings.
+
+        Highest system's settings take precedence.
+        """
+        for subsys in self._subsystems_myproc:
+            subsys._configure()
+
+        self.configure()
 
     def _setup_procs(self, pathname, comm):
         """
@@ -387,7 +431,7 @@ class Group(System):
 
         self._setup_global_shapes()
 
-    def _setup_global_connections(self, recurse=True):
+    def _setup_global_connections(self, recurse=True, conns=None):
         """
         Compute dict of all connections between this system's inputs and outputs.
 
@@ -401,21 +445,42 @@ class Group(System):
         ----------
         recurse : bool
             Whether to call this method in subsystems.
+        conns : dict
+            Dictionary of connections passed down from parent group.
         """
         super(Group, self)._setup_global_connections()
+
         global_abs_in2out = self._conn_global_abs_in2out
 
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
         allprocs_prom2abs_list_out = self._var_allprocs_prom2abs_list['output']
         abs2meta_in = self._var_abs2meta['input']
+        abs2meta_out = self._var_abs2meta['output']
         pathname = self.pathname
 
         abs_in2out = {}
 
         if pathname == '':
             path_len = 0
+            nparts = 0
         else:
             path_len = len(pathname) + 1
+            nparts = len(pathname.split('.'))
+
+        new_conns = defaultdict(dict)
+
+        if conns is not None:
+            for abs_in, abs_out in iteritems(conns):
+                inparts = abs_in.split('.')
+                outparts = abs_out.split('.')
+
+                if inparts[:nparts] == outparts[:nparts]:
+                    global_abs_in2out[abs_in] = abs_out
+
+                    # if connection is contained in a subgroup, add to conns
+                    # to pass down to subsystems.
+                    if inparts[:nparts + 1] == outparts[:nparts + 1]:
+                        new_conns[inparts[nparts]][abs_in] = abs_out
 
         # Add implicit connections (only ones owned by this group)
         for prom_name in allprocs_prom2abs_list_out:
@@ -428,7 +493,8 @@ class Group(System):
                         abs_in2out[abs_in] = abs_out
 
         # Add explicit connections (only ones declared by this group)
-        for prom_in, (prom_out, src_indices) in iteritems(self._manual_connections):
+        for prom_in, (prom_out, src_indices, flat_src_indices) in \
+                iteritems(self._manual_connections):
 
             # throw an exception if either output or input doesn't exist
             # (not traceable to a connect statement, so provide context)
@@ -446,9 +512,12 @@ class Group(System):
             # (not traceable to a connect statement, so provide context)
             # and check if src_indices is defined in both connect and add_input.
             abs_out = allprocs_prom2abs_list_out[prom_out][0]
-            out_subsys = abs_out.rsplit('.', 1)[0]
+            outparts = abs_out.split('.')
+            out_subsys = outparts[:-1]
+
             for abs_in in allprocs_prom2abs_list_in[prom_in]:
-                in_subsys = abs_in.rsplit('.', 1)[0]
+                inparts = abs_in.split('.')
+                in_subsys = inparts[:-1]
                 if out_subsys == in_subsys:
                     raise RuntimeError("Output and input are in the same System " +
                                        "for connection in '%s' from '%s' to '%s'." %
@@ -463,16 +532,23 @@ class Group(System):
                                            (self.pathname, prom_out,
                                             prom_in, prom_in))
                     meta['src_indices'] = np.atleast_1d(src_indices)
+                    meta['flat_src_indices'] = flat_src_indices
 
                 abs_in2out[abs_in] = abs_out
 
+                # if connection is contained in a subgroup, add to conns to pass down to subsystems.
+                if inparts[:nparts + 1] == outparts[:nparts + 1]:
+                    new_conns[inparts[nparts]][abs_in] = abs_out
+
         # Now that both implicit & explicit connections have been added,
-        # check unit compatibility, but only for connections that are either
-        # owned by (implicit) or declared by (explicit) this Group.
+        # check unit/shape compatibility, but only for connections that are
+        # either owned by (implicit) or declared by (explicit) this Group.
         # This way, we don't repeat the error checking in multiple groups
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
         allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
+
         for abs_in, abs_out in iteritems(abs_in2out):
+            # check unit compatibility
             out_units = allprocs_abs2meta_out[abs_out]['units']
             in_units = allprocs_abs2meta_in[abs_in]['units']
 
@@ -491,23 +567,99 @@ class Group(System):
                               "connected to output '%s' which has "
                               "no units." % (abs_in, in_units, abs_out))
 
+            # check shape compatibility
+            if abs_in in abs2meta_in and abs_out in abs2meta_out:
+                # get output shape from allprocs meta dict, since it may
+                # be distributed (we want global shape)
+                out_shape = allprocs_abs2meta_out[abs_out]['global_shape']
+                # get input shape and src_indices from the local meta dict
+                # (input is always local)
+                in_shape = abs2meta_in[abs_in]['shape']
+                src_indices = abs2meta_in[abs_in]['src_indices']
+                flat = abs2meta_in[abs_in]['flat_src_indices']
+
+                if src_indices is None and out_shape != in_shape:
+                    msg = ("The source and target shapes do not match"
+                           " for the connection '%s' to '%s'. Expected %s but got %s.")
+                    raise ValueError(msg % (abs_out, abs_in,
+                                            in_shape, out_shape))
+
+                if src_indices is not None:
+                    src_indices = np.atleast_1d(src_indices)
+
+                    # initial dimensions of indices shape must be same shape as target
+                    for idx_d, inp_d in zip(src_indices.shape, in_shape):
+                        if idx_d != inp_d:
+                            msg = ("The source indices %s do not specify a "
+                                   "valid shape for the connection '%s' to "
+                                   "'%s'. The target shape is "
+                                   "%s but indices are %s.")
+                            raise ValueError(msg % (str(src_indices).replace('\n', ''),
+                                                    abs_out, abs_in,
+                                                    in_shape, src_indices.shape))
+
+                    # any remaining dimension of indices must match shape of source
+                    if len(src_indices.shape) > len(in_shape):
+                        source_dimensions = src_indices.shape[len(in_shape)]
+                        if source_dimensions != len(out_shape):
+                            msg = ("The source indices %s do not specify a "
+                                   "valid shape for the connection '%s' to "
+                                   "'%s'. The source has %d "
+                                   "dimensions but the indices expect %d.")
+                            raise ValueError(msg % (str(src_indices).replace('\n', ''),
+                                                    abs_out, abs_in,
+                                                    len(out_shape), source_dimensions))
+                    else:
+                        source_dimensions = 1
+
+                    # check all indices are in range of the source dimensions
+                    if flat:
+                        out_size = np.prod(out_shape)
+                        mx = np.max(src_indices)
+                        mn = np.min(src_indices)
+                        if mx >= out_size:
+                            bad_idx = mx
+                        elif mn < -out_size:
+                            bad_idx = mn
+                        else:
+                            bad_idx = None
+                        if bad_idx is not None:
+                            msg = ("The source indices do not specify "
+                                   "a valid index for the connection "
+                                   "'%s' to '%s'. Index "
+                                   "'%d' is out of range for a flat source "
+                                   "of size %d.")
+                            raise ValueError(msg % (abs_out, abs_in,
+                                             bad_idx, out_size))
+                        if src_indices.ndim > 1:
+                            abs2meta_in[abs_in]['src_indices'] = \
+                                abs2meta_in[abs_in]['src_indices'].flatten()
+                    else:
+                        for d in range(source_dimensions):
+                            # when running under MPI, there is a value for each proc
+                            d_size = out_shape[d] * self.comm.size
+                            for i in src_indices[..., d].flat:
+                                if abs(i) >= d_size:
+                                    msg = ("The source indices do not specify "
+                                           "a valid index for the connection "
+                                           "'%s' to '%s'. Index "
+                                           "'%d' is out of range for source "
+                                           "dimension of size %d.")
+                                    raise ValueError(msg % (abs_out, abs_in,
+                                                     i, d_size))
+
         # Recursion
         if recurse:
             for subsys in self._subsystems_myproc:
-                subsys._conn_parents_abs_in2out = abs_in2out
-                subsys._setup_global_connections(recurse)
+                if subsys.name in new_conns:
+                    subsys._setup_global_connections(recurse=recurse,
+                                                     conns=new_conns[subsys.name])
+                else:
+                    subsys._setup_global_connections(recurse=recurse)
 
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
         global_abs_in2out.update(abs_in2out)
-
-        # This will only be used if we enter the following loop, in which case pathname != ''
-        path_dot = pathname + '.'
-
-        for abs_in, abs_out in iteritems(self._conn_parents_abs_in2out):
-            # We need to check the period as well because only the first part might match
-            if abs_in[:path_len] == path_dot and abs_out[:path_len] == path_dot:
-                global_abs_in2out[abs_in] = abs_out
 
         for subsys in self._subsystems_myproc:
             global_abs_in2out.update(subsys._conn_global_abs_in2out)
@@ -551,7 +703,6 @@ class Group(System):
         for abs_in, abs_out in iteritems(global_abs_in2out):
             # First, check that this system owns both the input and output.
             if abs_in[:len(pathname)] == pathname and abs_out[:len(pathname)] == pathname:
-
                 # Second, check that they are in different subsystems of this system.
                 out_subsys = abs_out[path_len:].split('.', 1)[0]
                 in_subsys = abs_in[path_len:].split('.', 1)[0]
@@ -707,7 +858,7 @@ class Group(System):
                 elif src_indices.ndim == 1:
                     src_indices = convert_neg(src_indices, global_size_out)
                 else:
-                    if len(shape_out) == 1:
+                    if len(shape_out) == 1 or shape_in == src_indices.shape:
                         src_indices = src_indices.flatten()
                         src_indices = convert_neg(src_indices, global_size_out)
                     else:
@@ -782,13 +933,12 @@ class Group(System):
 
         transfers = self._transfers
         vectors = self._vectors
-        for vec_name in self._vec_names:
-            transfer_class = vectors['output'][vec_name].TRANSFER
+        for vec_name, out_vec in iteritems(vectors['output']):
+            transfer_class = out_vec.TRANSFER
 
             transfers[vec_name] = {}
-            xfer_all = transfer_class(
-                vectors['input'][vec_name], vectors['output'][vec_name],
-                xfer_in, xfer_out, self.comm)
+            xfer_all = transfer_class(vectors['input'][vec_name], out_vec,
+                                      xfer_in, xfer_out, self.comm)
             transfers[vec_name]['fwd', None] = xfer_all
             transfers[vec_name]['rev', None] = xfer_all
             for isub in range(nsub_allprocs):
@@ -819,8 +969,8 @@ class Group(System):
         System
             The System that was passed in.
         """
-        warn_deprecation('This method provides backwards compatibility with '
-                         'OpenMDAO <= 1.x ; use add_subsystem instead.')
+        warn_deprecation("The 'add' method provides backwards compatibility with "
+                         "OpenMDAO <= 1.x ; use 'add_subsystem' instead.")
 
         return self.add_subsystem(name, subsys, promotes=promotes)
 
@@ -864,6 +1014,15 @@ class Group(System):
                 raise RuntimeError("Subsystem name '%s' is already used." %
                                    name)
 
+        if hasattr(self, name) and not isinstance(getattr(self, name), System):
+            # replacing a subsystem is ok (e.g. resetup) but no other attribute
+            raise RuntimeError("Group '%s' already has an attribute '%s'." %
+                               (self.name, name))
+
+        match = namecheck_rgx.match(name)
+        if match is None or match.group() != name:
+            raise NameError("'%s' is not a valid system name." % name)
+
         subsys.name = name
 
         if isinstance(promotes, string_types) or \
@@ -886,9 +1045,11 @@ class Group(System):
 
         subsystems_allprocs.append(subsys)
 
+        setattr(self, name, subsys)
+
         return subsys
 
-    def connect(self, src_name, tgt_name, src_indices=None):
+    def connect(self, src_name, tgt_name, src_indices=None, flat_src_indices=None):
         """
         Connect source src_name to target tgt_name in this namespace.
 
@@ -898,10 +1059,14 @@ class Group(System):
             name of the source variable to connect
         tgt_name : str or [str, ... ] or (str, ...)
             name of the target variable(s) to connect
-        src_indices : collection of int optional
-            When an input variable connects to some subset of an array output
-            variable, you can specify which global indices of the source to be
-            transferred to the input here.  Negative indices are supported.
+        src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
+            The global indices of the source variable to transfer data from.
+            The shapes of the target and src_indices must match, and form of the
+            entries within is determined by the value of 'flat_src_indices'.
+        flat_src_indices : bool
+            If True, each entry of src_indices is assumed to be an index into the
+            flattened source.  Otherwise it must be a tuple or list of size equal
+            to the number of dimensions of the source.
         """
         # if src_indices argument is given, it should be valid
         if isinstance(src_indices, string_types):
@@ -930,8 +1095,8 @@ class Group(System):
         for manual_connections in [self._manual_connections, self._static_manual_connections]:
             if tgt_name in manual_connections:
                 srcname = manual_connections[tgt_name][0]
-                raise RuntimeError(
-                    "Input '%s' is already connected to '%s'." % (tgt_name, srcname))
+                raise RuntimeError("Input '%s' is already connected to '%s'." %
+                                   (tgt_name, srcname))
 
         # source and target should not be in the same system
         if src_name.rsplit('.', 1)[0] == tgt_name.rsplit('.', 1)[0]:
@@ -943,7 +1108,7 @@ class Group(System):
         else:
             manual_connections = self._manual_connections
 
-        manual_connections[tgt_name] = (src_name, src_indices)
+        manual_connections[tgt_name] = (src_name, src_indices, flat_src_indices)
 
     def set_order(self, new_order):
         """
@@ -1305,6 +1470,13 @@ class Group(System):
                         meta_changes['cols'] = np.arange(size)
                         meta_changes['value'] = np.ones(size)
 
+                    # This suppports desvar and constraint indices.
+                    if key[0] in self._owns_approx_of_idx:
+                        meta_changes['idx_of'] = self._owns_approx_of_idx[key[0]]
+
+                    if key[1] in self._owns_approx_wrt_idx:
+                        meta_changes['idx_wrt'] = self._owns_approx_wrt_idx[key[1]]
+
                     meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
                     meta.update(meta_changes)
                     meta.update(self._owns_approx_jac_meta)
@@ -1332,3 +1504,62 @@ class Group(System):
             self._jacobian._initialize()
 
         super(Group, self)._setup_jacobians(jacobian, recurse)
+
+    def compute_sys_graph(self, comps_only=False, save_vars=False):
+        """
+        Compute a dependency graph for subsystems in this group.
+
+        Parameters
+        ----------
+        comps_only : bool (False)
+            If True, return a graph of all components within this group
+            or any of its descendants. No sub-groups will be included. Otherwise,
+            a graph containing only direct children (both Components and Groups)
+            of this group will be returned.
+
+        save_vars : bool (False)
+            If True, store variable connection information in each edge in
+            the system graph.
+
+        Returns
+        -------
+        DiGraph
+            A directed graph containing names of subsystems and their connections.
+        """
+        input_srcs = self._conn_global_abs_in2out
+        glen = len(self.pathname.split('.')) if self.pathname else 0
+        graph = nx.DiGraph()
+
+        # add all systems as nodes in the graph so they'll be there even if
+        # unconnected.
+        if comps_only:
+            graph.add_nodes_from(s.pathname for s in
+                                 self.system_iter(recurse=True, typ=Component))
+        else:
+            graph.add_nodes_from(s.pathname for s in self._subsystems_allprocs)
+
+        if save_vars:
+            edge_data = defaultdict(lambda: defaultdict(list))
+
+        for in_abs, src_abs in iteritems(input_srcs):
+            if src_abs is not None:
+                if comps_only:
+                    src = src_abs.rsplit('.', 1)[0]
+                    tgt = in_abs.rsplit('.', 1)[0]
+                else:
+                    src = src_abs.split('.')[glen]
+                    tgt = in_abs.split('.')[glen]
+
+                if save_vars:
+                    # store var connection data in each system to system edge for later
+                    # use in relevance calculation.
+                    edge_data[(src, tgt)][src_abs].append(in_abs)
+                else:
+                    graph.add_edge(src, tgt)
+
+        if save_vars:
+            for key in edge_data:
+                src_sys, tgt_sys = key
+                graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
+
+        return graph

@@ -2,8 +2,6 @@
 
 from __future__ import division
 
-import inspect
-
 import numpy as np
 from six import itervalues, iteritems
 from itertools import product
@@ -123,11 +121,6 @@ class ExplicitComponent(Component):
         """
         if res_ref is None:
             res_ref = ref
-
-        if inspect.stack()[1][3] == '__init__':
-            warn_deprecation("In the future, the 'add_output' method must be "
-                             "called from 'setup' rather than "
-                             "in the '__init__' function.")
 
         return super(ExplicitComponent, self).add_output(name,
                                                          val=val, shape=shape, units=units,
@@ -303,7 +296,7 @@ class ExplicitComponent(Component):
                 # negate constant subjacs (and others that will get overwritten)
                 # back to normal
                 self._negate_jac()
-                self.compute_partials(self._inputs, self._outputs, J)
+                self.compute_partials(self._inputs, J)
 
                 # re-negate the jacobian
                 self._negate_jac()
@@ -329,7 +322,7 @@ class ExplicitComponent(Component):
         """
         pass
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """
         Compute sub-jacobian parts. The model is assumed to be in an unscaled state.
 
@@ -337,8 +330,6 @@ class ExplicitComponent(Component):
         ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """

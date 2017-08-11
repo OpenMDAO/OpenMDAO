@@ -34,6 +34,9 @@ class TestGetSetVariables(unittest.TestCase):
         p['g.c.y'] = 5.0
         self.assertEqual(p['g.c.y'], 5.0)
 
+        # Conclude setup but don't run model.
+        p.final_setup()
+
         inputs, outputs, residuals = g.get_nonlinear_vectors()
 
         # inputs
@@ -85,6 +88,9 @@ class TestGetSetVariables(unittest.TestCase):
         p['y'] = 5.0
         self.assertEqual(p['y'], 5.0)
 
+        # Conclude setup but don't run model.
+        p.final_setup()
+
         inputs, outputs, residuals = g.get_nonlinear_vectors()
 
         # inputs
@@ -131,12 +137,18 @@ class TestGetSetVariables(unittest.TestCase):
         # inputs
         with assertRaisesRegex(self, KeyError, msg.format('x')):
             p['x'] = 5.0
+            p.final_setup()
+        p._initial_condition_cache = {}
+
         with assertRaisesRegex(self, KeyError, msg.format('x')):
             self.assertEqual(p['x'], 5.0)
 
         # outputs
         with assertRaisesRegex(self, KeyError, msg.format('y')):
             p['y'] = 5.0
+            p.final_setup()
+        p._initial_condition_cache = {}
+
         with assertRaisesRegex(self, KeyError, msg.format('y')):
             self.assertEqual(p['y'], 5.0)
 
@@ -204,6 +216,9 @@ class TestGetSetVariables(unittest.TestCase):
 
         p = Problem(model)
         p.setup(check=False)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
 
         # -------------------------------------------------------------------
 
@@ -275,6 +290,27 @@ class TestGetSetVariables(unittest.TestCase):
         # inputs (g.x is not connected)
         with assertRaisesRegex(self, KeyError, msg1.format('g.x')):
             p['g.x'] = 5.0
+            p.final_setup()
+
+        # Repeat test for post final_setup when vectors are allocated.
+        p = Problem(model)
+        p.setup(check=False)
+        p.final_setup()
+
+        # -------------------------------------------------------------------
+
+        msg1 = ('The promoted name "{}" is invalid because it is non-unique. '
+                'Access the value from the connected output variable instead.')
+
+        # inputs (g.x is not connected)
+        with assertRaisesRegex(self, KeyError, msg1.format('g.x')):
+            p['g.x'] = 5.0
+            p.final_setup()
+
+        # Start from a clean state again
+        p = Problem(model)
+        p.setup(check=False)
+
         with assertRaisesRegex(self, KeyError, msg1.format('g.x')):
             self.assertEqual(p['g.x'], 5.0)
 
@@ -289,6 +325,26 @@ class TestGetSetVariables(unittest.TestCase):
 
         # -------------------------------------------------------------------
 
+        # Repeat test for post final_setup when vectors are allocated.
+        p = Problem(model)
+        p.setup(check=False)
+        p.final_setup()
+
+        with assertRaisesRegex(self, KeyError, msg1.format('g.x')):
+            self.assertEqual(p['g.x'], 5.0)
+
+        with g.jacobian_context() as jac:
+
+            # d(outputs)/d(inputs)
+            with assertRaisesRegex(self, KeyError, msg1.format('x')):
+                jac['y', 'x'] = 5.0
+
+            with assertRaisesRegex(self, KeyError, msg1.format('x')):
+                self.assertEqual(jac['y', 'x'], 5.0)
+
+        # -------------------------------------------------------------------
+
+        # From here, 'g.x' has a valid source.
         model.connect('x', 'g.x')
 
         p = Problem(model)
@@ -298,8 +354,43 @@ class TestGetSetVariables(unittest.TestCase):
                 'Access the value from the connected output variable "{}" instead.')
 
         # inputs (g.x is connected to x)
+        p['g.x'] = 5.0
+        with assertRaisesRegex(self, KeyError, msg2.format('g.x', 'x')):
+            p.final_setup()
+
+        # Repeat test for post final_setup when vectors are allocated.
+        p = Problem(model)
+        p.setup(check=False)
+        p.final_setup()
+
+        msg2 = ('The promoted name "{}" is invalid because it is non-unique. '
+                'Access the value from the connected output variable "{}" instead.')
+
+        # inputs (g.x is connected to x)
         with assertRaisesRegex(self, KeyError, msg2.format('g.x', 'x')):
             p['g.x'] = 5.0
+
+        # Final test, the getitem
+        p = Problem(model)
+        p.setup(check=False)
+
+        with assertRaisesRegex(self, KeyError, msg2.format('g.x', 'x')):
+            self.assertEqual(p['g.x'], 5.0)
+
+        with g.jacobian_context() as jac:
+
+            # d(outputs)/d(inputs)
+            with assertRaisesRegex(self, KeyError, msg1.format('x')):
+                jac['y', 'x'] = 5.0
+
+            with assertRaisesRegex(self, KeyError, msg1.format('x')):
+                self.assertEqual(jac['y', 'x'], 5.0)        # Start from a clean state again
+
+        # Repeat test for post final_setup when vectors are allocated.
+        p = Problem(model)
+        p.setup(check=False)
+        p.final_setup()
+
         with assertRaisesRegex(self, KeyError, msg2.format('g.x', 'x')):
             self.assertEqual(p['g.x'], 5.0)
 

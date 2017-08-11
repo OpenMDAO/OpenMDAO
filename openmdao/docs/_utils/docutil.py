@@ -300,8 +300,13 @@ def get_unit_test_source_and_run_outputs(method_path):
     method_name = method_path.split('.')[-1]
     test_module = importlib.import_module(module_path)
     cls = getattr(test_module, class_name)
-    N_PROCS = getattr(cls, 'N_PROCS', 1)
-    use_mpi =  N_PROCS > 1
+    try:
+        import mpi4py
+    except ImportError:
+        use_mpi = False
+    else:
+        N_PROCS = getattr(cls, 'N_PROCS', 1)
+        use_mpi =  N_PROCS > 1
     meth = getattr(cls, method_name)
     class_source_code = inspect.getsource(cls)
 
@@ -495,6 +500,11 @@ def clean_up_empty_output_blocks(input_blocks, output_blocks):
             new_output_blocks.append(out_block)
             current_in_block = ''
 
+    # if there was no output, return the one input block and empty output block
+    if current_in_block:
+        new_input_blocks.append(current_in_block)
+        new_output_blocks.append('')
+
     return new_input_blocks, new_output_blocks
 
 def extract_output_blocks(run_output):
@@ -539,8 +549,13 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
         pass
     test_module = importlib.import_module(module_path)
     cls = getattr(test_module, class_name)
-    N_PROCS = getattr(cls, 'N_PROCS', 1)
-    use_mpi =  N_PROCS > 1
+    try:
+        import mpi4py
+    except ImportError:
+        use_mpi = False
+    else:
+        N_PROCS = getattr(cls, 'N_PROCS', 1)
+        use_mpi =  N_PROCS > 1
     meth = getattr(cls, method_name)
     class_source_code = inspect.getsource(cls)
 
@@ -568,7 +583,9 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
                 past_header = True
         else:
             newline = line[tab:]
-        new_lines.append(newline)
+        # exclude 'global' directives, not needed the way we are running things
+        if not newline.startswith("global "):
+            new_lines.append(newline)
 
     method_source = '\n'.join(new_lines[counter:])
 

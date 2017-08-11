@@ -10,6 +10,7 @@ from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDens
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.test_suite.components.simple_comps import NonSquareArrayComp
+from openmdao.test_suite.groups.sin_fitter import SineFitter
 
 
 class TestScipyOptimizer(unittest.TestCase):
@@ -305,6 +306,87 @@ class TestScipyOptimizer(unittest.TestCase):
         obj = prob['o']
         assert_rel_error(self, obj, 20.0, 1e-6)
 
+    def test_simple_array_comp2D_eq_con(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
+        model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
+        model.add_subsystem('obj', ExecComp('o = areas[0, 0] + areas[1, 1]', areas=np.zeros((2, 2))),
+                            promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizer()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('widths', lower=-50.0, upper=50.0)
+        model.add_objective('o')
+        model.add_constraint('areas', equals=np.array([24.0, 21.0, 3.5, 17.5]))
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        obj = prob['o']
+        assert_rel_error(self, obj, 41.5, 1e-6)
+
+    def test_simple_array_comp2D_dbl_sided_con(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
+        model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
+        model.add_subsystem('obj', ExecComp('o = areas[0, 0]', areas=np.zeros((2, 2))),
+                            promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizer()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('widths', lower=-50.0, upper=50.0)
+        model.add_objective('o')
+        model.add_constraint('areas', lower=np.array([24.0, 21.0, 3.5, 17.5]), upper=np.array([24.0, 21.0, 3.5, 17.5]))
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        con = prob['areas']
+        assert_rel_error(self, con, np.array([[24.0, 21.0], [3.5, 17.5]]), 1e-6)
+
+    def test_simple_array_comp2D_dbl_sided_con_array(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
+        model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
+        model.add_subsystem('obj', ExecComp('o = areas[0, 0]', areas=np.zeros((2, 2))),
+                            promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizer()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('widths', lower=-50.0, upper=50.0)
+        model.add_objective('o')
+        model.add_constraint('areas', lower=20.0, upper=20.0)
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        obj = prob['o']
+        assert_rel_error(self, obj, 20.0, 1e-6)
+
     def test_simple_array_comp2D_array_lo_hi(self):
 
         prob = Problem()
@@ -496,6 +578,18 @@ class TestScipyOptimizer(unittest.TestCase):
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
         assert_rel_error(self, prob['x'], 0.0, 1e-3)
+
+    def test_bug_in_eq_constraints(self):
+        # We were getting extra constraints created because lower and upper are maxfloat instead of
+        # None when unused.
+        p = Problem(model=SineFitter())
+        p.driver = ScipyOptimizer()
+
+        p.setup(check=False)
+        p.run_driver()
+
+        max_defect = np.max(np.abs(p['defect.defect']))
+        assert_rel_error(self, max_defect, 0.0, 1e-10)
 
 
 class TestScipyOptimizerFeatures(unittest.TestCase):

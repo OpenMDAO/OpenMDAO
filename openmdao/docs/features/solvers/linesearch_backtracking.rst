@@ -15,7 +15,7 @@ help alleviate these problems and improve robustness of your Newton solve.
 There are two different backtracking line-search algorithms in OpenMDAO:
 
 BoundsEnforceLS
-  Only checks bounds and backtracks to point that satisfies them.
+  Only checks bounds and backtracks to a point that satisfies them.
 
 ArmijoGoldsteinLS
   Checks bounds and backtracks to point that satisfies them. From there, further backtracking is performed until the termination criteria are satisfied.
@@ -113,5 +113,19 @@ Control Options
 
   In the `ArmijoGoldsteinLS`, the "c" option is a multiplier on the slope check. Setting it to a smaller value means a more
   gentle slope will satisfy the condition and terminate.
+
+- print_bound_enforce
+
+  When the "print_bound_enforce" option is set to True, the line-search will print the name and values of any variables
+  that exceeded their lower or upper bounds and were drawn back during bounds enforcement.
+
+.. embed-test::
+    openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_print_bound_enforce
+
+- retry_on_analysis_error
+
+  By default, the ArmijoGoldsteinLS line-search will backtrack if the model raises an AnalysisError, which can happen if
+  the component explicity raises it, or a subsolver hits its iteration limit with the 'err_on_maxiter' option set to True.
+  If you would rather terminate on an AnalysisError, you can set this option to False.
 
 .. tags:: linesearch, backtracking

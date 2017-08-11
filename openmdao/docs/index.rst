@@ -14,7 +14,6 @@ you will be able to construct models by linking multiple analyses together and t
    tutorials/first_optimization
    tutorials/first_mdao
 
-
 ===============================
 `Sample Problems`_
 ===============================
@@ -31,8 +30,6 @@ you will be able to construct models by linking multiple analyses together and t
 
 OpenMDAOs fully supported features are documented here.
 Anything documented here has been thoroughly tested an should be considered fully functional.
-
-
 
 Building components
 ====================
@@ -52,15 +49,16 @@ Grouping components for more complex models
 ===========================================
 
 .. toctree::
-    :maxdepth: 1
+   :maxdepth: 1
 
-    features/grouping_components/grouping_components
-    features/grouping_components/add_subsystem
-    features/grouping_components/get_subsystem
-    features/grouping_components/connect
-    features/grouping_components/set_order
-    features/grouping_components/src_indices
-    features/grouping_components/parallel_group
+   features/grouping_components/grouping_components
+   features/grouping_components/add_subsystem
+   features/grouping_components/get_subsystem
+   features/grouping_components/connect
+   features/grouping_components/set_order
+   features/grouping_components/src_indices
+   features/grouping_components/parallel_group
+   features/grouping_components/standalone_groups
 
 Defining partial derivatives
 ================================
@@ -101,7 +99,6 @@ Drivers
    features/drivers/add_vois
    features/drivers/scipy_optimizer
 
-
 Running your models
 ================================
 
@@ -109,6 +106,7 @@ Running your models
    :maxdepth: 1
 
    features/running/set_get
+   features/running/listing_variables
    features/running/setup_and_run
    features/running/check_total_derivatives
 
@@ -121,7 +119,6 @@ Specialized components
    features/special_components/distributed_comps
    features/special_components/metamodel
 
-
 Development Tools
 =================
 
@@ -129,7 +126,6 @@ Development Tools
    :maxdepth: 1
 
    features/devtools/inst_profile
-
 
 Drivers (optimizers and DOE)
 =============================

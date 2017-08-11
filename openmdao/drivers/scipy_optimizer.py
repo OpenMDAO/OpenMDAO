@@ -3,6 +3,7 @@ OpenMDAO Wrapper for the scipy.optimize.minimize family of local optimizers.
 """
 
 from __future__ import print_function
+import sys
 from collections import OrderedDict
 import traceback
 
@@ -13,6 +14,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 from openmdao.core.driver import Driver
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 _optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -203,7 +205,8 @@ class ScipyOptimizer(Driver):
         if opt in _constraint_optimizers:
             for name, meta in iteritems(self._cons):
                 size = meta['size']
-                dblcon = meta['upper'] is not None and meta['lower'] is not None
+
+                # Loop over every index separately, because scipy calls each constraint by index.
                 for j in range(0, size):
                     con_dict = OrderedDict()
                     if meta['equals'] is not None:
@@ -215,20 +218,30 @@ class ScipyOptimizer(Driver):
                         con_dict['jac'] = self._congradfunc
                     con_dict['args'] = [name, j]
                     constraints.append(con_dict)
-                self._con_idx[name] = i
-                i += size
 
-                # Add extra constraint if double-sided
-                if dblcon:
-                    name = '2bl-' + name
-                    for j in range(0, size):
+                    upper = meta['upper']
+                    if isinstance(upper, np.ndarray):
+                        upper = upper[j]
+
+                    lower = meta['lower']
+                    if isinstance(lower, np.ndarray):
+                        lower = lower[j]
+
+                    dblcon = (upper < sys.float_info.max) and (lower > -sys.float_info.max)
+
+                    # Add extra constraint if double-sided
+                    if dblcon:
+                        dblname = '2bl-' + name
                         con_dict = OrderedDict()
                         con_dict['type'] = 'ineq'
                         con_dict['fun'] = self._confunc
                         if opt in _constraint_grad_optimizers:
                             con_dict['jac'] = self._congradfunc
-                        con_dict['args'] = [name, j]
+                        con_dict['args'] = [dblname, j]
                         constraints.append(con_dict)
+
+                self._con_idx[name] = i
+                i += size
 
         # Provide gradients for optimizers that support it
         if opt in _gradient_optimizers:
@@ -283,8 +296,9 @@ class ScipyOptimizer(Driver):
                 self.set_design_var(name, x_new[i:i + size])
                 i += size
 
-            self.iter_count += 1
-            model._solve_nonlinear()
+            with Recording(self.options['optimizer'], self.iter_count, self) as rec:
+                self.iter_count += 1
+                model._solve_nonlinear()
 
             # Get the objective function evaluations
             for name, obj in iteritems(self.get_objective_values()):
@@ -342,19 +356,21 @@ class ScipyOptimizer(Driver):
         if equals is not None:
             if isinstance(equals, np.ndarray):
                 equals = equals[idx]
-            return -(equals - cons[name][idx])
+            return (cons[name][idx] - equals)
 
         # Note, scipy defines constraints to be satisfied when positive,
         # which is the opposite of OpenMDAO.
         upper = meta['upper']
+        if isinstance(upper, np.ndarray):
+            upper = upper[idx]
+
         lower = meta['lower']
-        if lower is None or dbl_side:
-            if isinstance(upper, np.ndarray):
-                upper = upper[idx]
+        if isinstance(lower, np.ndarray):
+            lower = lower[idx]
+
+        if (lower == -sys.float_info.max) or dbl_side:
             return upper - cons[name][idx]
         else:
-            if isinstance(lower, np.ndarray):
-                lower = lower[idx]
             return cons[name][idx] - lower
 
     def _gradfunc(self, x_new):
@@ -374,9 +390,8 @@ class ScipyOptimizer(Driver):
             Gradient of objective with respect to parameter array.
         """
         try:
-
             quantities = list(self._objs) + list(self._cons)
-            grad = self._compute_total_derivs(of=quantities, wrt=list(self._designvars.keys()),
+            grad = self._compute_total_derivs(of=quantities, wrt=list(self._designvars),
                                               return_format='array')
             self._grad_cache = grad
 
@@ -385,8 +400,8 @@ class ScipyOptimizer(Driver):
 
             # Exceptions seem to be swallowed by the C code, so this
             # should give the user more info than the dreaded "segfault"
-            print("Exception: %s" % str(msg))
-            print(70 * "=", tb, 70 * "=")
+            print("Exception: %s" % str(msg), file=sys.stderr)
+            print(70 * "=", tb, 70 * "=", file=sys.stderr)
 
         # print("Gradients calculated")
         # print(x_new)
@@ -435,7 +450,11 @@ class ScipyOptimizer(Driver):
 
         # Note, scipy defines constraints to be satisfied when positive,
         # which is the opposite of OpenMDAO.
-        if meta['lower'] is None or dbl_side:
+        lower = meta['lower']
+        if isinstance(lower, np.ndarray):
+            lower = lower[idx]
+
+        if (lower == -sys.float_info.max) or dbl_side:
             return -grad[grad_idx, :]
         else:
             return grad[grad_idx, :]

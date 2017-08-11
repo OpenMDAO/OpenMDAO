@@ -42,6 +42,9 @@ class TestPetscKSP(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False)
         p.set_solver_print(level=0)
 
+        # Conclude setup but don't run model.
+        p.final_setup()
+
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
         # forward
@@ -72,6 +75,9 @@ class TestPetscKSP(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False)
         p.set_solver_print(level=0)
 
+        # Conclude setup but don't run model.
+        p.final_setup()
+
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
         # forward
@@ -100,6 +106,9 @@ class TestPetscKSP(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False)
         p.set_solver_print(level=0)
 
+        # Conclude setup but don't run model.
+        p.final_setup()
+
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
         # forward
@@ -125,6 +134,9 @@ class TestPetscKSP(unittest.TestCase):
         p = Problem(group)
         p.setup(vector_class=PETScVector, check=False)
         p.set_solver_print(level=0)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
 
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
@@ -153,6 +165,78 @@ class TestPetscKSP(unittest.TestCase):
         # test the direct solver and make sure KSP correctly recurses for _linearize
         precon = group.linear_solver.precon = DirectSolver()
         p.setup(vector_class=PETScVector, check=False)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
+
+        d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
+
+        # forward
+        d_residuals.set_const(1.0)
+        d_outputs.set_const(0.0)
+        group.linear_solver._linearize()
+        group.run_solve_linear(['linear'], 'fwd')
+
+        output = d_outputs._data
+        assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
+        assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
+
+        # reverse
+        d_outputs.set_const(1.0)
+        d_residuals.set_const(0.0)
+        group.linear_solver._linearize()
+        group.run_solve_linear(['linear'], 'rev')
+
+        output = d_residuals._data
+        assert_rel_error(self, output[1], group.expected_solution[0], 3e-15)
+        assert_rel_error(self, output[5], group.expected_solution[1], 3e-15)
+
+    def test_solve_linear_ksp_precon_left(self):
+        """Solve implicit system with PetscKSP using a preconditioner."""
+
+        group = TestImplicitGroup(lnSolverClass=PetscKSP)
+        precon = group.linear_solver.precon = DirectSolver()
+        group.linear_solver.options['precon_side'] = 'left'
+        group.linear_solver.options['ksp_type'] = 'richardson'
+
+        p = Problem(group)
+        p.setup(vector_class=PETScVector, check=False)
+        p.set_solver_print(level=0)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
+
+        d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
+
+        # forward
+        d_residuals.set_const(1.0)
+        d_outputs.set_const(0.0)
+        group.run_linearize()
+        group.run_solve_linear(['linear'], 'fwd')
+
+        output = d_outputs._data
+        assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
+        assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
+
+        # reverse
+        d_outputs.set_const(1.0)
+        d_residuals.set_const(0.0)
+        group.run_linearize()
+        group.run_solve_linear(['linear'], 'rev')
+
+        output = d_residuals._data
+        assert_rel_error(self, output[1], group.expected_solution[0], 3e-15)
+        assert_rel_error(self, output[5], group.expected_solution[1], 3e-15)
+
+        # test the direct solver and make sure KSP correctly recurses for _linearize
+        precon = group.linear_solver.precon = DirectSolver()
+        group.linear_solver.options['precon_side'] = 'left'
+        group.linear_solver.options['ksp_type'] = 'richardson'
+
+        p.setup(vector_class=PETScVector, check=False)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
 
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
@@ -214,6 +298,9 @@ class TestPetscKSP(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False)
 
         p.set_solver_print(level=0)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
 
         # forward
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
@@ -421,10 +508,41 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         model.nonlinear_solver = NewtonSolver()
-        model.ln_sollver = PetscKSP()
+        model.linear_solver = PetscKSP()
 
         model.linear_solver.precon = LinearBlockGS()
         model.linear_solver.precon.options['maxiter'] = 2
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+    def test_specify_precon_left(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = PetscKSP()
+
+        model.linear_solver.precon = DirectSolver()
+        model.linear_solver.options['precon_side'] = 'left'
+        model.linear_solver.options['ksp_type'] = 'richardson'
 
         prob.setup()
         prob.run_model()

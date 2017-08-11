@@ -96,10 +96,6 @@ class DefaultVector(Vector):
         iproc = self._iproc
 
         sizes_byset_t = system._var_sizes_byset[type_]
-        sizes_t = system._var_sizes[type_]
-        allprocs_abs2idx_t = system._var_allprocs_abs2idx[type_]
-        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[type_]
-        abs2meta_t = system._var_abs2meta[type_]
 
         data = {}
         indices = {}
@@ -108,17 +104,21 @@ class DefaultVector(Vector):
             data[set_name] = np.zeros(size)
             indices[set_name] = np.zeros(size, int)
 
+        sizes_t = system._var_sizes[type_]
+        abs2meta_t = system._var_abs2meta[type_]
+        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[type_]
+        allprocs_abs2idx_t = system._var_allprocs_abs2idx[type_]
         for abs_name in system._var_abs_names[type_]:
-            idx = allprocs_abs2idx_t[abs_name]
-            idx_byset = allprocs_abs2idx_byset_t[abs_name]
             set_name = abs2meta_t[abs_name]['var_set']
 
-            ind1 = np.sum(sizes_t[iproc, :idx])
-            ind2 = np.sum(sizes_t[iproc, :idx + 1])
+            idx_byset = allprocs_abs2idx_byset_t[abs_name]
             ind_byset1 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset])
             ind_byset2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1])
 
-            set_name = abs2meta_t[abs_name]['var_set']
+            idx = allprocs_abs2idx_t[abs_name]
+            ind1 = np.sum(sizes_t[iproc, :idx])
+            ind2 = np.sum(sizes_t[iproc, :idx + 1])
+
             indices[set_name][ind_byset1:ind_byset2] = np.arange(ind1, ind2)
 
         return data, indices
@@ -253,21 +253,16 @@ class DefaultVector(Vector):
         type_ = self._typ
         iproc = self._iproc
 
-        allprocs_abs2idx_t = system._var_allprocs_abs2idx[type_]
+        self._views = self._names = views = {}
+        self._views_flat = views_flat = {}
+
+        alloc_complex = self._alloc_complex
+        self._imag_views = imag_views = {}
+        self._imag_views_flat = imag_views_flat = {}
+
         allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[type_]
         sizes_byset_t = system._var_sizes_byset[type_]
         abs2meta_t = system._var_abs2meta[type_]
-
-        # idxs contains a 0 index for floats or a slice(None) for arrays so getitem
-        # will return either a float or a properly shaped array respectively.
-        idxs = {}
-        views = {}
-        views_flat = {}
-
-        if self._alloc_complex:
-            imag_views = {}
-            imag_views_flat = {}
-
         for abs_name in system._var_abs_names[type_]:
             idx_byset = allprocs_abs2idx_byset_t[abs_name]
             set_name = abs2meta_t[abs_name]['var_set']
@@ -276,28 +271,18 @@ class DefaultVector(Vector):
             ind_byset2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1])
             shape = abs2meta_t[abs_name]['shape']
 
-            views_flat[abs_name] = self._data[set_name][ind_byset1:ind_byset2]
-            views[abs_name] = self._data[set_name][ind_byset1:ind_byset2]
-            views[abs_name].shape = shape
+            views_flat[abs_name] = v = self._data[set_name][ind_byset1:ind_byset2]
+            if shape != v.shape:
+                v = v.view()
+                v.shape = shape
+            views[abs_name] = v
 
-            if self._alloc_complex:
-                imag_views_flat[abs_name] = self._imag_data[set_name][ind_byset1:ind_byset2]
-                imag_views[abs_name] = self._imag_data[set_name][ind_byset1:ind_byset2]
-                imag_views[abs_name].shape = shape
-
-            # The shape entry overrides value's shape, which is why we don't
-            # use the shape of val as the reference
-            if np.prod(shape) == 1:
-                idxs[abs_name] = 0
-            else:
-                idxs[abs_name] = slice(None)
-
-        self._views = self._names = views
-        self._views_flat = views_flat
-
-        if self._alloc_complex:
-            self._imag_views = imag_views
-            self._imag_views_flat = imag_views_flat
+            if alloc_complex:
+                imag_views_flat[abs_name] = v = self._imag_data[set_name][ind_byset1:ind_byset2]
+                if shape != v.shape:
+                    v = v.view()
+                    v.shape = shape
+                imag_views[abs_name] = v
 
     def _clone_data(self):
         """
@@ -413,18 +398,6 @@ class DefaultVector(Vector):
         """
         for set_name, data in iteritems(self._data):
             data[:] *= vec._data[set_name]
-
-    def elem_div(self, vec):
-        """
-        Perform element-wise division and store the result in this vector.
-
-        Parameters
-        ----------
-        vec : <Vector>
-            The vector to perform element-wise division with.
-        """
-        for set_name, data in iteritems(self._data):
-            data[:] /= vec._data[set_name]
 
     def set_vec(self, vec):
         """

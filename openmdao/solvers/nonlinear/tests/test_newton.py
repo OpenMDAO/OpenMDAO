@@ -6,7 +6,7 @@ import numpy as np
 
 from openmdao.api import Group, Problem, IndepVarComp, LinearBlockGS, \
     NewtonSolver, ExecComp, ScipyIterativeSolver, ImplicitComponent, \
-    DirectSolver, DenseJacobian
+    DirectSolver, DenseJacobian, AnalysisError
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.double_sellar import DoubleSellar, DoubleSellarImplicit, \
      SubSellar
@@ -122,26 +122,6 @@ class TestNewton(unittest.TestCase):
         top.run_model()
         assert_rel_error(self, top['comp.z'], 2.5, 1e-8)
 
-
-    def test_sellar_analysis_error(self):
-        # Make sure analysis error is raised.
-
-        raise unittest.SkipTest("AnalysisError not implemented yet")
-
-        prob = Problem()
-        prob.model = SellarNoDerivatives()
-        prob.model.nonlinear_solver = Newton()
-        prob.model.nonlinear_solver.options['err_on_maxiter'] = True
-        prob.model.nonlinear_solver.options['maxiter'] = 2
-
-        prob.setup(check=False)
-
-        try:
-            prob.run_model()
-        except AnalysisError as err:
-            self.assertEqual(str(err), "Solve in '': Newton FAILED to converge after 2 iterations")
-        else:
-            self.fail("expected AnalysisError")
 
     def test_sellar_derivs(self):
         # Test top level Sellar (i.e., not grouped).
@@ -794,6 +774,25 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
+    def test_err_on_maxiter(self):
+        # Raise AnalysisError when it fails to converge
+
+        prob = Problem()
+        nlsolver = NewtonSolver()
+        prob.model = SellarDerivatives(nonlinear_solver=nlsolver, linear_solver=LinearBlockGS())
+
+        nlsolver.options['err_on_maxiter'] = True
+        nlsolver.options['maxiter'] = 1
+
+        prob.setup(check=False)
+        prob.set_solver_print(level=0)
+
+        with self.assertRaises(AnalysisError) as context:
+            prob.run_driver()
+
+        msg = "Solver 'NL: Newton' on system '' failed to converge."
+        self.assertEqual(str(context.exception), msg)
+
 
 class TestNewtonFeatures(unittest.TestCase):
 
@@ -979,6 +978,37 @@ class TestNewtonFeatures(unittest.TestCase):
 
         prob.setup()
         prob.run_model()
+
+    def test_feature_err_on_maxiter(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.linear_solver = LinearBlockGS()
+
+        nlgbs = model.nonlinear_solver = NewtonSolver()
+        nlgbs.options['maxiter'] = 1
+        nlgbs.options['err_on_maxiter'] = True
+
+        prob.setup()
+
+        try:
+            prob.run_model()
+        except AnalysisError:
+            pass
 
 if __name__ == "__main__":
     unittest.main()

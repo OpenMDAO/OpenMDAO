@@ -2,8 +2,6 @@
 
 from __future__ import division
 
-import inspect
-
 from fnmatch import fnmatchcase
 import numpy as np
 from itertools import product
@@ -102,20 +100,6 @@ class Component(System):
         super(Component, self)._setup_vars()
         num_var = self._num_var
         num_var_byset = self._num_var_byset
-
-        self._var_rel_names = {'input': [], 'output': []}
-        self._var_rel2data_io = {}
-        self._design_vars = {}
-        self._responses = {}
-
-        self._static_mode = False
-        self._var_rel2data_io.update(self._static_var_rel2data_io)
-        for type_ in ['input', 'output']:
-            self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
-        self._design_vars.update(self._static_design_vars)
-        self._responses.update(self._static_responses)
-        self.setup()
-        self._static_mode = True
 
         # Compute num_var
         for type_ in ['input', 'output']:
@@ -250,8 +234,8 @@ class Component(System):
         for of, wrt, method, kwargs in self._approximated_partials:
             self._approx_partials(of, wrt, method=method, **kwargs)
 
-    def add_input(self, name, val=1.0, shape=None, src_indices=None, units=None,
-                  desc='', var_set=0):
+    def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
+                  units=None, desc='', var_set=0):
         """
         Add an input variable to the component.
 
@@ -267,9 +251,13 @@ class Component(System):
             val is not an array. Default is None.
         src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
             The global indices of the source variable to transfer data from.
-            If val is given as an array_like object, the shapes of val and
-            src_indices must match. A value of None implies this input depends
-            on all entries of source. Default is None.
+            A value of None implies this input depends on all entries of source.
+            Default is None. The shapes of the target and src_indices must match,
+            and form of the entries within is determined by the value of 'flat_src_indices'.
+        flat_src_indices : bool
+            If True, each entry of src_indices is assumed to be an index into the
+            flattened source.  Otherwise each entry must be a tuple or list of size equal
+            to the number of dimensions of the source.
         units : str or None
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.
@@ -284,7 +272,7 @@ class Component(System):
         dict
             metadata for added variable
         """
-        if inspect.stack()[1][3] == '__init__':
+        if self._static_mode:
             warn_deprecation("In the future, the 'add_input' method must be "
                              "called from 'setup' rather than "
                              "in the '__init__' function.")
@@ -329,6 +317,7 @@ class Component(System):
             metadata['src_indices'] = None
         else:
             metadata['src_indices'] = np.atleast_1d(src_indices)
+        metadata['flat_src_indices'] = flat_src_indices
 
         # units: taken as is
         metadata['units'] = units
@@ -410,7 +399,7 @@ class Component(System):
         dict
             metadata for added variable
         """
-        if inspect.stack()[1][3] == '__init__':
+        if self._static_mode:
             warn_deprecation("In the future, the 'add_output' method must be "
                              "called from 'setup' rather than "
                              "in the '__init__' function.")

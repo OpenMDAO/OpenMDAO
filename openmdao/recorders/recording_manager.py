@@ -2,6 +2,9 @@
 RecordingManager class definition.
 """
 import time
+from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
+
+from openmdao.utils.mpi import MPI
 
 
 class RecordingManager(object):
@@ -21,7 +24,12 @@ class RecordingManager(object):
         init.
         """
         self._recorders = []
-        self.rank = 0
+        self._has_serial_recorders = False
+
+        if MPI:
+            self.rank = MPI.COMM_WORLD.rank
+        else:
+            self.rank = 0
 
     def __getitem__(self, index):
         """
@@ -97,8 +105,8 @@ class RecordingManager(object):
             The object that needs its metadata recorded.
 
         """
-        if not self._recorders:
-            return
-
         for recorder in self._recorders:
-            recorder.record_metadata(object_requesting_recording)
+            # If the recorder does not support parallel recording
+            # we need to make sure we only record on rank 0.
+            if recorder._parallel or self.rank == 0:
+                recorder.record_metadata(object_requesting_recording)

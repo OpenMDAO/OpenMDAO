@@ -23,6 +23,9 @@ class MetaModelTestCase(unittest.TestCase):
         testlogger = TestLogger()
         prob.setup(logger=testlogger)
 
+        # Conclude setup but don't run model.
+        prob.final_setup()
+
         msg = ("No default surrogate model is defined and the "
                "following outputs do not have a surrogate model:\n"
                "['f_x']\n"
@@ -72,6 +75,10 @@ class MetaModelTestCase(unittest.TestCase):
         # check that missing surrogate is detected in check_setup
         testlogger = TestLogger()
         prob.setup(logger=testlogger)
+
+        # Conclude setup but don't run model.
+        prob.final_setup()
+
         msg = ("No default surrogate model is defined and the "
                "following outputs do not have a surrogate model:\n"
                "['f_x']\n"
@@ -412,7 +419,7 @@ class MetaModelTestCase(unittest.TestCase):
         prob['x'] = 0.125
         prob.run_model()
 
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials()
 
         Jf = data['mm'][('f', 'x')]['J_fwd']
         Jr = data['mm'][('f', 'x')]['J_rev']

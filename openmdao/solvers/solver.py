@@ -6,11 +6,13 @@ import os
 
 import numpy as np
 
-from openmdao.utils.options_dictionary import OptionsDictionary
+
+from openmdao.core.analysis_error import AnalysisError
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
+from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration_stack
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.record_util import create_local_meta
-from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.utils.options_dictionary import OptionsDictionary
 
 
 class SolverInfo(object):
@@ -89,6 +91,8 @@ class Solver(object):
                              desc='relative error tolerance')
         self.options.declare('iprint', type_=int, default=1,
                              desc='whether to print output')
+        self.options.declare('err_on_maxiter', type_=bool, default=False,
+                             desc="When True, AnlysisError will be raised if we don't convege.")
 
         # What the solver supports.
         self.supports = OptionsDictionary()
@@ -229,6 +233,12 @@ class Solver(object):
                 if iprint > -1:
                     msg = ' Failed to Converge in {} iterations'.format(self._iter_count)
                     print(self._solver_info.prefix + self.SOLVER + msg)
+
+                # Raise AnalysisError if requested.
+                if self.options['err_on_maxiter']:
+                    msg = "Solver '{}' on system '{}' failed to converge."
+                    raise AnalysisError(msg.format(self.SOLVER, self._system.pathname))
+
             elif iprint == 1:
                 print(self._solver_info.prefix + self.SOLVER +
                       ' Converged in {} iterations'.format(self._iter_count))
@@ -370,7 +380,12 @@ class NonlinearSolver(Solver):
         float
             norm.
         """
+        recording_iteration_stack.append(('_iter_get_norm', 0))
+
         self._system._apply_nonlinear()
+
+        recording_iteration_stack.pop()
+
         return self._system._residuals.get_norm()
 
 
@@ -441,9 +456,13 @@ class LinearSolver(Solver):
         float
             norm.
         """
+        recording_iteration_stack.append(('_iter_get_norm', 0))
+
         system = self._system
         scope_out, scope_in = system._get_scope()
         system._apply_linear(self._vec_names, self._mode, scope_out, scope_in)
+
+        recording_iteration_stack.pop()
 
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']
