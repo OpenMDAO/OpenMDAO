@@ -73,8 +73,9 @@ class WebRecorder(BaseRecorder):
         else:
             self._case_id = '-1'
             if not suppress_output:
-                print("Failed to initialize case on server. No messages will be accepted\
-                 from server for this case.")
+                print("Failed to initialize case on server. No messages will be accepted \
+                from server for this case. Make sure you registered for a token at the \
+                given endpoint.")
 
             if 'reasoning' in response:
                 if not suppress_output:
