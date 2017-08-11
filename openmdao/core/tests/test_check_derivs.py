@@ -523,6 +523,83 @@ class TestProblemCheckPartials(unittest.TestCase):
         assert_rel_error(self, data['comp']['y', 'dummy']['J_fwd'], np.zeros((2, 2)))
         assert_rel_error(self, data['comp']['y', 'dummy']['J_rev'], np.zeros((2, 2)))
 
+    def test_dependent_false_hide(self):
+        # Test that we omit derivs declared with dependent=False
+
+        class SimpleComp1(ExplicitComponent):
+            def setup(self):
+                self.add_input('z', shape=(2, 2))
+                self.add_input('x', shape=(2, 2))
+                self.add_output('g', shape=(2, 2))
+
+                self.declare_partials('g', 'z', dependent=False)
+
+            def compute(self, inputs, outputs):
+                outputs['g'] = 3.0*inputs['x']
+
+            def compute_partials(self, inputs, partials):
+                partials['g', 'x'] = 3.
+
+
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('z', np.ones((2, 2))))
+        prob.model.add_subsystem('p2', IndepVarComp('x', np.ones((2, 2))))
+        prob.model.add_subsystem('comp', SimpleComp1())
+        prob.model.connect('p1.z', 'comp.z')
+        prob.model.connect('p2.x', 'comp.x')
+
+        prob.setup(check=False)
+
+        testlogger = TestLogger()
+        data = prob.check_partials(logger=testlogger)
+        lines = testlogger.get('info')
+
+        self.assertTrue("  comp: 'g' wrt 'z'\n" not in lines)
+        self.assertTrue(('g', 'z') not in data['comp'])
+        self.assertTrue("  comp: 'g' wrt 'x'\n"  in lines)
+        self.assertTrue(('g', 'x') in data['comp'])
+
+    def test_dependent_false_show(self):
+        # Test that we show derivs declared with dependent=False if the fd is not
+        # ~zero.
+
+        class SimpleComp2(ExplicitComponent):
+            def setup(self):
+                self.add_input('z', shape=(2, 2))
+                self.add_input('x', shape=(2, 2))
+                self.add_output('g', shape=(2, 2))
+
+                self.declare_partials('g', 'z', dependent=False)
+
+            def compute(self, inputs, outputs):
+                outputs['g'] = 2.0*inputs['z'] + 3.0*inputs['x']
+
+            def compute_partials(self, inputs, partials):
+                partials['g', 'x'] = 3.
+
+
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('z', np.ones((2, 2))))
+        prob.model.add_subsystem('p2', IndepVarComp('x', np.ones((2, 2))))
+        prob.model.add_subsystem('comp', SimpleComp2())
+        prob.model.connect('p1.z', 'comp.z')
+        prob.model.connect('p2.x', 'comp.x')
+
+        prob.setup(check=False)
+
+        testlogger = TestLogger()
+        data = prob.check_partials(logger=testlogger)
+        lines = testlogger.get('info')
+
+        self.assertTrue("  comp: 'g' wrt 'z'\n" in lines)
+        self.assertTrue(('g', 'z') in data['comp'])
+        self.assertTrue("  comp: 'g' wrt 'x'\n"  in lines)
+        self.assertTrue(('g', 'x') in data['comp'])
+
 
 class TestProblemCheckTotals(unittest.TestCase):
 

@@ -18,7 +18,8 @@ VAR_RGX = re.compile('([_a-zA-Z]\w*[ ]*\(?)')
 
 # Names of metadata entries allowed for ExecComp variables.
 _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc', 'var_set',
-                 'ref', 'ref0', 'res_ref', 'lower', 'upper', 'src_indices'}
+                 'ref', 'ref0', 'res_ref', 'lower', 'upper', 'src_indices',
+                 'flat_src_indices'}
 
 
 def array_idx_iter(shape):
