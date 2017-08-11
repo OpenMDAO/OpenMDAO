@@ -423,7 +423,7 @@ class TestConnectionsIndices(unittest.TestCase):
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp')
 
         expected = ("The source and target shapes do not match for the "
-                    "connection 'idvp.blammo' to 'arraycomp.inp' in Group ''. "
+                    "connection 'idvp.blammo' to 'arraycomp.inp'."
                     " Expected \(2.*,\) but got \(1.*,\).")
 
         with assertRaisesRegex(self, ValueError, expected):
@@ -435,8 +435,8 @@ class TestConnectionsIndices(unittest.TestCase):
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 1, 0])
 
         expected = ("The source indices \[0 1 0\] do not specify a valid shape "
-                    "for the connection 'idvp.blammo' to 'arraycomp.inp' in "
-                    "Group ''. The target shape is \(2.*,\) but indices are \(3.*,\).")
+                    "for the connection 'idvp.blammo' to 'arraycomp.inp'. "
+                    "The target shape is \(2.*,\) but indices are \(3.*,\).")
 
         with assertRaisesRegex(self, ValueError, expected):
             self.prob.setup(check=False)
@@ -447,7 +447,7 @@ class TestConnectionsIndices(unittest.TestCase):
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp1', src_indices=[100000])
 
         expected = ("The source indices do not specify a valid index for the "
-                    "connection 'idvp.arrout' to 'arraycomp.inp1' in Group ''. "
+                    "connection 'idvp.arrout' to 'arraycomp.inp1'. "
                     "Index '100000' is out of range for source dimension of "
                     "size 5.")
 
