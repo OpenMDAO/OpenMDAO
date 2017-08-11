@@ -415,10 +415,6 @@ class Problem(object):
         comm = self.comm
         mode = self._mode
 
-        if self._setup_status < 2:
-            model._final_setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex,
-                               mode=mode)
-
         self.driver._setup_driver(self)
 
         if isinstance(model, Group):
@@ -426,6 +422,12 @@ class Problem(object):
             self._relevant = get_relevant_vars(self._sys_graph,
                                                self.driver._designvars,
                                                self.driver._responses)
+        else:
+            self._relevant = {}
+
+        if self._setup_status < 2:
+            model._final_setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex,
+                               mode=mode, relevant=self._relevant)
 
         # Now that setup has been called, we can set the iprints.
         for items in self._solver_print_cache:

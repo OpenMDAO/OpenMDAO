@@ -2,7 +2,7 @@
 from __future__ import division
 
 from contextlib import contextmanager
-from collections import OrderedDict, Iterable
+from collections import OrderedDict, Iterable, defaultdict
 from fnmatch import fnmatchcase
 import sys
 from itertools import product
@@ -495,7 +495,8 @@ class System(object):
             }
             return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
-    def _get_root_vectors(self, vector_class, initial, force_alloc_complex=False, mode=None):
+    def _get_root_vectors(self, vector_class, initial, force_alloc_complex=False,
+                          mode=None, relevant=None):
         """
         Get the root vectors for the nonlinear and linear vectors for the model.
 
@@ -511,6 +512,8 @@ class System(object):
             after a reconfiguration) you may need to set this to True.
         mode : str or None
             Direction of derivatives.  If None, we are reconfiguring.
+        relevant : dict or None
+            Dict containing relevant (inputs, outputs, systems) for each vec_name.
 
         Returns
         -------
@@ -555,6 +558,9 @@ class System(object):
                 if nl_alloc_complex:
                     break
 
+            excl_in = defaultdict(set)
+            excl_out = defaultdict(set)
+
             for vec_name in vec_names:
                 ncol = 1
                 if vec_name == 'nonlinear':
@@ -562,20 +568,18 @@ class System(object):
                 else:
                     alloc_complex = force_alloc_complex
 
-                    if vec_name != 'linear' and vois[vec_name]['vectorize_derivs']:
+                    if vec_name != 'linear':
+                        if vois[vec_name]['vectorize_derivs']:
                             idxs = vois[vec_name]['indices']
                             if idxs is None:
                                 ncol = vois[vec_name]['size']
                             else:
                                 ncol = len(idxs)
+                        # inps, outs, systems =
                 for key in ['input', 'output', 'residual']:
                     root_vectors[key][vec_name] = vector_class(vec_name, _type_map[key], self,
                                                                alloc_complex=alloc_complex,
                                                                ncol=ncol)
-
-            excl_out = {vec_name: set() for vec_name in root_vectors['output']}
-            excl_in = {vec_name: set() for vec_name in root_vectors['output']}
-
         else:
 
             for key, vardict in iteritems(self._vectors):
@@ -718,7 +722,7 @@ class System(object):
         self._setup_connections(recurse=recurse)
 
     def _final_setup(self, comm, vector_class, setup_mode, force_alloc_complex=False,
-                     mode=None, multi_vector_class=None):
+                     mode=None, relevant=None):
         """
         Perform final setup for this system and its descendant systems.
 
@@ -743,10 +747,8 @@ class System(object):
             after a reconfiguration) you may need to set this to True.
         mode : str or None
             Derivative direction, either 'fwd', or 'rev', or None
-        multi_vector_class : type
-            reference to an actual <Vector> class; not an instance. This specifies
-            the class to use to perform matrix-matrix derivative operations.  If None,
-            matrix-matrix will not be used.
+        relevant : dict or None
+            Dict containing relevant (inputs, outputs, systems) for each vec_name.
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
@@ -771,7 +773,8 @@ class System(object):
         self._setup_global(ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset)
         root_vectors, excl_out, excl_in = \
             self._get_root_vectors(vector_class, initial,
-                                   force_alloc_complex=force_alloc_complex, mode=mode)
+                                   force_alloc_complex=force_alloc_complex, mode=mode,
+                                   relevant=relevant)
         self._setup_vectors(root_vectors, excl_out, excl_in, resize=resize)
         self._setup_bounds(*self._get_bounds_root_vectors(vector_class, initial), resize=resize)
         self._setup_scaling(self._get_scaling_root_vectors(vector_class, initial), resize=resize)

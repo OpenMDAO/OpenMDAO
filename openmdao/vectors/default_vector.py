@@ -209,9 +209,8 @@ class DefaultVector(Vector):
         imag_data = {}
         indices = {}
         for set_name in system._var_set2iset[type_]:
-            offset_byset = system._ext_sizes_byset[type_][set_name][0]
-            ind_byset1 = offset_byset
-            ind_byset2 = offset_byset + np.sum(system._var_sizes_byset[type_][set_name][iproc, :])
+            ind_byset1 = system._ext_sizes_byset[type_][set_name][0]
+            ind_byset2 = ind_byset1 + np.sum(system._var_sizes_byset[type_][set_name][iproc, :])
 
             data[set_name] = root_vec._data[set_name][ind_byset1:ind_byset2]
             indices[set_name] = root_vec._indices[set_name][ind_byset1:ind_byset2] - offset
