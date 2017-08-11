@@ -322,6 +322,21 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, C1.jacobian['y','x'], expect, 0.00001)
 
+    def test_feature_simple(self):
+        prob = Problem()
+        prob.model = model = Group()
+
+        model.add_subsystem('p', IndepVarComp('x', 2.0))
+        model.add_subsystem('comp', ExecComp('y=x+1.'))
+
+        model.connect('p.x', 'comp.x')
+
+        prob.setup(check=False)
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.y'], 3.0, 0.00001)
 
 if __name__ == "__main__":
     unittest.main()
