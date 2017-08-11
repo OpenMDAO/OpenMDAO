@@ -586,7 +586,8 @@ class Group(System):
                         msg = ("The source and target shapes do not match or are ambiguous"
                                " for the connection '%s' to '%s'. Expected %s but got %s.")
                         raise ValueError(msg % (abs_out, abs_in,
-                                                in_shape, out_shape))
+                                                tuple([int(s) for s in in_shape]),
+                                                tuple([int(s) for s in out_shape])))
 
                 if src_indices is not None:
                     src_indices = np.atleast_1d(src_indices)
