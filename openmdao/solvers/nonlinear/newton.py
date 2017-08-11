@@ -178,6 +178,35 @@ class NewtonSolver(NonlinearSolver):
         if self.linesearch is not None:
             self.linesearch._linearize()
 
+    def _iter_initialize(self):
+        """
+        Perform any necessary pre-processing operations.
+
+        Returns
+        -------
+        float
+            initial error.
+        float
+            error at the first iteration.
+        """
+        with Recording('Newton_subsolve', 0, self):
+            if self.options['solve_subsystems'] and \
+                 (self._iter_count <= self.options['max_sub_solves']):
+                system = self._system
+
+                # should call the subsystems solve before computing the first residual
+                for isub, subsys in enumerate(system._subsystems_myproc):
+                    system._transfer('nonlinear', 'fwd', isub)
+                    subsys._solve_nonlinear()
+                    system._check_reconf_update()
+
+        if self.options['maxiter'] > 0:
+            norm = self._iter_get_norm()
+        else:
+            norm = 1.0
+        norm0 = norm if norm != 0.0 else 1.0
+        return norm0, norm
+
     def _iter_execute(self):
         """
         Perform the operations in the iteration loop.
