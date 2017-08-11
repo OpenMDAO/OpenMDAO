@@ -459,94 +459,97 @@ class TestConnectionsIndices(unittest.TestCase):
         else:
             self.fail('Exception expected.')
 
-        def test_connect_flat_array_to_row_vector(self):
-            p = Problem()
-            p.model.add_subsystem('indep', IndepVarComp('x', val=np.arange(10)))
-            p.model.add_subsystem('C1',
-                                  ExecComp('y=numpy.dot(x, A)',
-                                           x={'value': np.zeros((1, 10))},
-                                           A={'value': np.eye(10)},
-                                           y={'value': np.zeros((1, 10))}))
-            p.model.connect('indep.x', 'C1.x')
+
+class TestShapes(unittest.TestCase):
+    def test_connect_flat_array_to_row_vector(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', val=np.arange(10)))
+        p.model.add_subsystem('C1',
+                              ExecComp('y=numpy.dot(x, A)',
+                                       x={'value': np.zeros((1, 10))},
+                                       A={'value': np.eye(10)},
+                                       y={'value': np.zeros((1, 10))}))
+        p.model.connect('indep.x', 'C1.x')
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.y'], np.arange(10)[np.newaxis, :])
+
+    def test_connect_flat_array_to_col_vector(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', val=np.arange(10)))
+        p.model.add_subsystem('C1',
+                              ExecComp('y=numpy.dot(A, x)',
+                                       x={'value': np.zeros((10, 1))},
+                                       A={'value': np.eye(10)},
+                                       y={'value': np.zeros((10, 1))}))
+        p.model.connect('indep.x', 'C1.x')
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.y'], np.arange(10)[:, np.newaxis])
+
+    def test_connect_row_vector_to_flat_array(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', val=np.arange(10)[np.newaxis, :]))
+        p.model.add_subsystem('C1', ExecComp('y=5*x',
+                                             x={'value': np.zeros(10)},
+                                             y={'value': np.zeros(10)}))
+        p.model.connect('indep.x', 'C1.x')
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.y'], 5 * np.arange(10))
+
+    def test_connect_col_vector_to_flat_array(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', val=np.arange(10)[:, np.newaxis]))
+        p.model.add_subsystem('C1', ExecComp('y=5*x',
+                                             x={'value': np.zeros(10)},
+                                             y={'value': np.zeros(10)}))
+        p.model.connect('indep.x', 'C1.x')
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.y'], 5 * np.arange(10))
+
+    def test_connect_flat_to_3d_array(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', val=np.arange(10)))
+        p.model.add_subsystem('C1', ExecComp('y=5*x',
+                                             x={'value': np.zeros((1, 10, 1))},
+                                             y={'value': np.zeros((1, 10, 1))}))
+        p.model.connect('indep.x', 'C1.x')
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.y'], 5 * np.arange(10)[np.newaxis, :, np.newaxis])
+
+    def test_connect_flat_nd_to_flat_nd(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x',
+                                                    val=np.arange(10)[np.newaxis, :, np.newaxis,
+                                                        np.newaxis]))
+        p.model.add_subsystem('C1', ExecComp('y=5*x',
+                                             x={'value': np.zeros((1, 1, 1, 10))},
+                                             y={'value': np.zeros((1, 1, 1, 10))}))
+        p.model.connect('indep.x', 'C1.x')
+        p.setup()
+        p.run_model()
+        assert_rel_error(self, p['C1.y'],
+                         5 * np.arange(10)[np.newaxis, np.newaxis, np.newaxis, :])
+
+    def test_connect_incompatible_shapes(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', val=np.arange(10)[np.newaxis, :,
+                                                             np.newaxis, np.newaxis]))
+        p.model.add_subsystem('C1', ExecComp('y=5*x',
+                                             x={'value': np.zeros((5, 2))},
+                                             y={'value': np.zeros((5, 2))}))
+        p.model.connect('indep.x', 'C1.x')
+
+        with self.assertRaises(Exception) as context:
             p.setup()
-            p.run_model()
-            assert_rel_error(self, p['C1.y'], np.arange(10)[np.newaxis, :])
+        self.assertEqual(str(context.exception),
+                         "The source and target shapes do not match or are ambiguous "
+                         "for the connection 'indep.x' to 'C1.x'. Expected (5, 2) but "
+                         "got (1, 10, 1, 1).")
 
-        def test_connect_flat_array_to_col_vector(self):
-            p = Problem()
-            p.model.add_subsystem('indep', IndepVarComp('x', val=np.arange(10)))
-            p.model.add_subsystem('C1',
-                                  ExecComp('y=numpy.dot(A, x)',
-                                           x={'value': np.zeros((10, 1))},
-                                           A={'value': np.eye(10)},
-                                           y={'value': np.zeros((10, 1))}))
-            p.model.connect('indep.x', 'C1.x')
-            p.setup()
-            p.run_model()
-            assert_rel_error(self, p['C1.y'], np.arange(10)[:, np.newaxis])
-
-        def test_connect_row_vector_to_flat_array(self):
-            p = Problem()
-            p.model.add_subsystem('indep', IndepVarComp('x', val=np.arange(10)[np.newaxis, :]))
-            p.model.add_subsystem('C1', ExecComp('y=5*x',
-                                                 x={'value': np.zeros(10)},
-                                                 y={'value': np.zeros(10)}))
-            p.model.connect('indep.x', 'C1.x')
-            p.setup()
-            p.run_model()
-            assert_rel_error(self, p['C1.y'], 5 * np.arange(10))
-
-        def test_connect_col_vector_to_flat_array(self):
-            p = Problem()
-            p.model.add_subsystem('indep', IndepVarComp('x', val=np.arange(10)[:, np.newaxis]))
-            p.model.add_subsystem('C1', ExecComp('y=5*x',
-                                                 x={'value': np.zeros(10)},
-                                                 y={'value': np.zeros(10)}))
-            p.model.connect('indep.x', 'C1.x')
-            p.setup()
-            p.run_model()
-            assert_rel_error(self, p['C1.y'], 5 * np.arange(10))
-
-        def test_connect_flat_to_3d_array(self):
-            p = Problem()
-            p.model.add_subsystem('indep', IndepVarComp('x', val=np.arange(10)))
-            p.model.add_subsystem('C1', ExecComp('y=5*x',
-                                                 x={'value': np.zeros((1, 10, 1))},
-                                                 y={'value': np.zeros((1, 10, 1))}))
-            p.model.connect('indep.x', 'C1.x')
-            p.setup()
-            p.run_model()
-            assert_rel_error(self, p['C1.y'], 5 * np.arange(10)[np.newaxis, :, np.newaxis])
-
-        def test_connect_flat_nd_to_flat_nd(self):
-            p = Problem()
-            p.model.add_subsystem('indep', IndepVarComp('x',
-                                                        val=np.arange(10)[np.newaxis, :, np.newaxis,
-                                                            np.newaxis]))
-            p.model.add_subsystem('C1', ExecComp('y=5*x',
-                                                 x={'value': np.zeros((1, 1, 1, 10))},
-                                                 y={'value': np.zeros((1, 1, 1, 10))}))
-            p.model.connect('indep.x', 'C1.x')
-            p.setup()
-            p.run_model()
-            assert_rel_error(self, p['C1.y'],
-                             5 * np.arange(10)[np.newaxis, np.newaxis, np.newaxis, :])
-
-        def test_connect_incompatible_shapes(self):
-            p = Problem()
-            p.model.add_subsystem('indep', IndepVarComp('x', val=np.arange(10)[np.newaxis, :,
-                                                                 np.newaxis, np.newaxis]))
-            p.model.add_subsystem('C1', ExecComp('y=5*x',
-                                                 x={'value': np.zeros((5, 2))},
-                                                 y={'value': np.zeros((5, 2))}))
-            p.model.connect('indep.x', 'C1.x')
-
-            with self.assertRaises(Exception) as context:
-                p.setup()
-            self.assertEqual(str(context.exception),
-                             "The source and target shapes do not match or are ambiguous "
-                             "for the connection 'indep.x' to 'C1.x'. Expected (5, 2) but "
-                             "got (1, 10, 1, 1).")
 
         #class TestUBCS(unittest.TestCase):
 
