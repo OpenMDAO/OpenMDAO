@@ -1654,20 +1654,28 @@ class System(object):
         if clear:
             if mode == 'fwd':
                 d_residuals.set_const(0.0)
-            elif mode == 'rev':
+            else:  # rev
                 d_inputs.set_const(0.0)
                 d_outputs.set_const(0.0)
 
         excl_out = self._excluded_vars_out[vec_name]
         excl_in = self._excluded_vars_in[vec_name]
 
-        res_names = set(self._var_abs_names['output']) - excl_out
-        out_names = set(self._var_abs_names['output']) - excl_out
-        in_names = set(self._var_abs_names['input']) - excl_in
+        if excl_out:
+            out_names = set(self._var_abs_names['output']) - excl_out
+        else:
+            out_names = self._var_abs_names['output']
+        res_names = out_names
+
+        if excl_in:
+            in_names = set(self._var_abs_names['input']) - excl_in
+        else:
+            in_names = self._var_abs_names['input']
+
         if scope_out is not None:
-            out_names = out_names & scope_out
+            out_names = scope_out.intersection(out_names)
         if scope_in is not None:
-            in_names = in_names & scope_in
+            in_names = scope_in.intersection(in_names)
 
         d_inputs._names = in_names
         d_outputs._names = out_names
