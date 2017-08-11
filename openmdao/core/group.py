@@ -493,7 +493,8 @@ class Group(System):
                         abs_in2out[abs_in] = abs_out
 
         # Add explicit connections (only ones declared by this group)
-        for prom_in, (prom_out, src_indices) in iteritems(self._manual_connections):
+        for prom_in, (prom_out, src_indices, flat_src_indices) in \
+                iteritems(self._manual_connections):
 
             # throw an exception if either output or input doesn't exist
             # (not traceable to a connect statement, so provide context)
@@ -531,6 +532,7 @@ class Group(System):
                                            (self.pathname, prom_out,
                                             prom_in, prom_in))
                     meta['src_indices'] = np.atleast_1d(src_indices)
+                    meta['flat_src_indices'] = flat_src_indices
 
                 abs_in2out[abs_in] = abs_out
 
@@ -573,16 +575,13 @@ class Group(System):
                 # get input shape and src_indices from the local meta dict
                 # (input is always local)
                 in_shape = abs2meta_in[abs_in]['shape']
-                src_indices = abs2meta_in[abs_in].get('src_indices')
-                prom_out = self._var_abs2prom['output'][abs_out]
-                prom_in = self._var_abs2prom['input'][abs_in]
+                src_indices = abs2meta_in[abs_in]['src_indices']
+                flat = abs2meta_in[abs_in]['flat_src_indices']
 
                 if src_indices is None and out_shape != in_shape:
                     msg = ("The source and target shapes do not match"
-                           " for the connection '%s' to '%s' in Group"
-                           " '%s'.  Expected %s but got %s.")
-                    raise ValueError(msg % (prom_out, prom_in,
-                                            self.pathname,
+                           " for the connection '%s' to '%s'. Expected %s but got %s.")
+                    raise ValueError(msg % (abs_out, abs_in,
                                             in_shape, out_shape))
 
                 if src_indices is not None:
@@ -593,11 +592,10 @@ class Group(System):
                         if idx_d != inp_d:
                             msg = ("The source indices %s do not specify a "
                                    "valid shape for the connection '%s' to "
-                                   "'%s' in Group '%s'. The target shape is "
+                                   "'%s'. The target shape is "
                                    "%s but indices are %s.")
                             raise ValueError(msg % (str(src_indices).replace('\n', ''),
-                                                    prom_out, prom_in,
-                                                    self.pathname,
+                                                    abs_out, abs_in,
                                                     in_shape, src_indices.shape))
 
                     # any remaining dimension of indices must match shape of source
@@ -606,27 +604,49 @@ class Group(System):
                         if source_dimensions != len(out_shape):
                             msg = ("The source indices %s do not specify a "
                                    "valid shape for the connection '%s' to "
-                                   "'%s' in Group '%s'. The source has %d "
+                                   "'%s'. The source has %d "
                                    "dimensions but the indices expect %d.")
                             raise ValueError(msg % (str(src_indices).replace('\n', ''),
-                                                    prom_out, prom_in, self.pathname,
+                                                    abs_out, abs_in,
                                                     len(out_shape), source_dimensions))
                     else:
                         source_dimensions = 1
 
                     # check all indices are in range of the source dimensions
-                    for d in range(source_dimensions):
-                        # when running under MPI, there is a value for each proc
-                        d_size = out_shape[d] * self.comm.size
-                        for i in src_indices[..., d].flat:
-                            if abs(i) >= d_size:
-                                msg = ("The source indices do not specify "
-                                       "a valid index for the connection "
-                                       "'%s' to '%s' in Group '%s'. Index "
-                                       "'%d' is out of range for source "
-                                       "dimension of size %d.")
-                                raise ValueError(msg % (prom_out, prom_in,
-                                                 self.pathname, i, d_size))
+                    if flat:
+                        out_size = np.prod(out_shape)
+                        mx = np.max(src_indices)
+                        mn = np.min(src_indices)
+                        if mx >= out_size:
+                            bad_idx = mx
+                        elif mn < -out_size:
+                            bad_idx = mn
+                        else:
+                            bad_idx = None
+                        if bad_idx is not None:
+                            msg = ("The source indices do not specify "
+                                   "a valid index for the connection "
+                                   "'%s' to '%s'. Index "
+                                   "'%d' is out of range for a flat source "
+                                   "of size %d.")
+                            raise ValueError(msg % (abs_out, abs_in,
+                                             bad_idx, out_size))
+                        if src_indices.ndim > 1:
+                            abs2meta_in[abs_in]['src_indices'] = \
+                                abs2meta_in[abs_in]['src_indices'].flatten()
+                    else:
+                        for d in range(source_dimensions):
+                            # when running under MPI, there is a value for each proc
+                            d_size = out_shape[d] * self.comm.size
+                            for i in src_indices[..., d].flat:
+                                if abs(i) >= d_size:
+                                    msg = ("The source indices do not specify "
+                                           "a valid index for the connection "
+                                           "'%s' to '%s'. Index "
+                                           "'%d' is out of range for source "
+                                           "dimension of size %d.")
+                                    raise ValueError(msg % (abs_out, abs_in,
+                                                     i, d_size))
 
         # Recursion
         if recurse:
@@ -838,7 +858,7 @@ class Group(System):
                 elif src_indices.ndim == 1:
                     src_indices = convert_neg(src_indices, global_size_out)
                 else:
-                    if len(shape_out) == 1:
+                    if len(shape_out) == 1 or shape_in == src_indices.shape:
                         src_indices = src_indices.flatten()
                         src_indices = convert_neg(src_indices, global_size_out)
                     else:
@@ -1029,7 +1049,7 @@ class Group(System):
 
         return subsys
 
-    def connect(self, src_name, tgt_name, src_indices=None):
+    def connect(self, src_name, tgt_name, src_indices=None, flat_src_indices=None):
         """
         Connect source src_name to target tgt_name in this namespace.
 
@@ -1039,10 +1059,14 @@ class Group(System):
             name of the source variable to connect
         tgt_name : str or [str, ... ] or (str, ...)
             name of the target variable(s) to connect
-        src_indices : collection of int optional
-            When an input variable connects to some subset of an array output
-            variable, you can specify which global indices of the source to be
-            transferred to the input here.  Negative indices are supported.
+        src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
+            The global indices of the source variable to transfer data from.
+            The shapes of the target and src_indices must match, and form of the
+            entries within is determined by the value of 'flat_src_indices'.
+        flat_src_indices : bool
+            If True, each entry of src_indices is assumed to be an index into the
+            flattened source.  Otherwise it must be a tuple or list of size equal
+            to the number of dimensions of the source.
         """
         # if src_indices argument is given, it should be valid
         if isinstance(src_indices, string_types):
@@ -1084,7 +1108,7 @@ class Group(System):
         else:
             manual_connections = self._manual_connections
 
-        manual_connections[tgt_name] = (src_name, src_indices)
+        manual_connections[tgt_name] = (src_name, src_indices, flat_src_indices)
 
     def set_order(self, new_order):
         """
@@ -1445,6 +1469,13 @@ class Group(System):
                         meta_changes['rows'] = np.arange(size)
                         meta_changes['cols'] = np.arange(size)
                         meta_changes['value'] = np.ones(size)
+
+                    # This suppports desvar and constraint indices.
+                    if key[0] in self._owns_approx_of_idx:
+                        meta_changes['idx_of'] = self._owns_approx_of_idx[key[0]]
+
+                    if key[1] in self._owns_approx_wrt_idx:
+                        meta_changes['idx_wrt'] = self._owns_approx_wrt_idx[key[1]]
 
                     meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
                     meta.update(meta_changes)

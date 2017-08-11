@@ -192,10 +192,24 @@ class System(object):
         If True, this system approximated its Jacobian
     _owns_approx_jac_meta : dict
         Stores approximation metadata (e.g., step_size) from calls to approx_total_derivs
-    _owns_approx_wrt : set or None
-        Overrides aproximation inputs.
     _owns_approx_of : set or None
-        Overrides aproximation outputs.
+        Overrides aproximation outputs. This is set when calculating system derivatives, and serves
+        as a way to communicate the driver's output quantities to the approximation objects so that
+        we only take derivatives of variables that the driver needs.
+    _owns_approx_of_idx : dict
+        Index for override 'of' approximations if declared. When the user calls  `add_objective`
+        or `add_constraint`, they may optionally specify an "indices" argument. This argument must
+        also be communicated to the approximations when they are set up so that 1) the Jacobian is
+        the correct size, and 2) we don't perform any extra unnecessary calculations.
+    _owns_approx_wrt : set or None
+        Overrides aproximation inputs. This is set when calculating system derivatives, and serves
+        as a way to communicate the driver's input quantities to the approximation objects so that
+        we only take derivatives with respect to variables that the driver needs.
+    _owns_approx_wrt_idx : dict
+        Index for override 'wrt' approximations if declared. When the user calls  `add_designvar`
+        they may optionally specify an "indices" argument. This argument must also be communicated
+        to the approximations when they are set up so that 1) the Jacobian is the correct size, and
+        2) we don't perform any extra unnecessary calculations.
     _subjacs_info : OrderedDict of dict
         Sub-jacobian metadata for each (output, input) pair added using
         declare_partials. Members of each pair may be glob patterns.
@@ -312,6 +326,8 @@ class System(object):
         self._owns_approx_jac_meta = {}
         self._owns_approx_wrt = None
         self._owns_approx_of = None
+        self._owns_approx_wrt_idx = {}
+        self._owns_approx_of_idx = {}
 
         self._design_vars = {}
         self._responses = {}
