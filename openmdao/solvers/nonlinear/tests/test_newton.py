@@ -1009,6 +1009,57 @@ class TestNewtonFeatures(unittest.TestCase):
             prob.run_model()
         except AnalysisError:
             pass
+            
+    def test_feature_initial_sub_solve(self):
+        
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                            z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.linear_solver = DirectSolver()
+
+        # First run the problem with solve_subsystems = True and max_sub_solves = 1
+        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver.options['maxiter'] = 2
+        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['max_sub_solves'] = 1
+
+        prob.setup()
+        prob.run_model()
+
+        before_y1 = prob['y1']
+        before_y2 = prob['y2']
+
+        # Then run the problem with solve_subsystems = False but initial_sub_solve = True 
+        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver.options['maxiter'] = 2
+        model.nonlinear_solver.options['solve_subsystems'] = False
+        model.nonlinear_solver.options['initial_sub_solve'] = True
+
+        prob.setup()
+        prob.run_model()
+
+        after_y1 = prob['y1']
+        after_y2 = prob['y2']
+
+        # Make sure the same values are returned after 1 Newton iteration
+        self.assertEqual(before_y1, after_y1)
+        self.assertEqual(before_y2, after_y2)
+        
+        self.assertEqual(model.nonlinear_solver.options['initial_sub_solve'], False)
+        
 
 if __name__ == "__main__":
     unittest.main()
