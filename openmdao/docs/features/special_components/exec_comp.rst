@@ -32,4 +32,11 @@ You can also access built-in Numpy functions by using the prefix "numpy." in fro
 .. embed-test::
     openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_numpy
 
+You can also declare metadata like 'units', 'upper', or 'lower' on the inputs and outputs. Here is an example
+where we declare all our inputs to be inches to trigger conversion from a variable expressed in feet in one
+connection source.
+
+.. embed-test::
+    openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_metadata
+
 .. tags:: ExecComp, Examples
