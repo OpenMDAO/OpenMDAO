@@ -38,7 +38,8 @@ class WebRecorder(BaseRecorder):
         Parameters
         ----------
         token: <string>
-            The token to be passed as a passphrase for authentication of each server request
+            The token to be passed as a user's unique identifier. Register to get a token
+            at the given endpoint
         case_name: <string>
             The name this case should be stored under. Default: 'Case Recording'
         endpoint: <string>
@@ -46,8 +47,7 @@ class WebRecorder(BaseRecorder):
         port: <string>
             The port which the server is listening on. Default to empty string (port 80)
         suppress_output: <bool>
-            Indicates if any printing should occur (including printing indicating the
-            visualization URL)
+            Indicates if all printing should be suppressed in this recorder
         """
         super(WebRecorder, self).__init__()
 
@@ -70,8 +70,6 @@ class WebRecorder(BaseRecorder):
         response = case_request.json()
         if response['status'] != 'Failed':
             self._case_id = str(response['case_id'])
-            if not suppress_output:
-                print("Visualization at: http://openmdao.org/visualization/case/" + self._case_id)
         else:
             self._case_id = '-1'
             if not suppress_output:
