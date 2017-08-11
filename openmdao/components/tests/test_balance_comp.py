@@ -513,32 +513,21 @@ class TestBalanceComp(unittest.TestCase):
         print(-c/b)
 
     def test_feature_kepler(self):
-        """
-        Solve Kepler's equation (convert mean anomaly to eccentric anomaly) using a BalanceComp.
-
-        Kepler's equation is:
-
-        ..math:
-
-            E - e * sin(E) = M
-        """
-        n = 100
-
         prob = Problem(model=Group())
 
         ivc = IndepVarComp()
 
         ivc.add_output(name='M',
-                       val=np.random.uniform(0, 2*np.pi, size=n),
-                       units='rad',
+                       val=85.0,
+                       units='deg',
                        desc='Mean anomaly')
 
         ivc.add_output(name='ecc',
-                       val=0.5*np.random.rand(n),
+                       val=0.6,
                        units=None,
                        desc='orbit eccentricity')
 
-        bal = BalanceComp(name='E', val=np.zeros(n),
+        bal = BalanceComp(name='E', val=0.0,
                           units='rad', rhs_name='M', eq_units='rad')
 
         # Override the guess_nonlinear method, always initialize E to the value of M
@@ -549,9 +538,9 @@ class TestBalanceComp(unittest.TestCase):
 
         # ExecComp used to compute the LHS of Kepler's equation.
         lhs_comp = ExecComp('k=E - ecc * sin(E)',
-                            k={'value': np.zeros(n), 'units': 'rad'},
-                            E={'value': np.zeros(n), 'units': 'rad'},
-                            ecc={'value': np.zeros(n)})
+                            k={'value': 0.0, 'units': 'rad'},
+                            E={'value': 0.0, 'units': 'rad'},
+                            ecc={'value': 0.0})
 
         prob.model.add_subsystem(name='ivc', subsys=ivc, promotes_outputs=['M', 'ecc'])
 
@@ -569,16 +558,22 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.linear_solver = DirectSolver()
         prob.model.nonlinear_solver = NewtonSolver()
         prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 2
+        prob.model.nonlinear_solver.options['iprint'] = 0
         prob.model.jacobian = DenseJacobian()
 
-        prob.setup()
+        prob.setup(check=False)
 
         prob.run_model()
 
-        print('ecc', prob['ecc'])
-        print('M (deg)', np.degrees(prob['M']))
-        print('E (deg)', np.degrees(prob['E']))
+        assert_almost_equal(np.degrees(prob['E']), 115.9, decimal=1)
+
+        ecc = prob['ecc']
+        M = prob['M']
+        E = prob['E']
+
+        print('ecc', ecc)
+        print('M (deg)', M)
+        print('E (deg)', np.degrees(E))
 
 
 

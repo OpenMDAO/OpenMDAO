@@ -35,6 +35,21 @@ of the implicit state variable.
 The BalanceComp supports vectorized implicit states, simply provide a default
 value or shape when adding the balance that reflects the correct shape.
 
+Balance accepts the following other arguments (which are all passed
+to ``add_balance`` during initialization):
+
+=========== ======================== ==================================================================================
+Name        Type                     Description
+=========== ======================== ==================================================================================
+eq_units    str or None              Units associated with LHS and RHS.  (mult is treated as unitless)
+lhs_name    str or None              Optional name associated with the left-hand-side of the balance.
+rhs_name    str or None              Optional name associated with the right-hand-side of the balance.
+mult_name   str or None              Optional name associated with the right-hand-side of the balance.
+rhs_val     int, float, or np.array  Default value for the RHS.
+mult_val    int, float, or np.array  Default value for the multiplier.
+kwargs      dict or named arguments  Additional arguments to be passed for the creation of the implicit state variable.
+=========== ======================== ==================================================================================
+
 Example:  Scalar Root Finding
 -----------------------------
 
@@ -69,5 +84,20 @@ they need not be connected.
 .. embed-test::
     openmdao.components.tests.test_balance_comp.TestBalanceComp.test_feature_vector
 
-.. tags:: BalanceComp, Examples
+A Practical Example:  Solving Kepler's Equation
+-----------------------------------------------
 
+This example uses the Balance component to convert mean anomaly to eccentric anomaly
+by use of Kepler's equation.
+
+.. math::
+
+    M = E - ecc \cdot \sin{E}
+
+Here M is the mean anomaly, E is the eccentric anomaly, and ecc is the eccentricity of the orbit.
+
+.. embed-test::
+    openmdao.components.tests.test_balance_comp.TestBalanceComp.test_feature_kepler
+
+
+.. tags:: BalanceComp, Examples
