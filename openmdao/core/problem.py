@@ -22,8 +22,9 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.logger_utils import get_default_logger
+from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.mpi import MPI, FakeComm
+from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.utils.graph_utils import all_connected_edges
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.vectors.default_multi_vector import DefaultMultiVector
@@ -66,6 +67,14 @@ class Problem(object):
         If True, allocate vectors to store ref. values.
     _solver_print_cache : list
         Allows solver iprints to be set to requested values after setup calls.
+    _initial_condition_cache : dict
+        Any initial conditions that are set at the problem level via setitem are cached here
+        until they can be processed.
+    _setup_status : int
+        Current status of the setup in _model.
+        0 -- Newly initialized problem or newly added model.
+        1 -- The `setup` method has been called, but vectors not initialized.
+        2 -- The `final_setup` has been run, everything ready to run.
     """
 
     def __init__(self, model=None, comm=None, use_ref_vector=True, root=None):
@@ -114,6 +123,14 @@ class Problem(object):
 
         recording_iteration_stack = []
 
+        self._initial_condition_cache = {}
+
+        # Status of the setup of _model.
+        # 0 -- Newly initialized problem or newly added model.
+        # 1 -- The `setup` method has been called, but vectors not initialized.
+        # 2 -- The `final_setup` has been run, everything ready to run.
+        self._setup_status = 0
+
     def __getitem__(self, name):
         """
         Get an output/input variable.
@@ -128,13 +145,69 @@ class Problem(object):
         float or ndarray
             the requested output/input variable.
         """
-        if name in self.model._outputs:
-            return self.model._outputs[name]
+        # Caching only needed if vectors aren't allocated yet.
+        if self._setup_status == 1:
+
+            # We have set and cached already
+            if name in self._initial_condition_cache:
+                val = self._initial_condition_cache[name]
+
+            # Vector not setup, so we need to pull values from saved metadata request.
+            else:
+                proms = self.model._var_allprocs_prom2abs_list
+                meta = self.model._var_abs2meta
+                if name in meta['input']:
+                    if name in self.model._conn_abs_in2out:
+                        src_name = self.model._conn_abs_in2out[name]
+                        val = meta['input'][src_name]['value']
+                    else:
+                        val = meta['input'][name]['value']
+
+                elif name in meta['output']:
+                    val = meta['output'][name]['value']
+
+                elif name in proms['input']:
+                    abs_name = proms['input'][name][0]
+                    if abs_name in self.model._conn_abs_in2out:
+                        src_name = self.model._conn_abs_in2out[abs_name]
+                        # So, if the inputs and outputs are promoted to the same name, then we
+                        # allow getitem, but if they aren't, then we raise an error due to non
+                        # uniqueness.
+                        if name not in proms['output']:
+                            # This triggers a check for unconnected non-unique inputs, and
+                            # raises the same error as vector access.
+                            abs_name = prom_name2abs_name(self.model, name, 'input')
+                        val = meta['output'][src_name]['value']
+                    else:
+                        # This triggers a check for unconnected non-unique inputs, and
+                        # raises the same error as vector access.
+                        abs_name = prom_name2abs_name(self.model, name, 'input')
+                        val = meta['input'][abs_name]['value']
+
+                elif name in proms['output']:
+                    abs_name = prom_name2abs_name(self.model, name, 'output')
+                    val = meta['output'][abs_name]['value']
+
+                else:
+                    msg = 'Variable name "{}" not found.'
+                    raise KeyError(msg.format(name))
+
+                self._initial_condition_cache[name] = val
+
+        elif name in self.model._outputs:
+            val = self.model._outputs[name]
+
         elif name in self.model._inputs:
-            return self.model._inputs[name]
+            val = self.model._inputs[name]
+
         else:
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
+
+        # Need to cache the "get" in case the user calls in-place numpy operations.
+        self._initial_condition_cache[name] = val
+
+        return val
 
     def __setitem__(self, name, value):
         """
@@ -147,13 +220,27 @@ class Problem(object):
         value : float or ndarray or list
             value to set this variable to.
         """
-        if name in self.model._outputs:
-            self.model._outputs[name] = value
-        elif name in self.model._inputs:
-            self.model._inputs[name] = value
+        # Caching only needed if vectors aren't allocated yet.
+        if self._setup_status == 1:
+            self._initial_condition_cache[name] = value
         else:
-            msg = 'Variable name "{}" not found.'
-            raise KeyError(msg.format(name))
+            if name in self.model._outputs:
+                self.model._outputs[name] = value
+            elif name in self.model._inputs:
+                self.model._inputs[name] = value
+            else:
+                msg = 'Variable name "{}" not found.'
+                raise KeyError(msg.format(name))
+
+    def _set_initial_conditions(self):
+        """
+        Set all initial conditions that have been saved in cache after setup.
+        """
+        for name, value in iteritems(self._initial_condition_cache):
+            self[name] = value
+
+        # Clean up cache
+        self._initial_condition_cache = {}
 
     @property
     def root(self):
@@ -199,6 +286,7 @@ class Problem(object):
         if self._mode is None:
             raise RuntimeError("The `setup` method must be called before `run_model`.")
 
+        self.final_setup()
         return self.model.run_solve_nonlinear()
 
     def run_driver(self):
@@ -213,6 +301,7 @@ class Problem(object):
         if self._mode is None:
             raise RuntimeError("The `setup` method must be called before `run_driver`.")
 
+        self.final_setup()
         with self.model._scaled_context_all():
             return self.driver.run()
 
@@ -257,7 +346,12 @@ class Problem(object):
     def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='auto',
               force_alloc_complex=False, multi_vector_class=None):
         """
-        Set up everything.
+        Set up the model hierarchy.
+
+        When `setup` is called, the model hierarchy is assembled, the processors are allocated
+        (for MPI), and variables and connections are all assigned. This method traverses down
+        the model hierarchy to call `setup` on each subsystem, and then traverses up te model
+        hierarchy to call `configure` on each subsystem.
 
         Parameters
         ----------
@@ -304,8 +398,42 @@ class Problem(object):
             mode = 'rev'
         self._mode = mode
 
-        model._setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex,
-                     mode=mode, multi_vector_class=multi_vector_class)
+        model._setup(comm, 'full')
+
+        # Cache all args for final setup.
+        self._vector_class = vector_class
+        self._check = check
+        self._logger = logger
+        self._force_alloc_complex = force_alloc_complex
+        self._multi_vector_class = multi_vector_class
+
+        self._setup_status = 1
+        return self
+
+    def final_setup(self):
+        """
+        Perform final setup phase on problem in preparation for run.
+
+        This is the second phase of setup, and is done automatically at the start of `run_driver`
+        and `run_model`. At the beginning of final_setup, we have a model hierarchy with defined
+        variables, solvers, case_recorders, and derivative settings. During this phase, the vectors
+        are created and populated, the drivers and solvers are initialized, and the recorders are
+        started, and the rest of the framework is prepared for execution.
+        """
+        vector_class = self._vector_class
+        check = self._check
+        logger = self._logger
+        force_alloc_complex = self._force_alloc_complex
+        multi_vector_class = self._multi_vector_class
+
+        model = self.model
+        comm = self.comm
+        mode = self._mode
+
+        if self._setup_status < 2:
+            model._final_setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex,
+                               mode=mode, multi_vector_class=multi_vector_class)
+
         self.driver._setup_driver(self)
 
         if isinstance(model, Group):
@@ -321,7 +449,9 @@ class Problem(object):
         if check and comm.rank == 0:
             check_config(self, logger)
 
-        return self
+        if self._setup_status < 2:
+            self._setup_status = 2
+            self._set_initial_conditions()
 
     def check_partials(self, logger=None, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6, global_options=None,
@@ -368,6 +498,9 @@ class Problem(object):
             For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
                 Jacobian for the three different methods of computation.
         """
+        if self._setup_status < 2:
+            self.final_setup()
+
         if not global_options:
             global_options = DEFAULT_FD_OPTIONS.copy()
             global_options['method'] = 'fd'
@@ -378,7 +511,7 @@ class Problem(object):
             raise ValueError('Unrecognized method: "{}"'.format(global_options['method']))
 
         model = self.model
-        logger = get_default_logger(logger, 'check_partials')
+        logger = logger if logger else get_logger('check_partials')
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -404,6 +537,10 @@ class Problem(object):
         input_cache = model._inputs._clone()
         output_cache = model._outputs._clone()
 
+        # Keep track of derivative keys that are declared dependent so that we don't print them
+        # unless they are in error.
+        indep_key = {}
+
         # Analytic Jacobians
         for mode in ('fwd', 'rev'):
             model._inputs.set_vec(input_cache)
@@ -424,6 +561,7 @@ class Problem(object):
                 deprecated = isinstance(comp, DepComponent)
                 matrix_free = comp.matrix_free
                 c_name = comp.pathname
+                indep_key[c_name] = set()
 
                 # TODO: Check deprecated deriv_options.
 
@@ -523,6 +661,15 @@ class Problem(object):
                             # No need to calculate partials; they are already stored
                             deriv_value = subjacs.get(abs_key)
 
+                            # Testing for pairs that are not dependent so that we suppress printing
+                            # them unless the fd is non zero. Note: subjacs_info is empty for
+                            # undeclared partials on implicit components.
+                            try:
+                                if comp._jacobian._subjacs_info[abs_key][0]['dependent'] is False:
+                                    indep_key[c_name].add(rel_key)
+                            except KeyError:
+                                pass
+
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
                                 try:
@@ -610,9 +757,9 @@ class Problem(object):
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
 
-        logging.getLogger().setLevel(logging.INFO)
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, logger, compact_print,
-                                  comps, global_options, suppress_output=suppress_output)
+                                  comps, global_options, suppress_output=suppress_output,
+                                  indep_key=indep_key)
 
         return partials_data
 
@@ -666,7 +813,8 @@ class Problem(object):
         """
         model = self.model
         global_names = False
-        logger = get_default_logger(logger, 'check_total_derivatives')
+
+        logger = logger if logger else get_logger('check_total_derivatives')
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -701,7 +849,6 @@ class Problem(object):
             data[''][key]['J_fd'] = Jfd[key]
         fd_args['method'] = 'fd'
 
-        logging.getLogger().setLevel(logging.INFO)
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, logger, compact_print, [model],
                                   fd_args, totals=True, suppress_output=suppress_output)
         return data['']
@@ -727,6 +874,9 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
+        if self._setup_status < 2:
+            self.final_setup()
+
         with self.model._scaled_context_all():
             if self.model._owns_approx_jac:
                 totals = self._compute_total_derivs_approx(of=of, wrt=wrt,
@@ -820,9 +970,27 @@ class Problem(object):
             model._owns_approx_of = set(of)
             model._owns_approx_wrt = set(wrt)
 
+            # Support for indices defined on driver vars.
+            dvs = self.driver._designvars
+            cons = self.driver._cons
+            objs = self.driver._objs
+
+            response_idx = {key: val['indices'] for key, val in iteritems(cons)
+                            if val['indices'] is not None}
+            for key, val in iteritems(objs):
+                if val['indices'] is not None:
+                    response_idx[key] = val['indices']
+
+            model._owns_approx_of_idx = response_idx
+
+            model._owns_approx_wrt_idx = {key: val['indices'] for key, val in iteritems(dvs)
+                                          if val['indices'] is not None}
+
         model._setup_jacobians(recurse=False)
 
+        model.jacobian._override_checks = True
         model._linearize()
+        model.jacobian._override_checks = False
         approx_jac = model._jacobian._subjacs
 
         # Create data structures (and possibly allocate space) for the total
@@ -1333,7 +1501,7 @@ class Problem(object):
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, logger,
                               compact_print, system_list, global_options, totals=False,
-                              suppress_output=False):
+                              suppress_output=False, indep_key=None):
     """
     Compute the relative and absolute errors in the given derivatives and print to the logger.
 
@@ -1357,6 +1525,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
         Set to True if we are doing check_total_derivs to skip a bunch of stuff.
     suppress_output : bool
         Set to True to suppress all output. Just calculate errors and add the keys.
+    indep_key : dict of sets, optional
+        Keyed by component name, contains the of/wrt keys that are declared not dependent.
     """
     fd_desc = "{}:{}".format(global_options['method'],
                              global_options['form'])
@@ -1467,6 +1637,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
                     derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fd_norm,
                                                                         rev_error / fd_norm,
                                                                         fwd_rev_error / fd_norm)
+
+            # Skip printing the dependent keys if the derivatives are fine.
+            if indep_key is not None:
+                rel_key = (of, wrt)
+                if rel_key in indep_key[sys_name] and fd_norm < abs_error_tol:
+                    del derivative_data[sys_name][rel_key]
+                    continue
 
             if not suppress_output:
                 if compact_print:

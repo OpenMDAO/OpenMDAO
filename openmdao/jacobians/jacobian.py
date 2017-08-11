@@ -26,6 +26,10 @@ class Jacobian(object):
         Dictionary of the sub-Jacobian metadata keyed by absolute names.
     options : <OptionsDictionary>
         Options dictionary.
+    _override_checks : bool
+        If we are approximating a jacobian at the top level and we have specified indices on the
+        functions or designvars, then we need to disable the size checking temporarily so that we
+        can assign a jacobian with less rows or columns than the variable sizes.
     """
 
     def __init__(self, **kwargs):
@@ -44,6 +48,8 @@ class Jacobian(object):
 
         self.options = OptionsDictionary()
         self.options.update(kwargs)
+
+        self._override_checks = False
 
     def _abs_key2shape(self, abs_key):
         """
@@ -161,7 +167,7 @@ class Jacobian(object):
         subjac : int or float or ndarray or sparse matrix
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
-        if not issparse(subjac):
+        if not issparse(subjac) and not self._override_checks:
             # np.promote_types will choose the smallest dtype that can contain both arguments
             subjac = np.atleast_1d(subjac)
             safe_dtype = np.promote_types(subjac.dtype, float)
@@ -191,8 +197,8 @@ class Jacobian(object):
 
                 if subjac.shape != rows.shape:
                     raise ValueError("Sub-jacobian for key %s has "
-                                     "the wrong size (%d), expected (%d)." %
-                                     (abs_key, len(subjac), len(rows)))
+                                     "the wrong shape (%s), expected (%s)." %
+                                     (abs_key, subjac.shape, rows.shape))
 
                 if abs_key in self._subjacs and subjac.shape == self._subjacs[abs_key][0].shape:
                     np.copyto(self._subjacs[abs_key][0], subjac)

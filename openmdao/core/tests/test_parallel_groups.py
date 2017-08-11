@@ -211,7 +211,7 @@ class TestParallelGroups(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = inputs['x'] * self.mult
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 partials['y', 'x'] = numpy.array([self.mult])
 
         prob = Problem()
@@ -284,6 +284,7 @@ class TestParallelGroups(unittest.TestCase):
         testlogger = TestLogger()
         prob.setup(vector_class=PETScVector, check=True, mode='fwd',
                    logger=testlogger)
+        prob.final_setup()
 
         if prob.comm.rank > 0:
             self.assertEqual(len(testlogger.get('error')), 0)

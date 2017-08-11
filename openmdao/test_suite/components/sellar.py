@@ -86,7 +86,7 @@ class SellarDis1withDerivatives(SellarDis1):
         # Finite difference nothing
         pass
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         """
         Jacobian for Sellar discipline 1.
         """
@@ -162,7 +162,7 @@ class SellarDis2withDerivatives(SellarDis2):
         # Finite difference nothing
         pass
 
-    def compute_partials(self, inputs, outputs, J):
+    def compute_partials(self, inputs, J):
         """
         Jacobian for Sellar discipline 2.
         """

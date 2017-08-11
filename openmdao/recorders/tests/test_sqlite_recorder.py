@@ -384,6 +384,33 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars,
                                            None, None, None),), self.eps)
 
+    def test_add_recorder_after_setup(self):
+
+        self.setup_sellar_model()
+
+        self.recorder.options['record_desvars'] = True
+        self.recorder.options['record_responses'] = False
+        self.recorder.options['record_objectives'] = False
+        self.recorder.options['record_constraints'] = False
+
+        self.prob.setup(check=False)
+
+        self.prob.driver.add_recorder(self.recorder)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+
+        coordinate = [0, 'Driver', (0, )]
+
+        expected_desvars = {
+                            "px.x": [1.0, ],
+                            "pz.z": [5.0, 2.0]
+                           }
+
+        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars,
+                                           None, None, None),), self.eps)
+
     def test_only_objectives_recorded(self):
 
         self.setup_sellar_model()
@@ -492,6 +519,9 @@ class TestSqliteRecorder(unittest.TestCase):
         self.recorder.options['record_metadata'] = True
         self.prob.driver.add_recorder(self.recorder)
         self.prob.setup(check=False)
+
+        # Conclude setup but don't run model.
+        self.prob.final_setup()
 
         self.prob.cleanup()
 
@@ -614,6 +644,59 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
                                            expected_objectives, expected_constraints), ), self.eps)
+
+    def test_includes_post_setup(self):
+        if OPT is None:
+            raise unittest.SkipTest("pyoptsparse is not installed")
+
+        if OPTIMIZER is None:
+            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        model.suppress_solver_output = True
+
+        prob.driver = pyOptSparseDriver()
+
+        prob.driver.options['optimizer'] = OPTIMIZER
+        prob.driver.opt_settings['ACC'] = 1e-9
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+
+        # Set up recorder after intitial setup.
+        prob.driver.add_recorder(self.recorder)
+        self.recorder.options['record_desvars'] = True
+        self.recorder.options['record_responses'] = True
+        self.recorder.options['record_objectives'] = True
+        self.recorder.options['record_constraints'] = True
+        self.recorder.options['includes'] = ['*']
+        self.recorder.options['excludes'] = ['p2*']
+
+        t0, t1 = run_driver(prob)
+
+        prob.cleanup()
+
+        coordinate = [0, 'SLSQP', (5, )]
+
+        expected_desvars = {"p1.x": prob["p1.x"]}
+
+        expected_objectives = {"comp.f_xy": prob['comp.f_xy'], }
+
+        expected_constraints = {"con.c": prob['con.c'], }
+
+        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
+                                                 expected_objectives, expected_constraints), ), self.eps)
 
     def test_record_system_with_hierarchy(self):
         if OPT is None:

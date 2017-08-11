@@ -42,6 +42,9 @@ class TestPetscKSP(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False)
         p.set_solver_print(level=0)
 
+        # Conclude setup but don't run model.
+        p.final_setup()
+
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
         # forward
@@ -72,6 +75,9 @@ class TestPetscKSP(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False)
         p.set_solver_print(level=0)
 
+        # Conclude setup but don't run model.
+        p.final_setup()
+
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
         # forward
@@ -100,6 +106,9 @@ class TestPetscKSP(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False)
         p.set_solver_print(level=0)
 
+        # Conclude setup but don't run model.
+        p.final_setup()
+
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
         # forward
@@ -125,6 +134,9 @@ class TestPetscKSP(unittest.TestCase):
         p = Problem(group)
         p.setup(vector_class=PETScVector, check=False)
         p.set_solver_print(level=0)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
 
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
@@ -153,6 +165,9 @@ class TestPetscKSP(unittest.TestCase):
         # test the direct solver and make sure KSP correctly recurses for _linearize
         precon = group.linear_solver.precon = DirectSolver()
         p.setup(vector_class=PETScVector, check=False)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
 
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
@@ -188,6 +203,9 @@ class TestPetscKSP(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False)
         p.set_solver_print(level=0)
 
+        # Conclude setup but don't run model.
+        p.final_setup()
+
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
         # forward
@@ -216,6 +234,9 @@ class TestPetscKSP(unittest.TestCase):
         group.linear_solver.options['ksp_type'] = 'richardson'
 
         p.setup(vector_class=PETScVector, check=False)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
 
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
@@ -277,6 +298,9 @@ class TestPetscKSP(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False)
 
         p.set_solver_print(level=0)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
 
         # forward
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()

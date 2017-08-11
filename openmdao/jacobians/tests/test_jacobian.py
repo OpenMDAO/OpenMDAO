@@ -43,7 +43,7 @@ class MyExplicitComp(ExplicitComponent):
                            y[0]*17. - y[0]*y[1] + 2.*y[1]
         outputs['f'][1] = outputs['f'][0]*3.0
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         x = inputs['x']
         y = inputs['y']
         jac1 = self._jac_type(np.array([
@@ -94,7 +94,7 @@ class MyExplicitComp2(ExplicitComponent):
         z = inputs['z']
         outputs['f'] = (w[0]-5.0)**2 + (w[1]+1.0)**2 + w[2]*6. + z*7.
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         w = inputs['w']
         z = inputs['z']
         jac = self._jac_type(np.array([[
@@ -137,7 +137,7 @@ class ExplicitSetItemComp(ExplicitComponent):
         self.add_input('in', val=in_val*scale)
         self.add_output('out', val=out_val*scale)
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         partials['out', 'in'] = self._constructor(self._value)
 
 
@@ -397,6 +397,7 @@ class TestJacobian(unittest.TestCase):
         prob.model.jacobian = DenseJacobian()
 
         prob.setup(check=False)
+        prob.final_setup()
 
         prob.model.jacobian = DenseJacobian()
 
@@ -425,6 +426,7 @@ class TestJacobian(unittest.TestCase):
         model.linear_solver = ScipyIterativeSolver()
 
         prob.setup(check=False)
+        prob.final_setup()
 
         d1 = prob.model.get_subsystem('d1')
         d1.jacobian = DenseJacobian()
@@ -501,8 +503,10 @@ class TestJacobian(unittest.TestCase):
         prob.model.connect('indeps.x', 'G1.C1.x')
         prob.model.connect('indeps.x', 'G1.C2.x')
 
+        prob.setup(check=False)
+
         with self.assertRaises(Exception) as context:
-            prob.setup(check=False)
+            prob.run_model()
         self.assertEqual(str(context.exception),
                          "System 'G1' has a solver of type 'NewtonSolver'but a sparse "
                          "AssembledJacobian has been set in a higher level system.")
@@ -539,9 +543,11 @@ class TestJacobian(unittest.TestCase):
 
         model.jacobian = DenseJacobian()
 
+        prob.setup()
+
         msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
-            prob.setup()
+            prob.run_model()
 
         # Nested
 
@@ -559,9 +565,11 @@ class TestJacobian(unittest.TestCase):
 
         model.jacobian = DenseJacobian()
 
+        prob.setup()
+
         msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
-            prob.setup()
+            prob.run_model()
 
         # Try a component that is derived from a matrix-free one
 
@@ -581,9 +589,11 @@ class TestJacobian(unittest.TestCase):
 
         model.jacobian = DenseJacobian()
 
+        prob.setup()
+
         msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
-            prob.setup()
+            prob.run_model()
 
         # Make sure regular comps don't give an error.
 
@@ -600,6 +610,7 @@ class TestJacobian(unittest.TestCase):
         model.jacobian = DenseJacobian()
 
         prob.setup()
+        prob.final_setup()
 
         class ParaboloidJacVec(Paraboloid):
 
@@ -625,9 +636,11 @@ class TestJacobian(unittest.TestCase):
 
         model.jacobian = DenseJacobian()
 
+        prob.setup()
+
         msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
-            prob.setup()
+            prob.run_model()
 
 if __name__ == '__main__':
     unittest.main()

@@ -35,7 +35,7 @@ Preamble
     from openmdao.api import ExplicitComponent
 
 At the top of any script you'll see these lines (or lines very similar to these) which import needed classes and functions. On the first import line the `print_function` is used so the code in the script will work in Python 2 or 3. If you want to know whats going on with the division operator, check out this `detailed explanation <https://www.python.org/dev/peps/pep-0238/>`_. The second import line brings in OpenMDAO classes that are needed to build and run a model.
-As you progress to more complex models you can expect to import more classes from `openmdao.api`, but for now we only need these 4.
+As you progress to more complex models you can expect to import more classes from `openmdao.api`, but for now we only need this one to define our paraboloid component.
 
 Defining a component
 ---------------------
@@ -54,13 +54,15 @@ The component is the basic building block of a model. You will always define com
     openmdao.test_suite.components.paraboloid.Paraboloid
 
 
-The run-script
+The run script
 ---------------------
 
 In this example we've set up the run script at the bottom of the file.
 The start of the run script is denoted by the following statement:
 
 :code:`if __name__ == '__main__':`
+
+At the top of our run script, we import the remaining OpenMDAO classes that we will need to define our problem.
 
 All OpenMDAO models are built up from a hierarchy of `Group` instances that organize the components.
 Here the hierarchy is very simple, consisting of a single root group that holds two components.

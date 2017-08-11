@@ -27,7 +27,7 @@ class RectangleComp(ExplicitComponent):
 
 class RectanglePartial(RectangleComp):
 
-    def compute_partials(self, inputs, outputs, partials):
+    def compute_partials(self, inputs, partials):
         partials['area', 'length'] = inputs['width']
         partials['area', 'width'] = inputs['length']
 
@@ -126,9 +126,6 @@ class ExplCompTestCase(unittest.TestCase):
 
         # list excluding both explicit and implicit components raises error
         msg = "You have excluded both Explicit and Implicit components."
-
-        with assertRaisesRegex(self, RuntimeError, msg):
-            prob.model.list_inputs(explicit=False, implicit=False)
 
         with assertRaisesRegex(self, RuntimeError, msg):
             prob.model.list_outputs(explicit=False, implicit=False)

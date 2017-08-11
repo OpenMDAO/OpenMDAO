@@ -27,7 +27,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 """Intentionally incorrect derivative."""
                 J = partials
                 J['y', 'x1'] = np.array([4.0])
@@ -49,7 +49,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
 
         testlogger = TestLogger()
-        data = prob.check_partials(logger=testlogger)
+        prob.check_partials(logger=testlogger)
 
         lines = testlogger.get('info')
 
@@ -74,7 +74,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 """Intentionally incorrect derivative."""
                 J = partials
                 J['y', 'x1'] = np.array([4.0])
@@ -117,7 +117,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 """Intentionally incorrect derivative."""
                 J = partials
                 J['y', 'x1'] = np.array([4.0])
@@ -153,7 +153,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 """Intentionally incorrect derivative."""
                 J = partials
                 J['y', 'x1'] = np.array([4.0])
@@ -168,7 +168,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
 
         testlogger = TestLogger()
-        data = prob.check_partials(logger=testlogger)
+        prob.check_partials(logger=testlogger)
 
         lines = testlogger.get('info')
 
@@ -193,7 +193,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 """Intentionally incorrect derivative."""
                 J = partials
                 J['y', 'x1'] = np.array([4.0])
@@ -231,7 +231,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 """Intentionally left out derivative."""
                 J = partials
                 J['y', 'x1'] = np.array([3.0])
@@ -250,7 +250,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials()
+        data = prob.check_partials(suppress_output=True)
 
         abs_error = data['comp']['y', 'x1']['abs error']
         rel_error = data['comp']['y', 'x1']['rel error']
@@ -296,7 +296,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         units = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
 
         p.setup()
-        data = p.check_partials()
+        data = p.check_partials(suppress_output=True)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -317,7 +317,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
                 self.run_count = 0
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 partials['flow:T', 'T'] = 1.
                 partials['flow:P', 'P'] = 1.
 
@@ -339,7 +339,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         model.nonlinear_solver = NonLinearRunOnce()
 
         p.setup()
-        data = p.check_partials()
+        data = p.check_partials(suppress_output=True)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -408,7 +408,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        data = p.check_partials()
+        data = p.check_partials(suppress_output=True)
         identity = np.eye(4)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_fwd'], identity, 1e-15)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_rev'], identity, 1e-15)
@@ -434,7 +434,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials()
+        data = prob.check_partials(suppress_output=True)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -466,7 +466,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials()
+        data = prob.check_partials(suppress_output=True)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -516,12 +516,89 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials()
+        data = prob.check_partials(suppress_output=True)
 
         assert_rel_error(self, data['comp']['y', 'extra']['J_fwd'], np.zeros((2, 2)))
         assert_rel_error(self, data['comp']['y', 'extra']['J_rev'], np.zeros((2, 2)))
         assert_rel_error(self, data['comp']['y', 'dummy']['J_fwd'], np.zeros((2, 2)))
         assert_rel_error(self, data['comp']['y', 'dummy']['J_rev'], np.zeros((2, 2)))
+
+    def test_dependent_false_hide(self):
+        # Test that we omit derivs declared with dependent=False
+
+        class SimpleComp1(ExplicitComponent):
+            def setup(self):
+                self.add_input('z', shape=(2, 2))
+                self.add_input('x', shape=(2, 2))
+                self.add_output('g', shape=(2, 2))
+
+                self.declare_partials('g', 'z', dependent=False)
+
+            def compute(self, inputs, outputs):
+                outputs['g'] = 3.0*inputs['x']
+
+            def compute_partials(self, inputs, partials):
+                partials['g', 'x'] = 3.
+
+
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('z', np.ones((2, 2))))
+        prob.model.add_subsystem('p2', IndepVarComp('x', np.ones((2, 2))))
+        prob.model.add_subsystem('comp', SimpleComp1())
+        prob.model.connect('p1.z', 'comp.z')
+        prob.model.connect('p2.x', 'comp.x')
+
+        prob.setup(check=False)
+
+        testlogger = TestLogger()
+        data = prob.check_partials(logger=testlogger)
+        lines = testlogger.get('info')
+
+        self.assertTrue("  comp: 'g' wrt 'z'\n" not in lines)
+        self.assertTrue(('g', 'z') not in data['comp'])
+        self.assertTrue("  comp: 'g' wrt 'x'\n"  in lines)
+        self.assertTrue(('g', 'x') in data['comp'])
+
+    def test_dependent_false_show(self):
+        # Test that we show derivs declared with dependent=False if the fd is not
+        # ~zero.
+
+        class SimpleComp2(ExplicitComponent):
+            def setup(self):
+                self.add_input('z', shape=(2, 2))
+                self.add_input('x', shape=(2, 2))
+                self.add_output('g', shape=(2, 2))
+
+                self.declare_partials('g', 'z', dependent=False)
+
+            def compute(self, inputs, outputs):
+                outputs['g'] = 2.0*inputs['z'] + 3.0*inputs['x']
+
+            def compute_partials(self, inputs, partials):
+                partials['g', 'x'] = 3.
+
+
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('z', np.ones((2, 2))))
+        prob.model.add_subsystem('p2', IndepVarComp('x', np.ones((2, 2))))
+        prob.model.add_subsystem('comp', SimpleComp2())
+        prob.model.connect('p1.z', 'comp.z')
+        prob.model.connect('p2.x', 'comp.x')
+
+        prob.setup(check=False)
+
+        testlogger = TestLogger()
+        data = prob.check_partials(logger=testlogger)
+        lines = testlogger.get('info')
+
+        self.assertTrue("  comp: 'g' wrt 'z'\n" in lines)
+        self.assertTrue(('g', 'z') in data['comp'])
+        self.assertTrue("  comp: 'g' wrt 'x'\n"  in lines)
+        self.assertTrue(('g', 'x') in data['comp'])
 
 
 class TestProblemCheckTotals(unittest.TestCase):
@@ -556,6 +633,98 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         assert_rel_error(self, totals['con_cmp2.con2', 'px.x']['J_fwd'], [[0.09692762]], 1e-5)
         assert_rel_error(self, totals['con_cmp2.con2', 'px.x']['J_fd'], [[0.09692762]], 1e-5)
+
+    def test_desvar_and_response_with_indices(self):
+
+        class ArrayComp2D(ExplicitComponent):
+            """
+            A fairly simple array component.
+            """
+
+            def setup(self):
+
+                self.JJ = np.array([[1.0, 3.0, -2.0, 7.0],
+                                    [6.0, 2.5, 2.0, 4.0],
+                                    [-1.0, 0.0, 8.0, 1.0],
+                                    [1.0, 4.0, -5.0, 6.0]])
+
+                # Params
+                self.add_input('x1', np.zeros([4]))
+
+                # Unknowns
+                self.add_output('y1', np.zeros([4]))
+
+            def compute(self, inputs, outputs):
+                """
+                Execution.
+                """
+                outputs['y1'] = self.JJ.dot(inputs['x1'])
+
+            def compute_partials(self, inputs, partials):
+                """
+                Analytical derivatives.
+                """
+                partials[('y1', 'x1')] = self.JJ
+
+        prob = Problem()
+        prob.model = model = Group()
+        model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
+                            promotes=['x1'])
+        model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
+
+        model.add_design_var('x1', indices=[1, 3])
+        model.add_constraint('y1', indices=[0, 2])
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False, mode='fwd')
+        prob.run_model()
+
+        Jbase = model.get_subsystem('mycomp').JJ
+        of = ['y1']
+        wrt = ['x1']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['y1', 'x1'][0][0], Jbase[0, 1], 1e-8)
+        assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[0, 3], 1e-8)
+        assert_rel_error(self, J['y1', 'x1'][1][0], Jbase[2, 1], 1e-8)
+        assert_rel_error(self, J['y1', 'x1'][1][1], Jbase[2, 3], 1e-8)
+
+        totals = prob.check_total_derivatives()
+        jac = totals[('mycomp.y1', 'x_param1.x1')]['J_fd']
+        assert_rel_error(self, jac[0][0], Jbase[0, 1], 1e-8)
+        assert_rel_error(self, jac[0][1], Jbase[0, 3], 1e-8)
+        assert_rel_error(self, jac[1][0], Jbase[2, 1], 1e-8)
+        assert_rel_error(self, jac[1][1], Jbase[2, 3], 1e-8)
+
+        # Objective instead
+
+        prob = Problem()
+        prob.model = model = Group()
+        model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
+                            promotes=['x1'])
+        model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
+
+        model.add_design_var('x1', indices=[1, 3])
+        model.add_objective('y1', index=1)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False, mode='fwd')
+        prob.run_model()
+
+        Jbase = model.get_subsystem('mycomp').JJ
+        of = ['y1']
+        wrt = ['x1']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['y1', 'x1'][0][0], Jbase[1, 1], 1e-8)
+        assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[1, 3], 1e-8)
+
+        totals = prob.check_total_derivatives()
+        jac = totals[('mycomp.y1', 'x_param1.x1')]['J_fd']
+        assert_rel_error(self, jac[0][0], Jbase[1, 1], 1e-8)
+        assert_rel_error(self, jac[0][1], Jbase[1, 3], 1e-8)
 
     def test_cs_suppress(self):
         prob = Problem()

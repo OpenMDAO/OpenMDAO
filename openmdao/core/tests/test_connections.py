@@ -38,6 +38,8 @@ class TestConnections(unittest.TestCase):
         self.p['G3.G4.C3.x'] = 222.
         self.p['G3.G4.C4.x'] = 333.
 
+        self.p.final_setup()
+
         self.assertEqual(self.C1._inputs['x'], 111.)
         self.assertEqual(self.C3._inputs['x'], 222.)
         self.assertEqual(self.C4._inputs['x'], 333.)
@@ -317,8 +319,6 @@ class TestConnectionsPromoted(unittest.TestCase):
         # setting promoted name will set the value into the outputs, but will
         # not propagate it to the inputs. That will happen during run_model().
         p['x'] = 999.
-        self.assertEqual(C3._inputs['x'], 0.)
-        self.assertEqual(C4._inputs['x'], 0.)
 
         p.run_model()
         self.assertEqual(C3._inputs['x'], 999.)
@@ -345,8 +345,6 @@ class TestConnectionsPromoted(unittest.TestCase):
         # setting promoted name will set the value into the outputs, but will
         # not propagate it to the inputs. That will happen during run_model().
         p['G1.x'] = 999.
-        self.assertEqual(C3._inputs['x'], 0.)
-        self.assertEqual(C4._inputs['x'], 0.)
 
         p.run_model()
         self.assertEqual(C3._inputs['x'], 999.)
@@ -425,7 +423,7 @@ class TestConnectionsIndices(unittest.TestCase):
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp')
 
         expected = ("The source and target shapes do not match for the "
-                    "connection 'idvp.blammo' to 'arraycomp.inp' in Group ''. "
+                    "connection 'idvp.blammo' to 'arraycomp.inp'."
                     " Expected \(2.*,\) but got \(1.*,\).")
 
         with assertRaisesRegex(self, ValueError, expected):
@@ -437,8 +435,8 @@ class TestConnectionsIndices(unittest.TestCase):
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 1, 0])
 
         expected = ("The source indices \[0 1 0\] do not specify a valid shape "
-                    "for the connection 'idvp.blammo' to 'arraycomp.inp' in "
-                    "Group ''. The target shape is \(2.*,\) but indices are \(3.*,\).")
+                    "for the connection 'idvp.blammo' to 'arraycomp.inp'. "
+                    "The target shape is \(2.*,\) but indices are \(3.*,\).")
 
         with assertRaisesRegex(self, ValueError, expected):
             self.prob.setup(check=False)
@@ -449,7 +447,7 @@ class TestConnectionsIndices(unittest.TestCase):
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp1', src_indices=[100000])
 
         expected = ("The source indices do not specify a valid index for the "
-                    "connection 'idvp.arrout' to 'arraycomp.inp1' in Group ''. "
+                    "connection 'idvp.arrout' to 'arraycomp.inp1'. "
                     "Index '100000' is out of range for source dimension of "
                     "size 5.")
 

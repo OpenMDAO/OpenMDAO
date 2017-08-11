@@ -233,6 +233,8 @@ class TestScaling(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         prob['sys1.old_length'] = 3.e5
+        prob.final_setup()
+
         assert_rel_error(self, prob['sys1.old_length'], 3.e5)
         assert_rel_error(self, prob.model._outputs['sys1.old_length'], 3.e5)
         prob.run_model()
@@ -343,7 +345,7 @@ class TestScaling(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = 2.0*(inputs['x'] + 1.0)
 
-            def compute_partials(self, inputs, outputs, partials):
+            def compute_partials(self, inputs, partials):
                 """
                 Jacobian for Sellar discipline 1.
                 """
