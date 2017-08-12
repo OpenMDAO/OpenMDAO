@@ -230,7 +230,7 @@ class TestDesvarOnModel(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.final_setup()
 
-        self.assertEqual(str(context.exception), "Output not found for design variable 'junk' in system ''.")
+        self.assertEqual(str(context.exception), "Output not found for design variable or response 'junk'.")
 
     def test_desvar_affine_and_scaleradder(self):
 
@@ -347,7 +347,7 @@ class TestConstraintOnModel(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.final_setup()
 
-        self.assertEqual(str(context.exception), "Output not found for response 'junk' in system ''.")
+        self.assertEqual(str(context.exception), "Output not found for design variable or response 'junk'.")
 
     def test_constraint_affine_and_scaleradder(self):
 
@@ -534,7 +534,7 @@ class TestObjectiveOnModel(unittest.TestCase):
             prob.final_setup()
 
         self.assertEqual(str(context.exception),
-                         "Output not found for response 'junk' in system ''.")
+                         "Output not found for design variable or response 'junk'.")
 
     def test_objective_affine_and_scaleradder(self):
 

@@ -563,6 +563,7 @@ class System(object):
 
             for vec_name in vec_names:
                 ncol = 1
+                rel = None
                 if vec_name == 'nonlinear':
                     alloc_complex = nl_alloc_complex
                 else:
@@ -575,11 +576,13 @@ class System(object):
                                 ncol = vois[vec_name]['size']
                             else:
                                 ncol = len(idxs)
-                        # inps, outs, systems =
+                        rdict = relevant[vec_name]
+                        if '@all' in rdict:
+                            _, rel, _ = relevant[vec_name]['@all']
                 for key in ['input', 'output', 'residual']:
                     root_vectors[key][vec_name] = vector_class(vec_name, _type_map[key], self,
                                                                alloc_complex=alloc_complex,
-                                                               ncol=ncol)
+                                                               ncol=ncol, relevant=rel)
         else:
 
             for key, vardict in iteritems(self._vectors):

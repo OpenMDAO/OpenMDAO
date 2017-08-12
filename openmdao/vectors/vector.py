@@ -91,7 +91,7 @@ class Vector(object):
     _vector_info = VectorInfo()
 
     def __init__(self, name, typ, system, root_vector=None, resize=False, alloc_complex=False,
-                 ncol=1):
+                 ncol=1, relevant=None):
         """
         Initialize all attributes.
 
@@ -116,6 +116,7 @@ class Vector(object):
         self._typ = typ
         self._ncol = ncol
         self._icol = None
+        self._relevant = relevant
 
         self._system = system
 

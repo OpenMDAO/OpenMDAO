@@ -396,6 +396,38 @@ class Problem(object):
         self._setup_status = 1
         return self
 
+    def get_voi_names(self):
+        """
+        Return set of names of variables of interest found in the model.
+
+        Returns
+        -------
+        set
+            Names of variables of interest.
+        """
+        model = self.model
+        iproc = self.comm.rank
+        dvnames = set()
+        resnames = set()
+
+        try:
+            for s in model.system_iter(recurse=True, include_self=True):
+                prom2abs = s._var_allprocs_prom2abs_list['output']
+                dvnames.update(prom2abs[dv][0] for dv in s._design_vars)
+                resnames.update(prom2abs[r][0] for r in s._responses)
+        except KeyError as err:
+            msg = "Output not found for design variable or response %s."
+            raise RuntimeError(msg % err)
+
+        if self.comm.size > 1 and model._subsystems_allprocs:
+            for rank, (dnames, rnames) in enumerate(self.comm.allgather((dvnames,
+                                                                         resnames))):
+                if rank != iproc:
+                    dvnames.update(dnames)
+                    resnames.update(rnames)
+
+        return dvnames, resnames
+
     def final_setup(self):
         """
         Perform final setup phase on problem in preparation for run.
@@ -415,19 +447,19 @@ class Problem(object):
         comm = self.comm
         mode = self._mode
 
-        self.driver._setup_driver(self)
-
         if isinstance(model, Group):
             self._sys_graph = model.compute_sys_graph(comps_only=True, save_vars=True)
+            dvnames, resnames = self.get_voi_names()
             self._relevant = get_relevant_vars(self._sys_graph,
-                                               self.driver._designvars,
-                                               self.driver._responses)
+                                               dvnames, resnames)
         else:
             self._relevant = {}
 
         if self._setup_status < 2:
             model._final_setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex,
                                mode=mode, relevant=self._relevant)
+
+        self.driver._setup_driver(self)
 
         # Now that setup has been called, we can set the iprints.
         for items in self._solver_print_cache:
