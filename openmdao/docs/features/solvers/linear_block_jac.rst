@@ -6,7 +6,7 @@ Linear Solver: LinearBlockJac
 =============================
 
 The LinearBlockJac uses the Block Jacobi method to solve the linear system. The method is similar to that used by the
-:ref:`LinearBlockGS <usr_openmdao.solvers.linear.linear_block_gs.py>` solver, except that it propagates the derivatives from outputs
+:ref:`LinearBlockGS <openmdao.solvers.linear.linear_block_gs.py>` solver, except that it propagates the derivatives from outputs
 to inputs only once per iteration. When to choose this solver over the other ones is an advanced topic.
 
 The LinearBlockJac solver is a block solver, so you can specify different linear solvers in the subsystems and they

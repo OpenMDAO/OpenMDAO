@@ -5,7 +5,7 @@
 Setting and Getting Component Variables
 =========================================
 
-You will both set and get the values in the dimensional and unscaled form via the :ref:`Problem <usr_openmdao.core.problem.py>` class.
+You will both set and get the values in the dimensional and unscaled form via the :ref:`Problem <openmdao.core.problem.py>` class.
 If you have promoted both inputs and outputs to the same name,
 then the output takes precedence and it determines the units you should work in.
 
@@ -23,7 +23,7 @@ You use the same syntax when working with the independent variables of your prob
 Independent variables hold values set by a user or are used as design variables by a <openmdao.core.driver.Driver>.
 OpenMDAO requires that every variable must have an ultimate source, even independent variables.
 We accomplish this by defining independent variables as outputs of a special component,
-:ref:`IndepVarComp <usr_openmdao.core.indepvarcomp.py>`, that does not any inputs.
+:ref:`IndepVarComp <openmdao.core.indepvarcomp.py>`, that does not any inputs.
 For example, consider our paraboloid tutorial problem problem which has two independent variables: `x` and `y`.
 
 These would be defined and set as follows:

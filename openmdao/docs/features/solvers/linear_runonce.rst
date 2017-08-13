@@ -14,7 +14,7 @@ used in systems where the following conditions are satisfied:
 2. System does not contain any implicit states, though subsystems may.
 
 However, subsystems can contain cycles or implicit states provided that they are using the appropriate
-solver such as :ref:`ScipyIterativeSolver <usr_openmdao.solvers.linear.scipy_iter_solver.py>`
+solver such as :ref:`ScipyIterativeSolver <openmdao.solvers.linear.scipy_iter_solver.py>`
 
 Here is an example of using an LinearRunOnce solver to calculate the derivatives across a simple model with
 the <Paraboloid> component.

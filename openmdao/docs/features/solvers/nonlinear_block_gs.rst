@@ -16,7 +16,7 @@ The NonlinearBlockGS solver is a block solver, so you can specify different nonl
 will be utilized to solve the subsystem nonlinear problem.
 
 Note that you may not know if you satisfy the second condition, so choosing a solver can be "trial and error." If
-NonlinearBlockGS doesn't work, then you will need to use :ref:`NewtonSolver <usr_openmdao.solvers.nonlinear.newton.py>`.
+NonlinearBlockGS doesn't work, then you will need to use :ref:`NewtonSolver <openmdao.solvers.nonlinear.newton.py>`.
 
 Here, we choose the NonlinearBlockGS to solve the Sellar problem, which has two components with a
 cyclic dependency, has no implicit states, and works very well with Gauss Seidel.

@@ -8,7 +8,7 @@ Basic Component Types: 3. ImplicitComponent
 Implicit variables are those that are computed as an implicit function of other variables.
 For instance, :math:`y` would be an implicit variable, given that it is computed by solving :math:`\cos(x \cdot y) - z \cdot y = 0`.
 
-Implicit variables are defined by writing a class that inherits from the :ref:`ImplicitComponent <usr_openmdao.core.implicitcomponent.py>` class.
+Implicit variables are defined by writing a class that inherits from the :ref:`ImplicitComponent <openmdao.core.implicitcomponent.py>` class.
 The implicit variables would be considered *outputs* (e.g., :math:`y` in the example above) while the variables on which they depend would be considered *inputs* (e.g., :math:`x` and :math:`z` in the example above).
 
 ImplicitComponent Methods

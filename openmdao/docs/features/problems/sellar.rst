@@ -11,7 +11,7 @@ The first discipline is defined by the following equation:
 
     y_1(x, y_2, z_1, z_2) = z_1^2 + x_1 + z_2 - 0.2y_2
 
-This is built as an openmdao :ref:`Component <usr_openmdao.core.component.py>` like this:
+This is built as an openmdao :ref:`Component <openmdao.core.component.py>` like this:
 
 .. embed-code::
     openmdao.test_suite.components.sellar_feature.SellarDis1
@@ -24,7 +24,7 @@ The second discipline is given by another equation:
 
   y_2(x, y_1, z_1, z_2) = \sqrt{y_1} + z_1 + z_2
 
-Which is translated into a :ref:`Component <usr_openmdao.core.component.py>` as seen here:
+Which is translated into a :ref:`Component <openmdao.core.component.py>` as seen here:
 
 .. embed-code::
     openmdao.test_suite.components.sellar_feature.SellarDis2
