@@ -6,7 +6,7 @@
 ============================
 `User Guide`_
 ============================
-.. _User Guide: user_guide/index
+.. _User Guide: user_guide/index.html
 
 These tutorials serve to give an initial introduction to the OpenMDAO framework.
 They are intended to be done in sequence. Once completed,
@@ -154,7 +154,7 @@ Visualization
 
 `OpenMDAO User Source Documentation`__
 
-.. __: _srcdocs/usr/index.html
+.. __: _srcdocs/index.html
 
 .. toctree::
    :maxdepth: 1
