@@ -90,7 +90,7 @@ def tag(args=None):
     if args is None:
         args = sys.argv[1:]
     # Set the directories in which to find tags
-    docdirs = ['features', 'style_guide', 'tutorials']
+    docdirs = ['features', 'style_guide', 'user_guide']
     tagdir = make_tagdir()
     make_tagfiles(docdirs, tagdir)
     make_tagindex(tagdir)

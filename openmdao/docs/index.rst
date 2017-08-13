@@ -1,7 +1,12 @@
 ============================
-`Tutorials`_
+`Getting Started`_
 ============================
-.. _OpenMDAO Tutorials: tutorials/index.html
+.. _Getting Started: getting_started/index.html
+
+============================
+`User Guide`_
+============================
+.. _User Guide: user_guide/index
 
 These tutorials serve to give an initial introduction to the OpenMDAO framework.
 They are intended to be done in sequence. Once completed,
@@ -10,9 +15,9 @@ you will be able to construct models by linking multiple analyses together and t
 .. toctree::
    :maxdepth: 1
 
-   tutorials/first_analysis
-   tutorials/first_optimization
-   tutorials/first_mdao
+   user_guide/first_analysis
+   user_guide/first_optimization
+   user_guide/first_mdao
 
 ===============================
 `Sample Problems`_
@@ -26,7 +31,7 @@ you will be able to construct models by linking multiple analyses together and t
 ============================
 `Features`_
 ============================
-.. _OpenMDAO Features: features/index.html
+.. _OpenMDAO Features: features/index
 
 OpenMDAOs fully supported features are documented here.
 Anything documented here has been thoroughly tested an should be considered fully functional.
