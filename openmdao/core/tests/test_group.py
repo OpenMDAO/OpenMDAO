@@ -1081,7 +1081,7 @@ class TestConnect(unittest.TestCase):
     def test_bad_shapes(self):
         self.sub.connect('src.s', 'arr.x')
 
-        msg = ("The source and target shapes do not match for the connection "
+        msg = ("The source and target shapes do not match or are ambiguous for the connection "
                "'sub.src.s' to 'sub.arr.x'.")
 
         with assertRaisesRegex(self, ValueError, msg):
