@@ -113,7 +113,7 @@ class WebRecorder(BaseRecorder):
                 for name, value in iteritems(desvars_values):
                     desvars_array.append({
                         'name': name,
-                        'values': list(value)
+                        'values': self.convert_to_list(value)
                     })
 
         if self.options['record_responses']:
@@ -128,7 +128,7 @@ class WebRecorder(BaseRecorder):
                 for name, value in iteritems(responses_values):
                     responses_array.append({
                         'name': name,
-                        'values': list(value)
+                        'values': self.convert_to_list(value)
                     })
 
         if self.options['record_objectives']:
@@ -143,7 +143,7 @@ class WebRecorder(BaseRecorder):
                 for name, value in iteritems(objectives_values):
                     objectives_array.append({
                         'name': name,
-                        'values': list(value)
+                        'values': self.convert_to_list(value)
                     })
 
         if self.options['record_constraints']:
@@ -158,7 +158,7 @@ class WebRecorder(BaseRecorder):
                 for name, value in iteritems(constraints_values):
                     constraints_array.append({
                         'name': name,
-                        'values': list(value)
+                        'values': self.convert_to_list(value)
                     })
 
         iteration_coordinate = get_formatted_iteration_coordinate()
@@ -168,10 +168,10 @@ class WebRecorder(BaseRecorder):
             "iteration_coordinate": iteration_coordinate,
             "success": metadata['success'],
             "msg": metadata['msg'],
-            "desvars": self.convert_to_list(desvars_array),
-            "responses": self.convert_to_list(responses_array),
-            "objectives": self.convert_to_list(objectives_array),
-            "constraints": self.convert_to_list(constraints_array)
+            "desvars": list(desvars_array),
+            "responses": list(responses_array),
+            "objectives": list(objectives_array),
+            "constraints": list(constraints_array)
         }
 
         global_iteration_dict = {
@@ -210,7 +210,7 @@ class WebRecorder(BaseRecorder):
             for name, value in iteritems(self._inputs):
                 inputs_array.append({
                     'name': name,
-                    'values': list(value)
+                    'values': self.convert_to_list(value)
                 })
 
         # Outputs
@@ -219,7 +219,7 @@ class WebRecorder(BaseRecorder):
             for name, value in iteritems(self._outputs):
                 outputs_array.append({
                     'name': name,
-                    'values': list(value)
+                    'values': self.convert_to_list(value)
                 })
 
         # Residuals
@@ -228,18 +228,19 @@ class WebRecorder(BaseRecorder):
             for name, value in iteritems(self._resids):
                 residuals_array.append({
                     'name': name,
-                    'values': list(value)
+                    'values': self.convert_to_list(value)
                 })
 
         iteration_coordinate = get_formatted_iteration_coordinate()
+
         system_iteration_dict = {
             'counter': self._counter,
             'iteration_coordinate': iteration_coordinate,
             'success': metadata['success'],
             'msg': metadata['msg'],
-            'inputs': self.convert_to_list(inputs_array),
-            'outputs': self.convert_to_list(outputs_array),
-            'residuals': self.convert_to_list(residuals_array)
+            'inputs': list(inputs_array),
+            'outputs': list(outputs_array),
+            'residuals': list(residuals_array)
         }
 
         global_iteration_dict = {
@@ -280,7 +281,7 @@ class WebRecorder(BaseRecorder):
             for name, value in iteritems(self._outputs):
                 outputs_array.append({
                     'name': name,
-                    'values': list(value)
+                    'values': self.convert_to_list(value)
                 })
 
         residuals_array = []
@@ -288,7 +289,7 @@ class WebRecorder(BaseRecorder):
             for name, value in iteritems(self._resids):
                 residuals_array.append({
                     'name': name,
-                    'values': list(value)
+                    'values': self.convert_to_list(value)
                 })
 
         iteration_coordinate = get_formatted_iteration_coordinate()
@@ -300,8 +301,8 @@ class WebRecorder(BaseRecorder):
             'msg': metadata['msg'],
             'abs_err': self._abs_error,
             'rel_err': self._rel_error,
-            'solver_output': self.convert_to_list(outputs_array),
-            'solver_residuals': self.convert_to_list(residuals_array)
+            'solver_output': list(outputs_array),
+            'solver_residuals': list(residuals_array)
         }
 
         global_iteration_dict = {
