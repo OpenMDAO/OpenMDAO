@@ -322,6 +322,90 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, C1.jacobian['y','x'], expect, 0.00001)
 
+    def test_feature_simple(self):
+        prob = Problem()
+        prob.model = model = Group()
 
+        model.add_subsystem('p', IndepVarComp('x', 2.0))
+        model.add_subsystem('comp', ExecComp('y=x+1.'))
+
+        model.connect('p.x', 'comp.x')
+
+        prob.setup()
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.y'], 3.0, 0.00001)
+
+    def test_feature_array(self):
+        prob = Problem()
+        prob.model = model = Group()
+
+        model.add_subsystem('p', IndepVarComp('x', np.array([1., 2., 3.])))
+        model.add_subsystem('comp', ExecComp('y=x[1]',
+                                             x=np.array([1.,2.,3.]),
+                                             y=0.0))
+        model.connect('p.x', 'comp.x')
+
+        prob.setup()
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.y'], 2.0, 0.00001)
+
+    def test_feature_math(self):
+        prob = Problem()
+        prob.model = model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', np.pi/2.0))
+        model.add_subsystem('p2', IndepVarComp('y', np.pi/2.0))
+        model.add_subsystem('comp', ExecComp('z = sin(x)**2 + cos(y)**2'))
+
+        model.connect('p1.x', 'comp.x')
+        model.connect('p2.y', 'comp.y')
+
+        prob.setup()
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.z'], 1.0, 0.00001)
+
+    def test_feature_numpy(self):
+        prob = Problem()
+        prob.model = model = Group()
+
+        model.add_subsystem('p', IndepVarComp('x', np.array([1., 2., 3.])))
+        model.add_subsystem('comp', ExecComp('y=numpy.sum(x)', x=np.zeros((3, ))))
+        model.connect('p.x', 'comp.x')
+
+        prob.setup()
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.y'], 6.0, 0.00001)
+
+    def test_feature_metadata(self):
+        prob = Problem()
+        prob.model = model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 12.0, units='inch'))
+        model.add_subsystem('p2', IndepVarComp('y', 1.0, units='ft'))
+        model.add_subsystem('comp', ExecComp('z=x+y',
+                                             x={'value': 0.0, 'units':'inch'},
+                                             y={'value': 0.0, 'units': 'inch'},
+                                             z={'value': 0.0, 'units': 'inch'}))
+        model.connect('p1.x', 'comp.x')
+        model.connect('p2.y', 'comp.y')
+
+        prob.setup()
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.z'], 24.0, 0.00001)
 if __name__ == "__main__":
     unittest.main()
