@@ -129,12 +129,12 @@ class ImplicitCompTestCase(unittest.TestCase):
 
         prob = Problem(model=group)
         prob.setup(check=False)
-        prob.run_model()
 
         self.prob = prob
 
     def test_compute_and_derivs(self):
         prob = self.prob
+        prob.run_model()
 
         assert_rel_error(self, prob['comp2.x'], 3.)
         assert_rel_error(self, prob['comp2.x'], 3.)
@@ -150,7 +150,36 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, total_derivs['comp3.x', 'comp1.b'], [[-1.5]])
         assert_rel_error(self, total_derivs['comp3.x', 'comp1.c'], [[-0.5]])
 
+    def test_list_inputs_before_run(self):
+        msg = "Unable to list inputs until model has been run."
+        try:
+            self.prob.model.list_inputs()
+        except Exception as err:
+            self.assertTrue(msg == str(err))
+        else:
+            self.fail("Exception expected")
+
+    def test_list_outputs_before_run(self):
+        msg = "Unable to list outputs until model has been run."
+        try:
+            self.prob.model.list_outputs()
+        except Exception as err:
+            self.assertTrue(msg == str(err))
+        else:
+            self.fail("Exception expected")
+
+    def test_list_residuals_before_run(self):
+        msg = "Unable to list residuals until model has been run."
+        try:
+            self.prob.model.list_residuals()
+        except Exception as err:
+            self.assertTrue(msg == str(err))
+        else:
+            self.fail("Exception expected")
+
     def test_list_inputs(self):
+        self.prob.run_model()
+
         stream = cStringIO()
         inputs = self.prob.model.list_inputs(out_stream=stream)
         self.assertEqual(sorted(inputs), [
@@ -167,6 +196,8 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('value:'), 6)
 
     def test_list_explicit_outputs(self):
+        self.prob.run_model()
+
         stream = cStringIO()
         outputs = self.prob.model.list_outputs(implicit=False, out_stream=stream)
         self.assertEqual(sorted(outputs), [
@@ -180,6 +211,8 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('residual:'), 3)
 
     def test_list_implicit_outputs(self):
+        self.prob.run_model()
+
         stream = cStringIO()
         states = self.prob.model.list_outputs(explicit=False, out_stream=stream)
         self.assertEqual(sorted(states), [
@@ -193,6 +226,8 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('residual:'), 2)
 
     def test_list_residuals(self):
+        self.prob.run_model()
+
         stream = cStringIO()
         resids = self.prob.model.list_residuals(out_stream=stream)
         self.assertEqual(sorted(resids), [
