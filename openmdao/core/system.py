@@ -258,7 +258,7 @@ class System(object):
         self._subsystems_var_range_byset = {'input': [], 'output': []}
 
         self._num_var = {'input': 0, 'output': 0}
-        self._num_var_byset = {'input': {}, 'output': {}}
+        self._num_var_byset = {'input': defaultdict(int), 'output': defaultdict(int)}
         self._var_set2iset = OrderedDict([('input', {}), ('output', {})])
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
@@ -819,7 +819,7 @@ class System(object):
             Whether to call this method in subsystems.
         """
         self._num_var = {'input': 0, 'output': 0}
-        self._num_var_byset = {'input': {}, 'output': {}}
+        self._num_var_byset = {'input': defaultdict(int), 'output': defaultdict(int)}
 
     def _setup_var_index_ranges(self, set2iset, recurse=True):
         """

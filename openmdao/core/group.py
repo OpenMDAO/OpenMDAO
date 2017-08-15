@@ -186,10 +186,7 @@ class Group(System):
 
             for subsys in self._subsystems_myproc:
                 for set_name, num in iteritems(subsys._num_var_byset[type_]):
-                    if set_name in num_var_byset[type_]:
-                        num_var_byset[type_][set_name] += num
-                    else:
-                        num_var_byset[type_][set_name] = num
+                    num_var_byset[type_][set_name] += num
 
         # If running in parallel, allgather
         if self.comm.size > 1:

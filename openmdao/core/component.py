@@ -8,7 +8,7 @@ from itertools import product
 from six import string_types, iteritems, itervalues
 from scipy.sparse import issparse
 from copy import deepcopy
-from collections import OrderedDict, Iterable
+from collections import OrderedDict, Iterable, defaultdict
 
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -133,7 +133,7 @@ class Component(System):
         abs2meta = self._var_abs2meta
 
         # Compute the prefix for turning rel/prom names into abs names
-        if self.pathname is not '':
+        if self.pathname:
             prefix = self.pathname + '.'
         else:
             prefix = ''
