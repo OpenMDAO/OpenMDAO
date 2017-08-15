@@ -568,7 +568,7 @@ class Group(System):
             for myproc_global_abs_in2out in gathered:
                 global_abs_in2out.update(myproc_global_abs_in2out)
 
-    def _setup_relevance(self, mode, relevant=None, vois=None):
+    def _setup_relevance(self, mode, relevant=None, vec_names=None, vois=None):
         """
         Set up the relevance dictionary.
 
@@ -579,49 +579,20 @@ class Group(System):
         relevant : dict or None
             Dictionary mapping VOI name to all variables necessary for computing
             derivatives between the VOI and other VOIs.
-        vois : set of str or None
-            The set of input or output VOIs, depending on the value of mode.
+        vec_names : list of str or None
+            The list of names of vectors. Depends on the value of mode.
+        vois : dict
+            Dictionary of either design vars or responses, depending on the value
+            of mode.
         """
-        self._mode = mode
-        if relevant is None:   # only True for top level Group
+        desvars, responses = super(Group, self)._setup_relevance(mode, relevant,
+                                                                 vec_names, vois)
+        if relevant is None:   # only True for top level
             sys_graph = self.compute_sys_graph(comps_only=True, save_vars=True)
-            dvnames, resnames = self.get_voi_names()
-            self._vois = vois = dvnames if mode == 'fwd' else resnames
             self._relevant = relevant = get_relevant_vars(sys_graph,
-                                                          dvnames, resnames, mode)
+                                                          desvars, responses, mode)
         for s in self._subsystems_myproc:
-            s._setup_relevance(mode, relevant, vois)
-
-    def get_voi_names(self):
-        """
-        Return set of names of variables of interest found in this Group or its children.
-
-        Returns
-        -------
-        set
-            Names of variables of interest.
-        """
-        iproc = self.comm.rank
-        dvnames = set()
-        resnames = set()
-
-        try:
-            for s in self.system_iter(recurse=True, include_self=True):
-                prom2abs = s._var_allprocs_prom2abs_list['output']
-                dvnames.update(prom2abs[dv][0] for dv in s._design_vars)
-                resnames.update(prom2abs[r][0] for r in s._responses)
-        except KeyError as err:
-            msg = "Output not found for design variable or response %s."
-            raise RuntimeError(msg % err)
-
-        if self.comm.size > 1 and self._subsystems_allprocs:
-            for rank, (dnames, rnames) in enumerate(self.comm.allgather((dvnames,
-                                                                         resnames))):
-                if rank != iproc:
-                    dvnames.update(dnames)
-                    resnames.update(rnames)
-
-        return dvnames, resnames
+            s._setup_relevance(mode, self._relevant, self._vec_names, self._vois)
 
     def _setup_connections(self, recurse=True):
         """

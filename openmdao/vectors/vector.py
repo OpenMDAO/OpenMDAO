@@ -86,6 +86,9 @@ class Vector(object):
     _icol : int or None
         If not None, specifies the 'active' column of a multivector when interfaceing with
         a component that does not support multivectors.
+    _relevant : dict
+        Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
+        and dependent systems.
     """
 
     _vector_info = VectorInfo()
@@ -111,6 +114,9 @@ class Vector(object):
             Whether to allocate any imaginary storage to perform complex step. Default is False.
         ncol : int
             Number of columns for multi-vectors.
+        relevant : dict
+            Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
+            and dependent systems.
         """
         self._name = name
         self._typ = typ

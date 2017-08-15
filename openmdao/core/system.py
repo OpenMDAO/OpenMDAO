@@ -226,6 +226,10 @@ class System(object):
     supports_multivecs : bool
         If True, this system overrides compute_multi_jacvec_product (if an ExplicitComponent),
         or solve_multi_linear/apply_multi_linear (if an ImplicitComponent).
+    #
+    _relevant : dict
+        Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
+        and dependent systems.
     """
 
     def __init__(self, **kwargs):
@@ -328,6 +332,8 @@ class System(object):
 
         self._reconfigured = False
         self.supports_multivecs = False
+
+        self._relevant = None
 
         self.initialize()
         self.metadata.update(kwargs)
@@ -512,28 +518,15 @@ class System(object):
         root_vectors = {'input': OrderedDict(),
                         'output': OrderedDict(),
                         'residual': OrderedDict()}
-        mode = self._mode
-        relevant = self._relevant
 
         if initial:
-            # get all vec_names.  If we know the  mode, only get vec_names for
-            # one direction.
-            vois = {}
-            if mode is None or mode == 'fwd':
-                desvars = self.get_design_vars(recurse=True)
-                in_vec_names = _get_vec_names(desvars)
-                vois.update(desvars)
-            else:
-                in_vec_names = set()
-
-            if mode is None or mode == 'rev':
-                responses = self.get_responses(recurse=True)
-                out_vec_names = _get_vec_names(responses)
-                vois.update(responses)
-            else:
-                out_vec_names = set()
-            vec_names = ['nonlinear', 'linear']
-            vec_names.extend(sorted(in_vec_names | out_vec_names))
+            mode = self._mode
+            relevant = self._relevant
+            vec_names = self._vec_names
+            vois = self._vois
+            iproc = self.comm.rank
+            sizes = self._var_sizes['output']
+            abs2idx = self._var_allprocs_abs2idx['output']
 
             # Check for complex step to set vectors up appropriately.
             # If any subsystem needs complex step, then we need to allocate it everywhere.
@@ -552,12 +545,12 @@ class System(object):
                     alloc_complex = force_alloc_complex
 
                     if vec_name != 'linear':
-                        if vois[vec_name]['vectorize_derivs']:
-                            idxs = vois[vec_name]['indices']
-                            if idxs is None:
-                                ncol = vois[vec_name]['size']
+                        voi = vois[vec_name]
+                        if voi['vectorize_derivs']:
+                            if 'size' in voi:
+                                ncol = voi['size']
                             else:
-                                ncol = len(idxs)
+                                ncol = sizes[iproc, abs2idx[vec_name]]
                         rdict = relevant[vec_name]
                         if '@all' in rdict:
                             _, rel, _ = relevant[vec_name]['@all']
@@ -704,7 +697,9 @@ class System(object):
         self._setup_var_data(recurse=recurse)
         self._setup_var_index_maps(recurse=recurse)
         self._setup_global_connections(recurse=recurse)
-        self._setup_relevance(mode)
+        if initial:
+            self._relevant = None
+        self._setup_relevance(mode, self._relevant)
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
@@ -960,7 +955,7 @@ class System(object):
         """
         self._conn_global_abs_in2out = {}
 
-    def _setup_relevance(self, mode, relevant=None, vois=None):
+    def _setup_relevance(self, mode, relevant=None, vec_names=None, vois=None):
         """
         Set up the relevance dictionary.
 
@@ -971,15 +966,41 @@ class System(object):
         relevant : dict or None
             Dictionary mapping VOI name to all variables necessary for computing
             derivatives between the VOI and all other VOIs.
-        vois : set of str or None
-            The set of input or output VOIs, depending on the value of mode.
+        vec_names : list of str or None
+            The list of names of vectors. Depends on the value of mode.
+        vois : dict
+            Dictionary of either design vars or responses, depending on the value
+            of mode.
+
+        Returns
+        -------
+        dict, dict
+            Design var and response dicts
         """
+        def _filter_names(voi_dict):
+            return set(voi for voi, data in iteritems(voi_dict)
+                       if data['parallel_deriv_color'] is not None
+                       or data['vectorize_derivs'])
+
         self._mode = mode
         self._vois = vois
-        if relevant is None:  # handle case where top System is a Component
+        if relevant is None:
+            desvars = self.get_design_vars(recurse=True, get_sizes=False)
+            responses = self.get_responses(recurse=True, get_sizes=False)
+            vec_names = ['nonlinear', 'linear']
+            if mode == 'fwd':
+                vec_names.extend(sorted(_filter_names(desvars)))
+                self._vois = vois = desvars
+            else:  # rev
+                vec_names.extend(sorted(_filter_names(responses)))
+                self._vois = vois = responses
+            self._vec_names = vec_names
             self._relevant = {}
+            return desvars, responses
         else:
             self._relevant = relevant
+            self._vec_names = vec_names
+            return None, None
 
     def _setup_connections(self, recurse=True):
         """
@@ -1979,8 +2000,8 @@ class System(object):
         dvs['ref'] = ref
         dvs['ref0'] = ref0
         if indices is not None:
-            dvs['size'] = len(indices)
             indices = np.atleast_1d(indices)
+            dvs['size'] = len(indices)
         dvs['indices'] = indices
         dvs['parallel_deriv_color'] = parallel_deriv_color
         dvs['vectorize_derivs'] = vectorize_derivs
@@ -2263,7 +2284,7 @@ class System(object):
                           parallel_deriv_color=parallel_deriv_color,
                           vectorize_derivs=vectorize_derivs)
 
-    def get_design_vars(self, recurse=True):
+    def get_design_vars(self, recurse=True, get_sizes=True):
         """
         Get the DesignVariable settings from this system.
 
@@ -2275,6 +2296,8 @@ class System(object):
         recurse : bool
             If True, recurse through the subsystems and return the path of
             all design vars relative to the this system.
+        get_sizes : bool, optional
+            If True, compute the size of each response.
 
         Returns
         -------
@@ -2292,17 +2315,18 @@ class System(object):
             msg = "Output not found for design variable {0} in system '{1}'."
             raise RuntimeError(msg.format(str(err), self.pathname))
 
-        # Size them all
         iproc = self.comm.rank
-        for name, data in iteritems(out):
-            if 'size' not in data:
-                data['size'] = \
-                    self._var_sizes['output'][iproc,
-                                              self._var_allprocs_abs2idx['output'][name]]
+        if get_sizes:
+            # Size them all
+            sizes = self._var_sizes['output']
+            abs2idx = self._var_allprocs_abs2idx['output']
+            for name in out:
+                if 'size' not in out[name]:
+                    out[name]['size'] = sizes[iproc, abs2idx[name]]
 
         if recurse:
             for subsys in self._subsystems_myproc:
-                out.update(subsys.get_design_vars(recurse=recurse))
+                out.update(subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes))
 
             if self.comm.size > 1 and self._subsystems_allprocs:
                 for rank, all_out in enumerate(self.comm.allgather(out)):
@@ -2311,7 +2335,7 @@ class System(object):
 
         return out
 
-    def get_responses(self, recurse=True):
+    def get_responses(self, recurse=True, get_sizes=True):
         """
         Get the response variable settings from this system.
 
@@ -2323,6 +2347,8 @@ class System(object):
         recurse : bool, optional
             If True, recurse through the subsystems and return the path of
             all responses relative to the this system.
+        get_sizes : bool, optional
+            If True, compute the size of each response.
 
         Returns
         -------
@@ -2340,17 +2366,18 @@ class System(object):
             msg = "Output not found for response {0} in system '{1}'."
             raise RuntimeError(msg.format(str(err), self.pathname))
 
-        # Size them all
         iproc = self.comm.rank
-        for name in out:
-            if 'size' not in out[name]:
-                out[name]['size'] = \
-                    self._var_sizes['output'][iproc,
-                                              self._var_allprocs_abs2idx['output'][name]]
+        if get_sizes:
+            # Size them all
+            sizes = self._var_sizes['output']
+            abs2idx = self._var_allprocs_abs2idx['output']
+            for name in out:
+                if 'size' not in out[name]:
+                    out[name]['size'] = sizes[iproc, abs2idx[name]]
 
         if recurse:
             for subsys in self._subsystems_myproc:
-                out.update(subsys.get_responses(recurse=recurse))
+                out.update(subsys.get_responses(recurse=recurse, get_sizes=get_sizes))
 
             if self.comm.size > 1 and self._subsystems_allprocs:
                 for rank, all_out in enumerate(self.comm.allgather(out)):
@@ -2841,9 +2868,3 @@ class System(object):
         metadata = create_local_meta(self.pathname)
         self._rec_mgr.record_iteration(self, metadata)
         self.iter_count += 1
-
-
-def _get_vec_names(voi_dict):
-    return set(voi for voi, data in iteritems(voi_dict)
-               if data['parallel_deriv_color'] is not None
-               or data['vectorize_derivs'])
