@@ -215,7 +215,7 @@ class NewtonSolver(NonlinearSolver):
         system = self._system
         self._solver_info.prefix += '|  '
         do_subsolve = self.options['solve_subsystems'] and \
-            (self._iter_count <= self.options['max_sub_solves'])
+            (self._iter_count < self.options['max_sub_solves'])
 
         # Disable local fd
         approx_status = system._owns_approx_jac
