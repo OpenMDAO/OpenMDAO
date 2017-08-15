@@ -25,7 +25,6 @@ from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
-from openmdao.utils.graph_utils import all_connected_edges
 from openmdao.vectors.default_vector import DefaultVector
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -385,7 +384,7 @@ class Problem(object):
             mode = 'rev'
         self._mode = mode
 
-        model._setup(comm, 'full')
+        model._setup(comm, 'full', mode)
 
         # Cache all args for final setup.
         self._vector_class = vector_class
@@ -395,38 +394,6 @@ class Problem(object):
 
         self._setup_status = 1
         return self
-
-    def get_voi_names(self):
-        """
-        Return set of names of variables of interest found in the model.
-
-        Returns
-        -------
-        set
-            Names of variables of interest.
-        """
-        model = self.model
-        iproc = self.comm.rank
-        dvnames = set()
-        resnames = set()
-
-        try:
-            for s in model.system_iter(recurse=True, include_self=True):
-                prom2abs = s._var_allprocs_prom2abs_list['output']
-                dvnames.update(prom2abs[dv][0] for dv in s._design_vars)
-                resnames.update(prom2abs[r][0] for r in s._responses)
-        except KeyError as err:
-            msg = "Output not found for design variable or response %s."
-            raise RuntimeError(msg % err)
-
-        if self.comm.size > 1 and model._subsystems_allprocs:
-            for rank, (dnames, rnames) in enumerate(self.comm.allgather((dvnames,
-                                                                         resnames))):
-                if rank != iproc:
-                    dvnames.update(dnames)
-                    resnames.update(rnames)
-
-        return dvnames, resnames
 
     def final_setup(self):
         """
@@ -447,17 +414,8 @@ class Problem(object):
         comm = self.comm
         mode = self._mode
 
-        if isinstance(model, Group):
-            self._sys_graph = model.compute_sys_graph(comps_only=True, save_vars=True)
-            dvnames, resnames = self.get_voi_names()
-            self._relevant = get_relevant_vars(self._sys_graph,
-                                               dvnames, resnames)
-        else:
-            self._relevant = {}
-
         if self._setup_status < 2:
-            model._final_setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex,
-                               mode=mode, relevant=self._relevant)
+            model._final_setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex)
 
         self.driver._setup_driver(self)
 
@@ -1138,7 +1096,7 @@ class Problem(object):
                     if 'indices' in out_voi_meta:
                         out_idxs = out_voi_meta['indices']
 
-                if not test_mode and input_name not in self._relevant[output_name]:
+                if not test_mode and input_name not in model._relevant[output_name]:
                     # irrelevant output, just give zeros
                     if out_idxs is None:
                         out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
@@ -1247,7 +1205,7 @@ class Problem(object):
         nproc = self.comm.size
         iproc = model.comm.rank
         sizes = model._var_sizes['output']
-        relevant = self._relevant
+        relevant = model._relevant
         fwd = (mode == 'fwd')
         prom2abs = model._var_allprocs_prom2abs_list['output']
 
@@ -1794,82 +1752,3 @@ def _format_error(error, tol):
     if np.isnan(error) or error < tol:
         return '{:.6e}'.format(error)
     return '{:.6e} *'.format(error)
-
-
-def get_relevant_vars(graph, desvars, responses):
-    """
-    Find all relevant vars between desvars and responses.
-
-    Both vars are assumed to be outputs (either design vars or responses).
-
-    Parameters
-    ----------
-    graph : networkx.DiGraph
-        System graph with var connection info on the edges.
-    desvars : list of str
-        Names of design variables.
-    responses : list of str
-        Names of response variables.
-
-    Returns
-    -------
-    dict
-        Dict of (dep_outputs, dep_inputs, dep_systems) keyed by design vars and responses.
-    """
-    relevant = defaultdict(dict)
-    edge_cache = {}
-
-    grev = graph.reverse()
-
-    for desvar in desvars:
-        start_sys = desvar.rsplit('.', 1)[0]
-        if start_sys not in edge_cache:
-            edge_cache[start_sys] = set(all_connected_edges(graph, start_sys))
-        start_edges = edge_cache[start_sys]
-
-        for response in responses:
-            end_sys = response.rsplit('.', 1)[0]
-            if end_sys not in edge_cache:
-                edge_cache[end_sys] = set((v, u) for u, v in
-                                          all_connected_edges(grev, end_sys))
-            end_edges = edge_cache[end_sys]
-
-            common_edges = start_edges.intersection(end_edges)
-
-            input_deps = set()
-            output_deps = set()
-            sys_deps = set()
-            for u, v in common_edges:
-                sys_deps.add(u)
-                sys_deps.add(v)
-                conns = graph[u][v]['conns']
-                output_deps.update(conns)
-                for inputs in conns.values():
-                    input_deps.update(inputs)
-
-            if sys_deps:
-                output_deps.update((desvar, response))
-                relevant[desvar][response] = relevant[response][desvar] = \
-                    (input_deps, output_deps, sys_deps)
-
-    # TODO: if we knew mode here, we would only need to compute for fwd or rev,
-    # instead of both.
-
-    # now calculate dependencies between each VOI and all other VOIs of the
-    # other type, e.g for each input VOI wrt all output VOIs.
-    for inputs, outputs in [(desvars, responses), (responses, desvars)]:
-        for inp in inputs:
-            relinp = relevant[inp]
-            if relinp:
-                total_inps = set()
-                total_outs = set()
-                total_systems = set()
-                for out in outputs:
-                    if out in relinp:
-                        inps, outs, systems = relinp[out]
-                        total_inps.update(inps)
-                        total_outs.update(outs)
-                        total_systems.update(systems)
-                relinp['@all'] = (total_inps, total_outs, total_systems)
-
-    return relevant

@@ -23,6 +23,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.units import is_compatible
+from openmdao.utils.graph_utils import all_connected_edges
 
 # regex to check for valid names.
 import re
@@ -540,12 +541,130 @@ class Group(System):
                 if inparts[:nparts + 1] == outparts[:nparts + 1]:
                     new_conns[inparts[nparts]][abs_in] = abs_out
 
+        # Recursion
+        if recurse:
+            for subsys in self._subsystems_myproc:
+                if subsys.name in new_conns:
+                    subsys._setup_global_connections(recurse=recurse,
+                                                     conns=new_conns[subsys.name])
+                else:
+                    subsys._setup_global_connections(recurse=recurse)
+
+        # Compute global_abs_in2out by first adding this group's contributions,
+        # then adding contributions from systems above/below, then allgathering.
+        global_abs_in2out.update(abs_in2out)
+
+        for subsys in self._subsystems_myproc:
+            global_abs_in2out.update(subsys._conn_global_abs_in2out)
+
+        # If running in parallel, allgather
+        if self.comm.size > 1:
+            if self._subsystems_myproc[0].comm.rank == 0:
+                raw = global_abs_in2out
+            else:
+                raw = {}
+            gathered = self.comm.allgather(raw)
+
+            for myproc_global_abs_in2out in gathered:
+                global_abs_in2out.update(myproc_global_abs_in2out)
+
+    def _setup_relevance(self, mode, relevant=None, vois=None):
+        """
+        Set up the relevance dictionary.
+
+        Parameters
+        ----------
+        mode : str
+            Derivative direction, either 'fwd' or 'rev'.
+        relevant : dict or None
+            Dictionary mapping VOI name to all variables necessary for computing
+            derivatives between the VOI and other VOIs.
+        vois : set of str or None
+            The set of input or output VOIs, depending on the value of mode.
+        """
+        self._mode = mode
+        if relevant is None:   # only True for top level Group
+            sys_graph = self.compute_sys_graph(comps_only=True, save_vars=True)
+            dvnames, resnames = self.get_voi_names()
+            self._vois = vois = dvnames if mode == 'fwd' else resnames
+            self._relevant = relevant = get_relevant_vars(sys_graph,
+                                                          dvnames, resnames, mode)
+        for s in self._subsystems_myproc:
+            s._setup_relevance(mode, relevant, vois)
+
+    def get_voi_names(self):
+        """
+        Return set of names of variables of interest found in this Group or its children.
+
+        Returns
+        -------
+        set
+            Names of variables of interest.
+        """
+        iproc = self.comm.rank
+        dvnames = set()
+        resnames = set()
+
+        try:
+            for s in self.system_iter(recurse=True, include_self=True):
+                prom2abs = s._var_allprocs_prom2abs_list['output']
+                dvnames.update(prom2abs[dv][0] for dv in s._design_vars)
+                resnames.update(prom2abs[r][0] for r in s._responses)
+        except KeyError as err:
+            msg = "Output not found for design variable or response %s."
+            raise RuntimeError(msg % err)
+
+        if self.comm.size > 1 and self._subsystems_allprocs:
+            for rank, (dnames, rnames) in enumerate(self.comm.allgather((dvnames,
+                                                                         resnames))):
+                if rank != iproc:
+                    dvnames.update(dnames)
+                    resnames.update(rnames)
+
+        return dvnames, resnames
+
+    def _setup_connections(self, recurse=True):
+        """
+        Compute dict of all implicit and explicit connections owned by this system.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        super(Group, self)._setup_connections()
+        abs_in2out = self._conn_abs_in2out
+
+        global_abs_in2out = self._conn_global_abs_in2out
+        pathname = self.pathname
+
+        # Recursion
+        if recurse:
+            for subsys in self._subsystems_myproc:
+                subsys._setup_connections(recurse)
+
+        if pathname == '':
+            path_len = 0
+        else:
+            path_len = len(pathname) + 1
+
+        for abs_in, abs_out in iteritems(global_abs_in2out):
+            # First, check that this system owns both the input and output.
+            if abs_in[:len(pathname)] == pathname and abs_out[:len(pathname)] == pathname:
+                # Second, check that they are in different subsystems of this system.
+                out_subsys = abs_out[path_len:].split('.', 1)[0]
+                in_subsys = abs_in[path_len:].split('.', 1)[0]
+                if out_subsys != in_subsys:
+                    abs_in2out[abs_in] = abs_out
+
         # Now that both implicit & explicit connections have been added,
         # check unit/shape compatibility, but only for connections that are
         # either owned by (implicit) or declared by (explicit) this Group.
         # This way, we don't repeat the error checking in multiple groups
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
         allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
+        abs2meta_in = self._var_abs2meta['input']
+        abs2meta_out = self._var_abs2meta['output']
 
         for abs_in, abs_out in iteritems(abs_in2out):
             # check unit compatibility
@@ -652,67 +771,6 @@ class Group(System):
                                            "dimension of size %d.")
                                     raise ValueError(msg % (abs_out, abs_in,
                                                      i, d_size))
-
-        # Recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                if subsys.name in new_conns:
-                    subsys._setup_global_connections(recurse=recurse,
-                                                     conns=new_conns[subsys.name])
-                else:
-                    subsys._setup_global_connections(recurse=recurse)
-
-        # Compute global_abs_in2out by first adding this group's contributions,
-        # then adding contributions from systems above/below, then allgathering.
-        global_abs_in2out.update(abs_in2out)
-
-        for subsys in self._subsystems_myproc:
-            global_abs_in2out.update(subsys._conn_global_abs_in2out)
-
-        # If running in parallel, allgather
-        if self.comm.size > 1:
-            if self._subsystems_myproc[0].comm.rank == 0:
-                raw = global_abs_in2out
-            else:
-                raw = {}
-            gathered = self.comm.allgather(raw)
-
-            for myproc_global_abs_in2out in gathered:
-                global_abs_in2out.update(myproc_global_abs_in2out)
-
-    def _setup_connections(self, recurse=True):
-        """
-        Compute dict of all implicit and explicit connections owned by this system.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        super(Group, self)._setup_connections()
-        abs_in2out = self._conn_abs_in2out
-
-        global_abs_in2out = self._conn_global_abs_in2out
-        pathname = self.pathname
-
-        # Recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_connections(recurse)
-
-        if pathname == '':
-            path_len = 0
-        else:
-            path_len = len(pathname) + 1
-
-        for abs_in, abs_out in iteritems(global_abs_in2out):
-            # First, check that this system owns both the input and output.
-            if abs_in[:len(pathname)] == pathname and abs_out[:len(pathname)] == pathname:
-                # Second, check that they are in different subsystems of this system.
-                out_subsys = abs_out[path_len:].split('.', 1)[0]
-                in_subsys = abs_in[path_len:].split('.', 1)[0]
-                if out_subsys != in_subsys:
-                    abs_in2out[abs_in] = abs_out
 
     def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
         """
@@ -1568,3 +1626,87 @@ class Group(System):
                 graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
 
         return graph
+
+
+def get_relevant_vars(graph, desvars, responses, mode):
+    """
+    Find all relevant vars between desvars and responses.
+
+    Both vars are assumed to be outputs (either design vars or responses).
+
+    Parameters
+    ----------
+    graph : networkx.DiGraph
+        System graph with var connection info on the edges.
+    desvars : list of str
+        Names of design variables.
+    responses : list of str
+        Names of response variables.
+    mode : str
+        Direction of derivatives, either 'fwd' or 'rev'.
+
+    Returns
+    -------
+    dict
+        Dict of (dep_outputs, dep_inputs, dep_systems) keyed by design vars and responses.
+    """
+    relevant = defaultdict(dict)
+    edge_cache = {}
+    fwd = mode == 'fwd'
+
+    grev = graph.reverse()
+
+    for desvar in desvars:
+        start_sys = desvar.rsplit('.', 1)[0]
+        if start_sys not in edge_cache:
+            edge_cache[start_sys] = set(all_connected_edges(graph, start_sys))
+        start_edges = edge_cache[start_sys]
+
+        for response in responses:
+            end_sys = response.rsplit('.', 1)[0]
+            if end_sys not in edge_cache:
+                edge_cache[end_sys] = set((v, u) for u, v in
+                                          all_connected_edges(grev, end_sys))
+            end_edges = edge_cache[end_sys]
+
+            common_edges = start_edges.intersection(end_edges)
+
+            input_deps = set()
+            output_deps = set()
+            sys_deps = set()
+            for u, v in common_edges:
+                sys_deps.add(u)
+                sys_deps.add(v)
+                conns = graph[u][v]['conns']
+                output_deps.update(conns)
+                for inputs in conns.values():
+                    input_deps.update(inputs)
+
+            if sys_deps:
+                output_deps.update((desvar, response))
+                relevant[desvar][response] = relevant[response][desvar] = \
+                    (input_deps, output_deps, sys_deps)
+
+    if fwd:
+        inputs, outputs = desvars, responses
+    else:
+        inputs, outputs = responses, desvars
+
+    # now calculate dependencies between each VOI and all other VOIs of the
+    # other type, e.g for each input VOI wrt all output VOIs.  This is only
+    # done for design vars in fwd mode or responses in rev mode.
+    for inp in inputs:
+        relinp = relevant[inp]
+        if relinp:
+            total_inps = set()
+            total_outs = set()
+            total_systems = set()
+            for out in outputs:
+                if out in relinp:
+                    inps, outs, systems = relinp[out]
+                    total_inps.update(inps)
+                    total_outs.update(outs)
+                    total_systems.update(systems)
+            relinp['@all'] = (total_inps, total_outs, total_systems)
+
+    return relevant

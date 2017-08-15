@@ -140,10 +140,6 @@ class System(object):
         List of names of the vectors (i.e., the right-hand sides).
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         Dictionaries of vectors keyed by vec_name.
-    _excluded_vars_out : dict of set
-        Set of output variable absolute names not relevant for each vec_name.
-    _excluded_vars_in : dict of set
-        Set of input variable absolute names not relevant for each vec_name.
     #
     _inputs : <Vector>
         The inputs vector; points to _vectors['input']['nonlinear'].
@@ -285,8 +281,6 @@ class System(object):
         self._ext_sizes_byset = {'input': {}, 'output': {}}
 
         self._vectors = {'input': {}, 'output': {}, 'residual': {}}
-        self._excluded_vars_out = set()
-        self._excluded_vars_in = set()
 
         self._inputs = None
         self._outputs = None
@@ -495,8 +489,7 @@ class System(object):
             }
             return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
-    def _get_root_vectors(self, vector_class, initial, force_alloc_complex=False,
-                          mode=None, relevant=None):
+    def _get_root_vectors(self, vector_class, initial, force_alloc_complex=False):
         """
         Get the root vectors for the nonlinear and linear vectors for the model.
 
@@ -510,29 +503,21 @@ class System(object):
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
             after a reconfiguration) you may need to set this to True.
-        mode : str or None
-            Direction of derivatives.  If None, we are reconfiguring.
-        relevant : dict or None
-            Dict containing relevant (inputs, outputs, systems) for each vec_name.
 
         Returns
         -------
         dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
-        dict of set
-            Dictionary of sets of excluded output variable absolute names, keyed by vec_name.
-        dict of set
-            Dictionary of sets of excluded input variable absolute names, keyed by vec_name.
         """
         root_vectors = {'input': OrderedDict(),
                         'output': OrderedDict(),
                         'residual': OrderedDict()}
+        mode = self._mode
+        relevant = self._relevant
 
         if initial:
             # get all vec_names.  If we know the  mode, only get vec_names for
             # one direction.
-            # TODO: during reconfig we currently don't know the mode, so we end
-            # up allocating unnecessary arrays when using parallel derivatives
             vois = {}
             if mode is None or mode == 'fwd':
                 desvars = self.get_design_vars(recurse=True)
@@ -557,9 +542,6 @@ class System(object):
                 nl_alloc_complex |= 'cs' in sub._approx_schemes
                 if nl_alloc_complex:
                     break
-
-            excl_in = defaultdict(set)
-            excl_out = defaultdict(set)
 
             for vec_name in vec_names:
                 ncol = 1
@@ -589,10 +571,7 @@ class System(object):
                 for vec_name, vec in iteritems(vardict):
                     root_vectors[key][vec_name] = vec._root_vector
 
-            excl_out = self._excluded_vars_out
-            excl_in = self._excluded_vars_in
-
-        return root_vectors, excl_out, excl_in
+        return root_vectors
 
     def _get_bounds_root_vectors(self, vector_class, initial):
         """
@@ -669,10 +648,10 @@ class System(object):
         setup_mode : str
             Must be one of 'full', 'reconf', or 'update'.
         """
-        self._setup(self.comm, setup_mode=setup_mode)
+        self._setup(self.comm, setup_mode=setup_mode, mode=self._mode)
         self._final_setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
 
-    def _setup(self, comm, setup_mode):
+    def _setup(self, comm, setup_mode, mode):
         """
         Perform setup for this system and its descendant systems.
 
@@ -687,6 +666,8 @@ class System(object):
             The global communicator.
         setup_mode : str
             Must be one of 'full', 'reconf', or 'update'.
+        mode : str or None
+            Derivative direction, either 'fwd', or 'rev', or None
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
@@ -704,6 +685,8 @@ class System(object):
             recurse = False
             resize = False
 
+        self._mode = mode
+
         # If we're only updating and not recursing, processors don't need to be redistributed
         if recurse:
             pathname, comm = self._get_initial_procs(comm, initial)
@@ -720,12 +703,12 @@ class System(object):
         self._setup_var_index_ranges(self._get_initial_var_indices(initial), recurse=recurse)
         self._setup_var_data(recurse=recurse)
         self._setup_var_index_maps(recurse=recurse)
-        self._setup_var_sizes(recurse=recurse)
         self._setup_global_connections(recurse=recurse)
+        self._setup_relevance(mode)
+        self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
-    def _final_setup(self, comm, vector_class, setup_mode, force_alloc_complex=False,
-                     mode=None, relevant=None):
+    def _final_setup(self, comm, vector_class, setup_mode, force_alloc_complex=False):
         """
         Perform final setup for this system and its descendant systems.
 
@@ -748,10 +731,6 @@ class System(object):
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
             after a reconfiguration) you may need to set this to True.
-        mode : str or None
-            Derivative direction, either 'fwd', or 'rev', or None
-        relevant : dict or None
-            Dict containing relevant (inputs, outputs, systems) for each vec_name.
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
@@ -774,11 +753,9 @@ class System(object):
         ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset = \
             self._get_initial_global(initial)
         self._setup_global(ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset)
-        root_vectors, excl_out, excl_in = \
-            self._get_root_vectors(vector_class, initial,
-                                   force_alloc_complex=force_alloc_complex, mode=mode,
-                                   relevant=relevant)
-        self._setup_vectors(root_vectors, excl_out, excl_in, resize=resize)
+        root_vectors = self._get_root_vectors(vector_class, initial,
+                                              force_alloc_complex=force_alloc_complex)
+        self._setup_vectors(root_vectors, resize=resize)
         self._setup_bounds(*self._get_bounds_root_vectors(vector_class, initial), resize=resize)
         self._setup_scaling(self._get_scaling_root_vectors(vector_class, initial), resize=resize)
 
@@ -983,6 +960,27 @@ class System(object):
         """
         self._conn_global_abs_in2out = {}
 
+    def _setup_relevance(self, mode, relevant=None, vois=None):
+        """
+        Set up the relevance dictionary.
+
+        Parameters
+        ----------
+        mode : str
+            Derivative direction, either 'fwd' or 'rev'.
+        relevant : dict or None
+            Dictionary mapping VOI name to all variables necessary for computing
+            derivatives between the VOI and all other VOIs.
+        vois : set of str or None
+            The set of input or output VOIs, depending on the value of mode.
+        """
+        self._mode = mode
+        self._vois = vois
+        if relevant is None:  # handle case where top System is a Component
+            self._relevant = {}
+        else:
+            self._relevant = relevant
+
     def _setup_connections(self, recurse=True):
         """
         Compute dict of all implicit and explicit connections owned by this system.
@@ -1014,7 +1012,7 @@ class System(object):
         self._ext_sizes = ext_sizes
         self._ext_sizes_byset = ext_sizes_byset
 
-    def _setup_vectors(self, root_vectors, excl_out, excl_in, resize=False, alloc_complex=False):
+    def _setup_vectors(self, root_vectors, resize=False, alloc_complex=False):
         """
         Compute all vectors for all vec names and assign excluded variables lists.
 
@@ -1022,10 +1020,6 @@ class System(object):
         ----------
         root_vectors : dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
-        excl_out : dict of set
-            Dictionary of sets of excluded output variable absolute names, keyed by vec_name.
-        excl_in : dict of set
-            Dictionary of sets of excluded input variable absolute names, keyed by vec_name.
         resize : bool
             Whether to resize the root vectors - i.e, because this system is initiating a reconf.
         alloc_complex : bool
@@ -1034,8 +1028,6 @@ class System(object):
         self._vectors = vectors = {'input': OrderedDict(),
                                    'output': OrderedDict(),
                                    'residual': OrderedDict()}
-        self._excluded_vars_out = excl_out
-        self._excluded_vars_in = excl_in
 
         # Allocate complex if root vector was allocated complex.
         alloc_complex = root_vectors['output']['nonlinear']._alloc_complex
@@ -1061,7 +1053,7 @@ class System(object):
         self._residuals = vectors['residual']['nonlinear']
 
         for subsys in self._subsystems_myproc:
-            subsys._setup_vectors(root_vectors, excl_out, excl_in, alloc_complex=alloc_complex)
+            subsys._setup_vectors(root_vectors, alloc_complex=alloc_complex)
 
     def _setup_bounds(self, root_lower, root_upper, resize=False):
         """
@@ -1664,19 +1656,9 @@ class System(object):
                 d_inputs.set_const(0.0)
                 d_outputs.set_const(0.0)
 
-        excl_out = self._excluded_vars_out[vec_name]
-        excl_in = self._excluded_vars_in[vec_name]
-
-        if excl_out:
-            out_names = set(self._var_abs_names['output']) - excl_out
-        else:
-            out_names = self._var_abs_names['output']
+        out_names = self._var_abs_names['output']
         res_names = out_names
-
-        if excl_in:
-            in_names = set(self._var_abs_names['input']) - excl_in
-        else:
-            in_names = self._var_abs_names['input']
+        in_names = self._var_abs_names['input']
 
         if scope_out is not None:
             out_names = scope_out.intersection(out_names)

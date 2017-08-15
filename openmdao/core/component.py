@@ -186,6 +186,7 @@ class Component(System):
 
         set2iset = self._var_set2iset
 
+        # ??? We don't need full VOIs here, only vec_names
         # Initialize empty arrays
         for type_ in ['input', 'output']:
             sizes[type_] = np.zeros((nproc, self._num_var[type_]), int)

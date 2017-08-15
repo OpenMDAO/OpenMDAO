@@ -6,8 +6,8 @@ from six import assertRaisesRegex
 
 import numpy as np
 
-from openmdao.core.problem import Problem, get_relevant_vars
-from openmdao.api import Group, IndepVarComp, PETScVector, NonlinearBlockGS, ScipyOptimizer, \
+from openmdao.core.group import get_relevant_vars
+from openmdao.api import Problem, Group, IndepVarComp, PETScVector, NonlinearBlockGS, ScipyOptimizer, \
      ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyIterativeSolver
 from openmdao.devtools.testutil import assert_rel_error
 
@@ -522,10 +522,11 @@ class TestProblem(unittest.TestCase):
         model.connect('G2.C5.x', 'C8.b')
         model.connect('G2.C7.x', 'C8.a')
 
-        p.setup(check=False)
+        p.setup(check=False, mode='rev')
 
         g = p.model.compute_sys_graph(comps_only=True, save_vars=True)
-        relevant = get_relevant_vars(g, ['indep1.x', 'indep2.x'], ['C8.y', 'Unconnected.y'])
+        relevant = get_relevant_vars(g, ['indep1.x', 'indep2.x'], ['C8.y', 'Unconnected.y'],
+                                     mode='rev')
 
         indep1_ins = set(['C3.b', 'C3.c', 'C8.b', 'G1.C1.a', 'G2.C5.a', 'G2.C5.b'])
         indep1_outs = set(['C3.y', 'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'])
