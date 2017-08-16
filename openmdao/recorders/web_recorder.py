@@ -347,16 +347,7 @@ class WebRecorder(BaseRecorder):
         object_requesting_recording: <System>
             The System that would like to record its metadata.
         """
-        scaling_vecs = pickle.dumps(object_requesting_recording._scaling_vecs,
-                                    pickle.HIGHEST_PROTOCOL)
-        encoded_scaling_vecs = base64.b64encode(scaling_vecs)
-        system_metadata_dict = {
-            'id': object_requesting_recording.pathname,
-            'scaling_factors': encoded_scaling_vecs.decode('ascii')
-        }
-        system_metadata = json.dumps(system_metadata_dict)
-        requests.post(self._endpoint + '/' + self._case_id + '/system_metadata',
-                      data=system_metadata, headers=self._headers)
+        pass
 
     def record_metadata_solver(self, object_requesting_recording):
         """
