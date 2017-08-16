@@ -1,5 +1,6 @@
 """Define the LinearUserDefined class."""
 
+from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.solver import LinearSolver
 
 
@@ -53,6 +54,7 @@ class LinearUserDefined(LinearSolver):
         self._mode = mode
 
         system = self._system
+        solve = self.solve_function
 
         for vec_name in self._vec_names:
             self._vec_name = vec_name
@@ -63,6 +65,11 @@ class LinearUserDefined(LinearSolver):
             self._iter_count = 0
 
             # run custom solver
-            fail, abs_error, rel_error = self.solve_function(d_outputs, d_resids, mode)
+            with Recording(type(self).__name__, self._iter_count, self) as rec:
+                with system._unscaled_context(outputs=[d_outputs], residuals=[d_resids]):
+                    fail, abs_error, rel_error = solve(d_outputs, d_resids, mode)
+
+                    rec.abs = abs_error
+                    rec.rel = rel_error
 
         return fail, abs_error, rel_error
