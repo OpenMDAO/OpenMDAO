@@ -65,8 +65,8 @@ class LinearUserDefined(LinearSolver):
             self._iter_count = 0
 
             # run custom solver
-            with Recording(type(self).__name__, self._iter_count, self) as rec:
-                with system._unscaled_context(outputs=[d_outputs], residuals=[d_resids]):
+            with system._unscaled_context(outputs=[d_outputs], residuals=[d_resids]):
+                with Recording(type(self).__name__, self._iter_count, self) as rec:
                     fail, abs_error, rel_error = solve(d_outputs, d_resids, mode)
 
                     rec.abs = abs_error
