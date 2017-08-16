@@ -168,10 +168,10 @@ class WebRecorder(BaseRecorder):
             "iteration_coordinate": iteration_coordinate,
             "success": metadata['success'],
             "msg": metadata['msg'],
-            "desvars": self.convert_to_list(desvars_array),
-            "responses": self.convert_to_list(responses_array),
-            "objectives": self.convert_to_list(objectives_array),
-            "constraints": self.convert_to_list(constraints_array)
+            "desvars": [] if desvars_array is None else list(desvars_array),
+            "responses": [] if responses_array is None else list(responses_array),
+            "objectives": [] if objectives_array is None else list(objectives_array),
+            "constraints": [] if constraints_array is None else list(constraints_array)
         }
 
         global_iteration_dict = {
@@ -238,9 +238,9 @@ class WebRecorder(BaseRecorder):
             'iteration_coordinate': iteration_coordinate,
             'success': metadata['success'],
             'msg': metadata['msg'],
-            'inputs': self.convert_to_list(inputs_array),
-            'outputs': self.convert_to_list(outputs_array),
-            'residuals': self.convert_to_list(residuals_array)
+            'inputs': [] if inputs_array is None else list(inputs_array),
+            'outputs': [] if outputs_array is None else list(outputs_array),
+            'residuals': [] if residuals_array is None else list(residuals_array)
         }
 
         global_iteration_dict = {
@@ -301,8 +301,8 @@ class WebRecorder(BaseRecorder):
             'msg': metadata['msg'],
             'abs_err': self._abs_error,
             'rel_err': self._rel_error,
-            'solver_output': self.convert_to_list(outputs_array),
-            'solver_residuals': self.convert_to_list(residuals_array)
+            'solver_output': [] if outputs_array is None else list(outputs_array),
+            'solver_residuals': [] if residuals_array is None else list(residuals_array)
         }
 
         global_iteration_dict = {
