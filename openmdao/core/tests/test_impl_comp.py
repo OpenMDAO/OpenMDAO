@@ -287,6 +287,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp2.x'], 3.)
 
     def test_guess_nonlinear_transfer(self):
+        # Test that data is transfered to a component before calling guess_nonlinear.
 
         class ImpWithInitial(ImplicitComponent):
 
@@ -322,7 +323,6 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp2.y'], 77.)
 
     def test_guess_nonlinear_feature(self):
-        # Test that data is transfered to a component before calling guess_nonlinear.
 
         class ImpWithInitial(ImplicitComponent):
 
