@@ -142,5 +142,35 @@ class TestUserDefinedSolver(unittest.TestCase):
 
         assert_rel_error(self, 15.0, jac['out_var']['a'][0][0])
 
+    def test_scaling(self):
+        # Make sure values are unscaled/dimensional.
+
+        def custom_method(d_outputs, d_residuals, mode):
+            if d_outputs['out_var'][0] != 12.0:
+                raise ValueError('This value should be unscaled.')
+            return False, 0, 0
+
+
+        class ScaledComp(ImplicitComponent):
+
+            def setup(self):
+
+                self.add_input('a', val=10., units='m')
+
+                self.add_output('states', val=20.0, ref=3333.0)
+                self.add_output('out_var', val=20.0, ref=12.0)
+
+
+        p = Problem()
+        p.model.add_subsystem('des_vars', IndepVarComp('a', val=10., units='m'), promotes=['*'])
+        p.model.add_subsystem('icomp', ScaledComp(), promotes=['*'])
+        model = p.model
+
+        model.linear_solver = LinearUserDefined(custom_method)
+
+        p.setup(vector_class=PETScVector, mode='rev', check=False)
+        p.run_model()
+        jac = p.compute_total_derivs(of=['out_var'], wrt=['a'], return_format='dict')
+
 if __name__ == "__main__":
     unittest.main()
