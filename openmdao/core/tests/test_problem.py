@@ -532,13 +532,17 @@ class TestProblem(unittest.TestCase):
         indep1_outs = set(['C3.y', 'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'])
         indep1_sys = set(['C3', 'C8', 'G1.C1', 'G2.C5', 'indep1'])
 
-        inputs, outputs, systems = relevant['indep1.x']['C8.y']
+        dct, systems = relevant['indep1.x']['C8.y']
+        inputs = dct['input']
+        outputs = dct['output']
 
         self.assertEqual(inputs, indep1_ins)
         self.assertEqual(outputs, indep1_outs)
         self.assertEqual(systems, indep1_sys)
 
-        inputs, outputs, systems = relevant['C8.y']['indep1.x']
+        dct, systems = relevant['C8.y']['indep1.x']
+        inputs = dct['input']
+        outputs = dct['output']
 
         self.assertEqual(inputs, indep1_ins)
         self.assertEqual(outputs, indep1_outs)
@@ -548,19 +552,25 @@ class TestProblem(unittest.TestCase):
         indep2_outs = set(['C8.y', 'G2.C6.y', 'G2.C7.x', 'indep2.x'])
         indep2_sys = set(['C8', 'G2.C6', 'G2.C7', 'indep2'])
 
-        inputs, outputs, systems = relevant['indep2.x']['C8.y']
+        dct, systems = relevant['indep2.x']['C8.y']
+        inputs = dct['input']
+        outputs = dct['output']
 
         self.assertEqual(inputs, indep2_ins)
         self.assertEqual(outputs, indep2_outs)
         self.assertEqual(systems, indep2_sys)
 
-        inputs, outputs, systems = relevant['C8.y']['indep2.x']
+        dct, systems = relevant['C8.y']['indep2.x']
+        inputs = dct['input']
+        outputs = dct['output']
 
         self.assertEqual(inputs, indep2_ins)
         self.assertEqual(outputs, indep2_outs)
         self.assertEqual(systems, indep2_sys)
 
-        inputs, outputs, systems = relevant['C8.y']['@all']
+        dct, systems = relevant['C8.y']['@all']
+        inputs = dct['input']
+        outputs = dct['output']
 
         self.assertEqual(inputs, indep1_ins | indep2_ins)
         self.assertEqual(outputs, indep1_outs | indep2_outs)

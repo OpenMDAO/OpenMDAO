@@ -998,7 +998,7 @@ class Problem(object):
     def _get_voi_info(self, voi_lists, inp2rhs_name, input_vec, output_vec, input_vois):
         voi_info = {}
         model = self.model
-        sizes = model._var_sizes['output']
+        sizes = model._var_sizes['nonlinear']['output']
         nproc = self.comm.size
         iproc = model.comm.rank
 
@@ -1054,7 +1054,7 @@ class Problem(object):
 
         return voi_info
 
-    def _compute_total_derivs_multi(self, totals, vois, voi_info, vec_names, mode,
+    def _compute_total_derivs_multi(self, totals, vois, voi_info, lin_vec_names, mode,
                                     output_list, old_output_list, output_vois,
                                     test_mode, return_format):
         # this sets dinputs for the current parallel_deriv_color to 0
@@ -1063,7 +1063,7 @@ class Problem(object):
         model = self.model
         nproc = model.comm.size
         iproc = model.comm.rank
-        sizes = model._var_sizes['output']
+        sizes = model._var_sizes['nonlinear']['output']
 
         for input_name, old_input_name in vois:
             dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
@@ -1081,7 +1081,7 @@ class Problem(object):
                         else:
                             dinputs._views_flat[input_name][idx - start] = 1.0
 
-        model._solve_linear(vec_names, mode)
+        model._solve_linear(lin_vec_names, mode)
 
         for input_name, old_input_name in vois:
             dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
@@ -1204,7 +1204,7 @@ class Problem(object):
         vec_dresid = model._vectors['residual']
         nproc = self.comm.size
         iproc = model.comm.rank
-        sizes = model._var_sizes['output']
+        sizes = model._var_sizes['nonlinear']['output']
         relevant = model._relevant
         fwd = (mode == 'fwd')
         prom2abs = model._var_allprocs_prom2abs_list['output']
@@ -1332,7 +1332,7 @@ class Problem(object):
 
             matmat |= varmatmat
 
-        vec_names = sorted(set(inp2rhs_name.values()))
+        lin_vec_names = sorted(set(inp2rhs_name.values()))
 
         voi_info = self._get_voi_info(voi_lists, inp2rhs_name, input_vec, output_vec, input_vois)
 
@@ -1341,7 +1341,7 @@ class Problem(object):
             # If Adjoint mode, solve linear system for each 'of'
 
             if matmat:
-                self._compute_total_derivs_multi(totals, vois, voi_info, vec_names, mode,
+                self._compute_total_derivs_multi(totals, vois, voi_info, lin_vec_names, mode,
                                                  output_list, old_output_list,
                                                  output_vois, test_mode, return_format)
                 continue
@@ -1369,7 +1369,7 @@ class Problem(object):
                         # need a vector for clean code, so use _views_flat.
                         dinputs._views_flat[input_name][idx - start] = 1.0
 
-                model._solve_linear(vec_names, mode)
+                model._solve_linear(lin_vec_names, mode)
 
                 for input_name, old_input_name in vois:
                     dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \

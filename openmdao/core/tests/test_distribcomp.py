@@ -329,6 +329,7 @@ class MPITests(unittest.TestCase):
 
         self.assertTrue(all(C3._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
+    @unittest.skipUnless(MPI, "only run under MPI")
     def test_distribcomp_feature(self):
         from openmdao.utils.array_utils import evenly_distrib_idxs
 
@@ -440,6 +441,7 @@ class MPITests(unittest.TestCase):
             self.assertTrue(all(C2._outputs['outvec'] == C1._outputs['outvec']*2.))
             self.assertTrue(all(C3._outputs['outvec'] == C2._outputs['outvec']))
 
+    @unittest.skipUnless(MPI, "only run under MPI")
     def test_overlapping_inputs_idxs(self):
         # distrib comp with src_indices that overlap, i.e. the same
         # entries are distributed to multiple processes

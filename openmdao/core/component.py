@@ -178,43 +178,55 @@ class Component(System):
         """
         super(Component, self)._setup_var_sizes()
 
-        sizes = self._var_sizes
-        sizes_byset = self._var_sizes_byset
-
         iproc = self.comm.rank
         nproc = self.comm.size
+        relevant = self._relevant
+        vec_names = self._vec_names
 
         set2iset = self._var_set2iset
 
-        # ??? We don't need full VOIs here, only vec_names
         # Initialize empty arrays
-        for type_ in ['input', 'output']:
-            sizes[type_] = np.zeros((nproc, self._num_var[type_]), int)
+        for vec_name in vec_names[1:]:
+            sizes = self._var_sizes[vec_name]
+            sizes_byset = self._var_sizes_byset[vec_name]
 
-            sizes_byset[type_] = {}
-            for set_name in set2iset[type_]:
-                sizes_byset[type_][set_name] = np.zeros(
-                    (nproc, self._num_var_byset[type_][set_name]), int)
+            for type_ in ['input', 'output']:
+                sizes[type_] = np.zeros((nproc, self._num_var[type_]), int)
+
+                sizes_byset[type_] = {}
+                for set_name in set2iset[type_]:
+                    sizes_byset[type_][set_name] = np.zeros(
+                        (nproc, self._num_var_byset[type_][set_name]), int)
 
         # Compute _var_sizes and _var_sizes_byset
-        for type_ in ['input', 'output']:
-            abs2meta_t = self._var_abs2meta[type_]
-            allprocs_abs2idx_byset_t = self._var_allprocs_abs2idx_byset[type_]
-            for idx, abs_name in enumerate(self._var_abs_names[type_]):
-                meta = abs2meta_t[abs_name]
-                set_name = meta['var_set']
-                size = np.prod(meta['shape'])
-                idx_byset = allprocs_abs2idx_byset_t[abs_name]
+        for vec_name in vec_names[1:]:
+            sizes = self._var_sizes[vec_name]
+            sizes_byset = self._var_sizes_byset[vec_name]
 
-                sizes[type_][iproc, idx] = size
-                sizes_byset[type_][set_name][iproc, idx_byset] = size
+            for type_ in ['input', 'output']:
+                abs2meta_t = self._var_abs2meta[type_]
+                allprocs_abs2idx_byset_t = self._var_allprocs_abs2idx_byset[type_]
+                for idx, abs_name in enumerate(self._var_abs_names[type_]):
+                    meta = abs2meta_t[abs_name]
+                    set_name = meta['var_set']
+                    size = np.prod(meta['shape'])
+                    idx_byset = allprocs_abs2idx_byset_t[abs_name]
+
+                    sizes[type_][iproc, idx] = size
+                    sizes_byset[type_][set_name][iproc, idx_byset] = size
 
         if self.comm.size > 1:
-            for type_ in ['input', 'output']:
-                self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
-                for set_name in self._var_set2iset[type_]:
-                    self.comm.Allgather(
-                        sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
+            for vec_name in vec_names[1:]:
+                sizes = self._var_sizes[vec_name]
+                sizes_byset = self._var_sizes_byset[vec_name]
+                for type_ in ['input', 'output']:
+                    self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
+                    for set_name in self._var_set2iset[type_]:
+                        self.comm.Allgather(
+                            sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
+
+        self._var_sizes['nonlinear'] = self._var_sizes['linear']
+        self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']
 
         self._setup_global_shapes()
 

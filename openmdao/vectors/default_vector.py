@@ -104,7 +104,7 @@ class DefaultVector(Vector):
         iproc = self._iproc
         ncol = self._ncol
 
-        sizes_byset_t = system._var_sizes_byset[type_]
+        sizes_byset_t = system._var_sizes_byset[self._name][type_]
 
         data = {}
         indices = {}
@@ -113,7 +113,7 @@ class DefaultVector(Vector):
             data[set_name] = np.zeros(size) if ncol == 1 else np.zeros((size, ncol))
             indices[set_name] = np.zeros(size, int)
 
-        sizes_t = system._var_sizes[type_]
+        sizes_t = system._var_sizes[self._name][type_]
         abs2meta_t = system._var_abs2meta[type_]
         allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[type_]
         allprocs_abs2idx_t = system._var_allprocs_abs2idx[type_]
@@ -144,7 +144,7 @@ class DefaultVector(Vector):
         _, tmp_indices = self._create_data()
 
         ext_sizes_t = system._ext_sizes[type_]
-        int_sizes_t = np.sum(system._var_sizes[type_][iproc, :])
+        int_sizes_t = np.sum(system._var_sizes[self._name][type_][iproc, :])
         old_sizes_total = np.sum([len(data) for data in itervalues(root_vec._data)])
 
         old_sizes = (
@@ -158,9 +158,11 @@ class DefaultVector(Vector):
             ext_sizes_t[1],
         )
 
+        sizes_byset = system._var_sizes_byset[self._name]
+
         for set_name in system._var_set2iset[type_]:
             ext_sizes_byset_t = system._ext_sizes_byset[type_][set_name]
-            int_sizes_byset_t = np.sum(system._var_sizes_byset[type_][set_name][iproc, :])
+            int_sizes_byset_t = np.sum(sizes_byset[type_][set_name][iproc, :])
             old_sizes_total_byset = len(root_vec._data[set_name])
 
             old_sizes_byset = (
@@ -204,13 +206,14 @@ class DefaultVector(Vector):
         root_vec = self._root_vector
 
         offset = system._ext_sizes[type_][0]
+        sizes_byset = system._var_sizes_byset[self._name]
 
         data = {}
         imag_data = {}
         indices = {}
         for set_name in system._var_set2iset[type_]:
             ind_byset1 = system._ext_sizes_byset[type_][set_name][0]
-            ind_byset2 = ind_byset1 + np.sum(system._var_sizes_byset[type_][set_name][iproc, :])
+            ind_byset2 = ind_byset1 + np.sum(sizes_byset[type_][set_name][iproc, :])
 
             data[set_name] = root_vec._data[set_name][ind_byset1:ind_byset2]
             indices[set_name] = root_vec._indices[set_name][ind_byset1:ind_byset2] - offset
@@ -270,7 +273,7 @@ class DefaultVector(Vector):
         self._imag_views_flat = imag_views_flat = {}
 
         allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[type_]
-        sizes_byset_t = system._var_sizes_byset[type_]
+        sizes_byset_t = system._var_sizes_byset[self._name][type_]
         abs2meta_t = system._var_abs2meta[type_]
         for abs_name in system._var_abs_names[type_]:
             idx_byset = allprocs_abs2idx_byset_t[abs_name]

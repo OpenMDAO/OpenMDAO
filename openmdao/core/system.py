@@ -230,6 +230,9 @@ class System(object):
     _relevant : dict
         Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
         and dependent systems.
+    _vois : dict
+        Either design vars or responses metadata, depending on the direction of
+        derivatives.
     """
 
     def __init__(self, **kwargs):
@@ -272,8 +275,8 @@ class System(object):
         self._var_allprocs_abs2idx = {'input': {}, 'output': {}}
         self._var_allprocs_abs2idx_byset = {'input': {}, 'output': {}}
 
-        self._var_sizes = {'input': None, 'output': None}
-        self._var_sizes_byset = {'input': {}, 'output': {}}
+        self._var_sizes = defaultdict(lambda: {'input': None, 'output': None})
+        self._var_sizes_byset = defaultdict(lambda: {'input': {}, 'output': {}})
 
         self._manual_connections = {}
         self._conn_global_abs_in2out = {}
@@ -334,6 +337,8 @@ class System(object):
         self.supports_multivecs = False
 
         self._relevant = None
+        self._vec_names = None
+        self._vois = None
 
         self.initialize()
         self.metadata.update(kwargs)
@@ -525,7 +530,6 @@ class System(object):
             vec_names = self._vec_names
             vois = self._vois
             iproc = self.comm.rank
-            sizes = self._var_sizes['output']
             abs2idx = self._var_allprocs_abs2idx['output']
 
             # Check for complex step to set vectors up appropriately.
@@ -537,6 +541,7 @@ class System(object):
                     break
 
             for vec_name in vec_names:
+                sizes = self._var_sizes[vec_name]['output']
                 ncol = 1
                 rel = None
                 if vec_name == 'nonlinear':
@@ -553,7 +558,8 @@ class System(object):
                                 ncol = sizes[iproc, abs2idx[vec_name]]
                         rdict = relevant[vec_name]
                         if '@all' in rdict:
-                            _, rel, _ = relevant[vec_name]['@all']
+                            dct, _ = relevant[vec_name]['@all']
+                            rel = dct['output']
                 for key in ['input', 'output', 'residual']:
                     root_vectors[key][vec_name] = vector_class(vec_name, _type_map[key], self,
                                                                alloc_complex=alloc_complex,
@@ -588,8 +594,8 @@ class System(object):
             lower = self._lower_bounds._root_vector
             upper = self._upper_bounds._root_vector
         else:
-            lower = vector_class('lower', 'output', self)
-            upper = vector_class('upper', 'output', self)
+            lower = vector_class('nonlinear', 'output', self)
+            upper = vector_class('nonlinear', 'output', self)
 
         return lower, upper
 
@@ -699,7 +705,7 @@ class System(object):
         self._setup_global_connections(recurse=recurse)
         if initial:
             self._relevant = None
-        self._setup_relevance(mode, self._relevant)
+        self._setup_relevance(mode, self._relevant, self._vec_names, self._vois)
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
@@ -897,8 +903,8 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._var_sizes = {'input': None, 'output': None}
-        self._var_sizes_byset = {'input': {}, 'output': {}}
+        self._var_sizes = defaultdict(lambda: {'input': None, 'output': None})
+        self._var_sizes_byset = defaultdict(lambda: {'input': {}, 'output': {}})
 
     def _setup_global_shapes(self):
         """
@@ -907,7 +913,7 @@ class System(object):
         meta = self._var_allprocs_abs2meta['output']
 
         # now set global sizes and shapes into metadata for distributed outputs
-        sizes = self._var_sizes['output']
+        sizes = self._var_sizes['nonlinear']['output']
         for idx, abs_name in enumerate(self._var_allprocs_abs_names['output']):
             mymeta = meta[abs_name]
             local_shape = mymeta['shape']
@@ -1091,9 +1097,9 @@ class System(object):
         """
         vector_class = root_lower.__class__
         self._lower_bounds = lower = vector_class(
-            'lower', 'output', self, root_lower, resize=resize)
+            'nonlinear', 'output', self, root_lower, resize=resize)
         self._upper_bounds = upper = vector_class(
-            'upper', 'output', self, root_upper, resize=resize)
+            'nonlinear', 'output', self, root_upper, resize=resize)
 
         for abs_name, meta in iteritems(self._var_abs2meta['output']):
             shape = meta['shape']
@@ -2318,7 +2324,7 @@ class System(object):
         iproc = self.comm.rank
         if get_sizes:
             # Size them all
-            sizes = self._var_sizes['output']
+            sizes = self._var_sizes['nonlinear']['output']
             abs2idx = self._var_allprocs_abs2idx['output']
             for name in out:
                 if 'size' not in out[name]:
@@ -2369,7 +2375,7 @@ class System(object):
         iproc = self.comm.rank
         if get_sizes:
             # Size them all
-            sizes = self._var_sizes['output']
+            sizes = self._var_sizes['nonlinear']['output']
             abs2idx = self._var_allprocs_abs2idx['output']
             for name in out:
                 if 'size' not in out[name]:

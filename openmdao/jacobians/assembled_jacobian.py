@@ -79,7 +79,7 @@ class AssembledJacobian(Jacobian):
         """
         system = self._system
 
-        sizes = system._var_sizes[type_]
+        sizes = system._var_sizes['nonlinear'][type_]
         iproc = system.comm.rank
         idx = system._var_allprocs_abs2idx[type_][abs_name]
 
@@ -203,11 +203,11 @@ class AssembledJacobian(Jacobian):
 
         sizes = system._var_sizes
         iproc = system.comm.rank
-        out_size = np.sum(sizes['output'][iproc, :])
+        out_size = np.sum(sizes['nonlinear']['output'][iproc, :])
 
         int_mtx._build(out_size, out_size)
         if ext_mtx._submats:
-            in_size = np.sum(sizes['input'][iproc, :])
+            in_size = np.sum(sizes['nonlinear']['input'][iproc, :])
             ext_mtx._build(out_size, in_size)
         else:
             ext_mtx = None
@@ -260,10 +260,10 @@ class AssembledJacobian(Jacobian):
 
         sizes = system._var_sizes
         iproc = system.comm.rank
-        out_size = np.sum(sizes['output'][iproc, :])
+        out_size = np.sum(sizes['nonlinear']['output'][iproc, :])
 
         if ext_mtx._submats:
-            in_size = np.sum(sizes['input'][iproc, :])
+            in_size = np.sum(sizes['nonlinear']['input'][iproc, :])
             ext_mtx._build(out_size, in_size)
         else:
             ext_mtx = None

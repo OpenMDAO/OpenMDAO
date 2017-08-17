@@ -385,8 +385,6 @@ class Group(System):
             Whether to call this method in subsystems.
         """
         super(Group, self)._setup_var_sizes()
-        sizes = self._var_sizes
-        sizes_byset = self._var_sizes_byset
 
         iproc = self.comm.rank
         nproc = self.comm.size
@@ -402,30 +400,40 @@ class Group(System):
                 subsys._setup_var_sizes(recurse)
 
         # Compute _var_sizes
-        for type_ in ['input', 'output']:
+        for vec_name in self._vec_names[1:]:
+            sizes = self._var_sizes[vec_name]
+            sizes_byset = self._var_sizes_byset[vec_name]
 
-            sizes[type_] = np.zeros((nproc, self._num_var[type_]), int)
-            for set_name in set2iset[type_]:
-                sizes_byset[type_][set_name] = np.zeros(
-                    (nproc, self._num_var_byset[type_][set_name]), int)
+            for type_ in ['input', 'output']:
 
-            for ind, subsys in enumerate(self._subsystems_myproc):
-                proc_slice = slice(*subsystems_proc_range[ind])
-                var_slice = slice(*subsystems_var_range[type_][ind])
-                sizes[type_][proc_slice, var_slice] = subsys._var_sizes[type_]
-
+                sizes[type_] = np.zeros((nproc, self._num_var[type_]), int)
                 for set_name in set2iset[type_]:
-                    var_slice = slice(*subsystems_var_range_byset[type_][set_name][ind])
-                    sizes_byset[type_][set_name][proc_slice, var_slice] = \
-                        subsys._var_sizes_byset[type_][set_name]
+                    sizes_byset[type_][set_name] = np.zeros(
+                        (nproc, self._num_var_byset[type_][set_name]), int)
+
+                for ind, subsys in enumerate(self._subsystems_myproc):
+                    proc_slice = slice(*subsystems_proc_range[ind])
+                    var_slice = slice(*subsystems_var_range[type_][ind])
+                    sizes[type_][proc_slice, var_slice] = subsys._var_sizes[vec_name][type_]
+
+                    for set_name in set2iset[type_]:
+                        var_slice = slice(*subsystems_var_range_byset[type_][set_name][ind])
+                        sizes_byset[type_][set_name][proc_slice, var_slice] = \
+                            subsys._var_sizes_byset[vec_name][type_][set_name]
 
         # If parallel, all gather
         if self.comm.size > 1:
-            for type_ in ['input', 'output']:
-                self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
-                for set_name in set2iset[type_]:
-                    self.comm.Allgather(
-                        sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
+            for vec_name in self._vec_names[1:]:
+                sizes = self._var_sizes[vec_name]
+                sizes_byset = self._var_sizes_byset[vec_name]
+                for type_ in ['input', 'output']:
+                    self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
+                    for set_name in set2iset[type_]:
+                        self.comm.Allgather(
+                            sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
+
+        self._var_sizes['nonlinear'] = self._var_sizes['linear']
+        self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']
 
         self._setup_global_shapes()
 
@@ -762,6 +770,8 @@ class Group(System):
 
         subsystems_var_range = self._subsystems_var_range
         subsystems_var_range_byset = self._subsystems_var_range_byset
+        nl_sizes = self._var_sizes['nonlinear']
+        nl_sizes_byset = self._var_sizes_byset['nonlinear']
 
         for ind, subsys in enumerate(self._subsystems_myproc):
             sub_ext_num_vars = {}
@@ -772,8 +782,8 @@ class Group(System):
             for type_ in ['input', 'output']:
                 num = self._num_var[type_]
                 idx1, idx2 = subsystems_var_range[type_][ind]
-                size1 = np.sum(self._var_sizes[type_][iproc, :idx1])
-                size2 = np.sum(self._var_sizes[type_][iproc, idx2:])
+                size1 = np.sum(nl_sizes[type_][iproc, :idx1])
+                size2 = np.sum(nl_sizes[type_][iproc, idx2:])
 
                 sub_ext_num_vars[type_] = (
                     ext_num_vars[type_][0] + idx1,
@@ -789,8 +799,8 @@ class Group(System):
                 for set_name in self._var_set2iset[type_]:
                     num = self._num_var_byset[type_][set_name]
                     idx1, idx2 = subsystems_var_range_byset[type_][set_name][ind]
-                    size1 = np.sum(self._var_sizes_byset[type_][set_name][iproc, :idx1])
-                    size2 = np.sum(self._var_sizes_byset[type_][set_name][iproc, idx2:])
+                    size1 = np.sum(nl_sizes_byset[type_][set_name][iproc, :idx1])
+                    size2 = np.sum(nl_sizes_byset[type_][set_name][iproc, idx2:])
 
                     sub_ext_num_vars_byset[type_][set_name] = (
                         ext_num_vars_byset[type_][set_name][0] + idx1,
@@ -853,8 +863,8 @@ class Group(System):
         allprocs_abs2idx_out = self._var_allprocs_abs2idx['output']
         allprocs_abs2idx_byset_in = self._var_allprocs_abs2idx_byset['input']
         allprocs_abs2idx_byset_out = self._var_allprocs_abs2idx_byset['output']
-        sizes_byset_in = self._var_sizes_byset['input']
-        sizes_byset_out = self._var_sizes_byset['output']
+        sizes_byset_in = self._var_sizes_byset['nonlinear']['input']
+        sizes_byset_out = self._var_sizes_byset['nonlinear']['output']
         set2iset_in = self._var_set2iset['input']
         set2iset_out = self._var_set2iset['output']
 
@@ -1616,7 +1626,8 @@ def get_relevant_vars(graph, desvars, responses, mode):
     Returns
     -------
     dict
-        Dict of (dep_outputs, dep_inputs, dep_systems) keyed by design vars and responses.
+        Dict of ({'outputs': dep_outputs, 'inputs': dep_inputs, dep_systems)
+        keyed by design vars and responses.
     """
     relevant = defaultdict(dict)
     edge_cache = {}
@@ -1653,7 +1664,7 @@ def get_relevant_vars(graph, desvars, responses, mode):
             if sys_deps:
                 output_deps.update((desvar, response))
                 relevant[desvar][response] = relevant[response][desvar] = \
-                    (input_deps, output_deps, sys_deps)
+                    ({'input': input_deps, 'output': output_deps}, sys_deps)
 
     if fwd:
         inputs, outputs = desvars, responses
@@ -1671,10 +1682,11 @@ def get_relevant_vars(graph, desvars, responses, mode):
             total_systems = set()
             for out in outputs:
                 if out in relinp:
-                    inps, outs, systems = relinp[out]
-                    total_inps.update(inps)
-                    total_outs.update(outs)
+                    dct, systems = relinp[out]
+                    total_inps.update(dct['input'])
+                    total_outs.update(dct['output'])
                     total_systems.update(systems)
-            relinp['@all'] = (total_inps, total_outs, total_systems)
+            relinp['@all'] = ({'input': total_inps, 'output': total_outs},
+                              total_systems)
 
     return relevant
