@@ -990,7 +990,7 @@ class System(object):
 
         self._mode = mode
         self._vois = vois
-        if relevant is None:
+        if relevant is None:  # should only occur at top level on full setup
             desvars = self.get_design_vars(recurse=True, get_sizes=False)
             responses = self.get_responses(recurse=True, get_sizes=False)
             vec_names = ['nonlinear', 'linear']

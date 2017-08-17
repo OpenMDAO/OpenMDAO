@@ -592,7 +592,7 @@ class Group(System):
         """
         desvars, responses = super(Group, self)._setup_relevance(mode, relevant,
                                                                  vec_names, vois)
-        if relevant is None:   # only True for top level
+        if relevant is None:   # only True for top level on full setup
             sys_graph = self.compute_sys_graph(comps_only=True, save_vars=True)
             self._relevant = relevant = get_relevant_vars(sys_graph,
                                                           desvars, responses, mode)
@@ -1676,17 +1676,17 @@ def get_relevant_vars(graph, desvars, responses, mode):
     # done for design vars in fwd mode or responses in rev mode.
     for inp in inputs:
         relinp = relevant[inp]
+        total_inps = set()
+        total_outs = set()
+        total_systems = set()
         if relinp:
-            total_inps = set()
-            total_outs = set()
-            total_systems = set()
             for out in outputs:
                 if out in relinp:
                     dct, systems = relinp[out]
                     total_inps.update(dct['input'])
                     total_outs.update(dct['output'])
                     total_systems.update(systems)
-            relinp['@all'] = ({'input': total_inps, 'output': total_outs},
-                              total_systems)
+        relinp['@all'] = ({'input': total_inps, 'output': total_outs},
+                          total_systems)
 
     return relevant
