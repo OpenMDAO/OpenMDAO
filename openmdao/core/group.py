@@ -1273,6 +1273,7 @@ class Group(System):
         # TODO: It is pointless to run this ahead of non-iterative solvers.
         for sub in self.system_iter(recurse=True):
             if hasattr(sub, 'guess_nonlinear'):
+                self._transfer('nonlinear', 'fwd')
                 with sub._unscaled_context(outputs=[sub._outputs], residuals=[sub._residuals]):
                     sub.guess_nonlinear(sub._inputs, sub._outputs, sub._residuals)
 

@@ -16,8 +16,8 @@ from openmdao.devtools.testutil import assert_rel_error
 class QuadraticComp(ImplicitComponent):
     """
     A Simple Implicit Component representing a Quadratic Equation.
-    
-    R(a, b, c, x) = ax^2 + bx + c 
+
+    R(a, b, c, x) = ax^2 + bx + c
 
     Solution via Quadratic Formula:
     x = (-b + sqrt(b^2 - 4ac)) / 2a
@@ -246,6 +246,42 @@ class ImplicitCompTestCase(unittest.TestCase):
 
     def test_guess_nonlinear(self):
 
+        class ImpWithInitial(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 3.0)
+                self.add_output('y', 4.0)
+
+            def solve_nonlinear(self, inputs, outputs):
+                """ Do nothing. """
+                pass
+
+            def apply_nonlinear(self, inputs, outputs):
+                """ Do nothing. """
+                pass
+
+            def guess_nonlinear(self, inputs, outputs, resids):
+                # Passthrough
+                outputs['y'] = inputs['x']
+
+
+        group = Group()
+
+        group.add_subsystem('px', IndepVarComp('x', 77.0))
+        group.add_subsystem('comp1', ImpWithInitial())
+        group.add_subsystem('comp2', ImpWithInitial())
+        group.connect('px.x', 'comp1.x')
+        group.connect('comp1.y', 'comp2.x')
+
+        prob = Problem(model=group)
+        prob.setup(check=False)
+
+        prob.run_model()
+        assert_rel_error(self, prob['comp2.y'], 77.)
+
+    def test_guess_transfer(self):
+        # Make sure that we transfer data after each component's guess_nonlinear
+
         class ImpWithInitial(QuadraticLinearize):
 
             def solve_nonlinear(self, inputs, outputs):
@@ -253,38 +289,7 @@ class ImplicitCompTestCase(unittest.TestCase):
                 pass
 
             def guess_nonlinear(self, inputs, outputs, resids):
-                # Solution at x=1 and x=3. Default value takes us to the x=1 solution. Here
-                # we set it to a value that will take us to the x=3 solution.
-                outputs['x'] = 5.0
-
-
-        group = Group()
-
-        group.add_subsystem('pa', IndepVarComp('a', 1.0))
-        group.add_subsystem('pb', IndepVarComp('b', 1.0))
-        group.add_subsystem('pc', IndepVarComp('c', 1.0))
-        group.add_subsystem('comp2', ImpWithInitial())
-        group.connect('pa.a', 'comp2.a')
-        group.connect('pb.b', 'comp2.b')
-        group.connect('pc.c', 'comp2.c')
-
-        prob = Problem(model=group)
-        group.nonlinear_solver = NewtonSolver()
-        group.nonlinear_solver.options['solve_subsystems'] = True
-        group.nonlinear_solver.options['max_sub_solves'] = 1
-        group.linear_solver = ScipyIterativeSolver()
-
-        prob.setup(check=False)
-
-        prob['pa.a'] = 1.
-        prob['pb.b'] = -4.
-        prob['pc.c'] = 3.
-
-        # Making sure that guess_nonlinear is called early enough to eradicate this.
-        prob['comp2.x'] = np.NaN
-
-        prob.run_model()
-        assert_rel_error(self, prob['comp2.x'], 3.)
+                outputs['xx'] = inputs['x']
 
     def test_guess_nonlinear_feature(self):
 
