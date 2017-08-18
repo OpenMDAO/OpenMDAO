@@ -29,7 +29,7 @@ mult:{name} input   left-hand-side multiplier of equation to be balanced
 
 The right-hand-side is optional and will default to zero if not connected.
 The multiplier is optional and will default to 1.0 if not connected. The
-left-hand-side should always be defined and should dependent upon the value
+left-hand-side should always be defined and should be dependent upon the value
 of the implicit state variable.
 
 The BalanceComp supports vectorized implicit states, simply provide a default
