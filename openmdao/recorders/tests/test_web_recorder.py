@@ -359,13 +359,7 @@ class TestServerRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        system_metadata = json.loads(self.system_metadata)
         system_iterations = json.loads(self.system_iterations)
-        scaling_facts_raw = system_metadata['scaling_factors']
-        scaling_facts_ascii = scaling_facts_raw.encode('ascii')
-        scaling_facts_base64 = base64.b64decode(scaling_facts_ascii)
-        scaling_facts = pickle.loads(scaling_facts_base64)
-        system_metadata['scaling_factors'] = scaling_facts
 
         inputs = [
             {'name': 'd1.z', 'values': [5.0, 2.0]},
