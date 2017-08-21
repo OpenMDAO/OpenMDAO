@@ -800,4 +800,3 @@ class Component(System):
         Does nothing on any non-implicit component.
         """
         pass
-

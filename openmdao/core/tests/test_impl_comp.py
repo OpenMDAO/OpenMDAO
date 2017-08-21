@@ -7,7 +7,7 @@ from six.moves import cStringIO
 import numpy as np
 
 from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, NewtonSolver, \
-                         ScipyIterativeSolver
+                         ScipyIterativeSolver, NonlinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
 
 
@@ -299,7 +299,7 @@ class ImplicitCompTestCase(unittest.TestCase):
                 """ Do nothing. """
                 pass
 
-            def apply_nonlinear(self, inputs, outputs):
+            def apply_nonlinear(self, inputs, outputs, resids):
                 """ Do nothing. """
                 pass
 
@@ -315,6 +315,8 @@ class ImplicitCompTestCase(unittest.TestCase):
         group.add_subsystem('comp2', ImpWithInitial())
         group.connect('px.x', 'comp1.x')
         group.connect('comp1.y', 'comp2.x')
+
+        group.nonlinear_solver = NonlinearBlockGS()
 
         prob = Problem(model=group)
         prob.setup(check=False)
@@ -335,8 +337,9 @@ class ImplicitCompTestCase(unittest.TestCase):
                 """ Do nothing. """
                 pass
 
-            def apply_nonlinear(self, inputs, outputs):
+            def apply_nonlinear(self, inputs, outputs, resids):
                 """ Do nothing. """
+                resids['y'] = 1.0
                 pass
 
             def guess_nonlinear(self, inputs, outputs, resids):
@@ -354,6 +357,8 @@ class ImplicitCompTestCase(unittest.TestCase):
         group.connect('sub.comp1.y', 'sub.comp2.x')
 
         group.add_subsystem('sub', sub)
+
+        group.nonlinear_solver = NonlinearBlockGS()
 
         prob = Problem(model=group)
         prob.setup(check=False)

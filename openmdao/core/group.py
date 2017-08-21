@@ -21,6 +21,7 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg
+from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.units import is_compatible
 
@@ -1270,7 +1271,8 @@ class Group(System):
         # Execute guess_nonlinear if specified.
         # We need to call this early enough so that any solver that needs initial guesses has
         # them.
-        # TODO: It is pointless to run this ahead of non-iterative solvers.
+        # TODO: It is pointless to run this ahead of non-iterative solvers, but multi-level
+        # models seem to ned it.
         self._guess_nonlinear()
 
         with Recording(name + '._solve_nonlinear', self.iter_count, self):
@@ -1282,9 +1284,11 @@ class Group(System):
         """
         Provide initial guess for states.
         """
+        from openmdao.api import ImplicitComponent
         for isub, sub in enumerate(self._subsystems_myproc):
-            self._transfer('nonlinear', 'fwd', isub)
-            sub._guess_nonlinear()
+            if overrides_method('guess_nonlinear', sub, ImplicitComponent):
+                self._transfer('nonlinear', 'fwd', isub)
+                sub._guess_nonlinear()
 
     def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """
