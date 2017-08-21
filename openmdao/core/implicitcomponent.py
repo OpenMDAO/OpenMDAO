@@ -71,6 +71,13 @@ class ImplicitComponent(Component):
             else:
                 return result
 
+    def _guess_nonlinear(self):
+        """
+        Provide initial guess for states.
+        """
+        with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
+            self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
+
     def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.

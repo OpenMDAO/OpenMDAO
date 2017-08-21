@@ -792,3 +792,12 @@ class Component(System):
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()
+
+    def _guess_nonlinear(self):
+        """
+        Provide initial guess for states.
+
+        Does nothing on any non-implicit component.
+        """
+        pass
+

@@ -1271,16 +1271,20 @@ class Group(System):
         # We need to call this early enough so that any solver that needs initial guesses has
         # them.
         # TODO: It is pointless to run this ahead of non-iterative solvers.
-        for sub in self.system_iter(recurse=True):
-            if hasattr(sub, 'guess_nonlinear'):
-                self._transfer('nonlinear', 'fwd')
-                with sub._unscaled_context(outputs=[sub._outputs], residuals=[sub._residuals]):
-                    sub.guess_nonlinear(sub._inputs, sub._outputs, sub._residuals)
+        self._guess_nonlinear()
 
         with Recording(name + '._solve_nonlinear', self.iter_count, self):
             result = self._nonlinear_solver.solve()
 
         return result
+
+    def _guess_nonlinear(self):
+        """
+        Provide initial guess for states.
+        """
+        for isub, sub in enumerate(self._subsystems_myproc):
+            self._transfer('nonlinear', 'fwd', isub)
+            sub._guess_nonlinear()
 
     def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """
