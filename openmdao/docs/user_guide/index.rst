@@ -9,7 +9,8 @@ you will be able to construct models by linking multiple analyses together and t
 .. toctree::
    :maxdepth: 1
 
-   first_analysis
-   first_optimization
-   first_mdao
-   ../features/problems/sellar
+   first_analysis.rst
+   first_optimization.rst
+   first_mdao.rst
+   building_components.rst
+   sellar.rst

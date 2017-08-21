@@ -69,12 +69,13 @@ OpenMDAO User Source Documentation
         'error_checking',
         'jacobians',
         'matrices',
+        'proc_allocators',
+        'recorders',
         'solvers',
         'surrogate_models',
         'solvers.linear',
         'solvers.nonlinear',
         'solvers.linesearch',
-        'proc_allocators',
         'vectors',
     ]
 

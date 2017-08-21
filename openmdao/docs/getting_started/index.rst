@@ -12,7 +12,7 @@ git clone http://github.com/OpenMDAO/blue
 
 Use pip to install openmdao locally:
 
-cd blue/openmdao
+cd blue
 
 pip install .
 

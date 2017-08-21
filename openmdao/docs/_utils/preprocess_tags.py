@@ -3,7 +3,6 @@
 # is created for each subject tag, that file contains links to
 # each instance of the tag throughout the docs.
 
-import sys
 import os
 import shutil
 import re
@@ -86,11 +85,9 @@ Tags in OpenMDAO
  """)
 
 
-def tag(args=None):
-    if args is None:
-        args = sys.argv[1:]
+def tag():
     # Set the directories in which to find tags
-    docdirs = ['features', 'style_guide', 'user_guide']
+    docdirs = ['examples', 'getting_started', 'features', 'style_guide', 'theory_manual', 'user_guide']
     tagdir = make_tagdir()
     make_tagfiles(docdirs, tagdir)
     make_tagindex(tagdir)
