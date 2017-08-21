@@ -134,7 +134,7 @@ class NewtonSolver(NonlinearSolver):
         """
         Run the the apply_nonlinear method on the system.
         """
-        recording_iteration_stack.append(('_iter_get_norm', 0))
+        recording_iteration_stack.append(('_run_apply', 0))
 
         system = self._system
 
