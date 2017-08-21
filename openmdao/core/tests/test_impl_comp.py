@@ -322,6 +322,45 @@ class ImplicitCompTestCase(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['comp2.y'], 77.)
 
+    def test_guess_nonlinear_transfer_subbed(self):
+        # Test that data is transfered to a component before calling guess_nonlinear.
+
+        class ImpWithInitial(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 3.0)
+                self.add_output('y', 4.0)
+
+            def solve_nonlinear(self, inputs, outputs):
+                """ Do nothing. """
+                pass
+
+            def apply_nonlinear(self, inputs, outputs):
+                """ Do nothing. """
+                pass
+
+            def guess_nonlinear(self, inputs, outputs, resids):
+                # Passthrough
+                outputs['y'] = inputs['x']
+
+
+        group = Group()
+        sub = Group()
+
+        group.add_subsystem('px', IndepVarComp('x', 77.0))
+        sub.add_subsystem('comp1', ImpWithInitial())
+        sub.add_subsystem('comp2', ImpWithInitial())
+        group.connect('px.x', 'sub.comp1.x')
+        group.connect('sub.comp1.y', 'sub.comp2.x')
+
+        group.add_subsystem('sub', sub)
+
+        prob = Problem(model=group)
+        prob.setup(check=False)
+
+        prob.run_model()
+        assert_rel_error(self, prob['sub.comp2.y'], 77.)
+
     def test_guess_nonlinear_feature(self):
 
         class ImpWithInitial(ImplicitComponent):
