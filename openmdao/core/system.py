@@ -75,12 +75,12 @@ class System(object):
         List of ranges of each myproc subsystem's processors relative to those of this system.
     _subsystems_var_range : {'input': list of (int, int), 'output': list of (int, int)}
         List of ranges of each myproc subsystem's allprocs variables relative to this system.
-    _subsystems_var_range_byset : {'input': list of dict, 'output': list of dict}
+    _subsystems_var_range_byset : {<vec_name>: {'input': list of dict, 'output': list of dict}, ...}
         Same as above, but by var_set name.
     #
     _num_var : {'input': int, 'output': int}
         Number of allprocs variables owned by this system.
-    _num_var_byset : {'input': dict of int, 'output': dict of int}
+    _num_var_byset : {<vec_name>: {'input': dict of int, 'output': dict of int}, ...}
         Same as above, but by var_set name.
     _var_set2iset : {'input': dict, 'output': dict}
         Dictionary mapping the var_set name to the var_set index.
@@ -108,7 +108,7 @@ class System(object):
     _var_allprocs_abs2idx : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
-    _var_allprocs_abs2idx_byset : {'input': dict of dict, 'output': dict of dict}
+    _var_allprocs_abs2idx_byset : {<vec_name>:{'input': dict of dict, 'output': dict of dict}, ...}
         Same as above, but by var_set name.
     #
     _var_sizes : {'input': ndarray, 'output': ndarray}
@@ -258,22 +258,22 @@ class System(object):
         self._subsystems_myproc_inds = []
         self._subsystems_proc_range = []
         self._subsystems_var_range = {'input': [], 'output': []}
-        self._subsystems_var_range_byset = {'input': [], 'output': []}
+        self._subsystems_var_range_byset = None
 
         self._num_var = {'input': 0, 'output': 0}
-        self._num_var_byset = {'input': defaultdict(int), 'output': defaultdict(int)}
+        self._num_var_byset = None
         self._var_set2iset = OrderedDict([('input', {}), ('output', {})])
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
-        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
+        self._var_allprocs_prom2abs_list = None
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_abs2meta = {'input': {}, 'output': {}}
 
         self._var_allprocs_abs2idx = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2idx_byset = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2idx_byset = None
 
         self._var_sizes = defaultdict(lambda: {'input': None, 'output': None})
         self._var_sizes_byset = defaultdict(lambda: {'input': {}, 'output': {}})
@@ -339,6 +339,8 @@ class System(object):
         self._relevant = None
         self._vec_names = None
         self._vois = None
+
+        self._scope_cache = {}
 
         self.initialize()
         self.metadata.update(kwargs)
@@ -698,14 +700,15 @@ class System(object):
         # For updating variable and connection data, setup needs to be performed only
         # in the current system, by gathering data from immediate subsystems,
         # and no recursion is necessary.
+        self._setup_var_data(recurse=recurse)
+        self._setup_vec_names(mode, self._vec_names, self._vois)
         self._setup_vars(recurse=recurse)
         self._setup_var_index_ranges(self._get_initial_var_indices(initial), recurse=recurse)
-        self._setup_var_data(recurse=recurse)
-        self._setup_var_index_maps(recurse=recurse)
         self._setup_global_connections(recurse=recurse)
         if initial:
             self._relevant = None
         self._setup_relevance(mode, self._relevant, self._vec_names, self._vois)
+        self._setup_var_index_maps(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
@@ -825,7 +828,8 @@ class System(object):
             Whether to call this method in subsystems.
         """
         self._num_var = {'input': 0, 'output': 0}
-        self._num_var_byset = {'input': defaultdict(int), 'output': defaultdict(int)}
+        self._num_var_byset = defaultdict(lambda: {'input': defaultdict(int),
+                                                   'output': defaultdict(int)})
 
     def _setup_var_index_ranges(self, set2iset, recurse=True):
         """
@@ -840,13 +844,14 @@ class System(object):
         """
         self._var_set2iset = set2iset
         self._subsystems_var_range = {'input': [], 'output': []}
-        self._subsystems_var_range_byset = {'input': [], 'output': []}
-
-        num_var_byset = self._num_var_byset
-        for type_ in ['input', 'output']:
-            for set_name in self._var_set2iset[type_]:
-                if set_name not in num_var_byset[type_]:
-                    num_var_byset[type_][set_name] = 0
+        self._subsystems_var_range_byset = defaultdict(lambda: {'input': defaultdict(int),
+                                                                'output': defaultdict(int)})
+        # for vec_name in self._vec_names:
+        #     num_var_byset = self._num_var_byset[vec_name]
+        #     for type_ in ['input', 'output']:
+        #         for set_name in self._var_set2iset[type_]:
+        #             if set_name not in num_var_byset[type_]:
+        #                 num_var_byset[type_][set_name] = 0
 
     def _setup_var_data(self, recurse=True):
         """
@@ -859,7 +864,7 @@ class System(object):
         """
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
-        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
+        self._var_allprocs_prom2abs_list = {'input': defaultdict(list), 'output': defaultdict(list)}
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_abs2meta = {'input': {}, 'output': {}}
@@ -874,20 +879,22 @@ class System(object):
             Whether to call this method in subsystems.
         """
         self._var_allprocs_abs2idx = allprocs_abs2idx = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2idx_byset = allprocs_abs2idx_byset = {'input': {}, 'output': {}}
+        abs2idx_byset = defaultdict(lambda: {'input': {}, 'output': {}})
+        self._var_allprocs_abs2idx_byset = abs2idx_byset
 
         for type_ in ['input', 'output']:
-            allprocs_abs2meta_t = self._var_allprocs_abs2meta[type_]
-            allprocs_abs2idx_t = allprocs_abs2idx[type_]
-            allprocs_abs2idx_byset_t = allprocs_abs2idx_byset[type_]
+            abs2idx_t = allprocs_abs2idx[type_]
+            abs2meta_t = self._var_allprocs_abs2meta[type_]
 
-            counter = {set_name: 0 for set_name in self._var_set2iset[type_]}
-            for idx, abs_name in enumerate(self._var_allprocs_abs_names[type_]):
-                allprocs_abs2idx_t[abs_name] = idx
+            counters = defaultdict(lambda: defaultdict(int))
+            for i, abs_name in enumerate(self._var_allprocs_abs_names[type_]):
+                abs2idx_t[abs_name] = i
+                set_name = abs2meta_t[abs_name]['var_set']
 
-                set_name = allprocs_abs2meta_t[abs_name]['var_set']
-                allprocs_abs2idx_byset_t[abs_name] = counter[set_name]
-                counter[set_name] += 1
+                for vec_name in self._vec_names:
+                    counter = counters[vec_name]
+                    abs2idx_byset[vec_name][type_][abs_name] = counter[set_name]
+                    counter[set_name] += 1
 
         # Recursion
         if recurse:
@@ -961,7 +968,42 @@ class System(object):
         """
         self._conn_global_abs_in2out = {}
 
-    def _setup_relevance(self, mode, relevant=None, vec_names=None, vois=None):
+    def _setup_vec_names(self, mode, vec_names=None, vois=None):
+        """
+        Return the list of vec_names and the vois dict.
+
+        Parameters
+        ----------
+        mode : str
+            Derivative direction, either 'fwd' or 'rev'.
+        vec_names : list of str or None
+            The list of names of vectors. Depends on the value of mode.
+        vois : dict
+            Dictionary of either design vars or responses, depending on the value
+            of mode.
+
+        """
+        def _filter_names(voi_dict):
+            return set(voi for voi, data in iteritems(voi_dict)
+                       if data['parallel_deriv_color'] is not None
+                       or data['vectorize_derivs'])
+
+        self._mode = mode
+        self._vois = vois
+        if vec_names is None:  # should only occur at top level on full setup
+            vec_names = ['nonlinear', 'linear']
+            if mode == 'fwd':
+                desvars = self.get_design_vars(recurse=True, get_sizes=False)
+                vec_names.extend(sorted(_filter_names(desvars)))
+                self._vois = vois = desvars
+            else:  # rev
+                responses = self.get_responses(recurse=True, get_sizes=False)
+                vec_names.extend(sorted(_filter_names(responses)))
+                self._vois = vois = responses
+
+        self._vec_names = vec_names
+
+    def _setup_relevance(self, mode, relevant=None):
         """
         Set up the relevance dictionary.
 
@@ -972,41 +1014,12 @@ class System(object):
         relevant : dict or None
             Dictionary mapping VOI name to all variables necessary for computing
             derivatives between the VOI and all other VOIs.
-        vec_names : list of str or None
-            The list of names of vectors. Depends on the value of mode.
-        vois : dict
-            Dictionary of either design vars or responses, depending on the value
-            of mode.
 
-        Returns
-        -------
-        dict, dict
-            Design var and response dicts
         """
-        def _filter_names(voi_dict):
-            return set(voi for voi, data in iteritems(voi_dict)
-                       if data['parallel_deriv_color'] is not None
-                       or data['vectorize_derivs'])
-
-        self._mode = mode
-        self._vois = vois
         if relevant is None:  # should only occur at top level on full setup
-            desvars = self.get_design_vars(recurse=True, get_sizes=False)
-            responses = self.get_responses(recurse=True, get_sizes=False)
-            vec_names = ['nonlinear', 'linear']
-            if mode == 'fwd':
-                vec_names.extend(sorted(_filter_names(desvars)))
-                self._vois = vois = desvars
-            else:  # rev
-                vec_names.extend(sorted(_filter_names(responses)))
-                self._vois = vois = responses
-            self._vec_names = vec_names
             self._relevant = {}
-            return desvars, responses
         else:
             self._relevant = relevant
-            self._vec_names = vec_names
-            return None, None
 
     def _setup_connections(self, recurse=True):
         """
@@ -1532,28 +1545,32 @@ class System(object):
         return maps
 
     def _get_scope(self, excl_sub=None):
+        if excl_sub in self._scope_cache:
+            return self._scope_cache[excl_sub]
+
         if excl_sub is None:
             # All myproc outputs
             scope_out = set(self._var_abs_names['output'])
 
             # All myproc inputs connected to an output in this system
-            scope_in = set(self._conn_global_abs_in2out) \
-                & set(self._var_abs_names['input'])
+            scope_in = set(self._conn_global_abs_in2out).intersection(
+                self._var_abs_names['input'])
+
         else:
             # All myproc outputs not in excl_sub
             scope_out = set(self._var_abs_names['output']).difference(
                 excl_sub._var_abs_names['output'])
 
             # All myproc inputs connected to an output in this system but not in excl_sub
-            scope_in = []
+            scope_in = set()
             for abs_in in self._var_abs_names['input']:
                 if abs_in in self._conn_global_abs_in2out:
                     abs_out = self._conn_global_abs_in2out[abs_in]
 
                     if abs_out not in excl_sub._var_allprocs_abs2idx['output']:
-                        scope_in.append(abs_in)
-            scope_in = set(scope_in)
+                        scope_in.add(abs_in)
 
+        self._scope_cache[excl_sub] = (scope_out, scope_in)
         return scope_out, scope_in
 
     @property

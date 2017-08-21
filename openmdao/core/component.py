@@ -16,7 +16,7 @@ from openmdao.core.system import System
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    warn_deprecation
+    warn_deprecation, ContainsAll
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 
 
@@ -144,10 +144,9 @@ class Component(System):
         }
 
         for type_ in ['input', 'output']:
-            for ind, prom_name in enumerate(self._var_rel_names[type_]):
+            for prom_name in self._var_rel_names[type_]:
                 abs_name = prefix + prom_name
-                data = self._var_rel2data_io[prom_name]
-                metadata = data['metadata']
+                metadata = self._var_rel2data_io[prom_name]['metadata']
 
                 # Compute allprocs_abs_names, abs_names
                 allprocs_abs_names[type_].append(abs_name)
@@ -158,11 +157,10 @@ class Component(System):
                 abs2prom[type_][abs_name] = prom_name
 
                 # Compute allprocs_abs2meta
-                allprocs_metadata = {
+                allprocs_abs2meta[type_][abs_name] = {
                     meta_name: metadata[meta_name]
                     for meta_name in meta_names[type_]
                 }
-                allprocs_abs2meta[type_][abs_name] = allprocs_metadata
 
                 # Compute abs2meta
                 abs2meta[type_][abs_name] = metadata
@@ -202,18 +200,23 @@ class Component(System):
         for vec_name in vec_names[1:]:
             sizes = self._var_sizes[vec_name]
             sizes_byset = self._var_sizes_byset[vec_name]
+            if vec_name in relevant:
+                relvars, _ = relevant[vec_name]['@all']
+            else:
+                relvars = {'input': ContainsAll(), 'output': ContainsAll()}
 
             for type_ in ['input', 'output']:
                 abs2meta_t = self._var_abs2meta[type_]
-                allprocs_abs2idx_byset_t = self._var_allprocs_abs2idx_byset[type_]
+                allprocs_abs2idx_byset_t = self._var_allprocs_abs2idx_byset[vec_name][type_]
                 for idx, abs_name in enumerate(self._var_abs_names[type_]):
-                    meta = abs2meta_t[abs_name]
-                    set_name = meta['var_set']
-                    size = np.prod(meta['shape'])
-                    idx_byset = allprocs_abs2idx_byset_t[abs_name]
+                    if abs_name in relvars[type_]:
+                        meta = abs2meta_t[abs_name]
+                        set_name = meta['var_set']
+                        size = np.prod(meta['shape'])
+                        idx_byset = allprocs_abs2idx_byset_t[abs_name]
 
-                    sizes[type_][iproc, idx] = size
-                    sizes_byset[type_][set_name][iproc, idx_byset] = size
+                        sizes[type_][iproc, idx] = size
+                        sizes_byset[type_][set_name][iproc, idx_byset] = size
 
         if self.comm.size > 1:
             for vec_name in vec_names[1:]:

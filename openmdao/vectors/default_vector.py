@@ -105,6 +105,7 @@ class DefaultVector(Vector):
         ncol = self._ncol
 
         sizes_byset_t = system._var_sizes_byset[self._name][type_]
+        sizes_t = system._var_sizes[self._name][type_]
 
         data = {}
         indices = {}
@@ -113,9 +114,8 @@ class DefaultVector(Vector):
             data[set_name] = np.zeros(size) if ncol == 1 else np.zeros((size, ncol))
             indices[set_name] = np.zeros(size, int)
 
-        sizes_t = system._var_sizes[self._name][type_]
         abs2meta_t = system._var_abs2meta[type_]
-        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[type_]
+        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[self._name][type_]
         allprocs_abs2idx_t = system._var_allprocs_abs2idx[type_]
         for abs_name in system._var_abs_names[type_]:
             set_name = abs2meta_t[abs_name]['var_set']
@@ -272,7 +272,7 @@ class DefaultVector(Vector):
         self._imag_views = imag_views = {}
         self._imag_views_flat = imag_views_flat = {}
 
-        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[type_]
+        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[self._name][type_]
         sizes_byset_t = system._var_sizes_byset[self._name][type_]
         abs2meta_t = system._var_abs2meta[type_]
         for abs_name in system._var_abs_names[type_]:

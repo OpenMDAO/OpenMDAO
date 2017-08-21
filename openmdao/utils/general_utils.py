@@ -269,3 +269,14 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
                         'numeric values, or a scalar numeric value. '
                         'Got {1} instead.'.format(name, values))
     return values
+
+
+class ContainsAll(object):
+    """
+    A fake dictionary that always reports __contains__(name) to be True.
+    """
+    def __contains__(self, name):
+        """
+        Always return True.
+        """
+        return True

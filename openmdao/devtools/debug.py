@@ -9,7 +9,7 @@ from resource import getrusage, RUSAGE_SELF, RUSAGE_CHILDREN
 from six.moves import zip_longest
 
 
-def dump_dist_idxs(problem, stream=sys.stdout):  # pragma: no cover
+def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma: no cover
     """Print out the distributed idxs for each variable in input and output vecs.
 
     Output looks like this:
@@ -30,15 +30,17 @@ def dump_dist_idxs(problem, stream=sys.stdout):  # pragma: no cover
     ----------
     problem : <Problem>
         The problem object that contains the model.
+    vec_name : str
+        Name of vector to dump (when there are multiple vectors due to parallel derivs)
     stream : File-like
         Where dump output will go.
     """
     def _get_data(g, type_):
 
         set_IDs = g._var_set2iset
-        sizes = g._var_sizes_byset
+        sizes = g._var_sizes_byset[vec_name]
         vnames = g._var_allprocs_abs_names
-        set_idxs = g._var_allprocs_abs2idx_byset
+        set_idxs = g._var_allprocs_abs2idx_byset[vec_name]
         abs2meta = g._var_allprocs_abs2meta
 
         idx = 0
