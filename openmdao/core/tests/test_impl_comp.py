@@ -320,6 +320,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         group.nonlinear_solver.options['maxiter'] = 1
 
         prob = Problem(model=group)
+        prob.set_solver_print(level=0)
         prob.setup(check=False)
 
         prob.run_model()
@@ -363,6 +364,51 @@ class ImplicitCompTestCase(unittest.TestCase):
         group.nonlinear_solver.options['maxiter'] = 1
 
         prob = Problem(model=group)
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+
+        prob.run_model()
+        assert_rel_error(self, prob['sub.comp2.y'], 77., 1e-5)
+
+    def test_guess_nonlinear_transfer_subbed2(self):
+        # Test that data is transfered to a component before calling guess_nonlinear.
+
+        class ImpWithInitial(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 3.0)
+                self.add_output('y', 4.0)
+
+            def solve_nonlinear(self, inputs, outputs):
+                """ Do nothing. """
+                pass
+
+            def apply_nonlinear(self, inputs, outputs, resids):
+                """ Do nothing. """
+                resids['y'] = 1.0e-6
+                pass
+
+            def guess_nonlinear(self, inputs, outputs, resids):
+                # Passthrough
+                outputs['y'] = inputs['x']
+
+
+        group = Group()
+        sub = Group()
+
+        group.add_subsystem('px', IndepVarComp('x', 77.0))
+        sub.add_subsystem('comp1', ImpWithInitial())
+        sub.add_subsystem('comp2', ImpWithInitial())
+        group.connect('px.x', 'sub.comp1.x')
+        group.connect('sub.comp1.y', 'sub.comp2.x')
+
+        group.add_subsystem('sub', sub)
+
+        sub.nonlinear_solver = NewtonSolver()
+        sub.nonlinear_solver.options['maxiter'] = 1
+
+        prob = Problem(model=group)
+        prob.set_solver_print(level=0)
         prob.setup(check=False)
 
         prob.run_model()
