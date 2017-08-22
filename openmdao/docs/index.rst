@@ -12,6 +12,3 @@ OpenMDAO Documentation
     theory_manual/index.rst
     _srcdocs/index.rst
     style_guide/index.rst
-
-
-
