@@ -95,7 +95,7 @@ class Recording(object):
         # Determine if recording is justified.
         do_recording = True
         for stack_item in recording_iteration_stack:
-            if stack_item[0] in ('_iter_get_norm', '_compute_total_derivs'):
+            if stack_item[0] in ('_run_apply', '_compute_total_derivs'):
                 do_recording = False
                 break
 
