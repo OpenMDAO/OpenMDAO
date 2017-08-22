@@ -26,6 +26,15 @@ class ImplicitComponent(Component):
         """
         super(ImplicitComponent, self).__init__(**kwargs)
 
+        if overrides_method('guess_nonlinear', self, ImplicitComponent):
+            self._has_guess = True
+
+    def _configure(self):
+        """
+        Configure this system to assign children settings.
+
+        Also tag component if it provides a guess_nonlinear.
+        """
         if overrides_method('apply_linear', self, ImplicitComponent):
             self.matrix_free = True
 

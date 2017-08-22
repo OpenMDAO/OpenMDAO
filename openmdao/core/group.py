@@ -21,7 +21,6 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg
-from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.units import is_compatible
 
@@ -102,6 +101,9 @@ class Group(System):
         """
         for subsys in self._subsystems_myproc:
             subsys._configure()
+
+            if subsys._has_guess:
+                self._has_guess = True
 
         self.configure()
 
@@ -1279,8 +1281,7 @@ class Group(System):
         """
         from openmdao.api import ImplicitComponent
         for isub, sub in enumerate(self._subsystems_myproc):
-            if overrides_method('guess_nonlinear', sub, ImplicitComponent) or \
-               isinstance(sub, Group):
+            if self._has_guess:
                 self._transfer('nonlinear', 'fwd', isub)
                 sub._guess_nonlinear()
 
