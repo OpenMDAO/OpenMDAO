@@ -1279,10 +1279,11 @@ class Group(System):
         """
         Provide initial guess for states.
         """
-        for isub, sub in enumerate(self._subsystems_myproc):
-            if self._has_guess:
-                self._transfer('nonlinear', 'fwd', isub)
-                sub._guess_nonlinear()
+        if self._has_guess:
+            for isub, sub in enumerate(self._subsystems_myproc):
+                if sub._has_guess:
+                    self._transfer('nonlinear', 'fwd', isub)
+                    sub._guess_nonlinear()
 
     def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """
