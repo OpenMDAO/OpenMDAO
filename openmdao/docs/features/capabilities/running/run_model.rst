@@ -5,10 +5,9 @@
 Run Your Model
 =========================
 
-Once :code:`setup()` is done, you can then execute your model:
-    #. :code:`run_model()`
+Once :code:`setup()` is done, you can then execute your model with :code:`run_model()`
 
-:code:`run_model()`, will execute one pass through your model.
+:code:`run_model()` will execute one pass through your model.
 
 Examples
 ---------

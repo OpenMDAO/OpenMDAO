@@ -6,22 +6,22 @@ Getting Started
 
 Installation Instructions:
 
-Use git to clone the repository:
+Use :code:`git` to clone the repository:
 
-git clone http://github.com/OpenMDAO/blue
+:code:`git clone http://github.com/OpenMDAO/blue`
 
-Use pip to install openmdao locally:
+Use :code:`pip` to install openmdao locally:
 
-cd blue
+:code:`cd blue`
 
-pip install .
+:code:`pip install .`
 
 Documentation Building Instructions:
 
-cd openmdao/docs
+:code:`cd openmdao/docs`
 
-make all
+:code:`make all`
 
-This will build the docs into openmdao/docs/_build/html.
+This will build the docs in :code:`openmdao/docs/_build/html.`
 
-Then, just open openmdao/docs/_build/html/index.html in a browser to begin.
+Then, just :code:`open openmdao/docs/_build/html/index.html` in a browser to begin.

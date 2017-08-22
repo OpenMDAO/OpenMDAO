@@ -9,6 +9,7 @@ Capabilities
 
     defining_components/index.rst
     grouping_components/index.rst
+    defining_desvars_objs_consts/index.rst
     running/index.rst
     controlling_solvers/index.rst
     working_with_derivatives/index.rst
