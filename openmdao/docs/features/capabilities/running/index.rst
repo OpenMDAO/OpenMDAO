@@ -8,5 +8,6 @@ Running Your Models
     :maxdepth: 1
 
     set_get.rst
-    setup_and_run.rst
-    check_total_derivatives.rst
+    setup.rst
+    run_model.rst
+    run_driver.rst
