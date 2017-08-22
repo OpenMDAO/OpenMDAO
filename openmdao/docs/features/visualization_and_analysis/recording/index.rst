@@ -1,10 +1,10 @@
 :orphan:
 
-*****************************************
-Components
-*****************************************
+*********
+Recording
+*********
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 2
 
     basic_recording.rst

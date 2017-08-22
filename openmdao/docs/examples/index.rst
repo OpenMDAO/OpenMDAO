@@ -4,8 +4,7 @@
 Examples
 ********
 
-Welcome to the Examples page!
+This document will link to all the code examples.
 
 .. toctree::
-   :maxdepth: 1
-
+   :maxdepth: 2

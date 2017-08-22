@@ -13,9 +13,9 @@ def generate_docs():
 
 .. _source_documentation:
 
-==================================
-OpenMDAO User Source Documentation
-==================================
+********************
+Source Docs
+********************
 
 .. toctree::
    :titlesonly:

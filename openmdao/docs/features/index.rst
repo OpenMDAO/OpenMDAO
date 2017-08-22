@@ -8,7 +8,7 @@ OpenMDAO's fully supported features are documented here.
 Anything documented here has been thoroughly tested an should be considered fully functional.
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
    capabilities/index.rst
    building_blocks/index.rst

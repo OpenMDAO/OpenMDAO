@@ -7,7 +7,7 @@ They are intended to be done in sequence. Once completed,
 you will be able to construct models by linking multiple analyses together and then perform optimization on those models.
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
    first_analysis.rst
    first_optimization.rst
