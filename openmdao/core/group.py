@@ -1279,7 +1279,6 @@ class Group(System):
         """
         Provide initial guess for states.
         """
-        from openmdao.api import ImplicitComponent
         for isub, sub in enumerate(self._subsystems_myproc):
             if self._has_guess:
                 self._transfer('nonlinear', 'fwd', isub)
