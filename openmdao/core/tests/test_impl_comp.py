@@ -316,13 +316,14 @@ class ImplicitCompTestCase(unittest.TestCase):
         group.connect('px.x', 'comp1.x')
         group.connect('comp1.y', 'comp2.x')
 
-        group.nonlinear_solver = NonlinearBlockGS()
+        group.nonlinear_solver = NewtonSolver()
+        group.nonlinear_solver.options['maxiter'] = 1
 
         prob = Problem(model=group)
         prob.setup(check=False)
 
         prob.run_model()
-        assert_rel_error(self, prob['comp2.y'], 77.)
+        assert_rel_error(self, prob['comp2.y'], 77., 1e-5)
 
     def test_guess_nonlinear_transfer_subbed(self):
         # Test that data is transfered to a component before calling guess_nonlinear.
@@ -339,7 +340,7 @@ class ImplicitCompTestCase(unittest.TestCase):
 
             def apply_nonlinear(self, inputs, outputs, resids):
                 """ Do nothing. """
-                resids['y'] = 1.0
+                resids['y'] = 1.0e-6
                 pass
 
             def guess_nonlinear(self, inputs, outputs, resids):
@@ -358,13 +359,14 @@ class ImplicitCompTestCase(unittest.TestCase):
 
         group.add_subsystem('sub', sub)
 
-        group.nonlinear_solver = NonlinearBlockGS()
+        group.nonlinear_solver = NewtonSolver()
+        group.nonlinear_solver.options['maxiter'] = 1
 
         prob = Problem(model=group)
         prob.setup(check=False)
 
         prob.run_model()
-        assert_rel_error(self, prob['sub.comp2.y'], 77.)
+        assert_rel_error(self, prob['sub.comp2.y'], 77., 1e-5)
 
     def test_guess_nonlinear_feature(self):
 

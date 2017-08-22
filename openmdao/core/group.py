@@ -1268,13 +1268,6 @@ class Group(System):
 
         name = self.pathname if self.pathname else 'root'
 
-        # Execute guess_nonlinear if specified.
-        # We need to call this early enough so that any solver that needs initial guesses has
-        # them.
-        # TODO: It is pointless to run this ahead of non-iterative solvers, but multi-level
-        # models seem to ned it.
-        self._guess_nonlinear()
-
         with Recording(name + '._solve_nonlinear', self.iter_count, self):
             result = self._nonlinear_solver.solve()
 
@@ -1286,7 +1279,8 @@ class Group(System):
         """
         from openmdao.api import ImplicitComponent
         for isub, sub in enumerate(self._subsystems_myproc):
-            if overrides_method('guess_nonlinear', sub, ImplicitComponent):
+            if overrides_method('guess_nonlinear', sub, ImplicitComponent) or \
+               isinstance(sub, Group):
                 self._transfer('nonlinear', 'fwd', isub)
                 sub._guess_nonlinear()
 
