@@ -102,7 +102,7 @@ class Component(System):
         num_var_byset = self._num_var_byset
         data = self._var_rel2data_io
 
-        for vec_name in self._vec_names[1:]:
+        for vec_name in self._vec_names:
             num_var[vec_name] = {}
             num_var_byset[vec_name] = {}
             # Compute num_var
@@ -116,9 +116,6 @@ class Component(System):
                     if set_name not in vbyset:
                         vbyset[set_name] = 0
                     vbyset[set_name] += 1
-
-        num_var['nonlinear'] = num_var['linear']
-        num_var_byset['nonlinear'] = num_var_byset['linear']
 
     def _setup_var_data(self, recurse=True):
         """
@@ -184,7 +181,7 @@ class Component(System):
         iproc = self.comm.rank
         nproc = self.comm.size
         relevant = self._relevant
-        vec_names = self._vec_names[1:]  # only loop over linear vecs
+        vec_names = self._vec_names
 
         sizes = self._var_sizes
         sizes_byset = self._var_sizes_byset
@@ -224,9 +221,6 @@ class Component(System):
                     self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
                     for set_name, sbyset in iteritems(sizes_byset[type_]):
                         self.comm.Allgather(sbyset[iproc, :], sbyset)
-
-        self._var_sizes['nonlinear'] = self._var_sizes['linear']
-        self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']
 
         self._setup_global_shapes()
 

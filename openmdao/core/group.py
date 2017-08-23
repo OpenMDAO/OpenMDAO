@@ -180,7 +180,7 @@ class Group(System):
                 subsys._setup_vars(recurse)
 
         # Compute num_var, num_var_byset, at least locally
-        for vec_name in self._vec_names[1:]:
+        for vec_name in self._vec_names:
             num_var[vec_name] = {}
             num_var_byset[vec_name] = {}
             relvars, relsys = self._relevant[vec_name]['@all']
@@ -225,9 +225,6 @@ class Group(System):
                                 num_var_byset[type_][set_name] = 0
                             num_var_byset[type_][set_name] += num
 
-        self._num_var['nonlinear'] = self._num_var['linear']
-        self._num_var_byset['nonlinear'] = self._num_var_byset['linear']
-
     def _setup_var_index_ranges(self, set2iset, recurse=True):
         """
         Compute the division of variables by subsystem and pass down the set_name-to-iset maps.
@@ -243,12 +240,11 @@ class Group(System):
 
         nsub_allprocs = len(self._subsystems_allprocs)
 
-
         subsystems_var_range = self._subsystems_var_range = {}
         subsystems_var_range_byset = self._subsystems_var_range_byset = {}
 
         # First compute these on one processor for each subsystem
-        for vec_name in self._vec_names[1:]:
+        for vec_name in self._vec_names:
             relvars, relsys = self._relevant[vec_name]['@all']
 
             # Here, we count the number of variables (total and by varset) in each subsystem.
@@ -304,9 +300,6 @@ class Group(System):
                         iset = set2iset[type_][set_name]
                         rng[subsys.name] = (np.sum(allprocs_counters_byset[type_][:isub, iset]),
                                     np.sum(allprocs_counters_byset[type_][:isub + 1, iset]))
-
-        subsystems_var_range['nonlinear'] = subsystems_var_range['linear']
-        subsystems_var_range_byset['nonlinear'] = subsystems_var_range_byset['linear']
 
         # Recursion
         if recurse:
@@ -422,7 +415,7 @@ class Group(System):
         sizes_byset = self._var_sizes_byset
 
         # Compute _var_sizes
-        for vec_name in self._vec_names[1:]:
+        for vec_name in self._vec_names:
             relvar, relsys = self._relevant[vec_name]['@all']
             sizes[vec_name] = {}
             sizes_byset[vec_name] = {}
@@ -456,9 +449,6 @@ class Group(System):
                     self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
                     for set_name, vsizes in iteritems(sizes_byset[type_]):
                         self.comm.Allgather(sizes_byset[type_][set_name][iproc, :], vsizes)
-
-        self._var_sizes['nonlinear'] = self._var_sizes['linear']
-        self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']
 
         self._setup_global_shapes()
 

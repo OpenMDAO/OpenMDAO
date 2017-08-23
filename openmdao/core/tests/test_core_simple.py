@@ -78,11 +78,11 @@ class Test(unittest.TestCase):
     def test_var_allprocs_idx_range(self):
         rng = self.p.model._subsystems_var_range
 
-        assert_rel_error(self, rng['nonlinear']['input'][0], np.array([0,0]))
-        assert_rel_error(self, rng['nonlinear']['input'][1], np.array([0,1]))
+        assert_rel_error(self, rng['nonlinear']['input']['A'], np.array([0,0]))
+        assert_rel_error(self, rng['nonlinear']['input']['B'], np.array([0,1]))
 
-        assert_rel_error(self, rng['nonlinear']['output'][0], np.array([0,1]))
-        assert_rel_error(self, rng['nonlinear']['output'][1], np.array([1,2]))
+        assert_rel_error(self, rng['nonlinear']['output']['A'], np.array([0,1]))
+        assert_rel_error(self, rng['nonlinear']['output']['B'], np.array([1,2]))
 
     def test_GS(self):
         root = self.p.model
