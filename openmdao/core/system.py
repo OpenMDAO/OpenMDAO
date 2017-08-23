@@ -237,6 +237,9 @@ class System(object):
     #
     _reconfigured : bool
         If True, this system has reconfigured, and the immediate parent should update.
+    #
+    _has_guess : bool
+        True if this system has or contains a system with a `guess_nonlinear` method defined.
     """
 
     def __init__(self, **kwargs):
@@ -343,6 +346,8 @@ class System(object):
 
         self.initialize()
         self.metadata.update(kwargs)
+
+        self._has_guess = False
 
     def _check_reconf(self):
         """

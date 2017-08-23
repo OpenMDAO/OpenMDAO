@@ -130,16 +130,11 @@ class NewtonSolver(NonlinearSolver):
         if self.linesearch is not None:
             self.linesearch._set_solver_print(level=level, type_=type_)
 
-    def _iter_get_norm(self):
+    def _run_apply(self):
         """
-        Return the norm of the residual.
-
-        Returns
-        -------
-        float
-            norm.
+        Run the the apply_nonlinear method on the system.
         """
-        recording_iteration_stack.append(('_iter_get_norm', 0))
+        recording_iteration_stack.append(('_run_apply', 0))
 
         system = self._system
 
@@ -153,8 +148,6 @@ class NewtonSolver(NonlinearSolver):
 
         # Enable local fd
         system._owns_approx_jac = approx_status
-
-        return system._residuals.get_norm()
 
     def _linearize_children(self):
         """
@@ -178,6 +171,48 @@ class NewtonSolver(NonlinearSolver):
         if self.linesearch is not None:
             self.linesearch._linearize()
 
+    def _iter_initialize(self):
+        """
+        Perform any necessary pre-processing operations.
+
+        Returns
+        -------
+        float
+            initial error.
+        float
+            error at the first iteration.
+        """
+        system = self._system
+
+        with Recording('Newton_subsolve', 0, self):
+            if self.options['solve_subsystems'] and \
+               (self._iter_count <= self.options['max_sub_solves']):
+
+                self._solver_info.prefix += '+  '
+
+                # should call the subsystems solve before computing the first residual
+                for isub, subsys in enumerate(system._subsystems_myproc):
+                    system._transfer('nonlinear', 'fwd', isub)
+
+                    if subsys in system._subsystems_myproc:
+                        subsys._solve_nonlinear()
+
+                    system._check_reconf_update()
+
+                self._solver_info.prefix = self._solver_info.prefix[:-3]
+
+        if self.options['maxiter'] > 0:
+
+            # Execute guess_nonlinear if specified.
+            system._guess_nonlinear()
+
+            self._run_apply()
+            norm = self._iter_get_norm()
+        else:
+            norm = 1.0
+        norm0 = norm if norm != 0.0 else 1.0
+        return norm0, norm
+
     def _iter_execute(self):
         """
         Perform the operations in the iteration loop.
@@ -185,26 +220,11 @@ class NewtonSolver(NonlinearSolver):
         system = self._system
         self._solver_info.prefix += '|  '
         do_subsolve = self.options['solve_subsystems'] and \
-            (self._iter_count <= self.options['max_sub_solves'])
+            (self._iter_count < self.options['max_sub_solves'])
 
         # Disable local fd
         approx_status = system._owns_approx_jac
         system._owns_approx_jac = False
-
-        # Hybrid newton support.
-        with Recording('Newton_subsolve', 0, self):
-            if do_subsolve:
-                self._solver_info.prefix += '+  '
-
-                for isub, subsys in enumerate(system._subsystems_allprocs):
-                    system._transfer('nonlinear', 'fwd', isub)
-
-                    if subsys in system._subsystems_myproc:
-                        subsys._solve_nonlinear()
-
-                self._solver_info.prefix = self._solver_info.prefix[:-3]
-
-                system._apply_nonlinear()
 
         system._vectors['residual']['linear'].set_vec(system._residuals)
         system._vectors['residual']['linear'] *= -1.0
@@ -219,6 +239,19 @@ class NewtonSolver(NonlinearSolver):
             system._outputs += system._vectors['output']['linear']
 
         self._solver_info.prefix = self._solver_info.prefix[:-3]
+
+        # Hybrid newton support.
+        with Recording('Newton_subsolve', 0, self):
+            if do_subsolve:
+                self._solver_info.prefix += '+  '
+
+                for isub, subsys in enumerate(system._subsystems_allprocs):
+                    system._transfer('nonlinear', 'fwd', isub)
+
+                    if subsys in system._subsystems_myproc:
+                        subsys._solve_nonlinear()
+
+                self._solver_info.prefix = self._solver_info.prefix[:-3]
 
         # Enable local fd
         system._owns_approx_jac = approx_status
