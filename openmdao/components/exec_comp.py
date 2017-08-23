@@ -14,7 +14,7 @@ from six.moves import range
 from openmdao.core.explicitcomponent import ExplicitComponent
 
 # regex to check for variable names.
-VAR_RGX = re.compile('([_a-zA-Z]\w*[ ]*\(?)')
+VAR_RGX = re.compile('([.]*[_a-zA-Z]\w*[ ]*\(?)')
 
 # Names of metadata entries allowed for ExecComp variables.
 _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc', 'var_set',
@@ -181,7 +181,7 @@ class ExecComp(ExplicitComponent):
 
     def _parse_for_out_vars(self, s):
         vnames = set([x.strip() for x in re.findall(VAR_RGX, s)
-                      if not x.endswith('(')])
+                      if not x.endswith('(') and not x.startswith('.')])
         for v in vnames:
             if v in _expr_dict:
                 raise NameError("%s: cannot assign to variable '%s' "
@@ -190,7 +190,8 @@ class ExecComp(ExplicitComponent):
         return vnames
 
     def _parse_for_vars(self, s):
-        vnames = set([x.strip() for x in re.findall(VAR_RGX, s) if not x.endswith('(')])
+        vnames = set([x.strip() for x in re.findall(VAR_RGX, s)
+                      if not x.endswith('(') and not x.startswith('.')])
         to_remove = []
         for v in vnames:
             if v in _expr_dict:

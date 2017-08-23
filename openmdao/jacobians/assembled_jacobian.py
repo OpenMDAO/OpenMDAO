@@ -81,7 +81,7 @@ class AssembledJacobian(Jacobian):
 
         sizes = system._var_sizes['nonlinear'][type_]
         iproc = system.comm.rank
-        idx = system._var_allprocs_abs2idx[type_][abs_name]
+        idx = system._var_allprocs_abs2idx['nonlinear'][type_][abs_name]
 
         ind1 = np.sum(sizes[iproc, :idx])
         ind2 = np.sum(sizes[iproc, :idx + 1])

@@ -530,9 +530,9 @@ class TestProblem(unittest.TestCase):
 
         indep1_ins = set(['C3.b', 'C3.c', 'C8.b', 'G1.C1.a', 'G2.C5.a', 'G2.C5.b'])
         indep1_outs = set(['C3.y', 'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'])
-        indep1_sys = set(['C3', 'C8', 'G1.C1', 'G2.C5', 'indep1'])
+        indep1_sys = set(['C3', 'C8', 'G1.C1', 'G2.C5', 'indep1', 'G1', 'G2'])
 
-        dct, systems = relevant['indep1.x']['C8.y']
+        dct, systems = relevant['C8.y']['indep1.x']
         inputs = dct['input']
         outputs = dct['output']
 
@@ -550,9 +550,9 @@ class TestProblem(unittest.TestCase):
 
         indep2_ins = set(['C8.a', 'G2.C6.a', 'G2.C7.b'])
         indep2_outs = set(['C8.y', 'G2.C6.y', 'G2.C7.x', 'indep2.x'])
-        indep2_sys = set(['C8', 'G2.C6', 'G2.C7', 'indep2'])
+        indep2_sys = set(['C8', 'G2.C6', 'G2.C7', 'indep2', 'G2'])
 
-        dct, systems = relevant['indep2.x']['C8.y']
+        dct, systems = relevant['C8.y']['indep2.x']
         inputs = dct['input']
         outputs = dct['output']
 

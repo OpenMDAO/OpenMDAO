@@ -233,6 +233,8 @@ class System(object):
     _vois : dict
         Either design vars or responses metadata, depending on the direction of
         derivatives.
+    _mode : str
+        Indicates derivative direction for the model, either 'fwd' or 'rev'.
     """
 
     def __init__(self, **kwargs):
@@ -257,8 +259,6 @@ class System(object):
         self._subsystems_myproc = []
         self._subsystems_myproc_inds = []
         self._subsystems_proc_range = []
-        self._subsystems_var_range = {'input': [], 'output': []}
-        self._subsystems_var_range_byset = None
 
         self._num_var = {'input': 0, 'output': 0}
         self._num_var_byset = None
@@ -275,8 +275,8 @@ class System(object):
         self._var_allprocs_abs2idx = {'input': {}, 'output': {}}
         self._var_allprocs_abs2idx_byset = None
 
-        self._var_sizes = defaultdict(lambda: {'input': None, 'output': None})
-        self._var_sizes_byset = defaultdict(lambda: {'input': {}, 'output': {}})
+        self._var_sizes = None
+        self._var_sizes_byset = None
 
         self._manual_connections = {}
         self._conn_global_abs_in2out = {}
@@ -339,6 +339,7 @@ class System(object):
         self._relevant = None
         self._vec_names = None
         self._vois = None
+        self._mode = None
 
         self._scope_cache = {}
 
@@ -460,7 +461,7 @@ class System(object):
             set2iset = {}
             for type_ in ['input', 'output']:
                 set2iset[type_] = {}
-                for iset, set_name in enumerate(self._num_var_byset[type_]):
+                for iset, set_name in enumerate(self._num_var_byset['nonlinear'][type_]):
                     set2iset[type_][set_name] = iset
 
             return set2iset
@@ -486,20 +487,25 @@ class System(object):
             Same as above, but by var_set name.
         """
         if not initial:
-            return (
-                self._ext_num_vars, self._ext_num_vars_byset,
-                self._ext_sizes, self._ext_sizes_byset)
+            return (self._ext_num_vars, self._ext_num_vars_byset,
+                    self._ext_sizes, self._ext_sizes_byset)
         else:
-            ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
-            ext_sizes = {'input': (0, 0), 'output': (0, 0)}
-            ext_num_vars_byset = {
-                'input': {set_name: (0, 0) for set_name in self._var_set2iset['input']},
-                'output': {set_name: (0, 0) for set_name in self._var_set2iset['output']}
-            }
-            ext_sizes_byset = {
-                'input': {set_name: (0, 0) for set_name in self._var_set2iset['input']},
-                'output': {set_name: (0, 0) for set_name in self._var_set2iset['output']}
-            }
+            ext_num_vars = {}
+            ext_sizes = {}
+            ext_num_vars_byset = {}
+            ext_sizes_byset = {}
+
+            for vec_name in self._vec_names:
+                ext_num_vars[vec_name] = {}
+                ext_num_vars_byset[vec_name] = {}
+                ext_sizes[vec_name] = {}
+                ext_sizes_byset[vec_name] = {}
+                for type_ in ['input', 'output']:
+                    ext_num_vars[vec_name][type_] = (0, 0)
+                    ext_sizes[vec_name][type_] = (0, 0)
+                    ext_num_vars_byset[vec_name][type_] = {set_name: (0, 0) for set_name in self._var_set2iset[type_]}
+                    ext_sizes_byset[vec_name][type_] = {set_name: (0, 0) for set_name in self._var_set2iset[type_]}
+
             return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
     def _get_root_vectors(self, vector_class, initial, force_alloc_complex=False):
@@ -532,7 +538,7 @@ class System(object):
             vec_names = self._vec_names
             vois = self._vois
             iproc = self.comm.rank
-            abs2idx = self._var_allprocs_abs2idx['output']
+            abs2idx = self._var_allprocs_abs2idx
 
             # Check for complex step to set vectors up appropriately.
             # If any subsystem needs complex step, then we need to allocate it everywhere.
@@ -557,7 +563,7 @@ class System(object):
                             if 'size' in voi:
                                 ncol = voi['size']
                             else:
-                                ncol = sizes[iproc, abs2idx[vec_name]]
+                                ncol = sizes[iproc, abs2idx[vec_name]['output'][vec_name]]
                         rdict = relevant[vec_name]
                         if '@all' in rdict:
                             dct, _ = relevant[vec_name]['@all']
@@ -702,12 +708,12 @@ class System(object):
         # and no recursion is necessary.
         self._setup_var_data(recurse=recurse)
         self._setup_vec_names(mode, self._vec_names, self._vois)
-        self._setup_vars(recurse=recurse)
-        self._setup_var_index_ranges(self._get_initial_var_indices(initial), recurse=recurse)
         self._setup_global_connections(recurse=recurse)
         if initial:
             self._relevant = None
-        self._setup_relevance(mode, self._relevant, self._vec_names, self._vois)
+        self._setup_relevance(mode, self._relevant)
+        self._setup_vars(recurse=recurse)
+        self._setup_var_index_ranges(self._get_initial_var_indices(initial), recurse=recurse)
         self._setup_var_index_maps(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
@@ -827,9 +833,8 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._num_var = {'input': 0, 'output': 0}
-        self._num_var_byset = defaultdict(lambda: {'input': defaultdict(int),
-                                                   'output': defaultdict(int)})
+        self._num_var = {}
+        self._num_var_byset = {}
 
     def _setup_var_index_ranges(self, set2iset, recurse=True):
         """
@@ -843,15 +848,6 @@ class System(object):
             Whether to call this method in subsystems.
         """
         self._var_set2iset = set2iset
-        self._subsystems_var_range = {'input': [], 'output': []}
-        self._subsystems_var_range_byset = defaultdict(lambda: {'input': defaultdict(int),
-                                                                'output': defaultdict(int)})
-        # for vec_name in self._vec_names:
-        #     num_var_byset = self._num_var_byset[vec_name]
-        #     for type_ in ['input', 'output']:
-        #         for set_name in self._var_set2iset[type_]:
-        #             if set_name not in num_var_byset[type_]:
-        #                 num_var_byset[type_][set_name] = 0
 
     def _setup_var_data(self, recurse=True):
         """
@@ -864,7 +860,7 @@ class System(object):
         """
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
-        self._var_allprocs_prom2abs_list = {'input': defaultdict(list), 'output': defaultdict(list)}
+        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_abs2meta = {'input': {}, 'output': {}}
@@ -878,22 +874,22 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._var_allprocs_abs2idx = allprocs_abs2idx = {'input': {}, 'output': {}}
-        abs2idx_byset = defaultdict(lambda: {'input': {}, 'output': {}})
-        self._var_allprocs_abs2idx_byset = abs2idx_byset
+        self._var_allprocs_abs2idx = abs2idx = {}
+        self._var_allprocs_abs2idx_byset = abs2idx_byset = {}
 
-        for type_ in ['input', 'output']:
-            abs2idx_t = allprocs_abs2idx[type_]
-            abs2meta_t = self._var_allprocs_abs2meta[type_]
+        for vec_name in self._vec_names:
+            abs2idx[vec_name] = {'input': {}, 'output': {}}
+            abs2idx_byset[vec_name] = {'input': {}, 'output': {}}
+            for type_ in ['input', 'output']:
+                counter = defaultdict(int)
+                abs2idx_t = abs2idx[vec_name][type_]
+                abs2idx_byset_t = abs2idx_byset[vec_name][type_]
+                abs2meta_t = self._var_allprocs_abs2meta[type_]
 
-            counters = defaultdict(lambda: defaultdict(int))
-            for i, abs_name in enumerate(self._var_allprocs_abs_names[type_]):
-                abs2idx_t[abs_name] = i
-                set_name = abs2meta_t[abs_name]['var_set']
-
-                for vec_name in self._vec_names:
-                    counter = counters[vec_name]
-                    abs2idx_byset[vec_name][type_][abs_name] = counter[set_name]
+                for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
+                    abs2idx_t[abs_name] = i
+                    set_name = abs2meta_t[abs_name]['var_set']
+                    abs2idx_byset_t[abs_name] = counter[set_name]
                     counter[set_name] += 1
 
         # Recursion
@@ -910,8 +906,8 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._var_sizes = defaultdict(lambda: {'input': None, 'output': None})
-        self._var_sizes_byset = defaultdict(lambda: {'input': {}, 'output': {}})
+        self._var_sizes = {}
+        self._var_sizes_byset = {}
 
     def _setup_global_shapes(self):
         """
@@ -1003,6 +999,9 @@ class System(object):
 
         self._vec_names = vec_names
 
+        for s in self.system_iter():
+            s._vec_names = vec_names
+
     def _setup_relevance(self, mode, relevant=None):
         """
         Set up the relevance dictionary.
@@ -1017,9 +1016,24 @@ class System(object):
 
         """
         if relevant is None:  # should only occur at top level on full setup
-            self._relevant = {}
+            self._relevant = relevant = {}
         else:
             self._relevant = relevant
+
+        self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
+        # in 'linear' all vars are relevant
+        self._var_allprocs_relevant_names['linear']['input'] = self._var_allprocs_abs_names['input']
+        self._var_allprocs_relevant_names['linear']['output'] = self._var_allprocs_abs_names['output']
+        self._var_allprocs_relevant_names['nonlinear'] = self._var_allprocs_relevant_names['linear']
+
+        self._rel_vec_names = set(['linear'])
+        for vec_name in self._vec_names[2:]:
+            rel, relsys = relevant[vec_name]['@all']
+            if self.pathname in relsys:
+                self._rel_vec_names.add(vec_name)
+            for type_ in ('input', 'output'):
+                self._var_allprocs_relevant_names[vec_name][type_].extend(v for v in
+                    self._var_allprocs_abs_names[type_] if v in rel[type_])
 
     def _setup_connections(self, recurse=True):
         """
@@ -1161,9 +1175,13 @@ class System(object):
 
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
         abs2meta_in = self._var_abs2meta['input']
+        abs2meta_out = self._var_abs2meta['output']
 
         for vec_name in self._vectors['output']:
             vector_class = root_vectors['residual', 'phys0'][vec_name].__class__
+            relvars, relsys = self._relevant[vec_name]['@all']
+            if self.pathname not in relsys:
+                continue
 
             for key in vecs:
                 vecs[key][vec_name] = vector_class(
@@ -1179,7 +1197,8 @@ class System(object):
                     if '1' in key[1]:
                         vecs[key][vec_name].set_const(1.)
 
-            for abs_name, meta in iteritems(self._var_abs2meta['output']):
+            for abs_name in self._var_allprocs_relevant_names[vec_name]['output']:
+                meta = abs2meta_out[abs_name]
                 shape = meta['shape']
                 ref = meta['ref']
                 ref0 = meta['ref0']
@@ -1204,7 +1223,7 @@ class System(object):
                 vecs['residual', 'norm1'][vec_name]._views[abs_name][:] = 1.0 / res_ref
 
             for abs_in, abs_out in iteritems(self._conn_abs_in2out):
-                if abs_in not in abs2meta_in:
+                if abs_in not in abs2meta_in or abs_in not in relvars:
                     continue
 
                 meta_out = allprocs_abs2meta_out[abs_out]
@@ -1567,7 +1586,7 @@ class System(object):
                 if abs_in in self._conn_global_abs_in2out:
                     abs_out = self._conn_global_abs_in2out[abs_in]
 
-                    if abs_out not in excl_sub._var_allprocs_abs2idx['output']:
+                    if abs_out not in excl_sub._var_allprocs_abs2idx['linear']['output']:
                         scope_in.add(abs_in)
 
         self._scope_cache[excl_sub] = (scope_out, scope_in)
@@ -2342,7 +2361,7 @@ class System(object):
         if get_sizes:
             # Size them all
             sizes = self._var_sizes['nonlinear']['output']
-            abs2idx = self._var_allprocs_abs2idx['output']
+            abs2idx = self._var_allprocs_abs2idx['nonlinear']['output']
             for name in out:
                 if 'size' not in out[name]:
                     out[name]['size'] = sizes[iproc, abs2idx[name]]
@@ -2393,7 +2412,7 @@ class System(object):
         if get_sizes:
             # Size them all
             sizes = self._var_sizes['nonlinear']['output']
-            abs2idx = self._var_allprocs_abs2idx['output']
+            abs2idx = self._var_allprocs_abs2idx['nonlinear']['output']
             for name in out:
                 if 'size' not in out[name]:
                     out[name]['size'] = sizes[iproc, abs2idx[name]]

@@ -998,17 +998,17 @@ class Problem(object):
     def _get_voi_info(self, voi_lists, inp2rhs_name, input_vec, output_vec, input_vois):
         voi_info = {}
         model = self.model
-        sizes = model._var_sizes['nonlinear']['output']
         nproc = self.comm.size
         iproc = model.comm.rank
 
         for rhs_name, vois in iteritems(voi_lists):
             for input_name, old_input_name in vois:
                 vecname = inp2rhs_name[input_name]
+                sizes = model._var_sizes[vecname]['output']
                 dinputs = input_vec[vecname]
                 doutputs = output_vec[vecname]
 
-                in_var_idx = model._var_allprocs_abs2idx['output'][input_name]
+                in_var_idx = model._var_allprocs_abs2idx[vecname]['output'][input_name]
                 in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
                 start = np.sum(sizes[:iproc, in_var_idx])
                 end = np.sum(sizes[:iproc + 1, in_var_idx])
@@ -1096,7 +1096,7 @@ class Problem(object):
                     if 'indices' in out_voi_meta:
                         out_idxs = out_voi_meta['indices']
 
-                if not test_mode and input_name not in model._relevant[output_name]:
+                if not test_mode and output_name not in model._relevant[input_name]:
                     # irrelevant output, just give zeros
                     if out_idxs is None:
                         out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
@@ -1400,7 +1400,7 @@ class Problem(object):
                         if not test_mode and input_name not in relevant[output_name]:
                             # irrelevant output, just give zeros
                             if out_idxs is None:
-                                out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
+                                out_var_idx = model._var_allprocs_abs2idx[inp2rhs_name[input_name]]['output'][output_name]
                                 deriv_val = np.zeros(sizes[iproc, out_var_idx])
                             else:
                                 deriv_val = np.zeros(len(out_idxs))

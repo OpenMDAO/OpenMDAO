@@ -8,7 +8,7 @@ from itertools import product
 from six import string_types, iteritems, itervalues
 from scipy.sparse import issparse
 from copy import deepcopy
-from collections import OrderedDict, Iterable, defaultdict
+from collections import OrderedDict, Iterable
 
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -100,20 +100,24 @@ class Component(System):
         super(Component, self)._setup_vars()
         num_var = self._num_var
         num_var_byset = self._num_var_byset
+        data = self._var_rel2data_io
 
-        # Compute num_var
-        for type_ in ['input', 'output']:
-            num_var[type_] = len(self._var_rel_names[type_])
+        for vec_name in self._vec_names[1:]:
+            num_var[vec_name] = {}
+            num_var_byset[vec_name] = {}
+            # Compute num_var
+            for type_ in ['input', 'output']:
+                num_var[vec_name][type_] = len(self._var_allprocs_relevant_names[vec_name][type_])
 
-        # Compute num_var_byset
-        for data in itervalues(self._var_rel2data_io):
-            type_ = data['type']
-            metadata = data['metadata']
-            set_name = metadata['var_set']
-            if set_name in num_var_byset[type_]:
-                num_var_byset[type_][set_name] += 1
-            else:
-                num_var_byset[type_][set_name] = 1
+                num_var_byset[vec_name][type_] = vbyset = {}
+                # Compute num_var_byset
+                for name in self._var_allprocs_relevant_names[vec_name][type_]:
+                    set_name = data[name.rsplit('.', 1)[-1]]['metadata']['var_set']
+                    if set_name not in vbyset:
+                        vbyset[set_name] = 0
+                    vbyset[set_name] += 1
+
+        num_var['nonlinear'] = num_var['linear']
 
     def _setup_var_data(self, recurse=True):
         """
@@ -179,54 +183,46 @@ class Component(System):
         iproc = self.comm.rank
         nproc = self.comm.size
         relevant = self._relevant
-        vec_names = self._vec_names
+        vec_names = self._vec_names[1:]  # only loop over linear vecs
 
-        set2iset = self._var_set2iset
+        sizes = self._var_sizes
+        sizes_byset = self._var_sizes_byset
 
         # Initialize empty arrays
-        for vec_name in vec_names[1:]:
-            sizes = self._var_sizes[vec_name]
-            sizes_byset = self._var_sizes_byset[vec_name]
+        for vec_name in vec_names:
+            sizes[vec_name] = {}
+            sizes_byset[vec_name] = {}
 
             for type_ in ['input', 'output']:
-                sizes[type_] = np.zeros((nproc, self._num_var[type_]), int)
+                sizes[vec_name][type_] = np.zeros((nproc, self._num_var[vec_name][type_]), int)
 
-                sizes_byset[type_] = {}
-                for set_name in set2iset[type_]:
-                    sizes_byset[type_][set_name] = np.zeros(
-                        (nproc, self._num_var_byset[type_][set_name]), int)
+                sizes_byset[vec_name][type_] = {}
+                for set_name, nvars in iteritems(self._num_var_byset[vec_name][type_]):
+                    sizes_byset[vec_name][type_][set_name] = np.zeros((nproc, nvars), int)
 
-        # Compute _var_sizes and _var_sizes_byset
-        for vec_name in vec_names[1:]:
-            sizes = self._var_sizes[vec_name]
-            sizes_byset = self._var_sizes_byset[vec_name]
-            if vec_name in relevant:
-                relvars, _ = relevant[vec_name]['@all']
-            else:
-                relvars = {'input': ContainsAll(), 'output': ContainsAll()}
-
+            # Compute _var_sizes and _var_sizes_byset
             for type_ in ['input', 'output']:
+                sz = sizes[vec_name][type_]
+                sz_byset = sizes_byset[vec_name][type_]
                 abs2meta_t = self._var_abs2meta[type_]
                 allprocs_abs2idx_byset_t = self._var_allprocs_abs2idx_byset[vec_name][type_]
-                for idx, abs_name in enumerate(self._var_abs_names[type_]):
-                    if abs_name in relvars[type_]:
-                        meta = abs2meta_t[abs_name]
-                        set_name = meta['var_set']
-                        size = np.prod(meta['shape'])
-                        idx_byset = allprocs_abs2idx_byset_t[abs_name]
+                for idx, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
+                    meta = abs2meta_t[abs_name]
+                    set_name = meta['var_set']
+                    size = np.prod(meta['shape'])
+                    idx_byset = allprocs_abs2idx_byset_t[abs_name]
 
-                        sizes[type_][iproc, idx] = size
-                        sizes_byset[type_][set_name][iproc, idx_byset] = size
+                    sz[iproc, idx] = size
+                    sz_byset[set_name][iproc, idx_byset] = size
 
         if self.comm.size > 1:
-            for vec_name in vec_names[1:]:
+            for vec_name in vec_names:
                 sizes = self._var_sizes[vec_name]
                 sizes_byset = self._var_sizes_byset[vec_name]
                 for type_ in ['input', 'output']:
                     self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
-                    for set_name in self._var_set2iset[type_]:
-                        self.comm.Allgather(
-                            sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
+                    for set_name, sbyset in iteritems(sizes_byset[type_]):
+                        self.comm.Allgather(sbyset[iproc, :], sbyset)
 
         self._var_sizes['nonlinear'] = self._var_sizes['linear']
         self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']

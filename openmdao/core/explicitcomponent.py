@@ -287,15 +287,16 @@ class ExplicitComponent(Component):
         """
         with Recording(self.pathname + '._solve_linear', self.iter_count, self):
             for vec_name in vec_names:
-                d_outputs = self._vectors['output'][vec_name]
-                d_residuals = self._vectors['residual'][vec_name]
-
-                with self._unscaled_context(
-                        outputs=[d_outputs], residuals=[d_residuals]):
-                    if mode == 'fwd':
-                        d_outputs.set_vec(d_residuals)
-                    elif mode == 'rev':
-                        d_residuals.set_vec(d_outputs)
+                if self.pathname in self._relevant[vec_name]['@all'][1]:
+                    d_outputs = self._vectors['output'][vec_name]
+                    d_residuals = self._vectors['residual'][vec_name]
+    
+                    with self._unscaled_context(
+                            outputs=[d_outputs], residuals=[d_residuals]):
+                        if mode == 'fwd':
+                            d_outputs.set_vec(d_residuals)
+                        elif mode == 'rev':
+                            d_residuals.set_vec(d_outputs)
         return False, 0., 0.
 
     def _linearize(self, do_nl=False, do_ln=False):

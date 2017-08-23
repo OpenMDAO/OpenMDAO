@@ -280,3 +280,20 @@ class ContainsAll(object):
         Always return True.
         """
         return True
+
+
+def all_ancestors(pathname, delim='.'):
+    """
+    Return a generator of pathnames of the starting object and all of its parents.
+
+    Parameters
+    ----------
+    pathname : str
+        Pathname of starting object.
+    delim : str
+        Delimiter used to split the name
+    """
+    parts = pathname.split(delim)
+    yield parts[0]
+    for i in range(2, len(parts) + 1):
+        yield delim.join(parts[:i])
