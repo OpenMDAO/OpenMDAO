@@ -290,7 +290,7 @@ class ExplicitComponent(Component):
                 if self.pathname in self._relevant[vec_name]['@all'][1]:
                     d_outputs = self._vectors['output'][vec_name]
                     d_residuals = self._vectors['residual'][vec_name]
-    
+
                     with self._unscaled_context(
                             outputs=[d_outputs], residuals=[d_residuals]):
                         if mode == 'fwd':

@@ -118,6 +118,7 @@ class Component(System):
                     vbyset[set_name] += 1
 
         num_var['nonlinear'] = num_var['linear']
+        num_var_byset['nonlinear'] = num_var_byset['linear']
 
     def _setup_var_data(self, recurse=True):
         """

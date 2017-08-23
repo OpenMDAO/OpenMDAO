@@ -15,8 +15,8 @@ import numpy as np
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
-from openmdao.utils.general_utils import \
-    determine_adder_scaler, format_as_float_or_array, warn_deprecation
+from openmdao.utils.general_utils import determine_adder_scaler, \
+    format_as_float_or_array, warn_deprecation, ContainsAll
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -1017,6 +1017,10 @@ class System(object):
         """
         if relevant is None:  # should only occur at top level on full setup
             self._relevant = relevant = {}
+            relevant['nonlinear'] = {'@all': ({'input': ContainsAll(),
+                                               'output': ContainsAll()},
+                                               ContainsAll())}
+            relevant['linear'] = relevant['nonlinear']
         else:
             self._relevant = relevant
 
@@ -1094,6 +1098,9 @@ class System(object):
             raise RuntimeError(msg)
 
         for vec_name in root_vectors['output']:
+            _, relsys = self._relevant[vec_name]['@all']
+            if self.pathname not in relsys:
+                continue
             vector_class = root_vectors['output'][vec_name].__class__
 
             for key in ['input', 'output', 'residual']:
@@ -1223,7 +1230,7 @@ class System(object):
                 vecs['residual', 'norm1'][vec_name]._views[abs_name][:] = 1.0 / res_ref
 
             for abs_in, abs_out in iteritems(self._conn_abs_in2out):
-                if abs_in not in abs2meta_in or abs_in not in relvars:
+                if abs_in not in abs2meta_in or abs_in not in relvars['input']:
                     continue
 
                 meta_out = allprocs_abs2meta_out[abs_out]

@@ -207,12 +207,12 @@ class DefaultVector(Vector):
         root_vec = self._root_vector
 
         offset = system._ext_sizes[self._name][type_][0]
-        sizes_byset = system._var_sizes_byset[self._name]
+        sizes_byset = system._var_sizes_byset[self._name][type_]
 
         data = {}
         imag_data = {}
         indices = {}
-        for set_name, sizes in iteritems(system._var_sizes_byset[self._name][type_]):
+        for set_name, sizes in iteritems(sizes_byset):
             ind_byset1 = system._ext_sizes_byset[self._name][type_][set_name][0]
             ind_byset2 = ind_byset1 + np.sum(sizes[iproc, :])
 

@@ -183,12 +183,16 @@ class Group(System):
         for vec_name in self._vec_names[1:]:
             num_var[vec_name] = {}
             num_var_byset[vec_name] = {}
+            relvars, relsys = self._relevant[vec_name]['@all']
             for type_ in ['input', 'output']:
                 num_var[vec_name][type_] = np.sum(
-                    [subsys._num_var[vec_name][type_] for subsys in self._subsystems_myproc])
+                    [subsys._num_var[vec_name][type_] for subsys in self._subsystems_myproc
+                     if subsys.pathname in relsys])
 
                 num_var_byset[vec_name][type_] = vbyset = {}
                 for subsys in self._subsystems_myproc:
+                    if subsys.pathname not in relsys:
+                        continue
                     for set_name, num in iteritems(subsys._num_var_byset[vec_name][type_]):
                         if set_name not in vbyset:
                             vbyset[set_name] = 0
@@ -245,6 +249,8 @@ class Group(System):
 
         # First compute these on one processor for each subsystem
         for vec_name in self._vec_names[1:]:
+            relvars, relsys = self._relevant[vec_name]['@all']
+
             # Here, we count the number of variables (total and by varset) in each subsystem.
             # We do this so that we can compute the offset when we recurse into each subsystem.
             allprocs_counters = {
@@ -255,7 +261,7 @@ class Group(System):
 
             for type_ in ['input', 'output']:
                 for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
-                    if subsys.comm.rank == 0:
+                    if subsys.comm.rank == 0 and subsys.pathname in relsys:
                         allprocs_counters[type_][isub] = subsys._num_var[vec_name][type_]
                         for set_name in subsys._num_var_byset[vec_name][type_]:
                             iset = set2iset[type_][set_name]
@@ -283,19 +289,21 @@ class Group(System):
             subsystems_var_range_byset[vec_name] = {}
 
             for type_ in ['input', 'output']:
-                subsystems_var_range[vec_name][type_] = []
+                subsystems_var_range[vec_name][type_] = {}
                 subsystems_var_range_byset[vec_name][type_] = {
-                    set_name: [] for set_name in set2iset[type_]
+                    set_name: {} for set_name in set2iset[type_]
                 }
 
-                for isub in self._subsystems_myproc_inds:
-                    subsystems_var_range[vec_name][type_].append((
+                for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
+                    if subsys.pathname not in relsys:
+                        continue
+                    subsystems_var_range[vec_name][type_][subsys.name] = (
                         np.sum(allprocs_counters[type_][:isub]),
-                        np.sum(allprocs_counters[type_][:isub + 1])))
+                        np.sum(allprocs_counters[type_][:isub + 1]))
                     for set_name, rng in iteritems(subsystems_var_range_byset[vec_name][type_]):
                         iset = set2iset[type_][set_name]
-                        rng.append((np.sum(allprocs_counters_byset[type_][:isub, iset]),
-                                    np.sum(allprocs_counters_byset[type_][:isub + 1, iset])))
+                        rng[subsys.name] = (np.sum(allprocs_counters_byset[type_][:isub, iset]),
+                                    np.sum(allprocs_counters_byset[type_][:isub + 1, iset]))
 
         subsystems_var_range['nonlinear'] = subsystems_var_range['linear']
         subsystems_var_range_byset['nonlinear'] = subsystems_var_range_byset['linear']
@@ -415,6 +423,7 @@ class Group(System):
 
         # Compute _var_sizes
         for vec_name in self._vec_names[1:]:
+            relvar, relsys = self._relevant[vec_name]['@all']
             sizes[vec_name] = {}
             sizes_byset[vec_name] = {}
             subsystems_var_range = self._subsystems_var_range[vec_name]
@@ -428,14 +437,14 @@ class Group(System):
                     sizes_byset[vec_name][type_][set_name] = np.zeros((nproc, nvars), int)
 
                 for ind, subsys in enumerate(self._subsystems_myproc):
-                    if vec_name not in subsys._rel_vec_names:
+                    if subsys.pathname not in relsys:
                         continue
                     proc_slice = slice(*subsystems_proc_range[ind])
-                    var_slice = slice(*subsystems_var_range[type_][ind])
+                    var_slice = slice(*subsystems_var_range[type_][subsys.name])
                     sizes[vec_name][type_][proc_slice, var_slice] = subsys._var_sizes[vec_name][type_]
 
                     for set_name, subsizes in iteritems(subsys._var_sizes_byset[vec_name][type_]):
-                        var_slice = slice(*subsystems_var_range_byset[type_][set_name][ind])
+                        var_slice = slice(*subsystems_var_range_byset[type_][set_name][subsys.name])
                         sizes_byset[vec_name][type_][set_name][proc_slice, var_slice] = subsizes
 
         # If parallel, all gather
@@ -798,13 +807,16 @@ class Group(System):
 
         iproc = self.comm.rank
 
-        for ind, subsys in enumerate(self._subsystems_myproc):
+        for subsys in self._subsystems_myproc:
             sub_ext_num_vars = {}
             sub_ext_sizes = {}
             sub_ext_num_vars_byset = {}
             sub_ext_sizes_byset = {}
 
             for vec_name in self._vec_names:
+                relvar, relsys = self._relevant[vec_name]['@all']
+                if subsys.pathname not in relsys:
+                    continue
                 subsystems_var_range = self._subsystems_var_range[vec_name]
                 subsystems_var_range_byset = self._subsystems_var_range_byset[vec_name]
                 sizes = self._var_sizes[vec_name]
@@ -817,7 +829,7 @@ class Group(System):
 
                 for type_ in ['input', 'output']:
                     num = self._num_var[vec_name][type_]
-                    idx1, idx2 = subsystems_var_range[type_][ind]
+                    idx1, idx2 = subsystems_var_range[type_][subsys.name]
                     size1 = np.sum(sizes[type_][iproc, :idx1])
                     size2 = np.sum(sizes[type_][iproc, idx2:])
 
@@ -833,7 +845,7 @@ class Group(System):
                     sub_ext_sizes_byset[vec_name][type_] = {}
                     sub_ext_num_vars_byset[vec_name][type_] = {}
                     for set_name, num in iteritems(self._num_var_byset[vec_name][type_]):
-                        idx1, idx2 = subsystems_var_range_byset[type_][set_name][ind]
+                        idx1, idx2 = subsystems_var_range_byset[type_][set_name][subsys.name]
                         size1 = np.sum(sizes_byset[type_][set_name][iproc, :idx1])
                         size2 = np.sum(sizes_byset[type_][set_name][iproc, idx2:])
 
@@ -919,7 +931,7 @@ class Group(System):
             for abs_in, abs_out in iteritems(self._conn_abs_in2out):
 
                 # Only continue if the input exists on this processor
-                if abs_in in abs2meta_in and abs_in in relvars:
+                if abs_in in abs2meta_in and abs_in in relvars['input']:
 
                     # Get meta
                     meta_in = abs2meta_in[abs_in]

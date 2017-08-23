@@ -192,7 +192,7 @@ class DecoupledTestCase(unittest.TestCase):
         prob.model.add_constraint('c4.y', upper=0.0)
 
         prob.setup(vector_class=vector_class, check=False, mode='fwd')
-        prob.run_driver()
+        prob.run_model()
 
         J = prob.compute_total_derivs(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
                                       return_format='flat_dict')

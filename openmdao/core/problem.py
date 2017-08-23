@@ -1099,7 +1099,7 @@ class Problem(object):
                 if not test_mode and output_name not in model._relevant[input_name]:
                     # irrelevant output, just give zeros
                     if out_idxs is None:
-                        out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
+                        out_var_idx = model._var_allprocs_abs2idx['linear']['output'][output_name]
                         if ncol > 1:
                             deriv_val = np.zeros((sizes[iproc, out_var_idx], ncol))
                         else:
@@ -1397,10 +1397,10 @@ class Problem(object):
                             if 'indices' in out_voi_meta:
                                 out_idxs = out_voi_meta['indices']
 
-                        if not test_mode and input_name not in relevant[output_name]:
+                        if not test_mode and output_name not in relevant[input_name]:
                             # irrelevant output, just give zeros
                             if out_idxs is None:
-                                out_var_idx = model._var_allprocs_abs2idx[inp2rhs_name[input_name]]['output'][output_name]
+                                out_var_idx = model._var_allprocs_abs2idx['linear']['output'][output_name]
                                 deriv_val = np.zeros(sizes[iproc, out_var_idx])
                             else:
                                 deriv_val = np.zeros(len(out_idxs))
