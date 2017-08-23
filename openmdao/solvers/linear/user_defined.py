@@ -13,7 +13,7 @@ class LinearUserDefined(LinearSolver):
 
     SOLVER = 'LN: USER'
 
-    def __init__(self, solve_function, **kwargs):
+    def __init__(self, solve_function=None, **kwargs):
         """
         Initialize all attributes.
 
@@ -55,6 +55,9 @@ class LinearUserDefined(LinearSolver):
 
         system = self._system
         solve = self.solve_function
+
+        if solve is None:
+            solve = system.solve_linear
 
         for vec_name in self._vec_names:
             self._vec_name = vec_name

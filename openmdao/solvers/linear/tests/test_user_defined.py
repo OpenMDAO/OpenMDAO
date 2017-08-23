@@ -172,5 +172,27 @@ class TestUserDefinedSolver(unittest.TestCase):
         p.run_model()
         jac = p.compute_total_derivs(of=['out_var'], wrt=['a'], return_format='dict')
 
+    def test_method_default(self):
+        # Uses `solve_linear` by default
+        p = Problem()
+
+        p.model.add_subsystem('des_vars', IndepVarComp('a', val=10., units='m'), promotes=['*'])
+
+        p.model.add_subsystem('icomp', DistribStateImplicit(), promotes=['*'])
+
+        model = p.model
+
+        model.linear_solver = PetscKSP()
+        model.linear_solver.precon = LinearRunOnce()
+
+        p.setup(vector_class=PETScVector, mode='rev', check=False)
+
+        model.icomp.linear_solver.precon = LinearUserDefined()
+
+        p.run_model()
+        jac = p.compute_total_derivs(of=['out_var'], wrt=['a'], return_format='dict')
+
+        assert_rel_error(self, 15.0, jac['out_var']['a'][0][0])
+
 if __name__ == "__main__":
     unittest.main()
