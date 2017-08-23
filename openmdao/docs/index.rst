@@ -88,6 +88,7 @@ Solvers (nonlinear and linear)
    features/solvers/scipy_iter_solver
    features/solvers/petsc_ksp
    features/solvers/linear_block_jac
+   features/solvers/linear_user_defined
    features/solvers/linesearch_backtracking
 
 Drivers

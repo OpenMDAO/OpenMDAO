@@ -194,5 +194,127 @@ class TestUserDefinedSolver(unittest.TestCase):
 
         assert_rel_error(self, 15.0, jac['out_var']['a'][0][0])
 
+    def test_feature(self):
+
+        class CustomSolveImplicit(ImplicitComponent):
+
+            def setup(self):
+
+                self.add_input('a', val=10., units='m')
+
+                rank = self.comm.rank
+                GLOBAL_SIZE = 15
+                sizes, offsets = evenly_distrib_idxs(self.comm.size, GLOBAL_SIZE)
+
+                self.add_output('states', shape=int(sizes[rank]))
+
+                self.add_output('out_var', shape=1)
+                self.local_size = sizes[rank]
+
+                self.linear_solver = PetscKSP()
+                self.linear_solver.precon = LinearUserDefined(solve_function=self.mysolve)
+
+            def get_req_procs(self):
+                return 1,10
+
+            def solve_nonlinear(self, i, o):
+                o['states'] = i['a']
+
+                local_sum = np.zeros(1)
+                local_sum[0] = np.sum(o['states'])
+                tmp = np.zeros(1)
+
+                o['out_var'] = tmp[0]
+
+            def apply_nonlinear(self, i, o, r):
+                r['states'] = o['states'] - i['a']
+
+                local_sum = np.zeros(1)
+                local_sum[0] = np.sum(o['states'])
+                global_sum = np.zeros(1)
+
+                r['out_var'] = o['out_var'] - tmp[0]
+
+            def apply_linear(self, i, o, d_i, d_o, d_r, mode):
+                if mode == 'fwd':
+                    if 'states' in d_o:
+                        d_r['states'] += d_o['states']
+
+                        local_sum = np.array([np.sum(d_o['states'])])
+                        global_sum = np.zeros(1)
+                        self.comm.Allreduce(local_sum, global_sum, op=MPI.SUM)
+                        d_r['out_var'] -= global_sum
+
+                    if 'out_var' in d_o:
+                            d_r['out_var'] += d_o['out_var']
+
+                    if 'a' in d_i:
+                            d_r['states'] -= d_i['a']
+
+                elif mode == 'rev':
+                    if 'states' in d_o:
+                        d_o['states'] += d_r['states']
+
+                        tmp = np.zeros(1)
+                        if self.comm.rank == 0:
+                            tmp[0] = d_r['out_var'].copy()
+                        self.comm.Bcast(tmp, root=0)
+
+                        d_o['states'] -= tmp
+
+                    if 'out_var' in d_o:
+                        d_o['out_var'] += d_r['out_var']
+
+                    if 'a' in d_i:
+                            d_i['a'] -= np.sum(d_r['states'])
+
+            def mysolve(self, d_outputs, d_residuals, mode):
+                r"""
+                Apply inverse jac product. The model is assumed to be in an unscaled state.
+
+                If mode is:
+                    'fwd': d_residuals \|-> d_outputs
+
+                    'rev': d_outputs \|-> d_residuals
+
+                Parameters
+                ----------
+                d_outputs : Vector
+                    unscaled, dimensional quantities read via d_outputs[key]
+                d_residuals : Vector
+                    unscaled, dimensional quantities read via d_residuals[key]
+                mode : str
+                    either 'fwd' or 'rev'
+
+                Returns
+                -------
+                None or bool or (bool, float, float)
+                    The bool is the failure flag; and the two floats are absolute and relative error.
+                """
+                # Note: we are just preconditioning with Identity as a proof of concept.
+                if mode == 'fwd':
+                    d_outputs.set_vec(d_residuals)
+                elif mode == 'rev':
+                    d_residuals.set_vec(d_outputs)
+
+                return False, 0., 0.
+
+        prob = Problem()
+
+
+        prob.model.add_subsystem('des_vars', IndepVarComp('a', val=10., units='m'), promotes=['*'])
+        prob.model.add_subsystem('icomp', CustomSolveImplicit(), promotes=['*'])
+
+        model = prob.model
+
+        model.linear_solver = PetscKSP()
+        model.linear_solver.precon = LinearRunOnce()
+
+        prob.setup(vector_class=PETScVector, mode='rev', check=False)
+        prob.run_model()
+        jac = prob.compute_total_derivs(of=['out_var'], wrt=['a'], return_format='dict')
+
+        assert_rel_error(self, 15.0, jac['out_var']['a'][0][0])
+
 if __name__ == "__main__":
     unittest.main()
