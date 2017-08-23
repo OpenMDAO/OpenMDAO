@@ -187,7 +187,7 @@ class Group(System):
             for type_ in ['input', 'output']:
                 num_var[vec_name][type_] = np.sum(
                     [subsys._num_var[vec_name][type_] for subsys in self._subsystems_myproc
-                     if subsys.pathname in relsys])
+                     if subsys.pathname in relsys], dtype=int)
 
                 num_var_byset[vec_name][type_] = vbyset = {}
                 for subsys in self._subsystems_myproc:
@@ -620,11 +620,15 @@ class Group(System):
             self._relevant = relevant
 
         self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
-
         # in 'linear' all vars are relevant
         self._var_allprocs_relevant_names['linear']['input'] = self._var_allprocs_abs_names['input']
         self._var_allprocs_relevant_names['linear']['output'] = self._var_allprocs_abs_names['output']
         self._var_allprocs_relevant_names['nonlinear'] = self._var_allprocs_relevant_names['linear']
+
+        self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
+        self._var_relevant_names['linear']['input'] = self._var_abs_names['input']
+        self._var_relevant_names['linear']['output'] = self._var_abs_names['output']
+        self._var_relevant_names['nonlinear'] = self._var_relevant_names['linear']
 
         self._rel_vec_names = set(['linear'])
         for vec_name in self._vec_names[2:]:
@@ -634,6 +638,8 @@ class Group(System):
             for type_ in ('input', 'output'):
                 self._var_allprocs_relevant_names[vec_name][type_].extend(v for v in
                     self._var_allprocs_abs_names[type_] if v in rel[type_])
+                self._var_relevant_names[vec_name][type_].extend(v for v in
+                    self._var_abs_names[type_] if v in rel[type_])
 
         for s in self._subsystems_myproc:
             s._setup_relevance(mode, relevant)
@@ -813,7 +819,7 @@ class Group(System):
             sub_ext_num_vars_byset = {}
             sub_ext_sizes_byset = {}
 
-            for vec_name in self._vec_names:
+            for vec_name in self._vec_names[1:]:
                 relvar, relsys = self._relevant[vec_name]['@all']
                 if subsys.pathname not in relsys:
                     continue
@@ -857,6 +863,11 @@ class Group(System):
                             ext_sizes_byset[vec_name][type_][set_name][0] + size1,
                             ext_sizes_byset[vec_name][type_][set_name][1] + size2,
                         )
+
+                sub_ext_num_vars['nonlinear'] = sub_ext_num_vars['linear']
+                sub_ext_sizes['nonlinear'] = sub_ext_sizes['linear']
+                sub_ext_num_vars_byset['nonlinear'] = sub_ext_num_vars_byset['linear']
+                sub_ext_sizes_byset['nonlinear'] = sub_ext_sizes_byset['linear']
 
             subsys._setup_global(
                 sub_ext_num_vars, sub_ext_num_vars_byset,
@@ -1394,21 +1405,24 @@ class Group(System):
                 # Use global Jacobian
                 if self._owns_assembled_jac or self._views_assembled_jac or self._owns_approx_jac:
                     for vec_name in vec_names:
-                        with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
-                            d_inputs, d_outputs, d_residuals = vecs
-                            J._apply(d_inputs, d_outputs, d_residuals, mode)
+                        if self.pathname in self._relevant[vec_name]['@all'][1]:
+                            with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
+                                d_inputs, d_outputs, d_residuals = vecs
+                                J._apply(d_inputs, d_outputs, d_residuals, mode)
                 # Apply recursion
                 else:
                     if mode == 'fwd':
                         for vec_name in vec_names:
-                            self._transfer(vec_name, mode)
+                            if self.pathname in self._relevant[vec_name]['@all'][1]:
+                                self._transfer(vec_name, mode)
 
                     for subsys in self._subsystems_myproc:
                         subsys._apply_linear(vec_names, mode, scope_out, scope_in)
 
                     if mode == 'rev':
                         for vec_name in vec_names:
-                            self._transfer(vec_name, mode)
+                            if self.pathname in self._relevant[vec_name]['@all'][1]:
+                                self._transfer(vec_name, mode)
 
     def _solve_linear(self, vec_names, mode):
         """

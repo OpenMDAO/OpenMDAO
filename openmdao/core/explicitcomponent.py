@@ -227,8 +227,7 @@ class ExplicitComponent(Component):
         """
         with Recording(self.pathname + '._apply_linear', self.iter_count, self):
             for vec_name in vec_names:
-                if vec_name is not 'linear':
-                    if self.pathname not in self._relevant[vec_name]['@all'][1]:
+                if vec_name not in self._rel_vec_names:
                         continue
 
                 with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:

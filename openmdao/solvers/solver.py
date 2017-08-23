@@ -438,7 +438,8 @@ class LinearSolver(Solver):
             b_vecs = system._vectors['output']
 
         for vec_name in self._vec_names:
-            self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
+            if system.pathname in system._relevant[vec_name]['@all'][1]:
+                self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
 
         if self.options['maxiter'] > 1:
             norm = self._iter_get_norm()
@@ -471,9 +472,10 @@ class LinearSolver(Solver):
 
         norm = 0
         for vec_name in self._vec_names:
-            b_vec = b_vecs[vec_name]
-            b_vec -= self._rhs_vecs[vec_name]
-            norm += b_vec.get_norm()**2
+            if vec_name in system._rel_vec_names:
+                b_vec = b_vecs[vec_name]
+                b_vec -= self._rhs_vecs[vec_name]
+                norm += b_vec.get_norm()**2
 
         return norm ** 0.5
 

@@ -1030,6 +1030,11 @@ class System(object):
         self._var_allprocs_relevant_names['linear']['output'] = self._var_allprocs_abs_names['output']
         self._var_allprocs_relevant_names['nonlinear'] = self._var_allprocs_relevant_names['linear']
 
+        self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
+        self._var_relevant_names['linear']['input'] = self._var_abs_names['input']
+        self._var_relevant_names['linear']['output'] = self._var_abs_names['output']
+        self._var_relevant_names['nonlinear'] = self._var_relevant_names['linear']
+
         self._rel_vec_names = set(['linear'])
         for vec_name in self._vec_names[2:]:
             rel, relsys = relevant[vec_name]['@all']
@@ -1038,6 +1043,8 @@ class System(object):
             for type_ in ('input', 'output'):
                 self._var_allprocs_relevant_names[vec_name][type_].extend(v for v in
                     self._var_allprocs_abs_names[type_] if v in rel[type_])
+                self._var_relevant_names[vec_name][type_].extend(v for v in
+                    self._var_abs_names[type_] if v in rel[type_])
 
     def _setup_connections(self, recurse=True):
         """

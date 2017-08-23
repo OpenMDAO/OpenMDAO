@@ -31,7 +31,7 @@ class DictionaryJacobian(Jacobian):
         with self._system._unscaled_context(
                 outputs=[d_outputs], residuals=[d_residuals]):
             ncol = d_residuals._ncol
-            for abs_key in self._iter_abs_keys():
+            for abs_key in self._iter_abs_keys(d_residuals._name):
                 subjac = self._subjacs[abs_key]
 
                 if type(subjac) is np.ndarray or scipy.sparse.issparse(subjac):
