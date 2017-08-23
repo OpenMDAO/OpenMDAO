@@ -1,9 +1,8 @@
-:orphan:
-
 .. _check-total-derivatives:
 
+**************************
 Checking Total Derivatives
-============================
+**************************
 
 If you want to check the analytic derivatives of your model (or just part of it) against finite-difference or complex-step approximations, you can use :code:`check_total_derivatives()`. You should always converge your model
 before calling this method.
@@ -16,7 +15,7 @@ before calling this method.
     :noindex:
 
 Examples
------------
+--------
 
 You can check specific combinations of variables by specifying them manually:
 
@@ -52,7 +51,3 @@ Turn off standard output and just view the derivatives in the return:
 .. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_check_total_derivatives_suppress
 
-
-Related Features
------------------
-check-partial-derivatives, :ref:`Set up Model<setup-and-run>`, :ref:`Run Model<setup-and-run>`

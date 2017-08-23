@@ -1,9 +1,8 @@
-:orphan:
-
 .. _scipyiterativesolver:
 
+********************
 ScipyIterativeSolver
-====================
+********************
 
 The ScipyIterativeSolver is an iterative linear solver that wraps the methods found in `scipy.sparse.linalg`.
 The default method is "GMRES", or the Generalized Minimal RESidual method, though you can give it other

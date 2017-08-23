@@ -1,6 +1,6 @@
-
+*******************************
 Instance-based Memory Profiling
-===============================
+*******************************
 
 The `iprofmem` command can be used to obtain an estimate of the memory usage of method calls on a
 per-instance basis.  For example:

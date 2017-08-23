@@ -1,9 +1,8 @@
-:orphan:
-
 .. _sellar:
 
+****************************************
 Sellar - A Simple Two-Discipline Problem
-========================================
+****************************************
 
 The first discipline is defined by the following equation:
 

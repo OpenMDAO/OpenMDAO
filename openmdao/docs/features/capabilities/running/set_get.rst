@@ -1,9 +1,8 @@
-:orphan:
-
 .. _set-and-get-variables:
 
+***************************************
 Setting and Getting Component Variables
-=========================================
+***************************************
 
 You will both set and get the values in the dimensional and unscaled form via the :ref:`Problem <openmdao.core.problem.py>` class.
 If you have promoted both inputs and outputs to the same name,
@@ -11,7 +10,8 @@ then the output takes precedence and it determines the units you should work in.
 
 
 Outputs and Independent Variables
------------------------------------
+---------------------------------
+
 To set or get the output variable, you reference it by its promoted name.
 In the regular <openmdao.test_suite.components.sellar.py> problem all the variables have been promoted to the top of the model.
 So to get the value of the "y1" output defined in <openmdao.test_suite.components.sellar.SellarDis1withDerivatives> component you would do the following:
@@ -54,7 +54,8 @@ In other words, the shape of the list has to match the shape of the actual data.
 
 
 Residuals
----------------------------
+---------
+
 If you want to look at the residual values associated with any particular output variable, you will reference them using the same naming conventions the outputs.
 Also like outputs, you will be given the residuals in the unscaled dimensional form.
 
@@ -63,7 +64,7 @@ Also like outputs, you will be given the residuals in the unscaled dimensional f
 
 
 Inputs
-------------------------------
+------
 
 .. note::
     99.9% of the time, you don't want to work with input variables.
@@ -75,6 +76,3 @@ To set or get the and input variable, you reference it by its absolute path name
 
 .. embed-test:: openmdao.core.tests.test_problem.TestProblem.test_feature_promoted_sellar_set_get_inputs
 
-Related Features
------------------
-:ref:`Building Components<building-components>`, :ref:`Setup<setup-and-run>`, :ref:`Run Model<setup-and-run>`

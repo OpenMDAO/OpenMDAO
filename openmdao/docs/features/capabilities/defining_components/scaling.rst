@@ -1,9 +1,8 @@
-:orphan:
-
 .. _scale_outputs_and_resids:
 
+*****************
 Scaling variables
-=================
+*****************
 
 As we saw in <Section declaring_variables>, we can specify scaling parameters for outputs and residuals.
 Scaling can be important for the efficiency of some linear solvers and can have an impact on some gradient free

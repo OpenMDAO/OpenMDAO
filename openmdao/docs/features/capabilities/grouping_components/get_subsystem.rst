@@ -1,6 +1,6 @@
-
+***********************************
 Accessing subsystems within a Group
------------------------------------
+***********************************
 
 To access a Component or another Group within a Group, use the get_subsystem
 method.
@@ -11,7 +11,7 @@ method.
 
 
 Usage
-+++++
+-----
 
 The following examples use the same model, defined by the following Group:
 

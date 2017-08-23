@@ -1,17 +1,14 @@
-
+****************************
 Adding Subsystems to a Group
-----------------------------
+****************************
 
 To add a Component or another Group to a Group, use the add_subsystem method.
-
 
 .. automethod:: openmdao.core.group.Group.add_subsystem
     :noindex:
 
-
-
 Usage
-+++++
+-----
 
 1. Add a component to a Group.
 

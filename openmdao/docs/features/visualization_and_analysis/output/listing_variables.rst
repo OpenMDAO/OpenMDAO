@@ -1,9 +1,8 @@
-:orphan:
-
 .. _listing-variables:
 
+*****************
 Listing Variables
-=================
+*****************
 
 When working with a model, it may sometimes be helpful to examine the input and output variables.
 

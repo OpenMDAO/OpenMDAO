@@ -1,5 +1,6 @@
+**************************
 Recording Data in OpenMDAO
---------------------------
+**************************
 
 In OpenMDAO, you can instantiate recorder objects and attach them to the System, Driver or Solver
 instance(s) of your choice.

@@ -1,8 +1,6 @@
-:orphan:
-
-
+************************
 Instance-based Profiling
-========================
+************************
 
 Python has several good profilers available for general python
 code, and instance-based profiling is not meant to replace general profiling.

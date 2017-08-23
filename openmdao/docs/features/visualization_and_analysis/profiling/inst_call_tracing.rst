@@ -1,5 +1,6 @@
+***************************
 Instance-based Call Tracing
-===========================
+***************************
 
 The `icalltrace` command can be used to print a trace of each instance method call.  For example:
 

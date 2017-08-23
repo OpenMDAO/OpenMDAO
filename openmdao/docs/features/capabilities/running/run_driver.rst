@@ -1,9 +1,8 @@
-:orphan:
+. _setup-and-run:
 
-.. _setup-and-run:
-
+************
 Run a Driver
-=========================
+************
 
 Once :code:`setup()` is done, you can then run the optimization with :code:`run_driver()`.
 

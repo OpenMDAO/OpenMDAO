@@ -1,9 +1,11 @@
-:orphan:
-
 .. _declaring-variables:
 
+*******************
+Declaring Variables
+*******************
+
 Calling add_input and add_output
-================================
+--------------------------------
 
 Every component in an OpenMDAO model is an instance of :code:`IndepVarComp`, :code:`ExplicitComponent`, :code:`ImplicitComponent`, or a subclass of one of these classes.
 Regardless of the type, each component has input variables and output variables that it must declare.

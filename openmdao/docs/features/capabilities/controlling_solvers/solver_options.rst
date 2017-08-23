@@ -1,13 +1,8 @@
-:orphan:
-
 .. _solver-options:
 
-
-Controlling Solver Behavior
-===========================
-
+**************
 Solver Options
-----------------
+**************
 
 All solvers (both nonlinear and linear) have a number of options that you access via the `options` attribute that control its behavior.
 For instance, here is how you would change the iteration limit and convergence tolerances for the :ref: `NonlinearBlockGS <openmdao.solvers.nonlinear.nonlinear_block_gs.NonlinearBlockGS>`

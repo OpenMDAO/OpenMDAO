@@ -1,5 +1,6 @@
+****************************
 Checking Partial Derivatives
-============================
+****************************
 
 In addition to using approximations to estimate partial derivatives, you can also use
 approximations to check your implementations of the partial derivatives for a component.

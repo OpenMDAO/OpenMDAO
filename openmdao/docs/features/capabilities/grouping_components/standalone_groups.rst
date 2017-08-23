@@ -1,6 +1,6 @@
-
+**************************************
 Building Models with Standalone Groups
---------------------------------------
+**************************************
 
 So far we have showed how to build groups, add subsystems to them, and connect variables in your run script. You can also
 create custom groups that can be instantiated as part of larger models. To do this, create a new class that inherits from

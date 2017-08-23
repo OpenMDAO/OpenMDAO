@@ -1,9 +1,8 @@
-:orphan:
-
 .. _run-model:
 
+**************
 Run Your Model
-=========================
+**************
 
 Once :code:`setup()` is done, you can then execute your model with :code:`run_model()`
 

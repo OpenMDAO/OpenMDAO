@@ -1,6 +1,6 @@
-
+**********************
 Distributed Components
-----------------------
+**********************
 
 At times when you need to perform a computation using large input arrays, you may
 want to perform that computation in multiple processes, where each process

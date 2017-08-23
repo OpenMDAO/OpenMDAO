@@ -1,5 +1,3 @@
-:orphan:
-
 .. _units:
 
 Specifying Units for Variables

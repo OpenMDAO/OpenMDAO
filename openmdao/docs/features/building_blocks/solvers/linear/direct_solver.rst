@@ -1,9 +1,8 @@
-:orphan:
-
 .. _directsolver:
 
+************
 DirectSolver
-============
+************
 
 The DirectSolver is a linear solver that assembles the system Jacobian and solves the linear
 system with LU factorization and back substitution. It can handle any system topology. Since it

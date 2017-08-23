@@ -1,7 +1,6 @@
-:orphan:
-
+*******************
 Adding an Objective
--------------------
+*******************
 
 To add an objective to an optimization, use the *add_objective* method on System.
 

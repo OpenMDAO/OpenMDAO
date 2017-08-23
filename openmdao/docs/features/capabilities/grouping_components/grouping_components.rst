@@ -1,8 +1,6 @@
-
-.. `Grouping components - overview`
-
+********
 Overview
-========
+********
 
 It's often desirable to represent a complex model as a collection of components.
 Using Group objects, we can group components, as well as other Groups,

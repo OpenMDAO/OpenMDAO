@@ -1,9 +1,8 @@
-:orphan:
-
 .. _comp-type-2-explicitcomp:
 
+*****************
 ExplicitComponent
-=================
+*****************
 
 Explicit variables are those that are computed as an explicit function of other variables.
 For instance, :math:`z` would be an explicit variable, given :math:`z = \sin(y)`, while :math:`y` would not be, given that it is defined implicitly by the nonlinear equation, :math:`\cos(x \cdot y) - z \cdot y = 0`.

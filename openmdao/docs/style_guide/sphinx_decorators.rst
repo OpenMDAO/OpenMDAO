@@ -1,9 +1,8 @@
-:orphan:
-
 .. _`sphinx_decorators`:
 
+****************************
 Sphinx and Decorated Methods
-----------------------------
+****************************
 
 Sphinx does not correctly handle decorated methods. To ensure a method's
 call signature appears correctly in the docs, put the call signature of the method

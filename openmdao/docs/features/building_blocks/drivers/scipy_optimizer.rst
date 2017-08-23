@@ -1,9 +1,8 @@
-:orphan:
-
 .. _scipyoptimizer:
 
+*********************
 ScipyOptimizer Driver
-=====================
+*********************
 
 The ScipyOptimizer driver wraps the optimizers in `scipy.optimize.minimize`. In this example, we use the SLSQP
 optimizer to find the minimum of the Paraboloid problem.

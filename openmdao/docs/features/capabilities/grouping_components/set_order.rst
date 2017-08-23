@@ -1,6 +1,6 @@
-
+******************************************
 Setting the Order of Subsystems in a Group
-------------------------------------------
+******************************************
 
 By default, subsystems are executed in the same order that they were added to
 their parent Group.  In order to change this order, use the set_order method.

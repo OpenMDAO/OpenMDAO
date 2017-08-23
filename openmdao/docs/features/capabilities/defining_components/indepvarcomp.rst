@@ -1,9 +1,8 @@
-:orphan:
-
 .. _comp-type-1-indepvarcomp:
 
+************
 IndepVarComp
-============
+************
 
 Independent variables are those that are set externally to the model---therefore, they are called model inputs.
 From the perspective of a component, they are component outputs that do not depend on any component inputs.

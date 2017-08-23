@@ -1,9 +1,8 @@
-:orphan:
-
 .. _linearblockjac:
 
+**************
 LinearBlockJac
-==============
+**************
 
 The LinearBlockJac uses the Block Jacobi method to solve the linear system. The method is similar to that used by the
 :ref:`LinearBlockGS <openmdao.solvers.linear.linear_block_gs.py>` solver, except that it propagates the derivatives from outputs

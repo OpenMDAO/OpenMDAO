@@ -1,9 +1,8 @@
-:orphan:
-
 .. _linearblockgs:
 
+*************
 LinearBlockGS
-==============
+*************
 
 The LinearBlockGS uses Block Gauss Seidel to solve the linear system. The LinearBlockGS solver iterates until the linear
 residual is below a tolerance, or the maximum number of iterations has been exceeded. As such,

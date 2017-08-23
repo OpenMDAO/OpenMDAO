@@ -1,6 +1,6 @@
-
-Connecting variables
---------------------
+********************
+Connecting Variables
+********************
 
 To cause data to flow between two systems in a model, we must connect at
 least one output variable from one system to at least one input variable
@@ -17,7 +17,7 @@ To connect two variables within a model, use the connect function.
 
 
 Usage
-+++++
+-----
 
 1. Connect an output variable to an input variable, with an automatic
 unit conversion.

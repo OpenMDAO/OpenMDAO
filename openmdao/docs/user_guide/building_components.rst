@@ -1,9 +1,8 @@
-:orphan:
-
 .. _building-components:
 
-Building Components - Overview
-==============================
+*******************
+Building Components
+*******************
 
 The feature docs for building components explain the first step of implementing a numerical model in OpenMDAO.
 In general, a numerical model can be complex, multidisciplinary, and heterogeneous, so we decompose it into a set of components and implement it as such.

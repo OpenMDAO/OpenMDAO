@@ -1,9 +1,8 @@
-:orphan:
-
 .. _setup:
 
+****************
 Setup Your Model
-=========================
+****************
 
 After you have built up a model by defining variables and components, then organizing them into a hierarchy, and connecting them together, \
 you need to call the :code:`setup()` method to have the framework do some initialization work in preparation for execution.

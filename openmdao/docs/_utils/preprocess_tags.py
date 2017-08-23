@@ -74,6 +74,8 @@ def make_tagindex(tagdir):
     for filepath, dirnames, filenames in os.walk(tagdir):
         with open(indexfile, 'a') as index:
             index.write("""
+:orphan:
+
 ================
 Tags in OpenMDAO
 ================

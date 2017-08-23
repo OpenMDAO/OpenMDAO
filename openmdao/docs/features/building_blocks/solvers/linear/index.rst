@@ -1,10 +1,9 @@
-:orphan:
 
 **************
 Linear Solvers
 **************
 
-Nonlinear Solvers...
+Linear Solvers
 
 .. toctree::
     :maxdepth: 1

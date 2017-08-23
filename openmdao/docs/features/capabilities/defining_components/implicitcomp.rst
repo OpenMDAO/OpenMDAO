@@ -1,9 +1,8 @@
-:orphan:
-
 .. _comp-type-3-implicitcomp:
 
+*****************
 ImplicitComponent
-=================
+*****************
 
 Implicit variables are those that are computed as an implicit function of other variables.
 For instance, :math:`y` would be an implicit variable, given that it is computed by solving :math:`\cos(x \cdot y) - z \cdot y = 0`.

@@ -1,6 +1,6 @@
-
-Using src_indices with promoted variables
------------------------------------------
+*****************************************
+Using src_indices with Promoted Variables
+*****************************************
 
 Inputs and outputs can be connected by promoting them to the same name, but what
 if your output is an array and you only want to connect part of it to your
@@ -12,7 +12,7 @@ or as tuples or lists of indices into the unflattened source.  The default
 of *flat_src_indices=True* assumes indices into a flattened source.
 
 Usage
-+++++
+-----
 
 1. Connect an independent array variable to two different components where
 each component gets part of the array.

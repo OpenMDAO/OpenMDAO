@@ -1,9 +1,8 @@
-:orphan:
-
 .. _set-solvers:
 
+************************************
 Setting Nonlinear and Linear Solvers
-====================================
+************************************
 
 A nonlinear solver, like :ref:`NonlinearBlockGS <openmdao.solvers.nonlinear.nonlinear_block_gs.py>` or :ref:`Newton <openmdao.solvers.nonlinear.newton.py>`,
 is used to converge the nonlinear analysis. A nonlinear solver is needed whenever this is either a cyclic dependency between components in your model.

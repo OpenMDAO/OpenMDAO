@@ -1,9 +1,8 @@
-:orphan:
-
 .. _nlbjac:
 
+*****************
 NonlinearBlockJac
-=================
+*****************
 
 The NonlinearBlockJac solver is a nonlinear solver that uses the block Jacobi method to solve
 the system. When to choose this solver over :ref:`NonlinearBlockGS <openmdao.solvers.nonlinear.nonlinear_block_gs.py>`

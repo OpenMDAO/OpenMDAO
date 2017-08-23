@@ -1,9 +1,8 @@
-:orphan:
-
 .. _nlnewton:
 
+************
 NewtonSolver
-============
+************
 
 The `NewtonSolver` solver implements Newton's method to solve the system that contains it. This
 is the most general solver in OpenMDAO in that it can solve any topology including cyclic

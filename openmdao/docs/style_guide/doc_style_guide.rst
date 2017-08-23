@@ -1,8 +1,6 @@
-:orphan:
-
-=====================================
-OpenMDAO-v2 documentation style guide
-=====================================
+*************************
+OpenMDAO Docs Style Guide
+*************************
 
 This document outlines OpenMDAO-v2 documentation conventions regarding
 both content and formatting.

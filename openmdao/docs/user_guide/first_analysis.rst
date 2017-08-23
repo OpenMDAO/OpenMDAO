@@ -1,5 +1,6 @@
-Setting up a simple analysis
-=================================================
+****************************
+Setting up a Simple Analysis
+****************************
 
 This tutorial illustrates how to build, run, and optimize a very simple model in
 OpenMDAO. It will introduce the basic types of OpenMDAO classes, and the

@@ -1,9 +1,8 @@
-:orphan:
-
 .. _nlbgs:
 
+****************
 NonlinearBlockGS
-================
+****************
 
 The NonlinearBlockGS solver applies Block Gauss Seidel (also known as Fixed Point Iteration) to the
 components and subsystems in the system. This is mainly used to solve cyclic connections. You
