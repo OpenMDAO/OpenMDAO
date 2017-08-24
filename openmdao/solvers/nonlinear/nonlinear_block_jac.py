@@ -14,7 +14,7 @@ class NonlinearBlockJac(NonlinearSolver):
         """
         Perform the operations in the iteration loop.
         """
-        self._solver_info.prefix += '|  '
+        self._solver_info.append_subsolver()
         self._system._transfer('nonlinear', 'fwd')
 
         with Recording('NonlinearBlockJac', 0, self) as rec:
@@ -24,7 +24,7 @@ class NonlinearBlockJac(NonlinearSolver):
             rec.abs = 0.0
             rec.rel = 0.0
 
-        self._solver_info.prefix = self._solver_info.prefix[:-3]
+        self._solver_info.pop()
 
     def _mpi_print_header(self):
         """
