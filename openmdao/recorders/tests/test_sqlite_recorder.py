@@ -254,6 +254,11 @@ def _assertDriverMetadataRecorded(test, db_cur, expected):
 
 
 class TestSqliteRecorder(unittest.TestCase):
+    """
+    Features
+    --------
+    CaseRecorder
+    """
     def setUp(self):
         if OPT is None:
             raise unittest.SkipTest("pyoptsparse is not installed")
