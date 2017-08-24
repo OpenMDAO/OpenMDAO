@@ -18,7 +18,7 @@ def run_model(prob):
     stdout = sys.stdout
     strout = StringIO()
 
-    #sys.stdout = strout
+    sys.stdout = strout
     try:
         prob.run_model()
     finally:
