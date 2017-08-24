@@ -17,7 +17,6 @@ try:
 except ImportError:
     PETScVector = None
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
 class DistribStateImplicit(ImplicitComponent):
 
     def setup(self):
@@ -127,6 +126,7 @@ class DistribStateImplicit(ImplicitComponent):
         return False, 0., 0.
 
 
+@unittest.skipUnless(PETScVector, "PETSc is required.")
 class TestUserDefinedSolver(unittest.TestCase):
 
     def test_method(self):
