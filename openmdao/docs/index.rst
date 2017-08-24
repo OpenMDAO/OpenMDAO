@@ -116,6 +116,7 @@ Specialized components
 .. toctree::
    :maxdepth: 1
 
+   features/special_components/balance
    features/special_components/distributed_comps
    features/special_components/exec_comp
    features/special_components/metamodel
