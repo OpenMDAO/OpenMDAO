@@ -10,7 +10,7 @@ you will be able to construct models by linking multiple analyses together and t
    :maxdepth: 2
 
    first_analysis.rst
+   building_components.rst
    first_optimization.rst
    first_mdao.rst
-   building_components.rst
    sellar.rst
