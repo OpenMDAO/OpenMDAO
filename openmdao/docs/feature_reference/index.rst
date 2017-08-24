@@ -1,6 +1,6 @@
-********
-Features
-********
+**************
+Feature Manual
+**************
 
 OpenMDAO's fully-supported features are documented here.
 Anything documented here has been thoroughly tested, and should be considered fully functional.
@@ -8,6 +8,6 @@ Anything documented here has been thoroughly tested, and should be considered fu
 .. toctree::
    :maxdepth: 2
 
-   capabilities/index.rst
+   core_features/index.rst
    building_blocks/index.rst
    visualization_and_analysis/index.rst

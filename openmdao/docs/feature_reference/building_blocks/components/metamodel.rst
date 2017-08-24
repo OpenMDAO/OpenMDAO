@@ -1,7 +1,8 @@
 .. index:: MetaModel Example
 
+*******************
 MetaModel Component
----------------------------
+*******************
 
 `MetaModel` lets you quickly create a component with surrogate models
 used to compute the outputs based on training data. Generally, this is

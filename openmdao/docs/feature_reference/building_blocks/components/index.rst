@@ -8,3 +8,5 @@ Components
 
     metamodel.rst
     exec_comp.rst
+    balance.rst
+    linearsystem.rst

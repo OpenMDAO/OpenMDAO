@@ -1,8 +1,8 @@
 .. index:: BalanceComp Example
 
-=================
+*****************
 Balance Component
-=================
+*****************
 
 `BalanceComp` is a specialized implementation of `ImplicitComponent` that
 is intended to provide a simple way to implement most implicit equations
