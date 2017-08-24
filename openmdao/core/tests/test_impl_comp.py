@@ -16,8 +16,8 @@ from openmdao.devtools.testutil import assert_rel_error
 class QuadraticComp(ImplicitComponent):
     """
     A Simple Implicit Component representing a Quadratic Equation.
-    
-    R(a, b, c, x) = ax^2 + bx + c 
+
+    R(a, b, c, x) = ax^2 + bx + c
 
     Solution via Quadratic Formula:
     x = (-b + sqrt(b^2 - 4ac)) / 2a
@@ -285,6 +285,134 @@ class ImplicitCompTestCase(unittest.TestCase):
 
         prob.run_model()
         assert_rel_error(self, prob['comp2.x'], 3.)
+
+    def test_guess_nonlinear_transfer(self):
+        # Test that data is transfered to a component before calling guess_nonlinear.
+
+        class ImpWithInitial(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 3.0)
+                self.add_output('y', 4.0)
+
+            def solve_nonlinear(self, inputs, outputs):
+                """ Do nothing. """
+                pass
+
+            def apply_nonlinear(self, inputs, outputs, resids):
+                """ Do nothing. """
+                pass
+
+            def guess_nonlinear(self, inputs, outputs, resids):
+                # Passthrough
+                outputs['y'] = inputs['x']
+
+
+        group = Group()
+
+        group.add_subsystem('px', IndepVarComp('x', 77.0))
+        group.add_subsystem('comp1', ImpWithInitial())
+        group.add_subsystem('comp2', ImpWithInitial())
+        group.connect('px.x', 'comp1.x')
+        group.connect('comp1.y', 'comp2.x')
+
+        group.nonlinear_solver = NewtonSolver()
+        group.nonlinear_solver.options['maxiter'] = 1
+
+        prob = Problem(model=group)
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+
+        prob.run_model()
+        assert_rel_error(self, prob['comp2.y'], 77., 1e-5)
+
+    def test_guess_nonlinear_transfer_subbed(self):
+        # Test that data is transfered to a component before calling guess_nonlinear.
+
+        class ImpWithInitial(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 3.0)
+                self.add_output('y', 4.0)
+
+            def solve_nonlinear(self, inputs, outputs):
+                """ Do nothing. """
+                pass
+
+            def apply_nonlinear(self, inputs, outputs, resids):
+                """ Do nothing. """
+                resids['y'] = 1.0e-6
+                pass
+
+            def guess_nonlinear(self, inputs, outputs, resids):
+                # Passthrough
+                outputs['y'] = inputs['x']
+
+
+        group = Group()
+        sub = Group()
+
+        group.add_subsystem('px', IndepVarComp('x', 77.0))
+        sub.add_subsystem('comp1', ImpWithInitial())
+        sub.add_subsystem('comp2', ImpWithInitial())
+        group.connect('px.x', 'sub.comp1.x')
+        group.connect('sub.comp1.y', 'sub.comp2.x')
+
+        group.add_subsystem('sub', sub)
+
+        group.nonlinear_solver = NewtonSolver()
+        group.nonlinear_solver.options['maxiter'] = 1
+
+        prob = Problem(model=group)
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+
+        prob.run_model()
+        assert_rel_error(self, prob['sub.comp2.y'], 77., 1e-5)
+
+    def test_guess_nonlinear_transfer_subbed2(self):
+        # Test that data is transfered to a component before calling guess_nonlinear.
+
+        class ImpWithInitial(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 3.0)
+                self.add_output('y', 4.0)
+
+            def solve_nonlinear(self, inputs, outputs):
+                """ Do nothing. """
+                pass
+
+            def apply_nonlinear(self, inputs, outputs, resids):
+                """ Do nothing. """
+                resids['y'] = 1.0e-6
+                pass
+
+            def guess_nonlinear(self, inputs, outputs, resids):
+                # Passthrough
+                outputs['y'] = inputs['x']
+
+
+        group = Group()
+        sub = Group()
+
+        group.add_subsystem('px', IndepVarComp('x', 77.0))
+        sub.add_subsystem('comp1', ImpWithInitial())
+        sub.add_subsystem('comp2', ImpWithInitial())
+        group.connect('px.x', 'sub.comp1.x')
+        group.connect('sub.comp1.y', 'sub.comp2.x')
+
+        group.add_subsystem('sub', sub)
+
+        sub.nonlinear_solver = NewtonSolver()
+        sub.nonlinear_solver.options['maxiter'] = 1
+
+        prob = Problem(model=group)
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+
+        prob.run_model()
+        assert_rel_error(self, prob['sub.comp2.y'], 77., 1e-5)
 
     def test_guess_nonlinear_feature(self):
 
