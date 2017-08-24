@@ -39,14 +39,14 @@ class SolverInfo(object):
         Remove one level of solver depth in the printing.
         """
         last_string = self.stack.pop()
-        nchar = len(last_string) + 1
+        nchar = len(last_string)
         self.prefix = self.prefix[:-nchar]
 
     def append_solver(self):
         """
         Add a new level for the main solver in a group.
         """
-        new_str = '+ '
+        new_str = '+  '
         self.prefix += new_str
         self.stack.append(new_str)
 
@@ -54,7 +54,7 @@ class SolverInfo(object):
         """
         Add a new level for any sub-solver for another solver.
         """
-        new_str = '| '
+        new_str = '|  '
         self.prefix += new_str
         self.stack.append(new_str)
 
