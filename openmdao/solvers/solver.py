@@ -23,7 +23,7 @@ class SolverInfo(object):
     ----------
     prefix : <System>
         Prefix to prepend during this iprint.
-    stack : Lists
+    stack : List
         List of strings; strings are popped and appended as needed.
     """
 
