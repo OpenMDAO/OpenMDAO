@@ -52,7 +52,7 @@ class SolverInfo(object):
 
     def append_subsolver(self):
         """
-        Add a new level for any sub-solver for another solver.
+        Add a new level for any sub-solver for your solver.
         """
         new_str = '|  '
         self.prefix += new_str
@@ -60,7 +60,7 @@ class SolverInfo(object):
 
     def append_precon(self):
         """
-        Add a new level for any preconditioner to a linear sollver.
+        Add a new level for any preconditioner to a linear solver.
         """
         new_str = '| precon:'
         self.prefix += new_str
