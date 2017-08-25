@@ -1,0 +1,16 @@
+
+**************
+Linear Solvers
+**************
+
+Linear Solvers
+
+.. toctree::
+    :maxdepth: 1
+
+    linear_block_gs.rst
+    linear_block_jac.rst
+    linear_runonce.rst
+    direct_solver.rst
+    petsc_ksp.rst
+    scipy_iter_solver.rst

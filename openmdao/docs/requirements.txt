@@ -1,6 +1,5 @@
 mock==2.0.0
 redbaron==0.6.3
-six==1.9.0
 networkx==1.11
 numpy==1.12.1
 numpydoc==0.6.0

@@ -5,30 +5,17 @@ from openmdao.docs.config_params import IGNORE_LIST
 # of our source docs, as well as writing out each individual rst file.
 
 
-def generate_docs(doctype):
+def generate_docs():
     """
     generate_docs
     """
-    index_top_dev = """:orphan:
+    index_top = """:orphan:
 
-.. _source_documentation_dev:
+.. _source_documentation:
 
-=======================================
-OpenMDAO Developer Source Documentation
-=======================================
-
-.. toctree::
-   :titlesonly:
-   :maxdepth: 1
-
-"""
-    index_top_usr = """:orphan:
-
-.. _source_documentation_usr:
-
-==================================
-OpenMDAO User Source Documentation
-==================================
+********************
+Source Docs
+********************
 
 .. toctree::
    :titlesonly:
@@ -41,8 +28,7 @@ OpenMDAO User Source Documentation
 
 """
 
-    if doctype == "usr":
-        ref_sheet_bottom = """
+    ref_sheet_bottom = """
    :members:
    :undoc-members:
    :special-members: __init__, __contains__, __iter__, __setitem__, __getitem__
@@ -52,22 +38,10 @@ OpenMDAO User Source Documentation
 .. toctree::
    :maxdepth: 1
 """
-#     elif doctype == "dev":
-#         ref_sheet_bottom = """
-#    :members:
-#    :show-inheritance:
-#    :private-members:
-#    :special-members: __init__, __contains__, __iter__, __setitem__, __getitem__
-#
-# .. toctree::
-#    :maxdepth: 1
-# """
 
-    # need to set up the _srcdocs directory structure, relative to docs.
-    # docs_dir = os.path.dirname(__file__)
     docs_dir = os.path.dirname("..")
 
-    doc_dir = os.path.join(docs_dir, "_srcdocs", doctype)
+    doc_dir = os.path.join(docs_dir, "_srcdocs")
     if os.path.isdir(doc_dir):
         import shutil
         shutil.rmtree(doc_dir)
@@ -95,12 +69,13 @@ OpenMDAO User Source Documentation
         'error_checking',
         'jacobians',
         'matrices',
+        'proc_allocators',
+        'recorders',
         'solvers',
         'surrogate_models',
         'solvers.linear',
         'solvers.nonlinear',
         'solvers.linesearch',
-        'proc_allocators',
         'vectors',
     ]
 
@@ -113,10 +88,7 @@ OpenMDAO User Source Documentation
     # begin writing the '_srcdocs/index.rst' file at mid  level.
     index_filename = os.path.join(doc_dir, "index.rst")
     index = open(index_filename, "w")
-    if doctype == "dev":
-        index.write(index_top_dev)
-    else:
-        index.write(index_top_usr)
+    index.write(index_top)
 
     # auto-generate package header files (e.g. 'openmdao.core.rst')
     for package in packages:
@@ -169,8 +141,8 @@ OpenMDAO User Source Documentation
 
                     # get the meat of the ref sheet code done
                     filename = sub_package + ".py"
-                    ref_sheet.write(".. index:: " + doctype + "_" + filename + "\n\n")
-                    ref_sheet.write(".. _" + doctype + "_" + package_name + "." +
+                    ref_sheet.write(".. index:: " + filename + "\n\n")
+                    ref_sheet.write(".. _" + package_name + "." +
                                     filename + ":\n\n")
                     ref_sheet.write(filename + "\n")
                     ref_sheet.write("-" * len(filename) + "\n\n")
