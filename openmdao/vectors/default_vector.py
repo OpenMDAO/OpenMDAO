@@ -117,7 +117,7 @@ class DefaultVector(Vector):
         abs2meta_t = system._var_abs2meta[type_]
         allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[self._name][type_]
         allprocs_abs2idx_t = system._var_allprocs_abs2idx[self._name][type_]
-        for abs_name in system._var_allprocs_relevant_names[self._name][type_]:
+        for abs_name in system._var_relevant_names[self._name][type_]:
             set_name = abs2meta_t[abs_name]['var_set']
 
             idx_byset = allprocs_abs2idx_byset_t[abs_name]
@@ -276,7 +276,7 @@ class DefaultVector(Vector):
         allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[self._name][type_]
         sizes_byset_t = system._var_sizes_byset[self._name][type_]
         abs2meta_t = system._var_abs2meta[type_]
-        for abs_name in system._var_allprocs_relevant_names[self._name][type_]:
+        for abs_name in system._var_relevant_names[self._name][type_]:
             idx_byset = allprocs_abs2idx_byset_t[abs_name]
             set_name = abs2meta_t[abs_name]['var_set']
 

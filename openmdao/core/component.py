@@ -107,15 +107,23 @@ class Component(System):
             num_var_byset[vec_name] = {}
             # Compute num_var
             for type_ in ['input', 'output']:
-                num_var[vec_name][type_] = len(self._var_allprocs_relevant_names[vec_name][type_])
+                relnames = self._var_allprocs_relevant_names[vec_name][type_]
+                num_var[vec_name][type_] = len(relnames)
 
                 num_var_byset[vec_name][type_] = vbyset = {}
                 # Compute num_var_byset
-                for name in self._var_allprocs_relevant_names[vec_name][type_]:
+                for name in relnames:
                     set_name = data[name.rsplit('.', 1)[-1]]['metadata']['var_set']
                     if set_name not in vbyset:
                         vbyset[set_name] = 0
                     vbyset[set_name] += 1
+
+                # if 0 in num_var_byset[vec_name][type_]:
+                #     print self.pathname, vec_name, type_, num_var[vec_name][type_], num_var_byset[vec_name][type_][0]
+                #     print relnames
+                #     if len(relnames) != num_var_byset[vec_name][type_][0]:
+                #         print"MISMATCH"
+                #     print
 
     def _setup_var_data(self, recurse=True):
         """

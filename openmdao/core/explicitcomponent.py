@@ -286,7 +286,7 @@ class ExplicitComponent(Component):
         """
         with Recording(self.pathname + '._solve_linear', self.iter_count, self):
             for vec_name in vec_names:
-                if self.pathname in self._relevant[vec_name]['@all'][1]:
+                if vec_name in self._rel_vec_names:
                     d_outputs = self._vectors['output'][vec_name]
                     d_residuals = self._vectors['residual'][vec_name]
 

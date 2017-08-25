@@ -24,7 +24,8 @@ class LinearBlockGS(BlockLinearSolver):
             for ind, subsys in enumerate(system._subsystems_myproc):
                 isub = system._subsystems_myproc_inds[ind]
                 for vec_name in vec_names:
-                    system._transfer(vec_name, mode, isub)
+                    if vec_name in system._rel_vec_names:
+                        system._transfer(vec_name, mode, isub)
                 scope_out, scope_in = system._get_scope(subsys)
                 subsys._apply_linear(vec_names, mode, scope_out, scope_in)
                 for vec_name in vec_names:

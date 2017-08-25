@@ -1004,6 +1004,8 @@ class Problem(object):
         for rhs_name, vois in iteritems(voi_lists):
             for input_name, old_input_name in vois:
                 vecname = inp2rhs_name[input_name]
+                if vecname not in input_vec:
+                    continue
                 sizes = model._var_sizes[vecname]['output']
                 dinputs = input_vec[vecname]
                 doutputs = output_vec[vecname]
@@ -1122,7 +1124,7 @@ class Problem(object):
                             deriv_val = deriv_val[out_idxs]
 
                     if dup and nproc > 1:
-                        out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
+                        out_var_idx = model._var_allprocs_abs2idx['linear']['output'][output_name]
                         # TODO: do during setup
                         root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
                         if deriv_val is None:
@@ -1417,7 +1419,7 @@ class Problem(object):
                                     deriv_val = deriv_val[out_idxs]
 
                             if dup and nproc > 1:
-                                out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
+                                out_var_idx = model._var_allprocs_abs2idx['linear']['output'][output_name]
                                 root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
                                 if deriv_val is None:
                                     if out_idxs is not None:

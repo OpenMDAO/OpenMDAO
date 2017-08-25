@@ -42,7 +42,8 @@ class LinearRunOnce(LinearBlockGS):
             b_vecs = system._vectors['output']
 
         for vec_name in self._vec_names:
-            self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
+            if vec_name in system._rel_vec_names:
+                self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
 
         with Recording('LinearRunOnce', 0, self) as rec:
             # Single iteration of GS

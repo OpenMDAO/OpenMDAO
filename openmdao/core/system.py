@@ -635,7 +635,7 @@ class System(object):
         for key in root_vectors:
             vec_key, coeff_key = key
 
-            for vec_name in self._vectors['output']:
+            for vec_name in self._vec_names:
                 if initial:
                     root_vectors[key][vec_name] = vector_class(vec_name, _type_map[vec_key], self)
 
@@ -1025,18 +1025,10 @@ class System(object):
             self._relevant = relevant
 
         self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
-        # in 'linear' all vars are relevant
-        self._var_allprocs_relevant_names['linear']['input'] = self._var_allprocs_abs_names['input']
-        self._var_allprocs_relevant_names['linear']['output'] = self._var_allprocs_abs_names['output']
-        self._var_allprocs_relevant_names['nonlinear'] = self._var_allprocs_relevant_names['linear']
-
         self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
-        self._var_relevant_names['linear']['input'] = self._var_abs_names['input']
-        self._var_relevant_names['linear']['output'] = self._var_abs_names['output']
-        self._var_relevant_names['nonlinear'] = self._var_relevant_names['linear']
 
-        self._rel_vec_names = set(['linear'])
-        for vec_name in self._vec_names[2:]:
+        self._rel_vec_names = set()
+        for vec_name in self._vec_names:
             rel, relsys = relevant[vec_name]['@all']
             if self.pathname in relsys:
                 self._rel_vec_names.add(vec_name)
@@ -1104,9 +1096,8 @@ class System(object):
                 '"force_alloc_complex" to True during setup.'
             raise RuntimeError(msg)
 
-        for vec_name in root_vectors['output']:
-            _, relsys = self._relevant[vec_name]['@all']
-            if self.pathname not in relsys:
+        for vec_name in self._vec_names:
+            if vec_name not in self._rel_vec_names:
                 continue
             vector_class = root_vectors['output'][vec_name].__class__
 
@@ -1191,11 +1182,11 @@ class System(object):
         abs2meta_in = self._var_abs2meta['input']
         abs2meta_out = self._var_abs2meta['output']
 
-        for vec_name in self._vectors['output']:
-            vector_class = root_vectors['residual', 'phys0'][vec_name].__class__
-            relvars, relsys = self._relevant[vec_name]['@all']
-            if self.pathname not in relsys:
+        for vec_name in self._vec_names:
+            if vec_name not in self._rel_vec_names:
                 continue
+            vector_class = root_vectors['residual', 'phys0'][vec_name].__class__
+            relvars, _ = self._relevant[vec_name]['@all']
 
             for key in vecs:
                 vecs[key][vec_name] = vector_class(
@@ -1211,7 +1202,7 @@ class System(object):
                     if '1' in key[1]:
                         vecs[key][vec_name].set_const(1.)
 
-            for abs_name in self._var_allprocs_relevant_names[vec_name]['output']:
+            for abs_name in self._var_relevant_names[vec_name]['output']:
                 meta = abs2meta_out[abs_name]
                 shape = meta['shape']
                 ref = meta['ref']

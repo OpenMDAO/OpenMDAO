@@ -438,7 +438,7 @@ class LinearSolver(Solver):
             b_vecs = system._vectors['output']
 
         for vec_name in self._vec_names:
-            if system.pathname in system._relevant[vec_name]['@all'][1]:
+            if vec_name in system._rel_vec_names:
                 self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
 
         if self.options['maxiter'] > 1:
