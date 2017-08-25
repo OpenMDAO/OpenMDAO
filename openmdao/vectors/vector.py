@@ -491,6 +491,19 @@ class Vector(object):
         """
         pass
 
+    def dot(self, vec):
+        """
+        Compute the dot product of the current vec and the incoming vec.
+
+        Must be implemented by the subclass.
+
+        Parameters
+        ----------
+        vec : <Vector>
+            the vector whose values self is set to.
+        """
+        pass
+
     def get_norm(self):
         """
         Return the norm of this vector.
