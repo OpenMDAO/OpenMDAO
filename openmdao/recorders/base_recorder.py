@@ -9,9 +9,8 @@ from openmdao.utils.general_utils import warn_deprecation
 from openmdao.core.system import System
 from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver, NonlinearSolver
-from openmdao.recorders.recording_iteration_stack import recording_iteration_stack, \
+from openmdao.recorders.recording_iteration_stack import recording_iteration, \
     get_formatted_iteration_coordinate
-
 
 class BaseRecorder(object):
     """
@@ -460,7 +459,7 @@ class BaseRecorder(object):
             '_apply_nonlinear,' '_solve_nonlinear'. Behavior varies based on from which function
             record_iteration was called.
         """
-        stack_top = recording_iteration_stack[-1][0]
+        stack_top = recording_iteration.stack[-1][0]
         method = stack_top.split('.')[-1]
 
         if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear',

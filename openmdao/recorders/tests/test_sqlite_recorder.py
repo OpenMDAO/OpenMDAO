@@ -20,6 +20,7 @@ from openmdao.devtools.testutil import assert_rel_error
 from openmdao.utils.record_util import format_iteration_coordinate
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.sqlite_recorder import format_version, blob_to_array
+from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
     SellarDis2withDerivatives
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -261,6 +262,7 @@ class TestSqliteRecorder(unittest.TestCase):
         if OPTIMIZER is None:
             raise unittest.SkipTest("pyoptsparse is not providing SLSQP")
 
+        recording_iteration.stack = []
         self.dir = mkdtemp()
         self.filename = os.path.join(self.dir, "sqlite_test")
         self.recorder = SqliteRecorder(self.filename)

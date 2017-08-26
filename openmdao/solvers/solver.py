@@ -9,7 +9,7 @@ import numpy as np
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
-from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration_stack
+from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -380,11 +380,11 @@ class NonlinearSolver(Solver):
         float
             norm.
         """
-        recording_iteration_stack.append(('_iter_get_norm', 0))
+        recording_iteration.stack.append(('_iter_get_norm', 0))
 
         self._system._apply_nonlinear()
 
-        recording_iteration_stack.pop()
+        recording_iteration.stack.pop()
 
         return self._system._residuals.get_norm()
 
@@ -457,13 +457,13 @@ class LinearSolver(Solver):
         float
             norm.
         """
-        recording_iteration_stack.append(('_iter_get_norm', 0))
+        recording_iteration.stack.append(('_iter_get_norm', 0))
 
         system = self._system
         scope_out, scope_in = system._get_scope()
         system._apply_linear(self._vec_names, self._mode, scope_out, scope_in)
 
-        recording_iteration_stack.pop()
+        recording_iteration.stack.pop()
 
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']

@@ -2,7 +2,6 @@
 RecordingManager class definition.
 """
 import time
-from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
 
 from openmdao.utils.mpi import MPI
 

@@ -3,7 +3,7 @@
 from __future__ import print_function
 
 from openmdao.solvers.solver import NonlinearSolver
-from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration_stack
+from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration
 from openmdao.utils.general_utils import warn_deprecation
 
 
@@ -139,7 +139,7 @@ class NewtonSolver(NonlinearSolver):
         float
             norm.
         """
-        recording_iteration_stack.append(('_iter_get_norm', 0))
+        recording_iteration.stack.append(('_iter_get_norm', 0))
 
         system = self._system
 
@@ -149,7 +149,7 @@ class NewtonSolver(NonlinearSolver):
 
         system._apply_nonlinear()
 
-        recording_iteration_stack.pop()
+        recording_iteration.stack.pop()
 
         # Enable local fd
         system._owns_approx_jac = approx_status

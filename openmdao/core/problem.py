@@ -20,7 +20,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
-from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
+from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.mpi import MPI, FakeComm
@@ -111,7 +111,7 @@ class Problem(object):
 
         self._mode = None  # mode is assigned in setup()
 
-        recording_iteration_stack = []
+        recording_iteration.stack = []
 
         self._initial_condition_cache = {}
 
@@ -889,7 +889,7 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        recording_iteration_stack.append(('_compute_total_derivs', 0))
+        recording_iteration.stack.append(('_compute_total_derivs', 0))
         model = self.model
         mode = self._mode
         vec_dinput = model._vectors['input']
@@ -992,7 +992,7 @@ class Problem(object):
             msg = "Unsupported return format '%s." % return_format
             raise NotImplementedError(msg)
 
-        recording_iteration_stack.pop()
+        recording_iteration.stack.pop()
         return totals
 
     def _get_voi_info(self, voi_lists, inp2rhs_name, input_vec, output_vec, input_vois):
@@ -1198,7 +1198,7 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        recording_iteration_stack.append(('_compute_total_derivs', 0))
+        recording_iteration.stack.append(('_compute_total_derivs', 0))
         model = self.model
         mode = self._mode
         vec_dinput = model._vectors['input']
@@ -1465,7 +1465,7 @@ class Problem(object):
                         else:
                             raise RuntimeError("unsupported return format")
 
-        recording_iteration_stack.pop()
+        recording_iteration.stack.pop()
         return totals
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
