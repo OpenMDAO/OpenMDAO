@@ -35,7 +35,7 @@ class LinearBlockGS(BlockLinearSolver):
                         b_vec += self._rhs_vecs[vec_name]
                 subsys._solve_linear(vec_names, mode)
 
-        elif mode == 'rev':
+        else:  # rev
             subsystems = system._subsystems_allprocs
             subinds = system._subsystems_myproc_inds
             for revidx in range(len(system._subsystems_myproc) - 1, -1, -1):

@@ -151,7 +151,7 @@ class DirectSolver(LinearSolver):
                     b_vec = d_residuals
                     trans_lu = 0
                     trans_splu = 'N'
-                elif self._mode == 'rev':
+                else:  # rev
                     x_vec = d_residuals
                     b_vec = d_outputs
                     trans_lu = 1

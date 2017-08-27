@@ -124,7 +124,7 @@ class ScipyIterativeSolver(LinearSolver):
         if self._mode == 'fwd':
             x_vec = system._vectors['output'][vec_name]
             b_vec = system._vectors['residual'][vec_name]
-        elif self._mode == 'rev':
+        else:  # rev
             x_vec = system._vectors['residual'][vec_name]
             b_vec = system._vectors['output'][vec_name]
 
@@ -188,12 +188,15 @@ class ScipyIterativeSolver(LinearSolver):
         restart = self.options['restart']
 
         for vec_name in self._vec_names:
+            if vec_name not in system._rel_vec_names:
+                continue
+
             self._vec_name = vec_name
 
             if self._mode == 'fwd':
                 x_vec = system._vectors['output'][vec_name]
                 b_vec = system._vectors['residual'][vec_name]
-            elif self._mode == 'rev':
+            else:  # rev
                 x_vec = system._vectors['residual'][vec_name]
                 b_vec = system._vectors['output'][vec_name]
 
@@ -245,7 +248,7 @@ class ScipyIterativeSolver(LinearSolver):
         if mode == 'fwd':
             x_vec = system._vectors['output'][vec_name]
             b_vec = system._vectors['residual'][vec_name]
-        elif mode == 'rev':
+        else:  # rev
             x_vec = system._vectors['residual'][vec_name]
             b_vec = system._vectors['output'][vec_name]
 
