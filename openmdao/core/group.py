@@ -180,7 +180,7 @@ class Group(System):
                 subsys._setup_vars(recurse)
 
         # Compute num_var, num_var_byset, at least locally
-        for vec_name in self._vec_names:
+        for vec_name in self._lin_vec_names:
             if vec_name not in self._rel_vec_names:
                 continue
             num_var[vec_name] = {}
@@ -208,7 +208,7 @@ class Group(System):
                 raw = (None, None)
             gathered = self.comm.allgather(raw)
 
-            for vec_name in self._vec_names:
+            for vec_name in self._lin_vec_names:
                 if vec_name not in self._rel_vec_names:
                     continue
                 num_var = self._num_var[vec_name]
@@ -229,6 +229,9 @@ class Group(System):
                             if set_name not in num_var_byset[type_]:
                                 num_var_byset[type_][set_name] = 0
                             num_var_byset[type_][set_name] += num
+
+        self._num_var['nonlinear'] = self._num_var['linear']
+        self._num_var_byset['nonlinear'] = self._num_var_byset['linear']
 
     def _setup_var_index_ranges(self, set2iset, recurse=True):
         """

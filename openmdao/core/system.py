@@ -137,7 +137,9 @@ class System(object):
         Same as above, but by var_set name.
     #
     _vec_names : [str, ...]
-        List of names of the vectors (i.e., the right-hand sides).
+        List of names of all vectors, including the nonlinear vector.
+    _lin_vec_names : [str, ...]
+        List of names of the linear vectors (i.e., the right-hand sides).
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         Dictionaries of vectors keyed by vec_name.
     #
@@ -1004,9 +1006,11 @@ class System(object):
                 self._vois = vois = responses
 
         self._vec_names = vec_names
+        self._lin_vec_names = vec_names[1:]  # only linear vec names
 
         for s in self.system_iter():
             s._vec_names = vec_names
+            s._lin_vec_names = self._lin_vec_names
 
     def _setup_relevance(self, mode, relevant=None):
         """
