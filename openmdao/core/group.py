@@ -252,7 +252,7 @@ class Group(System):
         subsystems_var_range_byset = self._subsystems_var_range_byset = {}
 
         # First compute these on one processor for each subsystem
-        for vec_name in self._vec_names:
+        for vec_name in self._lin_vec_names:
             if vec_name not in self._rel_vec_names:
                 continue
 
@@ -282,8 +282,8 @@ class Group(System):
                     type_: np.zeros(nsub_allprocs, int) for type_ in ['input', 'output']}
                 allprocs_counters_byset = {
                     type_: np.zeros((nsub_allprocs, len(set2iset[type_])), int)
-                    for type_ in ['input', 'output']}
-
+                    for type_ in ['input', 'output']
+                }
                 for myproc_counters, myproc_counters_byset in gathered:
                     for type_ in ['input', 'output']:
                         allprocs_counters[type_] += myproc_counters[type_]
@@ -310,6 +310,9 @@ class Group(System):
                         rng[subsys.name] = (np.sum(allprocs_counters_byset[type_][:isub, iset]),
                                             np.sum(allprocs_counters_byset[type_][:isub + 1,
                                                                                   iset]))
+
+        self._subsystems_var_range['nonlinear'] = self._subsystems_var_range['linear']
+        self._subsystems_var_range_byset['nonlinear'] = self._subsystems_var_range_byset['linear']
 
         # Recursion
         if recurse:
@@ -425,7 +428,7 @@ class Group(System):
         sizes_byset = self._var_sizes_byset
 
         # Compute _var_sizes
-        for vec_name in self._vec_names:
+        for vec_name in self._lin_vec_names:
             if vec_name not in self._rel_vec_names:
                 continue
             sizes[vec_name] = {}
@@ -454,7 +457,7 @@ class Group(System):
 
         # If parallel, all gather
         if self.comm.size > 1:
-            for vec_name in self._vec_names:
+            for vec_name in self._lin_vec_names:
                 if vec_name not in self._rel_vec_names:
                     continue
                 sizes = self._var_sizes[vec_name]
@@ -463,6 +466,9 @@ class Group(System):
                     self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
                     for set_name, vsizes in iteritems(sizes_byset[type_]):
                         self.comm.Allgather(sizes_byset[type_][set_name][iproc, :], vsizes)
+
+        self._var_sizes['nonlinear'] = self._var_sizes['linear']
+        self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']
 
         self._setup_global_shapes()
 
@@ -815,7 +821,7 @@ class Group(System):
             sub_ext_num_vars_byset = {}
             sub_ext_sizes_byset = {}
 
-            for vec_name in self._vec_names:
+            for vec_name in self._lin_vec_names:
                 if vec_name not in subsys._rel_vec_names:
                     continue
                 subsystems_var_range = self._subsystems_var_range[vec_name]
@@ -859,6 +865,11 @@ class Group(System):
                             ext_sizes_byset[vec_name][type_][set_name][1] + size2,
                         )
 
+            sub_ext_num_vars['nonlinear'] = sub_ext_num_vars['linear']
+            sub_ext_sizes['nonlinear'] = sub_ext_sizes['linear']
+            sub_ext_num_vars_byset['nonlinear'] = sub_ext_num_vars_byset['linear']
+            sub_ext_sizes_byset['nonlinear'] = sub_ext_sizes_byset['linear']
+
             subsys._setup_global(
                 sub_ext_num_vars, sub_ext_num_vars_byset,
                 sub_ext_sizes, sub_ext_sizes_byset
@@ -897,7 +908,7 @@ class Group(System):
 
         transfers = self._transfers
         vectors = self._vectors
-        for vec_name in self._vec_names:
+        for vec_name in self._lin_vec_names:
             if vec_name not in self._rel_vec_names:
                 continue
             relvars, _ = self._relevant[vec_name]['@all']
@@ -1041,6 +1052,8 @@ class Group(System):
                 transfers[vec_name]['rev', isub] = transfer_class(
                     vectors['input'][vec_name], vectors['output'][vec_name],
                     rev_xfer_in[isub], rev_xfer_out[isub], self.comm)
+
+        transfers['nonlinear'] = transfers['linear']
 
     def add(self, name, subsys, promotes=None):
         """
