@@ -7,7 +7,7 @@ import sys
 from resource import getrusage, RUSAGE_SELF, RUSAGE_CHILDREN
 
 from six.moves import zip_longest
-
+from openmdao.core.group import Group
 
 def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma: no cover
     """Print out the distributed idxs for each variable in input and output vecs.
@@ -106,6 +106,33 @@ def tree(system, include_solvers=True, stream=sys.stdout):
                 stream.write("%s %s nonlinear_solver\n" % (indent, type(s.nonlinear_solver).__name__))
             if s.linear_solver is not None:
                 stream.write("%s %s linear_solver\n" % (indent, type(s.linear_solver).__name__))
+
+def config_summary(problem, stream=sys.stdout):
+    """
+    Prints various high level statistics about the model structure.
+
+    Parameters
+    ----------
+    problem : Problem
+        The Problem to be summarized.
+    stream : File-like
+        Where the output will be written.
+    """
+    allsystems = list(problem.model.system_iter(recurse=True, include_self=True))
+    sysnames = [s.pathname for s in allsystems]
+    nsystems = len(allsystems)
+    ngroups = len([s for s in allsystems if isinstance(s, Group)])
+    ncomps = nsystems - ngroups
+    noutputs = len(problem.model._var_allprocs_abs_names['output'])
+    ninputs = len(problem.model._var_allprocs_abs_names['input'])
+    maxdepth = max([len(name.split('.')) for name in sysnames])
+
+    print("============== Problem Summary ============", file=stream)
+    print("Number of Groups: %d" % ngroups, file=stream)
+    print("Number of Components: %d" % ncomps, file=stream)
+    print("Max tree depth: %d" % maxdepth, file=stream)
+    print("Number of Inputs: %d" % ninputs, file=stream)
+    print("Number of Outputs: %d" % noutputs, file=stream)
 
 def max_mem_usage():
     """
