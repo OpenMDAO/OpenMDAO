@@ -906,13 +906,13 @@ class Problem(object):
 
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
-        for subname in model._lin_vec_names:
+        for vec_name in model._lin_vec_names:
 
             # TODO: Do all three deriv vectors have the same keys?
 
-            vec_dinput[subname].set_const(0.0)
-            vec_doutput[subname].set_const(0.0)
-            vec_dresid[subname].set_const(0.0)
+            vec_dinput[vec_name].set_const(0.0)
+            vec_doutput[vec_name].set_const(0.0)
+            vec_dresid[vec_name].set_const(0.0)
 
         # Linearize Model
         model._linearize()
@@ -1228,17 +1228,13 @@ class Problem(object):
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
         matmat = False
-        for subname in vec_dinput:
+        for vec_name in model._lin_vec_names:
 
             # TODO: Do all three deriv vectors have the same keys?
 
-            # Skip nonlinear because we don't need to mess with it?
-            if subname == 'nonlinear':
-                continue
-
-            vec_dinput[subname].set_const(0.0)
-            vec_doutput[subname].set_const(0.0)
-            vec_dresid[subname].set_const(0.0)
+            vec_dinput[vec_name].set_const(0.0)
+            vec_doutput[vec_name].set_const(0.0)
+            vec_dresid[vec_name].set_const(0.0)
 
         # Linearize Model
         model._linearize()

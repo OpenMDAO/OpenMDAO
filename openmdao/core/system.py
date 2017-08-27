@@ -1470,7 +1470,7 @@ class System(object):
 
         if mode == 'fwd':
             direction = ('norm', 'phys')
-        elif mode == 'rev':
+        else:  # rev
             direction = ('phys', 'norm')
 
         self._scale_vec(vec_inputs, 'input', direction[0])
@@ -1747,25 +1747,19 @@ class System(object):
                 d_inputs.set_const(0.0)
                 d_outputs.set_const(0.0)
 
-        out_names = self._var_abs_names['output']
-        res_names = out_names
-        in_names = self._var_abs_names['input']
+        if scope_out is None and scope_in is None:
+            yield d_inputs, d_outputs, d_residuals
+        else:
+            if scope_out is not None:
+                d_outputs._names = scope_out.intersection(d_outputs._views)
+            if scope_in is not None:
+                d_inputs._names = scope_in.intersection(d_inputs._views)
 
-        if scope_out is not None:
-            out_names = scope_out.intersection(out_names)
-        if scope_in is not None:
-            in_names = scope_in.intersection(in_names)
+            yield d_inputs, d_outputs, d_residuals
 
-        d_inputs._names = in_names
-        d_outputs._names = out_names
-        d_residuals._names = res_names
-
-        yield d_inputs, d_outputs, d_residuals
-
-        # reset _names so users will see full vector contents
-        d_inputs._names = d_inputs._views
-        d_outputs._names = d_outputs._views
-        d_residuals._names = d_residuals._views
+            # reset _names so users will see full vector contents
+            d_inputs._names = d_inputs._views
+            d_outputs._names = d_outputs._views
 
     def get_nonlinear_vectors(self):
         """
