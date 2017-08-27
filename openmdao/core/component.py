@@ -118,13 +118,6 @@ class Component(System):
                         vbyset[set_name] = 0
                     vbyset[set_name] += 1
 
-                # if 0 in num_var_byset[vec_name][type_]:
-                #     print self.pathname, vec_name, type_, num_var[vec_name][type_], num_var_byset[vec_name][type_][0]
-                #     print relnames
-                #     if len(relnames) != num_var_byset[vec_name][type_][0]:
-                #         print"MISMATCH"
-                #     print
-
     def _setup_var_data(self, recurse=True):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.

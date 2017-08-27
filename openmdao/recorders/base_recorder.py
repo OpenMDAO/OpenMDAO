@@ -12,6 +12,7 @@ from openmdao.solvers.solver import Solver, NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import recording_iteration, \
     get_formatted_iteration_coordinate
 
+
 class BaseRecorder(object):
     """
     Base class for all case recorders and is not a functioning case recorder on its own.

@@ -1210,6 +1210,7 @@ class Problem(object):
         relevant = model._relevant
         fwd = (mode == 'fwd')
         prom2abs = model._var_allprocs_prom2abs_list['output']
+        abs2idx_out = model._var_allprocs_abs2idx['linear']['output']
 
         if wrt is None:
             wrt = list(self.driver._designvars)
@@ -1402,7 +1403,7 @@ class Problem(object):
                         if not test_mode and output_name not in relevant[input_name]:
                             # irrelevant output, just give zeros
                             if out_idxs is None:
-                                out_var_idx = model._var_allprocs_abs2idx['linear']['output'][output_name]
+                                out_var_idx = abs2idx_out[output_name]
                                 deriv_val = np.zeros(sizes[iproc, out_var_idx])
                             else:
                                 deriv_val = np.zeros(len(out_idxs))
@@ -1419,7 +1420,7 @@ class Problem(object):
                                     deriv_val = deriv_val[out_idxs]
 
                             if dup and nproc > 1:
-                                out_var_idx = model._var_allprocs_abs2idx['linear']['output'][output_name]
+                                out_var_idx = abs2idx_out[output_name]
                                 root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
                                 if deriv_val is None:
                                     if out_idxs is not None:

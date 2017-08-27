@@ -275,9 +275,20 @@ class ContainsAll(object):
     """
     A fake dictionary that always reports __contains__(name) to be True.
     """
+
     def __contains__(self, name):
         """
-        Always return True.
+        Return if the named object is contained.
+
+        Parameters
+        ----------
+        name : str
+            Name of the object being looked up.
+
+        Returns
+        -------
+        bool
+            Always returns True.
         """
         return True
 

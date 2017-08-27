@@ -305,7 +305,8 @@ class Group(System):
                     for set_name, rng in iteritems(subsystems_var_range_byset[vec_name][type_]):
                         iset = set2iset[type_][set_name]
                         rng[subsys.name] = (np.sum(allprocs_counters_byset[type_][:isub, iset]),
-                                    np.sum(allprocs_counters_byset[type_][:isub + 1, iset]))
+                                            np.sum(allprocs_counters_byset[type_][:isub + 1,
+                                                                                  iset]))
 
         # Recursion
         if recurse:
@@ -441,7 +442,8 @@ class Group(System):
                         continue
                     proc_slice = slice(*subsystems_proc_range[ind])
                     var_slice = slice(*subsystems_var_range[type_][subsys.name])
-                    sizes[vec_name][type_][proc_slice, var_slice] = subsys._var_sizes[vec_name][type_]
+                    sizes[vec_name][type_][proc_slice, var_slice] = \
+                        subsys._var_sizes[vec_name][type_]
 
                     for set_name, subsizes in iteritems(subsys._var_sizes_byset[vec_name][type_]):
                         var_slice = slice(*subsystems_var_range_byset[type_][set_name][subsys.name])
@@ -627,10 +629,10 @@ class Group(System):
             if self.pathname in relsys:
                 self._rel_vec_names.add(vec_name)
             for type_ in ('input', 'output'):
-                self._var_allprocs_relevant_names[vec_name][type_].extend(v for v in
-                    self._var_allprocs_abs_names[type_] if v in rel[type_])
-                self._var_relevant_names[vec_name][type_].extend(v for v in
-                    self._var_abs_names[type_] if v in rel[type_])
+                self._var_allprocs_relevant_names[vec_name][type_].extend(
+                    v for v in self._var_allprocs_abs_names[type_] if v in rel[type_])
+                self._var_relevant_names[vec_name][type_].extend(
+                    v for v in self._var_abs_names[type_] if v in rel[type_])
 
         for s in self._subsystems_myproc:
             s._setup_relevance(mode, relevant)
@@ -1685,10 +1687,6 @@ def get_relevant_vars(graph, desvars, responses, mode):
 
     grev = graph.reverse()
 
-    # lin_ins = set()
-    # lin_outs = set()
-    # lin_sys = set()
-
     for desvar in desvars:
         start_sys = (desvar.rsplit('.', 1)[0], 'dv')
         if start_sys not in edge_cache:
@@ -1718,16 +1716,13 @@ def get_relevant_vars(graph, desvars, responses, mode):
 
                 output_deps.update((desvar, response))
                 if fwd:
-                    relevant[desvar][response] = ({'input': input_deps, 'output': output_deps}, sys_deps)
+                    relevant[desvar][response] = ({'input': input_deps,
+                                                   'output': output_deps}, sys_deps)
                 else:  # rev
-                    relevant[response][desvar] = ({'input': input_deps, 'output': output_deps}, sys_deps)
+                    relevant[response][desvar] = ({'input': input_deps,
+                                                   'output': output_deps}, sys_deps)
 
-                sys_deps.add('')   # top level Group is always relevant
-
-            # if common_edges:
-            #     lin_ins.update(input_deps)
-            #     lin_outs.update(output_deps)
-            #     lin_sys.update(sys_deps)
+                sys_deps.add('')  # top level Group is always relevant
 
     if fwd:
         inputs, outputs = desvars, responses
@@ -1752,12 +1747,7 @@ def get_relevant_vars(graph, desvars, responses, mode):
         relinp['@all'] = ({'input': total_inps, 'output': total_outs},
                           total_systems)
 
-    # if desvars and responses:
-    #     relevant['linear'] = {'@all': ({'input': lin_ins, 'output': lin_outs},
-    #                                    lin_sys)}
-    # else:
     relevant['linear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
                                    ContainsAll())}
-    relevant['nonlinear'] = relevant['linear'] # {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
-                                      # ContainsAll())}
+    relevant['nonlinear'] = relevant['linear']
     return relevant

@@ -1,10 +1,12 @@
 """Management of iteration stack for recording."""
 
+
 class _RecIteration(object):
-    pass
+    def __init__(self):
+        self.stack = []
+
 
 recording_iteration = _RecIteration()
-recording_iteration.stack = []
 
 
 def print_recording_iteration_stack():

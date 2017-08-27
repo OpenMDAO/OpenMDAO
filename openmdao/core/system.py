@@ -235,6 +235,8 @@ class System(object):
         derivatives.
     _mode : str
         Indicates derivative direction for the model, either 'fwd' or 'rev'.
+    _scope_cache : dict
+        Cache for variables in the scope of various mat-vec products.
     """
 
     def __init__(self, **kwargs):
@@ -503,8 +505,12 @@ class System(object):
                 for type_ in ['input', 'output']:
                     ext_num_vars[vec_name][type_] = (0, 0)
                     ext_sizes[vec_name][type_] = (0, 0)
-                    ext_num_vars_byset[vec_name][type_] = {set_name: (0, 0) for set_name in self._var_set2iset[type_]}
-                    ext_sizes_byset[vec_name][type_] = {set_name: (0, 0) for set_name in self._var_set2iset[type_]}
+                    ext_num_vars_byset[vec_name][type_] = {
+                        set_name: (0, 0) for set_name in self._var_set2iset[type_]
+                    }
+                    ext_sizes_byset[vec_name][type_] = {
+                        set_name: (0, 0) for set_name in self._var_set2iset[type_]
+                    }
 
             return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
@@ -1019,7 +1025,7 @@ class System(object):
             self._relevant = relevant = {}
             relevant['nonlinear'] = {'@all': ({'input': ContainsAll(),
                                                'output': ContainsAll()},
-                                               ContainsAll())}
+                                              ContainsAll())}
             relevant['linear'] = relevant['nonlinear']
         else:
             self._relevant = relevant
@@ -1033,10 +1039,10 @@ class System(object):
             if self.pathname in relsys:
                 self._rel_vec_names.add(vec_name)
             for type_ in ('input', 'output'):
-                self._var_allprocs_relevant_names[vec_name][type_].extend(v for v in
-                    self._var_allprocs_abs_names[type_] if v in rel[type_])
-                self._var_relevant_names[vec_name][type_].extend(v for v in
-                    self._var_abs_names[type_] if v in rel[type_])
+                self._var_allprocs_relevant_names[vec_name][type_].extend(
+                    v for v in self._var_allprocs_abs_names[type_] if v in rel[type_])
+                self._var_relevant_names[vec_name][type_].extend(
+                    v for v in self._var_abs_names[type_] if v in rel[type_])
 
     def _setup_connections(self, recurse=True):
         """
