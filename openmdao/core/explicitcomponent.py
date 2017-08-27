@@ -294,7 +294,7 @@ class ExplicitComponent(Component):
                             outputs=[d_outputs], residuals=[d_residuals]):
                         if mode == 'fwd':
                             d_outputs.set_vec(d_residuals)
-                        elif mode == 'rev':
+                        else:  # rev
                             d_residuals.set_vec(d_outputs)
         return False, 0., 0.
 
