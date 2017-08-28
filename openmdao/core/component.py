@@ -105,7 +105,7 @@ class Component(System):
         num_var_byset = self._num_var_byset
         data = self._var_rel2data_io
 
-        for vec_name in self._lin_vec_names:
+        for vec_name in self._vec_names:
             num_var[vec_name] = {}
             num_var_byset[vec_name] = {}
             # Compute num_var
@@ -120,9 +120,6 @@ class Component(System):
                     if set_name not in vbyset:
                         vbyset[set_name] = 0
                     vbyset[set_name] += 1
-
-        num_var['nonlinear'] = num_var['linear']
-        num_var_byset['nonlinear'] = num_var_byset['linear']
 
     def _setup_var_data(self, recurse=True):
         """

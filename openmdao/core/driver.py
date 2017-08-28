@@ -413,38 +413,40 @@ class Driver(object):
             islices = {}
             oslices = {}
             for okey, oval in iteritems(derivs):
-                if do_wrt:
-                    for ikey, val in iteritems(oval):
-                        istart = isize
-                        isize += val.shape[1]
-                        islices[ikey] = slice(istart, isize)
+                #if do_wrt:
+                for ikey, val in iteritems(oval):
+                    istart = isize
+                    isize += val.shape[1]
+                    print(okey, ikey, val.shape[1], val.shape)
+                    islices[ikey] = slice(istart, isize)
 
                 do_wrt = False
                 ostart = osize
                 osize += oval[ikey].shape[0]
+                print(okey, oval[ikey].shape[0], oval[ikey].shape)
                 oslices[okey] = slice(ostart, osize)
 
             new_derivs = np.zeros((osize, isize))
 
+            relevant = prob.model._relevant
+
             # Apply driver ref/ref0 and position subjac into array jacobian.
             for okey, oval in iteritems(derivs):
+                oscaler = self._responses[okey]['scaler']
                 for ikey, val in iteritems(oval):
+                    if okey in relevant[ikey]: 
+                        iscaler = self._designvars[ikey]['scaler']
 
-                    imeta = self._designvars[ikey]
-                    ometa = self._responses[okey]
+                        # Scale response side
+                        if oscaler is not None:
+                            val[:] = (oscaler * val.T).T
 
-                    iscaler = imeta['scaler']
-                    oscaler = ometa['scaler']
+                        # Scale design var side
+                        if iscaler is not None:
+                            val *= 1.0 / iscaler
 
-                    # Scale response side
-                    if oscaler is not None:
-                        val[:] = (oscaler * val.T).T
-
-                    # Scale design var side
-                    if iscaler is not None:
-                        val *= 1.0 / iscaler
-
-                    new_derivs[oslices[okey], islices[ikey]] = val
+                        print(okey, ikey, oslices[okey], islices[ikey], val.shape)
+                        new_derivs[oslices[okey], islices[ikey]] = val
 
             derivs = new_derivs
 
