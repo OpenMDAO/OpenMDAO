@@ -7,6 +7,7 @@ import numpy
 
 from openmdao.api import Problem, Group, ParallelGroup, ExecComp, IndepVarComp, \
                          ExplicitComponent
+from openmdao.utils.mpi import MPI
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -261,6 +262,7 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
         assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
 
+    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_setup_messages(self):
 
         class Noisy(ConvergeDiverge):
