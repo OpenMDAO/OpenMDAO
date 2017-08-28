@@ -134,6 +134,9 @@ class DirectSolver(LinearSolver):
         float
             relative error.
         """
+        if len(vec_names) > 1:
+            raise RuntimeError("DirectSolvers with multiple right-hand-sides are not supported.")
+
         self._vec_names = vec_names
         self._mode = mode
 

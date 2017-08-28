@@ -447,33 +447,5 @@ class MatMatTestCase(unittest.TestCase):
         for i in range(N_PHASES):
             assert_rel_error(self, expected, p['p%d.y_lgl' % i], 1.e-5)
 
-    def test_phases_multi_dense_fwd(self):
-        N_PHASES = 4
-        p, expected = phase_model(order=20, nphases=N_PHASES, vectorize=True)
-
-        p.model.jacobian = DenseJacobian()
-        p.model.linear_solver = DirectSolver()
-
-        p.setup(check=False, mode='fwd')
-
-        p.run_driver()
-
-        for i in range(N_PHASES):
-            assert_rel_error(self, expected, p['p%d.y_lgl' % i], 1.e-5)
-
-    def test_phases_multi_dense_rev(self):
-        N_PHASES = 4
-        p, expected = phase_model(order=20, nphases=N_PHASES, vectorize=True)
-
-        p.model.jacobian = DenseJacobian()
-        p.model.linear_solver = DirectSolver()
-
-        p.setup(check=False, mode='rev')
-
-        p.run_driver()
-
-        for i in range(N_PHASES):
-            assert_rel_error(self, expected, p['p%d.y_lgl' % i], 1.e-5)
-
 if __name__ == '__main__':
     unittest.main()
