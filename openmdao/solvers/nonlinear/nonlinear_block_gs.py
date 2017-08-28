@@ -49,11 +49,13 @@ class NonlinearBlockGS(NonlinearSolver):
         float
             error at the first iteration.
         """
-        self._aitken_work1 = self._system._outputs._clone()
-        self._aitken_work2 = self._system._outputs._clone()
-        self._aitken_work3 = self._system._outputs._clone()
-        self._aitken_work4 = self._system._outputs._clone()
-        self._theta_n_1 = 1.
+        
+        if self.options['use_aitken']:
+            self._aitken_work1 = self._system._outputs._clone()
+            self._aitken_work2 = self._system._outputs._clone()
+            self._aitken_work3 = self._system._outputs._clone()
+            self._aitken_work4 = self._system._outputs._clone()
+            self._theta_n_1 = 1.
 
         return super(NonlinearBlockGS, self)._iter_initialize()        
 
@@ -62,22 +64,24 @@ class NonlinearBlockGS(NonlinearSolver):
         Perform the operations in the iteration loop.
         """
         system = self._system
-        outputs = self._system._outputs
         
         use_aitken = self.options['use_aitken']
-        aitken_min_factor = self.options['aitken_min_factor']
-        aitken_max_factor = self.options['aitken_max_factor']
+        
+        if use_aitken:
+            outputs = self._system._outputs
+            aitken_min_factor = self.options['aitken_min_factor']
+            aitken_max_factor = self.options['aitken_max_factor']
 
-        # some variables that are used for Aitken's relaxation:
-        delta_outputs_n_1 = self._aitken_work1
-        delta_outputs_n = self._aitken_work2
-        outputs_n = self._aitken_work3
-        temp = self._aitken_work4
-        theta_n_1 = self._theta_n_1
-        # store a copy of the outputs, used to compute the change in outputs later
-        delta_outputs_n.set_vec(outputs)  
-        # store a copy of the outputs
-        outputs_n.set_vec(outputs) 
+            # some variables that are used for Aitken's relaxation
+            delta_outputs_n_1 = self._aitken_work1
+            delta_outputs_n = self._aitken_work2
+            outputs_n = self._aitken_work3
+            temp = self._aitken_work4
+            theta_n_1 = self._theta_n_1
+            # store a copy of the outputs, used to compute the change in outputs later
+            delta_outputs_n.set_vec(outputs)  
+            # store a copy of the outputs
+            outputs_n.set_vec(outputs) 
 
         self._solver_info.prefix += '|  '
         for isub, subsys in enumerate(system._subsystems_myproc):
@@ -85,35 +89,36 @@ class NonlinearBlockGS(NonlinearSolver):
             subsys._solve_nonlinear()
             system._check_reconf_update()
 
-        # compute the change in the outputs after the NLBGS iteration
-        delta_outputs_n -= outputs 
-        delta_outputs_n *= -1
+        if use_aitken:
+            # compute the change in the outputs after the NLBGS iteration
+            delta_outputs_n -= outputs 
+            delta_outputs_n *= -1
 
-        if self._iter_count >= 2 and use_aitken:
-            # Compute relaxation factor. This method is used by Kenway et al. in 
-            # "Scalable Parallel Approach for High-Fidelity Steady-State Aero-
-            # elastic Analysis and Adjoint Derivative Computations" (ln 22 of Algo 1)
+            if self._iter_count >= 2:
+                # Compute relaxation factor. This method is used by Kenway et al. in 
+                # "Scalable Parallel Approach for High-Fidelity Steady-State Aero-
+                # elastic Analysis and Adjoint Derivative Computations" (ln 22 of Algo 1)
 
-            temp.set_vec(delta_outputs_n)
-            temp -= delta_outputs_n_1
-            temp_norm = temp.get_norm()
-            if temp_norm == 0.:
-                temp_norm = 1e-12 # prevent division by 0 in the next line 
-            theta_n = theta_n_1 * (1 - temp.dot(delta_outputs_n) / temp_norm ** 2)
-            # limit relaxation factor to the specified range
-            theta_n = max(aitken_min_factor, min(aitken_max_factor, theta_n)) 
-            # save relaxation factor for the next iteration
-            theta_n_1 = theta_n 
-        else:
-            theta_n = 1.
+                temp.set_vec(delta_outputs_n)
+                temp -= delta_outputs_n_1
+                temp_norm = temp.get_norm()
+                if temp_norm == 0.:
+                    temp_norm = 1e-12 # prevent division by 0 in the next line 
+                theta_n = theta_n_1 * (1 - temp.dot(delta_outputs_n) / temp_norm ** 2)
+                # limit relaxation factor to the specified range
+                theta_n = max(aitken_min_factor, min(aitken_max_factor, theta_n)) 
+                # save relaxation factor for the next iteration
+                theta_n_1 = theta_n 
+            else:
+                theta_n = 1.
 
-        outputs.set_vec(outputs_n)
+            outputs.set_vec(outputs_n)
 
-        # compute relaxed outputs
-        outputs.add_scal_vec(theta_n, delta_outputs_n)
+            # compute relaxed outputs
+            outputs.add_scal_vec(theta_n, delta_outputs_n)
 
-        # save update to use in next iteration 
-        delta_outputs_n_1.set_vec(delta_outputs_n)
+            # save update to use in next iteration 
+            delta_outputs_n_1.set_vec(delta_outputs_n)
 
         self._solver_info.prefix = self._solver_info.prefix[:-3]
 
