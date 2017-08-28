@@ -1735,6 +1735,12 @@ def get_relevant_vars(graph, desvars, responses, mode):
                         input_deps.update(inputs)
 
                 output_deps.update((desvar, response))
+            elif desvar == response:
+                input_deps = set()
+                output_deps = set([response])
+                sys_deps = set([start_sys[0]])
+
+            if common_edges or desvar == response:
                 if fwd:
                     relevant[desvar][response] = ({'input': input_deps,
                                                    'output': output_deps}, sys_deps)
