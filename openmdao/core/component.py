@@ -237,7 +237,7 @@ class Component(System):
         for of, wrt, method, kwargs in self._approximated_partials:
             self._approx_partials(of, wrt, method=method, **kwargs)
 
-    def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
+    def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=True,
                   units=None, desc='', var_set=0):
         """
         Add an input variable to the component.

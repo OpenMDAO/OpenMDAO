@@ -1057,7 +1057,7 @@ class Group(System):
 
         return subsys
 
-    def connect(self, src_name, tgt_name, src_indices=None, flat_src_indices=None):
+    def connect(self, src_name, tgt_name, src_indices=None, flat_src_indices=True):
         """
         Connect source src_name to target tgt_name in this namespace.
 
