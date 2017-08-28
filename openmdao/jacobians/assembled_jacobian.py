@@ -112,8 +112,12 @@ class AssembledJacobian(Jacobian):
             src_indices_dict[abs_name] = \
                 system._var_abs2meta['input'][abs_name]['src_indices']
 
-        for j, s in enumerate(self._system.system_iter(local=True, recurse=True,
-                                                       include_self=True)):
+        # If the AssembledJacobian is slotted into a Component, then we handle things a little
+        # differently.
+        recurse = not isinstance(system, Component)
+
+        for s in self._system.system_iter(local=True, recurse=recurse,
+                                          include_self=True):
 
             min_res_offset = sys.maxsize
             max_res_offset = 0
@@ -167,11 +171,8 @@ class AssembledJacobian(Jacobian):
 
                     self._keymap[abs_key] = abs_key
 
-                    if j == 0 or in_abs_name in system._conn_global_abs_in2out:
-                        if j == 0:
-                            out_abs_name = in_abs_name
-                        else:
-                            out_abs_name = system._conn_global_abs_in2out[in_abs_name]
+                    if in_abs_name in system._conn_global_abs_in2out:
+                        out_abs_name = system._conn_global_abs_in2out[in_abs_name]
                         out_offset, _ = out_ranges[out_abs_name]
                         src_indices = src_indices_dict[in_abs_name]
 
@@ -330,13 +331,17 @@ class AssembledJacobian(Jacobian):
         with system._unscaled_context(
                 outputs=[d_outputs], residuals=[d_residuals]):
             if mode == 'fwd':
-                d_residuals.iadd_data(int_mtx._prod(d_outputs.get_data(), mode, int_ranges))
-                if ext_mtx is not None:
+                if len(d_outputs._names) > 0 and len(d_residuals._names) > 0:
+                    d_residuals.iadd_data(int_mtx._prod(d_outputs.get_data(), mode, int_ranges))
+                if ext_mtx is not None and \
+                   len(d_inputs._names) > 0 and len(d_residuals._names) > 0:
                     d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, None))
             elif mode == 'rev':
                 dresids = d_residuals.get_data()
-                d_outputs.iadd_data(int_mtx._prod(dresids, mode, int_ranges))
-                if ext_mtx is not None:
+                if len(d_outputs._names) > 0 and len(d_residuals._names) > 0:
+                    d_outputs.iadd_data(int_mtx._prod(dresids, mode, int_ranges))
+                if ext_mtx is not None and \
+                    len(d_inputs._names) > 0 and len(d_residuals._names) > 0:
                     d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None))
 
 

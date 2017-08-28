@@ -229,15 +229,20 @@ class ExplicitComponent(Component):
 
                     # Jacobian and vectors are all scaled, unitless
                     with self.jacobian_context() as J:
+                        print(self.pathname)
+                        print('before', d_inputs.get_data(), d_outputs.get_data(), d_residuals.get_data())
                         J._apply(d_inputs, d_outputs, d_residuals, mode)
+                        print('after', d_inputs.get_data(), d_outputs.get_data(), d_residuals.get_data())
 
                     # Jacobian and vectors are all unscaled, dimensional
-                    with self._unscaled_context(
-                            outputs=[self._outputs], residuals=[d_residuals]):
-                        d_residuals *= -1.0
-                        self.compute_jacvec_product(self._inputs, self._outputs,
-                                                    d_inputs, d_residuals, mode)
-                        d_residuals *= -1.0
+                    if not self._owns_assembled_jac:
+                        with self._unscaled_context(
+                                outputs=[self._outputs], residuals=[d_residuals]):
+                            d_residuals *= -1.0
+                            self.compute_jacvec_product(self._inputs, self._outputs,
+                                                        d_inputs, d_residuals, mode)
+                            d_residuals *= -1.0
+                    print('after jacvec', d_inputs.get_data(), d_outputs.get_data(), d_residuals.get_data())
 
     def _solve_linear(self, vec_names, mode):
         """

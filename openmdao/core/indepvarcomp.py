@@ -7,6 +7,7 @@ import collections
 from six import string_types
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.general_utils import warn_deprecation
 
 
@@ -43,6 +44,10 @@ class IndepVarComp(ExplicitComponent):
         super(IndepVarComp, self).__init__()
         self._indep = []
         self._indep_external = []
+
+        # No need for the default jacobian here.
+        self._jacobian = DictionaryJacobian()
+        self._owns_assembled_jac = False
 
         # A single variable is declared during instantiation
         if isinstance(name, string_types):
