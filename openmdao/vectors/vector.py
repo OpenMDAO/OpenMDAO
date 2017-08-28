@@ -500,7 +500,7 @@ class Vector(object):
         Parameters
         ----------
         vec : <Vector>
-            the vector whose values self is set to.
+            The incoming vector being dotted with self.
         """
         pass
 
