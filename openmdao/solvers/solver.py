@@ -214,6 +214,7 @@ class Solver(object):
             with Recording(type(self).__name__, self._iter_count, self) as rec:
                 self._iter_execute()
                 self._iter_count += 1
+                self._run_apply()
                 norm = self._iter_get_norm()
                 # With solvers, we want to record the norm AFTER the call, but the call needs to
                 # be wrapped in the with for stack purposes, so we locally assign  norm & norm0
@@ -263,6 +264,12 @@ class Solver(object):
     def _iter_execute(self):
         """
         Perform the operations in the iteration loop.
+        """
+        pass
+
+    def _run_apply(self):
+        """
+        Run the appropriate apply method on the system.
         """
         pass
 
@@ -365,11 +372,20 @@ class NonlinearSolver(Solver):
             error at the first iteration.
         """
         if self.options['maxiter'] > 0:
+            self._run_apply()
             norm = self._iter_get_norm()
         else:
             norm = 1.0
         norm0 = norm if norm != 0.0 else 1.0
         return norm0, norm
+
+    def _run_apply(self):
+        """
+        Run the the apply_nonlinear method on the system.
+        """
+        recording_iteration.stack.append(('_run_apply', 0))
+        self._system._apply_nonlinear()
+        recording_iteration.stack.pop()
 
     def _iter_get_norm(self):
         """
@@ -380,12 +396,6 @@ class NonlinearSolver(Solver):
         float
             norm.
         """
-        recording_iteration.stack.append(('_iter_get_norm', 0))
-
-        self._system._apply_nonlinear()
-
-        recording_iteration.stack.pop()
-
         return self._system._residuals.get_norm()
 
 
@@ -442,11 +452,24 @@ class LinearSolver(Solver):
                 self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
 
         if self.options['maxiter'] > 1:
+            self._run_apply()
             norm = self._iter_get_norm()
         else:
             norm = 1.0
         norm0 = norm if norm != 0.0 else 1.0
         return norm0, norm
+
+    def _run_apply(self):
+        """
+        Run the the apply_linear method on the system.
+        """
+        recording_iteration.stack.append(('_run_apply', 0))
+
+        system = self._system
+        scope_out, scope_in = system._get_scope()
+        system._apply_linear(self._vec_names, self._mode, scope_out, scope_in)
+
+        recording_iteration.stack.pop()
 
     def _iter_get_norm(self):
         """
@@ -457,13 +480,7 @@ class LinearSolver(Solver):
         float
             norm.
         """
-        recording_iteration.stack.append(('_iter_get_norm', 0))
-
         system = self._system
-        scope_out, scope_in = system._get_scope()
-        system._apply_linear(self._vec_names, self._mode, scope_out, scope_in)
-
-        recording_iteration.stack.pop()
 
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']

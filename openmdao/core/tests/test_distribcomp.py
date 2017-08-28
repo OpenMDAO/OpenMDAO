@@ -6,7 +6,7 @@ import time
 import six
 import numpy as np
 
-from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp
+from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp, ExecComp
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.devtools.testutil import assert_rel_error
@@ -18,8 +18,10 @@ except ImportError:
 
 if MPI:
     rank = MPI.COMM_WORLD.rank
+    commsize = MPI.COMM_WORLD.size
 else:
     rank = 0
+    commsize = 1
 
 
 def take_nth(rank, size, seq):
@@ -111,7 +113,7 @@ class DistribInputComp(ExplicitComponent):
 
         self.add_input('invec', np.ones(self.sizes[rank], float),
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_output('outvec', np.ones(self.arr_size, float))
+        self.add_output('outvec', np.ones(self.arr_size, float), shape=np.int32(self.arr_size))
 
     def get_req_procs(self):
         return (2, 2)
@@ -307,6 +309,28 @@ class MPITests(unittest.TestCase):
 
         self.assertTrue(all(C2._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
+    def test_distrib_1D_dist_output(self):
+        size = 11
+
+        p = Problem(model=Group())
+        top = p.model
+        C1 = top.add_subsystem("C1", InOutArrayComp(size))
+        C2 = top.add_subsystem("C2", DistribInputComp(size))
+        C3 = top.add_subsystem("C3", ExecComp("y=x", x=np.zeros(size*commsize),
+                                              y=np.zeros(size*commsize)))
+        top.connect('C1.outvec', 'C2.invec')
+        top.connect('C2.outvec', 'C3.x')
+        p.setup(vector_class=PETScVector, check=False)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
+
+        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+
+        p.run_model()
+
+        self.assertTrue(all(C2._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
+
     def test_distrib_idx_in_distrb_idx_out(self):
         # normal comp to distrib comp to distrb gather comp
         size = 3
@@ -329,7 +353,7 @@ class MPITests(unittest.TestCase):
 
         self.assertTrue(all(C3._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
-    @unittest.skipUnless(MPI, "only run under MPI")
+    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_distribcomp_feature(self):
         from openmdao.utils.array_utils import evenly_distrib_idxs
 
@@ -441,7 +465,7 @@ class MPITests(unittest.TestCase):
             self.assertTrue(all(C2._outputs['outvec'] == C1._outputs['outvec']*2.))
             self.assertTrue(all(C3._outputs['outvec'] == C2._outputs['outvec']))
 
-    @unittest.skipUnless(MPI, "only run under MPI")
+    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_overlapping_inputs_idxs(self):
         # distrib comp with src_indices that overlap, i.e. the same
         # entries are distributed to multiple processes

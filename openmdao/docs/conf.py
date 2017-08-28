@@ -49,11 +49,11 @@ def __init__(self, docstring, config={}):
         e.docstring = orig_docstring
         raise
 
-    # In creation of usr docs, remove private Attributes (beginning with '_')
+    # In creation of docs, remove private Attributes (beginning with '_')
     # with a crazy list comprehension
-    if tags.has("usr"):
-        self._parsed_data["Attributes"][:] = [att for att in self._parsed_data["Attributes"]
-                                              if not att[0].startswith('_')]
+    self._parsed_data["Attributes"][:] = [att for att in self._parsed_data["Attributes"]
+                                          if not att[0].startswith('_')]
+
 NumpyDocString.__init__ = __init__
 
 do_monkeypatch()
@@ -128,13 +128,11 @@ language = None
 
 # exclude_patterns is a list of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-if tags.has("usr"):
-    from openmdao.docs._utils.generate_sourcedocs import generate_docs
-    if tags.has("usr"):
-        exclude_patterns = ['_build', '_srcdocs/dev']
-        absp = os.path.join('.', '_srcdocs', 'usr')
-        sys.path.insert(0, os.path.abspath(absp))
-        generate_docs("usr")
+from openmdao.docs._utils.generate_sourcedocs import generate_docs
+exclude_patterns = ['_build', '_srcdocs/dev']
+absp = os.path.join('.', '_srcdocs')
+sys.path.insert(0, os.path.abspath(absp))
+generate_docs()
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
@@ -167,6 +165,10 @@ html_last_updated_fmt = '%b %d, %Y'
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'OpenMDAOdoc'
 
+#Customize sidebar
+html_sidebars = {
+   '**': ['globaltoc.html']
+}
 # -- Options for manual page output ---------------------------------------
 
 # One entry per manual page. List of tuples

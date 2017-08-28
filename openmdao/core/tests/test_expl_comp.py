@@ -2,7 +2,6 @@
 from __future__ import division
 
 from six import assertRaisesRegex
-from six.moves import cStringIO
 
 import unittest
 
@@ -76,6 +75,30 @@ class ExplCompTestCase(unittest.TestCase):
     def test_compute_and_list(self):
         prob = Problem(RectangleGroup())
         prob.setup(check=False)
+
+        msg = "Unable to list inputs until model has been run."
+        try:
+            prob.model.list_inputs()
+        except Exception as err:
+            self.assertTrue(msg == str(err))
+        else:
+            self.fail("Exception expected")
+
+        msg = "Unable to list outputs until model has been run."
+        try:
+            prob.model.list_outputs()
+        except Exception as err:
+            self.assertTrue(msg == str(err))
+        else:
+            self.fail("Exception expected")
+
+        msg = "Unable to list residuals until model has been run."
+        try:
+            prob.model.list_residuals()
+        except Exception as err:
+            self.assertTrue(msg == str(err))
+        else:
+            self.fail("Exception expected")
 
         prob['comp1.length'] = 3.
         prob['comp1.width'] = 2.

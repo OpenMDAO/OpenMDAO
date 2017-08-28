@@ -11,6 +11,7 @@ from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver, Group, PET
                          IndepVarComp, NonlinearBlockGS, NonlinearBlockJac, LinearBlockGS
 from openmdao.test_suite.components.double_sellar import SubSellar
 from openmdao.test_suite.components.sellar import SellarDerivatives
+from openmdao.utils.mpi import MPI
 
 
 def run_model(prob):
@@ -308,6 +309,7 @@ class MPITests(unittest.TestCase):
 
     N_PROCS = 2
 
+    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_hierarchy_iprint(self):
         prob = Problem()
         model = prob.model

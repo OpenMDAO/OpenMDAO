@@ -16,8 +16,8 @@ from openmdao.devtools.testutil import assert_rel_error
 class QuadraticComp(ImplicitComponent):
     """
     A Simple Implicit Component representing a Quadratic Equation.
-    
-    R(a, b, c, x) = ax^2 + bx + c 
+
+    R(a, b, c, x) = ax^2 + bx + c
 
     Solution via Quadratic Formula:
     x = (-b + sqrt(b^2 - 4ac)) / 2a
@@ -129,12 +129,12 @@ class ImplicitCompTestCase(unittest.TestCase):
 
         prob = Problem(model=group)
         prob.setup(check=False)
-        prob.run_model()
 
         self.prob = prob
 
     def test_compute_and_derivs(self):
         prob = self.prob
+        prob.run_model()
 
         assert_rel_error(self, prob['comp2.x'], 3.)
         assert_rel_error(self, prob['comp2.x'], 3.)
@@ -150,7 +150,36 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, total_derivs['comp3.x', 'comp1.b'], [[-1.5]])
         assert_rel_error(self, total_derivs['comp3.x', 'comp1.c'], [[-0.5]])
 
+    def test_list_inputs_before_run(self):
+        msg = "Unable to list inputs until model has been run."
+        try:
+            self.prob.model.list_inputs()
+        except Exception as err:
+            self.assertTrue(msg == str(err))
+        else:
+            self.fail("Exception expected")
+
+    def test_list_outputs_before_run(self):
+        msg = "Unable to list outputs until model has been run."
+        try:
+            self.prob.model.list_outputs()
+        except Exception as err:
+            self.assertTrue(msg == str(err))
+        else:
+            self.fail("Exception expected")
+
+    def test_list_residuals_before_run(self):
+        msg = "Unable to list residuals until model has been run."
+        try:
+            self.prob.model.list_residuals()
+        except Exception as err:
+            self.assertTrue(msg == str(err))
+        else:
+            self.fail("Exception expected")
+
     def test_list_inputs(self):
+        self.prob.run_model()
+
         stream = cStringIO()
         inputs = self.prob.model.list_inputs(out_stream=stream)
         self.assertEqual(sorted(inputs), [
@@ -167,6 +196,8 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('value:'), 6)
 
     def test_list_explicit_outputs(self):
+        self.prob.run_model()
+
         stream = cStringIO()
         outputs = self.prob.model.list_outputs(implicit=False, out_stream=stream)
         self.assertEqual(sorted(outputs), [
@@ -180,6 +211,8 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('residual:'), 3)
 
     def test_list_implicit_outputs(self):
+        self.prob.run_model()
+
         stream = cStringIO()
         states = self.prob.model.list_outputs(explicit=False, out_stream=stream)
         self.assertEqual(sorted(states), [
@@ -193,6 +226,8 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('residual:'), 2)
 
     def test_list_residuals(self):
+        self.prob.run_model()
+
         stream = cStringIO()
         resids = self.prob.model.list_residuals(out_stream=stream)
         self.assertEqual(sorted(resids), [
@@ -250,6 +285,134 @@ class ImplicitCompTestCase(unittest.TestCase):
 
         prob.run_model()
         assert_rel_error(self, prob['comp2.x'], 3.)
+
+    def test_guess_nonlinear_transfer(self):
+        # Test that data is transfered to a component before calling guess_nonlinear.
+
+        class ImpWithInitial(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 3.0)
+                self.add_output('y', 4.0)
+
+            def solve_nonlinear(self, inputs, outputs):
+                """ Do nothing. """
+                pass
+
+            def apply_nonlinear(self, inputs, outputs, resids):
+                """ Do nothing. """
+                pass
+
+            def guess_nonlinear(self, inputs, outputs, resids):
+                # Passthrough
+                outputs['y'] = inputs['x']
+
+
+        group = Group()
+
+        group.add_subsystem('px', IndepVarComp('x', 77.0))
+        group.add_subsystem('comp1', ImpWithInitial())
+        group.add_subsystem('comp2', ImpWithInitial())
+        group.connect('px.x', 'comp1.x')
+        group.connect('comp1.y', 'comp2.x')
+
+        group.nonlinear_solver = NewtonSolver()
+        group.nonlinear_solver.options['maxiter'] = 1
+
+        prob = Problem(model=group)
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+
+        prob.run_model()
+        assert_rel_error(self, prob['comp2.y'], 77., 1e-5)
+
+    def test_guess_nonlinear_transfer_subbed(self):
+        # Test that data is transfered to a component before calling guess_nonlinear.
+
+        class ImpWithInitial(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 3.0)
+                self.add_output('y', 4.0)
+
+            def solve_nonlinear(self, inputs, outputs):
+                """ Do nothing. """
+                pass
+
+            def apply_nonlinear(self, inputs, outputs, resids):
+                """ Do nothing. """
+                resids['y'] = 1.0e-6
+                pass
+
+            def guess_nonlinear(self, inputs, outputs, resids):
+                # Passthrough
+                outputs['y'] = inputs['x']
+
+
+        group = Group()
+        sub = Group()
+
+        group.add_subsystem('px', IndepVarComp('x', 77.0))
+        sub.add_subsystem('comp1', ImpWithInitial())
+        sub.add_subsystem('comp2', ImpWithInitial())
+        group.connect('px.x', 'sub.comp1.x')
+        group.connect('sub.comp1.y', 'sub.comp2.x')
+
+        group.add_subsystem('sub', sub)
+
+        group.nonlinear_solver = NewtonSolver()
+        group.nonlinear_solver.options['maxiter'] = 1
+
+        prob = Problem(model=group)
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+
+        prob.run_model()
+        assert_rel_error(self, prob['sub.comp2.y'], 77., 1e-5)
+
+    def test_guess_nonlinear_transfer_subbed2(self):
+        # Test that data is transfered to a component before calling guess_nonlinear.
+
+        class ImpWithInitial(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 3.0)
+                self.add_output('y', 4.0)
+
+            def solve_nonlinear(self, inputs, outputs):
+                """ Do nothing. """
+                pass
+
+            def apply_nonlinear(self, inputs, outputs, resids):
+                """ Do nothing. """
+                resids['y'] = 1.0e-6
+                pass
+
+            def guess_nonlinear(self, inputs, outputs, resids):
+                # Passthrough
+                outputs['y'] = inputs['x']
+
+
+        group = Group()
+        sub = Group()
+
+        group.add_subsystem('px', IndepVarComp('x', 77.0))
+        sub.add_subsystem('comp1', ImpWithInitial())
+        sub.add_subsystem('comp2', ImpWithInitial())
+        group.connect('px.x', 'sub.comp1.x')
+        group.connect('sub.comp1.y', 'sub.comp2.x')
+
+        group.add_subsystem('sub', sub)
+
+        sub.nonlinear_solver = NewtonSolver()
+        sub.nonlinear_solver.options['maxiter'] = 1
+
+        prob = Problem(model=group)
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+
+        prob.run_model()
+        assert_rel_error(self, prob['sub.comp2.y'], 77., 1e-5)
 
     def test_guess_nonlinear_feature(self):
 

@@ -8,7 +8,6 @@ from itertools import product
 
 from openmdao.core.component import Component
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import warn_deprecation
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
 

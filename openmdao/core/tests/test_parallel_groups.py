@@ -7,7 +7,9 @@ import numpy
 
 from openmdao.api import Problem, Group, ParallelGroup, ExecComp, IndepVarComp, \
                          ExplicitComponent
+
 from openmdao.utils.mpi import under_mpirun
+from openmdao.utils.mpi import MPI
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -278,7 +280,7 @@ class TestParallelGroups(unittest.TestCase):
                    "running in parallel under MPI but 'DefaultVector' was specified.")
             with self.assertRaises(ValueError) as cm:
                 prob.setup(check=False, mode='fwd')
-    
+
             self.assertEqual(str(cm.exception), msg)
         else:
             prob.setup(check=False, mode='fwd')

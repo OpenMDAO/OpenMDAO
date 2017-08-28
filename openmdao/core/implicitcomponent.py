@@ -26,6 +26,15 @@ class ImplicitComponent(Component):
         """
         super(ImplicitComponent, self).__init__(**kwargs)
 
+        if overrides_method('guess_nonlinear', self, ImplicitComponent):
+            self._has_guess = True
+
+    def _configure(self):
+        """
+        Configure this system to assign children settings.
+
+        Also tag component if it provides a guess_nonlinear.
+        """
         self.matrix_free = overrides_method('apply_linear', self, ImplicitComponent)
         self.supports_multivecs = overrides_method('apply_multi_linear',
                                                    self, ImplicitComponent)
@@ -72,6 +81,13 @@ class ImplicitComponent(Component):
                 return result, 0., 0.
             else:
                 return result
+
+    def _guess_nonlinear(self):
+        """
+        Provide initial guess for states.
+        """
+        with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
+            self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
 
     def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """

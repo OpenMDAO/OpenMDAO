@@ -152,7 +152,7 @@ class MPITests2(unittest.TestCase):
 
     N_PROCS = 2
 
-    @unittest.skipUnless(MPI, "only run under MPI")
+    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_distrib_shape(self):
         points = numpy.array([
             [0., 0., 0.],
@@ -186,7 +186,7 @@ class MPITests2(unittest.TestCase):
 
         assert_rel_error(self, prob['total.y'], final)
 
-    @unittest.skipUnless(MPI, "only run under MPI")
+    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_two_simple(self):
         size = 3
         group = Group()
@@ -221,7 +221,7 @@ class MPITests2(unittest.TestCase):
         J = prob.compute_total_derivs(['C2.z'], ['P.x'])
         assert_rel_error(self, J['C2.z', 'P.x'], numpy.diag([6.0, 6.0, 9.0]), 1e-6)
 
-    @unittest.skipUnless(MPI, "only run under MPI")
+    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_fan_out_grouped(self):
         size = 3
         prob = Problem()
@@ -274,7 +274,7 @@ class MPITests2(unittest.TestCase):
         assert_rel_error(self, J['C2.y', 'P.x'], diag1, 1e-6)
         assert_rel_error(self, J['C3.y', 'P.x'], diag2, 1e-6)
 
-    @unittest.skipUnless(MPI, "only run under MPI")
+    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_fan_in_grouped(self):
         size = 3
 
@@ -417,6 +417,7 @@ class MPITests3(unittest.TestCase):
 
     N_PROCS = 3
 
+    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_distrib_apply(self):
         p = Problem()
 

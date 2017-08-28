@@ -61,11 +61,14 @@ class Component(System):
         **kwargs : dict of keyword arguments
             available here and in all descendants of this system.
         """
-        super(Component, self).__init__(**kwargs)
-        self._approx_schemes = OrderedDict()
-
+        # put these here to prevent them from possibly overriding values set
+        # by the user in initialize().
         self.matrix_free = False
         self.distributed = False
+
+        super(Component, self).__init__(**kwargs)
+
+        self._approx_schemes = OrderedDict()
 
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}
@@ -803,3 +806,11 @@ class Component(System):
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()
+
+    def _guess_nonlinear(self):
+        """
+        Provide initial guess for states.
+
+        Does nothing on any non-implicit component.
+        """
+        pass
