@@ -63,7 +63,7 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('comp.y1')
         model.add_constraint('comp.y2')
 
-        prob.setup(check=False)
+        prob.setup(check=False, mode='fwd')
         prob.run_driver()
 
         derivs = prob.driver._compute_total_derivs(of=['comp.y1'], wrt=['px.x'],
