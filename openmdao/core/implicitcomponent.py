@@ -6,8 +6,9 @@ import numpy as np
 from six import itervalues
 
 from openmdao.core.component import Component
-from openmdao.utils.class_util import overrides_method
+from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS, DenseJacobian
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.utils.class_util import overrides_method
 
 
 class ImplicitComponent(Component):
@@ -28,6 +29,10 @@ class ImplicitComponent(Component):
 
         if overrides_method('guess_nonlinear', self, ImplicitComponent):
             self._has_guess = True
+
+        # For components, default to DenseJacobian for performance.
+        self._jacobian = DenseJacobian()
+        self._owns_assembled_jac = True
 
     def _configure(self):
         """
@@ -116,12 +121,11 @@ class ImplicitComponent(Component):
                     print('after', d_inputs.get_data(), d_outputs.get_data(), d_residuals.get_data())
 
                 # Jacobian and vectors are all unscaled, dimensional
-                if not self._owns_assembled_jac:
-                    with self._unscaled_context(
-                            outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
-                        with Recording(self.pathname + '._apply_linear', self.iter_count, self):
-                            self.apply_linear(self._inputs, self._outputs,
-                                              d_inputs, d_outputs, d_residuals, mode)
+                with self._unscaled_context(
+                        outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
+                    with Recording(self.pathname + '._apply_linear', self.iter_count, self):
+                        self.apply_linear(self._inputs, self._outputs,
+                                          d_inputs, d_outputs, d_residuals, mode)
                 print('after jacvec', d_inputs.get_data(), d_outputs.get_data(), d_residuals.get_data())
 
     def _solve_linear(self, vec_names, mode):

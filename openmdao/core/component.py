@@ -13,7 +13,7 @@ from collections import OrderedDict, Iterable
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
-from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS, DenseJacobian
+from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation
@@ -75,10 +75,6 @@ class Component(System):
 
         self._declared_partials = []
         self._approximated_partials = []
-
-        # For components, default to DenseJacobian for performance.
-        self._jacobian = DenseJacobian()
-        self._owns_assembled_jac = True
 
     def setup(self):
         """
