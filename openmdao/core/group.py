@@ -1389,29 +1389,28 @@ class Group(System):
         """
         name = self.pathname if self.pathname else 'root'
 
+        vec_names = [v for v in vec_names if v in self._rel_vec_names]
+
         with Recording(name + '._apply_linear', self.iter_count, self):
             with self.jacobian_context() as J:
                 # Use global Jacobian
                 if self._owns_assembled_jac or self._views_assembled_jac or self._owns_approx_jac:
                     for vec_name in vec_names:
-                        if vec_name in self._rel_vec_names:
-                            with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
-                                d_inputs, d_outputs, d_residuals = vecs
-                                J._apply(d_inputs, d_outputs, d_residuals, mode)
+                        with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
+                            d_inputs, d_outputs, d_residuals = vecs
+                            J._apply(d_inputs, d_outputs, d_residuals, mode)
                 # Apply recursion
                 else:
                     if mode == 'fwd':
                         for vec_name in vec_names:
-                            if vec_name in self._rel_vec_names:
-                                self._transfer(vec_name, mode)
+                            self._transfer(vec_name, mode)
 
                     for subsys in self._subsystems_myproc:
                         subsys._apply_linear(vec_names, mode, scope_out, scope_in)
 
                     if mode == 'rev':
                         for vec_name in vec_names:
-                            if vec_name in self._rel_vec_names:
-                                self._transfer(vec_name, mode)
+                            self._transfer(vec_name, mode)
 
     def _solve_linear(self, vec_names, mode):
         """
@@ -1434,6 +1433,8 @@ class Group(System):
             absolute error.
         """
         name = self.pathname if self.pathname else 'root'
+
+        vec_names = [v for v in vec_names if v in self._rel_vec_names]
 
         with Recording(name + '._solve_linear', self.iter_count, self):
             result = self._linear_solver.solve(vec_names, mode)

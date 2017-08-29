@@ -432,7 +432,7 @@ class Driver(object):
             for okey, oval in iteritems(derivs):
                 oscaler = self._responses[okey]['scaler']
                 for ikey, val in iteritems(oval):
-                    if okey in relevant[ikey] or ikey in relevant[okey]: 
+                    if okey in relevant[ikey] or ikey in relevant[okey]:
                         iscaler = self._designvars[ikey]['scaler']
 
                         # Scale response side

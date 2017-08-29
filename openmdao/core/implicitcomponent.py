@@ -107,9 +107,8 @@ class ImplicitComponent(Component):
             If None, all are in the scope.
         """
         for vec_name in vec_names:
-            if vec_name is not 'linear':
-                if vec_name not in self._rel_vec_names:
-                    continue
+            if vec_name not in self._rel_vec_names:
+                continue
             with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
 
@@ -152,9 +151,11 @@ class ImplicitComponent(Component):
 
         else:
             failed = False
-            abs_errors = []
-            rel_errors = []
+            abs_errors = [0.0]
+            rel_errors = [0.0]
             for vec_name in vec_names:
+                if vec_name not in self._rel_vec_names:
+                    continue
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
 
