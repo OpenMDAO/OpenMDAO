@@ -24,12 +24,12 @@ class LinearBlockGS(BlockLinearSolver):
             for ind, subsys in enumerate(system._subsystems_myproc):
                 isub = system._subsystems_myproc_inds[ind]
                 for vec_name in vec_names:
-                    if vec_name in system._rel_vec_names:
+                    if vec_name in subsys._rel_vec_names:
                         system._transfer(vec_name, mode, isub)
                 scope_out, scope_in = system._get_scope(subsys)
                 subsys._apply_linear(vec_names, mode, scope_out, scope_in)
                 for vec_name in vec_names:
-                    if vec_name in system._rel_vec_names:
+                    if vec_name in subsys._rel_vec_names:
                         b_vec = system._vectors['residual'][vec_name]
                         b_vec *= -1.0
                         b_vec += self._rhs_vecs[vec_name]
@@ -42,7 +42,7 @@ class LinearBlockGS(BlockLinearSolver):
                 isub = subinds[revidx]
                 subsys = subsystems[isub]
                 for vec_name in vec_names:
-                    if vec_name in system._rel_vec_names:
+                    if vec_name in subsys._rel_vec_names:
                         b_vec = system._vectors['output'][vec_name]
                         b_vec.set_const(0.0)
                         system._transfer(vec_name, mode, isub)
