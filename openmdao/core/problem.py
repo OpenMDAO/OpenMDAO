@@ -1091,8 +1091,7 @@ class Problem(object):
                 out_idxs = None
                 if output_name in output_vois:
                     out_voi_meta = output_vois[output_name]
-                    if 'indices' in out_voi_meta:
-                        out_idxs = out_voi_meta['indices']
+                    out_idxs = out_voi_meta['indices']
 
                 if not test_mode and output_name not in model._relevant[input_name]:
                     # irrelevant output, just give zeros

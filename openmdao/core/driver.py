@@ -1,4 +1,5 @@
 """Define a base class for all Drivers in OpenMDAO."""
+from __future__ import print_function
 from six import iteritems
 
 import numpy as np
@@ -413,17 +414,14 @@ class Driver(object):
             islices = {}
             oslices = {}
             for okey, oval in iteritems(derivs):
-                #if do_wrt:
-                for ikey, val in iteritems(oval):
-                    istart = isize
-                    isize += val.shape[1]
-                    print(okey, ikey, val.shape[1], val.shape)
-                    islices[ikey] = slice(istart, isize)
-
-                do_wrt = False
+                if do_wrt:
+                    for ikey, val in iteritems(oval):
+                        istart = isize
+                        isize += val.shape[1]
+                        islices[ikey] = slice(istart, isize)
+                    do_wrt = False
                 ostart = osize
                 osize += oval[ikey].shape[0]
-                print(okey, oval[ikey].shape[0], oval[ikey].shape)
                 oslices[okey] = slice(ostart, osize)
 
             new_derivs = np.zeros((osize, isize))
@@ -434,7 +432,7 @@ class Driver(object):
             for okey, oval in iteritems(derivs):
                 oscaler = self._responses[okey]['scaler']
                 for ikey, val in iteritems(oval):
-                    if okey in relevant[ikey]: 
+                    if okey in relevant[ikey] or ikey in relevant[okey]: 
                         iscaler = self._designvars[ikey]['scaler']
 
                         # Scale response side
@@ -445,7 +443,6 @@ class Driver(object):
                         if iscaler is not None:
                             val *= 1.0 / iscaler
 
-                        print(okey, ikey, oslices[okey], islices[ikey], val.shape)
                         new_derivs[oslices[okey], islices[ikey]] = val
 
             derivs = new_derivs
