@@ -182,9 +182,11 @@ class pyOptSparseDriver(Driver):
             Failure flag; True if failed to converge, False is successful.
         """
         problem = self._problem
-        model = self._problem.model
+        model = problem.model
+        relevant = model._relevant
         self.pyopt_solution = None
         self.iter_count = 0
+        fwd = problem._mode == 'fwd'
 
         # Metadata Setup
         self.metadata = create_local_meta(self.options['optimizer'])
@@ -230,13 +232,18 @@ class pyOptSparseDriver(Driver):
         for name, meta in iteritems(eqcons):
             size = meta['size']
             lower = upper = meta['equals']
+            if fwd:
+                wrt = [v for v in indep_list if name in relevant[v]]
+            else:
+                rels = relevant[name]
+                wrt = [v for v in indep_list if v in rels]
 
             if meta['linear']:
                 opt_prob.addConGroup(name, size, lower=lower, upper=upper,
-                                     linear=True,
+                                     linear=True, wrt=wrt,
                                      jac=_lin_jacs[name])
             else:
-                opt_prob.addConGroup(name, size, lower=lower, upper=upper)
+                opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrt)
                 self._quantities.append(name)
 
         # Add all inequality constraints
@@ -249,12 +256,18 @@ class pyOptSparseDriver(Driver):
             lower = meta['lower']
             upper = meta['upper']
 
+            if fwd:
+                wrt = [v for v in indep_list if name in relevant[v]]
+            else:
+                rels = relevant[name]
+                wrt = [v for v in indep_list if v in rels]
+
             if meta['linear']:
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower,
-                                     linear=True,
+                                     linear=True, wrt=wrt,
                                      jac=_lin_jacs[name])
             else:
-                opt_prob.addConGroup(name, size, upper=upper, lower=lower)
+                opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt)
                 self._quantities.append(name)
 
         # Instantiate the requested optimizer
