@@ -1096,7 +1096,8 @@ class Problem(object):
                 if not test_mode and output_name not in model._relevant[input_name]:
                     # irrelevant output, just give zeros
                     if out_idxs is None:
-                        out_var_idx = model._var_allprocs_abs2idx['linear']['output'][output_name]
+                        out_var_idx = \
+                            model._var_allprocs_abs2idx['nonlinear']['output'][output_name]
                         if ncol > 1:
                             deriv_val = np.zeros((sizes[iproc, out_var_idx], ncol))
                         else:
@@ -1119,7 +1120,8 @@ class Problem(object):
                             deriv_val = deriv_val[out_idxs]
 
                     if dup and nproc > 1:
-                        out_var_idx = model._var_allprocs_abs2idx['linear']['output'][output_name]
+                        out_var_idx = \
+                            model._var_allprocs_abs2idx['nonlinear']['output'][output_name]
                         # TODO: do during setup
                         root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
                         if deriv_val is None:
