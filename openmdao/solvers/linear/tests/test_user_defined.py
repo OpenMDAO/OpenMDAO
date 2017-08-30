@@ -7,11 +7,15 @@ import unittest
 import numpy as np
 
 from openmdao.api import Group, Problem, ImplicitComponent, PetscKSP, LinearRunOnce, \
-     IndepVarComp, PETScVector
+     IndepVarComp
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.linear.user_defined import LinearUserDefined
 from openmdao.utils.array_utils import evenly_distrib_idxs
 
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 class DistribStateImplicit(ImplicitComponent):
 
@@ -122,6 +126,7 @@ class DistribStateImplicit(ImplicitComponent):
         return False, 0., 0.
 
 
+@unittest.skipUnless(PETScVector, "PETSc is required.")
 class TestUserDefinedSolver(unittest.TestCase):
 
     def test_method(self):
