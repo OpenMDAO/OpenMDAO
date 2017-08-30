@@ -1218,9 +1218,6 @@ class Problem(object):
         # A number of features will need to be supported here as development
         # goes forward.
         # -------------------------------------------------------------------
-        # TODO: Support parallel adjoint and parallel forward derivatives
-        #       Aside: how are they specified, and do we have to pick up any
-        #       that are missed?
         # TODO: Support constraint sparsity (i.e., skip in/out that are not
         #       relevant for this constraint) (desvars too?)
         # TODO: Don't calculate for inactive constraints
@@ -1332,15 +1329,17 @@ class Problem(object):
 
         voi_info = self._get_voi_info(voi_lists, inp2rhs_name, input_vec, output_vec, input_vois)
 
-        for rhs_name, vois in iteritems(voi_lists):
-            # If Forward mode, solve linear system for each 'wrt'
-            # If Adjoint mode, solve linear system for each 'of'
-
-            if matmat:
+        if matmat:
+            for rhs_name, vois in iteritems(voi_lists):
                 self._compute_total_derivs_multi(totals, vois, voi_info, lin_vec_names, mode,
                                                  output_list, old_output_list,
                                                  output_vois, use_rel_reduction, return_format)
-                continue
+            recording_iteration.stack.pop()
+            return totals
+
+        for rhs_name, vois in iteritems(voi_lists):
+            # If Forward mode, solve linear system for each 'wrt'
+            # If Adjoint mode, solve linear system for each 'of'
 
             loc_idxs = defaultdict(lambda: -1)
 
