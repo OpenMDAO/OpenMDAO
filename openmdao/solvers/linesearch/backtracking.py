@@ -268,7 +268,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         # Hybrid newton support.
         if self._do_subsolve and self._iter_count > 0:
 
-            self._solver_info.prefix += '+  '
+            self._solver_info.append_solver()
 
             try:
                 for isub, subsys in enumerate(system._subsystems_allprocs):
@@ -277,7 +277,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                     if subsys in system._subsystems_myproc:
                         subsys._solve_nonlinear()
 
-                self._solver_info.prefix = self._solver_info.prefix[:-3]
+                self._solver_info.pop()
 
                 system._apply_nonlinear()
 

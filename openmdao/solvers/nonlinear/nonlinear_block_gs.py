@@ -32,13 +32,13 @@ class NonlinearBlockGS(NonlinearSolver):
         """
         system = self._system
 
-        self._solver_info.prefix += '|  '
+        self._solver_info.append_subsolver()
         for isub, subsys in enumerate(system._subsystems_myproc):
             system._transfer('nonlinear', 'fwd', isub)
             subsys._solve_nonlinear()
             system._check_reconf_update()
 
-        self._solver_info.prefix = self._solver_info.prefix[:-3]
+        self._solver_info.pop()
 
     def _mpi_print_header(self):
         """
