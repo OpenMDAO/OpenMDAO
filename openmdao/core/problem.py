@@ -1054,7 +1054,7 @@ class Problem(object):
 
     def _compute_total_derivs_multi(self, totals, vois, voi_info, lin_vec_names, mode,
                                     output_list, old_output_list, output_vois,
-                                    test_mode, return_format):
+                                    use_rel_reduction, return_format):
         # this sets dinputs for the current parallel_deriv_color to 0
         voi_info[vois[0][0]][0].set_const(0.0)
         fwd = mode == 'fwd'
@@ -1093,7 +1093,7 @@ class Problem(object):
                     out_voi_meta = output_vois[output_name]
                     out_idxs = out_voi_meta['indices']
 
-                if not test_mode and output_name not in model._relevant[input_name]:
+                if use_rel_reduction and output_name not in model._relevant[input_name]:
                     # irrelevant output, just give zeros
                     if out_idxs is None:
                         out_var_idx = \
@@ -1298,7 +1298,7 @@ class Problem(object):
         # don't do relevance checking (because we only want to analyze the
         # dependency graph for VOIs rather than for every input/output
         # in the model)
-        test_mode = False
+        use_rel_reduction = True
 
         matmat = False
         for i, name in enumerate(input_list):
@@ -1309,7 +1309,7 @@ class Problem(object):
                 varmatmat |= (meta['vectorize_derivs'] and meta['size'] > 1)
             else:
                 parallel_deriv_color = None
-                test_mode = True
+                use_rel_reduction = False
             if parallel_deriv_color is None:  # variable is not in an parallel_deriv_color
                 if name in voi_lists:
                     raise RuntimeError("Variable name '%s' matches an parallel_deriv_color name." %
@@ -1339,7 +1339,7 @@ class Problem(object):
             if matmat:
                 self._compute_total_derivs_multi(totals, vois, voi_info, lin_vec_names, mode,
                                                  output_list, old_output_list,
-                                                 output_vois, test_mode, return_format)
+                                                 output_vois, use_rel_reduction, return_format)
                 continue
 
             loc_idxs = defaultdict(lambda: -1)
@@ -1393,7 +1393,7 @@ class Problem(object):
                             if 'indices' in out_voi_meta:
                                 out_idxs = out_voi_meta['indices']
 
-                        if not test_mode and output_name not in relevant[input_name]:
+                        if use_rel_reduction and output_name not in relevant[input_name]:
                             # irrelevant output, just give zeros
                             if out_idxs is None:
                                 out_var_idx = abs2idx_out[output_name]
