@@ -1344,7 +1344,7 @@ class Problem(object):
 
             loc_idxs = defaultdict(lambda: -1)
 
-            max_len = max(len(v[2]) for v in voi_info.values())
+            max_len = max(len(voi_info[name][2]) for name, _ in vois)
             for i in range(max_len):
                 # this sets dinputs for the current parallel_deriv_color to 0
                 voi_info[vois[0][0]][0].set_const(0.0)

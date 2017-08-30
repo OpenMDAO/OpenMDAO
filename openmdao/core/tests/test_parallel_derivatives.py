@@ -208,6 +208,28 @@ class DecoupledTestCase(unittest.TestCase):
 
         #import wingdbstub
 
+        prob.model.add_design_var('p1.x', parallel_deriv_color='pardv')
+        prob.model.add_design_var('p2.x', parallel_deriv_color='pardv')
+        prob.model.add_constraint('c3.y', upper=0.0)
+        prob.model.add_constraint('c4.y', upper=0.0)
+
+        prob.setup(vector_class=vector_class, check=False, mode='fwd')
+        prob.run_driver()
+
+        J = prob.compute_total_derivs(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
+                                      return_format='flat_dict')
+
+        assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
+        expected = np.zeros((asize, asize+2))
+        expected[:,:asize] = np.eye(asize)*8.0
+        assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
+
+    def test_parallel_fwd_multi(self):
+        asize = self.asize
+        prob = self.setup_model()
+
+        #import wingdbstub
+
         prob.model.add_design_var('p1.x', parallel_deriv_color='pardv', vectorize_derivs=True)
         prob.model.add_design_var('p2.x', parallel_deriv_color='pardv', vectorize_derivs=True)
         prob.model.add_constraint('c3.y', upper=0.0)
@@ -223,6 +245,7 @@ class DecoupledTestCase(unittest.TestCase):
         expected = np.zeros((asize, asize+2))
         expected[:,:asize] = np.eye(asize)*8.0
         assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
+
 
     def test_serial_rev(self):
         asize = self.asize

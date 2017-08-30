@@ -7,6 +7,7 @@ import sys
 from resource import getrusage, RUSAGE_SELF, RUSAGE_CHILDREN
 
 from six.moves import zip_longest
+from openmdao.core.problem = Problem
 from openmdao.core.group import Group
 
 def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma: no cover
@@ -106,6 +107,33 @@ def tree(system, include_solvers=True, stream=sys.stdout):
                 stream.write("%s %s nonlinear_solver\n" % (indent, type(s.nonlinear_solver).__name__))
             if s.linear_solver is not None:
                 stream.write("%s %s linear_solver\n" % (indent, type(s.linear_solver).__name__))
+
+def solver_tree(top, stream=sys.stdout):
+    """
+    Dump the solver tree structure to the given stream.
+
+    Parameters
+    ----------
+    top : System or Problem
+        The top of the tree to dump.  If top is a Problem, then the driver
+        will be dumped as well.
+    """
+    indent = 0
+    if isinstance(top, Problem):
+        print('Driver: %s' % type(top.driver).__name__, file=stream)
+        top = top.model
+        indent += 3
+
+    for s in top.system_iter(include_self=True, recurse=True, typ=Group):
+        if s.pathname:
+            depth = len(s.pathname.split('.'))
+        else:
+            depth = 0
+        indent = '   ' * (depth + indent)
+        print("%s%s LN: %s, NL: %s\n" % (indent, s.name,
+                                         type(s.linear_solver).__name__,
+                                         type(s.nonlinear_solver).__name,
+                                         file=stream)
 
 def config_summary(problem, stream=sys.stdout):
     """
