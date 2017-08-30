@@ -28,12 +28,9 @@ html-update:
 
 all:
 	python _utils/create_feature_docs_unit_test_db.py
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)\html -t "usr"
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)\html -t "dev"
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)\html
 	rm feature_docs_unit_test_db.sqlite
 	IF EXIST $(BUILDDIR) rmdir /s /q $(BUILDDIR)
-	IF EXIST _srcdocs\usr rmdir /s /q _srcdocs\usr
-	IF EXIST _srcdocs\dev rmdir /s /q _srcdocs\dev
 	IF EXIST tags rmdir /s /q tags
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)\html."
@@ -72,8 +69,7 @@ help:
 
 clean:
 	IF EXIST $(BUILDDIR) rmdir /s /q $(BUILDDIR)
-	IF EXIST _srcdocs\usr rmdir /s /q _srcdocs\usr
-	IF EXIST _srcdocs\dev rmdir /s /q _srcdocs\dev
+	IF EXIST _srcdocs\ rmdir /s /q _srcdocs\*
 	IF EXIST tags rmdir /s /q tags
 
 dirhtml:
