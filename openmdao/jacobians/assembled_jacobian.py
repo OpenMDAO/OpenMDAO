@@ -112,12 +112,7 @@ class AssembledJacobian(Jacobian):
             src_indices_dict[abs_name] = \
                 system._var_abs2meta['input'][abs_name]['src_indices']
 
-        # If the AssembledJacobian is slotted into a Component, then we handle things a little
-        # differently.
-        recurse = not isinstance(system, Component)
-
-        for s in self._system.system_iter(local=True, recurse=recurse,
-                                          include_self=True):
+        for s in self._system.system_iter(local=True, recurse=True, include_self=True):
 
             min_res_offset = sys.maxsize
             max_res_offset = 0
@@ -341,7 +336,7 @@ class AssembledJacobian(Jacobian):
                 if len(d_outputs._names) > 0 and len(d_residuals._names) > 0:
                     d_outputs.iadd_data(int_mtx._prod(dresids, mode, int_ranges))
                 if ext_mtx is not None and \
-                    len(d_inputs._names) > 0 and len(d_residuals._names) > 0:
+                   len(d_inputs._names) > 0 and len(d_residuals._names) > 0:
                     d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None))
 
 

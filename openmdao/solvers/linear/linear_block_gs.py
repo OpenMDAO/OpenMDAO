@@ -32,6 +32,7 @@ class LinearBlockGS(BlockLinearSolver):
                     b_vec *= -1.0
                     b_vec += self._rhs_vecs[vec_name]
                 subsys._solve_linear(vec_names, mode)
+                subsys._vectors['input']['linear'].set_const(0.0)
 
         elif mode == 'rev':
             subsystems = system._subsystems_allprocs

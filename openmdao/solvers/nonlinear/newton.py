@@ -240,6 +240,11 @@ class NewtonSolver(NonlinearSolver):
 
         self._solver_info.prefix = self._solver_info.prefix[:-3]
 
+        # Clean out remnants of old linear solve.
+        # We need to do this now because DenseJacobian doesn't mask away outer scope
+        # connections.
+        system._vectors['input']['linear'].set_const(0.0)
+
         # Hybrid newton support.
         with Recording('Newton_subsolve', 0, self):
             if do_subsolve:
