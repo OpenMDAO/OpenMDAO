@@ -67,7 +67,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
 
     # if shape is not given, infer from value (if not scalar) or indices
     if shape is not None:
-        if isinstance(shape, int):
+        if isinstance(shape, numbers.Integral):
             shape = (shape,)
         elif isinstance(shape, list):
             shape = tuple(shape)
