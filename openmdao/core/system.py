@@ -1017,6 +1017,27 @@ class System(object):
             s._vec_names = vec_names
             s._lin_vec_names = self._lin_vec_names
 
+    def _init_relevance(self, mode):
+        """
+        Create the relevance dictionary.
+
+        Parameters
+        ----------
+        mode : str
+            Derivative direction, either 'fwd' or 'rev'.
+
+        Returns
+        -------
+        dict
+            The relevance dictionary.
+        """
+        self._relevant = relevant = {}
+        relevant['nonlinear'] = {'@all': ({'input': ContainsAll(),
+                                           'output': ContainsAll()},
+                                          ContainsAll())}
+        relevant['linear'] = relevant['nonlinear']
+        return relevant
+
     def _setup_relevance(self, mode, relevant=None):
         """
         Set up the relevance dictionary.
@@ -1031,27 +1052,28 @@ class System(object):
 
         """
         if relevant is None:  # should only occur at top level on full setup
-            self._relevant = relevant = {}
-            relevant['nonlinear'] = {'@all': ({'input': ContainsAll(),
-                                               'output': ContainsAll()},
-                                              ContainsAll())}
-            relevant['linear'] = relevant['nonlinear']
+            self._relevant = relevant = self._init_relevance(mode)
         else:
             self._relevant = relevant
 
         self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
         self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
 
-        self._rel_vec_names = set()
+        self._rel_vec_name_list = []
         for vec_name in self._vec_names:
             rel, relsys = relevant[vec_name]['@all']
             if self.pathname in relsys:
-                self._rel_vec_names.add(vec_name)
+                self._rel_vec_name_list.append(vec_name)
             for type_ in ('input', 'output'):
                 self._var_allprocs_relevant_names[vec_name][type_].extend(
                     v for v in self._var_allprocs_abs_names[type_] if v in rel[type_])
                 self._var_relevant_names[vec_name][type_].extend(
                     v for v in self._var_abs_names[type_] if v in rel[type_])
+
+        self._rel_vec_names = set(self._rel_vec_name_list)
+
+        for s in self._subsystems_myproc:
+            s._setup_relevance(mode, relevant)
 
     def _setup_connections(self, recurse=True):
         """
@@ -1111,9 +1133,7 @@ class System(object):
                 '"force_alloc_complex" to True during setup.'
             raise RuntimeError(msg)
 
-        for vec_name in self._vec_names:
-            if vec_name not in self._rel_vec_names:
-                continue
+        for vec_name in self._rel_vec_name_list:
             vector_class = root_vectors['output'][vec_name].__class__
 
             for key in ['input', 'output', 'residual']:
@@ -1197,9 +1217,7 @@ class System(object):
         abs2meta_in = self._var_abs2meta['input']
         abs2meta_out = self._var_abs2meta['output']
 
-        for vec_name in self._vec_names:
-            if vec_name not in self._rel_vec_names:
-                continue
+        for vec_name in self._rel_vec_name_list:
             vector_class = root_vectors['residual', 'phys0'][vec_name].__class__
             relvars, _ = self._relevant[vec_name]['@all']
 

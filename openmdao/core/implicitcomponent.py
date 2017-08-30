@@ -106,9 +106,7 @@ class ImplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        for vec_name in vec_names:
-            if vec_name not in self._rel_vec_names:
-                continue
+        for vec_name in self._rel_vec_name_list[1:]:
             with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
 

@@ -183,9 +183,7 @@ class Group(System):
                 subsys._setup_vars(recurse)
 
         # Compute num_var, num_var_byset, at least locally
-        for vec_name in self._vec_names:
-            if vec_name not in self._rel_vec_names:
-                continue
+        for vec_name in self._rel_vec_name_list:
             num_var[vec_name] = {}
             num_var_byset[vec_name] = {}
             for type_ in ['input', 'output']:
@@ -211,9 +209,7 @@ class Group(System):
                 raw = (None, None)
             gathered = self.comm.allgather(raw)
 
-            for vec_name in self._vec_names:
-                if vec_name not in self._rel_vec_names:
-                    continue
+            for vec_name in self._rel_vec_name_list:
                 num_var = self._num_var[vec_name]
                 num_var_byset = self._num_var_byset[vec_name]
 
@@ -252,9 +248,7 @@ class Group(System):
         subsystems_var_range_byset = self._subsystems_var_range_byset = {}
 
         # First compute these on one processor for each subsystem
-        for vec_name in self._vec_names:
-            if vec_name not in self._rel_vec_names:
-                continue
+        for vec_name in self._rel_vec_name_list:
 
             # Here, we count the number of variables (total and by varset) in each subsystem.
             # We do this so that we can compute the offset when we recurse into each subsystem.
@@ -425,9 +419,7 @@ class Group(System):
         sizes_byset = self._var_sizes_byset
 
         # Compute _var_sizes
-        for vec_name in self._vec_names:
-            if vec_name not in self._rel_vec_names:
-                continue
+        for vec_name in self._rel_vec_name_list:
             sizes[vec_name] = {}
             sizes_byset[vec_name] = {}
             subsystems_var_range = self._subsystems_var_range[vec_name]
@@ -454,9 +446,7 @@ class Group(System):
 
         # If parallel, all gather
         if self.comm.size > 1:
-            for vec_name in self._vec_names:
-                if vec_name not in self._rel_vec_names:
-                    continue
+            for vec_name in self._rel_vec_name_list:
                 sizes = self._var_sizes[vec_name]
                 sizes_byset = self._var_sizes_byset[vec_name]
                 for type_ in ['input', 'output']:
@@ -602,43 +592,24 @@ class Group(System):
             for myproc_global_abs_in2out in gathered:
                 global_abs_in2out.update(myproc_global_abs_in2out)
 
-    def _setup_relevance(self, mode, relevant=None):
+    def _init_relevance(self, mode):
         """
-        Set up the relevance dictionary.
+        Create the relevance dictionary.
 
         Parameters
         ----------
         mode : str
             Derivative direction, either 'fwd' or 'rev'.
-        relevant : dict or None
-            Dictionary mapping VOI name to all variables necessary for computing
-            derivatives between the VOI and other VOIs.
+
+        Returns
+        -------
+        dict
+            The relevance dictionary.
         """
-        if relevant is None:   # only True for top level on full setup
-            desvars = self.get_design_vars(recurse=True, get_sizes=False)
-            responses = self.get_responses(recurse=True, get_sizes=False)
-            sys_graph = self.compute_sys_graph(comps_only=True, save_vars=True)
-            self._relevant = relevant = get_relevant_vars(sys_graph,
-                                                          desvars, responses, mode)
-        else:
-            self._relevant = relevant
-
-        self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
-        self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
-
-        self._rel_vec_names = set()
-        for vec_name in self._vec_names:
-            rel, relsys = relevant[vec_name]['@all']
-            if self.pathname in relsys:
-                self._rel_vec_names.add(vec_name)
-            for type_ in ('input', 'output'):
-                self._var_allprocs_relevant_names[vec_name][type_].extend(
-                    v for v in self._var_allprocs_abs_names[type_] if v in rel[type_])
-                self._var_relevant_names[vec_name][type_].extend(
-                    v for v in self._var_abs_names[type_] if v in rel[type_])
-
-        for s in self._subsystems_myproc:
-            s._setup_relevance(mode, relevant)
+        desvars = self.get_design_vars(recurse=True, get_sizes=False)
+        responses = self.get_responses(recurse=True, get_sizes=False)
+        sys_graph = self.compute_sys_graph(comps_only=True, save_vars=True)
+        return get_relevant_vars(sys_graph, desvars, responses, mode)
 
     def _setup_connections(self, recurse=True):
         """
@@ -897,9 +868,7 @@ class Group(System):
 
         transfers = self._transfers
         vectors = self._vectors
-        for vec_name in self._vec_names:
-            if vec_name not in self._rel_vec_names:
-                continue
+        for vec_name in self._rel_vec_name_list:
             relvars, _ = self._relevant[vec_name]['@all']
 
             # Initialize empty lists for the transfer indices
