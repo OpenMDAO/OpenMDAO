@@ -1,8 +1,6 @@
-:orphan:
-
-=====================================
-OpenMDAO-v2 documentation style guide
-=====================================
+*************************
+OpenMDAO Docs Style Guide
+*************************
 
 This document outlines OpenMDAO-v2 documentation conventions regarding
 both content and formatting.
@@ -190,18 +188,17 @@ We'll do this with a `:ref:` tag.  The basic syntax looks like this:
 
   .. code-block:: python
 
-    :ref:`LinkText <usr_openmdao.path.to.file.py>`
+    :ref:`LinkText <openmdao.path.to.file.py>`
 
-note the `usr_` prefix to the path reference, followed by the path to the file in
-which the class lives. Here's a specific, working example:
+note the path to the file in which the class lives. Here's a specific, working example:
 
   .. code-block:: python
 
-    :ref:`Direct <usr_openmdao.solvers.linear.direct.py>`
+    :ref:`Direct <openmdao.solvers.linear.direct.py>`
 
 which makes a link like this, that leads to the Direct solver's user docs:
 
-    :ref:`Direct <usr_openmdao.solvers.linear.direct.py>`
+    :ref:`Direct <openmdao.solvers.linear.direct.py>`
 
 
 Feature Docs and their Custom Directives for Including Code in Documentation

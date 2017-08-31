@@ -359,13 +359,7 @@ class TestServerRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        system_metadata = json.loads(self.system_metadata)
         system_iterations = json.loads(self.system_iterations)
-        scaling_facts_raw = system_metadata['scaling_factors']
-        scaling_facts_ascii = scaling_facts_raw.encode('ascii')
-        scaling_facts_base64 = base64.b64decode(scaling_facts_ascii)
-        scaling_facts = pickle.loads(scaling_facts_base64)
-        system_metadata['scaling_factors'] = scaling_facts
 
         inputs = [
             {'name': 'd1.z', 'values': [5.0, 2.0]},
@@ -549,7 +543,7 @@ class TestServerRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        expected_abs_error = model._residuals.get_norm()
+        expected_abs_error = 3.49773898733e-9
         expected_rel_error = expected_abs_error / 2.9086436370499857e-08
 
         solver_iteration = json.loads(self.solver_iterations)

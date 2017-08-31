@@ -254,6 +254,11 @@ def _assertDriverMetadataRecorded(test, db_cur, expected):
 
 
 class TestSqliteRecorder(unittest.TestCase):
+    """
+    Features
+    --------
+    CaseRecorder
+    """
     def setUp(self):
         if OPT is None:
             raise unittest.SkipTest("pyoptsparse is not installed")
@@ -822,7 +827,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.cleanup()
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'ArmijoGoldsteinLS', (4,)]
-        expected_abs_error = model._residuals.get_norm()
+        expected_abs_error = 3.49773898733e-9
         expected_rel_error = expected_abs_error / 2.9086436370499857e-08
         expected_solver_output = None
         expected_solver_residuals = None

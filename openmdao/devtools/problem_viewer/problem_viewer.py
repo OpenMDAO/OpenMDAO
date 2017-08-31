@@ -188,7 +188,7 @@ def view_model(problem_or_filename, outfile='visualization', show_browser=True):
     cur_dir = os.getcwd()
     if outfile == 'visualization':
         outfile = os.path.join(cur_dir, outfile)
-        
+
     model_data_filename = 'model_data.js'
     folder_name = outfile
     code_dir = os.path.dirname(os.path.abspath(__file__))

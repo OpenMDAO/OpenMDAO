@@ -237,6 +237,9 @@ class System(object):
     #
     _reconfigured : bool
         If True, this system has reconfigured, and the immediate parent should update.
+    #
+    _has_guess : bool
+        True if this system has or contains a system with a `guess_nonlinear` method defined.
     """
 
     def __init__(self, **kwargs):
@@ -343,6 +346,8 @@ class System(object):
 
         self.initialize()
         self.metadata.update(kwargs)
+
+        self._has_guess = False
 
     def _check_reconf(self):
         """
@@ -2434,8 +2439,10 @@ class System(object):
         list
             list of of input names, or (name, value) if values is True
         """
-        inputs = []
+        if self._inputs is None:
+            raise RuntimeError("Unable to list inputs until model has been run.")
 
+        inputs = []
         for name, val in iteritems(self._inputs._views):
             inputs.append((name, val)) if values else inputs.append(name)
 
@@ -2486,6 +2493,9 @@ class System(object):
         list
             list of of output names, or (name, value) if values is True
         """
+        if self._outputs is None:
+            raise RuntimeError("Unable to list outputs until model has been run.")
+
         states = self._list_states()
 
         expl_outputs = []
@@ -2535,6 +2545,9 @@ class System(object):
         list
             list of of residual names, or (name, value) if values is True
         """
+        if self._residuals is None:
+            raise RuntimeError("Unable to list residuals until model has been run.")
+
         states = self._list_states()
 
         expl_resids = []

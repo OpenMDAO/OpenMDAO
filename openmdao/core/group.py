@@ -102,6 +102,9 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             subsys._configure()
 
+            if subsys._has_guess:
+                self._has_guess = True
+
         self.configure()
 
     def _setup_procs(self, pathname, comm):
@@ -1093,7 +1096,7 @@ class Group(System):
         # if multiple targets are given, recursively connect to each
         if not isinstance(tgt_name, string_types) and isinstance(tgt_name, Iterable):
             for name in tgt_name:
-                self.connect(src_name, name, src_indices)
+                self.connect(src_name, name, src_indices, flat_src_indices=flat_src_indices)
             return
 
         # target should not already be connected
@@ -1267,19 +1270,20 @@ class Group(System):
 
         name = self.pathname if self.pathname else 'root'
 
-        # Execute guess_nonlinear if specified.
-        # We need to call this early enough so that any solver that needs initial guesses has
-        # them.
-        # TODO: It is pointless to run this ahead of non-iterative solvers.
-        for sub in self.system_iter(recurse=True):
-            if hasattr(sub, 'guess_nonlinear'):
-                with sub._unscaled_context(outputs=[sub._outputs], residuals=[sub._residuals]):
-                    sub.guess_nonlinear(sub._inputs, sub._outputs, sub._residuals)
-
         with Recording(name + '._solve_nonlinear', self.iter_count, self):
             result = self._nonlinear_solver.solve()
 
         return result
+
+    def _guess_nonlinear(self):
+        """
+        Provide initial guess for states.
+        """
+        if self._has_guess:
+            for isub, sub in enumerate(self._subsystems_myproc):
+                if sub._has_guess:
+                    self._transfer('nonlinear', 'fwd', isub)
+                    sub._guess_nonlinear()
 
     def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """

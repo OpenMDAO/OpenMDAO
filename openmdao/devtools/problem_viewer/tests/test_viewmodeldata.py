@@ -81,7 +81,7 @@ class TestViewModelData(unittest.TestCase):
         view_model(p, outfile=self.problem_filename, show_browser=False)
 
         # Check that the html file has been created and has something in it.
-        self.assertTrue(os.path.isfile(self.problem_html_filename))
+        self.assertTrue(os.path.isfile(self.problem_html_filename), (self.problem_html_filename + " is not a valid file."))
         self.assertGreater(os.path.getsize(self.problem_html_filename), 100)
 
     def test_view_model_from_sqlite(self):
@@ -98,7 +98,7 @@ class TestViewModelData(unittest.TestCase):
         view_model(self.sqlite_db_filename2, outfile=self.sqlite_filename, show_browser=False)
 
         # Check that the html file has been created and has something in it.
-        self.assertTrue(os.path.isfile(self.sqlite_html_filename))
+        self.assertTrue(os.path.isfile(self.sqlite_html_filename), (self.problem_html_filename + " is not a valid file."))
         self.assertGreater(os.path.getsize(self.sqlite_html_filename), 100)
 
 

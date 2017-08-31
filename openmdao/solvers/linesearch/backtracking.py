@@ -108,6 +108,8 @@ class BoundsEnforceLS(NonlinearSolver):
         u = system._outputs
         du = system._vectors['output']['linear']
 
+        self._run_apply()
+
         norm0 = self._iter_get_norm()
         if norm0 == 0.0:
             norm0 = 1.0
@@ -125,6 +127,7 @@ class BoundsEnforceLS(NonlinearSolver):
             elif self.options['bound_enforcement'] == 'wall':
                 u._enforce_bounds_wall(du, 1.0, system._lower_bounds, system._upper_bounds)
 
+            self._run_apply()
             norm = self._iter_get_norm()
             # With solvers, we want to record the norm AFTER
             # the call, but the call needs to
@@ -189,6 +192,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         u = system._outputs
         du = system._vectors['output']['linear']
 
+        self._run_apply()
         norm0 = self._iter_get_norm()
         if norm0 == 0.0:
             norm0 = 1.0
@@ -206,6 +210,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
             u._enforce_bounds_wall(du, self.alpha, system._lower_bounds, system._upper_bounds)
 
         try:
+            self._run_apply()
             norm = self._iter_get_norm()
 
         except AnalysisError as err:
@@ -258,7 +263,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         # Hybrid newton support.
         if self._do_subsolve and self._iter_count > 0:
 
-            self._solver_info.prefix += '+  '
+            self._solver_info.append_solver()
 
             try:
                 for isub, subsys in enumerate(system._subsystems_allprocs):
@@ -267,7 +272,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                     if subsys in system._subsystems_myproc:
                         subsys._solve_nonlinear()
 
-                self._solver_info.prefix = self._solver_info.prefix[:-3]
+                self._solver_info.pop()
 
                 system._apply_nonlinear()
 
@@ -315,6 +320,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                 self._iter_execute()
                 self._iter_count += 1
                 try:
+                    self._run_apply()
                     norm = self._iter_get_norm()
 
                     # With solvers, we want to report the norm AFTER
