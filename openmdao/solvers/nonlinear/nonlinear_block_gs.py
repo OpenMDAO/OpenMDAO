@@ -30,7 +30,7 @@ class NonlinearBlockGS(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        
+
         self.options.declare('use_aitken', type_=bool, default=False,
                              desc='set to True to use Aitken relaxation')
         self.options.declare('aitken_min_factor', default=0.1,
@@ -49,7 +49,7 @@ class NonlinearBlockGS(NonlinearSolver):
         float
             error at the first iteration.
         """
-        
+
         if self.options['use_aitken']:
             self._aitken_work1 = self._system._outputs._clone()
             self._aitken_work2 = self._system._outputs._clone()
@@ -57,16 +57,16 @@ class NonlinearBlockGS(NonlinearSolver):
             self._aitken_work4 = self._system._outputs._clone()
             self._theta_n_1 = 1.
 
-        return super(NonlinearBlockGS, self)._iter_initialize()        
+        return super(NonlinearBlockGS, self)._iter_initialize()
 
     def _iter_execute(self):
         """
         Perform the operations in the iteration loop.
         """
         system = self._system
-        
+
         use_aitken = self.options['use_aitken']
-        
+
         if use_aitken:
             outputs = self._system._outputs
             aitken_min_factor = self.options['aitken_min_factor']
@@ -79,9 +79,9 @@ class NonlinearBlockGS(NonlinearSolver):
             temp = self._aitken_work4
             theta_n_1 = self._theta_n_1
             # store a copy of the outputs, used to compute the change in outputs later
-            delta_outputs_n.set_vec(outputs)  
+            delta_outputs_n.set_vec(outputs)
             # store a copy of the outputs
-            outputs_n.set_vec(outputs) 
+            outputs_n.set_vec(outputs)
 
         self._solver_info.prefix += '|  '
         for isub, subsys in enumerate(system._subsystems_myproc):
@@ -91,11 +91,11 @@ class NonlinearBlockGS(NonlinearSolver):
 
         if use_aitken:
             # compute the change in the outputs after the NLBGS iteration
-            delta_outputs_n -= outputs 
+            delta_outputs_n -= outputs
             delta_outputs_n *= -1
 
             if self._iter_count >= 2:
-                # Compute relaxation factor. This method is used by Kenway et al. in 
+                # Compute relaxation factor. This method is used by Kenway et al. in
                 # "Scalable Parallel Approach for High-Fidelity Steady-State Aero-
                 # elastic Analysis and Adjoint Derivative Computations" (ln 22 of Algo 1)
 
@@ -103,12 +103,12 @@ class NonlinearBlockGS(NonlinearSolver):
                 temp -= delta_outputs_n_1
                 temp_norm = temp.get_norm()
                 if temp_norm == 0.:
-                    temp_norm = 1e-12 # prevent division by 0 in the next line 
+                    temp_norm = 1e-12 # prevent division by 0 in the next line
                 theta_n = theta_n_1 * (1 - temp.dot(delta_outputs_n) / temp_norm ** 2)
                 # limit relaxation factor to the specified range
-                theta_n = max(aitken_min_factor, min(aitken_max_factor, theta_n)) 
+                theta_n = max(aitken_min_factor, min(aitken_max_factor, theta_n))
                 # save relaxation factor for the next iteration
-                theta_n_1 = theta_n 
+                theta_n_1 = theta_n
             else:
                 theta_n = 1.
 
@@ -117,7 +117,7 @@ class NonlinearBlockGS(NonlinearSolver):
             # compute relaxed outputs
             outputs.add_scal_vec(theta_n, delta_outputs_n)
 
-            # save update to use in next iteration 
+            # save update to use in next iteration
             delta_outputs_n_1.set_vec(delta_outputs_n)
 
         self._solver_info.prefix = self._solver_info.prefix[:-3]
