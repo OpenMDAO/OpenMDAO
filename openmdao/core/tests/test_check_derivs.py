@@ -801,7 +801,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(force_alloc_complex=True)
+        prob.setup(check=False)
 
         # We don't call run_driver() here because we don't
         # actually want the optimizer to run
