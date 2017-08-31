@@ -1,7 +1,12 @@
 import unittest
 
 from openmdao.api import Problem, IndepVarComp
-from openmdao.parallel_api import PETScVector
+
+try:
+    from openmdao.parallel_api import PETScVector
+except ImportError:
+    PETScVector = None
+
 
 class TestVector(unittest.TestCase):
 
@@ -47,7 +52,6 @@ class TestVector(unittest.TestCase):
         new_vec.set_const(3.)
 
         self.assertEqual(new_vec.dot(p.model._outputs), 9.)
-
 
 if __name__ == '__main__':
 
