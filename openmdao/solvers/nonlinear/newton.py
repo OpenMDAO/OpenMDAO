@@ -188,7 +188,7 @@ class NewtonSolver(NonlinearSolver):
             if self.options['solve_subsystems'] and \
                (self._iter_count <= self.options['max_sub_solves']):
 
-                self._solver_info.prefix += '+  '
+                self._solver_info.append_solver()
 
                 # should call the subsystems solve before computing the first residual
                 for isub, subsys in enumerate(system._subsystems_myproc):
@@ -199,7 +199,7 @@ class NewtonSolver(NonlinearSolver):
 
                     system._check_reconf_update()
 
-                self._solver_info.prefix = self._solver_info.prefix[:-3]
+                self._solver_info.pop()
 
         if self.options['maxiter'] > 0:
 
@@ -218,7 +218,7 @@ class NewtonSolver(NonlinearSolver):
         Perform the operations in the iteration loop.
         """
         system = self._system
-        self._solver_info.prefix += '|  '
+        self._solver_info.append_subsolver()
         do_subsolve = self.options['solve_subsystems'] and \
             (self._iter_count < self.options['max_sub_solves'])
 
@@ -238,7 +238,7 @@ class NewtonSolver(NonlinearSolver):
         else:
             system._outputs += system._vectors['output']['linear']
 
-        self._solver_info.prefix = self._solver_info.prefix[:-3]
+        self._solver_info.pop()
 
         # Clean out remnants of old linear solve.
         # We need to do this now because DenseJacobian doesn't mask away outer scope
@@ -248,7 +248,7 @@ class NewtonSolver(NonlinearSolver):
         # Hybrid newton support.
         with Recording('Newton_subsolve', 0, self):
             if do_subsolve:
-                self._solver_info.prefix += '+  '
+                self._solver_info.append_solver()
 
                 for isub, subsys in enumerate(system._subsystems_allprocs):
                     system._transfer('nonlinear', 'fwd', isub)
@@ -256,7 +256,7 @@ class NewtonSolver(NonlinearSolver):
                     if subsys in system._subsystems_myproc:
                         subsys._solve_nonlinear()
 
-                self._solver_info.prefix = self._solver_info.prefix[:-3]
+                self._solver_info.pop()
 
         # Enable local fd
         system._owns_approx_jac = approx_status
