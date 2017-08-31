@@ -30,7 +30,6 @@ class NonlinearBlockGS(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-
         self.options.declare('use_aitken', type_=bool, default=False,
                              desc='set to True to use Aitken relaxation')
         self.options.declare('aitken_min_factor', default=0.1,
@@ -49,7 +48,6 @@ class NonlinearBlockGS(NonlinearSolver):
         float
             error at the first iteration.
         """
-
         if self.options['use_aitken']:
             self._aitken_work1 = self._system._outputs._clone()
             self._aitken_work2 = self._system._outputs._clone()
@@ -64,7 +62,6 @@ class NonlinearBlockGS(NonlinearSolver):
         Perform the operations in the iteration loop.
         """
         system = self._system
-
         use_aitken = self.options['use_aitken']
 
         if use_aitken:
@@ -89,6 +86,8 @@ class NonlinearBlockGS(NonlinearSolver):
             subsys._solve_nonlinear()
             system._check_reconf_update()
 
+        self._solver_info.pop()
+
         if use_aitken:
             # compute the change in the outputs after the NLBGS iteration
             delta_outputs_n -= outputs
@@ -103,7 +102,7 @@ class NonlinearBlockGS(NonlinearSolver):
                 temp -= delta_outputs_n_1
                 temp_norm = temp.get_norm()
                 if temp_norm == 0.:
-                    temp_norm = 1e-12 # prevent division by 0 in the next line
+                    temp_norm = 1e-12  # prevent division by 0 in the next line
                 theta_n = theta_n_1 * (1 - temp.dot(delta_outputs_n) / temp_norm ** 2)
                 # limit relaxation factor to the specified range
                 theta_n = max(aitken_min_factor, min(aitken_max_factor, theta_n))
@@ -119,8 +118,6 @@ class NonlinearBlockGS(NonlinearSolver):
 
             # save update to use in next iteration
             delta_outputs_n_1.set_vec(delta_outputs_n)
-
-        self._solver_info.pop()
 
     def _mpi_print_header(self):
         """

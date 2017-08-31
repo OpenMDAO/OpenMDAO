@@ -63,20 +63,5 @@ class TestSolverFeatures(unittest.TestCase):
         assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
-    def test_NLBGS_Aitken(self):
-
-        prob = Problem()
-        model = prob.model = SellarDerivatives()
-        model.nonlinear_solver = NonlinearBlockGS()
-
-        prob.setup()
-        model.nonlinear_solver.options['use_aitken'] = True
-        prob.run_model()
-
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
-        self.assertTrue(model.nonlinear_solver._iter_count == 5)
-
-
 if __name__ == "__main__":
     unittest.main()
