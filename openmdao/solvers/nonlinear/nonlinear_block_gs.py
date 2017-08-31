@@ -83,7 +83,7 @@ class NonlinearBlockGS(NonlinearSolver):
             # store a copy of the outputs
             outputs_n.set_vec(outputs)
 
-        self._solver_info.prefix += '|  '
+        self._solver_info.append_subsolver()
         for isub, subsys in enumerate(system._subsystems_myproc):
             system._transfer('nonlinear', 'fwd', isub)
             subsys._solve_nonlinear()
@@ -120,7 +120,7 @@ class NonlinearBlockGS(NonlinearSolver):
             # save update to use in next iteration
             delta_outputs_n_1.set_vec(delta_outputs_n)
 
-        self._solver_info.prefix = self._solver_info.prefix[:-3]
+        self._solver_info.pop()
 
     def _mpi_print_header(self):
         """
