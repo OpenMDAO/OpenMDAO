@@ -348,6 +348,120 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
+    def test_desvar_with_indices(self):
+         # Just desvars on this one to cover code missed by desvar+response test.
+
+        class ArrayComp2D(ExplicitComponent):
+            """
+            A fairly simple array component.
+            """
+
+            def setup(self):
+
+                self.JJ = np.array([[1.0, 3.0, -2.0, 7.0],
+                                    [6.0, 2.5, 2.0, 4.0],
+                                    [-1.0, 0.0, 8.0, 1.0],
+                                    [1.0, 4.0, -5.0, 6.0]])
+
+                # Params
+                self.add_input('x1', np.zeros([4]))
+
+                # Unknowns
+                self.add_output('y1', np.zeros([4]))
+
+            def compute(self, inputs, outputs):
+                """
+                Execution.
+                """
+                outputs['y1'] = self.JJ.dot(inputs['x1'])
+
+            def compute_partials(self, inputs, partials):
+                """
+                Analytical derivatives.
+                """
+                partials[('y1', 'x1')] = self.JJ
+
+        prob = Problem()
+        prob.model = model = Group()
+        model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
+                            promotes=['x1'])
+        model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
+
+        model.add_design_var('x1', indices=[1, 3])
+        model.add_constraint('y1')
+
+        prob.set_solver_print(level=0)
+        model.approx_total_derivs(method='cs')
+
+        prob.setup(check=False, mode='fwd')
+        prob.run_model()
+
+        Jbase = model.get_subsystem('mycomp').JJ
+        of = ['y1']
+        wrt = ['x1']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['y1', 'x1'][0][0], Jbase[0, 1], 1e-8)
+        assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[0, 3], 1e-8)
+        assert_rel_error(self, J['y1', 'x1'][2][0], Jbase[2, 1], 1e-8)
+        assert_rel_error(self, J['y1', 'x1'][2][1], Jbase[2, 3], 1e-8)
+
+    def test_desvar_and_response_with_indices(self):
+
+        class ArrayComp2D(ExplicitComponent):
+            """
+            A fairly simple array component.
+            """
+
+            def setup(self):
+
+                self.JJ = np.array([[1.0, 3.0, -2.0, 7.0],
+                                    [6.0, 2.5, 2.0, 4.0],
+                                    [-1.0, 0.0, 8.0, 1.0],
+                                    [1.0, 4.0, -5.0, 6.0]])
+
+                # Params
+                self.add_input('x1', np.zeros([4]))
+
+                # Unknowns
+                self.add_output('y1', np.zeros([4]))
+
+            def compute(self, inputs, outputs):
+                """
+                Execution.
+                """
+                outputs['y1'] = self.JJ.dot(inputs['x1'])
+
+            def compute_partials(self, inputs, partials):
+                """
+                Analytical derivatives.
+                """
+                partials[('y1', 'x1')] = self.JJ
+
+        prob = Problem()
+        prob.model = model = Group()
+        model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
+                            promotes=['x1'])
+        model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
+
+        model.add_design_var('x1', indices=[1, 3])
+        model.add_constraint('y1', indices=[0, 2])
+
+        prob.set_solver_print(level=0)
+        model.approx_total_derivs(method='cs')
+
+        prob.setup(check=False, mode='fwd')
+        prob.run_model()
+
+        Jbase = model.get_subsystem('mycomp').JJ
+        of = ['y1']
+        wrt = ['x1']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['y1', 'x1'][0][0], Jbase[0, 1], 1e-8)
+        assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[0, 3], 1e-8)
+        assert_rel_error(self, J['y1', 'x1'][1][0], Jbase[2, 1], 1e-8)
+        assert_rel_error(self, J['y1', 'x1'][1][1], Jbase[2, 3], 1e-8)
 
 def title(txt):
     """ Provide nice title for parameterized testing."""
@@ -674,6 +788,64 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[0, 3], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][1][0], Jbase[2, 1], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][1][1], Jbase[2, 3], 1e-8)
+
+    def test_desvar_with_indices(self):
+        # Just desvars on this one to cover code missed by desvar+response test.
+
+        class ArrayComp2D(ExplicitComponent):
+            """
+            A fairly simple array component.
+            """
+
+            def setup(self):
+
+                self.JJ = np.array([[1.0, 3.0, -2.0, 7.0],
+                                    [6.0, 2.5, 2.0, 4.0],
+                                    [-1.0, 0.0, 8.0, 1.0],
+                                    [1.0, 4.0, -5.0, 6.0]])
+
+                # Params
+                self.add_input('x1', np.zeros([4]))
+
+                # Unknowns
+                self.add_output('y1', np.zeros([4]))
+
+            def compute(self, inputs, outputs):
+                """
+                Execution.
+                """
+                outputs['y1'] = self.JJ.dot(inputs['x1'])
+
+            def compute_partials(self, inputs, partials):
+                """
+                Analytical derivatives.
+                """
+                partials[('y1', 'x1')] = self.JJ
+
+        prob = Problem()
+        prob.model = model = Group()
+        model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
+                            promotes=['x1'])
+        model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
+
+        model.add_design_var('x1', indices=[1, 3])
+        model.add_constraint('y1')
+
+        prob.set_solver_print(level=0)
+        model.approx_total_derivs(method='cs')
+
+        prob.setup(check=False, mode='fwd')
+        prob.run_model()
+
+        Jbase = model.get_subsystem('mycomp').JJ
+        of = ['y1']
+        wrt = ['x1']
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['y1', 'x1'][0][0], Jbase[0, 1], 1e-8)
+        assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[0, 3], 1e-8)
+        assert_rel_error(self, J['y1', 'x1'][2][0], Jbase[2, 1], 1e-8)
+        assert_rel_error(self, J['y1', 'x1'][2][1], Jbase[2, 3], 1e-8)
 
 
 class TestComponentComplexStep(unittest.TestCase):

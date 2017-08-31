@@ -1002,7 +1002,12 @@ class Problem(object):
                 okey = old_output_list[ocount]
                 for icount, input_name in enumerate(input_list):
                     ikey = old_input_list[icount]
-                    totals[okey, ikey] = -approx_jac[output_name, input_name]
+                    jac = approx_jac[output_name, input_name]
+                    if isinstance(jac, list):
+                        #Support for design variable as objective.
+                        totals[okey, ikey] = np.eye(len(jac[0]))
+                    else:
+                        totals[okey, ikey] = -jac
 
         elif return_format == 'dict':
             for ocount, output_name in enumerate(output_list):
@@ -1010,7 +1015,12 @@ class Problem(object):
                 totals[okey] = tot = OrderedDict()
                 for icount, input_name in enumerate(input_list):
                     ikey = old_input_list[icount]
-                    tot[ikey] = -approx_jac[output_name, input_name]
+                    jac = approx_jac[output_name, input_name]
+                    if isinstance(jac, list):
+                        #Support for design variable as objective.
+                        tot[ikey] = np.eye(len(jac[0]))
+                    else:
+                        tot[ikey] = -jac
         else:
             msg = "Unsupported return format '%s." % return_format
             raise NotImplementedError(msg)

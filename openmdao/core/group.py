@@ -1499,11 +1499,13 @@ class Group(System):
 
                         # Skip indepvarcomp res wrt other srcs
                         if key[0] in ivc:
+                            print('skip', key)
                             continue
 
                         # Skip explicit res wrt outputs
                         if key[1] in of and key[1] not in ivc:
-                            continue
+                            if key[1] not in wrt or key[0] == key[1]:
+                                continue
 
                         approx.add_approximation(key, meta)
 

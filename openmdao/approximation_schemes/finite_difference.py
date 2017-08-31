@@ -243,7 +243,7 @@ class FiniteDifference(ApproximationScheme):
                         out_idx = system._owns_approx_of_idx[of]
                         subjac[:, i_count] = result._views_flat[of][out_idx]
                     else:
-                        subjac[:, idx] = result._views_flat[of]
+                        subjac[:, i_count] = result._views_flat[of]
 
             for of, subjac in outputs:
                 rel_key = abs_key2rel_key(system, (of, wrt))

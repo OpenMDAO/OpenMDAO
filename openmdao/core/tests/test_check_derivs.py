@@ -634,6 +634,36 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_rel_error(self, totals['con_cmp2.con2', 'px.x']['J_fwd'], [[0.09692762]], 1e-5)
         assert_rel_error(self, totals['con_cmp2.con2', 'px.x']['J_fd'], [[0.09692762]], 1e-5)
 
+    def test_desvar_as_obj(self):
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_objective('x')
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(force_alloc_complex=True)
+
+        # We don't call run_driver() here because we don't
+        # actually want the optimizer to run
+        prob.run_model()
+
+        # check derivatives with complex step and a larger step size.
+        testlogger = TestLogger()
+        totals = prob.check_total_derivatives(method='cs', step=1.0e-1, logger=testlogger)
+
+        lines = testlogger.get('info')
+
+        self.assertTrue('1.000' in lines[4])
+        self.assertTrue('1.000' in lines[5])
+        self.assertTrue('0.000' in lines[6])
+        self.assertTrue('0.000' in lines[8])
+
+        assert_rel_error(self, totals['px.x', 'px.x']['J_fwd'], [[1.0]], 1e-5)
+        assert_rel_error(self, totals['px.x', 'px.x']['J_fd'], [[1.0]], 1e-5)
+
     def test_desvar_and_response_with_indices(self):
 
         class ArrayComp2D(ExplicitComponent):
