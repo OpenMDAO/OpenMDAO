@@ -40,6 +40,9 @@ class TestVector(unittest.TestCase):
         self.assertEqual(new_vec.dot(p.model._outputs), 9.)
 
     def test_dot_petsc(self):
+        if not PETScVector:
+            raise unittest.SkipTest("PETSc is not installed")
+
         p = Problem()
         comp = IndepVarComp()
         comp.add_output('v1', val=1.0)
