@@ -229,7 +229,7 @@ class ExplicitComponent(Component):
         with Recording(self.pathname + '._apply_linear', self.iter_count, self):
             for vec_name in vec_names:
                 if vec_name not in self._rel_vec_names:
-                        continue
+                    continue
 
                 with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                     d_inputs, d_outputs, d_residuals = vecs
@@ -237,10 +237,6 @@ class ExplicitComponent(Component):
                     # Jacobian and vectors are all scaled, unitless
                     with self.jacobian_context() as J:
                         J._apply(d_inputs, d_outputs, d_residuals, mode)
-
-                    # TODO: the entire following block could be skipped unless
-                    #       self.matrix_free is True, since the call to
-                    #       compute_jacvec_product does nothing otherwise.
 
                     # Jacobian and vectors are all unscaled, dimensional
                     with self._unscaled_context(
