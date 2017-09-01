@@ -1166,7 +1166,7 @@ class Group(System):
         # if multiple targets are given, recursively connect to each
         if not isinstance(tgt_name, string_types) and isinstance(tgt_name, Iterable):
             for name in tgt_name:
-                self.connect(src_name, name, src_indices)
+                self.connect(src_name, name, src_indices, flat_src_indices=flat_src_indices)
             return
 
         # target should not already be connected

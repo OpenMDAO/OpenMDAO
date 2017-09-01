@@ -257,9 +257,9 @@ class ScipyIterativeSolver(LinearSolver):
         b_vec.set_data(in_vec)
 
         # call the preconditioner
-        self._solver_info.prefix += '| precon:'
-        self.precon.solve([vec_name], mode, self._rel_systems)
-        self._solver_info.prefix = self._solver_info.prefix[:-9]
+        self._solver_info.append_precon()
+        self.precon.solve([vec_name], mode)
+        self._solver_info.pop()
 
         # return resulting value of x vector
         return x_vec.get_data()

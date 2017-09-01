@@ -297,7 +297,7 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.ln_sollver = ScipyIterativeSolver()
+        prob.model.linear_solver = ScipyIterativeSolver()
 
         prob.model.linear_solver.precon = LinearBlockGS()
         prob.model.linear_solver.precon.options['maxiter'] = 2

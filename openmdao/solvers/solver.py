@@ -23,6 +23,8 @@ class SolverInfo(object):
     ----------
     prefix : <System>
         Prefix to prepend during this iprint.
+    stack : List
+        List of strings; strings are popped and appended as needed.
     """
 
     def __init__(self):
@@ -30,6 +32,39 @@ class SolverInfo(object):
         Initialize.
         """
         self.prefix = ""
+        self.stack = []
+
+    def pop(self):
+        """
+        Remove one level of solver depth in the printing.
+        """
+        last_string = self.stack.pop()
+        nchar = len(last_string)
+        self.prefix = self.prefix[:-nchar]
+
+    def append_solver(self):
+        """
+        Add a new level for the main solver in a group.
+        """
+        new_str = '+  '
+        self.prefix += new_str
+        self.stack.append(new_str)
+
+    def append_subsolver(self):
+        """
+        Add a new level for any sub-solver for your solver.
+        """
+        new_str = '|  '
+        self.prefix += new_str
+        self.stack.append(new_str)
+
+    def append_precon(self):
+        """
+        Add a new level for any preconditioner to a linear solver.
+        """
+        new_str = '| precon:'
+        self.prefix += new_str
+        self.stack.append(new_str)
 
 
 class Solver(object):
@@ -230,10 +265,11 @@ class Solver(object):
                 (norm > atol and norm / norm0 > rtol))
 
         if self._system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
+            prefix = self._solver_info.prefix + self.SOLVER
             if fail:
                 if iprint > -1:
                     msg = ' Failed to Converge in {} iterations'.format(self._iter_count)
-                    print(self._solver_info.prefix + self.SOLVER + msg)
+                    print(prefix + msg)
 
                 # Raise AnalysisError if requested.
                 if self.options['err_on_maxiter']:
@@ -241,10 +277,9 @@ class Solver(object):
                     raise AnalysisError(msg.format(self.SOLVER, self._system.pathname))
 
             elif iprint == 1:
-                print(self._solver_info.prefix + self.SOLVER +
-                      ' Converged in {} iterations'.format(self._iter_count))
+                print(prefix + ' Converged in {} iterations'.format(self._iter_count))
             elif iprint == 2:
-                print(self._solver_info.prefix + self.SOLVER + ' Converged')
+                print(prefix + ' Converged')
 
         return fail, norm, norm / norm0
 
