@@ -911,6 +911,8 @@ class Group(System):
 
             # Loop through all explicit / implicit connections owned by this system
             for abs_in, abs_out in iteritems(self._conn_abs_in2out):
+                if abs_out not in relvars['output']:
+                    continue
 
                 # Only continue if the input exists on this processor
                 if abs_in in abs2meta_in and abs_in in relvars['input']:
