@@ -447,6 +447,26 @@ class DefaultVector(Vector):
         for data in itervalues(self._data):
             data[:] = val
 
+    def dot(self, vec):
+        """
+        Compute the dot product of the real parts of the current vec and the incoming vec.
+
+        Parameters
+        ----------
+        vec : <Vector>
+            The incoming vector being dotted with self.
+
+        Returns
+        -------
+        float
+            The computed dot product value.
+        """
+        global_sum = 0
+        for set_name, data in iteritems(self._data):
+            global_sum += np.dot(self._data[set_name], vec._data[set_name])
+
+        return global_sum
+
     def get_norm(self):
         """
         Return the norm of this vector.
