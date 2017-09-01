@@ -391,7 +391,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.add_constraint('y1')
 
         prob.set_solver_print(level=0)
-        model.approx_total_derivs(method='cs')
+        model.approx_total_derivs(method='fd')
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -448,7 +448,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.add_constraint('y1', indices=[0, 2])
 
         prob.set_solver_print(level=0)
-        model.approx_total_derivs(method='cs')
+        model.approx_total_derivs(method='fd')
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
