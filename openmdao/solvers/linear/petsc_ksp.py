@@ -294,7 +294,7 @@ class PetscKSP(LinearSolver):
 
         # apply linear
         scope_out, scope_in = system._get_scope()
-        system._apply_linear([vec_name], self._mode, scope_out, scope_in)
+        system._apply_linear([vec_name], self._rel_systems, self._mode, scope_out, scope_in)
 
         # stuff resulting value of b vector into result for KSP
         b_vec.get_data(result.array)
@@ -318,7 +318,7 @@ class PetscKSP(LinearSolver):
         if self.precon is not None:
             self.precon._linearize()
 
-    def solve(self, vec_names, mode):
+    def solve(self, vec_names, mode, rel_systems=None):
         """
         Solve the linear system for the problem in self._system.
 
@@ -341,6 +341,7 @@ class PetscKSP(LinearSolver):
             relative error.
         """
         self._vec_names = vec_names
+        self._rel_systems = rel_systems
         self._mode = mode
 
         system = self._system

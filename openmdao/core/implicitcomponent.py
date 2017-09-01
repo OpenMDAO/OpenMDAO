@@ -89,7 +89,7 @@ class ImplicitComponent(Component):
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
             self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
 
-    def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -97,6 +97,8 @@ class ImplicitComponent(Component):
         ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
         mode : str
             'fwd' or 'rev'.
         scope_out : set or None
@@ -106,7 +108,9 @@ class ImplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        for vec_name in self._rel_vec_name_list[1:]:
+        for vec_name in vec_names:
+            if vec_name not in self._rel_vec_names:
+                continue
             with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
 
@@ -121,7 +125,7 @@ class ImplicitComponent(Component):
                         self.apply_linear(self._inputs, self._outputs,
                                           d_inputs, d_outputs, d_residuals, mode)
 
-    def _solve_linear(self, vec_names, mode):
+    def _solve_linear(self, vec_names, mode, rel_systems):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -131,6 +135,8 @@ class ImplicitComponent(Component):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
 
         Returns
         -------
@@ -143,7 +149,7 @@ class ImplicitComponent(Component):
         """
         if self._linear_solver is not None:
             with Recording(self.pathname + '._solve_linear', self.iter_count, self):
-                result = self._linear_solver.solve(vec_names, mode)
+                result = self._linear_solver.solve(vec_names, mode, rel_systems)
 
             return result
 

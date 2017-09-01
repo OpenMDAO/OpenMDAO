@@ -328,7 +328,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=10.0, upper=11.0)
 
-        prob.setup(check=False)
+        prob.setup(check=False, mode='rev')
         prob.run_driver()
 
         # Minimum should be at (7.166667, -7.833334)

@@ -2751,7 +2751,7 @@ class System(object):
             If None, all are in the scope.
         """
         with self._scaled_context_all():
-            self._apply_linear(vec_names, mode, scope_out, scope_in)
+            self._apply_linear(vec_names, ContainsAll(), mode, scope_out, scope_in)
 
     def run_solve_linear(self, vec_names, mode):
         """
@@ -2776,7 +2776,7 @@ class System(object):
             absolute error.
         """
         with self._scaled_context_all():
-            result = self._solve_linear(vec_names, mode)
+            result = self._solve_linear(vec_names, mode, ContainsAll())
 
         return result
 
@@ -2832,7 +2832,7 @@ class System(object):
         """
         pass
 
-    def _apply_linear(self, vec_names, mode, var_inds=None):
+    def _apply_linear(self, vec_names, rel_systems, mode, var_inds=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -2840,15 +2840,17 @@ class System(object):
         ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
         mode : str
             'fwd' or 'rev'.
         var_inds : [int, int, int, int] or None
             ranges of variable IDs involved in this matrix-vector product.
             The ordering is [lb1, ub1, lb2, ub2].
         """
-        pass
+        raise NotImplementedError("_apply_linear has not been overridden")
 
-    def _solve_linear(self, vec_names, mode):
+    def _solve_linear(self, vec_names, mode, rel_systems):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -2858,6 +2860,8 @@ class System(object):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
 
         Returns
         -------

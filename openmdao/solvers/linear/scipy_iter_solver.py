@@ -130,7 +130,7 @@ class ScipyIterativeSolver(LinearSolver):
 
         x_vec.set_data(in_vec)
         scope_out, scope_in = system._get_scope()
-        system._apply_linear([vec_name], self._mode, scope_out, scope_in)
+        system._apply_linear([vec_name], self._rel_systems, self._mode, scope_out, scope_in)
 
         # print('in', in_vec)
         # print('out', b_vec.get_data())
@@ -156,7 +156,7 @@ class ScipyIterativeSolver(LinearSolver):
         self._mpi_print(self._iter_count, norm, norm / self._norm0)
         self._iter_count += 1
 
-    def solve(self, vec_names, mode):
+    def solve(self, vec_names, mode, rel_systems=None):
         """
         Run the solver.
 
@@ -177,6 +177,7 @@ class ScipyIterativeSolver(LinearSolver):
             relative error.
         """
         self._vec_names = vec_names
+        self._rel_systems = rel_systems
         self._mode = mode
 
         system = self._system
@@ -257,7 +258,7 @@ class ScipyIterativeSolver(LinearSolver):
 
         # call the preconditioner
         self._solver_info.prefix += '| precon:'
-        self.precon.solve([vec_name], mode)
+        self.precon.solve([vec_name], mode, self._rel_systems)
         self._solver_info.prefix = self._solver_info.prefix[:-9]
 
         # return resulting value of x vector

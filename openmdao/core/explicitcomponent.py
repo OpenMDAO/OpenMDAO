@@ -207,7 +207,7 @@ class ExplicitComponent(Component):
                 failed = self.compute(self._inputs, self._outputs)
         return bool(failed), 0., 0.
 
-    def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -215,6 +215,8 @@ class ExplicitComponent(Component):
         ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
         mode : str
             'fwd' or 'rev'.
         scope_out : set or None
@@ -263,7 +265,7 @@ class ExplicitComponent(Component):
                                                         d_inputs, d_residuals, mode)
                         d_residuals *= -1.0
 
-    def _solve_linear(self, vec_names, mode):
+    def _solve_linear(self, vec_names, mode, rel_systems):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -273,6 +275,8 @@ class ExplicitComponent(Component):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
 
         Returns
         -------
@@ -285,16 +289,17 @@ class ExplicitComponent(Component):
         """
         with Recording(self.pathname + '._solve_linear', self.iter_count, self):
             for vec_name in vec_names:
-                if vec_name in self._rel_vec_names:
-                    d_outputs = self._vectors['output'][vec_name]
-                    d_residuals = self._vectors['residual'][vec_name]
+                if vec_name not in self._rel_vec_names:
+                    continue
+                d_outputs = self._vectors['output'][vec_name]
+                d_residuals = self._vectors['residual'][vec_name]
 
-                    with self._unscaled_context(
-                            outputs=[d_outputs], residuals=[d_residuals]):
-                        if mode == 'fwd':
-                            d_outputs.set_vec(d_residuals)
-                        else:  # rev
-                            d_residuals.set_vec(d_outputs)
+                with self._unscaled_context(
+                        outputs=[d_outputs], residuals=[d_residuals]):
+                    if mode == 'fwd':
+                        d_outputs.set_vec(d_residuals)
+                    else:  # rev
+                        d_residuals.set_vec(d_outputs)
         return False, 0., 0.
 
     def _linearize(self, do_nl=False, do_ln=False):

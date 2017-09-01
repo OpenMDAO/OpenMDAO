@@ -6,7 +6,7 @@ from collections import OrderedDict, defaultdict, namedtuple
 from itertools import product
 import logging
 
-from six import iteritems, iterkeys
+from six import iteritems, iterkeys, itervalues
 from six.moves import range
 
 import numpy as np
@@ -21,7 +21,7 @@ from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.general_utils import warn_deprecation, ContainsAll
 from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
@@ -35,6 +35,8 @@ from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
+
+_contains_all = ContainsAll()
 
 
 class Problem(object):
@@ -595,7 +597,7 @@ class Problem(object):
                                 flat_view[idx] = perturb
 
                                 # Matrix Vector Product
-                                comp._apply_linear(['linear'], mode)
+                                comp._apply_linear(['linear'], _contains_all, mode)
 
                                 for out in out_list:
                                     out_abs = rel_name2abs_name(comp, out)
@@ -997,7 +999,7 @@ class Problem(object):
         nproc = self.comm.size
         iproc = model.comm.rank
 
-        for rhs_name, vois in iteritems(voi_lists):
+        for vois in itervalues(voi_lists):
             for input_name, old_input_name in vois:
                 vecname = inp2rhs_name[input_name]
                 if vecname not in input_vec:
@@ -1054,7 +1056,7 @@ class Problem(object):
 
     def _compute_total_derivs_multi(self, totals, vois, voi_info, lin_vec_names, mode,
                                     output_list, old_output_list, output_vois,
-                                    use_rel_reduction, return_format):
+                                    use_rel_reduction, rel_systems, return_format):
         # this sets dinputs for the current parallel_deriv_color to 0
         voi_info[vois[0][0]][0].set_const(0.0)
         fwd = mode == 'fwd'
@@ -1079,7 +1081,7 @@ class Problem(object):
                         else:
                             dinputs._views_flat[input_name][idx - start] = 1.0
 
-        model._solve_linear(lin_vec_names, mode)
+        model._solve_linear(lin_vec_names, mode, rel_systems)
 
         for input_name, old_input_name in vois:
             dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
@@ -1307,6 +1309,7 @@ class Problem(object):
             else:
                 parallel_deriv_color = None
                 use_rel_reduction = False
+
             if parallel_deriv_color is None:  # variable is not in an parallel_deriv_color
                 if name in voi_lists:
                     raise RuntimeError("Variable name '%s' matches an parallel_deriv_color name." %
@@ -1330,16 +1333,30 @@ class Problem(object):
         voi_info = self._get_voi_info(voi_lists, inp2rhs_name, input_vec, output_vec, input_vois)
 
         if matmat:
-            for rhs_name, vois in iteritems(voi_lists):
+            for vois in itervalues(voi_lists):
+                if use_rel_reduction:
+                    rel_systems = set()
+                    for voi, _ in vois:
+                        rel_systems.update(relevant[voi]['@all'][1])
+                else:
+                    rel_systems = _contains_all
                 self._compute_total_derivs_multi(totals, vois, voi_info, lin_vec_names, mode,
                                                  output_list, old_output_list,
-                                                 output_vois, use_rel_reduction, return_format)
+                                                 output_vois, use_rel_reduction, rel_systems,
+                                                 return_format)
             recording_iteration.stack.pop()
             return totals
 
-        for rhs_name, vois in iteritems(voi_lists):
+        for vois in itervalues(voi_lists):
             # If Forward mode, solve linear system for each 'wrt'
             # If Adjoint mode, solve linear system for each 'of'
+
+            if use_rel_reduction:
+                rel_systems = set()
+                for voi, _ in vois:
+                    rel_systems.update(relevant[voi]['@all'][1])
+            else:
+                rel_systems = _contains_all
 
             loc_idxs = defaultdict(lambda: -1)
 
@@ -1347,6 +1364,11 @@ class Problem(object):
             for i in range(max_len):
                 # this sets dinputs for the current parallel_deriv_color to 0
                 voi_info[vois[0][0]][0].set_const(0.0)
+                if use_rel_reduction:
+                    if fwd:
+                        vec_doutput['linear'].set_const(0.0)
+                    else:
+                        vec_dinput['linear'].set_const(0.0)
 
                 for input_name, old_input_name in vois:
                     dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
@@ -1364,7 +1386,7 @@ class Problem(object):
                         # need a vector for clean code, so use _views_flat.
                         dinputs._views_flat[input_name][idx - start] = 1.0
 
-                model._solve_linear(lin_vec_names, mode)
+                model._solve_linear(lin_vec_names, mode, rel_systems)
 
                 for input_name, old_input_name in vois:
                     dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \

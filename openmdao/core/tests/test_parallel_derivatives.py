@@ -99,7 +99,7 @@ class ParDerivTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class, check=False, mode='rev')
         prob.run_driver()
 
-        unknown_list = ['c2.y', 'c3.y']
+        unknown_list = ['c3.y','c2.y'] #['c2.y', 'c3.y']
         indep_list = ['iv.x']
 
         J = prob.compute_total_derivs(unknown_list, indep_list, return_format='flat_dict')
@@ -142,12 +142,12 @@ class ParDerivTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class, check=False, mode='rev')
         prob.run_driver()
 
-        unknown_list = ['sub.c2.y', 'sub.c3.y']
+        unknown_list = ['c2.y', 'c3.y']
         indep_list = ['iv.x']
 
         J = prob.compute_total_derivs(unknown_list, indep_list, return_format='flat_dict')
-        assert_rel_error(self, J['sub.c2.y', 'iv.x'][0][0], -6.0, 1e-6)
-        assert_rel_error(self, J['sub.c3.y', 'iv.x'][0][0], 15.0, 1e-6)
+        assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
+        assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
 
 class DecoupledTestCase(unittest.TestCase):

@@ -178,7 +178,7 @@ class Component(BaseComponent):
             self._scale_vec(self._outputs, 'output', 'norm')
             self._scale_vec(self._residuals, 'residual', 'norm')
 
-    def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product.
 
@@ -219,7 +219,7 @@ class Component(BaseComponent):
                         for name in d_inputs:
                             d_inputs[name] *= -1.0
 
-    def _solve_linear(self, vec_names, mode):
+    def _solve_linear(self, vec_names, mode, rel_systems):
         """
         Apply inverse jac product.
 
@@ -240,9 +240,11 @@ class Component(BaseComponent):
             absolute error.
         """
         if self._linear_solver is not None:
-            return self._linear_solver(vec_names, mode)
+            return self._linear_solver(vec_names, mode, rel_systems)
         else:
             for vec_name in vec_names:
+                if vec_name not in self._rel_vec_names:
+                    continue
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
 
@@ -254,6 +256,8 @@ class Component(BaseComponent):
                               vec_names, mode)
 
             for vec_name in vec_names:
+                if vec_name not in self._rel_vec_names:
+                    continue
 
                 # skip for pure explicit components.
                 if len(self._state_names) > 0:

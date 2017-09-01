@@ -1339,7 +1339,7 @@ class Group(System):
                     self._transfer('nonlinear', 'fwd', isub)
                     sub._guess_nonlinear()
 
-    def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -1347,6 +1347,8 @@ class Group(System):
         ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
         mode : str
             'fwd' or 'rev'.
         scope_out : set or None
@@ -1375,13 +1377,14 @@ class Group(System):
                             self._transfer(vec_name, mode)
 
                     for subsys in self._subsystems_myproc:
-                        subsys._apply_linear(vec_names, mode, scope_out, scope_in)
+                        if rel_systems is None or subsys.pathname in rel_systems:
+                            subsys._apply_linear(vec_names, rel_systems, mode, scope_out, scope_in)
 
                     if mode == 'rev':
                         for vec_name in vec_names:
                             self._transfer(vec_name, mode)
 
-    def _solve_linear(self, vec_names, mode):
+    def _solve_linear(self, vec_names, mode, rel_systems):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -1391,6 +1394,8 @@ class Group(System):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
 
         Returns
         -------
@@ -1406,7 +1411,7 @@ class Group(System):
         vec_names = [v for v in vec_names if v in self._rel_vec_names]
 
         with Recording(name + '._solve_linear', self.iter_count, self):
-            result = self._linear_solver.solve(vec_names, mode)
+            result = self._linear_solver.solve(vec_names, mode, rel_systems)
 
         return result
 

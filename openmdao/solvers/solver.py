@@ -402,9 +402,26 @@ class NonlinearSolver(Solver):
 class LinearSolver(Solver):
     """
     Base class for linear solvers.
+
+    Attributes
+    ----------
+    _rel_systems : set of str
+        Names of systems relevant to the current solve.
     """
 
-    def solve(self, vec_names, mode):
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
+        """
+        super(LinearSolver, self).__init__(**kwargs)
+        self._rel_systems = None
+
+    def solve(self, vec_names, mode, rel_systems=None):
         """
         Run the solver.
 
@@ -414,6 +431,8 @@ class LinearSolver(Solver):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
 
         Returns
         -------
@@ -425,6 +444,7 @@ class LinearSolver(Solver):
             error at the first iteration.
         """
         self._vec_names = vec_names
+        self._rel_systems = rel_systems
         self._mode = mode
         return self._run_iterator()
 
@@ -467,7 +487,7 @@ class LinearSolver(Solver):
 
         system = self._system
         scope_out, scope_in = system._get_scope()
-        system._apply_linear(self._vec_names, self._mode, scope_out, scope_in)
+        system._apply_linear(self._vec_names, self._rel_systems, self._mode, scope_out, scope_in)
 
         recording_iteration.stack.pop()
 

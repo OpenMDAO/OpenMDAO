@@ -329,6 +329,23 @@ class TestDesvarOnModel(unittest.TestCase):
             prob.model.add_design_var('x', lower=0.0, upper=['a', 'b'],
                                       ref0=-100.0, ref=100)
 
+    def test_two_desvar_as_con(self):
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_constraint('x', upper=0.0)
+        prob.model.add_constraint('z', upper=0.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(force_alloc_complex=True)
+
+        # We don't call run_driver() here because we don't
+        # actually want the optimizer to run
+        prob.run_model()
 
 class TestConstraintOnModel(unittest.TestCase):
 

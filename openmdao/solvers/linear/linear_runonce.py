@@ -12,7 +12,7 @@ class LinearRunOnce(LinearBlockGS):
 
     SOLVER = 'LN: RUNONCE'
 
-    def solve(self, vec_names, mode):
+    def solve(self, vec_names, mode, rel_systems=None):
         """
         Run the solver.
 
@@ -32,6 +32,7 @@ class LinearRunOnce(LinearBlockGS):
         """
         self._vec_names = vec_names
         self._mode = mode
+        self._rel_systems = rel_systems
         system = self._system
 
         # Pre-processing
