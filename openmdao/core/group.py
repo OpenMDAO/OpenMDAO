@@ -1503,7 +1503,10 @@ class Group(System):
 
                         # Skip explicit res wrt outputs
                         if key[1] in of and key[1] not in ivc:
-                            continue
+
+                            # Support for specifying a desvar as an obj/con.
+                            if key[1] not in wrt or key[0] == key[1]:
+                                continue
 
                         approx.add_approximation(key, meta)
 

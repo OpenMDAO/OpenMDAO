@@ -14,3 +14,4 @@ Linear Solvers
     direct_solver.rst
     petsc_ksp.rst
     scipy_iter_solver.rst
+    linear_user_defined.rst
