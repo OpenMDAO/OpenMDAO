@@ -1057,13 +1057,19 @@ class Problem(object):
     def _compute_total_derivs_multi(self, totals, vois, voi_info, lin_vec_names, mode,
                                     output_list, old_output_list, output_vois,
                                     use_rel_reduction, rel_systems, return_format):
-        # this sets dinputs for the current parallel_deriv_color to 0
-        voi_info[vois[0][0]][0].set_const(0.0)
         fwd = mode == 'fwd'
         model = self.model
         nproc = model.comm.size
         iproc = model.comm.rank
         sizes = model._var_sizes['nonlinear']['output']
+
+        # this sets dinputs for the current parallel_deriv_color to 0
+        voi_info[vois[0][0]][0].set_const(0.0)
+        if use_rel_reduction:
+            if fwd:
+                model._vectors['output']['linear'].set_const(0.0)
+            else:
+                model._vectors['input']['linear'].set_const(0.0)
 
         for input_name, old_input_name in vois:
             dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
@@ -1363,11 +1369,14 @@ class Problem(object):
             max_len = max(len(voi_info[name][2]) for name, _ in vois)
             for i in range(max_len):
                 # this sets dinputs for the current parallel_deriv_color to 0
-                voi_info[vois[0][0]][0].set_const(0.0)
-                if use_rel_reduction:
-                    if fwd:
+                # dinputs is dresids in fwd, doutouts in rev
+                if fwd:
+                    vec_dresid['linear'].set_const(0.0)
+                    if use_rel_reduction:
                         vec_doutput['linear'].set_const(0.0)
-                    else:
+                else:  # rev
+                    vec_doutput['linear'].set_const(0.0)
+                    if use_rel_reduction:
                         vec_dinput['linear'].set_const(0.0)
 
                 for input_name, old_input_name in vois:
