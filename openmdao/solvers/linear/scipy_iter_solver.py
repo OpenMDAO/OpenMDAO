@@ -189,8 +189,6 @@ class ScipyIterativeSolver(LinearSolver):
         restart = self.options['restart']
 
         for vec_name in self._vec_names:
-            if vec_name not in system._rel_vec_names:
-                continue
 
             self._vec_name = vec_name
 

@@ -183,7 +183,7 @@ class Group(System):
                 subsys._setup_vars(recurse)
 
         # Compute num_var, num_var_byset, at least locally
-        for vec_name in self._rel_vec_name_list[1:]:
+        for vec_name in self._lin_rel_vec_name_list:
             num_var[vec_name] = {}
             num_var_byset[vec_name] = {}
             for type_ in ['input', 'output']:
@@ -209,7 +209,7 @@ class Group(System):
                 raw = (None, None)
             gathered = self.comm.allgather(raw)
 
-            for vec_name in self._rel_vec_name_list[1:]:
+            for vec_name in self._lin_rel_vec_name_list:
                 num_var = self._num_var[vec_name]
                 num_var_byset = self._num_var_byset[vec_name]
 
@@ -251,7 +251,7 @@ class Group(System):
         subsystems_var_range_byset = self._subsystems_var_range_byset = {}
 
         # First compute these on one processor for each subsystem
-        for vec_name in self._rel_vec_name_list[1:]:
+        for vec_name in self._lin_rel_vec_name_list:
 
             # Here, we count the number of variables (total and by varset) in each subsystem.
             # We do this so that we can compute the offset when we recurse into each subsystem.
@@ -425,7 +425,7 @@ class Group(System):
         sizes_byset = self._var_sizes_byset
 
         # Compute _var_sizes
-        for vec_name in self._rel_vec_name_list[1:]:
+        for vec_name in self._lin_rel_vec_name_list:
             sizes[vec_name] = {}
             sizes_byset[vec_name] = {}
             subsystems_var_range = self._subsystems_var_range[vec_name]
@@ -452,7 +452,7 @@ class Group(System):
 
         # If parallel, all gather
         if self.comm.size > 1:
-            for vec_name in self._rel_vec_name_list[1:]:
+            for vec_name in self._lin_rel_vec_name_list:
                 sizes = self._var_sizes[vec_name]
                 sizes_byset = self._var_sizes_byset[vec_name]
                 for type_ in ['input', 'output']:
@@ -795,9 +795,7 @@ class Group(System):
             sub_ext_num_vars_byset = {}
             sub_ext_sizes_byset = {}
 
-            for vec_name in self._lin_vec_names:
-                if vec_name not in subsys._rel_vec_names:
-                    continue
+            for vec_name in subsys._lin_rel_vec_name_list:
                 subsystems_var_range = self._subsystems_var_range[vec_name]
                 subsystems_var_range_byset = self._subsystems_var_range_byset[vec_name]
                 sizes = self._var_sizes[vec_name]
@@ -882,7 +880,7 @@ class Group(System):
 
         transfers = self._transfers
         vectors = self._vectors
-        for vec_name in self._rel_vec_name_list[1:]:
+        for vec_name in self._lin_rel_vec_name_list:
             relvars, _ = self._relevant[vec_name]['@all']
 
             # Initialize empty lists for the transfer indices

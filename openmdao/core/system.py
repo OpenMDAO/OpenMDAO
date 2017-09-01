@@ -504,7 +504,7 @@ class System(object):
             ext_num_vars_byset = {}
             ext_sizes_byset = {}
 
-            for vec_name in self._vec_names:
+            for vec_name in self._lin_rel_vec_name_list:
                 ext_num_vars[vec_name] = {}
                 ext_num_vars_byset[vec_name] = {}
                 ext_sizes[vec_name] = {}
@@ -518,6 +518,11 @@ class System(object):
                     ext_sizes_byset[vec_name][type_] = {
                         set_name: (0, 0) for set_name in self._var_set2iset[type_]
                     }
+
+            ext_num_vars['nonlinear'] = ext_num_vars['linear']
+            ext_num_vars_byset['nonlinear'] = ext_num_vars_byset['linear']
+            ext_sizes['nonlinear'] = ext_sizes['linear']
+            ext_sizes_byset['nonlinear'] = ext_sizes_byset['linear']
 
             return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
@@ -548,7 +553,7 @@ class System(object):
         if initial:
             mode = self._mode
             relevant = self._relevant
-            vec_names = self._vec_names
+            vec_names = self._rel_vec_name_list
             vois = self._vois
             iproc = self.comm.rank
             abs2idx = self._var_allprocs_abs2idx
@@ -577,10 +582,8 @@ class System(object):
                                 ncol = voi['size']
                             else:
                                 ncol = sizes[iproc, abs2idx[vec_name]['output'][vec_name]]
-                        rdict = relevant[vec_name]
-                        if '@all' in rdict:
-                            dct, _ = relevant[vec_name]['@all']
-                            rel = dct['output']
+                        rdct, _ = relevant[vec_name]['@all']
+                        rel = rdct['output']
                 for key in ['input', 'output', 'residual']:
                     root_vectors[key][vec_name] = vector_class(vec_name, _type_map[key], self,
                                                                alloc_complex=alloc_complex,
@@ -648,7 +651,7 @@ class System(object):
         for key in root_vectors:
             vec_key, coeff_key = key
 
-            for vec_name in self._vec_names:
+            for vec_name in self._lin_rel_vec_name_list:
                 if initial:
                     root_vectors[key][vec_name] = vector_class(vec_name, _type_map[vec_key], self)
 
@@ -656,6 +659,9 @@ class System(object):
                         root_vectors[key][vec_name].set_const(1.0)
                 else:
                     root_vectors[key][vec_name] = self._scaling_vecs[key][vec_name]._root_vector
+
+            if initial:
+                root_vectors[key]['nonlinear'] = root_vectors[key]['linear']
 
         return root_vectors
 
@@ -890,7 +896,7 @@ class System(object):
         self._var_allprocs_abs2idx = abs2idx = {}
         self._var_allprocs_abs2idx_byset = abs2idx_byset = {}
 
-        for vec_name in self._lin_vec_names:
+        for vec_name in self._lin_rel_vec_name_list:
             abs2idx[vec_name] = {'input': {}, 'output': {}}
             abs2idx_byset[vec_name] = {'input': {}, 'output': {}}
             for type_ in ['input', 'output']:
@@ -1074,6 +1080,7 @@ class System(object):
                     v for v in self._var_abs_names[type_] if v in rel[type_])
 
         self._rel_vec_names = set(self._rel_vec_name_list)
+        self._lin_rel_vec_name_list = self._rel_vec_name_list[1:]
 
         for s in self._subsystems_myproc:
             s._setup_relevance(mode, relevant)
@@ -1220,7 +1227,7 @@ class System(object):
         abs2meta_in = self._var_abs2meta['input']
         abs2meta_out = self._var_abs2meta['output']
 
-        for vec_name in self._rel_vec_name_list[1:]:
+        for vec_name in self._lin_rel_vec_name_list:
             vector_class = root_vectors['residual', 'phys0'][vec_name].__class__
             relvars, _ = self._relevant[vec_name]['@all']
 

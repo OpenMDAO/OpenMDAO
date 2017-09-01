@@ -503,8 +503,7 @@ class LinearSolver(Solver):
             b_vecs = system._vectors['output']
 
         for vec_name in self._vec_names:
-            if vec_name in system._rel_vec_names:
-                self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
+            self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
 
         if self.options['maxiter'] > 1:
             self._run_apply()

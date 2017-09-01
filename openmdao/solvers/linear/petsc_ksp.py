@@ -347,9 +347,7 @@ class PetscKSP(LinearSolver):
         atol = options['atol']
         rtol = options['rtol']
 
-        for vec_name in self._vec_names:
-            if vec_name not in system._rel_vec_names:
-                continue
+        for vec_name in vec_names:
 
             self._vec_name = vec_name
 

@@ -105,7 +105,7 @@ class Component(System):
         num_var_byset = self._num_var_byset
         data = self._var_rel2data_io
 
-        for vec_name in self._lin_vec_names:
+        for vec_name in self._lin_rel_vec_name_list:
             num_var[vec_name] = {}
             num_var_byset[vec_name] = {}
             # Compute num_var
@@ -188,7 +188,7 @@ class Component(System):
         iproc = self.comm.rank
         nproc = self.comm.size
         relevant = self._relevant
-        vec_names = self._lin_vec_names
+        vec_names = self._lin_rel_vec_name_list
 
         sizes = self._var_sizes
         sizes_byset = self._var_sizes_byset

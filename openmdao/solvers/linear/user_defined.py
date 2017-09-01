@@ -53,6 +53,7 @@ class LinearUserDefined(LinearSolver):
             relative error.
         """
         self._vec_names = vec_names
+        self._rel_systems = rel_systems
         self._mode = mode
 
         system = self._system
