@@ -476,6 +476,9 @@ class LinearSolver(Solver):
         """
         system = self._system
 
+        inputs = self._system._vectors['input']
+        inputs['linear'].set_const(0.0)
+
         self._rhs_vecs = {}
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']
@@ -550,4 +553,10 @@ class BlockLinearSolver(LinearSolver):
             raise RuntimeError("A block linear solver '%s' is being used with "
                                "an AssembledJacobian in system '%s'" %
                                (self.SOLVER, self._system.pathname))
+
+        inputs = self._system._vectors['input']
+        inputs['linear'].set_const(0.0)
+        #for vec in inputs:
+        #    vec.set_const(0.0)
+
         return super(BlockLinearSolver, self)._iter_initialize()
