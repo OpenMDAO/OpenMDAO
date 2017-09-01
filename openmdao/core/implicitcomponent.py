@@ -122,8 +122,25 @@ class ImplicitComponent(Component):
                 with self._unscaled_context(
                         outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
                     with Recording(self.pathname + '._apply_linear', self.iter_count, self):
-                        self.apply_linear(self._inputs, self._outputs,
-                                          d_inputs, d_outputs, d_residuals, mode)
+                        if d_inputs._ncol > 1:
+                            if self.supports_multivecs:
+                                self.apply_multi_linear(self._inputs, self._outputs,
+                                                        d_inputs, d_residuals, mode)
+                            else:
+                                for i in range(d_inputs._ncol):
+                                    # need to make the multivecs look like regular single vecs
+                                    # since the component doesn't know about multivecs.
+                                    d_inputs._icol = i
+                                    d_outputs._icol = i
+                                    d_residuals._icol = i
+                                    self.apply_linear(self._inputs, self._outputs,
+                                                      d_inputs, d_residuals, mode)
+                                d_inputs._icol = None
+                                d_outputs._icol = None
+                                d_residuals._icol = None
+                        else:
+                            self.apply_linear(self._inputs, self._outputs,
+                                              d_inputs, d_outputs, d_residuals, mode)
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """

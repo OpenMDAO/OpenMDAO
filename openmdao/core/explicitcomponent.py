@@ -244,8 +244,8 @@ class ExplicitComponent(Component):
                         d_residuals *= -1.0
                         if d_inputs._ncol > 1:
                             if self.supports_multivecs:
-                                self._compute_multi_jacvec_product(self._inputs, self._outputs,
-                                                                   d_inputs, d_residuals, mode)
+                                self.compute_multi_jacvec_product(self._inputs, self._outputs,
+                                                                  d_inputs, d_residuals, mode)
                             else:
                                 for i in range(d_inputs._ncol):
                                     # need to make the multivecs look like regular single vecs
