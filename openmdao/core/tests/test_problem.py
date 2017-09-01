@@ -524,7 +524,7 @@ class TestProblem(unittest.TestCase):
 
         p.setup(check=False, mode='rev')
 
-        g = p.model.compute_sys_graph(comps_only=True, save_vars=True)
+        g = p.model.compute_sys_graph(comps_only=True)
         relevant = get_relevant_vars(g, ['indep1.x', 'indep2.x'], ['C8.y', 'Unconnected.y'],
                                      mode='rev')
 

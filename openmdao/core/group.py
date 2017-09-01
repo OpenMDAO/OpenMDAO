@@ -617,7 +617,7 @@ class Group(System):
         """
         desvars = self.get_design_vars(recurse=True, get_sizes=False)
         responses = self.get_responses(recurse=True, get_sizes=False)
-        sys_graph = self.compute_sys_graph(comps_only=True, save_vars=True)
+        sys_graph = self.compute_sys_graph(comps_only=True)
         return get_relevant_vars(sys_graph, desvars, responses, mode)
 
     def _setup_connections(self, recurse=True):
@@ -1593,9 +1593,12 @@ class Group(System):
 
         super(Group, self)._setup_jacobians(jacobian, recurse)
 
-    def compute_sys_graph(self, comps_only=False, save_vars=False):
+    def compute_sys_graph(self, comps_only=False):
         """
         Compute a dependency graph for subsystems in this group.
+
+        Variable connection information is stored in each edge of
+        the system graph.
 
         Parameters
         ----------
@@ -1604,10 +1607,6 @@ class Group(System):
             or any of its descendants. No sub-groups will be included. Otherwise,
             a graph containing only direct children (both Components and Groups)
             of this group will be returned.
-
-        save_vars : bool (False)
-            If True, store variable connection information in each edge in
-            the system graph.
 
         Returns
         -------
@@ -1626,8 +1625,7 @@ class Group(System):
         else:
             graph.add_nodes_from(s.pathname for s in self._subsystems_allprocs)
 
-        if save_vars:
-            edge_data = defaultdict(lambda: defaultdict(list))
+        edge_data = defaultdict(lambda: defaultdict(list))
 
         for in_abs, src_abs in iteritems(input_srcs):
             if src_abs is not None:
@@ -1638,17 +1636,13 @@ class Group(System):
                     src = src_abs.split('.')[glen]
                     tgt = in_abs.split('.')[glen]
 
-                if save_vars:
-                    # store var connection data in each system to system edge for later
-                    # use in relevance calculation.
-                    edge_data[(src, tgt)][src_abs].append(in_abs)
-                else:
-                    graph.add_edge(src, tgt)
+                # store var connection data in each system to system edge for later
+                # use in relevance calculation.
+                edge_data[(src, tgt)][src_abs].append(in_abs)
 
-        if save_vars:
-            for key in edge_data:
-                src_sys, tgt_sys = key
-                graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
+        for key in edge_data:
+            src_sys, tgt_sys = key
+            graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
 
         return graph
 
@@ -1681,10 +1675,6 @@ def get_relevant_vars(graph, desvars, responses, mode):
     fwd = mode == 'fwd'
 
     grev = graph.reverse()
-
-    lin_inps = set()
-    lin_outs = set()
-    lin_sys = set()
 
     for desvar in desvars:
         start_sys = (desvar.rsplit('.', 1)[0], 'dv')
@@ -1729,10 +1719,6 @@ def get_relevant_vars(graph, desvars, responses, mode):
 
                 sys_deps.add('')  # top level Group is always relevant
 
-                lin_inps.update(input_deps)
-                lin_outs.update(output_deps)
-                lin_sys.update(sys_deps)
-
     if fwd:
         inputs, outputs = desvars, responses
     else:
@@ -1743,10 +1729,10 @@ def get_relevant_vars(graph, desvars, responses, mode):
     # done for design vars in fwd mode or responses in rev mode.
     for inp in inputs:
         relinp = relevant[inp]
-        total_inps = set()
-        total_outs = set()
-        total_systems = set()
         if relinp:
+            total_inps = set()
+            total_outs = set()
+            total_systems = set()
             for out in outputs:
                 if out in relinp:
                     dct, systems = relinp[out]
