@@ -174,8 +174,6 @@ class PetscKSP(LinearSolver):
     ----------
     precon : Solver
         Preconditioner for linear solve. Default is None for no preconditioner.
-    _print_name : str ('KSP')
-        print name.
     _ksp : dist
         dictionary of KSP instances (keyed on vector name).
     """
@@ -195,8 +193,6 @@ class PetscKSP(LinearSolver):
             raise RuntimeError("PETSc is not available.")
 
         super(PetscKSP, self).__init__(**kwargs)
-
-        self._print_name = 'KSP'
 
         # initialize dictionary of KSP instances (keyed on vector name)
         self._ksp = {}
