@@ -1004,7 +1004,7 @@ class Problem(object):
                     ikey = old_input_list[icount]
                     jac = approx_jac[output_name, input_name]
                     if isinstance(jac, list):
-                        #Support for design variable as objective.
+                        # Support for design variable as objective.
                         totals[okey, ikey] = np.eye(len(jac[0]))
                     else:
                         totals[okey, ikey] = -jac
@@ -1017,7 +1017,7 @@ class Problem(object):
                     ikey = old_input_list[icount]
                     jac = approx_jac[output_name, input_name]
                     if isinstance(jac, list):
-                        #Support for design variable as objective.
+                        # Support for design variable as objective.
                         tot[ikey] = np.eye(len(jac[0]))
                     else:
                         tot[ikey] = -jac
