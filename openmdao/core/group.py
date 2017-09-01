@@ -183,7 +183,7 @@ class Group(System):
                 subsys._setup_vars(recurse)
 
         # Compute num_var, num_var_byset, at least locally
-        for vec_name in self._rel_vec_name_list:
+        for vec_name in self._rel_vec_name_list[1:]:
             num_var[vec_name] = {}
             num_var_byset[vec_name] = {}
             for type_ in ['input', 'output']:
@@ -209,7 +209,7 @@ class Group(System):
                 raw = (None, None)
             gathered = self.comm.allgather(raw)
 
-            for vec_name in self._rel_vec_name_list:
+            for vec_name in self._rel_vec_name_list[1:]:
                 num_var = self._num_var[vec_name]
                 num_var_byset = self._num_var_byset[vec_name]
 
@@ -228,6 +228,9 @@ class Group(System):
                             if set_name not in num_var_byset[type_]:
                                 num_var_byset[type_][set_name] = 0
                             num_var_byset[type_][set_name] += num
+
+        self._num_var['nonlinear'] = self._num_var['linear']
+        self._num_var_byset['nonlinear'] = self._num_var_byset['linear']
 
     def _setup_var_index_ranges(self, set2iset, recurse=True):
         """
@@ -248,7 +251,7 @@ class Group(System):
         subsystems_var_range_byset = self._subsystems_var_range_byset = {}
 
         # First compute these on one processor for each subsystem
-        for vec_name in self._rel_vec_name_list:
+        for vec_name in self._rel_vec_name_list[1:]:
 
             # Here, we count the number of variables (total and by varset) in each subsystem.
             # We do this so that we can compute the offset when we recurse into each subsystem.
@@ -304,6 +307,9 @@ class Group(System):
                         rng[subsys.name] = (np.sum(allprocs_counters_byset[type_][:isub, iset]),
                                             np.sum(allprocs_counters_byset[type_][:isub + 1,
                                                                                   iset]))
+
+        subsystems_var_range['nonlinear'] = subsystems_var_range['linear']
+        subsystems_var_range_byset['nonlinear'] = subsystems_var_range_byset['linear']
 
         # Recursion
         if recurse:
@@ -419,7 +425,7 @@ class Group(System):
         sizes_byset = self._var_sizes_byset
 
         # Compute _var_sizes
-        for vec_name in self._rel_vec_name_list:
+        for vec_name in self._rel_vec_name_list[1:]:
             sizes[vec_name] = {}
             sizes_byset[vec_name] = {}
             subsystems_var_range = self._subsystems_var_range[vec_name]
@@ -446,13 +452,16 @@ class Group(System):
 
         # If parallel, all gather
         if self.comm.size > 1:
-            for vec_name in self._rel_vec_name_list:
+            for vec_name in self._rel_vec_name_list[1:]:
                 sizes = self._var_sizes[vec_name]
                 sizes_byset = self._var_sizes_byset[vec_name]
                 for type_ in ['input', 'output']:
                     self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
                     for set_name, vsizes in iteritems(sizes_byset[type_]):
                         self.comm.Allgather(sizes_byset[type_][set_name][iproc, :], vsizes)
+
+        self._var_sizes['nonlinear'] = self._var_sizes['linear']
+        self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']
 
         self._setup_global_shapes()
 
@@ -786,7 +795,7 @@ class Group(System):
             sub_ext_num_vars_byset = {}
             sub_ext_sizes_byset = {}
 
-            for vec_name in self._vec_names:
+            for vec_name in self._lin_vec_names:
                 if vec_name not in subsys._rel_vec_names:
                     continue
                 subsystems_var_range = self._subsystems_var_range[vec_name]
@@ -830,6 +839,11 @@ class Group(System):
                             ext_sizes_byset[vec_name][type_][set_name][1] + size2,
                         )
 
+            sub_ext_num_vars['nonlinear'] = sub_ext_num_vars['linear']
+            sub_ext_sizes['nonlinear'] = sub_ext_sizes['linear']
+            sub_ext_num_vars_byset['nonlinear'] = sub_ext_num_vars_byset['linear']
+            sub_ext_sizes_byset['nonlinear'] = sub_ext_sizes_byset['linear']
+
             subsys._setup_global(
                 sub_ext_num_vars, sub_ext_num_vars_byset,
                 sub_ext_sizes, sub_ext_sizes_byset
@@ -868,7 +882,7 @@ class Group(System):
 
         transfers = self._transfers
         vectors = self._vectors
-        for vec_name in self._rel_vec_name_list:
+        for vec_name in self._rel_vec_name_list[1:]:
             relvars, _ = self._relevant[vec_name]['@all']
 
             # Initialize empty lists for the transfer indices
@@ -1010,6 +1024,8 @@ class Group(System):
                 transfers[vec_name]['rev', isub] = transfer_class(
                     vectors['input'][vec_name], vectors['output'][vec_name],
                     rev_xfer_in[isub], rev_xfer_out[isub], self.comm)
+
+        transfers['nonlinear'] = transfers['linear']
 
     def add(self, name, subsys, promotes=None):
         """
@@ -1740,14 +1756,8 @@ def get_relevant_vars(graph, desvars, responses, mode):
         relinp['@all'] = ({'input': total_inps, 'output': total_outs},
                           total_systems)
 
-    if desvars and responses:
-        relevant['linear'] = {'@all': ({'input': lin_inps, 'output': lin_outs},
-                                       lin_sys)}
-    else:
-        relevant['linear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
-                                       ContainsAll())}
-
-    relevant['nonlinear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
-                                      ContainsAll())}
+    relevant['linear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
+                                   ContainsAll())}
+    relevant['nonlinear'] = relevant['linear']
 
     return relevant

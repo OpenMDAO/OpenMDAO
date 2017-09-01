@@ -890,7 +890,7 @@ class System(object):
         self._var_allprocs_abs2idx = abs2idx = {}
         self._var_allprocs_abs2idx_byset = abs2idx_byset = {}
 
-        for vec_name in self._vec_names:
+        for vec_name in self._lin_vec_names:
             abs2idx[vec_name] = {'input': {}, 'output': {}}
             abs2idx_byset[vec_name] = {'input': {}, 'output': {}}
             for type_ in ['input', 'output']:
@@ -904,6 +904,9 @@ class System(object):
                     set_name = abs2meta_t[abs_name]['var_set']
                     abs2idx_byset_t[abs_name] = counter[set_name]
                     counter[set_name] += 1
+
+        abs2idx['nonlinear'] = abs2idx['linear']
+        abs2idx_byset['nonlinear'] = abs2idx_byset['linear']
 
         # Recursion
         if recurse:
@@ -1217,7 +1220,7 @@ class System(object):
         abs2meta_in = self._var_abs2meta['input']
         abs2meta_out = self._var_abs2meta['output']
 
-        for vec_name in self._rel_vec_name_list:
+        for vec_name in self._rel_vec_name_list[1:]:
             vector_class = root_vectors['residual', 'phys0'][vec_name].__class__
             relvars, _ = self._relevant[vec_name]['@all']
 
@@ -1330,8 +1333,8 @@ class System(object):
                 vecs['input', 'norm0'][vec_name]._views[abs_in][:] = -a0 / a1
                 vecs['input', 'norm1'][vec_name]._views[abs_in][:] = 1.0 / a1
 
-        # for key in vecs:
-        #     vecs[key]['nonlinear'] = vecs[key]['linear']
+        for key in vecs:
+            vecs[key]['nonlinear'] = vecs[key]['linear']
 
         for subsys in self._subsystems_myproc:
             subsys._setup_scaling(root_vectors)
