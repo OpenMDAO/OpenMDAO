@@ -36,8 +36,11 @@ class ImplicitComponent(Component):
         Also tag component if it provides a guess_nonlinear.
         """
         self.matrix_free = overrides_method('apply_linear', self, ImplicitComponent)
-        self.supports_multivecs = overrides_method('apply_multi_linear',
-                                                   self, ImplicitComponent)
+        self.has_apply_multi_linear = overrides_method('apply_multi_linear',
+                                                       self, ImplicitComponent)
+        self.has_solve_multi_linear = overrides_method('solve_multi_linear',
+                                                       self, ImplicitComponent)
+        self.supports_multivecs = self.has_apply_multi_linear or self.has_solve_multi_linear
         self.matrix_free |= self.supports_multivecs
 
     def _apply_nonlinear(self):
@@ -123,7 +126,7 @@ class ImplicitComponent(Component):
                         outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
                     with Recording(self.pathname + '._apply_linear', self.iter_count, self):
                         if d_inputs._ncol > 1:
-                            if self.supports_multivecs:
+                            if self.has_apply_multi_linear:
                                 self.apply_multi_linear(self._inputs, self._outputs,
                                                         d_inputs, d_residuals, mode)
                             else:
@@ -182,16 +185,34 @@ class ImplicitComponent(Component):
 
                 with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                     with Recording(self.pathname + '._solve_linear', self.iter_count, self):
-                        result = self.solve_linear(d_outputs, d_residuals, mode)
+                        if d_outputs._ncol > 1:
+                            if self.has_solve_multi_linear:
+                                self.solve_multi_linear(d_outputs, d_residuals, mode)
+                            else:
+                                for i in range(d_outputs._ncol):
+                                    # need to make the multivecs look like regular single vecs
+                                    # since the component doesn't know about multivecs.
+                                    d_outputs._icol = i
+                                    d_residuals._icol = i
+                                    result = self.solve_linear(d_outputs, d_residuals, mode)
+                                    if isinstance(result, bool):
+                                        failed |= result
+                                    elif result is not None:
+                                        failed = failed or result[0]
+                                        abs_errors.append(result[1])
+                                        rel_errors.append(result[2])
 
-                if result is None:
-                    result = False, 0., 0.
-                elif type(result) is bool:
-                    result = result, 0., 0.
+                                d_outputs._icol = None
+                                d_residuals._icol = None
+                        else:
+                            result = self.solve_linear(d_outputs, d_residuals, mode)
 
-                failed = failed or result[0]
-                abs_errors.append(result[1])
-                rel_errors.append(result[2])
+                if isinstance(result, bool):
+                    failed |= result
+                elif result is not None:
+                    failed = failed or result[0]
+                    abs_errors.append(result[1])
+                    rel_errors.append(result[2])
 
             return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 
