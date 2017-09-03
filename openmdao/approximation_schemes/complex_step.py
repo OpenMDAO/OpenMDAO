@@ -166,7 +166,7 @@ class ComplexStep(ApproximationScheme):
                         out_idx = system._owns_approx_of_idx[of]
                         subjac[:, i_count] = result._imag_views_flat[of][out_idx] * fact
                     else:
-                        subjac[:, idx] = result._imag_views_flat[of] * fact
+                        subjac[:, i_count] = result._imag_views_flat[of] * fact
 
             for of, subjac in outputs:
                 rel_key = abs_key2rel_key(system, (of, wrt))
