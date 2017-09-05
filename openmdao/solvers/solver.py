@@ -237,6 +237,7 @@ class Solver(object):
         atol = self.options['atol']
         rtol = self.options['rtol']
         iprint = self.options['iprint']
+        print("Run Iter Start", self._system.pathname, self.SOLVER)
 
         self._mpi_print_header()
 
@@ -249,6 +250,8 @@ class Solver(object):
             with Recording(type(self).__name__, self._iter_count, self) as rec:
                 self._iter_execute()
                 self._iter_count += 1
+                print("Run Apply", self._system.pathname, self.SOLVER)
+
                 self._run_apply()
                 norm = self._iter_get_norm()
                 # With solvers, we want to record the norm AFTER the call, but the call needs to
@@ -476,8 +479,8 @@ class LinearSolver(Solver):
         """
         system = self._system
 
-        inputs = self._system._vectors['input']
-        inputs['linear'].set_const(0.0)
+        #inputs = self._system._vectors['input']
+        #inputs['linear'].set_const(0.0)
 
         self._rhs_vecs = {}
         if self._mode == 'fwd':
@@ -501,6 +504,10 @@ class LinearSolver(Solver):
         Run the the apply_linear method on the system.
         """
         recording_iteration_stack.append(('_run_apply', 0))
+
+        # Clean up
+        #self._system._vectors['input']['linear'].set_const(0.0)
+        #self._system._vectors['output']['linear'].set_const(0.0)
 
         system = self._system
         scope_out, scope_in = system._get_scope()
