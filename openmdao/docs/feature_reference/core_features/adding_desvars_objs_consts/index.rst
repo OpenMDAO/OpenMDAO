@@ -8,3 +8,4 @@ Adding Design Variables, Constraints & Objectives
     adding_desvars.rst
     adding_objectives.rst
     adding_constraints.rst
+    grouping_vois.rst

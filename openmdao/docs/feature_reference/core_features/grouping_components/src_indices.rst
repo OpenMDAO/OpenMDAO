@@ -9,7 +9,7 @@ you call *add_input* to add your input variable to its component.  Another
 argument, *flat_src_indices* is a boolean that determines whether the entries
 of the src_indices array are interpreted as indices into the flattened source
 or as tuples or lists of indices into the unflattened source.  The default
-of *flat_src_indices=True* assumes indices into a flattened source.
+of *flat_src_indices=False* assumes indices into an unflattened source.
 
 Usage
 -----
@@ -35,22 +35,28 @@ call might look like the following if we use flat src_indices:
 
 .. code::
 
-    self.add_input('x', 1.0, src_indices=[10], shape=1)
+    self.add_input('x', 1.0, src_indices=[10], shape=1, flat_src_indices=True)
 
 
-If we instead set *flat_src_indices=False*, we must specify the input shape
-since a scalar input value alone doesn't necessarily indicate that the input
-variable is scalar.  For example, in the case below if we didn't know the
+If we instead use the default setting of *flat_src_indices=False*, we must specify
+the input shape since a scalar input value alone doesn't necessarily indicate that
+the input variable is scalar.  For example, in the case below if we didn't know the
 input shape, we wouldn't know if it was scalar and connected to a 2-D source
 array, or if it was shape (1,2) and connected to a flat source array.
 
 .. code::
 
-    self.add_input('x', 1.0, src_indices=np.array([[3,1]]), flat_src_indices=False, shape=1)
+    self.add_input('x', 1.0, src_indices=np.array([[3,1]]), shape=1)
 
 5.  If the source array is flat and the input is shape (2,2), the *add_input*
-call might look like this if *flat_src_indices=False*:
+call might look like this:
 
 .. code::
 
-    self.add_input('x', src_indices=[[0, 10], [7, 4]], flat_src_indices=False, shape=(2,2))
+    self.add_input('x', src_indices=[[0, 10], [7, 4]], shape=(2,2))
+
+
+.. note::
+
+    If the source array is flat, we allow the use of flat src_indices even
+    without setting *flat_src_indices=True*.
