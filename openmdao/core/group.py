@@ -1742,8 +1742,8 @@ def get_relevant_vars(graph, desvars, responses, mode):
                     total_inps.update(dct['input'])
                     total_outs.update(dct['output'])
                     total_systems.update(systems)
-        relinp['@all'] = ({'input': total_inps, 'output': total_outs},
-                          total_systems)
+            relinp['@all'] = ({'input': total_inps, 'output': total_outs},
+                              total_systems)
 
     relevant['linear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
                                    ContainsAll())}

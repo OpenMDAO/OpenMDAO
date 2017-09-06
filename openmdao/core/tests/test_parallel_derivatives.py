@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import unittest
 import numpy as np
-import time
+from timeit import default_timer as timer
 
 from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, DefaultVector, \
     ExecComp, ExplicitComponent, PETScVector
@@ -585,9 +585,9 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False, mode='fwd')
         p.run_model()
 
-        elapsed_fwd = time.time()
+        elapsed_fwd = timer()
         J = p.compute_total_derivs(of, wrt, return_format='dict')
-        elapsed_fwd = time.time() - elapsed_fwd
+        elapsed_fwd = timer() - elapsed_fwd
 
         assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0][0], 10.0, 1e-6)
         assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0][0], -15.0, 1e-6)
@@ -597,9 +597,9 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False, mode='rev')
         p.run_model()
 
-        elapsed_rev = time.time()
+        elapsed_rev = timer()
         J = p.compute_total_derivs(of, wrt, return_format='dict')
-        elapsed_rev = time.time() - elapsed_rev
+        elapsed_rev = timer() - elapsed_rev
 
         assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0][0], 10.0, 1e-6)
         assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0][0], -15.0, 1e-6)

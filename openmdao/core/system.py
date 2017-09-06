@@ -2075,7 +2075,7 @@ class System(object):
         dvs['scaler'] = scaler
 
         if isinstance(adder, np.ndarray):
-            if np.all(adder == 0.0):
+            if not np.any(adder):
                 adder = None
         elif adder == 0.0:
             adder = None
@@ -2228,7 +2228,7 @@ class System(object):
         resp['scaler'] = scaler
 
         if isinstance(adder, np.ndarray):
-            if np.all(adder == 0.0):
+            if not np.any(adder):
                 adder = None
         elif adder == 0.0:
             adder = None

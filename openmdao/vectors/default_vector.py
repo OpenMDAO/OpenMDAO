@@ -375,8 +375,8 @@ class DefaultVector(Vector):
             for key in self._data:
                 r_data = self._data[key]
                 i_data = self._imag_data[key]
-                r_data = r_val * r_data + i_val * i_data
-                i_data = r_val * i_data + i_val * r_data
+                self._data[key] = r_val * r_data + i_val * i_data
+                self._imag_data[key] = r_val * i_data + i_val * r_data
         else:
             for data in itervalues(self._data):
                 data *= val

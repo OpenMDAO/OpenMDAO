@@ -35,19 +35,6 @@ def array_idx_iter(shape):
         yield p
 
 
-def _valid_name(s, exprs):
-    """
-    Generate a locally unique replacement for a dotted name.
-    """
-    i = 0
-    check = ' '.join(exprs)
-    while True:
-        n = s.replace(':', '%d' % i)
-        if n not in check:
-            return n
-        i += 1
-
-
 class ExecComp(ExplicitComponent):
     """
     A component defined by an expression string.
