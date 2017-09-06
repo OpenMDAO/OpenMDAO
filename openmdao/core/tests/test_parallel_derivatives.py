@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import unittest
 import numpy as np
-from timeit import default_timer as timer
+import time
 
 from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, DefaultVector, \
     ExecComp, ExplicitComponent, PETScVector
@@ -523,6 +523,21 @@ class MatMatTestCase(unittest.TestCase):
         expected = np.eye(asize)*8.0
         assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
 
+class SumComp(ExplicitComponent):
+    def __init__(self, size):
+        super(SumComp, self).__init__()
+        self.size = size
+
+    def setup(self):
+        self.add_input('x', val=np.zeros(self.size))
+        self.add_output('y', val=0.0)
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = np.sum(inputs['x'])
+
+    def compute_partials(self, inputs, partials):
+        partials['y', 'x'] = np.ones(inputs['x'].size)
+
 
 class SlowComp(ExplicitComponent):
     """
@@ -536,7 +551,7 @@ class SlowComp(ExplicitComponent):
         self.mult = mult
 
     def setup(self):
-        self.add_input('x', val=np.zeros(self.size))
+        self.add_input('x', val=0.0)
         self.add_output('y', val=np.zeros(self.size))
 
     def compute(self, inputs, outputs):
@@ -545,14 +560,16 @@ class SlowComp(ExplicitComponent):
     def compute_partials(self, inputs, partials):
         partials['y', 'x'] = self.mult
 
+    def _apply_linear(self, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
+        time.sleep(self.delay)
+        super(SlowComp, self)._apply_linear(vec_names, rel_systems, mode, scope_out, scope_in)
 
 class PartialDependGroup(Group):
     def setup(self):
-        size = 3
+        size = 4
 
         Indep1 = self.add_subsystem('Indep1', IndepVarComp('x', np.arange(size, dtype=float)+1.0))
-        Comp1 = self.add_subsystem('Comp1', ExecComp('y = x * 5.0',
-                                                     x=np.zeros(size), y=np.zeros(size)))
+        Comp1 = self.add_subsystem('Comp1', SumComp(size))
         pargroup = self.add_subsystem('ParallelGroup1', ParallelGroup())
 
         self.linear_solver = LinearBlockGS()
@@ -560,16 +577,18 @@ class PartialDependGroup(Group):
         pargroup.linear_solver = LinearBlockGS()
         pargroup.linear_solver.options['iprint'] = -1
 
-        Con1 = pargroup.add_subsystem('Con1', SlowComp(delay=2.0, size=size, mult=2.0))
-        Con2 = pargroup.add_subsystem('Con2', SlowComp(delay=2.0, size=size, mult=-3.0))
+        delay = .1
+        Con1 = pargroup.add_subsystem('Con1', SlowComp(delay=delay, size=2, mult=2.0))
+        Con2 = pargroup.add_subsystem('Con2', SlowComp(delay=delay, size=2, mult=-3.0))
 
         self.connect('Indep1.x', 'Comp1.x')
         self.connect('Comp1.y', 'ParallelGroup1.Con1.x')
         self.connect('Comp1.y', 'ParallelGroup1.Con2.x')
 
+        color = 'parcon'
         self.add_design_var('Indep1.x')
-        self.add_constraint('ParallelGroup1.Con1.y', lower=0.0, parallel_deriv_color='par_con')
-        self.add_constraint('ParallelGroup1.Con2.y', upper=0.0, parallel_deriv_color='par_con')
+        self.add_constraint('ParallelGroup1.Con1.y', lower=0.0, parallel_deriv_color=color)
+        self.add_constraint('ParallelGroup1.Con2.y', upper=0.0, parallel_deriv_color=color)
 
 
 @unittest.skipUnless(MPI, "MPI is required.")
@@ -577,6 +596,8 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
     N_PROCS = 2
 
     def test_fwd_vs_rev(self):
+        size = 4
+
         of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
         wrt = ['Indep1.x']
 
@@ -585,24 +606,24 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         p.setup(vector_class=PETScVector, check=False, mode='fwd')
         p.run_model()
 
-        elapsed_fwd = timer()
+        elapsed_fwd = time.time()
         J = p.compute_total_derivs(of, wrt, return_format='dict')
-        elapsed_fwd = timer() - elapsed_fwd
+        elapsed_fwd = time.time() - elapsed_fwd
 
-        assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0][0], 10.0, 1e-6)
-        assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0][0], -15.0, 1e-6)
+        assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
+        assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
 
         # now run in rev mode and compare times for deriv calculation
         p = Problem(model=PartialDependGroup())
         p.setup(vector_class=PETScVector, check=False, mode='rev')
         p.run_model()
 
-        elapsed_rev = timer()
+        elapsed_rev = time.time()
         J = p.compute_total_derivs(of, wrt, return_format='dict')
-        elapsed_rev = timer() - elapsed_rev
+        elapsed_rev = time.time() - elapsed_rev
 
-        assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0][0], 10.0, 1e-6)
-        assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0][0], -15.0, 1e-6)
+        assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
+        assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
 
         # make sure that rev mode is faster than fwd mode
         self.assertGreater(elapsed_fwd / elapsed_rev, 1.0)

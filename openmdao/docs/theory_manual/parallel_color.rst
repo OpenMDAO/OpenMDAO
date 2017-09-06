@@ -42,17 +42,14 @@ components, that do take a long time to run.
 
 In the model above, both of our constraints, *Con1.y* and *Con2.y* are dependent
 on our design variable *Indep1.x*.  Let's assume here also that the size of our
-design variable is the same as the size of each of our constraints.  In that case,
-at first glance it might appear that we should solve for our derivatives in fwd
-mode since we only have 1 design variable but we have 2 constraints.  If all
-of our components took about the same time to run then that would in fact be
-the case, but in our case, *Con1* and *Con2* take much longer to run than *Comp1*.
-So if we solve for our derivatives using adjoint (rev) mode and group *Con1.y* and
+design variable is the same as the combined size of our constraints, and that
+*Con1* and *Con2* take much longer to run than *Comp1*.
+If we solve for our derivatives using adjoint (rev) mode and we group *Con1.y* and
 *Con2.y* by specifying that they have the same *parallel_deriv_color*, we will
 compute derivatives for *Con1* and *Con2* concurrently while solving for
 the derivatives of *Con1.y wrt Indep1.x* and *Con2.y wrt Indep1.x*.  This will
 require that the *Comp1* derivative computation is
-duplicated in each process, but we don't care since it's very fast compared
+duplicated in each process, but we don't care since it's fast compared
 to *Con1* and *Con2*.
 
 
@@ -62,8 +59,9 @@ The code below defines the model described above:
       openmdao.core.tests.test_parallel_derivatives.PartialDependGroup
 
 
-And here we test that rev mode is faster than fwd mode when our 'slow'
-components have a delay of 2 seconds.
+And here we see that rev mode with parallel derivatives is roughly twice as fast
+as fwd mode when our 'slow' components have a delay of .1 seconds.  Without parallel
+derivatives, the fwd and rev speeds are roughly equivalent.
 
 .. embed-test::
     openmdao.core.tests.test_parallel_derivatives.ParDerivColorFeatureTestCase.test_fwd_vs_rev
