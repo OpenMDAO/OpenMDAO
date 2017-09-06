@@ -272,7 +272,7 @@ class ExplicitComponent(Component):
                         d_residuals.set_vec(d_outputs)
         return False, 0., 0.
 
-    def _linearize(self, do_nl=False, do_ln=False):
+    def _linearize(self, do_nl=False, do_ln=False, mode='fwd'):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
@@ -282,6 +282,8 @@ class ExplicitComponent(Component):
             Flag indicating if the nonlinear solver should be linearized.
         do_ln : boolean
             Flag indicating if the linear solver should be linearized.
+        mode : str
+            Mode for derivative calculation, default is fwd.
         """
         with self.jacobian_context() as J:
             with self._unscaled_context(

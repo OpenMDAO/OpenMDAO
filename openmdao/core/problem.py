@@ -942,7 +942,7 @@ class Problem(object):
             vec_dresid[subname].set_const(0.0)
 
         # Linearize Model
-        model._linearize()
+        model._linearize(mode=mode)
 
         # Convert of and wrt names from promoted to bsolute path
         oldwrt, oldof = wrt, of
@@ -989,7 +989,7 @@ class Problem(object):
         model._setup_jacobians(recurse=False)
 
         model.jacobian._override_checks = True
-        model._linearize()
+        model._linearize(mode=mode)
         model.jacobian._override_checks = False
         approx_jac = model._jacobian._subjacs
 
@@ -1269,7 +1269,7 @@ class Problem(object):
             vec_dresid[subname].set_const(0.0)
 
         # Linearize Model
-        model._linearize()
+        model._linearize(mode=mode)
 
         # Create data structures (and possibly allocate space) for the total
         # derivatives that we will return.

@@ -161,15 +161,20 @@ class NewtonSolver(NonlinearSolver):
         return (self.options['solve_subsystems']
                 and self._iter_count <= self.options['max_sub_solves'])
 
-    def _linearize(self):
+    def _linearize(self, mode='fwd'):
         """
         Perform any required linearization operations such as matrix factorization.
+
+        Parameters
+        ----------
+        mode : str
+            Mode for derivative calculation, default is fwd.
         """
         if not self._linear_solver_from_parent:
-            self.linear_solver._linearize()
+            self.linear_solver._linearize(mode=mode)
 
         if self.linesearch is not None:
-            self.linesearch._linearize()
+            self.linesearch._linearize(mode=mode)
 
     def _iter_initialize(self):
         """
@@ -228,7 +233,7 @@ class NewtonSolver(NonlinearSolver):
 
         system._vectors['residual']['linear'].set_vec(system._residuals)
         system._vectors['residual']['linear'] *= -1.0
-        system._linearize()
+        system._linearize(mode='fwd')
 
         self.linear_solver.solve(['linear'], 'fwd')
 

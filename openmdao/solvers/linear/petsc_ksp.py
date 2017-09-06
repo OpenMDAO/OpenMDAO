@@ -307,12 +307,17 @@ class PetscKSP(LinearSolver):
         precon = self.precon
         return (precon is not None) and (precon._linearize_children())
 
-    def _linearize(self):
+    def _linearize(self, mode='fwd'):
         """
         Perform any required linearization operations such as matrix factorization.
+
+        Parameters
+        ----------
+        mode : str
+            Mode for derivative calculation, default is fwd.
         """
         if self.precon is not None:
-            self.precon._linearize()
+            self.precon._linearize(mode=mode)
 
     def solve(self, vec_names, mode):
         """

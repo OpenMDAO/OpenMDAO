@@ -1352,7 +1352,7 @@ class Group(System):
 
         return result
 
-    def _linearize(self, do_nl=True, do_ln=True):
+    def _linearize(self, do_nl=True, do_ln=True, mode='fwd'):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
@@ -1362,6 +1362,8 @@ class Group(System):
             Flag indicating if the nonlinear solver should be linearized.
         do_ln : boolean
             Flag indicating if the linear solver should be linearized.
+        mode : str
+            Mode for derivative calculation, default is fwd.
         """
         with self.jacobian_context() as J:
 
@@ -1371,7 +1373,7 @@ class Group(System):
                         (self._linear_solver._linearize_children())
 
             for subsys in self._subsystems_myproc:
-                subsys._linearize(do_nl=sub_do_nl, do_ln=sub_do_ln)
+                subsys._linearize(do_nl=sub_do_nl, do_ln=sub_do_ln, mode=mode)
 
             # Group finite difference
             if self._owns_approx_jac:
@@ -1386,10 +1388,10 @@ class Group(System):
                 J._update()
 
         if self._nonlinear_solver is not None and do_nl:
-            self._nonlinear_solver._linearize()
+            self._nonlinear_solver._linearize(mode=mode)
 
         if self._linear_solver is not None and do_ln:
-            self._linear_solver._linearize()
+            self._linear_solver._linearize(mode=mode)
 
     def approx_total_derivs(self, method='fd', **kwargs):
         """

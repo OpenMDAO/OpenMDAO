@@ -122,7 +122,6 @@ class TestNewton(unittest.TestCase):
         top.run_model()
         assert_rel_error(self, top['comp.z'], 2.5, 1e-8)
 
-
     def test_sellar_derivs(self):
         # Test top level Sellar (i.e., not grouped).
         # Also, piggybacked testing that makes sure we only call apply_nonlinear
@@ -631,7 +630,7 @@ class TestNewton(unittest.TestCase):
                 super(DirectSolver, self).__init__(**kwargs)
                 self.lin_count = 0
 
-            def _linearize(self):
+            def _linearize(self, mode='fwd'):
                 super(CountDS, self)._linearize()
                 self.lin_count += 1
 

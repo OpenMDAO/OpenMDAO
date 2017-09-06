@@ -23,10 +23,16 @@ class DirectSolver(LinearSolver):
 
     SOLVER = 'LN: Direct'
 
-    def _linearize(self):
+    def _linearize(self, mode='fwd'):
         """
         Perform factorization.
+
+        Parameters
+        ----------
+        mode : str
+            Mode for derivative calculation, default is fwd.
         """
+        self._mode = mode
         system = self._system
 
         if system._owns_assembled_jac or system._views_assembled_jac:
@@ -59,7 +65,10 @@ class DirectSolver(LinearSolver):
             eye = np.eye(nmtx)
             mtx = np.empty((nmtx, nmtx))
             for i in range(nmtx):
-                self._mat_vec(eye[:, i], mtx[:, i])
+                if self._mode == 'fwd':
+                    self._mat_vec(eye[:, i], mtx[:, i])
+                else:
+                    self._mat_vec(eye[i, :], mtx[i, :])
 
             # Restore the backed-up vectors
             system._vectors['residual']['linear'].set_data(b_data)
@@ -82,16 +91,20 @@ class DirectSolver(LinearSolver):
         system = self._system
         mode = self._mode
 
-        # assign x and b vectors based on fwd mode
-        x_vec = system._vectors['output'][vec_name]
-        b_vec = system._vectors['residual'][vec_name]
+        # assign x and b vectors based on mode
+        if mode == 'fwd':
+            x_vec = system._vectors['output'][vec_name]
+            b_vec = system._vectors['residual'][vec_name]
+        else:
+            b_vec = system._vectors['output'][vec_name]
+            x_vec = system._vectors['residual'][vec_name]
 
         # set value of x vector to provided value
         x_vec.set_data(in_vec)
 
         # apply linear
         scope_out, scope_in = system._get_scope()
-        system._apply_linear([vec_name], self._mode, scope_out, scope_in)
+        system._apply_linear([vec_name], mode, scope_out, scope_in)
 
         # put new value in out_vec
         b_vec.get_data(out_vec)
