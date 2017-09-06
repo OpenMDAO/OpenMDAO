@@ -237,7 +237,6 @@ class Solver(object):
         atol = self.options['atol']
         rtol = self.options['rtol']
         iprint = self.options['iprint']
-        print("Run Iter Start", self._system.pathname, self.SOLVER)
 
         self._mpi_print_header()
 
@@ -250,7 +249,6 @@ class Solver(object):
             with Recording(type(self).__name__, self._iter_count, self) as rec:
                 self._iter_execute()
                 self._iter_count += 1
-                print("Run Apply", self._system.pathname, self.SOLVER)
 
                 self._run_apply()
                 norm = self._iter_get_norm()
@@ -479,9 +477,6 @@ class LinearSolver(Solver):
         """
         system = self._system
 
-        #inputs = self._system._vectors['input']
-        #inputs['linear'].set_const(0.0)
-
         self._rhs_vecs = {}
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']
@@ -506,7 +501,7 @@ class LinearSolver(Solver):
         recording_iteration_stack.append(('_run_apply', 0))
 
         # Clean up
-        #self._system._vectors['input']['linear'].set_const(0.0)
+        # self._system._vectors['input']['linear'].set_const(0.0)
         #self._system._vectors['output']['linear'].set_const(0.0)
 
         system = self._system
@@ -563,7 +558,5 @@ class BlockLinearSolver(LinearSolver):
 
         inputs = self._system._vectors['input']
         inputs['linear'].set_const(0.0)
-        #for vec in inputs:
-        #    vec.set_const(0.0)
 
         return super(BlockLinearSolver, self)._iter_initialize()

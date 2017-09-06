@@ -412,7 +412,7 @@ class LinearSolverTests(object):
 
             prob = Problem()
             prob.model = SellarStateConnection(linear_solver=self.linear_solver_class(), nl_atol=1e-12)
-            prob.set_solver_print(level=2)
+            prob.set_solver_print(level=0)
 
             prob.setup(check=False, mode='fwd')
             prob.run_model()
