@@ -19,27 +19,9 @@ from openmdao.recorders.recording_iteration_stack import Recording
 class DirectSolver(LinearSolver):
     """
     LinearSolver that uses linalg.solve or LU factor/solve.
-
-    Attributes
-    ----------
-    _print_name : str ('Direct')
-        print name.
     """
 
     SOLVER = 'LN: Direct'
-
-    def __init__(self, **kwargs):
-        """
-        Declare the solver option.
-
-        Parameters
-        ----------
-        **kwargs : {}
-            dictionary of options set by the instantiating class/script.
-        """
-        super(DirectSolver, self).__init__(**kwargs)
-
-        self._print_name = 'Direct'
 
     def _linearize(self):
         """

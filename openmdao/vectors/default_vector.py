@@ -433,7 +433,7 @@ class DefaultVector(Vector):
         Parameters
         ----------
         vec : <Vector>
-            the vector whose values self is set to.
+            The incoming vector being dotted with self.
 
         Returns
         -------
@@ -442,7 +442,7 @@ class DefaultVector(Vector):
         """
         global_sum = 0
         for set_name, data in iteritems(self._data):
-            global_sum += np.sum(self._data[set_name] * vec._data[set_name])
+            global_sum += np.dot(self._data[set_name], vec._data[set_name])
 
         return global_sum
 

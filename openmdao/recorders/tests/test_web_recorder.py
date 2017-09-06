@@ -51,7 +51,7 @@ def run_driver(problem):
 class TestServerRecorder(unittest.TestCase):
     _endpoint_base = 'http://www.openmdao.org/visualization/case'
     _default_case_id = '123456'
-    _accepted_token = 'test'
+    _accepted_token = 'DU89SZPIIZ'
     recorded_metadata = False
     recorded_driver_iteration = False
     recorded_global_iteration = False
