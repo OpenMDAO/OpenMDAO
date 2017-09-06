@@ -2846,6 +2846,8 @@ class System(object):
         ----------
         recorder : <BaseRecorder>
            A recorder instance.
+        recurse : boolean
+            Flag indicating if the recorder should be added to all the subsystems.
         """
         for s in self.system_iter(include_self=True, recurse=recurse):
             s._rec_mgr.append(recorder)
