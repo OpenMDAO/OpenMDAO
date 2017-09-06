@@ -792,47 +792,6 @@ class TestNewton(unittest.TestCase):
         msg = "Solver 'NL: Newton' on system '' failed to converge."
         self.assertEqual(str(context.exception), msg)
 
-    def test_relevancy_for_newton(self):
-
-        class TestImplCompSimple(ImplicitComponent):
-
-            def setup(self):
-                self.add_input('a', val=1.)
-                self.add_output('x', val=0.)
-
-            def apply_nonlinear(self, inputs, outputs, residuals):
-                residuals['x'] = np.exp(outputs['x']) - \
-                    inputs['a']**2 * outputs['x']**2
-
-            def linearize(self, inputs, outputs, jacobian):
-                jacobian['x', 'x'] = np.exp(outputs['x']) - \
-                    2 * inputs['a']**2 * outputs['x']
-                jacobian['x', 'a'] = -2 * inputs['a'] * outputs['x']**2
-
-
-        prob = Problem()
-        prob.model = model = Group()
-
-        model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        model.add_subsystem('icomp', TestImplCompSimple())
-        model.add_subsystem('ecomp', ExecComp('y = x*p', p=1.0))
-
-        model.connect('p1.x', 'ecomp.x')
-        model.connect('icomp.x', 'ecomp.p')
-
-        model.add_design_var('p1.x', 3.0)
-        model.add_objective('ecomp.y')
-
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
-
-        prob.setup(check=False)
-
-        prob.run_model()
-
-        J = prob.compute_total_derivs()
-        assert_rel_error(self, J['ecomp.y', 'p1.x'][0][0], -0.703467422498, 1e-6)
-
 
 class TestNewtonFeatures(unittest.TestCase):
 
