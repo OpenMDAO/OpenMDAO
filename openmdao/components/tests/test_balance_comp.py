@@ -12,6 +12,7 @@ from openmdao.api import BalanceComp
 
 class TestBalanceComp(unittest.TestCase):
 
+
     def test_scalar_example(self):
 
         prob = Problem(model=Group())
@@ -34,6 +35,20 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
+        # do one test in an unconverged state, to capture accuracy of partials
+        prob.setup()
+
+        prob['y_tgt'] = 100000 #set rhs and lhs to very different values. Trying to capture some derivatives wrt
+        prob['exec.y'] = .001
+
+        prob.run_model()
+
+        cpd = prob.check_partials()
+
+        for (of, wrt) in cpd['balance']:
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+
+        # set an actual solver, and re-setup. Then check derivatives at a converged point
         prob.model.linear_solver = DirectSolver()
         prob.model.nonlinear_solver = NewtonSolver()
 

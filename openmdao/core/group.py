@@ -1096,7 +1096,7 @@ class Group(System):
         # if multiple targets are given, recursively connect to each
         if not isinstance(tgt_name, string_types) and isinstance(tgt_name, Iterable):
             for name in tgt_name:
-                self.connect(src_name, name, src_indices)
+                self.connect(src_name, name, src_indices, flat_src_indices=flat_src_indices)
             return
 
         # target should not already be connected
@@ -1503,7 +1503,10 @@ class Group(System):
 
                         # Skip explicit res wrt outputs
                         if key[1] in of and key[1] not in ivc:
-                            continue
+
+                            # Support for specifying a desvar as an obj/con.
+                            if key[1] not in wrt or key[0] == key[1]:
+                                continue
 
                         approx.add_approximation(key, meta)
 

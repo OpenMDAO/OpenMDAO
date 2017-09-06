@@ -188,7 +188,7 @@ def view_model(problem_or_filename, outfile='visualization', show_browser=True):
     cur_dir = os.getcwd()
     if outfile == 'visualization':
         outfile = os.path.join(cur_dir, outfile)
-        
+
     model_data_filename = 'model_data.js'
     folder_name = outfile
     code_dir = os.path.dirname(os.path.abspath(__file__))
@@ -207,5 +207,5 @@ def view_model(problem_or_filename, outfile='visualization', show_browser=True):
     if show_browser:
         from openmdao.devtools.webview import webview
         view_path = os.path.join(cur_dir, folder_name)
-        view_path = os.path.join(view_path, 'index.rst')
+        view_path = os.path.join(view_path, 'index.html')
         webview(view_path)
