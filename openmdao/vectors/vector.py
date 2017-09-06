@@ -364,7 +364,7 @@ class Vector(object):
             if self._icol is None:
                 return self._views[abs_name]
             else:
-                return self_views[abs_name][:, self._icol]
+                return self._views[abs_name][:, self._icol]
         else:
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
@@ -382,11 +382,11 @@ class Vector(object):
         """
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
-            value, shape = ensure_compatible(name, value, self._views[abs_name].shape)
             if self._icol is None:
                 slc = _full_slice
             else:
                 slc = (_full_slice, self._icol)
+            value, shape = ensure_compatible(name, value, self._views[abs_name][slc].shape)
             if self._vector_info._under_complex_step:
 
                 # setitem overwrites anything you may have done with numpy indexing
