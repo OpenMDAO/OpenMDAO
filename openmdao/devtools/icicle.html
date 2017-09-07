@@ -155,8 +155,7 @@ window.onload = function() {
     var totpcttotal = d3.select(".totpcttotal")
 
     var stratify = d3.stratify()
-        .id(function(d) { return d.name; })
-        .parentId(function(d) { return d.name.substring(0, d.name.lastIndexOf("@")); });
+        .parentId(function(d) { return d.id.substring(0, d.id.lastIndexOf("@")); });
 
     var root = stratify(root_table)
         .sum(function(d) { return d.time; })

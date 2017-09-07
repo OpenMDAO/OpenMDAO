@@ -22,7 +22,7 @@ from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _coll
 
 def _prof_node(parts):
     return {
-        'name': parts[0],
+        'id': parts[0],
         'short_name': parts[0].rsplit('@', 1)[-1],
         'time': parts[2],
         'count': parts[3],
