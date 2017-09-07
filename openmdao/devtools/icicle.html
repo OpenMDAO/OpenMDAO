@@ -167,8 +167,13 @@ window.onload = function() {
 
     partition(root);
 
+    var finished_data = root.descendants();
+
+    var filtered_data = finished_data.filter(function(d) { return d.depth < 10; });
+
     rect = d3.select("svg").selectAll("rect")
-        .data(root.descendants())
+        //.data(root.descendants())
+        .data(filtered_data)
         .enter().append("rect")
         .attr("x", function(d) { return x(d.x0); })
         .attr("y", function(d) { return y(d.y0); })
