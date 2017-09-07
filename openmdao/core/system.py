@@ -551,7 +551,6 @@ class System(object):
                         'residual': OrderedDict()}
 
         if initial:
-            mode = self._mode
             relevant = self._relevant
             vec_names = self._rel_vec_name_list
             vois = self._vois
