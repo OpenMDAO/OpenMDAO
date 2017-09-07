@@ -9,15 +9,22 @@ from openmdao.core.component import Component
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 
+_inst_functs = ['apply_linear', 'apply_multi_linear', 'solve_multi_linear']
+
 
 class ImplicitComponent(Component):
     """
     Class to inherit from when all output variables are implicit.
+
+    Attributes
+    ----------
+    _inst_functs : dict
+        Dictionary of names mapped to bound methods.
     """
 
     def __init__(self, **kwargs):
         """
-        Check if we are matrix-free.
+        Store some bound methods so we can detect runtime overrides.
 
         Parameters
         ----------
@@ -26,8 +33,7 @@ class ImplicitComponent(Component):
         """
         super(ImplicitComponent, self).__init__(**kwargs)
 
-        if overrides_method('guess_nonlinear', self, ImplicitComponent):
-            self._has_guess = True
+        self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
 
     def _configure(self):
         """
@@ -35,11 +41,26 @@ class ImplicitComponent(Component):
 
         Also tag component if it provides a guess_nonlinear.
         """
-        self.matrix_free = overrides_method('apply_linear', self, ImplicitComponent)
-        self.has_apply_multi_linear = overrides_method('apply_multi_linear',
-                                                       self, ImplicitComponent)
-        self.has_solve_multi_linear = overrides_method('solve_multi_linear',
-                                                       self, ImplicitComponent)
+        self._has_guess = overrides_method('guess_nonlinear', self, ImplicitComponent)
+
+        new_apply_linear = getattr(self, 'apply_linear', None)
+        new_apply_multi_linear = getattr(self, 'apply_multi_linear', None)
+        new_solve_multi_linear = getattr(self, 'solve_multi_linear', None)
+
+        self.matrix_free = (overrides_method('apply_linear', self, ImplicitComponent) or
+                            (new_apply_linear is not None and
+                             self._inst_functs['apply_linear'] != new_apply_linear))
+        self.has_apply_multi_linear = (overrides_method('apply_multi_linear',
+                                                        self, ImplicitComponent) or
+                                       (new_apply_multi_linear is not None and
+                                        self._inst_functs['apply_multi_linear'] !=
+                                        new_apply_multi_linear))
+        self.has_solve_multi_linear = (overrides_method('solve_multi_linear',
+                                                        self, ImplicitComponent) or
+                                       (new_solve_multi_linear is not None and
+                                        self._inst_functs['solve_multi_linear'] !=
+                                        new_solve_multi_linear))
+
         self.supports_multivecs = self.has_apply_multi_linear or self.has_solve_multi_linear
         self.matrix_free |= self.supports_multivecs
 
@@ -114,12 +135,18 @@ class ImplicitComponent(Component):
         for vec_name in vec_names:
             if vec_name not in self._rel_vec_names:
                 continue
+
             with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
 
                 # Jacobian and vectors are all scaled, unitless
                 with self.jacobian_context() as J:
                     J._apply(d_inputs, d_outputs, d_residuals, mode)
+
+                # if we're not matrix free, we can skip the bottom of
+                # this loop because apply_linear does nothing.
+                if not self.matrix_free:
+                    continue
 
                 # Jacobian and vectors are all unscaled, dimensional
                 with self._unscaled_context(

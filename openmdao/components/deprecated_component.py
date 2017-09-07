@@ -20,6 +20,9 @@ class Component(BaseComponent):
         list of names of the states (deprecated OpenMDAO 1.0 concept).
     _output_names : [str, ...]
         list of names of the outputs (deprecated OpenMDAO 1.0 concept).
+    _initial_apply_linear : bound_method
+        Reference to this instance's apply_linear method, if any, for later
+        comparison to detect runtime overrides.
     """
 
     def __init__(self, **kwargs):
@@ -34,14 +37,23 @@ class Component(BaseComponent):
         super(Component, self).__init__(**kwargs)
         self._state_names = []
         self._output_names = []
-
-        if overrides_method('apply_linear', self, Component):
-            self.matrix_free = True
+        self._initial_apply_linear = getattr(self, 'apply_linear', None)
 
         warn_deprecation('Components should inherit from ImplicitComponent '
                          'or ExplicitComponent. This class provides '
                          'backwards compatibility with OpenMDAO <= 1.x as '
                          'this Component class is deprecated')
+
+    def _configure(self):
+        """
+        Configure this system to assign children settings.
+
+        Also tag component if it provides a guess_nonlinear.
+        """
+        new_apply_linear = getattr(self, 'apply_linear', None)
+        self.matrix_free = (overrides_method('apply_linear', self, Component) or
+                            (new_apply_linear is not None and new_apply_linear !=
+                             self._initial_apply_linear))
 
     def _setup_partials(self, recurse=True):
         super(Component, self)._setup_partials()
@@ -204,6 +216,11 @@ class Component(BaseComponent):
                 with self.jacobian_context():
                     self._jacobian._apply(d_inputs, d_outputs, d_residuals,
                                           mode)
+
+                # if we're not matrix free, we can skip the bottom of
+                # this loop because apply_linear does nothing.
+                if not self.matrix_free:
+                    continue
 
                 with self._unscaled_context(
                         outputs=[self._outputs, d_outputs], residuals=[d_residuals]):

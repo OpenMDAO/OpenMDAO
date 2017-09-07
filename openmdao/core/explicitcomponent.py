@@ -11,15 +11,22 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
 
+_inst_functs = ['compute_jacvec_product', 'compute_multi_jacvec_product']
+
 
 class ExplicitComponent(Component):
     """
     Class to inherit from when all output variables are explicit.
+
+    Attributes
+    ----------
+    _inst_functs : dict
+        Dictionary of names mapped to bound methods.
     """
 
     def __init__(self, **kwargs):
         """
-        Check if we are matrix-free.
+        Store some bound methods so we can detect runtime overrides.
 
         Parameters
         ----------
@@ -28,10 +35,26 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self).__init__(**kwargs)
 
-        self.supports_multivecs = overrides_method('compute_multi_jacvec_product',
-                                                   self, ExplicitComponent)
-        self.matrix_free = self.supports_multivecs or overrides_method('compute_jacvec_product',
-                                                                       self, ExplicitComponent)
+        self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
+
+    def _configure(self):
+        """
+        Configure this system to assign children settings.
+
+        Also tag component if it provides a guess_nonlinear.
+        """
+        new_jacvec_prod = getattr(self, 'compute_jacvec_product', None)
+        new_multi_jacvec_prod = getattr(self, 'compute_multi_jacvec_product', None)
+
+        self.supports_multivecs = (overrides_method('compute_multi_jacvec_product',
+                                                    self, ExplicitComponent) or
+                                   (new_multi_jacvec_prod is not None and
+                                    new_multi_jacvec_prod !=
+                                    self._inst_functs['compute_multi_jacvec_product']))
+        self.matrix_free = self.supports_multivecs or (
+            overrides_method('compute_jacvec_product', self, ExplicitComponent) or
+            (new_jacvec_prod is not None and
+             new_jacvec_prod != self._inst_functs['compute_jacvec_product']))
 
     def _setup_partials(self, recurse=True):
         """
@@ -237,6 +260,11 @@ class ExplicitComponent(Component):
                     # Jacobian and vectors are all scaled, unitless
                     with self.jacobian_context() as J:
                         J._apply(d_inputs, d_outputs, d_residuals, mode)
+
+                    # if we're not matrix free, we can skip the bottom of
+                    # this loop because compute_jacvec_product does nothing.
+                    if not self.matrix_free:
+                        continue
 
                     # Jacobian and vectors are all unscaled, dimensional
                     with self._unscaled_context(
