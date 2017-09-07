@@ -168,7 +168,7 @@ class ImplicitComponent(Component):
 
             return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 
-    def _linearize(self, do_nl=True, do_ln=True, mode='fwd'):
+    def _linearize(self, do_nl=True, do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
@@ -178,8 +178,6 @@ class ImplicitComponent(Component):
             Flag indicating if the nonlinear solver should be linearized.
         do_ln : boolean
             Flag indicating if the linear solver should be linearized.
-        mode : str
-            Mode for derivative calculation, default is fwd.
         """
         with self.jacobian_context() as J:
             with self._unscaled_context(outputs=[self._outputs]):
@@ -193,10 +191,10 @@ class ImplicitComponent(Component):
                 J._update()
 
         if self._nonlinear_solver is not None and do_nl:
-            self._nonlinear_solver._linearize(mode=mode)
+            self._nonlinear_solver._linearize()
 
         if self._linear_solver is not None and do_ln:
-            self._linear_solver._linearize(mode=mode)
+            self._linear_solver._linearize()
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """

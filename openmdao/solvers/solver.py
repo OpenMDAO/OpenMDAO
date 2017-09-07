@@ -319,15 +319,9 @@ class Solver(object):
         """
         pass
 
-    def _linearize(self, mode='fwd'):
+    def _linearize(self):
         """
         Perform any required linearization operations such as matrix factorization.
-
-        Parameters
-        ----------
-        mode : str
-            Mode for derivative calculation, default is fwd.
-
         """
         pass
 

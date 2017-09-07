@@ -2773,7 +2773,7 @@ class System(object):
         """
         pass
 
-    def _linearize(self, do_nl=True, do_ln=True, mode='fwd'):
+    def _linearize(self, do_nl=True, do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
@@ -2783,8 +2783,6 @@ class System(object):
             Flag indicating if the nonlinear solver should be linearized.
         do_ln : boolean
             Flag indicating if the linear solver should be linearized.
-        mode : str
-            Mode for derivative calculation, default is fwd.
         """
         pass
 

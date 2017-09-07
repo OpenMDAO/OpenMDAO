@@ -107,7 +107,7 @@ class ScipyIterativeSolver(LinearSolver):
             Mode for derivative calculation, default is fwd.
         """
         if self.precon is not None:
-            self.precon._linearize(mode=mode)
+            self.precon._linearize()
 
     def _mat_vec(self, in_vec):
         """
