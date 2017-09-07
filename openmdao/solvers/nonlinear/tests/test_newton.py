@@ -630,7 +630,7 @@ class TestNewton(unittest.TestCase):
                 super(DirectSolver, self).__init__(**kwargs)
                 self.lin_count = 0
 
-            def _linearize(self, mode='fwd'):
+            def _linearize(self):
                 super(CountDS, self)._linearize()
                 self.lin_count += 1
 

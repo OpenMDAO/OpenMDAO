@@ -97,14 +97,9 @@ class ScipyIterativeSolver(LinearSolver):
         precon = self.precon
         return (precon is not None) and (precon._linearize_children())
 
-    def _linearize(self, mode='fwd'):
+    def _linearize(self):
         """
         Perform any required linearization operations such as matrix factorization.
-
-        Parameters
-        ----------
-        mode : str
-            Mode for derivative calculation, default is fwd.
         """
         if self.precon is not None:
             self.precon._linearize()
