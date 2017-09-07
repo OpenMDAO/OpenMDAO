@@ -2838,7 +2838,7 @@ class System(object):
 
         return states
 
-    def add_recorder(self, recorder):
+    def add_recorder(self, recorder, recurse=False):
         """
         Add a recorder to the driver.
 
@@ -2846,8 +2846,11 @@ class System(object):
         ----------
         recorder : <BaseRecorder>
            A recorder instance.
+        recurse : boolean
+            Flag indicating if the recorder should be added to all the subsystems.
         """
-        self._rec_mgr.append(recorder)
+        for s in self.system_iter(include_self=True, recurse=recurse):
+            s._rec_mgr.append(recorder)
 
     def record_iteration(self):
         """
