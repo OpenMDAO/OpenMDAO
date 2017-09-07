@@ -116,10 +116,12 @@ def setup(methods=None, show_return=False):
     """
     global _registered, _trace_calls
     if not _registered:
-        if methods is None or methods not in func_group:
+        if methods is None:
             methods = func_group['openmdao']
         elif isinstance(methods, string_types):
-            methods = func_group[methods]
+            methods = func_group.get(methods)
+            if methods is None:
+                methods = func_group['openmdao']
 
         call_stack = []
         qual_cache = {}

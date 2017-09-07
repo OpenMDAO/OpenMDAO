@@ -2,7 +2,7 @@ from __future__ import print_function
 
 import os
 import sys
-from time import time as etime
+from timeit import default_timer as etime
 import argparse
 import json
 import atexit

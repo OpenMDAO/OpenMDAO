@@ -11,15 +11,22 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
 
+_inst_functs = ['compute_jacvec_product', 'compute_multi_jacvec_product']
+
 
 class ExplicitComponent(Component):
     """
     Class to inherit from when all output variables are explicit.
+
+    Attributes
+    ----------
+    _inst_functs : dict
+        Dictionary of names mapped to bound methods.
     """
 
     def __init__(self, **kwargs):
         """
-        Check if we are matrix-free.
+        Store some bound methods so we can detect runtime overrides.
 
         Parameters
         ----------
@@ -28,8 +35,26 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self).__init__(**kwargs)
 
-        if overrides_method('compute_jacvec_product', self, ExplicitComponent):
-            self.matrix_free = True
+        self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
+
+    def _configure(self):
+        """
+        Configure this system to assign children settings.
+
+        Also tag component if it provides a guess_nonlinear.
+        """
+        new_jacvec_prod = getattr(self, 'compute_jacvec_product', None)
+        new_multi_jacvec_prod = getattr(self, 'compute_multi_jacvec_product', None)
+
+        self.supports_multivecs = (overrides_method('compute_multi_jacvec_product',
+                                                    self, ExplicitComponent) or
+                                   (new_multi_jacvec_prod is not None and
+                                    new_multi_jacvec_prod !=
+                                    self._inst_functs['compute_multi_jacvec_product']))
+        self.matrix_free = self.supports_multivecs or (
+            overrides_method('compute_jacvec_product', self, ExplicitComponent) or
+            (new_jacvec_prod is not None and
+             new_jacvec_prod != self._inst_functs['compute_jacvec_product']))
 
     def _setup_partials(self, recurse=True):
         """
@@ -205,7 +230,7 @@ class ExplicitComponent(Component):
                 failed = self.compute(self._inputs, self._outputs)
         return bool(failed), 0., 0.
 
-    def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -213,6 +238,8 @@ class ExplicitComponent(Component):
         ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
         mode : str
             'fwd' or 'rev'.
         scope_out : set or None
@@ -224,6 +251,9 @@ class ExplicitComponent(Component):
         """
         with Recording(self.pathname + '._apply_linear', self.iter_count, self):
             for vec_name in vec_names:
+                if vec_name not in self._rel_vec_names:
+                    continue
+
                 with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                     d_inputs, d_outputs, d_residuals = vecs
 
@@ -231,15 +261,35 @@ class ExplicitComponent(Component):
                     with self.jacobian_context() as J:
                         J._apply(d_inputs, d_outputs, d_residuals, mode)
 
+                    # if we're not matrix free, we can skip the bottom of
+                    # this loop because compute_jacvec_product does nothing.
+                    if not self.matrix_free:
+                        continue
+
                     # Jacobian and vectors are all unscaled, dimensional
                     with self._unscaled_context(
                             outputs=[self._outputs], residuals=[d_residuals]):
                         d_residuals *= -1.0
-                        self.compute_jacvec_product(self._inputs, self._outputs,
-                                                    d_inputs, d_residuals, mode)
+                        if d_inputs._ncol > 1:
+                            if self.supports_multivecs:
+                                self.compute_multi_jacvec_product(self._inputs, self._outputs,
+                                                                  d_inputs, d_residuals, mode)
+                            else:
+                                for i in range(d_inputs._ncol):
+                                    # need to make the multivecs look like regular single vecs
+                                    # since the component doesn't know about multivecs.
+                                    d_inputs._icol = i
+                                    d_residuals._icol = i
+                                    self.compute_jacvec_product(self._inputs, self._outputs,
+                                                                d_inputs, d_residuals, mode)
+                                d_inputs._icol = None
+                                d_residuals._icol = None
+                        else:
+                            self.compute_jacvec_product(self._inputs, self._outputs,
+                                                        d_inputs, d_residuals, mode)
                         d_residuals *= -1.0
 
-    def _solve_linear(self, vec_names, mode):
+    def _solve_linear(self, vec_names, mode, rel_systems):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -249,6 +299,8 @@ class ExplicitComponent(Component):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
 
         Returns
         -------
@@ -261,6 +313,8 @@ class ExplicitComponent(Component):
         """
         with Recording(self.pathname + '._solve_linear', self.iter_count, self):
             for vec_name in vec_names:
+                if vec_name not in self._rel_vec_names:
+                    continue
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
 
@@ -268,7 +322,7 @@ class ExplicitComponent(Component):
                         outputs=[d_outputs], residuals=[d_residuals]):
                     if mode == 'fwd':
                         d_outputs.set_vec(d_residuals)
-                    elif mode == 'rev':
+                    else:  # rev
                         d_residuals.set_vec(d_outputs)
         return False, 0., 0.
 

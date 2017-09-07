@@ -91,12 +91,12 @@ class DirectSolver(LinearSolver):
 
         # apply linear
         scope_out, scope_in = system._get_scope()
-        system._apply_linear([vec_name], self._mode, scope_out, scope_in)
+        system._apply_linear([vec_name], self._rel_systems, self._mode, scope_out, scope_in)
 
         # put new value in out_vec
         b_vec.get_data(out_vec)
 
-    def solve(self, vec_names, mode):
+    def solve(self, vec_names, mode, rel_systems=None):
         """
         Run the solver.
 
@@ -116,13 +116,18 @@ class DirectSolver(LinearSolver):
         float
             relative error.
         """
+        if len(vec_names) > 1:
+            raise RuntimeError("DirectSolvers with multiple right-hand-sides are not supported.")
+
         self._vec_names = vec_names
         self._mode = mode
 
         system = self._system
 
         with Recording('DirectSolver', 0, self) as rec:
-            for vec_name in self._vec_names:
+            for vec_name in vec_names:
+                if vec_name not in system._rel_vec_names:
+                    continue
                 self._vec_name = vec_name
                 d_residuals = system._vectors['residual'][vec_name]
                 d_outputs = system._vectors['output'][vec_name]
@@ -133,7 +138,7 @@ class DirectSolver(LinearSolver):
                     b_vec = d_residuals
                     trans_lu = 0
                     trans_splu = 'N'
-                elif self._mode == 'rev':
+                else:  # rev
                     x_vec = d_residuals
                     b_vec = d_outputs
                     trans_lu = 1

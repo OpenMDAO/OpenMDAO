@@ -7,9 +7,10 @@ import sys
 from resource import getrusage, RUSAGE_SELF, RUSAGE_CHILDREN
 
 from six.moves import zip_longest
+from openmdao.core.problem = Problem
+from openmdao.core.group import Group
 
-
-def dump_dist_idxs(problem, stream=sys.stdout):  # pragma: no cover
+def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma: no cover
     """Print out the distributed idxs for each variable in input and output vecs.
 
     Output looks like this:
@@ -30,15 +31,17 @@ def dump_dist_idxs(problem, stream=sys.stdout):  # pragma: no cover
     ----------
     problem : <Problem>
         The problem object that contains the model.
+    vec_name : str
+        Name of vector to dump (when there are multiple vectors due to parallel derivs)
     stream : File-like
         Where dump output will go.
     """
     def _get_data(g, type_):
 
         set_IDs = g._var_set2iset
-        sizes = g._var_sizes_byset
+        sizes = g._var_sizes_byset[vec_name]
         vnames = g._var_allprocs_abs_names
-        set_idxs = g._var_allprocs_abs2idx_byset
+        set_idxs = g._var_allprocs_abs2idx_byset[vec_name]
         abs2meta = g._var_allprocs_abs2meta
 
         idx = 0
@@ -104,6 +107,60 @@ def tree(system, include_solvers=True, stream=sys.stdout):
                 stream.write("%s %s nonlinear_solver\n" % (indent, type(s.nonlinear_solver).__name__))
             if s.linear_solver is not None:
                 stream.write("%s %s linear_solver\n" % (indent, type(s.linear_solver).__name__))
+
+def solver_tree(top, stream=sys.stdout):
+    """
+    Dump the solver tree structure to the given stream.
+
+    Parameters
+    ----------
+    top : System or Problem
+        The top of the tree to dump.  If top is a Problem, then the driver
+        will be dumped as well.
+    """
+    indent = 0
+    if isinstance(top, Problem):
+        print('Driver: %s' % type(top.driver).__name__, file=stream)
+        top = top.model
+        indent += 3
+
+    for s in top.system_iter(include_self=True, recurse=True, typ=Group):
+        if s.pathname:
+            depth = len(s.pathname.split('.'))
+        else:
+            depth = 0
+        indent = '   ' * (depth + indent)
+        print("%s%s LN: %s, NL: %s\n" % (indent, s.name,
+                                         type(s.linear_solver).__name__,
+                                         type(s.nonlinear_solver).__name,
+                                         file=stream)
+
+def config_summary(problem, stream=sys.stdout):
+    """
+    Prints various high level statistics about the model structure.
+
+    Parameters
+    ----------
+    problem : Problem
+        The Problem to be summarized.
+    stream : File-like
+        Where the output will be written.
+    """
+    allsystems = list(problem.model.system_iter(recurse=True, include_self=True))
+    sysnames = [s.pathname for s in allsystems]
+    nsystems = len(allsystems)
+    ngroups = len([s for s in allsystems if isinstance(s, Group)])
+    ncomps = nsystems - ngroups
+    noutputs = len(problem.model._var_allprocs_abs_names['output'])
+    ninputs = len(problem.model._var_allprocs_abs_names['input'])
+    maxdepth = max([len(name.split('.')) for name in sysnames])
+
+    print("============== Problem Summary ============", file=stream)
+    print("Number of Groups: %d" % ngroups, file=stream)
+    print("Number of Components: %d" % ncomps, file=stream)
+    print("Max tree depth: %d" % maxdepth, file=stream)
+    print("Number of Inputs: %d" % ninputs, file=stream)
+    print("Number of Outputs: %d" % noutputs, file=stream)
 
 def max_mem_usage():
     """

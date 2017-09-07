@@ -281,7 +281,7 @@ class PetscKSP(LinearSolver):
         if self._mode == 'fwd':
             x_vec = system._vectors['output'][vec_name]
             b_vec = system._vectors['residual'][vec_name]
-        elif self._mode == 'rev':
+        else:  # rev
             x_vec = system._vectors['residual'][vec_name]
             b_vec = system._vectors['output'][vec_name]
 
@@ -290,7 +290,7 @@ class PetscKSP(LinearSolver):
 
         # apply linear
         scope_out, scope_in = system._get_scope()
-        system._apply_linear([vec_name], self._mode, scope_out, scope_in)
+        system._apply_linear([vec_name], self._rel_systems, self._mode, scope_out, scope_in)
 
         # stuff resulting value of b vector into result for KSP
         b_vec.get_data(result.array)
@@ -314,7 +314,7 @@ class PetscKSP(LinearSolver):
         if self.precon is not None:
             self.precon._linearize()
 
-    def solve(self, vec_names, mode):
+    def solve(self, vec_names, mode, rel_systems=None):
         """
         Solve the linear system for the problem in self._system.
 
@@ -337,6 +337,7 @@ class PetscKSP(LinearSolver):
             relative error.
         """
         self._vec_names = vec_names
+        self._rel_systems = rel_systems
         self._mode = mode
 
         system = self._system
@@ -346,14 +347,15 @@ class PetscKSP(LinearSolver):
         atol = options['atol']
         rtol = options['rtol']
 
-        for vec_name in self._vec_names:
+        for vec_name in vec_names:
+
             self._vec_name = vec_name
 
             # assign x and b vectors based on mode
             if self._mode == 'fwd':
                 x_vec = system._vectors['output'][vec_name]
                 b_vec = system._vectors['residual'][vec_name]
-            elif self._mode == 'rev':
+            else:  # rev
                 x_vec = system._vectors['residual'][vec_name]
                 b_vec = system._vectors['output'][vec_name]
 
@@ -403,7 +405,7 @@ class PetscKSP(LinearSolver):
             if mode == 'fwd':
                 x_vec = system._vectors['output'][vec_name]
                 b_vec = system._vectors['residual'][vec_name]
-            elif mode == 'rev':
+            else:  # rev
                 x_vec = system._vectors['residual'][vec_name]
                 b_vec = system._vectors['output'][vec_name]
 
@@ -444,8 +446,8 @@ class PetscKSP(LinearSolver):
             return self._ksp[vec_name]
 
         iproc = system.comm.rank
-        lsize = np.sum(system._var_sizes['output'][iproc, :])
-        size = np.sum(system._var_sizes['output'])
+        lsize = np.sum(system._var_sizes[vec_name]['output'][iproc, :])
+        size = np.sum(system._var_sizes[vec_name]['output'])
 
         jac_mat = PETSc.Mat().createPython([(lsize, size), (lsize, size)],
                                            comm=system.comm)

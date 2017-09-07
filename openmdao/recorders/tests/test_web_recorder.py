@@ -20,6 +20,7 @@ from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, N
 from openmdao.core.problem import Problem
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.utils.record_util import format_iteration_coordinate
+from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.web_recorder import format_version
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
@@ -68,6 +69,7 @@ class TestServerRecorder(unittest.TestCase):
     solver_iterations = None
 
     def setUp(self):
+        recording_iteration.stack = []  # reset to avoid problems with earlier tests
         super(TestServerRecorder, self).setUp()
 
     def assert_array_close(self, test_val, comp_set):

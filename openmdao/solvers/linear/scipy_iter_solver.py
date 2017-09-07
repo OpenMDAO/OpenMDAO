@@ -124,13 +124,13 @@ class ScipyIterativeSolver(LinearSolver):
         if self._mode == 'fwd':
             x_vec = system._vectors['output'][vec_name]
             b_vec = system._vectors['residual'][vec_name]
-        elif self._mode == 'rev':
+        else:  # rev
             x_vec = system._vectors['residual'][vec_name]
             b_vec = system._vectors['output'][vec_name]
 
         x_vec.set_data(in_vec)
         scope_out, scope_in = system._get_scope()
-        system._apply_linear([vec_name], self._mode, scope_out, scope_in)
+        system._apply_linear([vec_name], self._rel_systems, self._mode, scope_out, scope_in)
 
         # print('in', in_vec)
         # print('out', b_vec.get_data())
@@ -156,7 +156,7 @@ class ScipyIterativeSolver(LinearSolver):
         self._mpi_print(self._iter_count, norm, norm / self._norm0)
         self._iter_count += 1
 
-    def solve(self, vec_names, mode):
+    def solve(self, vec_names, mode, rel_systems=None):
         """
         Run the solver.
 
@@ -177,6 +177,7 @@ class ScipyIterativeSolver(LinearSolver):
             relative error.
         """
         self._vec_names = vec_names
+        self._rel_systems = rel_systems
         self._mode = mode
 
         system = self._system
@@ -188,12 +189,13 @@ class ScipyIterativeSolver(LinearSolver):
         restart = self.options['restart']
 
         for vec_name in self._vec_names:
+
             self._vec_name = vec_name
 
             if self._mode == 'fwd':
                 x_vec = system._vectors['output'][vec_name]
                 b_vec = system._vectors['residual'][vec_name]
-            elif self._mode == 'rev':
+            else:  # rev
                 x_vec = system._vectors['residual'][vec_name]
                 b_vec = system._vectors['output'][vec_name]
 
@@ -245,7 +247,7 @@ class ScipyIterativeSolver(LinearSolver):
         if mode == 'fwd':
             x_vec = system._vectors['output'][vec_name]
             b_vec = system._vectors['residual'][vec_name]
-        elif mode == 'rev':
+        else:  # rev
             x_vec = system._vectors['residual'][vec_name]
             b_vec = system._vectors['output'][vec_name]
 
