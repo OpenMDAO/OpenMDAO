@@ -296,6 +296,18 @@ class TestSqliteRecorder(unittest.TestCase):
         _assertSystemIterationDataRecorded(self, cur, expected, tolerance)
         con.close()
 
+    def assertSystemIterationCoordinatesRecorded(self, iteration_coordinates):
+        con = sqlite3.connect(self.filename)
+        cur = con.cursor()
+        for iteration_coordinate in iteration_coordinates:
+            cur.execute("SELECT * FROM system_iterations WHERE "
+                           "iteration_coordinate=:iteration_coordinate",
+                           {"iteration_coordinate": iteration_coordinate})
+            row_actual = cur.fetchone()
+            self.assertTrue(row_actual,
+                'System iterations table does not contain the requested iteration coordinate: "{}"'.\
+                            format(iteration_coordinate))
+
     def assertSolverIterationDataRecorded(self, expected, tolerance):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
@@ -313,6 +325,17 @@ class TestSqliteRecorder(unittest.TestCase):
         cur = con.cursor()
         _assertDriverMetadataRecorded(self, cur, expected_driver_metadata)
         con.close()
+
+    def assertSystemMetadataIdsRecorded(self, ids):
+        con = sqlite3.connect(self.filename)
+        cur = con.cursor()
+        for id in ids:
+            cur.execute("SELECT * FROM system_metadata WHERE "
+                           "id=:id",
+                           {"id": id})
+            row_actual = cur.fetchone()
+            self.assertTrue(row_actual,
+                'System metadata table does not contain the requested id: "{}"'.format(id))
 
     def setup_sellar_model(self):
         self.prob = Problem()
@@ -1480,6 +1503,67 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
                                                  expected_outputs, expected_residuals),), self.eps)
+
+    def test_record_system_recursively(self):
+        # Test adding recorders to all Systems using the recurse option
+        #    to add_recorder
+        if OPT is None:
+            raise unittest.SkipTest("pyoptsparse is not installed")
+
+        if OPTIMIZER is None:
+            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
+
+        self.setup_sellar_grouped_model()
+
+        self.prob.driver = pyOptSparseDriver()
+        self.prob.driver.options['optimizer'] = OPTIMIZER
+        self.prob.driver.opt_settings['ACC'] = 1e-9
+
+        self.recorder.options['record_metadata'] = True
+
+        # Add recorder to model and all subsystems
+        self.recorder.options['record_inputs'] = True
+        self.recorder.options['record_outputs'] = True
+        self.recorder.options['record_residuals'] = True
+
+        self.prob.setup(check=False, mode='rev')
+
+        # Need to do recursive adding of recorders AFTER setup
+        self.prob.model.add_recorder(self.recorder, recurse=True)
+
+        t0, t1 = run_driver(self.prob)
+        self.prob.cleanup()
+
+        # Just make sure all Systems had some metadata recorded
+        self.assertSystemMetadataIdsRecorded(
+            [
+                'root',
+                'px',
+                'pz',
+                'mda',
+                'mda.d1',
+                'mda.d2',
+                'obj_cmp',
+                'con_cmp1',
+                'con_cmp2'
+            ]
+        )
+
+        # Make sure all the Systems are recorded at least once
+        self.assertSystemIterationCoordinatesRecorded(
+            [
+            'rank0:SLSQP|0|root._solve_nonlinear|0',
+            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|con_cmp1._solve_nonlinear|0',
+            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|con_cmp2._solve_nonlinear|0',
+            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0',
+            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d1._solve_nonlinear|0',
+            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d2._solve_nonlinear|0',
+            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|obj_cmp._solve_nonlinear|0',
+            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|px._solve_nonlinear|0',
+            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
+            ]
+        )
+
 
 
 if __name__ == "__main__":

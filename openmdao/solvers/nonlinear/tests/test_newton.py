@@ -122,7 +122,6 @@ class TestNewton(unittest.TestCase):
         top.run_model()
         assert_rel_error(self, top['comp.z'], 2.5, 1e-8)
 
-
     def test_sellar_derivs(self):
         # Test top level Sellar (i.e., not grouped).
         # Also, piggybacked testing that makes sure we only call apply_nonlinear
