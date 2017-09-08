@@ -78,7 +78,7 @@ class System(object):
     _subsystems_var_range_byset : {<vec_name>: {'input': list of dict, 'output': list of dict}, ...}
         Same as above, but by var_set name.
     #
-    _num_var : {'input': int, 'output': int}
+    _num_var : {<vec_name>: {'input': int, 'output': int}, ...}
         Number of allprocs variables owned by this system.
     _num_var_byset : {<vec_name>: {'input': dict of int, 'output': dict of int}, ...}
         Same as above, but by var_set name.

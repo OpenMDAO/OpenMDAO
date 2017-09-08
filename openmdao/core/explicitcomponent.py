@@ -39,9 +39,7 @@ class ExplicitComponent(Component):
 
     def _configure(self):
         """
-        Configure this system to assign children settings.
-
-        Also tag component if it provides a guess_nonlinear.
+        Configure this system to assign children settings and detect if matrix_free.
         """
         new_jacvec_prod = getattr(self, 'compute_jacvec_product', None)
         new_multi_jacvec_prod = getattr(self, 'compute_multi_jacvec_product', None)

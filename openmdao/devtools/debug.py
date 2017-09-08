@@ -7,7 +7,7 @@ import sys
 from resource import getrusage, RUSAGE_SELF, RUSAGE_CHILDREN
 
 from six.moves import zip_longest
-from openmdao.core.problem = Problem
+from openmdao.core.problem import Problem
 from openmdao.core.group import Group
 
 def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma: no cover
@@ -132,8 +132,8 @@ def solver_tree(top, stream=sys.stdout):
         indent = '   ' * (depth + indent)
         print("%s%s LN: %s, NL: %s\n" % (indent, s.name,
                                          type(s.linear_solver).__name__,
-                                         type(s.nonlinear_solver).__name,
-                                         file=stream)
+                                         type(s.nonlinear_solver).__name),
+              file=stream)
 
 def config_summary(problem, stream=sys.stdout):
     """

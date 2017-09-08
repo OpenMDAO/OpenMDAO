@@ -198,7 +198,7 @@ class Component(System):
             sizes[vec_name] = {}
             sizes_byset[vec_name] = {}
 
-            for type_ in ['input', 'output']:
+            for type_ in ('input', 'output'):
                 sizes[vec_name][type_] = np.zeros((nproc, self._num_var[vec_name][type_]), int)
 
                 sizes_byset[vec_name][type_] = {}
@@ -206,7 +206,7 @@ class Component(System):
                     sizes_byset[vec_name][type_][set_name] = np.zeros((nproc, nvars), int)
 
             # Compute _var_sizes and _var_sizes_byset
-            for type_ in ['input', 'output']:
+            for type_ in ('input', 'output'):
                 sz = sizes[vec_name][type_]
                 sz_byset = sizes_byset[vec_name][type_]
                 abs2meta_t = self._var_abs2meta[type_]
