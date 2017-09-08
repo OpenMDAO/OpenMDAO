@@ -87,6 +87,8 @@ step       Step size for finite difference check.
 step_calc  Type of step calculation for check, can be "abs" for absolute (default) or "rel" for relative.
 =========  ====================================================================================================
 
+Note that the global check options take precedence over the ones defined on a component.
+
 Here, we show how to set the step size. In this case, the TrickyParaboloid requires a higher step size because the values and derivatives
 are fairly large, so we give it a higher stepsize. However, we choose here to use this setting for all comps.
 
