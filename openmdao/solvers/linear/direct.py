@@ -80,9 +80,8 @@ class DirectSolver(LinearSolver):
         """
         vec_name = 'linear'
         system = self._system
-        mode = self._mode
 
-        # assign x and b vectors based on fwd mode
+        # assign x and b vectors based on mode
         x_vec = system._vectors['output'][vec_name]
         b_vec = system._vectors['residual'][vec_name]
 
@@ -91,7 +90,7 @@ class DirectSolver(LinearSolver):
 
         # apply linear
         scope_out, scope_in = system._get_scope()
-        system._apply_linear([vec_name], self._rel_systems, self._mode, scope_out, scope_in)
+        system._apply_linear([vec_name], self._rel_systems, 'fwd', scope_out, scope_in)
 
         # put new value in out_vec
         b_vec.get_data(out_vec)
@@ -120,7 +119,6 @@ class DirectSolver(LinearSolver):
             raise RuntimeError("DirectSolvers with multiple right-hand-sides are not supported.")
 
         self._vec_names = vec_names
-        self._mode = mode
 
         system = self._system
 
@@ -133,7 +131,7 @@ class DirectSolver(LinearSolver):
                 d_outputs = system._vectors['output'][vec_name]
 
                 # assign x and b vectors based on mode
-                if self._mode == 'fwd':
+                if mode == 'fwd':
                     x_vec = d_outputs
                     b_vec = d_residuals
                     trans_lu = 0
