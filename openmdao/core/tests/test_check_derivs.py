@@ -13,6 +13,43 @@ from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 from openmdao.test_suite.components.sellar import SellarDerivatives
 
 
+class ParaboloidTricky(ExplicitComponent):
+    """
+    Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
+    """
+
+    def setup(self):
+        self.add_input('x', val=0.0)
+        self.add_input('y', val=0.0)
+
+        self.add_output('f_xy', val=0.0)
+
+        self.scale = 1e-7
+
+    def compute(self, inputs, outputs):
+        """
+        f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
+
+        Optimal solution (minimum): x = 6.6667; y = -7.3333
+        """
+        sc = self.scale
+        x = inputs['x']*sc
+        y = inputs['y']*sc
+
+        outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+
+    def compute_partials(self, inputs, partials):
+        """
+        Jacobian for our paraboloid.
+        """
+        sc = self.scale
+        x = inputs['x']
+        y = inputs['y']
+
+        partials['f_xy', 'x'] = 2.0*x*sc*sc - 6.0*sc + y*sc*sc
+        partials['f_xy', 'y'] = 2.0*y*sc*sc + 8.0*sc + x*sc*sc
+
+
 class TestProblemCheckPartials(unittest.TestCase):
 
     def test_incorrect_jacobian(self):
@@ -599,6 +636,229 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertTrue(('g', 'z') in data['comp'])
         self.assertTrue("  comp: 'g' wrt 'x'\n"  in lines)
         self.assertTrue(('g', 'x') in data['comp'])
+
+    def test_set_step_on_comp(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+
+        prob.set_solver_print(level=0)
+
+        comp.metadata['check_step'] = 1e-2
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partials(suppress_output=True)
+
+        # This will fail unless you set the check_step.
+        x_error = data['comp']['f_xy', 'x']['rel error']
+        self.assertLess(x_error.forward, 1e-5)
+        self.assertLess(x_error.reverse, 1e-5)
+
+    def test_set_step_global(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+
+        prob.set_solver_print(level=0)
+
+        opts = {'step' : 1e-2}
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partials(suppress_output=True, global_options=opts)
+
+        # This will fail unless you set the global step.
+        x_error = data['comp']['f_xy', 'x']['rel error']
+        self.assertLess(x_error.forward, 1e-5)
+        self.assertLess(x_error.reverse, 1e-5)
+
+    def test_complex_step_not_allocated(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+
+        prob.set_solver_print(level=0)
+
+        comp.metadata['check_method'] = 'cs'
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        with self.assertRaises(RuntimeError) as context:
+            data = prob.check_partials(suppress_output=True)
+
+        msg = 'In order to check partials with complex step, you need to set ' + \
+            '"force_alloc_complex" to True during setup.'
+        self.assertEqual(str(context.exception), msg)
+
+    def test_set_method_on_comp(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+
+        prob.set_solver_print(level=0)
+
+        comp.metadata['check_method'] = 'cs'
+
+        prob.setup(check=False, force_alloc_complex=True)
+        prob.run_model()
+
+        data = prob.check_partials(suppress_output=True)
+
+        x_error = data['comp']['f_xy', 'x']['rel error']
+        self.assertLess(x_error.forward, 1e-5)
+        self.assertLess(x_error.reverse, 1e-5)
+
+    def test_set_method_global(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+
+        prob.set_solver_print(level=0)
+
+        opts = {'method' : 'cs'}
+
+        prob.setup(check=False, force_alloc_complex=True)
+        prob.run_model()
+
+        data = prob.check_partials(suppress_output=True, global_options=opts)
+
+        x_error = data['comp']['f_xy', 'x']['rel error']
+        self.assertLess(x_error.forward, 1e-5)
+        self.assertLess(x_error.reverse, 1e-5)
+
+    def test_set_form_on_comp(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+
+        prob.set_solver_print(level=0)
+
+        comp.metadata['check_form'] = 'central'
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partials(suppress_output=True)
+
+        # This will fail unless you set the check_step.
+        x_error = data['comp']['f_xy', 'x']['rel error']
+        self.assertLess(x_error.forward, 1e-3)
+        self.assertLess(x_error.reverse, 1e-3)
+
+    def test_set_form_global(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+
+        prob.set_solver_print(level=0)
+
+        opts = {'form' : 'central'}
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partials(suppress_output=True, global_options=opts)
+
+        # This will fail unless you set the check_step.
+        x_error = data['comp']['f_xy', 'x']['rel error']
+        self.assertLess(x_error.forward, 1e-3)
+        self.assertLess(x_error.reverse, 1e-3)
+
+    def test_set_step_calc_on_comp(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+
+        prob.set_solver_print(level=0)
+
+        comp.metadata['check_step_calc'] = 'rel'
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partials(suppress_output=True)
+
+        # This will fail unless you set the check_step.
+        x_error = data['comp']['f_xy', 'x']['rel error']
+        self.assertLess(x_error.forward, 3e-3)
+        self.assertLess(x_error.reverse, 3e-3)
+
+    def test_set_step_calc_global(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+
+        prob.set_solver_print(level=0)
+
+        opts = {'step_calc' : 'rel'}
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partials(suppress_output=True, global_options=opts)
+
+        # This will fail unless you set the global step.
+        x_error = data['comp']['f_xy', 'x']['rel error']
+        self.assertLess(x_error.forward, 3e-3)
+        self.assertLess(x_error.reverse, 3e-3)
 
 
 class TestProblemCheckTotals(unittest.TestCase):

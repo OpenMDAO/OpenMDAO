@@ -12,7 +12,8 @@ from six.moves import range
 import numpy as np
 import scipy.sparse as sparse
 
-from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
+from openmdao.approximation_schemes.complex_step import ComplexStep
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.components.deprecated_component import Component as DepComponent
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver
@@ -502,13 +503,7 @@ class Problem(object):
             self.final_setup()
 
         if not global_options:
-            global_options = DEFAULT_FD_OPTIONS.copy()
-            global_options['method'] = 'fd'
-
-        if global_options['method'] == 'fd':
-            scheme = FiniteDifference
-        else:
-            raise ValueError('Unrecognized method: "{}"'.format(global_options['method']))
+            global_options = {}
 
         model = self.model
         logger = logger if logger else get_logger('check_partials')
@@ -711,8 +706,9 @@ class Problem(object):
         model._outputs.set_vec(output_cache)
         model.run_apply_nonlinear()
 
-        # Finite Difference (or TODO: Complex Step) to calculate Jacobian
+        # Finite Difference to calculate Jacobian
         jac_key = 'J_fd'
+        alloc_complex = model._outputs._alloc_complex
         for comp in comps:
 
             c_name = comp.pathname
@@ -721,10 +717,31 @@ class Problem(object):
             if isinstance(comp, IndepVarComp):
                 continue
 
+            fd_options = {'order' : None}
+
+            # Global options take precedence over component metadata options.
+            for name in ['step', 'step_calc', 'form', 'method']:
+                ch_name = 'check_%s' % name
+                fd_options[name] = global_options.get(name, comp.metadata[ch_name])
+
             subjac_info = comp._subjacs_info
             explicit = isinstance(comp, ExplicitComponent)
             deprecated = isinstance(comp, DepComponent)
-            approximation = scheme()
+
+            scheme = global_options.get('method', comp.metadata['check_method'])
+            if scheme == 'fd':
+                approximation = FiniteDifference()
+
+            elif scheme == 'cs':
+                approximation = ComplexStep()
+
+                if not alloc_complex:
+                    msg = 'In order to check partials with complex step, you need to set ' + \
+                        '"force_alloc_complex" to True during setup.'
+                    raise RuntimeError(msg)
+
+            else:
+                raise ValueError('Unrecognized method: "{}"'.format(global_options['method']))
 
             of = list(comp._var_allprocs_prom2abs_list['output'].keys())
             wrt = list(comp._var_allprocs_prom2abs_list['input'].keys())
@@ -737,7 +754,7 @@ class Problem(object):
 
             for rel_key in product(of, wrt):
                 abs_key = rel_key2abs_key(comp, rel_key)
-                approximation.add_approximation(abs_key, global_options)
+                approximation.add_approximation(abs_key, fd_options)
 
             approx_jac = {}
             approximation._init_approximations()
@@ -753,6 +770,9 @@ class Problem(object):
                     partials_data[c_name][rel_key][jac_key] = -partial
                 else:
                     partials_data[c_name][rel_key][jac_key] = partial
+
+        # TODO: Rework so that we print the opts for every comp.
+        global_options = fd_options
 
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}

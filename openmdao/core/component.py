@@ -81,8 +81,15 @@ class Component(System):
 
         # Defaults for the finite difference check used by check_partial_derivs.
         meta = self.metadata
-        meta.declare('check_type', default='fd', values=['fd', 'cs'],
-                     desc='Type of check, "fd" for finite difference, "cs" for complex step.')
+        meta.declare('check_method', default='fd', values=['fd', 'cs'],
+                     desc='Method for check: "fd" for finite difference, "cs" for complex step.')
+        meta.declare('check_form', default='forward', values=['forward', 'central', 'backward'],
+                     desc='Finite difference form for check, can be "forward", "central", or '
+                     '"backward".')
+        meta.declare('check_step', default=1.0e-6, desc='Step size for finite difference check.')
+        meta.declare('check_step_calc', default='abs', values=['abs', 'rel'],
+                     desc='Type of step calculation for check, can be "abs" for absolute '
+                     '(default) or "rel" for relative.')
 
     def setup(self):
         """
