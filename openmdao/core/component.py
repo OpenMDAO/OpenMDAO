@@ -79,6 +79,11 @@ class Component(System):
         self._declared_partials = []
         self._approximated_partials = []
 
+        # Defaults for the finite difference check used by check_partial_derivs.
+        meta = self.metadata
+        meta.declare('check_type', default='fd', values=['fd', 'cs'],
+                     desc='Type of check, "fd" for finite difference, "cs" for complex step.')
+
     def setup(self):
         """
         Declare inputs and outputs.
