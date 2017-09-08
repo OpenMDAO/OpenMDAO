@@ -99,85 +99,6 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertFalse(lines[y_wrt_x1_line+6].endswith('*'),
                         msg='Error flag not expected in output but displayed')
 
-    def test_feature_incorrect_jacobian(self):
-        class MyComp(ExplicitComponent):
-            def setup(self):
-                self.add_input('x1', 3.0)
-                self.add_input('x2', 5.0)
-
-                self.add_output('y', 5.5)
-
-            def compute(self, inputs, outputs):
-                """ Doesn't do much. """
-                outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
-
-            def compute_partials(self, inputs, partials):
-                """Intentionally incorrect derivative."""
-                J = partials
-                J['y', 'x1'] = np.array([4.0])
-                J['y', 'x2'] = np.array([40])
-
-        prob = Problem()
-        prob.model = Group()
-
-        prob.model.add_subsystem('p1', IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('x2', 5.0))
-        prob.model.add_subsystem('comp', MyComp())
-
-        prob.model.connect('p1.x1', 'comp.x1')
-        prob.model.connect('p2.x2', 'comp.x2')
-
-        prob.set_solver_print(level=0)
-
-        prob.setup(check=False)
-        prob.run_model()
-
-        data = prob.check_partials()
-
-        x1_error = data['comp']['y', 'x1']['abs error']
-        assert_rel_error(self, x1_error.forward, 1., 1e-8)
-        assert_rel_error(self, x1_error.reverse, 1., 1e-8)
-
-        x2_error = data['comp']['y', 'x2']['rel error']
-        assert_rel_error(self, x2_error.forward, 9., 1e-8)
-        assert_rel_error(self, x2_error.reverse, 9., 1e-8)
-
-    def test_feature_check_partials_suppress(self):
-        class MyComp(ExplicitComponent):
-            def setup(self):
-                self.add_input('x1', 3.0)
-                self.add_input('x2', 5.0)
-
-                self.add_output('y', 5.5)
-
-            def compute(self, inputs, outputs):
-                """ Doesn't do much. """
-                outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
-
-            def compute_partials(self, inputs, partials):
-                """Intentionally incorrect derivative."""
-                J = partials
-                J['y', 'x1'] = np.array([4.0])
-                J['y', 'x2'] = np.array([40])
-
-        prob = Problem()
-        prob.model = Group()
-
-        prob.model.add_subsystem('p1', IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('x2', 5.0))
-        prob.model.add_subsystem('comp', MyComp())
-
-        prob.model.connect('p1.x1', 'comp.x1')
-        prob.model.connect('p2.x2', 'comp.x2')
-
-        prob.set_solver_print(level=0)
-
-        prob.setup(check=False)
-        prob.run_model()
-
-        data = prob.check_partials(suppress_output=True)
-        print(data)
-
     def test_component_only(self):
         class MyComp(ExplicitComponent):
             def setup(self):
@@ -859,6 +780,263 @@ class TestProblemCheckPartials(unittest.TestCase):
         x_error = data['comp']['f_xy', 'x']['rel error']
         self.assertLess(x_error.forward, 3e-3)
         self.assertLess(x_error.reverse, 3e-3)
+
+
+class TestCheckPartialsFeature(unittest.TestCase):
+
+    def test_feature_incorrect_jacobian(self):
+        class MyComp(ExplicitComponent):
+            def setup(self):
+                self.add_input('x1', 3.0)
+                self.add_input('x2', 5.0)
+
+                self.add_output('y', 5.5)
+
+            def compute(self, inputs, outputs):
+                """ Doesn't do much. """
+                outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
+
+            def compute_partials(self, inputs, partials):
+                """Intentionally incorrect derivative."""
+                J = partials
+                J['y', 'x1'] = np.array([4.0])
+                J['y', 'x2'] = np.array([40])
+
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('x2', 5.0))
+        prob.model.add_subsystem('comp', MyComp())
+
+        prob.model.connect('p1.x1', 'comp.x1')
+        prob.model.connect('p2.x2', 'comp.x2')
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partials()
+
+        x1_error = data['comp']['y', 'x1']['abs error']
+        assert_rel_error(self, x1_error.forward, 1., 1e-8)
+        assert_rel_error(self, x1_error.reverse, 1., 1e-8)
+
+        x2_error = data['comp']['y', 'x2']['rel error']
+        assert_rel_error(self, x2_error.forward, 9., 1e-8)
+        assert_rel_error(self, x2_error.reverse, 9., 1e-8)
+
+    def test_feature_check_partials_suppress(self):
+        class MyComp(ExplicitComponent):
+            def setup(self):
+                self.add_input('x1', 3.0)
+                self.add_input('x2', 5.0)
+
+                self.add_output('y', 5.5)
+
+            def compute(self, inputs, outputs):
+                """ Doesn't do much. """
+                outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
+
+            def compute_partials(self, inputs, partials):
+                """Intentionally incorrect derivative."""
+                J = partials
+                J['y', 'x1'] = np.array([4.0])
+                J['y', 'x2'] = np.array([40])
+
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('x2', 5.0))
+        prob.model.add_subsystem('comp', MyComp())
+
+        prob.model.connect('p1.x1', 'comp.x1')
+        prob.model.connect('p2.x2', 'comp.x2')
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partials(suppress_output=True)
+        print(data)
+
+    def test_set_step_on_comp(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+        prob.model.add_subsystem('comp2', ParaboloidMatVec())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+        prob.model.connect('comp.f_xy', 'comp2.x')
+
+        prob.set_solver_print(level=0)
+
+        comp.metadata['check_step'] = 1e-2
+
+        prob.setup()
+        prob.run_model()
+
+        prob.check_partials()
+
+    def test_set_step_global(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+        prob.model.add_subsystem('comp2', ParaboloidMatVec())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+        prob.model.connect('comp.f_xy', 'comp2.x')
+
+        prob.set_solver_print(level=0)
+
+        opts = {'step' : 1e-2}
+
+        prob.setup()
+        prob.run_model()
+
+        prob.check_partials(global_options=opts)
+
+    def test_set_method_on_comp(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+        prob.model.add_subsystem('comp2', ParaboloidMatVec())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+        prob.model.connect('comp.f_xy', 'comp2.x')
+
+        prob.set_solver_print(level=0)
+
+        comp.metadata['check_method'] = 'cs'
+
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+
+        prob.check_partials()
+
+    def test_set_method_global(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+        prob.model.add_subsystem('comp2', ParaboloidMatVec())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+        prob.model.connect('comp.f_xy', 'comp2.x')
+
+        prob.set_solver_print(level=0)
+
+        opts = {'method' : 'cs'}
+
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+
+        prob.check_partials(global_options=opts)
+
+    def test_set_form_on_comp(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+        prob.model.add_subsystem('comp2', ParaboloidMatVec())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+        prob.model.connect('comp.f_xy', 'comp2.x')
+
+        prob.set_solver_print(level=0)
+
+        comp.metadata['check_form'] = 'central'
+
+        prob.setup()
+        prob.run_model()
+
+        prob.check_partials()
+
+    def test_set_form_global(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+        prob.model.add_subsystem('comp2', ParaboloidMatVec())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+        prob.model.connect('comp.f_xy', 'comp2.x')
+
+        prob.set_solver_print(level=0)
+
+        opts = {'form' : 'central'}
+
+        prob.setup()
+        prob.run_model()
+
+        prob.check_partials(global_options=opts)
+
+    def test_set_step_calc_on_comp(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+        prob.model.add_subsystem('comp2', ParaboloidMatVec())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+        prob.model.connect('comp.f_xy', 'comp2.x')
+
+        prob.set_solver_print(level=0)
+
+        comp.metadata['check_step_calc'] = 'rel'
+
+        prob.setup()
+        prob.run_model()
+
+        prob.check_partials()
+
+    def test_set_step_calc_global(self):
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+
+        prob.set_solver_print(level=0)
+
+        opts = {'step_calc' : 'rel'}
+
+        prob.setup()
+        prob.run_model()
+
+        prob.check_partials(global_options=opts)
+
 
 
 class TestProblemCheckTotals(unittest.TestCase):

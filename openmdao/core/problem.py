@@ -709,6 +709,7 @@ class Problem(object):
         # Finite Difference to calculate Jacobian
         jac_key = 'J_fd'
         alloc_complex = model._outputs._alloc_complex
+        all_fd_options = {}
         for comp in comps:
 
             c_name = comp.pathname
@@ -717,13 +718,14 @@ class Problem(object):
             if isinstance(comp, IndepVarComp):
                 continue
 
-            fd_options = {'order' : None}
+            fd_options = {'order': None}
 
             # Global options take precedence over component metadata options.
             for name in ['step', 'step_calc', 'form', 'method']:
                 ch_name = 'check_%s' % name
                 fd_options[name] = global_options.get(name, comp.metadata[ch_name])
 
+            all_fd_options[c_name] = fd_options
             subjac_info = comp._subjacs_info
             explicit = isinstance(comp, ExplicitComponent)
             deprecated = isinstance(comp, DepComponent)
@@ -771,14 +773,11 @@ class Problem(object):
                 else:
                     partials_data[c_name][rel_key][jac_key] = partial
 
-        # TODO: Rework so that we print the opts for every comp.
-        global_options = fd_options
-
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, logger, compact_print,
-                                  comps, global_options, suppress_output=suppress_output,
+                                  comps, all_fd_options, suppress_output=suppress_output,
                                   indep_key=indep_key)
 
         return partials_data
@@ -870,7 +869,7 @@ class Problem(object):
         fd_args['method'] = 'fd'
 
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, logger, compact_print, [model],
-                                  fd_args, totals=True, suppress_output=suppress_output)
+                                  {'': fd_args}, totals=True, suppress_output=suppress_output)
         return data['']
 
     def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
@@ -1558,19 +1557,14 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
     indep_key : dict of sets, optional
         Keyed by component name, contains the of/wrt keys that are declared not dependent.
     """
-    fd_desc = "{}:{}".format(global_options['method'],
-                             global_options['form'])
     nan = float('nan')
 
     if compact_print:
-        check_desc = "    (Check Type: {})".format(fd_desc)
         if totals:
             deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
         else:
             deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e} | {6:.4e} | {7:.4e}"\
                          " | {8:.4e} | {9:.4e} | {10:.4e}"
-    else:
-        check_desc = ""
 
     for system in system_list:
         # No need to see derivatives of IndepVarComps
@@ -1579,6 +1573,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
 
         sys_name = system.pathname
         explicit = False
+
+        fd_desc = "{}:{}".format(global_options[sys_name]['method'],
+                                 global_options[sys_name]['form'])
+        if compact_print:
+            check_desc = "    (Check Type: {})".format(fd_desc)
+        else:
+            check_desc = ""
 
         # Match header to appropriate type.
         if isinstance(system, Component):
