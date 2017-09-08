@@ -548,8 +548,6 @@ class LinearSolver(Solver):
                 b_vec -= self._rhs_vecs[vec_name]
                 norm += b_vec.get_norm()**2
 
-        print("BVEC:", b_vec._views_flat)
-        print(self.SOLVER, 'NORM', norm)
         return norm ** 0.5
 
 

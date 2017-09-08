@@ -1388,9 +1388,16 @@ class Group(System):
                             J._apply(d_inputs, d_outputs, d_residuals, mode)
                 # Apply recursion
                 else:
+                    if rel_systems is not None:
+                        irrelevant_subs = [s for s in self._subsystems_myproc
+                                           if s.pathname not in rel_systems]
                     if mode == 'fwd':
                         for vec_name in vec_names:
                             self._transfer(vec_name, mode)
+                        if rel_systems is not None:
+                            for s in irrelevant_subs:
+                                # zero out dvecs of irrelevant subsystems
+                                s._vectors['residual']['linear'].set_const(0.0)
 
                     for subsys in self._subsystems_myproc:
                         if rel_systems is None or subsys.pathname in rel_systems:
@@ -1399,6 +1406,10 @@ class Group(System):
                     if mode == 'rev':
                         for vec_name in vec_names:
                             self._transfer(vec_name, mode)
+                            if rel_systems is not None:
+                                for s in irrelevant_subs:
+                                    # zero out dvecs of irrelevant subsystems
+                                    s._vectors['output']['linear'].set_const(0.0)
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """
