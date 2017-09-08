@@ -50,7 +50,7 @@ def _trace_call(frame, arg, stack, context):
     """
     This is called after we have matched based on glob pattern and isinstance check.
     """
-    qual_cache, method_counts, class_counts = context
+    qual_cache, method_counts, class_counts, verbose = context
     funcname = find_qualified_name(frame.f_code.co_filename,
                                    frame.f_code.co_firstlineno, qual_cache)
 
@@ -68,8 +68,11 @@ def _trace_call(frame, arg, stack, context):
     method_counts[fullname] += 1
 
     indent = tab * (len(stack)-1)
-    print("%s%s (%d)" % (indent, fullname, method_counts[fullname]))
-    _indented_print(frame.f_locals, frame.f_locals, len(stack)-1)
+    if verbose:
+        print("%s%s (%d)" % (indent, fullname, method_counts[fullname]))
+        _indented_print(frame.f_locals, frame.f_locals, len(stack)-1)
+    else:
+        print("%s%s" % (indent, fullname))
     sys.stdout.flush()
 
 
@@ -79,7 +82,7 @@ def _trace_return(frame, arg, stack, context):
 
     This only happens if show_return is True when setup() is called.
     """
-    qual_cache, method_counts, class_counts = context
+    qual_cache, method_counts, class_counts, _ = context
     funcname = find_qualified_name(frame.f_code.co_filename,
                                    frame.f_code.co_firstlineno, qual_cache)
 
@@ -104,7 +107,7 @@ def _trace_return(frame, arg, stack, context):
     sys.stdout.flush()
 
 
-def setup(methods=None, show_return=False):
+def setup(methods=None, verbose=False):
     """
     Setup call tracing.
 
@@ -112,7 +115,8 @@ def setup(methods=None, show_return=False):
     ----------
     methods : list of (glob, (classes...)) or None
         Methods to be traced, based on glob patterns and isinstance checks.
-
+    verbose : bool
+        If True, show function locals and return values.
     """
     global _registered, _trace_calls
     if not _registered:
@@ -127,14 +131,15 @@ def setup(methods=None, show_return=False):
         qual_cache = {}
         method_counts = defaultdict(int)
         class_counts = defaultdict(set)
-        if show_return:
+        if verbose:
             do_ret = _trace_return
         else:
             do_ret = None
         _trace_calls = _create_profile_callback(call_stack, _collect_methods(methods),
                                                 do_call=_trace_call,
                                                 do_ret=do_ret,
-                                                context=(qual_cache, method_counts, class_counts))
+                                                context=(qual_cache, method_counts,
+                                                         class_counts, verbose))
 
 
 def start():
@@ -202,6 +207,8 @@ def trace_py_file():
                         default='openmdao',
                         help='Determines which group of methods will be tracked. Default is "openmdao".'
                               ' Options are: %s' % sorted(func_group.keys()))
+    parser.add_argument('-v', '--verbose', action='store_true', dest='verbose',
+                        help="Show function locals and return values.")
     parser.add_argument('file', metavar='file', nargs=1,
                         help='Python file to profile.')
 
@@ -210,7 +217,7 @@ def trace_py_file():
     progname = options.file[0]
     sys.path.insert(0, os.path.dirname(progname))
 
-    setup(methods=func_group[options.group])
+    setup(methods=func_group[options.group], verbose=options.verbose)
     with open(progname, 'rb') as fp:
         code = compile(fp.read(), progname, 'exec')
 

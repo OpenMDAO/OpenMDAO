@@ -1405,6 +1405,7 @@ class Problem(object):
                         # need a vector for clean code, so use _views_flat.
                         dinputs._views_flat[input_name][idx - start] = 1.0
 
+                print("VOIS:", [v for v, _ in vois])
                 model._solve_linear(lin_vec_names, mode, rel_systems)
 
                 for input_name, old_input_name in vois:
