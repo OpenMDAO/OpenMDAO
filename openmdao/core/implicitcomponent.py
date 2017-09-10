@@ -164,7 +164,7 @@ class ImplicitComponent(Component):
                                     d_outputs._icol = i
                                     d_residuals._icol = i
                                     self.apply_linear(self._inputs, self._outputs,
-                                                      d_inputs, d_residuals, mode)
+                                                      d_inputs, d_outputs, d_residuals, mode)
                                 d_inputs._icol = None
                                 d_outputs._icol = None
                                 d_residuals._icol = None
@@ -214,7 +214,7 @@ class ImplicitComponent(Component):
                     with Recording(self.pathname + '._solve_linear', self.iter_count, self):
                         if d_outputs._ncol > 1:
                             if self.has_solve_multi_linear:
-                                self.solve_multi_linear(d_outputs, d_residuals, mode)
+                                result = self.solve_multi_linear(d_outputs, d_residuals, mode)
                             else:
                                 for i in range(d_outputs._ncol):
                                     # need to make the multivecs look like regular single vecs
