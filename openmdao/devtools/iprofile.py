@@ -21,9 +21,10 @@ from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _coll
 
 
 def _prof_node(parts):
+    pathparts = parts[0].split('@')
     return {
         'id': parts[0],
-        'short_name': parts[0].rsplit('@', 1)[-1],
+        'short_name': pathparts[-1],
         'time': parts[2],
         'count': parts[3],
         'tot_time': 0.,
@@ -33,6 +34,7 @@ def _prof_node(parts):
         'pct_parent': 0.,
         'child_time': 0.,
         'obj': parts[1],
+        'depth': len(pathparts) - 1,
     }
 
 _profile_prefix = None
@@ -323,7 +325,7 @@ def process_profile(flist):
         if parts[-1] == '$parent':
             tree_nodes[parts[0]]['time'] = 0.
 
-    return list(tree_nodes.values()), totals
+    return tree_nodes, totals
 
 
 def prof_totals():

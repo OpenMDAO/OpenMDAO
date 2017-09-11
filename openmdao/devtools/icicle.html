@@ -177,12 +177,8 @@ window.onload = function() {
 
     partition(root);
 
-    finished_data = root.descendants();
-    filtered_data = filt_data(finished_data);
-
     rect = d3.select("svg").selectAll("rect")
-        //.data(root.descendants())
-        .data(filtered_data)
+        .data(root.descendants())
         .enter().append("rect")
         .attr("x", function(d) { return x(d.x0); })
         .attr("y", function(d) { return y(d.y0); })
