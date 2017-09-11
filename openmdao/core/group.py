@@ -1397,6 +1397,10 @@ class Group(System):
                         if rel_systems is not None:
                             for s in irrelevant_subs:
                                 # zero out dvecs of irrelevant subsystems
+                                # TODO: it's not completely clear that this is
+                                #       necessary in fwd mode.  I wasn't able to
+                                #       produce convergence failures during testing
+                                #       in fwd mode.
                                 s._vectors['residual']['linear'].set_const(0.0)
 
                     for subsys in self._subsystems_myproc:

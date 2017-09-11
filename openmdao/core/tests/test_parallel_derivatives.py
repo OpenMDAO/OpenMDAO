@@ -5,10 +5,12 @@ from __future__ import print_function
 import unittest
 import numpy as np
 import time
+import random
 
 from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, DefaultVector, \
-    ExecComp, ExplicitComponent, PETScVector
+    ExecComp, ExplicitComponent, PETScVector, ScipyIterativeSolver, NonlinearBlockGS
 from openmdao.utils.mpi import MPI
+from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped
 from openmdao.devtools.testutil import assert_rel_error
 
@@ -627,6 +629,64 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
 
         # make sure that rev mode is faster than fwd mode
         self.assertGreater(elapsed_fwd / elapsed_rev, 1.0)
+
+
+class CleanupTestCase(unittest.TestCase):
+    # This is to test for a bug john found that caused his ozone problem to fail
+    # to converge.  The problem was due to garbage in the doutputs vector that
+    # was coming from transfers to irrelevant variables during Group._apply_linear.
+    def setUp(self):
+        p = self.p = Problem()
+        root = p.model
+        root.linear_solver = LinearBlockGS()
+        root.linear_solver.options['err_on_maxiter'] = True
+
+        inputs = root.add_subsystem("inputs", IndepVarComp("x", 1.0))
+        G1 = root.add_subsystem("G1", Group())
+        dparam = G1.add_subsystem("dparam", ExecComp("y = .5*x"))
+        G1_inputs = G1.add_subsystem("inputs", IndepVarComp("x", 1.5))
+        start = G1.add_subsystem("start", ExecComp("y = .7*x"))
+        timecomp = G1.add_subsystem("time", ExecComp("y = -.2*x"))
+
+        G2 = G1.add_subsystem("G2", Group())
+        stage_step = G2.add_subsystem("stage_step",
+                                      ExecComp("y = -0.1*x + .5*x2 - .4*x3 + .9*x4"))
+        ode = G2.add_subsystem("ode", ExecComp("y = .8*x - .6*x2"))
+        dummy = G2.add_subsystem("dummy", IndepVarComp("x", 1.3))
+
+        step = G1.add_subsystem("step", ExecComp("y = -.2*x + .4*x2 - .4*x3"))
+        output = G1.add_subsystem("output", ExecComp("y = .6*x"))
+
+        con = root.add_subsystem("con", ExecComp("y = .2 * x"))
+        obj = root.add_subsystem("obj", ExecComp("y = .3 * x"))
+
+        root.connect("inputs.x", "G1.dparam.x")
+
+        G1.connect("inputs.x", ["start.x", "time.x"])
+        G1.connect("dparam.y", "G2.ode.x")
+        G1.connect("start.y", ["step.x", "G2.stage_step.x4"])
+        G1.connect("time.y", ["step.x2", "G2.stage_step.x3"])
+        G1.connect("step.y", "output.x")
+        G1.connect("G2.ode.y", ["step.x3", "G2.stage_step.x"])
+
+        G2.connect("stage_step.y", "ode.x2")
+        G2.connect("dummy.x", "stage_step.x2")
+
+        root.connect("G1.output.y", ["con.x", "obj.x"])
+
+        root.add_design_var('inputs.x')
+        root.add_constraint('con.y')
+        root.add_constraint('obj.y')
+
+    def test_rev(self):
+        p = self.p
+        p.setup(check=False, mode='rev')
+        p.run_model()
+
+        # test will fail if this fails to converge
+        J = p.compute_total_derivs(['con.y', 'obj.y'],
+                                   ['inputs.x'], return_format='dict')
+
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
