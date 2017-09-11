@@ -601,13 +601,11 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
     # Remove docstring from source code
     source_minus_docstrings = remove_docstrings(method_source)
 
-    # We are using the RedBaron module in the next two function calls
-    #    to get the code in the way we want it.
-
     #####################
     ### 2. Replace the asserts with prints -> source_minus_docstrings_with_prints_cleaned ###
     #####################
     # Replace some of the asserts with prints of the actual values
+    # This calls RedBaron
     source_minus_docstrings_with_prints = replace_asserts_with_prints(source_minus_docstrings)
 
     # remove raise SkipTest lines
@@ -637,7 +635,10 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
     #   raise call
     raise_skip_test_source_code = ""
     if '@unittest.skip' in class_source_code:
+
+        # This calls RedBaron
         skip_predicate_and_message = get_skip_predicate_and_message(class_source_code, method_name)
+
         if skip_predicate_and_message:
             # predicate, message = skip_unless_predicate_and_message
             predicate, message = skip_predicate_and_message
