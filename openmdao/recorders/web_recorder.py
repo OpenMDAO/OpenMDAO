@@ -162,21 +162,48 @@ class WebRecorder(BaseRecorder):
                     })
 
         iteration_coordinate = get_formatted_iteration_coordinate()
+        self._record_driver_iteration(self._counter, iteration_coordinate, metadata['success'],
+                                      metadata['msg'], desvars_array, responses_array,
+                                      objectives_array, constraints_array)
 
+    def _record_driver_iteration(self, counter, iteration_coordinate, success, msg,
+                                 desvars, responses, objectives, constraints):
+        """
+        Record a driver iteration.
+
+        Parameters
+        ----------
+        counter : int
+            The global counter associated with this iteration.
+        iteration_coordinate : str
+            The iteration coordinate to identify this iteration.
+        success : int
+            Integer to indicate success.
+        msg : str
+            The metadata message.
+        desvars : [JSON]
+            The array of json objects representing the design variables.
+        responses : [JSON]
+            The array of json objects representing the responses.
+        objectives : [JSON]
+            The array of json objects representing the objectives.
+        constraints : [JSON]
+            The array of json objects representing the constraints.
+        """
         driver_iteration_dict = {
-            "counter": self._counter,
+            "counter": counter,
             "iteration_coordinate": iteration_coordinate,
-            "success": metadata['success'],
-            "msg": metadata['msg'],
-            "desvars": [] if desvars_array is None else desvars_array,
-            "responses": [] if responses_array is None else responses_array,
-            "objectives": [] if objectives_array is None else objectives_array,
-            "constraints": [] if constraints_array is None else constraints_array
+            "success": success,
+            "msg": msg,
+            "desvars": [] if desvars is None else desvars,
+            "responses": [] if responses is None else responses,
+            "objectives": [] if objectives is None else objectives,
+            "constraints": [] if constraints is None else constraints
         }
 
         global_iteration_dict = {
             'record_type': 'driver',
-            'counter': self._counter
+            'counter': counter
         }
 
         driver_iteration = json.dumps(driver_iteration_dict)
@@ -232,20 +259,46 @@ class WebRecorder(BaseRecorder):
                 })
 
         iteration_coordinate = get_formatted_iteration_coordinate()
+        self._record_system_iteration(self._counter, iteration_coordinate, metadata['success'],
+                                      metadata['msg'], inputs_array, outputs_array,
+                                      residuals_array)
 
+
+    def _record_system_iteration(self, counter, iteration_coordinate, success, msg,
+                                 inputs, outputs, residuals):
+        """
+        Record a system iteration.
+
+        Parameters
+        ----------
+        counter : int
+            The global counter associated with this iteration.
+        iteration_coordinate : str
+            The iteration coordinate to identify this iteration.
+        success : int
+            Integer to indicate success.
+        msg : str
+            The metadata message.
+        inputs : [JSON]
+            The array of json objects representing the inputs.
+        outputs : [JSON]
+            The array of json objects representing the outputs.
+        residuals : [JSON]
+            The array of json objects representing the residuals.
+        """
         system_iteration_dict = {
-            'counter': self._counter,
+            'counter': counter,
             'iteration_coordinate': iteration_coordinate,
-            'success': metadata['success'],
-            'msg': metadata['msg'],
-            'inputs': [] if inputs_array is None else inputs_array,
-            'outputs': [] if outputs_array is None else outputs_array,
-            'residuals': [] if residuals_array is None else residuals_array
+            'success': success,
+            'msg': msg,
+            'inputs': [] if inputs is None else inputs,
+            'outputs': [] if outputs is None else outputs,
+            'residuals': [] if residuals is None else residuals
         }
 
         global_iteration_dict = {
             'record_type': 'system',
-            'counter': self._counter
+            'counter': counter
         }
 
         system_iteration = json.dumps(system_iteration_dict)
@@ -293,21 +346,48 @@ class WebRecorder(BaseRecorder):
                 })
 
         iteration_coordinate = get_formatted_iteration_coordinate()
+        self._record_solver_iteration(self._counter, iteration_coordinate, metadata['success'],
+                                      metadata['msg'], self._abs_error, self._rel_error,
+                                      outputs_array, residuals_array)        
 
+    def _record_solver_iteration(self, counter, iteration_coordinate, success, msg,
+                                 abs_error, rel_error, outputs, residuals):
+        """
+        Record a solver iteration.
+
+        Parameters
+        ----------
+        counter : int
+            The global counter associated with this iteration.
+        iteration_coordinate : str
+            The iteration coordinate to identify this iteration.
+        success : int
+            Integer to indicate success.
+        msg : str
+            The metadata message.
+        abs_error : float
+            The absolute error.
+        rel_error : float
+            The relative error.
+        outputs : [JSON]
+            The array of json objects representing the outputs.
+        residuals : [JSON]
+            The array of json objects representing the residuals.
+        """
         solver_iteration_dict = {
-            'counter': self._counter,
+            'counter': counter,
             'iteration_coordinate': iteration_coordinate,
-            'success': metadata['success'],
-            'msg': metadata['msg'],
-            'abs_err': self._abs_error,
-            'rel_err': self._rel_error,
-            'solver_output': [] if outputs_array is None else outputs_array,
-            'solver_residuals': [] if residuals_array is None else residuals_array
+            'success': success,
+            'msg': msg,
+            'abs_err': abs_error,
+            'rel_err': rel_error,
+            'solver_output': [] if outputs is None else outputs,
+            'solver_residuals': [] if residuals is None else residuals
         }
 
         global_iteration_dict = {
             'record_type': 'solver',
-            'counter': self._counter
+            'counter': counter
         }
 
         solver_iteration = json.dumps(solver_iteration_dict)
@@ -329,6 +409,19 @@ class WebRecorder(BaseRecorder):
         """
         driver_class = type(object_requesting_recording).__name__
         model_viewer_data = json.dumps(object_requesting_recording._model_viewer_data)
+        self._record_driver_metadata(driver_class, model_viewer_data)
+
+    def _record_driver_metadata(self, driver_class, model_viewer_data):
+        """
+        Record driver metadata.
+
+        Parameters
+        ----------
+        driver_class : str
+            The name of the driver type.
+        model_viewer_data : JSON Object
+            All model viewer data, including variable names relationships.
+        """
         driver_metadata_dict = {
             'id': driver_class,
             'model_viewer_data': model_viewer_data
@@ -364,7 +457,19 @@ class WebRecorder(BaseRecorder):
         opts = pickle.dumps(object_requesting_recording.options,
                             pickle.HIGHEST_PROTOCOL)
         encoded_opts = base64.b64encode(opts)
+        self._record_solver_metadata(encoded_opts, solver_class)
 
+    def _record_solver_metadata(self, encoded_opts, solver_class):
+        """
+        Record solver metadata.
+
+        Parameters
+        ----------
+        encoded_opts : base64 encoding
+            The encoded solver options.
+        solver_class : str
+            The name of the solver class.
+        """
         solver_options_dict = {
             'options': encoded_opts.decode('ascii'),
         }
