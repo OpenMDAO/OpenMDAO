@@ -20,7 +20,8 @@ class LinearUserDefined(LinearSolver):
         Parameters
         ----------
         solve_function : function
-            Custom function containing the solve_linear function.
+            Custom function containing the solve_linear function. The default is None, which means
+            the name defaults to "solve_linear".
         **kwargs : dict
             Options dictionary.
         """
