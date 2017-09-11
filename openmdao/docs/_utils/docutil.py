@@ -598,20 +598,11 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
 
     method_source = '\n'.join(new_lines[counter:])
 
-    #rb = RedBaron(class_source_code)
-    #def_nodes = rb.find("DefNode", name=method_name)
-    #def_nodes.value.decrease_indentation(8)
-    #method_source = def_nodes.value.dumps()
-
     # Remove docstring from source code
     source_minus_docstrings = remove_docstrings(method_source)
 
     # We are using the RedBaron module in the next two function calls
     #    to get the code in the way we want it.
-
-    # Only want the method body. Do not want the 'def' line
-    # method_body_source = get_method_body(source_minus_docstrings)
-    # method_body_source = source_minus_docstrings
 
     #####################
     ### 2. Replace the asserts with prints -> source_minus_docstrings_with_prints_cleaned ###
