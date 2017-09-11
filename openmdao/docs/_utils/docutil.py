@@ -123,6 +123,15 @@ def replace_asserts_with_prints(source_code):
         #                                                  the TestCase
         assert_node.value[0].replace("print")
 
+    assert_nodes = rb.findAll("NameNode", value='assert_almost_equal')
+    for assert_node in assert_nodes:
+        assert_node = assert_node.parent
+        # If relative error tolerance is specified, there are 3 arguments
+        if len(assert_node.value[1]) == 3:
+            remove_redbaron_node(assert_node.value[1], -1)  # remove the relative error tolerance
+        remove_redbaron_node(assert_node.value[1], -1)  # remove the expected value
+        assert_node.value[0].replace("print")
+
     source_code_with_prints = rb.dumps()  # get back the string representation of the code
     return source_code_with_prints
 
