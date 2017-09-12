@@ -34,13 +34,17 @@ class ContentContainerDirective(Directive):
 
 
 class EmbedCompareDirective(Directive):
-    """EmbedCompareDirective is a custom directive to allow blocks of
-     python code to be shown side by side to compare the new API with the old API. An
-     exmple looks like this:
+    """
+    EmbedCompareDirective is a custom directive to allow blocks of
+    python code to be shown side by side to compare the new API with the old API. An
+    exmple looks like this:
 
     .. embed-compare::
-        openmdao.test.whatever.method1
-        openmdao.test.whatever.method2
+        openmdao.test.whatever.method
+        optional text for searching for the first line
+        optional text for searching for the end line
+
+      Old OpenMDAO lines of code go here.
 
     What the above will do is replace the directive and its args with the block of code
     containing the class for method1 on the left and the class for method2 on the right.
