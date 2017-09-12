@@ -72,15 +72,15 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         for t in system._var_abs_names['input']:
             tmeta = system._var_abs2meta['input'][t]
             idxs = tmeta['src_indices']
+            flat = tmeta['flat_src_indices']
             if idxs is None:
                 idxs = np.arange(np.prod(tmeta['shape']), dtype=int)
 
             if t in connections:
                 s = connections[t]
                 val = system._outputs[s]
-                if isinstance(val, np.ndarray) and idxs is not None:
-                    shape = val.shape
-                    val = system._outputs[s].flatten()[idxs].reshape(shape)
+                if isinstance(val, np.ndarray):
+                    val = system._outputs[s].flatten()[idxs]
                 else:
                     val = system._outputs[s]
 

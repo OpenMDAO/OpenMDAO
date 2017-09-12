@@ -225,10 +225,8 @@ class TestDesvarOnModel(unittest.TestCase):
 
         prob.model.add_design_var('junk')
 
-        prob.setup(check=False)
-
         with self.assertRaises(RuntimeError) as context:
-            prob.final_setup()
+            prob.setup(check=False)
 
         self.assertEqual(str(context.exception), "Output not found for design variable 'junk' in system ''.")
 
@@ -331,7 +329,6 @@ class TestDesvarOnModel(unittest.TestCase):
             prob.model.add_design_var('x', lower=0.0, upper=['a', 'b'],
                                       ref0=-100.0, ref=100)
 
-
 class TestConstraintOnModel(unittest.TestCase):
 
     def test_constraint_not_exist(self):
@@ -342,10 +339,9 @@ class TestConstraintOnModel(unittest.TestCase):
         prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.model.add_constraint('junk')
-        prob.setup(check=False)
 
         with self.assertRaises(RuntimeError) as context:
-            prob.final_setup()
+            prob.setup(check=False)
 
         self.assertEqual(str(context.exception), "Output not found for response 'junk' in system ''.")
 
@@ -528,10 +524,8 @@ class TestObjectiveOnModel(unittest.TestCase):
 
         prob.model.add_objective('junk')
 
-        prob.setup(check=False)
-
         with self.assertRaises(RuntimeError) as context:
-            prob.final_setup()
+            prob.setup(check=False)
 
         self.assertEqual(str(context.exception),
                          "Output not found for response 'junk' in system ''.")
