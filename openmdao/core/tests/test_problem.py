@@ -17,6 +17,23 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDeriv
 
 class TestProblem(unittest.TestCase):
 
+    def test_feature_simple_run_once_no_promote(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        model.add_subsystem('p2', IndepVarComp('y', -4.0))
+        model.add_subsystem('comp', Paraboloid())
+
+        model.connect('p1.x', 'comp.x')
+        model.connect('p2.y', 'comp.y')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.f_xy'], -15.0)
+
     def test_set_2d_array(self):
 
         prob = Problem(model=Group())

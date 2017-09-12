@@ -137,7 +137,36 @@ div.output_area pre {
     margin-bottom: 0px;
 }
 
-div.highlight-python pre{
+div.rosetta_left {
+    background-color: rgba(250, 219, 216, 1.0);
+    border-radius: 2px;
+    display: table-cell;
+    width: 50%
+}
+
+div.rosetta_right {
+    background-color: rgba(213, 245, 227, 1.0);
+    border-radius: 2px;
+    display: table-cell;
+    width: 50%
+}
+
+div.rosetta_left pre {
+    background-color: rgba(250, 219, 216, 1.0);
+    border: none;
+}
+
+div.rosetta_right pre {
+    background-color: rgba(213, 245, 227, 1.0);
+    border: none;
+}
+
+div.rosetta_outer {
+    display: table;
+    width: 100%
+}
+
+div.highlight-python {
   margin-top: 0px;
   margin-bottom: 0px;
 }
