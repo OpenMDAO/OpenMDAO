@@ -348,7 +348,7 @@ class MPITests(unittest.TestCase):
         # if USE_PROC_FILES is not set, solver convergence messages
         # should only appear on proc 0
         output = run_model(prob)
-        if self.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
+        if model.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
             self.assertTrue(output.count('\nNL: Newton Converged') == 1)
         else:
             self.assertTrue(output.count('\nNL: Newton Converged') == 0)
