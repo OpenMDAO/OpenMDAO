@@ -454,12 +454,10 @@ class WebRecorder(BaseRecorder):
         path = object_requesting_recording._system.pathname
         solver_class = type(object_requesting_recording).__name__
         id = "{}.{}".format(path, solver_class)
-        opts = pickle.dumps(object_requesting_recording.options,
-                            pickle.HIGHEST_PROTOCOL)
-        encoded_opts = base64.b64encode(opts)
-        self._record_solver_metadata(encoded_opts, solver_class)
+        
+        self._record_solver_metadata(object_requesting_recording.options, solver_class)
 
-    def _record_solver_metadata(self, encoded_opts, solver_class):
+    def _record_solver_metadata(self, opts, solver_class):
         """
         Record solver metadata.
 
@@ -470,6 +468,9 @@ class WebRecorder(BaseRecorder):
         solver_class : str
             The name of the solver class.
         """
+        opts = pickle.dumps(opts,
+                            pickle.HIGHEST_PROTOCOL)
+        encoded_opts = base64.b64encode(opts)
         solver_options_dict = {
             'options': encoded_opts.decode('ascii'),
         }
