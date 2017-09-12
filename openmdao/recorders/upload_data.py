@@ -1,4 +1,5 @@
 import sys
+import json
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.api import WebRecorder
 from pprint import pprint
@@ -7,44 +8,44 @@ def upload(sqlite_file, token, name=None, case_id=None):
     reader = SqliteCaseReader(sqlite_file)
     recorder = WebRecorder(token, name)
 
-    dataset = []
-    print('Data Uploader: Prepping driver iteration data')
-    _add_driver_iteration_to_list(dataset, reader.driver_cases, recorder)
+    print('Data Uploader: Recording driver iteration data')
+    _upload_driver_iterations(reader.driver_cases, recorder)
 
-    print('Data Uploader: Prepping system iteration data')
-    _add_system_iteration_to_list(dataset, reader.system_cases, recorder)
+    print('Data Uploader: Recording system iteration data')
+    _upload_system_iterations(reader.system_cases, recorder)
 
-    print('Data Uploader: Prepping solver iteration data')
-    _add_solver_iteration_to_list(dataset, reader.solver_cases, recorder)
+    print('Data Uploader: Recording solver iteration data')
+    _upload_solver_iterations(reader.solver_cases, recorder)
 
-    #sort so that the global iterations are the same (for debugging capabilites later on)
-    print('Data Uploader: Sorting')
-    dataset.sort(key=lambda x: x.counter)
+    recorder._record_driver_metadata('', json.dumps(reader.driver_metadata))
+    for item in reader.solver_metadata:
+        recorder._record_solver_metadata(reader.solver_metadata[item]['solver_options'],
+            reader.solver_metadata[item]['solver_class'], '')
 
-    dataset.append(reader.driver_metadata)
-    dataset.append(reader.solver_metadata)
+    # dataset.append(reader.driver_metadata)
+    # dataset.append(reader.solver_metadata)
 
-    print('Data Uploader: Recording data')
-    for data in dataset:
-        if str(type(data)) == "<class 'openmdao.recorders.case.SystemCase'>":
-            recorder._record_system_iteration(data.counter, data.iteration_coordinate,
-                    data.success, data.msg, data.inputs, data.outputs, data.residuals)
-        elif str(type(data)) == "<class 'openmdao.recorders.case.SolverCase'>":
-            recorder._record_solver_iteration(data.counter, data.iteration_coordinate,
-                data.success, data.msg, data.abs_err, data.rel_err, data.outputs,
-                data.residuals)
-        elif str(type(data)) == "<class 'openmdao.recorders.case.DriverCase'>":
-            recorder._record_driver_iteration(data.counter, data.iteration_coordinate,
-                data.success, data.msg, data.desvars_array, data.responses_array,
-                data.objectives_array, data.constraints_array)
-        elif 'tree' in data:
-            recorder._record_driver_metadata('', reader.driver_metadata)
+    # print('Data Uploader: Uploading to server')
+    # for data in dataset:
+    #     if str(type(data)) == "<class 'openmdao.recorders.case.SystemCase'>":
+    #         recorder._record_system_iteration(data.counter, data.iteration_coordinate,
+    #                 data.success, data.msg, data.inputs, data.outputs, data.residuals)
+    #     elif str(type(data)) == "<class 'openmdao.recorders.case.SolverCase'>":
+    #         recorder._record_solver_iteration(data.counter, data.iteration_coordinate,
+    #             data.success, data.msg, data.abs_err, data.rel_err, data.outputs,
+    #             data.residuals)
+    #     elif str(type(data)) == "<class 'openmdao.recorders.case.DriverCase'>":
+    #         recorder._record_driver_iteration(data.counter, data.iteration_coordinate,
+    #             data.success, data.msg, data.desvars_array, data.responses_array,
+    #             data.objectives_array, data.constraints_array)
+    #     elif 'tree' in data:
+    #         recorder._record_driver_metadata('', reader.driver_metadata)
         # else:
         #     for item in reader.solver_metadata:
         #         recorder._record_solver_metadata(reader.solver_metadata[item]['solver_options'],
         #             reader.solver_metadata[item]['solver_class'])
 
-def _add_system_iteration_to_list(dataset, new_list, recorder):
+def _upload_system_iterations(new_list, recorder):
     case_keys = new_list.list_cases()
     for case_key in case_keys:
         data = new_list.get_case(case_key)
@@ -73,9 +74,10 @@ def _add_system_iteration_to_list(dataset, new_list, recorder):
         data.inputs = inputs
         data.outputs = outputs
         data.residuals = residuals
-        dataset.append(data)
+        recorder._record_system_iteration(data.counter, data.iteration_coordinate,
+            data.success, data.msg, data.inputs, data.outputs, data.residuals)
 
-def _add_solver_iteration_to_list(dataset, new_list, recorder):
+def _upload_solver_iterations(new_list, recorder):
     case_keys = new_list.list_cases()
     for case_key in case_keys:
         data = new_list.get_case(case_key)
@@ -96,9 +98,11 @@ def _add_solver_iteration_to_list(dataset, new_list, recorder):
 
         data.outputs = outputs
         data.residuals = residuals
-        dataset.append(data)
+        recorder._record_solver_iteration(data.counter, data.iteration_coordinate,
+            data.success, data.msg, data.abs_err, data.rel_err, data.outputs,
+            data.residuals)
 
-def _add_driver_iteration_to_list(dataset, new_list, recorder):
+def _upload_driver_iterations(new_list, recorder):
     case_keys = new_list.list_cases()
     for case_key in case_keys:
         data = new_list.get_case(case_key)
@@ -135,13 +139,9 @@ def _add_driver_iteration_to_list(dataset, new_list, recorder):
         data.responses_array = responses_array
         data.objectives_array = objectives_array
         data.constraints_array = constraints_array
-        dataset.append(data)
-
-def _add_data_to_list(dataset, new_list):
-    case_keys = new_list.list_cases()
-    for case_key in case_keys:
-        data = new_list.get_case(case_key)
-        dataset.append(data)
+        recorder._record_driver_iteration(data.counter, data.iteration_coordinate,
+            data.success, data.msg, data.desvars_array, data.responses_array,
+            data.objectives_array, data.constraints_array)
 
 def _help():
     print("Upload Data\r\n\

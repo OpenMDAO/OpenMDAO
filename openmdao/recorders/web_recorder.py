@@ -451,13 +451,11 @@ class WebRecorder(BaseRecorder):
         object_requesting_recording: <Solver>
             The Solver that would like to record its metadata.
         """
-        path = object_requesting_recording._system.pathname
         solver_class = type(object_requesting_recording).__name__
-        id = "{}.{}".format(path, solver_class)
-        
-        self._record_solver_metadata(object_requesting_recording.options, solver_class)
+        path = object_requesting_recording._system.pathname
+        self._record_solver_metadata(object_requesting_recording.options, solver_class, path)
 
-    def _record_solver_metadata(self, opts, solver_class):
+    def _record_solver_metadata(self, opts, solver_class, path):
         """
         Record solver metadata.
 
@@ -475,6 +473,7 @@ class WebRecorder(BaseRecorder):
             'options': encoded_opts.decode('ascii'),
         }
 
+        id = "{}.{}".format(path, solver_class)
         solver_options = json.dumps(solver_options_dict)
         solver_metadata_dict = {
             'id': id,
