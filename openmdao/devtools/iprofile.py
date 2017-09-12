@@ -21,10 +21,9 @@ from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _coll
 
 
 def _prof_node(parts):
-    pathparts = parts[0].split('@')
+    pathparts = parts[0].split('-')
     return {
         'id': parts[0],
-        'short_name': pathparts[-1],
         'time': parts[2],
         'count': parts[3],
         'tot_time': 0.,
@@ -32,7 +31,7 @@ def _prof_node(parts):
         'pct_total': 0.,
         'tot_pct_total': 0.,
         'pct_parent': 0.,
-        'child_time': 0.,
+        #'child_time': 0.,
         'obj': parts[1],
         'depth': len(pathparts) - 1,
     }
@@ -162,7 +161,7 @@ def _instance_profile_callback(frame, event, arg):
         _, start, oldframe = _call_stack[-1]
         if oldframe is frame:
             final = etime()
-            path = '@'.join(s[0] for s in _call_stack)
+            path = '-'.join(s[0] for s in _call_stack)
             if path not in _inst_data:
                 _inst_data[path] = [path, frame.f_locals['self'], 0., 0]
 
@@ -188,7 +187,7 @@ def _finalize_profile():
     for funcpath, data in iteritems(_inst_data):
         _inst_data[funcpath] = _prof_node(data)
         data = _inst_data[funcpath]
-        parts = funcpath.rsplit('@', 1)
+        parts = funcpath.rsplit('-', 1)
         fname = parts[-1]
         if fname == '$total':
             continue
@@ -211,36 +210,36 @@ def _finalize_profile():
             _obj_map[fname] = '.'.join((name, "<%s.%s>" % (qclass, qname)))
 
     _obj_map['$total'] = '$total'
-    _obj_map['$parent'] = '$parent'
+#    _obj_map['$parent'] = '$parent'
 
-    # compute child times
-    for funcpath, data in iteritems(_inst_data):
-        parts = funcpath.rsplit('@', 1)
-        if len(parts) > 1:
-            _inst_data[parts[0]]['child_time'] += data['time']
+    # # compute child times
+    # for funcpath, data in iteritems(_inst_data):
+    #     parts = funcpath.rsplit('-', 1)
+    #     if len(parts) > 1:
+    #         _inst_data[parts[0]]['child_time'] += data['time']
 
-    # in order to make the D3 partition layout give accurate proportions, we can only put values
-    # into leaf nodes because the parent node values get overridden by the sum of the children. To
-    # get around this, we create a child for each non-leaf node with the name '$parent' and put the
-    # time exclusive to the parent into that child, so that when all of the children are summed, they'll
-    # add up to the correct time for the parent and the visual proportions of the parent will be correct.
-
-    # compute child timings
+    # # in order to make the D3 partition layout give accurate proportions, we can only put values
+    # # into leaf nodes because the parent node values get overridden by the sum of the children. To
+    # # get around this, we create a child for each non-leaf node with the name '$parent' and put the
+    # # time exclusive to the parent into that child, so that when all of the children are summed, they'll
+    # # add up to the correct time for the parent and the visual proportions of the parent will be correct.
+    #
+    # # compute child timings
     parnodes = []
-    for funcpath, node in iteritems(_inst_data):
-        if node['child_time'] > 0.:
-            parts = funcpath.split('@')
-            pparts = parts + ['$parent']
-            chname = '@'.join(pparts)
-            ex_child_node = _prof_node([chname, None, node['time'] - node['child_time'], 1])
-            parnodes.append((chname, ex_child_node))
+    # for funcpath, node in iteritems(_inst_data):
+    #     if node['child_time'] > 0.:
+    #         parts = funcpath.split('-')
+    #         pparts = parts + ['$parent']
+    #         chname = '-'.join(pparts)
+    #         ex_child_node = _prof_node([chname, None, node['time'] - node['child_time'], 1])
+    #         parnodes.append((chname, ex_child_node))
 
     rank = MPI.COMM_WORLD.rank if MPI else 0
 
     fname = os.path.basename(_profile_prefix)
     with open("%s.%d" % (fname, rank), 'w') as f:
         for name, data in chain(iteritems(_inst_data), parnodes):
-            new_name = '@'.join([_obj_map[s] for s in name.split('@')])
+            new_name = '-'.join([_obj_map[s] for s in name.split('-')])
             f.write("%s %d %f\n" % (new_name, data['count'], data['time']))
 
 
@@ -272,6 +271,7 @@ def process_profile(flist):
     totals = {}
 
     tree_nodes = {}
+    tree_parts = []
 
     for fname in flist:
         ext = os.path.splitext(fname)[1]
@@ -283,18 +283,18 @@ def process_profile(flist):
 
         for funcpath, count, t in _iter_raw_prof_file(fname):
 
-            parts = funcpath.split('@')
+            parts = funcpath.split('-')
 
             # for multi-file MPI profiles, decorate names with the rank
             if nfiles > 1 and dec:
                 parts = ["%s%s" % (p,dec) for p in parts]
-                funcpath = '@'.join(parts)
+                funcpath = '-'.join(parts)
 
             tree_nodes[funcpath] = node = _prof_node([funcpath, None, t, count])
 
             funcname = parts[-1]
-            if funcname == '$parent':
-                continue
+            # if funcname == '$parent':
+            #     continue
 
             if funcname in totals:
                 tnode = totals[funcname]
@@ -304,26 +304,27 @@ def process_profile(flist):
             tnode['tot_time'] += t
             tnode['tot_count'] += count
 
-    for funcpath, node in iteritems(tree_nodes):
-        parts = funcpath.rsplit('@', 1)
-        if parts[-1] != '$parent':
-            node['tot_time'] = totals[parts[-1]]['tot_time']
-            node['tot_count'] = totals[parts[-1]]['tot_count']
-            node['pct_parent'] = node['time'] / tree_nodes[parts[0]]['time']
-            node['pct_total'] = node['time'] / tree_nodes['$total']['time']
-            node['tot_pct_total'] = totals[parts[-1]]['tot_time'] / tree_nodes['$total']['time']
+            tree_parts.append((parts, node))
+
+    for parts, node in tree_parts:
+        short = parts[-1]
+        node['tot_time'] = totals[short]['tot_time']
+        node['tot_count'] = totals[short]['tot_count']
+        node['pct_parent'] = node['time'] / tree_nodes[parts[0]]['time']
+        node['pct_total'] = node['time'] / tree_nodes['$total']['time']
+        node['tot_pct_total'] = totals[short]['tot_time'] / tree_nodes['$total']['time']
         del node['obj']
-        del node['child_time']
+        #del node['child_time']
 
     tree_nodes['$total']['tot_time'] = tree_nodes['$total']['time']
 
-    for funcpath, node in iteritems(tree_nodes):
-        parts = funcpath.rsplit('@', 1)
-        # D3 sums up all children to get parent value, so we need to
-        # zero out the parent value else we get double the value we want
-        # once we add in all of the times from descendants.
-        if parts[-1] == '$parent':
-            tree_nodes[parts[0]]['time'] = 0.
+    # for funcpath, node in iteritems(tree_nodes):
+    #     parts = funcpath.rsplit('-', 1)
+    #     # D3 sums up all children to get parent value, so we need to
+    #     # zero out the parent value else we get double the value we want
+    #     # once we add in all of the times from descendants.
+    #     if parts[-1] == '$parent':
+    #         tree_nodes[parts[0]]['time'] = 0.
 
     return tree_nodes, totals
 
