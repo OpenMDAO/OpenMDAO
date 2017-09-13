@@ -138,26 +138,34 @@ div.output_area pre {
 }
 
 div.rosetta_left {
-    background-color: rgba(250, 219, 216, 1.0);
+    background-color: rgba(255, 238, 238, 1.0);
     border-radius: 2px;
     display: table-cell;
-    width: 50%
-}
+    width: 50%;
+    border-top: 2px solid #c9a;
+    border-bottom: 2px solid #c9a;
+    border-left: 1px solid #c9a;
+    border-right: 2px solid #c9a;
+  }
 
 div.rosetta_right {
-    background-color: rgba(213, 245, 227, 1.0);
+    background-color: rgba(238, 255, 238, 1.0);
     border-radius: 2px;
     display: table-cell;
-    width: 50%
+    width: 50%;
+    border-top: 2px solid #ac9;
+    border-bottom: 2px solid #ac9;
+    border-left: 1px solid #ac9;
+    border-right: 2px solid #ac9;
 }
 
 div.rosetta_left pre {
-    background-color: rgba(250, 219, 216, 1.0);
+    background-color: rgba(255, 238, 238, 1.0);
     border: none;
 }
 
 div.rosetta_right pre {
-    background-color: rgba(213, 245, 227, 1.0);
+    background-color: rgba(238, 255, 238, 1.0);
     border: none;
 }
 
