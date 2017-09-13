@@ -93,7 +93,7 @@ def setup(prefix='iprof', methods=None, prof_dir=None, finalize=True):
         methods = func_group['openmdao']
 
     rank = MPI.COMM_WORLD.rank if MPI else 0
-    _profile_out = open("%s.%d" % (_profile_prefix, rank), 'wb')
+    _profile_out = open("%s.%s" % (_profile_prefix, rank), 'wb')
 
     if finalize:
         atexit.register(_finalize_profile)
@@ -236,7 +236,7 @@ def _finalize_profile():
     rank = MPI.COMM_WORLD.rank if MPI else 0
 
     fname = os.path.basename(_profile_prefix)
-    with open("%s.%d" % (fname, rank), 'w') as f:
+    with open("%s.%s" % (fname, rank), 'w') as f:
         for name, data in chain(iteritems(_inst_data), parnodes):
             new_name = '@'.join([_obj_map[s] for s in name.split('@')])
             f.write("%s %d %f\n" % (new_name, data['count'], data['time']))
