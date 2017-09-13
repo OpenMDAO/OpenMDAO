@@ -69,12 +69,6 @@ class TestDataUploader(unittest.TestCase):
     solver_iterations = None
 
     def setUp(self):
-        if OPT is None:
-            raise unittest.SkipTest("pyoptsparse is not installed")
-
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SLSQP")
-
         recording_iteration.stack = []
         self.dir = mkdtemp()
         self.filename = os.path.join(self.dir, "sqlite_test")

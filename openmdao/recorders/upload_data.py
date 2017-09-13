@@ -4,8 +4,9 @@ Script for uploading data from a local sqlite file to the web server.
 
 import sys
 import json
-from openmdao.recorders.sqlite_reader import SqliteCaseReader
+import argparse
 from openmdao.api import WebRecorder
+from openmdao.recorders.sqlite_reader import SqliteCaseReader
 
 def upload(sqlite_file, token, name=None, case_id=None, suppress_output=False):
     """
@@ -18,9 +19,11 @@ def upload(sqlite_file, token, name=None, case_id=None, suppress_output=False):
     token : str
         The web recorder token.
     name : str
-        The name of the recording (defaults to None).abs
+        The name of the recording (defaults to None).
     case_id : str
         The case_id if this upload is intended to update a recording.
+    suppress_output : bool
+        Indicates whether or not the upload status should be printed.
     """
     reader = SqliteCaseReader(sqlite_file)
     recorder = WebRecorder(token, name)
@@ -173,30 +176,15 @@ def _upload_driver_iterations(new_list, recorder):
             data.success, data.msg, data.desvars, data.responses,
             data.objectives, data.constraints)
 
-def _help():
-    print("Upload Data\r\n\
-    Parameters: \r\n\
-        * sqlite_file_location - location of the original recording\r\n\
-        * token - the web token you use for the web recorder\r\n\
-        * name [optional] - the name of the recording\r\n\
-        * case_id [optional] - the ID of the case recording if you're simply updating data\r\n")
-
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print('Error: must pass in at least two arguments')
-        _help()
-    else:
-        sqlite_file = sys.argv[1]
-        token = sys.argv[2]
-        name = ''
-        case_id = ''
+    parser = argparse.ArgumentParser()
+    parser.add_argument("sqlite_file", help="the location of the sqlite file whose data\
+                        needs to be uploaded", type=str)
+    parser.add_argument("token", help="the web server token used for the web recorder",
+                        type=str)
+    parser.add_argument("-n", "--name", help="the name to give to this recording", type=str)
+    parser.add_argument("-c", "--case_id", help="the case ID if you want to update an existing \
+                        recording")
+    args = parser.parse_args()
 
-        if len(sys.argv) >= 4:
-            name = sys.argv[3]
-        if len(sys.argv) >= 5:
-            case_id = sys.argv[4]
-
-        print('Uploading data from ' + sqlite_file + ' to the web server')
-        print('name: ' + name + ', case_id: ' + case_id)
-
-        upload(sqlite_file, token, name, case_id)
+    upload(args.sqlite_file, args.token, args.name, args.case_id)
