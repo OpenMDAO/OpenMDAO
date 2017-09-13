@@ -114,11 +114,12 @@ var last_d = null;
 var rect;
 var tooltip;
 
-window.onresize = resize;
+window.onresize = function() {
+    resize();
+}
 
 function resize() {
     width = window.innerWidth;
-
     svg.attr("width", width);
     x = d3.scaleLinear()
         .range([0, width]);
@@ -136,10 +137,13 @@ function resize() {
 
 
 function click(d) {
-  last_d = null;
-  reload(d.depth, d.idx, function() {
-      resize();
+  reload(d.idx, function() {
       last_d = d;
+      width = window.innerWidth;
+      svg.attr("width", width);
+      x = d3.scaleLinear()
+            .range([0, width]);
+
       x.domain([d.x0, d.x1]);
       y.domain([d.y0, 1]).range([d.y0 ? 20 : 0, height]);
 
@@ -153,14 +157,15 @@ function click(d) {
 }
 
 
-function reload(depth, idx, callback) {
-    d3.json("/func/"+depth.toString()+"/"+idx.toString(),  function(data) {
+function reload(idx, callback) {
+    d3.json("/func/"+idx.toString(),  function(data) {
         tooltip = d3.selectAll("#tooltip")
             .style("display", "none");
 
-        svg = d3.select("body").append("svg")
-            .attr("width", width)
-            .attr("height", height);
+        x = d3.scaleLinear()
+            .range([0, width]);
+        y = d3.scaleLinear()
+            .range([0, height]);
 
         var funcpath = d3.select(".funcpath");
         var loctime = d3.select(".loctime");
@@ -172,19 +177,17 @@ function reload(depth, idx, callback) {
         var totpcttotal = d3.select(".totpcttotal")
 
         rect = d3.select("svg").selectAll("rect")
-            .data(data)
-            .enter().append("rect")
-            .attr("x", function(d) { return x(d.x0); })
-            .attr("y", function(d) { return y(d.y0); })
-            .attr("width", function(d) { return x(d.x1) - x(d.x0); })
-            .attr("height", function(d) { return y(d.y1) - y(d.y0); })
+              .data(data);
+
+        rect.exit().remove();
+
+        rect.enter().append("rect")
             .attr("fill", function(d) {
                 return color(d.id);
             })
-            .on("click", click)
             .on("mouseover", function(d) {
                 rect.attr("fill", function(dd) {
-                    if (d.id.split("-").slice(-1) === dd.id.split("-").slice(-1)) {
+                    if (d.id.split("-").slice(-1)[0] === dd.id.split("-").slice(-1)[0]) {
                         return "magenta";
                     }
                     else {
@@ -202,11 +205,12 @@ function reload(depth, idx, callback) {
                  return tooltip.style("display", "inline");
              })
             .on("mouseout", function(d) {
-                rect.attr("fill", function(d) {
-                    return color(d.id);
+                rect.attr("fill", function(dd) {
+                    return color(dd.id);
                 });
                  return tooltip.style("display", "none");
             })
+            .on("click", click)
             .on("mousemove", function(d) {
                 var newx;
                 var clientWidthO2 = tooltip.nodes()[0].clientWidth/2;
@@ -222,15 +226,24 @@ function reload(depth, idx, callback) {
                 return tooltip
                     .style("left", (newx) + "px")
                     .style("top", (d3.event.pageY + 20) + "px");
-            });
-        rect.exit().remove();
+            })
+            .merge(rect)
+            .attr("x", function(d) { return x(d.x0); })
+            .attr("y", function(d) { return y(d.y0); })
+            .attr("width", function(d) { return x(d.x1) - x(d.x0); })
+            .attr("height", function(d) { return y(d.y1) - y(d.y0); });
+
         callback();
     });
 };
 
 
 window.onload = function() {
-    reload(0, 0, resize);
+    width = window.innerWidth;
+    svg = d3.select("body").append("svg")
+        .attr("width", width)
+        .attr("height", height);
+    reload(0, resize);
 };
 
 </script>

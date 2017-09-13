@@ -210,35 +210,12 @@ def _finalize_profile():
             _obj_map[fname] = '.'.join((name, "<%s.%s>" % (qclass, qname)))
 
     _obj_map['$total'] = '$total'
-#    _obj_map['$parent'] = '$parent'
-
-    # # compute child times
-    # for funcpath, data in iteritems(_inst_data):
-    #     parts = funcpath.rsplit('-', 1)
-    #     if len(parts) > 1:
-    #         _inst_data[parts[0]]['child_time'] += data['time']
-
-    # # in order to make the D3 partition layout give accurate proportions, we can only put values
-    # # into leaf nodes because the parent node values get overridden by the sum of the children. To
-    # # get around this, we create a child for each non-leaf node with the name '$parent' and put the
-    # # time exclusive to the parent into that child, so that when all of the children are summed, they'll
-    # # add up to the correct time for the parent and the visual proportions of the parent will be correct.
-    #
-    # # compute child timings
-    parnodes = []
-    # for funcpath, node in iteritems(_inst_data):
-    #     if node['child_time'] > 0.:
-    #         parts = funcpath.split('-')
-    #         pparts = parts + ['$parent']
-    #         chname = '-'.join(pparts)
-    #         ex_child_node = _prof_node([chname, None, node['time'] - node['child_time'], 1])
-    #         parnodes.append((chname, ex_child_node))
 
     rank = MPI.COMM_WORLD.rank if MPI else 0
 
     fname = os.path.basename(_profile_prefix)
     with open("%s.%d" % (fname, rank), 'w') as f:
-        for name, data in chain(iteritems(_inst_data), parnodes):
+        for name, data in iteritems(_inst_data):
             new_name = '-'.join([_obj_map[s] for s in name.split('-')])
             f.write("%s %d %f\n" % (new_name, data['count'], data['time']))
 
