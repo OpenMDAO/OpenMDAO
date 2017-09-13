@@ -7,7 +7,7 @@ import json
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.api import WebRecorder
 
-def upload(sqlite_file, token, name=None, case_id=None):
+def upload(sqlite_file, token, name=None, case_id=None, suppress_output=False):
     """
     Upload sqlite recording to the web server.
 
@@ -25,19 +25,25 @@ def upload(sqlite_file, token, name=None, case_id=None):
     reader = SqliteCaseReader(sqlite_file)
     recorder = WebRecorder(token, name)
 
-    print('Data Uploader: Recording driver iteration data')
+    if not suppress_output:
+        print('Data Uploader: Recording driver iteration data')
     _upload_driver_iterations(reader.driver_cases, recorder)
 
-    print('Data Uploader: Recording system iteration data')
+    if not suppress_output:
+        print('Data Uploader: Recording system iteration data')
     _upload_system_iterations(reader.system_cases, recorder)
 
-    print('Data Uploader: Recording solver iteration data')
+    if not suppress_output:
+        print('Data Uploader: Recording solver iteration data')
     _upload_solver_iterations(reader.solver_cases, recorder)
 
-    recorder._record_driver_metadata('', json.dumps(reader.driver_metadata))
+    recorder._record_driver_metadata('Driver', json.dumps(reader.driver_metadata))
     for item in reader.solver_metadata:
         recorder._record_solver_metadata(reader.solver_metadata[item]['solver_options'],
             reader.solver_metadata[item]['solver_class'], '')
+
+    if not suppress_output:
+        print('Finished uploading')
 
 def _upload_system_iterations(new_list, recorder):
     """
@@ -130,42 +136,42 @@ def _upload_driver_iterations(new_list, recorder):
     case_keys = new_list.list_cases()
     for case_key in case_keys:
         data = new_list.get_case(case_key)
-        desvars_array = []
-        responses_array = []
-        objectives_array = []
-        constraints_array = []
-        if data.desvars_array != None:
-            for n in data.desvars_array.dtype.names:
-                desvars_array.append({
+        desvars = []
+        responses = []
+        objectives = []
+        constraints = []
+        if data.desvars != None:
+            for n in data.desvars.dtype.names:
+                desvars.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.outputs[n])
+                    'values': recorder.convert_to_list(data.desvars[n])
                 })
-        if data.responses_array != None:
-            for n in data.responses_array.dtype.names:
-                responses_array.append({
+        if data.responses != None:
+            for n in data.responses.dtype.names:
+                responses.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.residuals[n])
+                    'values': recorder.convert_to_list(data.responses[n])
                 })
-        if data.objectives_array != None:
-            for n in data.objectives_array.dtype.names:
-                objectives_array.append({
+        if data.objectives != None:
+            for n in data.objectives.dtype.names:
+                objectives.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.residuals[n])
+                    'values': recorder.convert_to_list(data.objectives[n])
                 })
-        if data.constraints_array != None:
-            for n in data.constraints_array.dtype.names:
-                constraints_array.append({
+        if data.constraints != None:
+            for n in data.constraints.dtype.names:
+                constraints.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.residuals[n])
+                    'values': recorder.convert_to_list(data.constraints[n])
                 })
 
-        data.desvars_array = desvars_array
-        data.responses_array = responses_array
-        data.objectives_array = objectives_array
-        data.constraints_array = constraints_array
+        data.desvars = desvars
+        data.responses = responses
+        data.objectives = objectives
+        data.constraints = constraints
         recorder._record_driver_iteration(data.counter, data.iteration_coordinate,
-            data.success, data.msg, data.desvars_array, data.responses_array,
-            data.objectives_array, data.constraints_array)
+            data.success, data.msg, data.desvars, data.responses,
+            data.objectives, data.constraints)
 
 def _help():
     print("Upload Data\r\n\
