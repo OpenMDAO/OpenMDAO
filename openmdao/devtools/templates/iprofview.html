@@ -137,7 +137,7 @@ function resize() {
 
 function click(d) {
   last_d = null;
-  reload(d.data.idx, function() {
+  reload(d.depth, d.idx, function() {
       resize();
       last_d = d;
       x.domain([d.x0, d.x1]);
@@ -153,8 +153,8 @@ function click(d) {
 }
 
 
-function reload(fidx, callback) {
-    d3.json("/func/"+fidx.toString(),  function(data) {
+function reload(depth, idx, callback) {
+    d3.json("/func/"+depth.toString()+"/"+idx.toString(),  function(data) {
         tooltip = d3.selectAll("#tooltip")
             .style("display", "none");
 
@@ -171,20 +171,6 @@ function reload(fidx, callback) {
         var pcttotal = d3.select(".pcttotal");
         var totpcttotal = d3.select(".totpcttotal")
 
-        var stratify = d3.stratify()
-            .parentId(function(d) { return d.id.substring(0, d.id.lastIndexOf("-")); });
-
-        var root = stratify(data)
-            .sum(function(d) { return d.time; })
-            .sort(function(a,b) { return b.value - a.value; });
-
-        var partition = d3.partition()
-            .padding(0);
-
-        partition(root);
-
-        var data = root.descendants();
-
         rect = d3.select("svg").selectAll("rect")
             .data(data)
             .enter().append("rect")
@@ -192,39 +178,32 @@ function reload(fidx, callback) {
             .attr("y", function(d) { return y(d.y0); })
             .attr("width", function(d) { return x(d.x1) - x(d.x0); })
             .attr("height", function(d) { return y(d.y1) - y(d.y0); })
-            .classed("hiderect", function(d) { return d.data.endsWith("$parent"); });
-
-        rect.exit().remove();
-
-        var crect = rect.select(function(d) {
-                return d.data.endsWith("$parent") ? null : this;
-            })
             .attr("fill", function(d) {
-                return color((d.children ? d : d.parent).id);
+                return color(d.id);
             })
             .on("click", click)
             .on("mouseover", function(d) {
-                crect.attr("fill", function(dd) {
-                    if (d.data.id.split("-").slice(-1) === dd.data.id.split("-").slice(-1)) {
+                rect.attr("fill", function(dd) {
+                    if (d.id.split("-").slice(-1) === dd.id.split("-").slice(-1)) {
                         return "magenta";
                     }
                     else {
-                        return color((dd.children ? dd : dd.parent).id);
+                        return color(dd.id);
                     }
                 });
-                 funcpath.text(d.data.id.split("-").slice(-1));
-                 loctime.text(formatTime(d.value));
-                 tottime.text(formatTime(d.data.tot_time));
-                 loccalls.text(formatCalls(d.data.count));
-                 totcalls.text(formatCalls(d.data.tot_count));
-                 pctparent.text(formatPct(d.data.pct_parent));
-                 pcttotal.text(formatPct(d.data.pct_total));
-                 totpcttotal.text(formatPct(d.data.tot_pct_total));
+                 funcpath.text(d.id.split("-").slice(-1));
+                 loctime.text(formatTime(d.time));
+                 tottime.text(formatTime(d.tot_time));
+                 loccalls.text(formatCalls(d.count));
+                 totcalls.text(formatCalls(d.tot_count));
+                 pctparent.text(formatPct(d.pct_parent));
+                 pcttotal.text(formatPct(d.pct_total));
+                 totpcttotal.text(formatPct(d.tot_pct_total));
                  return tooltip.style("display", "inline");
              })
             .on("mouseout", function(d) {
-                crect.attr("fill", function(d) {
-                    return color((d.children ? d : d.parent).id);
+                rect.attr("fill", function(d) {
+                    return color(d.id);
                 });
                  return tooltip.style("display", "none");
             })
@@ -244,13 +223,14 @@ function reload(fidx, callback) {
                     .style("left", (newx) + "px")
                     .style("top", (d3.event.pageY + 20) + "px");
             });
+        rect.exit().remove();
         callback();
     });
 };
 
 
 window.onload = function() {
-    reload(-1, resize);
+    reload(0, 0, resize);
 };
 
 </script>

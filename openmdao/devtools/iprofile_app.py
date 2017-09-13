@@ -30,15 +30,23 @@ def startThread(fn):
     thread.start()
     return thread
 
+def _parent_key(d):
+    parts = d['id'].rsplit('-', 1)
+    if len(parts) == 1:
+        return ''
+    return parts[0]
+
 def stratify(call_data, sortby='time'):
     """
     Group node data by depth and sort with a depth by time.
     """
     depth_groups = []
     node_dict = {}  # maps (depth, idx) to node data
-    keyfunc=lambda d: d['depth']
-    for key, group in groupby(sorted(call_data.values(), key=keyfunc), key=keyfunc):
-        # sort each depth group by sortby, highest to lowest
+    depthfunc=lambda d: d['depth']
+    for key, group in groupby(sorted(call_data.values(), key=depthfunc), key=depthfunc):
+        # now further group each group by parent, then sort those in descending order
+        # by 'sortby'
+        subdict = {key: list(sub) for key, sub in groupby(sorted(group, key=_parent_key), key=_parent_key)}
         depth_groups.append(sorted(group, key=lambda d: d[sortby], reverse=True))
 
     total = 0
@@ -46,22 +54,32 @@ def stratify(call_data, sortby='time'):
     delta_y = 1.0 / max_depth
     y = 0
     max_x = depth_groups[0][0][sortby]
+
     for depth, group in enumerate(depth_groups):
         y0 = delta_y * depth
         y1 = y0 + delta_y
-        start_x = 0
-        end_x = 0
+
+        child_x = {}
         for i, node in enumerate(group):
-            start_x = end_x
-            end_x += node[sortby]
+            parts = node['id'].rsplit('-', 1)
+            if len(parts) == 1:
+                child_x[''] = 0
+                parent = ''
+            else:
+                parent = parts[0]
+                if parent not in child_x:
+                    child_x[parent] = call_data[parent]['x0']
+            start_x = child_x[parent]
+            child_x[parent] = start_x + node[sortby]
             node['x0'] = start_x / max_x
-            node['x1'] = end_x / max_x
+            node['x1'] = child_x[parent] / max_x
             node['y0'] = y0
             node['y1'] = y1
-            node['idx'] = (depth, i)
+            node['idx'] = i
+            node_dict[(depth, i)] = node
 
-        # values = [(dat['y0'], dat['y1']) for dat in group[:2]]
-        # print("depth", depth, "data:", len(group), 'values:', values)
+        values = [(dat['x0'], dat['x1']) for dat in group[:3]]
+        print("depth", depth, "data:", len(group), 'values:', values)
 
     return depth_groups, node_dict
 
@@ -69,12 +87,12 @@ def stratify(call_data, sortby='time'):
 class Application(tornado.web.Application):
     def __init__(self, options):
         self.call_data, _ = process_profile(options.files)
+        self.depth_groups, self.node_dict = stratify(self.call_data)
         self.options = options
 
         # create a new data structure that is a dict keyed on root pathname,
         # where each value is a list of lists of node data stored by depth (index==depth).
         self.call_tree = tree = defaultdict(lambda : [None, {}])
-        self.idx2data = []  # map index to data
         for path, data in iteritems(self.call_data):
             data['id'] = path
             parts = path.rsplit('-', 1)
@@ -82,12 +100,10 @@ class Application(tornado.web.Application):
             if len(parts) > 1:
                 tree[parts[0]][1][path] = data
             tree[path][0] = data
-            data['idx'] = len(self.idx2data)
-            self.idx2data.append(tree[path])
 
         handlers = [
             (r"/", Index),
-            (r"/func/(-?[0-9]+)", Function),
+            (r"/func/([0-9]+)/([0-9]+)", Function),
         ]
 
         settings = dict(
@@ -97,16 +113,17 @@ class Application(tornado.web.Application):
 
         super(Application, self).__init__(handlers, **settings)
 
-    def get_nodes(self, idx):
+    def get_nodes(self, depth, idx):
         """
         Yield all children of the given root up to a depth of root depth + depth.
         """
-        if idx < 0:
+        if depth == 0:
             root = self.call_tree['$total']
         else:
-            root = self.idx2data[idx]
-
+            root = self.node_dict[(depth, idx)]
+            root = self.call_tree[root['id']]
         print("ROOT:", root[0]['id'])
+
         maxcalls = self.options.maxcalls
         stack = deque()
         stack.appendleft(root)
@@ -131,10 +148,10 @@ class Index(tornado.web.RequestHandler):
 
 
 class Function(tornado.web.RequestHandler):
-    def get(self, func_idx):
-        print("func: %s" % (func_idx,))
+    def get(self, depth, idx):
+        print("func: %s, %s" % (depth, idx))
         app = self.application
-        dump = json.dumps(list(app.get_nodes(int(func_idx))))
+        dump = json.dumps(list(app.get_nodes(int(depth), int(idx))))
         self.set_header('Content-Type', 'application/json')
         self.write(dump)
 
