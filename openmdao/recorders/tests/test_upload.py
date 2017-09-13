@@ -69,11 +69,11 @@ class TestDataUploader(unittest.TestCase):
     solver_iterations = None
 
     def setUp(self):
-        # if OPT is None:
-        #     raise unittest.SkipTest("pyoptsparse is not installed")
+        if OPT is None:
+            raise unittest.SkipTest("pyoptsparse is not installed")
 
-        # if OPTIMIZER is None:
-        #     raise unittest.SkipTest("pyoptsparse is not providing SLSQP")
+        if OPTIMIZER is None:
+            raise unittest.SkipTest("pyoptsparse is not providing SLSQP")
 
         recording_iteration.stack = []
         self.dir = mkdtemp()
@@ -281,6 +281,807 @@ class TestDataUploader(unittest.TestCase):
         self.assertEqual(driver_iteration_data['responses'], [])
         self.assertEqual(driver_iteration_data['objectives'], [])
         self.assertEqual(driver_iteration_data['constraints'], [])
+
+    def test_only_objectives_recorded(self, m):
+        self.setup_endpoints(m)
+
+        self.setup_sellar_model()
+
+        self.recorder.options['record_desvars'] = False
+        self.recorder.options['record_responses'] = False
+        self.recorder.options['record_objectives'] = True
+        self.recorder.options['record_constraints'] = False
+        self.prob.driver.add_recorder(self.recorder)
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+        upload(self.filename, self._accepted_token)
+
+        driver_iteration_data = json.loads(self.driver_iteration_data)
+        self.assertAlmostEqual(driver_iteration_data['objectives'][0]['values'][0], 28.5883082)
+        self.assertEqual(driver_iteration_data['objectives'][0]['name'], 'obj_cmp.obj')
+        self.assertEqual(driver_iteration_data['desvars'], [])
+        self.assertEqual(driver_iteration_data['responses'], [])
+        self.assertEqual(driver_iteration_data['constraints'], [])
+
+    def test_only_constraints_recorded(self, m):
+        self.setup_endpoints(m)
+
+        self.setup_sellar_model()
+
+        self.recorder.options['record_desvars'] = False
+        self.recorder.options['record_responses'] = False
+        self.recorder.options['record_objectives'] = False
+        self.recorder.options['record_constraints'] = True
+        self.prob.driver.add_recorder(self.recorder)
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+        upload(self.filename, self._accepted_token)
+
+        driver_iteration_data = json.loads(self.driver_iteration_data)
+        if driver_iteration_data['constraints'][0]['name'] == 'con_cmp1.con1':
+            self.assertAlmostEqual(driver_iteration_data['constraints'][0]['values'][0],
+                                   -22.42830237)
+            self.assertAlmostEqual(driver_iteration_data['constraints'][1]['values'][0],
+                                   -11.94151185)
+            self.assertEqual(driver_iteration_data['constraints'][1]['name'], 'con_cmp2.con2')
+            self.assertEqual(driver_iteration_data['constraints'][0]['name'], 'con_cmp1.con1')
+        elif driver_iteration_data['constraints'][0]['name'] == 'con_cmp2.con2':
+            self.assertAlmostEqual(driver_iteration_data['constraints'][1]['values'][0],
+                                   -22.42830237)
+            self.assertAlmostEqual(driver_iteration_data['constraints'][0]['values'][0],
+                                   -11.94151185)
+            self.assertEqual(driver_iteration_data['constraints'][0]['name'], 'con_cmp2.con2')
+            self.assertEqual(driver_iteration_data['constraints'][1]['name'], 'con_cmp1.con1')
+        else:
+            self.assertTrue(False, 'Driver iteration data did not contain\
+             the expected names for constraints')
+
+        self.assertEqual(driver_iteration_data['desvars'], [])
+        self.assertEqual(driver_iteration_data['objectives'], [])
+        self.assertEqual(driver_iteration_data['responses'], [])
+
+    def test_record_system(self, m):
+        self.setup_endpoints(m)
+
+        self.setup_sellar_model()
+
+        self.recorder.options['record_inputs'] = True
+        self.recorder.options['record_outputs'] = True
+        self.recorder.options['record_residuals'] = True
+        self.recorder.options['record_metadata'] = True
+
+        self.prob.model.add_recorder(self.recorder)
+
+        d1 = self.prob.model.get_subsystem('d1')  # instance of SellarDis1withDerivatives, a Group
+        d1.add_recorder(self.recorder)
+
+        obj_cmp = self.prob.model.get_subsystem('obj_cmp')  # an ExecComp
+        obj_cmp.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+        upload(self.filename, self._accepted_token)
+
+        system_iterations = json.loads(self.system_iterations)
+
+        inputs = [
+            {'name': 'd1.z', 'values': [5.0, 2.0]},
+            {'name': 'd1.x', 'values': [1.0]},
+            {'name': 'd2.z', 'values': [5.0, 2.0]},
+            {'name': 'd1.y2', 'values': [12.05848815]}
+        ]
+
+        outputs = [
+            {'name': 'd1.y1', 'values': [25.58830237]}
+        ]
+
+        residuals = [
+            {'name': 'd1.y1', 'values': [0.0]}
+        ]
+
+        for i in inputs:
+            self.assert_array_close(i, system_iterations['inputs'])
+        for o in outputs:
+            self.assert_array_close(o, system_iterations['outputs'])
+        for r in residuals:
+            self.assert_array_close(r, system_iterations['residuals'])
+
+        inputs = [
+            {'name': 'con_cmp2.y2', 'values': [12.058488150624356]},
+            {'name': 'obj_cmp.y1', 'values': [25.58830237000701]},
+            {'name': 'obj_cmp.x', 'values': [1.0]},
+            {'name': 'obj_cmp.z', 'values': [5.0, 2.0]}
+        ]
+
+        outputs = [
+            {'name': 'obj_cmp.obj', 'values': [28.58830816]}
+        ]
+
+        residuals = [
+            {'name': 'obj_cmp.obj', 'values': [0.0]}
+        ]
+
+        for i in inputs:
+            self.assert_array_close(i, system_iterations['inputs'])
+        for o in outputs:
+            self.assert_array_close(o, system_iterations['outputs'])
+        for r in residuals:
+            self.assert_array_close(r, system_iterations['residuals'])
+
+    def test_simple_driver_recording(self, m):
+        self.setup_endpoints(m)
+
+        if OPT is None:
+            raise unittest.SkipTest("pyoptsparse is not installed")
+
+        if OPTIMIZER is None:
+            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        model.suppress_solver_output = True
+
+        prob.driver = pyOptSparseDriver()
+
+        prob.driver.add_recorder(self.recorder)
+        self.recorder.options['record_desvars'] = True
+        self.recorder.options['record_responses'] = True
+        self.recorder.options['record_objectives'] = True
+        self.recorder.options['record_constraints'] = True
+
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+        prob.setup(check=False)
+
+        t0, t1 = run_driver(prob)
+
+        prob.cleanup()
+        upload(self.filename, self._accepted_token)
+
+        driver_iteration_data = json.loads(self.driver_iteration_data)
+
+        expected_desvars = [
+            {'name': 'p1.x', 'values': [7.1666666]},
+            {'name': 'p2.y', 'values': [-7.8333333]}
+        ]
+
+        expected_objectives = [
+            {'name': 'comp.f_xy', 'values': [-27.083333]}
+        ]
+
+        expected_constraints = [
+            {'name': 'con.c', 'values': [-15.0]}
+        ]
+
+        for d in expected_desvars:
+            self.assert_array_close(d, driver_iteration_data['desvars'])
+
+        for o in expected_objectives:
+            self.assert_array_close(o, driver_iteration_data['objectives'])
+
+        for c in expected_constraints:
+            self.assert_array_close(c, driver_iteration_data['constraints'])
+
+    def test_record_solver(self, m):
+        self.setup_endpoints(m)
+
+        self.setup_sellar_model()
+
+        self.recorder.options['record_abs_error'] = True
+        self.recorder.options['record_rel_error'] = True
+        self.recorder.options['record_solver_output'] = True
+        self.recorder.options['record_solver_residuals'] = True
+        self.prob.model._nonlinear_solver.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+        upload(self.filename, self._accepted_token)
+
+        expected_solver_output = [
+            {'name': 'con_cmp1.con1', 'values': [-22.42830237000701]},
+            {'name': 'd1.y1', 'values': [25.58830237000701]},
+            {'name': 'con_cmp2.con2', 'values': [-11.941511849375644]},
+            {'name': 'pz.z', 'values': [5.0, 2.0]},
+            {'name': 'obj_cmp.obj', 'values': [28.588308165163074]},
+            {'name': 'd2.y2', 'values': [12.058488150624356]},
+            {'name': 'px.x', 'values': [1.0]}
+        ]
+
+        expected_solver_residuals = [
+            {'name': 'con_cmp1.con1', 'values': [0.0]},
+            {'name': 'd1.y1', 'values': [1.318802844707534e-10]},
+            {'name': 'con_cmp2.con2', 'values': [0.0]},
+            {'name': 'pz.z', 'values': [0.0, 0.0]},
+            {'name': 'obj_cmp.obj', 'values': [0.0]},
+            {'name': 'd2.y2', 'values': [0.0]},
+            {'name': 'px.x', 'values': [0.0]}
+        ]
+
+        solver_iteration = json.loads(self.solver_iterations)
+
+        self.assertAlmostEqual(solver_iteration['abs_err'], 1.31880284470753394998e-10)
+        self.assertAlmostEqual(solver_iteration['rel_err'], 3.6299074030587596e-12)
+
+        for o in expected_solver_output:
+            self.assert_array_close(o, solver_iteration['solver_output'])
+
+        for r in expected_solver_residuals:
+            self
+
+    def test_record_line_search_armijo_goldstein(self, m):
+        self.setup_endpoints(m)
+        self.setup_sellar_model()
+
+        model = self.prob.model
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
+
+        model._nonlinear_solver.options['solve_subsystems'] = True
+        model._nonlinear_solver.options['max_sub_solves'] = 4
+        ls = model._nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+
+        # This is pretty bogus, but it ensures that we get a few LS iterations.
+        ls.options['c'] = 100.0
+        ls.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+        upload(self.filename, self._accepted_token)
+
+        expected_abs_error = 3.49773898733e-9
+        expected_rel_error = expected_abs_error / 2.9086436370499857e-08
+
+        solver_iteration = json.loads(self.solver_iterations)
+
+        self.assertAlmostEqual(solver_iteration['abs_err'], expected_abs_error)
+        self.assertAlmostEqual(solver_iteration['rel_err'], expected_rel_error)
+        self.assertEqual(solver_iteration['solver_output'], [])
+        self.assertEqual(solver_iteration['solver_residuals'], [])
+
+    def test_record_line_search_bounds_enforce(self, m):
+        self.setup_endpoints(m)
+        self.setup_sellar_model()
+
+        model = self.prob.model
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
+
+        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['max_sub_solves'] = 4
+        ls = model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
+
+        ls.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+        upload(self.filename, self._accepted_token)
+
+        expected_abs_error = 7.02783609310096e-10
+        expected_rel_error = 8.078674883382422e-07
+
+        solver_iteration = json.loads(self.solver_iterations)
+        self.assertAlmostEqual(solver_iteration['abs_err'], expected_abs_error)
+        self.assertAlmostEqual(solver_iteration['rel_err'], expected_rel_error)
+        self.assertEqual(solver_iteration['solver_output'], [])
+        self.assertEqual(solver_iteration['solver_residuals'], [])
+
+    def test_record_solver_nonlinear_block_gs(self, m):
+        self.setup_endpoints(m)
+        self.setup_sellar_model()
+
+        self.prob.model.nonlinear_solver = NonlinearBlockGS()
+        self.prob.model.nonlinear_solver.add_recorder(self.recorder)
+
+        self.recorder.options['record_solver_output'] = True
+        self.recorder.options['record_solver_residuals'] = True
+
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+        upload(self.filename, self._accepted_token)
+
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NonlinearBlockGS', (6, )]
+        expected_abs_error = 1.31880284470753394998e-10
+        expected_rel_error = 3.6299074030587596e-12
+
+        expected_solver_output = [
+            {'name': 'px.x', 'values': [1.0]},
+            {'name': 'pz.z', 'values': [5., 2.]},
+            {'name': 'd1.y1', 'values': [25.58830237]},
+            {'name': 'd2.y2', 'values': [12.05848815]},
+            {'name': 'obj_cmp.obj', 'values': [28.58830817]},
+            {'name': 'con_cmp1.con1', 'values': [-22.42830237]},
+            {'name': 'con_cmp2.con2', 'values': [-11.94151185]}
+        ]
+
+        expected_solver_residuals = [
+            {'name': 'px.x', 'values': [-0]},
+            {'name': 'pz.z', 'values': [-0., -0.]},
+            {'name': 'd1.y1', 'values': [1.31880284e-10]},
+            {'name': 'd2.y2', 'values': [0.]},
+            {'name': 'obj_cmp.obj', 'values': [0.]},
+            {'name': 'con_cmp1.con1', 'values': [0.]},
+            {'name': 'con_cmp2.con2', 'values': [0.]},
+        ]
+
+        solver_iteration = json.loads(self.solver_iterations)
+
+        self.assertAlmostEqual(solver_iteration['abs_err'], expected_abs_error)
+        self.assertAlmostEqual(solver_iteration['rel_err'], expected_rel_error)
+
+        for o in expected_solver_output:
+            self.assert_array_close(o, solver_iteration['solver_output'])
+
+        for r in expected_solver_residuals:
+            self.assert_array_close(r, solver_iteration['solver_residuals'])
+
+    def test_record_solver_nonlinear_block_jac(self, m):
+        self.setup_endpoints(m)
+        self.setup_sellar_model()
+
+        self.prob.model.nonlinear_solver = NonlinearBlockJac()
+        self.prob.model.nonlinear_solver.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+        upload(self.filename, self._accepted_token)
+
+        solver_iteration = json.loads(self.solver_iterations)
+
+        expected_abs_error = 7.234027587097439e-07
+        expected_rel_error = 1.991112651729199e-08
+        self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
+        self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
+        self.assertEqual(solver_iteration['solver_residuals'], [])
+        self.assertEqual(solver_iteration['solver_output'], [])
+
+    def test_record_solver_nonlinear_newton(self, m):
+        self.setup_endpoints(m)
+        self.setup_sellar_model()
+
+        self.prob.model.nonlinear_solver = NewtonSolver()
+        self.prob.model.nonlinear_solver.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+        upload(self.filename, self._accepted_token)
+
+        solver_iteration = json.loads(self.solver_iterations)
+
+        expected_abs_error = 5.041402548755789e-06
+        expected_rel_error = 1.3876088080160474e-07
+        self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
+        self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
+        self.assertEqual(solver_iteration['solver_residuals'], [])
+        self.assertEqual(solver_iteration['solver_output'], [])
+
+    def test_record_solver_nonlinear_nonlinear_run_once(self, m):
+        self.setup_endpoints(m)
+        self.setup_sellar_model()
+
+        self.prob.model.nonlinear_solver = NonLinearRunOnce()
+        self.prob.model.nonlinear_solver.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+        upload(self.filename, self._accepted_token)
+
+        # No norms so no expected norms
+        expected_abs_error = 0.0
+        expected_rel_error = 0.0
+        expected_solver_residuals = None
+        expected_solver_output = None
+
+        solver_iteration = json.loads(self.solver_iterations)
+
+        self.assertEqual(expected_abs_error, solver_iteration['abs_err'])
+        self.assertEqual(expected_rel_error, solver_iteration['rel_err'])
+        self.assertEqual(solver_iteration['solver_residuals'], [])
+        self.assertEqual(solver_iteration['solver_output'], [])
+
+    def test_record_solver_linear_direct_solver(self, m):
+        self.setup_endpoints(m)
+        self.setup_sellar_model()
+
+        self.prob.model.nonlinear_solver = NewtonSolver()
+        # used for analytic derivatives
+        self.prob.model.nonlinear_solver.linear_solver = DirectSolver()
+
+        self.recorder.options['record_abs_error'] = True
+        self.recorder.options['record_rel_error'] = True
+        self.recorder.options['record_solver_output'] = True
+        self.recorder.options['record_solver_residuals'] = True
+        self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+        t0, t1 = run_driver(self.prob)
+
+        expected_solver_output = [
+            {'name': 'px.x', 'values': [0.0]},
+            {'name': 'pz.z', 'values': [0.0, 0.0]},
+            {'name': 'd1.y1', 'values': [0.00045069]},
+            {'name': 'd2.y2', 'values': [-0.00225346]},
+            {'name': 'obj_cmp.obj', 'values': [0.00045646]},
+            {'name': 'con_cmp1.con1', 'values': [-0.00045069]},
+            {'name': 'con_cmp2.con2', 'values': [-0.00225346]},
+        ]
+
+        expected_solver_residuals = [
+            {'name': 'px.x', 'values': [0.0]},
+            {'name': 'pz.z', 'values': [-0., -0.]},
+            {'name': 'd1.y1', 'values': [0.0]},
+            {'name': 'd2.y2', 'values': [-0.00229801]},
+            {'name': 'obj_cmp.obj', 'values': [5.75455956e-06]},
+            {'name': 'con_cmp1.con1', 'values': [-0.]},
+            {'name': 'con_cmp2.con2', 'values': [-0.]},
+        ]
+        upload(self.filename, self._accepted_token)
+
+        solver_iteration = json.loads(self.solver_iterations)
+
+        self.assertAlmostEqual(0.0, solver_iteration['abs_err'])
+        self.assertAlmostEqual(0.0, solver_iteration['rel_err'])
+
+        for o in expected_solver_output:
+            self.assert_array_close(o, solver_iteration['solver_output'])
+
+        for r in expected_solver_residuals:
+            self.assert_array_close(r, solver_iteration['solver_residuals'])
+
+    def test_record_solver_linear_scipy_iterative_solver(self, m):
+        self.setup_endpoints(m)
+        self.setup_sellar_model()
+
+        self.prob.model.nonlinear_solver = NewtonSolver()
+        # used for analytic derivatives
+        self.prob.model.nonlinear_solver.linear_solver = ScipyIterativeSolver()
+
+        self.recorder.options['record_abs_error'] = True
+        self.recorder.options['record_rel_error'] = True
+        self.recorder.options['record_solver_output'] = True
+        self.recorder.options['record_solver_residuals'] = True
+        self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+        t0, t1 = run_driver(self.prob)
+
+        expected_abs_error = 0.0
+        expected_rel_error = 0.0
+
+        expected_solver_output = [
+            {'name': 'px.x', 'values': [0.0]},
+            {'name': 'pz.z', 'values': [0.0, 0.0]},
+        ]
+
+        upload(self.filename, self._accepted_token)
+        solver_iteration = json.loads(self.solver_iterations)
+
+        self.assertAlmostEqual(0.0, solver_iteration['abs_err'])
+        self.assertAlmostEqual(0.0, solver_iteration['rel_err'])
+
+        for o in expected_solver_output:
+            self.assert_array_close(o, solver_iteration['solver_output'])
+
+    def test_record_solver_linear_block_gs(self, m):
+        self.setup_endpoints(m)
+        self.setup_sellar_model()
+
+        self.prob.model.nonlinear_solver = NewtonSolver()
+        # used for analytic derivatives
+        self.prob.model.nonlinear_solver.linear_solver = LinearBlockGS()
+
+        self.recorder.options['record_abs_error'] = True
+        self.recorder.options['record_rel_error'] = True
+        self.recorder.options['record_solver_output'] = True
+        self.recorder.options['record_solver_residuals'] = True
+        self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+        t0, t1 = run_driver(self.prob)
+        upload(self.filename, self._accepted_token)
+
+        solver_iteration = json.loads(self.solver_iterations)
+        expected_abs_error = 9.109083208861876e-11
+        expected_rel_error = 9.114367543620551e-12
+
+        expected_solver_output = [
+            {'name': 'px.x', 'values': [0.0]},
+            {'name': 'pz.z', 'values': [0.0, 0.0]},
+            {'name': 'd1.y1', 'values': [0.00045069]},
+            {'name': 'd2.y2', 'values': [-0.00225346]},
+            {'name': 'obj_cmp.obj', 'values': [0.00045646]},
+            {'name': 'con_cmp1.con1', 'values': [-0.00045069]},
+            {'name': 'con_cmp2.con2', 'values': [-0.00225346]},
+        ]
+
+        self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
+        self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
+
+        for o in expected_solver_output:
+            self.assert_array_close(o, solver_iteration['solver_output'])
+
+    def test_record_solver_linear_linear_run_once(self, m):
+        self.setup_endpoints(m)
+        # raise unittest.SkipTest("Linear Solver recording not working yet")
+        self.setup_sellar_model()
+
+        self.prob.model.nonlinear_solver = NewtonSolver()
+        # used for analytic derivatives
+        self.prob.model.nonlinear_solver.linear_solver = LinearRunOnce()
+
+        self.recorder.options['record_abs_error'] = True
+        self.recorder.options['record_rel_error'] = True
+        self.recorder.options['record_solver_output'] = True
+        self.recorder.options['record_solver_residuals'] = True
+        self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+        t0, t1 = run_driver(self.prob)
+        upload(self.filename, self._accepted_token)
+
+        solver_iteration = json.loads(self.solver_iterations)
+        expected_abs_error = 0.0
+        expected_rel_error = 0.0
+
+        expected_solver_output = [
+            {'name': 'px.x', 'values': [0.0]},
+            {'name': 'pz.z', 'values': [0.0, 0.0]},
+            {'name': 'd1.y1', 'values': [-4.15366975e-05]},
+            {'name': 'd2.y2', 'values': [-4.10568454e-06]},
+            {'name': 'obj_cmp.obj', 'values': [-4.15366737e-05]},
+            {'name': 'con_cmp1.con1', 'values': [4.15366975e-05]},
+            {'name': 'con_cmp2.con2', 'values': [-4.10568454e-06]},
+        ]
+
+        self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
+        self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
+
+        for o in expected_solver_output:
+            self.assert_array_close(o, solver_iteration['solver_output'])
+
+    def test_record_solver_linear_block_jac(self, m):
+        self.setup_endpoints(m)
+        self.setup_sellar_model()
+
+        self.prob.model.nonlinear_solver = NewtonSolver()
+        # used for analytic derivatives
+        self.prob.model.nonlinear_solver.linear_solver = LinearBlockJac()
+
+        self.recorder.options['record_abs_error'] = True
+        self.recorder.options['record_rel_error'] = True
+        self.recorder.options['record_solver_output'] = True
+        self.recorder.options['record_solver_residuals'] = True
+        self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+        t0, t1 = run_driver(self.prob)
+        upload(self.filename, self._accepted_token)
+
+        solver_iteration = json.loads(self.solver_iterations)
+        expected_abs_error = 9.947388408259769e-11
+        expected_rel_error = 4.330301334141486e-08
+
+        expected_solver_output = [
+            {'name': 'px.x', 'values': [0.0]},
+            {'name': 'pz.z', 'values': [0.0, 0.0]},
+            {'name': 'd1.y1', 'values': [4.55485639e-09]},
+            {'name': 'd2.y2', 'values': [-2.27783334e-08]},
+            {'name': 'obj_cmp.obj', 'values': [-2.28447051e-07]},
+            {'name': 'con_cmp1.con1', 'values': [2.28461863e-07]},
+            {'name': 'con_cmp2.con2', 'values': [-2.27742837e-08]},
+        ]
+
+        self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
+        self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
+
+        for o in expected_solver_output:
+            self.assert_array_close(o, solver_iteration['solver_output'])
+
+    def test_record_driver_system_solver(self, m):
+        # Test what happens when all three types are recorded:
+        #    Driver, System, and Solver
+        self.setup_endpoints(m)
+        if OPT is None:
+            raise unittest.SkipTest("pyoptsparse is not installed")
+
+        if OPTIMIZER is None:
+            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
+
+        self.setup_sellar_grouped_model()
+
+        self.prob.driver = pyOptSparseDriver()
+        self.prob.driver.options['optimizer'] = OPTIMIZER
+        self.prob.driver.opt_settings['ACC'] = 1e-9
+
+        self.recorder.options['record_metadata'] = True
+
+        # Add recorders
+        # Driver
+        self.prob.driver.add_recorder(self.recorder)
+        # System
+        pz = self.prob.model.get_subsystem('pz')  # IndepVarComp which is an ExplicitComponent
+        pz.add_recorder(self.recorder)
+        # Solver
+        mda = self.prob.model.get_subsystem('mda')
+        mda.nonlinear_solver.add_recorder(self.recorder)
+
+        # Driver
+        self.recorder.options['record_desvars'] = True
+        self.recorder.options['record_responses'] = True
+        self.recorder.options['record_objectives'] = True
+        self.recorder.options['record_constraints'] = True
+
+        # System
+        self.recorder.options['record_inputs'] = True
+        self.recorder.options['record_outputs'] = True
+        self.recorder.options['record_residuals'] = True
+
+        # Solver
+        self.recorder.options['record_abs_error'] = True
+        self.recorder.options['record_rel_error'] = True
+        self.recorder.options['record_solver_output'] = True
+        self.recorder.options['record_solver_residuals'] = True
+
+        self.prob.setup(check=False, mode='rev')
+        t0, t1 = run_driver(self.prob)
+        self.prob.cleanup()
+        upload(self.filename, self._accepted_token)
+
+        # Driver recording test
+        coordinate = [0, 'SLSQP', (7, )]
+
+        expected_desvars = [
+            {'name': 'pz.z', 'values': self.prob['pz.z']},
+            {'name': 'px.x', 'values': self.prob['px.x']}
+        ]
+
+        expected_objectives = [
+            {'name': 'obj_cmp.obj', 'values': self.prob['obj_cmp.obj']}
+        ]
+
+        expected_constraints = [
+            {'name': 'con_cmp1.con1', 'values': self.prob['con_cmp1.con1']},
+            {'name': 'con_cmp2.con2', 'values': self.prob['con_cmp2.con2']}
+        ]
+
+        driver_iteration_data = json.loads(self.driver_iteration_data)
+
+        for d in expected_desvars:
+            self.assert_array_close(d, driver_iteration_data['desvars'])
+
+        for o in expected_objectives:
+            self.assert_array_close(o, driver_iteration_data['objectives'])
+
+        for c in expected_constraints:
+            self.assert_array_close(c, driver_iteration_data['constraints'])
+
+        # System recording test
+        expected_inputs = []
+        expected_outputs = [{'name': 'pz.z', 'values': [1.97764, -1.13287e-15]}]
+        expected_residuals = [{'name': 'pz.z', 'values': [0.0, 0.0]}]
+
+        system_iteration = json.loads(self.system_iterations)
+
+        self.assertEqual(expected_inputs, system_iteration['inputs'])
+
+        for o in expected_outputs:
+            self.assert_array_close(o, system_iteration['outputs'])
+
+        for r in expected_residuals:
+            self.assert_array_close(r, system_iteration['residuals'])
+
+        # Solver recording test
+        expected_abs_error = 3.90598e-11
+        expected_rel_error = 1.037105199e-6
+
+        expected_solver_output = [
+            {'name': 'mda.d2.y2', 'values': [3.75527777]},
+            {'name': 'mda.d1.y1', 'values': [3.16]}
+        ]
+
+        expected_solver_residuals = [
+            {'name': 'mda.d2.y2', 'values': [0.0]},
+            {'name': 'mda.d1.y1', 'values': [0.0]}
+        ]
+
+        solver_iteration = json.loads(self.solver_iterations)
+
+        self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
+        self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
+
+        for o in expected_solver_output:
+            self.assert_array_close(o, solver_iteration['solver_output'])
+
+        for r in expected_solver_residuals:
+            self.assert_array_close(r, solver_iteration['solver_residuals'])
+
+    def test_implicit_component(self, m):
+        self.setup_endpoints(m)
+        from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
+        group = Group()
+        group.add_subsystem('comp1', IndepVarComp([('a', 1.0), ('b', 1.0), ('c', 1.0)]))
+        group.add_subsystem('comp2', QuadraticLinearize())
+        group.add_subsystem('comp3', QuadraticJacVec())
+        group.connect('comp1.a', 'comp2.a')
+        group.connect('comp1.b', 'comp2.b')
+        group.connect('comp1.c', 'comp2.c')
+        group.connect('comp1.a', 'comp3.a')
+        group.connect('comp1.b', 'comp3.b')
+        group.connect('comp1.c', 'comp3.c')
+
+        prob = Problem(model=group)
+        prob.setup(check=False)
+
+        prob['comp1.a'] = 1.
+        prob['comp1.b'] = -4.
+        prob['comp1.c'] = 3.
+
+        comp2 = prob.model.get_subsystem('comp2')  # ImplicitComponent
+        comp2.add_recorder(self.recorder)
+
+        t0, t1 = run_driver(prob)
+        prob.cleanup()
+        upload(self.filename, self._accepted_token)
+
+        expected_inputs = [
+            {'name': 'comp2.a', 'values': [1.0]},
+            {'name': 'comp2.b', 'values': [-4.0]},
+            {'name': 'comp2.c', 'values': [3.0]}
+        ]
+        expected_outputs = [{'name': 'comp2.x', 'values': [3.0]}]
+        expected_residuals = [{'name': 'comp2.x', 'values': [0.0]}]
+
+        system_iteration = json.loads(self.system_iterations)
+
+        for i in expected_inputs:
+            self.assert_array_close(i, system_iteration['inputs'])
+
+        for r in expected_residuals:
+            self.assert_array_close(r, system_iteration['residuals'])
+
+        for o in expected_outputs:
+            self.assert_array_close(o, system_iteration['outputs'])
 
 if __name__ == "__main__":
     unittest.main()
