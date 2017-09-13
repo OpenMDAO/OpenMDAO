@@ -1,10 +1,27 @@
+"""
+Script for uploading data from a local sqlite file to the web server.
+"""
+
 import sys
 import json
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.api import WebRecorder
-from pprint import pprint
 
 def upload(sqlite_file, token, name=None, case_id=None):
+    """
+    Upload sqlite recording to the web server.
+
+    Parameters
+    ----------
+    sqlite_file : str
+        The location of the sqlite file.
+    token : str
+        The web recorder token.
+    name : str
+        The name of the recording (defaults to None).abs
+    case_id : str
+        The case_id if this upload is intended to update a recording.
+    """
     reader = SqliteCaseReader(sqlite_file)
     recorder = WebRecorder(token, name)
 
@@ -22,30 +39,17 @@ def upload(sqlite_file, token, name=None, case_id=None):
         recorder._record_solver_metadata(reader.solver_metadata[item]['solver_options'],
             reader.solver_metadata[item]['solver_class'], '')
 
-    # dataset.append(reader.driver_metadata)
-    # dataset.append(reader.solver_metadata)
-
-    # print('Data Uploader: Uploading to server')
-    # for data in dataset:
-    #     if str(type(data)) == "<class 'openmdao.recorders.case.SystemCase'>":
-    #         recorder._record_system_iteration(data.counter, data.iteration_coordinate,
-    #                 data.success, data.msg, data.inputs, data.outputs, data.residuals)
-    #     elif str(type(data)) == "<class 'openmdao.recorders.case.SolverCase'>":
-    #         recorder._record_solver_iteration(data.counter, data.iteration_coordinate,
-    #             data.success, data.msg, data.abs_err, data.rel_err, data.outputs,
-    #             data.residuals)
-    #     elif str(type(data)) == "<class 'openmdao.recorders.case.DriverCase'>":
-    #         recorder._record_driver_iteration(data.counter, data.iteration_coordinate,
-    #             data.success, data.msg, data.desvars_array, data.responses_array,
-    #             data.objectives_array, data.constraints_array)
-    #     elif 'tree' in data:
-    #         recorder._record_driver_metadata('', reader.driver_metadata)
-        # else:
-        #     for item in reader.solver_metadata:
-        #         recorder._record_solver_metadata(reader.solver_metadata[item]['solver_options'],
-        #             reader.solver_metadata[item]['solver_class'])
-
 def _upload_system_iterations(new_list, recorder):
+    """
+    Upload all system iterations to the web server.
+
+    Parameters
+    ----------
+    new_list : [SystemCase]
+        The list of system case data from the reader.
+    recorder : WebRecorder
+        The web recorder used to upload this data.
+    """
     case_keys = new_list.list_cases()
     for case_key in case_keys:
         data = new_list.get_case(case_key)
@@ -78,6 +82,16 @@ def _upload_system_iterations(new_list, recorder):
             data.success, data.msg, data.inputs, data.outputs, data.residuals)
 
 def _upload_solver_iterations(new_list, recorder):
+    """
+    Upload all slver iterations to the web server.
+
+    Parameters
+    ----------
+    new_list : [SolverCase]
+        The list of solver case data from the reader.
+    recorder : WebRecorder
+        The web recorder used to upload this data.
+    """
     case_keys = new_list.list_cases()
     for case_key in case_keys:
         data = new_list.get_case(case_key)
@@ -103,6 +117,16 @@ def _upload_solver_iterations(new_list, recorder):
             data.residuals)
 
 def _upload_driver_iterations(new_list, recorder):
+    """
+    Upload all driver iterations to the web server.
+
+    Parameters
+    ----------
+    new_list : [DriverCase]
+        The list of driver case data from the reader.
+    recorder : WebRecorder
+        The web recorder used to upload this data.
+    """
     case_keys = new_list.list_cases()
     for case_key in case_keys:
         data = new_list.get_case(case_key)
