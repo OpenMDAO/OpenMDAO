@@ -20,6 +20,7 @@ from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, N
 from openmdao.core.problem import Problem
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.utils.record_util import format_iteration_coordinate
+from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.web_recorder import format_version
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
@@ -68,6 +69,7 @@ class TestServerRecorder(unittest.TestCase):
     solver_iterations = None
 
     def setUp(self):
+        recording_iteration.stack = []  # reset to avoid problems with earlier tests
         super(TestServerRecorder, self).setUp()
 
     def assert_array_close(self, test_val, comp_set):
@@ -359,13 +361,7 @@ class TestServerRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        system_metadata = json.loads(self.system_metadata)
         system_iterations = json.loads(self.system_iterations)
-        scaling_facts_raw = system_metadata['scaling_factors']
-        scaling_facts_ascii = scaling_facts_raw.encode('ascii')
-        scaling_facts_base64 = base64.b64decode(scaling_facts_ascii)
-        scaling_facts = pickle.loads(scaling_facts_base64)
-        system_metadata['scaling_factors'] = scaling_facts
 
         inputs = [
             {'name': 'd1.z', 'values': [5.0, 2.0]},
@@ -549,7 +545,7 @@ class TestServerRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        expected_abs_error = model._residuals.get_norm()
+        expected_abs_error = 3.49773898733e-9
         expected_rel_error = expected_abs_error / 2.9086436370499857e-08
 
         solver_iteration = json.loads(self.solver_iterations)

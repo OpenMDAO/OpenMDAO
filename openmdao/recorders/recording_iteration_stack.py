@@ -1,7 +1,13 @@
 """Management of iteration stack for recording."""
 from openmdao.utils.mpi import MPI
 
-recording_iteration_stack = []
+
+class _RecIteration(object):
+    def __init__(self):
+        self.stack = []
+
+
+recording_iteration = _RecIteration()
 
 
 def print_recording_iteration_stack():
@@ -11,7 +17,7 @@ def print_recording_iteration_stack():
     Used for debugging.
     """
     print()
-    for name, iter_count in reversed(recording_iteration_stack):
+    for name, iter_count in reversed(recording_iteration.stack):
         print('^^^', name, iter_count)
     print(60 * '^')
 
@@ -25,7 +31,7 @@ def get_formatted_iteration_coordinate():
     separator = '|'
     iteration_coord_list = []
 
-    for name, iter_count in recording_iteration_stack:
+    for name, iter_count in recording_iteration.stack:
         iteration_coord_list.append('{}{}{}'.format(name, separator, iter_count))
 
     if MPI and MPI.COMM_WORLD.rank > 0:
@@ -89,7 +95,7 @@ class Recording(object):
         """
         Do things before the code inside the 'with Recording' block.
         """
-        recording_iteration_stack.append((self.name, self.iter_count))
+        recording_iteration.stack.append((self.name, self.iter_count))
         return self
 
     def __exit__(self, *args):
@@ -98,8 +104,9 @@ class Recording(object):
         """
         # Determine if recording is justified.
         do_recording = True
-        for stack_item in recording_iteration_stack:
-            if stack_item[0] in ('_iter_get_norm', '_compute_total_derivs'):
+
+        for stack_item in recording_iteration.stack:
+            if stack_item[0] in ('_run_apply', '_compute_total_derivs'):
                 do_recording = False
                 break
 
@@ -112,4 +119,4 @@ class Recording(object):
         # Enable the following line for stack debugging.
         # print_recording_iteration_stack()
 
-        recording_iteration_stack.pop()
+        recording_iteration.stack.pop()

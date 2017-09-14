@@ -38,7 +38,8 @@ class WebRecorder(BaseRecorder):
         Parameters
         ----------
         token: <string>
-            The token to be passed as a passphrase for authentication of each server request
+            The token to be passed as a user's unique identifier. Register to get a token
+            at the given endpoint
         case_name: <string>
             The name this case should be stored under. Default: 'Case Recording'
         endpoint: <string>
@@ -46,8 +47,7 @@ class WebRecorder(BaseRecorder):
         port: <string>
             The port which the server is listening on. Default to empty string (port 80)
         suppress_output: <bool>
-            Indicates if any printing should occur (including printing indicating the
-            visualization URL)
+            Indicates if all printing should be suppressed in this recorder
         """
         super(WebRecorder, self).__init__()
 
@@ -70,13 +70,12 @@ class WebRecorder(BaseRecorder):
         response = case_request.json()
         if response['status'] != 'Failed':
             self._case_id = str(response['case_id'])
-            if not suppress_output:
-                print("Visualization at: http://openmdao.org/visualization/case/" + self._case_id)
         else:
             self._case_id = '-1'
             if not suppress_output:
-                print("Failed to initialize case on server. No messages will be accepted\
-                 from server for this case.")
+                print("Failed to initialize case on server. No messages will be accepted \
+                from server for this case. Make sure you registered for a token at the \
+                given endpoint.")
 
             if 'reasoning' in response:
                 if not suppress_output:
@@ -205,7 +204,7 @@ class WebRecorder(BaseRecorder):
                 for name, value in iteritems(desvars_values):
                     desvars_array.append({
                         'name': name,
-                        'values': list(value)
+                        'values': self.convert_to_list(value)
                     })
 
         if self.options['record_responses']:
@@ -220,7 +219,7 @@ class WebRecorder(BaseRecorder):
                 for name, value in iteritems(responses_values):
                     responses_array.append({
                         'name': name,
-                        'values': list(value)
+                        'values': self.convert_to_list(value)
                     })
 
         if self.options['record_objectives']:
@@ -235,7 +234,7 @@ class WebRecorder(BaseRecorder):
                 for name, value in iteritems(objectives_values):
                     objectives_array.append({
                         'name': name,
-                        'values': list(value)
+                        'values': self.convert_to_list(value)
                     })
 
         if self.options['record_constraints']:
@@ -250,7 +249,7 @@ class WebRecorder(BaseRecorder):
                 for name, value in iteritems(constraints_values):
                     constraints_array.append({
                         'name': name,
-                        'values': list(value)
+                        'values': self.convert_to_list(value)
                     })
 
         iteration_coordinate = get_formatted_iteration_coordinate()
@@ -260,10 +259,10 @@ class WebRecorder(BaseRecorder):
             "iteration_coordinate": iteration_coordinate,
             "success": metadata['success'],
             "msg": metadata['msg'],
-            "desvars": self.convert_to_list(desvars_array),
-            "responses": self.convert_to_list(responses_array),
-            "objectives": self.convert_to_list(objectives_array),
-            "constraints": self.convert_to_list(constraints_array)
+            "desvars": [] if desvars_array is None else desvars_array,
+            "responses": [] if responses_array is None else responses_array,
+            "objectives": [] if objectives_array is None else objectives_array,
+            "constraints": [] if constraints_array is None else constraints_array
         }
 
         global_iteration_dict = {
@@ -302,7 +301,7 @@ class WebRecorder(BaseRecorder):
             for name, value in iteritems(self._inputs):
                 inputs_array.append({
                     'name': name,
-                    'values': list(value)
+                    'values': self.convert_to_list(value)
                 })
 
         # Outputs
@@ -311,7 +310,7 @@ class WebRecorder(BaseRecorder):
             for name, value in iteritems(self._outputs):
                 outputs_array.append({
                     'name': name,
-                    'values': list(value)
+                    'values': self.convert_to_list(value)
                 })
 
         # Residuals
@@ -320,18 +319,19 @@ class WebRecorder(BaseRecorder):
             for name, value in iteritems(self._resids):
                 residuals_array.append({
                     'name': name,
-                    'values': list(value)
+                    'values': self.convert_to_list(value)
                 })
 
         iteration_coordinate = get_formatted_iteration_coordinate()
+
         system_iteration_dict = {
             'counter': self._counter,
             'iteration_coordinate': iteration_coordinate,
             'success': metadata['success'],
             'msg': metadata['msg'],
-            'inputs': self.convert_to_list(inputs_array),
-            'outputs': self.convert_to_list(outputs_array),
-            'residuals': self.convert_to_list(residuals_array)
+            'inputs': [] if inputs_array is None else inputs_array,
+            'outputs': [] if outputs_array is None else outputs_array,
+            'residuals': [] if residuals_array is None else residuals_array
         }
 
         global_iteration_dict = {
@@ -372,7 +372,7 @@ class WebRecorder(BaseRecorder):
             for name, value in iteritems(self._outputs):
                 outputs_array.append({
                     'name': name,
-                    'values': list(value)
+                    'values': self.convert_to_list(value)
                 })
 
         residuals_array = []
@@ -380,7 +380,7 @@ class WebRecorder(BaseRecorder):
             for name, value in iteritems(self._resids):
                 residuals_array.append({
                     'name': name,
-                    'values': list(value)
+                    'values': self.convert_to_list(value)
                 })
 
         iteration_coordinate = get_formatted_iteration_coordinate()
@@ -392,8 +392,8 @@ class WebRecorder(BaseRecorder):
             'msg': metadata['msg'],
             'abs_err': self._abs_error,
             'rel_err': self._rel_error,
-            'solver_output': self.convert_to_list(outputs_array),
-            'solver_residuals': self.convert_to_list(residuals_array)
+            'solver_output': [] if outputs_array is None else outputs_array,
+            'solver_residuals': [] if residuals_array is None else residuals_array
         }
 
         global_iteration_dict = {
@@ -438,16 +438,7 @@ class WebRecorder(BaseRecorder):
         object_requesting_recording: <System>
             The System that would like to record its metadata.
         """
-        scaling_vecs = pickle.dumps(object_requesting_recording._scaling_vecs,
-                                    pickle.HIGHEST_PROTOCOL)
-        encoded_scaling_vecs = base64.b64encode(scaling_vecs)
-        system_metadata_dict = {
-            'id': object_requesting_recording.pathname,
-            'scaling_factors': encoded_scaling_vecs.decode('ascii')
-        }
-        system_metadata = json.dumps(system_metadata_dict)
-        requests.post(self._endpoint + '/' + self._case_id + '/system_metadata',
-                      data=system_metadata, headers=self._headers)
+        pass
 
     def record_metadata_solver(self, object_requesting_recording):
         """

@@ -14,11 +14,12 @@ from six.moves import range
 from openmdao.core.explicitcomponent import ExplicitComponent
 
 # regex to check for variable names.
-VAR_RGX = re.compile('([_a-zA-Z]\w*[ ]*\(?)')
+VAR_RGX = re.compile('([.]*[_a-zA-Z]\w*[ ]*\(?)')
 
 # Names of metadata entries allowed for ExecComp variables.
 _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc', 'var_set',
-                 'ref', 'ref0', 'res_ref', 'lower', 'upper', 'src_indices'}
+                 'ref', 'ref0', 'res_ref', 'lower', 'upper', 'src_indices',
+                 'flat_src_indices'}
 
 
 def array_idx_iter(shape):
@@ -32,19 +33,6 @@ def array_idx_iter(shape):
     """
     for p in product(*[range(s) for s in shape]):
         yield p
-
-
-def _valid_name(s, exprs):
-    """
-    Generate a locally unique replacement for a dotted name.
-    """
-    i = 0
-    check = ' '.join(exprs)
-    while True:
-        n = s.replace(':', '%d' % i)
-        if n not in check:
-            return n
-        i += 1
 
 
 class ExecComp(ExplicitComponent):
@@ -180,7 +168,7 @@ class ExecComp(ExplicitComponent):
 
     def _parse_for_out_vars(self, s):
         vnames = set([x.strip() for x in re.findall(VAR_RGX, s)
-                      if not x.endswith('(')])
+                      if not x.endswith('(') and not x.startswith('.')])
         for v in vnames:
             if v in _expr_dict:
                 raise NameError("%s: cannot assign to variable '%s' "
@@ -189,7 +177,8 @@ class ExecComp(ExplicitComponent):
         return vnames
 
     def _parse_for_vars(self, s):
-        vnames = set([x.strip() for x in re.findall(VAR_RGX, s) if not x.endswith('(')])
+        vnames = set([x.strip() for x in re.findall(VAR_RGX, s)
+                      if not x.endswith('(') and not x.startswith('.')])
         to_remove = []
         for v in vnames:
             if v in _expr_dict:

@@ -1,10 +1,11 @@
 """Complex Step derivative approximations."""
 from __future__ import division, print_function
 
-import numpy as np
 from collections import namedtuple
 from itertools import groupby
 from six.moves import range
+
+import numpy as np
 
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
 from openmdao.utils.name_maps import abs_key2rel_key
@@ -124,10 +125,16 @@ class ComplexStep(ApproximationScheme):
             if form == 'reverse':
                 delta *= -1.0
 
-            if wrt in system._var_abs2meta['input']:
-                in_size = np.prod(system._var_abs2meta['input'][wrt]['shape'])
-            elif wrt in system._var_abs2meta['output']:
-                in_size = np.prod(system._var_abs2meta['output'][wrt]['shape'])
+            if wrt in system._owns_approx_wrt_idx:
+                in_idx = system._owns_approx_wrt_idx[wrt]
+                in_size = len(in_idx)
+            else:
+                if wrt in system._var_abs2meta['input']:
+                    in_size = np.prod(system._var_abs2meta['input'][wrt]['shape'])
+                elif wrt in system._var_abs2meta['output']:
+                    in_size = np.prod(system._var_abs2meta['output'][wrt]['shape'])
+
+                in_idx = range(in_size)
 
             outputs = []
 
@@ -136,10 +143,15 @@ class ComplexStep(ApproximationScheme):
             for approx_tuple in approximations:
                 of = approx_tuple[0]
                 # TODO: Sparse derivatives
-                out_size = np.prod(system._var_abs2meta['output'][of]['shape'])
+                if of in system._owns_approx_of_idx:
+                    out_idx = system._owns_approx_of_idx[of]
+                    out_size = len(out_idx)
+                else:
+                    out_size = np.prod(system._var_abs2meta['output'][of]['shape'])
+
                 outputs.append((of, np.zeros((out_size, in_size))))
 
-            for idx in range(in_size):
+            for i_count, idx in enumerate(in_idx):
                 # Run the Finite Difference
                 input_delta = [(wrt, idx, delta)]
                 result = self._run_point_complex(system, input_delta, deriv_type)
@@ -150,7 +162,11 @@ class ComplexStep(ApproximationScheme):
                         # Sign difference between output and resids
                         fact = -fact
 
-                    subjac[:, idx] = result._imag_views_flat[of] * fact
+                    if of in system._owns_approx_of_idx:
+                        out_idx = system._owns_approx_of_idx[of]
+                        subjac[:, i_count] = result._imag_views_flat[of][out_idx] * fact
+                    else:
+                        subjac[:, i_count] = result._imag_views_flat[of] * fact
 
             for of, subjac in outputs:
                 rel_key = abs_key2rel_key(system, (of, wrt))

@@ -8,6 +8,9 @@ import numpy
 from openmdao.api import Problem, Group, ParallelGroup, ExecComp, IndepVarComp, \
                          ExplicitComponent
 
+from openmdao.utils.mpi import under_mpirun
+from openmdao.utils.mpi import MPI
+
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
@@ -272,12 +275,15 @@ class TestParallelGroups(unittest.TestCase):
         prob = Problem(Noisy())
 
         # check that error is thrown if not using PETScVector
-        msg = ("The `vector_class` argument must be `PETScVector` when "
-               "running in parallel under MPI but 'DefaultVector' was specified.")
-        with self.assertRaises(ValueError) as cm:
-            prob.setup(check=False, mode='fwd')
+        if under_mpirun():
+            msg = ("The `vector_class` argument must be `PETScVector` when "
+                   "running in parallel under MPI but 'DefaultVector' was specified.")
+            with self.assertRaises(ValueError) as cm:
+                prob.setup(check=False, mode='fwd')
 
-        self.assertEqual(str(cm.exception), msg)
+            self.assertEqual(str(cm.exception), msg)
+        else:
+            prob.setup(check=False, mode='fwd')
 
         # check that we get setup messages only on proc 0
         msg = 'Only want to see this on rank 0'

@@ -61,7 +61,7 @@ class Test(unittest.TestCase):
     def test_var_indices(self):
         def get_inds(p, sname, type_):
             system = p.model.get_subsystem(sname) if sname else p.model
-            idxs = p.model._var_allprocs_abs2idx[type_]
+            idxs = p.model._var_allprocs_abs2idx['linear'][type_]
             return np.array([
                 idxs[name] for name in system._var_abs_names[type_]
             ])
@@ -78,11 +78,11 @@ class Test(unittest.TestCase):
     def test_var_allprocs_idx_range(self):
         rng = self.p.model._subsystems_var_range
 
-        assert_rel_error(self, rng['input'][0], np.array([0,0]))
-        assert_rel_error(self, rng['input'][1], np.array([0,1]))
+        assert_rel_error(self, rng['nonlinear']['input']['A'], np.array([0,0]))
+        assert_rel_error(self, rng['nonlinear']['input']['B'], np.array([0,1]))
 
-        assert_rel_error(self, rng['output'][0], np.array([0,1]))
-        assert_rel_error(self, rng['output'][1], np.array([1,2]))
+        assert_rel_error(self, rng['nonlinear']['output']['A'], np.array([0,1]))
+        assert_rel_error(self, rng['nonlinear']['output']['B'], np.array([1,2]))
 
     def test_GS(self):
         root = self.p.model

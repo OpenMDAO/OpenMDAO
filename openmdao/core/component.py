@@ -16,7 +16,7 @@ from openmdao.core.system import System
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    warn_deprecation
+    warn_deprecation, ContainsAll
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 
 
@@ -61,11 +61,14 @@ class Component(System):
         **kwargs : dict of keyword arguments
             available here and in all descendants of this system.
         """
-        super(Component, self).__init__(**kwargs)
-        self._approx_schemes = OrderedDict()
-
+        # put these here to prevent them from possibly overriding values set
+        # by the user in initialize().
         self.matrix_free = False
         self.distributed = False
+
+        super(Component, self).__init__(**kwargs)
+
+        self._approx_schemes = OrderedDict()
 
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}
@@ -100,20 +103,26 @@ class Component(System):
         super(Component, self)._setup_vars()
         num_var = self._num_var
         num_var_byset = self._num_var_byset
+        data = self._var_rel2data_io
 
-        # Compute num_var
-        for type_ in ['input', 'output']:
-            num_var[type_] = len(self._var_rel_names[type_])
+        for vec_name in self._lin_rel_vec_name_list:
+            num_var[vec_name] = {}
+            num_var_byset[vec_name] = {}
+            # Compute num_var
+            for type_ in ['input', 'output']:
+                relnames = self._var_allprocs_relevant_names[vec_name][type_]
+                num_var[vec_name][type_] = len(relnames)
 
-        # Compute num_var_byset
-        for data in itervalues(self._var_rel2data_io):
-            type_ = data['type']
-            metadata = data['metadata']
-            set_name = metadata['var_set']
-            if set_name in num_var_byset[type_]:
-                num_var_byset[type_][set_name] += 1
-            else:
-                num_var_byset[type_][set_name] = 1
+                num_var_byset[vec_name][type_] = vbyset = {}
+                # Compute num_var_byset
+                for name in relnames:
+                    set_name = data[name.rsplit('.', 1)[-1]]['metadata']['var_set']
+                    if set_name not in vbyset:
+                        vbyset[set_name] = 0
+                    vbyset[set_name] += 1
+
+        self._num_var['nonlinear'] = self._num_var['linear']
+        self._num_var_byset['nonlinear'] = self._num_var_byset['linear']
 
     def _setup_var_data(self, recurse=True):
         """
@@ -133,7 +142,7 @@ class Component(System):
         abs2meta = self._var_abs2meta
 
         # Compute the prefix for turning rel/prom names into abs names
-        if self.pathname is not '':
+        if self.pathname:
             prefix = self.pathname + '.'
         else:
             prefix = ''
@@ -144,10 +153,9 @@ class Component(System):
         }
 
         for type_ in ['input', 'output']:
-            for ind, prom_name in enumerate(self._var_rel_names[type_]):
+            for prom_name in self._var_rel_names[type_]:
                 abs_name = prefix + prom_name
-                data = self._var_rel2data_io[prom_name]
-                metadata = data['metadata']
+                metadata = self._var_rel2data_io[prom_name]['metadata']
 
                 # Compute allprocs_abs_names, abs_names
                 allprocs_abs_names[type_].append(abs_name)
@@ -158,11 +166,10 @@ class Component(System):
                 abs2prom[type_][abs_name] = prom_name
 
                 # Compute allprocs_abs2meta
-                allprocs_metadata = {
+                allprocs_abs2meta[type_][abs_name] = {
                     meta_name: metadata[meta_name]
                     for meta_name in meta_names[type_]
                 }
-                allprocs_abs2meta[type_][abs_name] = allprocs_metadata
 
                 # Compute abs2meta
                 abs2meta[type_][abs_name] = metadata
@@ -178,42 +185,52 @@ class Component(System):
         """
         super(Component, self)._setup_var_sizes()
 
+        iproc = self.comm.rank
+        nproc = self.comm.size
+        relevant = self._relevant
+        vec_names = self._lin_rel_vec_name_list
+
         sizes = self._var_sizes
         sizes_byset = self._var_sizes_byset
 
-        iproc = self.comm.rank
-        nproc = self.comm.size
-
-        set2iset = self._var_set2iset
-
         # Initialize empty arrays
-        for type_ in ['input', 'output']:
-            sizes[type_] = np.zeros((nproc, self._num_var[type_]), int)
+        for vec_name in vec_names:
+            sizes[vec_name] = {}
+            sizes_byset[vec_name] = {}
 
-            sizes_byset[type_] = {}
-            for set_name in set2iset[type_]:
-                sizes_byset[type_][set_name] = np.zeros(
-                    (nproc, self._num_var_byset[type_][set_name]), int)
+            for type_ in ('input', 'output'):
+                sizes[vec_name][type_] = np.zeros((nproc, self._num_var[vec_name][type_]), int)
 
-        # Compute _var_sizes and _var_sizes_byset
-        for type_ in ['input', 'output']:
-            abs2meta_t = self._var_abs2meta[type_]
-            allprocs_abs2idx_byset_t = self._var_allprocs_abs2idx_byset[type_]
-            for idx, abs_name in enumerate(self._var_abs_names[type_]):
-                meta = abs2meta_t[abs_name]
-                set_name = meta['var_set']
-                size = np.prod(meta['shape'])
-                idx_byset = allprocs_abs2idx_byset_t[abs_name]
+                sizes_byset[vec_name][type_] = {}
+                for set_name, nvars in iteritems(self._num_var_byset[vec_name][type_]):
+                    sizes_byset[vec_name][type_][set_name] = np.zeros((nproc, nvars), int)
 
-                sizes[type_][iproc, idx] = size
-                sizes_byset[type_][set_name][iproc, idx_byset] = size
+            # Compute _var_sizes and _var_sizes_byset
+            for type_ in ('input', 'output'):
+                sz = sizes[vec_name][type_]
+                sz_byset = sizes_byset[vec_name][type_]
+                abs2meta_t = self._var_abs2meta[type_]
+                allprocs_abs2idx_byset_t = self._var_allprocs_abs2idx_byset[vec_name][type_]
+                for idx, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
+                    meta = abs2meta_t[abs_name]
+                    set_name = meta['var_set']
+                    size = np.prod(meta['shape'])
+                    idx_byset = allprocs_abs2idx_byset_t[abs_name]
+
+                    sz[iproc, idx] = size
+                    sz_byset[set_name][iproc, idx_byset] = size
 
         if self.comm.size > 1:
-            for type_ in ['input', 'output']:
-                self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
-                for set_name in self._var_set2iset[type_]:
-                    self.comm.Allgather(
-                        sizes_byset[type_][set_name][iproc, :], sizes_byset[type_][set_name])
+            for vec_name in vec_names:
+                sizes = self._var_sizes[vec_name]
+                sizes_byset = self._var_sizes_byset[vec_name]
+                for type_ in ['input', 'output']:
+                    self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
+                    for set_name, sbyset in iteritems(sizes_byset[type_]):
+                        self.comm.Allgather(sbyset[iproc, :], sbyset)
+
+        self._var_sizes['nonlinear'] = self._var_sizes['linear']
+        self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']
 
         self._setup_global_shapes()
 
@@ -234,8 +251,8 @@ class Component(System):
         for of, wrt, method, kwargs in self._approximated_partials:
             self._approx_partials(of, wrt, method=method, **kwargs)
 
-    def add_input(self, name, val=1.0, shape=None, src_indices=None, units=None,
-                  desc='', var_set=0):
+    def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
+                  units=None, desc='', var_set=0):
         """
         Add an input variable to the component.
 
@@ -251,9 +268,13 @@ class Component(System):
             val is not an array. Default is None.
         src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
             The global indices of the source variable to transfer data from.
-            If val is given as an array_like object, the shapes of val and
-            src_indices must match. A value of None implies this input depends
-            on all entries of source. Default is None.
+            A value of None implies this input depends on all entries of source.
+            Default is None. The shapes of the target and src_indices must match,
+            and form of the entries within is determined by the value of 'flat_src_indices'.
+        flat_src_indices : bool
+            If True, each entry of src_indices is assumed to be an index into the
+            flattened source.  Otherwise each entry must be a tuple or list of size equal
+            to the number of dimensions of the source.
         units : str or None
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.
@@ -313,6 +334,7 @@ class Component(System):
             metadata['src_indices'] = None
         else:
             metadata['src_indices'] = np.atleast_1d(src_indices)
+        metadata['flat_src_indices'] = flat_src_indices
 
         # units: taken as is
         metadata['units'] = units
@@ -787,3 +809,11 @@ class Component(System):
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()
+
+    def _guess_nonlinear(self):
+        """
+        Provide initial guess for states.
+
+        Does nothing on any non-implicit component.
+        """
+        pass

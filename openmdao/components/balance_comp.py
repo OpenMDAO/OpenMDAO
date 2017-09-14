@@ -212,7 +212,7 @@ class BalanceComp(ImplicitComponent):
             self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
             self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
 
-            self._dscale_drhs[idxs_nnz] = np.sign(rhs[idxs_nnz]) / rhs[idxs_nnz]**2
+            self._dscale_drhs[idxs_nnz] = -np.sign(rhs[idxs_nnz]) / rhs[idxs_nnz]**2
             self._dscale_drhs[idxs_nz] = -.5 * rhs[idxs_nz] / (.25 * rhs[idxs_nz] ** 2 + 1) ** 2
 
             # Partials of residual wrt rhs

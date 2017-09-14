@@ -9,6 +9,9 @@ from openmdao.utils.general_utils import ensure_compatible
 from openmdao.utils.name_maps import name2abs_name
 
 
+_full_slice = slice(None)
+
+
 class VectorInfo(object):
     """
     Communal object for storing some global information in the vectors.
@@ -80,12 +83,18 @@ class Vector(object):
         Temporary storage of complex views used by in-place numpy operations.
     _ncol : int
         Number of columns for multi-vectors.
+    _icol : int or None
+        If not None, specifies the 'active' column of a multivector when interfaceing with
+        a component that does not support multivectors.
+    _relevant : dict
+        Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
+        and dependent systems.
     """
 
     _vector_info = VectorInfo()
 
     def __init__(self, name, typ, system, root_vector=None, resize=False, alloc_complex=False,
-                 ncol=1):
+                 ncol=1, relevant=None):
         """
         Initialize all attributes.
 
@@ -105,10 +114,15 @@ class Vector(object):
             Whether to allocate any imaginary storage to perform complex step. Default is False.
         ncol : int
             Number of columns for multi-vectors.
+        relevant : dict
+            Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
+            and dependent systems.
         """
         self._name = name
         self._typ = typ
         self._ncol = ncol
+        self._icol = None
+        self._relevant = relevant
 
         self._system = system
 
@@ -147,7 +161,7 @@ class Vector(object):
         self._initialize_data(root_vector)
         self._initialize_views()
 
-        self._length = np.sum(self._system._var_sizes[self._typ][self._iproc, :])
+        self._length = np.sum(self._system._var_sizes[self._name][self._typ][self._iproc, :])
 
     def __str__(self):
         """
@@ -227,7 +241,8 @@ class Vector(object):
             Array combining the data of all the varsets.
         """
         if new_array is None:
-            new_array = np.zeros(self._length)
+            ncol = self._ncol
+            new_array = np.zeros(self._length) if ncol == 1 else np.zeros((self._length, ncol))
 
         for set_name, data in iteritems(self._data):
             new_array[self._indices[set_name]] = data
@@ -329,14 +344,27 @@ class Vector(object):
         if abs_name is not None:
             if self._vector_info._under_complex_step:
                 if self._typ == 'input':
-                    return self._views[abs_name] + 1j * self._imag_views[abs_name]
+                    if self._icol is None:
+                        return self._views[abs_name] + 1j * self._imag_views[abs_name]
+                    else:
+                        return self._views[abs_name][:, self._icol] + \
+                            1j * self._imag_views[abs_name][:, self._icol]
                 else:
                     if abs_name not in self._complex_view_cache:
-                        self._complex_view_cache[abs_name] = self._views[abs_name] + \
-                            1j * self._imag_views[abs_name]
+                        if self._icol is None:
+                            self._complex_view_cache[abs_name] = self._views[abs_name] + \
+                                1j * self._imag_views[abs_name]
+                        else:
+                            self._complex_view_cache[abs_name][:, self._icol] = \
+                                self._views[abs_name][:, self._icol] + \
+                                1j * self._imag_views[abs_name][:, self._icol]
+                            return self._complex_view_cache[abs_name][:, self._icol]
                     return self._complex_view_cache[abs_name]
 
-            return self._views[abs_name]
+            if self._icol is None:
+                return self._views[abs_name]
+            else:
+                return self._views[abs_name][:, self._icol]
         else:
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
@@ -354,7 +382,11 @@ class Vector(object):
         """
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
-            value, shape = ensure_compatible(name, value, self._views[abs_name].shape)
+            if self._icol is None:
+                slc = _full_slice
+            else:
+                slc = (_full_slice, self._icol)
+            value, shape = ensure_compatible(name, value, self._views[abs_name][slc].shape)
             if self._vector_info._under_complex_step:
 
                 # setitem overwrites anything you may have done with numpy indexing
@@ -363,10 +395,10 @@ class Vector(object):
                 except KeyError:
                     pass
 
-                self._views[abs_name][:] = value.real
-                self._imag_views[abs_name][:] = value.imag
+                self._views[abs_name][slc] = value.real
+                self._imag_views[abs_name][slc] = value.imag
             else:
-                self._views[abs_name][:] = value
+                self._views[abs_name][slc] = value
         else:
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
@@ -491,6 +523,19 @@ class Vector(object):
         """
         pass
 
+    def dot(self, vec):
+        """
+        Compute the dot product of the current vec and the incoming vec.
+
+        Must be implemented by the subclass.
+
+        Parameters
+        ----------
+        vec : <Vector>
+            The incoming vector being dotted with self.
+        """
+        pass
+
     def get_norm(self):
         """
         Return the norm of this vector.
@@ -608,10 +653,6 @@ class Transfer(object):
 
     Attributes
     ----------
-    _in_vec : Vector
-        pointer to the input vector.
-    _out_vec : Vector
-        pointer to the output vector.
     _in_inds : int ndarray
         input indices for the transfer.
     _out_inds : int ndarray
@@ -637,13 +678,11 @@ class Transfer(object):
         comm : MPI.Comm or <FakeComm>
             communicator of the system that owns this transfer.
         """
-        self._in_vec = in_vec
-        self._out_vec = out_vec
         self._in_inds = in_inds
         self._out_inds = out_inds
         self._comm = comm
 
-        self._initialize_transfer()
+        self._initialize_transfer(in_vec, out_vec)
 
     def __str__(self):
         """
@@ -659,11 +698,18 @@ class Transfer(object):
         except Exception as err:
             return "<error during call to Transfer.__str__: %s" % err
 
-    def _initialize_transfer(self):
+    def _initialize_transfer(self, in_vec, out_vec):
         """
         Set up the transfer; do any necessary pre-computation.
 
         Optionally implemented by the subclass.
+
+        Parameters
+        ----------
+        in_vec : <Vector>
+            reference to the input vector.
+        out_vec : <Vector>
+            reference to the output vector.
         """
         pass
 

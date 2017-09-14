@@ -9,7 +9,7 @@ import numpy as np
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
-from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration_stack
+from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -23,6 +23,8 @@ class SolverInfo(object):
     ----------
     prefix : <System>
         Prefix to prepend during this iprint.
+    stack : List
+        List of strings; strings are popped and appended as needed.
     """
 
     def __init__(self):
@@ -30,6 +32,39 @@ class SolverInfo(object):
         Initialize.
         """
         self.prefix = ""
+        self.stack = []
+
+    def pop(self):
+        """
+        Remove one level of solver depth in the printing.
+        """
+        last_string = self.stack.pop()
+        nchar = len(last_string)
+        self.prefix = self.prefix[:-nchar]
+
+    def append_solver(self):
+        """
+        Add a new level for the main solver in a group.
+        """
+        new_str = '+  '
+        self.prefix += new_str
+        self.stack.append(new_str)
+
+    def append_subsolver(self):
+        """
+        Add a new level for any sub-solver for your solver.
+        """
+        new_str = '|  '
+        self.prefix += new_str
+        self.stack.append(new_str)
+
+    def append_precon(self):
+        """
+        Add a new level for any preconditioner to a linear solver.
+        """
+        new_str = '| precon:'
+        self.prefix += new_str
+        self.stack.append(new_str)
 
 
 class Solver(object):
@@ -216,6 +251,7 @@ class Solver(object):
             with Recording(type(self).__name__, self._iter_count, self) as rec:
                 self._iter_execute()
                 self._iter_count += 1
+                self._run_apply()
                 norm = self._iter_get_norm()
                 # With solvers, we want to record the norm AFTER the call, but the call needs to
                 # be wrapped in the with for stack purposes, so we locally assign  norm & norm0
@@ -231,10 +267,11 @@ class Solver(object):
                 (norm > atol and norm / norm0 > rtol))
 
         if self._system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
+            prefix = self._solver_info.prefix + self.SOLVER
             if fail:
                 if iprint > -1:
                     msg = ' Failed to Converge in {} iterations'.format(self._iter_count)
-                    print(self._solver_info.prefix + self.SOLVER + msg)
+                    print(prefix + msg)
 
                 # Raise AnalysisError if requested.
                 if self.options['err_on_maxiter']:
@@ -242,10 +279,9 @@ class Solver(object):
                     raise AnalysisError(msg.format(self.SOLVER, self._system.pathname))
 
             elif iprint == 1:
-                print(self._solver_info.prefix + self.SOLVER +
-                      ' Converged in {} iterations'.format(self._iter_count))
+                print(prefix + ' Converged in {} iterations'.format(self._iter_count))
             elif iprint == 2:
-                print(self._solver_info.prefix + self.SOLVER + ' Converged')
+                print(prefix + ' Converged')
 
         return fail, norm, norm / norm0
 
@@ -265,6 +301,12 @@ class Solver(object):
     def _iter_execute(self):
         """
         Perform the operations in the iteration loop.
+        """
+        pass
+
+    def _run_apply(self):
+        """
+        Run the appropriate apply method on the system.
         """
         pass
 
@@ -367,11 +409,20 @@ class NonlinearSolver(Solver):
             error at the first iteration.
         """
         if self.options['maxiter'] > 0:
+            self._run_apply()
             norm = self._iter_get_norm()
         else:
             norm = 1.0
         norm0 = norm if norm != 0.0 else 1.0
         return norm0, norm
+
+    def _run_apply(self):
+        """
+        Run the the apply_nonlinear method on the system.
+        """
+        recording_iteration.stack.append(('_run_apply', 0))
+        self._system._apply_nonlinear()
+        recording_iteration.stack.pop()
 
     def _iter_get_norm(self):
         """
@@ -382,21 +433,32 @@ class NonlinearSolver(Solver):
         float
             norm.
         """
-        recording_iteration_stack.append(('_iter_get_norm', 0))
-
-        self._system._apply_nonlinear()
-
-        recording_iteration_stack.pop()
-
         return self._system._residuals.get_norm()
 
 
 class LinearSolver(Solver):
     """
     Base class for linear solvers.
+
+    Attributes
+    ----------
+    _rel_systems : set of str
+        Names of systems relevant to the current solve.
     """
 
-    def solve(self, vec_names, mode):
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
+        """
+        super(LinearSolver, self).__init__(**kwargs)
+        self._rel_systems = None
+
+    def solve(self, vec_names, mode, rel_systems=None):
         """
         Run the solver.
 
@@ -406,6 +468,8 @@ class LinearSolver(Solver):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
 
         Returns
         -------
@@ -417,6 +481,7 @@ class LinearSolver(Solver):
             error at the first iteration.
         """
         self._vec_names = vec_names
+        self._rel_systems = rel_systems
         self._mode = mode
         return self._run_iterator()
 
@@ -443,11 +508,24 @@ class LinearSolver(Solver):
             self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
 
         if self.options['maxiter'] > 1:
+            self._run_apply()
             norm = self._iter_get_norm()
         else:
             norm = 1.0
         norm0 = norm if norm != 0.0 else 1.0
         return norm0, norm
+
+    def _run_apply(self):
+        """
+        Run the the apply_linear method on the system.
+        """
+        recording_iteration.stack.append(('_run_apply', 0))
+
+        system = self._system
+        scope_out, scope_in = system._get_scope()
+        system._apply_linear(self._vec_names, self._rel_systems, self._mode, scope_out, scope_in)
+
+        recording_iteration.stack.pop()
 
     def _iter_get_norm(self):
         """
@@ -458,13 +536,7 @@ class LinearSolver(Solver):
         float
             norm.
         """
-        recording_iteration_stack.append(('_iter_get_norm', 0))
-
         system = self._system
-        scope_out, scope_in = system._get_scope()
-        system._apply_linear(self._vec_names, self._mode, scope_out, scope_in)
-
-        recording_iteration_stack.pop()
 
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']
@@ -473,9 +545,10 @@ class LinearSolver(Solver):
 
         norm = 0
         for vec_name in self._vec_names:
-            b_vec = b_vecs[vec_name]
-            b_vec -= self._rhs_vecs[vec_name]
-            norm += b_vec.get_norm()**2
+            if vec_name in system._rel_vec_names:
+                b_vec = b_vecs[vec_name]
+                b_vec -= self._rhs_vecs[vec_name]
+                norm += b_vec.get_norm()**2
 
         return norm ** 0.5
 

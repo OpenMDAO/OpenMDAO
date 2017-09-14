@@ -38,7 +38,7 @@ single:
 
 clean:
 	rm -rf $(BUILDDIR)/*
-	rm -rf _srcdocs/usr
+	rm -rf _srcdocs/*
 	rm -rf tags
 	rm -rf tmp
 	rm -f feature_docs_unit_test_db.sqlite
@@ -53,7 +53,7 @@ redbaron:
 
 all: mock redbaron
 	# Cleaning up previously-generated files before docbuild
-	rm -rf _srcdocs/usr
+	rm -rf _srcdocs/*
 
 	# Running things before docbuild
 	python _utils/preprocess_tags.py
@@ -62,7 +62,7 @@ all: mock redbaron
 	# Doing the first command in the background does two builds in parallel
 	#       dev docs get built into tmp/moved into _build later
 	#       to avoid race to create dirs.
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html -t "usr"
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 
 	# post-game clean-up
 	rm feature_docs_unit_test_db.sqlite

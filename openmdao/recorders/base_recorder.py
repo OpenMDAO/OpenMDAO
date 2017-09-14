@@ -9,7 +9,7 @@ from openmdao.utils.general_utils import warn_deprecation
 from openmdao.core.system import System
 from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver, NonlinearSolver
-from openmdao.recorders.recording_iteration_stack import recording_iteration_stack, \
+from openmdao.recorders.recording_iteration_stack import recording_iteration, \
     get_formatted_iteration_coordinate
 from openmdao.utils.mpi import MPI
 
@@ -395,7 +395,24 @@ class BaseRecorder(object):
 
     def record_iteration_driver_passing_vars(self, object_requesting_recording, desvars, responses,
                                              objectives, constraints, metadata):
+        """
+        Record an iteration of a driver with the variables passed in.
 
+        Parameters
+        ----------
+        object_requesting_recording: <Driver>
+            The Driver object that wants to record an iteration.
+        desvars : dict
+            Dictionary containing design variables.
+        responses : dict
+            Dictionary containing response variables.
+        objectives : dict
+            Dictionary containing objective variables.
+        constraints : dict
+            Dictionary containing constraint variables.
+        metadata : dict
+            Dictionary containing execution metadata (e.g. iteration coordinate).
+        """
         # TODO: this code and the same code in record_iteration should be in a separate method
         if not self._parallel:
             if MPI and MPI.COMM_WORLD.rank > 0:
@@ -515,7 +532,7 @@ class BaseRecorder(object):
             '_apply_nonlinear,' '_solve_nonlinear'. Behavior varies based on from which function
             record_iteration was called.
         """
-        stack_top = recording_iteration_stack[-1][0]
+        stack_top = recording_iteration.stack[-1][0]
         method = stack_top.split('.')[-1]
 
         if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear',

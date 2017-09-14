@@ -11,6 +11,7 @@ from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver, Group, PET
                          IndepVarComp, NonlinearBlockGS, NonlinearBlockJac, LinearBlockGS
 from openmdao.test_suite.components.double_sellar import SubSellar
 from openmdao.test_suite.components.sellar import SellarDerivatives
+from openmdao.utils.mpi import MPI
 
 
 def run_model(prob):
@@ -308,6 +309,7 @@ class MPITests(unittest.TestCase):
 
     N_PROCS = 2
 
+    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_hierarchy_iprint(self):
         prob = Problem()
         model = prob.model
@@ -346,7 +348,7 @@ class MPITests(unittest.TestCase):
         # if USE_PROC_FILES is not set, solver convergence messages
         # should only appear on proc 0
         output = run_model(prob)
-        if self.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
+        if model.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
             self.assertTrue(output.count('\nNL: Newton Converged') == 1)
         else:
             self.assertTrue(output.count('\nNL: Newton Converged') == 0)

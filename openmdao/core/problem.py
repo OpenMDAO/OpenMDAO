@@ -6,7 +6,7 @@ from collections import OrderedDict, defaultdict, namedtuple
 from itertools import product
 import logging
 
-from six import iteritems, iterkeys
+from six import iteritems, iterkeys, itervalues
 from six.moves import range
 
 import numpy as np
@@ -20,31 +20,23 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
-from openmdao.recorders.recording_iteration_stack import recording_iteration_stack
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.recorders.recording_iteration_stack import recording_iteration
+from openmdao.utils.general_utils import warn_deprecation, ContainsAll
 from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
-from openmdao.utils.graph_utils import all_connected_edges
 from openmdao.vectors.default_vector import DefaultVector
-from openmdao.vectors.default_multi_vector import DefaultMultiVector
 try:
     from openmdao.vectors.petsc_vector import PETScVector
-    from openmdao.vectors.petsc_multi_vector import PETScMultiVector
 except ImportError:
     PETScVector = None
-
-    class PETScMultiVector(object):
-        """
-        A dummy class so we can do isinstance checks.
-        """
-
-        pass
 
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
+
+_contains_all = ContainsAll()
 
 
 class Problem(object):
@@ -121,7 +113,7 @@ class Problem(object):
 
         self._mode = None  # mode is assigned in setup()
 
-        recording_iteration_stack = []
+        recording_iteration.stack = []
 
         self._initial_condition_cache = {}
 
@@ -344,7 +336,7 @@ class Problem(object):
         self.driver.cleanup()
 
     def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='auto',
-              force_alloc_complex=False, multi_vector_class=None):
+              force_alloc_complex=False):
         """
         Set up the model hierarchy.
 
@@ -369,10 +361,6 @@ class Problem(object):
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
             after a reconfiguration) you may need to set this to True.
-        multi_vector_class : type
-            reference to an actual <Vector> class; not an instance. This specifies
-            the class to use to perform matrix-matrix derivative operations.  If None,
-            matrix-matrix will not be used.
 
         Returns
         -------
@@ -398,14 +386,13 @@ class Problem(object):
             mode = 'rev'
         self._mode = mode
 
-        model._setup(comm, 'full')
+        model._setup(comm, 'full', mode)
 
         # Cache all args for final setup.
         self._vector_class = vector_class
         self._check = check
         self._logger = logger
         self._force_alloc_complex = force_alloc_complex
-        self._multi_vector_class = multi_vector_class
 
         self._setup_status = 1
         return self
@@ -424,23 +411,15 @@ class Problem(object):
         check = self._check
         logger = self._logger
         force_alloc_complex = self._force_alloc_complex
-        multi_vector_class = self._multi_vector_class
 
         model = self.model
         comm = self.comm
         mode = self._mode
 
         if self._setup_status < 2:
-            model._final_setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex,
-                               mode=mode, multi_vector_class=multi_vector_class)
+            model._final_setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex)
 
         self.driver._setup_driver(self)
-
-        if isinstance(model, Group):
-            self._sys_graph = model.compute_sys_graph(comps_only=True, save_vars=True)
-            self._relevant = get_relevant_vars(self._sys_graph,
-                                               self.driver._designvars,
-                                               self.driver._responses)
 
         # Now that setup has been called, we can set the iprints.
         for items in self._solver_print_cache:
@@ -537,6 +516,10 @@ class Problem(object):
         input_cache = model._inputs._clone()
         output_cache = model._outputs._clone()
 
+        # Keep track of derivative keys that are declared dependent so that we don't print them
+        # unless they are in error.
+        indep_key = {}
+
         # Analytic Jacobians
         for mode in ('fwd', 'rev'):
             model._inputs.set_vec(input_cache)
@@ -557,6 +540,7 @@ class Problem(object):
                 deprecated = isinstance(comp, DepComponent)
                 matrix_free = comp.matrix_free
                 c_name = comp.pathname
+                indep_key[c_name] = set()
 
                 # TODO: Check deprecated deriv_options.
 
@@ -613,7 +597,7 @@ class Problem(object):
                                 flat_view[idx] = perturb
 
                                 # Matrix Vector Product
-                                comp._apply_linear(['linear'], mode)
+                                comp._apply_linear(['linear'], _contains_all, mode)
 
                                 for out in out_list:
                                     out_abs = rel_name2abs_name(comp, out)
@@ -655,6 +639,15 @@ class Problem(object):
 
                             # No need to calculate partials; they are already stored
                             deriv_value = subjacs.get(abs_key)
+
+                            # Testing for pairs that are not dependent so that we suppress printing
+                            # them unless the fd is non zero. Note: subjacs_info is empty for
+                            # undeclared partials on implicit components.
+                            try:
+                                if comp._jacobian._subjacs_info[abs_key][0]['dependent'] is False:
+                                    indep_key[c_name].add(rel_key)
+                            except KeyError:
+                                pass
 
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
@@ -744,7 +737,8 @@ class Problem(object):
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, logger, compact_print,
-                                  comps, global_options, suppress_output=suppress_output)
+                                  comps, global_options, suppress_output=suppress_output,
+                                  indep_key=indep_key)
 
         return partials_data
 
@@ -897,7 +891,7 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        recording_iteration_stack.append(('_compute_total_derivs', 0))
+        recording_iteration.stack.append(('_compute_total_derivs', 0))
         model = self.model
         mode = self._mode
         vec_dinput = model._vectors['input']
@@ -914,17 +908,13 @@ class Problem(object):
 
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
-        for subname in vec_dinput:
+        for vec_name in model._lin_vec_names:
 
             # TODO: Do all three deriv vectors have the same keys?
 
-            # Skip nonlinear because we don't need to mess with it?
-            if subname == 'nonlinear':
-                continue
-
-            vec_dinput[subname].set_const(0.0)
-            vec_doutput[subname].set_const(0.0)
-            vec_dresid[subname].set_const(0.0)
+            vec_dinput[vec_name].set_const(0.0)
+            vec_doutput[vec_name].set_const(0.0)
+            vec_dresid[vec_name].set_const(0.0)
 
         # Linearize Model
         model._linearize()
@@ -955,9 +945,27 @@ class Problem(object):
             model._owns_approx_of = set(of)
             model._owns_approx_wrt = set(wrt)
 
+            # Support for indices defined on driver vars.
+            dvs = self.driver._designvars
+            cons = self.driver._cons
+            objs = self.driver._objs
+
+            response_idx = {key: val['indices'] for key, val in iteritems(cons)
+                            if val['indices'] is not None}
+            for key, val in iteritems(objs):
+                if val['indices'] is not None:
+                    response_idx[key] = val['indices']
+
+            model._owns_approx_of_idx = response_idx
+
+            model._owns_approx_wrt_idx = {key: val['indices'] for key, val in iteritems(dvs)
+                                          if val['indices'] is not None}
+
         model._setup_jacobians(recurse=False)
 
+        model.jacobian._override_checks = True
         model._linearize()
+        model.jacobian._override_checks = False
         approx_jac = model._jacobian._subjacs
 
         # Create data structures (and possibly allocate space) for the total
@@ -969,7 +977,12 @@ class Problem(object):
                 okey = old_output_list[ocount]
                 for icount, input_name in enumerate(input_list):
                     ikey = old_input_list[icount]
-                    totals[okey, ikey] = -approx_jac[output_name, input_name]
+                    jac = approx_jac[output_name, input_name]
+                    if isinstance(jac, list):
+                        # This is a design variable that was declared as an obj/con.
+                        totals[okey, ikey] = np.eye(len(jac[0]))
+                    else:
+                        totals[okey, ikey] = -jac
 
         elif return_format == 'dict':
             for ocount, output_name in enumerate(output_list):
@@ -977,75 +990,100 @@ class Problem(object):
                 totals[okey] = tot = OrderedDict()
                 for icount, input_name in enumerate(input_list):
                     ikey = old_input_list[icount]
-                    tot[ikey] = -approx_jac[output_name, input_name]
+                    jac = approx_jac[output_name, input_name]
+                    if isinstance(jac, list):
+                        # This is a design variable that was declared as an obj/con.
+                        tot[ikey] = np.eye(len(jac[0]))
+                    else:
+                        tot[ikey] = -jac
         else:
             msg = "Unsupported return format '%s." % return_format
             raise NotImplementedError(msg)
 
-        recording_iteration_stack.pop()
+        recording_iteration.stack.pop()
         return totals
 
-    def _get_voi_info(self, vois, inp2rhs_name, input_vec, output_vec, input_vois):
+    def _get_voi_info(self, voi_lists, inp2rhs_name, input_vec, output_vec, input_vois):
         voi_info = {}
         model = self.model
-        sizes = model._var_sizes['output']
         nproc = self.comm.size
         iproc = model.comm.rank
 
-        for input_name, old_input_name in vois:
-            vecname = inp2rhs_name[input_name]
-            dinputs = input_vec[vecname]
-            doutputs = output_vec[vecname]
+        for vois in itervalues(voi_lists):
+            for input_name, old_input_name in vois:
+                vecname = inp2rhs_name[input_name]
+                if vecname not in input_vec:
+                    continue
+                sizes = model._var_sizes[vecname]['output']
+                dinputs = input_vec[vecname]
+                doutputs = output_vec[vecname]
 
-            in_var_idx = model._var_allprocs_abs2idx['output'][input_name]
-            in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
-            start = np.sum(sizes[:iproc, in_var_idx])
-            end = np.sum(sizes[:iproc + 1, in_var_idx])
+                in_var_idx = model._var_allprocs_abs2idx[vecname]['output'][input_name]
+                in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
+                start = np.sum(sizes[:iproc, in_var_idx])
+                end = np.sum(sizes[:iproc + 1, in_var_idx])
 
-            in_idxs = None
-            if input_name in input_vois:
-                in_voi_meta = input_vois[input_name]
-                if 'indices' in in_voi_meta:
-                    in_idxs = in_voi_meta['indices']
+                in_idxs = None
+                if input_name in input_vois:
+                    in_voi_meta = input_vois[input_name]
+                    if 'indices' in in_voi_meta:
+                        in_idxs = in_voi_meta['indices']
 
-            dup = not in_var_meta['distributed']
-            if in_idxs is not None:
-                irange = in_idxs
-                max_i = max(in_idxs)
-                min_i = min(in_idxs)
-                loc_size = len(in_idxs)
-            else:
-                irange = list(range(in_var_meta['global_size']))
-                max_i = in_var_meta['global_size'] - 1
-                min_i = 0
-                loc_size = end - start
+                if in_idxs is not None:
+                    irange = in_idxs
+                    max_i = np.max(in_idxs)
+                    min_i = np.min(in_idxs)
+                    loc_size = len(in_idxs)
+                else:
+                    irange = list(range(in_var_meta['global_size']))
+                    max_i = in_var_meta['global_size'] - 1
+                    min_i = 0
+                    loc_size = end - start
 
-            if loc_size == 0:
-                # var is not local. get size of var in owned proc
-                for rank in range(nproc):
-                    sz = sizes[rank, in_var_idx]
-                    if sz > 0:
-                        loc_size = sz
-                        break
+                if loc_size == 0:
+                    # var is not local. get size of var in owned proc
+                    for rank in range(nproc):
+                        sz = sizes[rank, in_var_idx]
+                        if sz > 0:
+                            loc_size = sz
+                            break
 
-            voi_info[input_name] = (dinputs, doutputs, irange, max_i, min_i,
-                                    loc_size, start, end, dup)
+                dup = not in_var_meta['distributed']
+
+                # set totals to zeros instead of None in those cases when none
+                # of the specified indices are within the range of interest
+                # for this proc.
+                store = True if ((start <= min_i < end) or (start <= max_i < end)) else dup
+
+                if store:
+                    offset = start + min_i
+                    loc_idxs = irange - offset
+
+                voi_info[input_name] = (dinputs, doutputs, irange, loc_idxs, max_i, min_i,
+                                        loc_size, start, end, dup, store)
 
         return voi_info
 
-    def _compute_total_derivs_multi(self, totals, vois, voi_info, vec_names, mode,
+    def _compute_total_derivs_multi(self, totals, vois, voi_info, lin_vec_names, mode,
                                     output_list, old_output_list, output_vois,
-                                    test_mode, return_format):
-        # this sets dinputs for the current rhs_group to 0
-        voi_info[vois[0][0]][0].set_const(0.0)
+                                    use_rel_reduction, rel_systems, return_format):
         fwd = mode == 'fwd'
         model = self.model
         nproc = model.comm.size
         iproc = model.comm.rank
-        sizes = model._var_sizes['output']
+        sizes = model._var_sizes['nonlinear']['output']
+
+        # this sets dinputs for the current parallel_deriv_color to 0
+        voi_info[vois[0][0]][0].set_const(0.0)
+        if use_rel_reduction:
+            if fwd:
+                model._vectors['output']['linear'].set_const(0.0)
+            else:
+                model._vectors['input']['linear'].set_const(0.0)
 
         for input_name, old_input_name in vois:
-            dinputs, doutputs, idxs, max_i, min_i, loc_size, start, end, dup = voi_info[input_name]
+            dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
+                dup, store = voi_info[input_name]
             if input_name in dinputs:
                 vec = dinputs._views_flat[input_name]
                 for i, idx in enumerate(idxs):
@@ -1059,32 +1097,25 @@ class Problem(object):
                         else:
                             dinputs._views_flat[input_name][idx - start] = 1.0
 
-        model._solve_linear(vec_names, mode)
+        model._solve_linear(lin_vec_names, mode, rel_systems)
 
         for input_name, old_input_name in vois:
-            dinputs, doutputs, idxs, max_i, min_i, loc_size, start, end, dup = voi_info[input_name]
+            dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
+                dup, store = voi_info[input_name]
             ncol = dinputs._ncol
-
-            # totals to zeros instead of None in those cases when none
-            # of the specified indices are within the range of interest
-            # for this proc.
-            store = True if ((start <= min_i < end) or (start <= max_i < end)) else dup
-
-            if store:
-                loc_idxs = idxs - start
 
             # Pull out the answers and pack into our data structure.
             for ocount, output_name in enumerate(output_list):
                 out_idxs = None
                 if output_name in output_vois:
                     out_voi_meta = output_vois[output_name]
-                    if 'indices' in out_voi_meta:
-                        out_idxs = out_voi_meta['indices']
+                    out_idxs = out_voi_meta['indices']
 
-                if not test_mode and input_name not in self._relevant[output_name]:
+                if use_rel_reduction and output_name not in model._relevant[input_name]:
                     # irrelevant output, just give zeros
                     if out_idxs is None:
-                        out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
+                        out_var_idx = \
+                            model._var_allprocs_abs2idx['nonlinear']['output'][output_name]
                         if ncol > 1:
                             deriv_val = np.zeros((sizes[iproc, out_var_idx], ncol))
                         else:
@@ -1107,7 +1138,8 @@ class Problem(object):
                             deriv_val = deriv_val[out_idxs]
 
                     if dup and nproc > 1:
-                        out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
+                        out_var_idx = \
+                            model._var_allprocs_abs2idx['nonlinear']['output'][output_name]
                         # TODO: do during setup
                         root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
                         if deriv_val is None:
@@ -1119,6 +1151,9 @@ class Problem(object):
                         self.comm.Bcast(deriv_val, root=root)
 
                 len_val = len(deriv_val)
+
+                if store and len(deriv_val.shape) == 1:
+                    deriv_val = np.atleast_2d(deriv_val).T
 
                 if return_format == 'flat_dict':
                     if fwd:
@@ -1178,7 +1213,7 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        recording_iteration_stack.append(('_compute_total_derivs', 0))
+        recording_iteration.stack.append(('_compute_total_derivs', 0))
         model = self.model
         mode = self._mode
         vec_dinput = model._vectors['input']
@@ -1186,10 +1221,11 @@ class Problem(object):
         vec_dresid = model._vectors['residual']
         nproc = self.comm.size
         iproc = model.comm.rank
-        sizes = model._var_sizes['output']
-        relevant = self._relevant
+        sizes = model._var_sizes['nonlinear']['output']
+        relevant = model._relevant
         fwd = (mode == 'fwd')
         prom2abs = model._var_allprocs_prom2abs_list['output']
+        abs2idx_out = model._var_allprocs_abs2idx['linear']['output']
 
         if wrt is None:
             wrt = list(self.driver._designvars)
@@ -1200,9 +1236,6 @@ class Problem(object):
         # A number of features will need to be supported here as development
         # goes forward.
         # -------------------------------------------------------------------
-        # TODO: Support parallel adjoint and parallel forward derivatives
-        #       Aside: how are they specified, and do we have to pick up any
-        #       that are missed?
         # TODO: Support constraint sparsity (i.e., skip in/out that are not
         #       relevant for this constraint) (desvars too?)
         # TODO: Don't calculate for inactive constraints
@@ -1211,19 +1244,13 @@ class Problem(object):
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
         matmat = False
-        for subname in vec_dinput:
+        for vec_name in model._lin_vec_names:
 
             # TODO: Do all three deriv vectors have the same keys?
 
-            # Skip nonlinear because we don't need to mess with it?
-            if subname == 'nonlinear':
-                continue
-            elif subname != 'linear':
-                matmat |= isinstance(vec_doutput[subname], (DefaultMultiVector, PETScMultiVector))
-
-            vec_dinput[subname].set_const(0.0)
-            vec_doutput[subname].set_const(0.0)
-            vec_dresid[subname].set_const(0.0)
+            vec_dinput[vec_name].set_const(0.0)
+            vec_doutput[vec_name].set_const(0.0)
+            vec_dresid[vec_name].set_const(0.0)
 
         # Linearize Model
         model._linearize()
@@ -1267,9 +1294,9 @@ class Problem(object):
 
         # Solve for derivs using linear solver.
 
-        # this maps either an rhs_group to a list of tuples of (absname, oldname)
+        # this maps either an parallel_deriv_color to a list of tuples of (absname, oldname)
         # of variables in that group, or, for variables that aren't in an
-        # rhs_group, it maps the variable name to a one entry list containing
+        # parallel_deriv_color, it maps the variable name to a one entry list containing
         # the tuple (absname, oldname) for that variable.  oldname will be
         # the promoted name if the 'global_names' arg is False, else it will
         # be the same as absname (the absolute variable name).
@@ -1277,7 +1304,7 @@ class Problem(object):
 
         # this maps the names from input_list to the corresponding names
         # of the RHS vectors.  For any variables that are not part of an
-        # rhs_group, they will map to 'linear'.  All rhs_group'ed variables
+        # parallel_deriv_color, they will map to 'linear'.  All parallel_deriv_color'ed variables
         # will just map to their own name.
         inp2rhs_name = {}
 
@@ -1286,52 +1313,84 @@ class Problem(object):
         # don't do relevance checking (because we only want to analyze the
         # dependency graph for VOIs rather than for every input/output
         # in the model)
-        test_mode = False
+        use_rel_reduction = True
 
+        matmat = False
         for i, name in enumerate(input_list):
+            varmatmat = False
             if name in input_vois:
-                rhs_group = input_vois[name]['rhs_group']
+                meta = input_vois[name]
+                parallel_deriv_color = meta['parallel_deriv_color']
+                varmatmat |= (meta['vectorize_derivs'] and meta['size'] > 1)
             else:
-                rhs_group = None
-                test_mode = True
-            if rhs_group is None:  # variable is not in an rhs_group
+                parallel_deriv_color = None
+                use_rel_reduction = False
+
+            if parallel_deriv_color is None:  # variable is not in an parallel_deriv_color
                 if name in voi_lists:
-                    raise RuntimeError("Variable name '%s' matches an rhs_group name." %
+                    raise RuntimeError("Variable name '%s' matches an parallel_deriv_color name." %
                                        name)
                 else:
                     # store the absolute name along with the original name, which
                     # can be either promoted or absolute depending on the value
                     # of the 'global_names' flag.
                     voi_lists[name] = [(name, old_input_list[i])]
-                    inp2rhs_name[name] = 'linear'
+                    inp2rhs_name[name] = name if varmatmat else 'linear'
             else:
-                if rhs_group not in voi_lists:
-                    voi_lists[rhs_group] = []
-                voi_lists[rhs_group].append((name, old_input_list[i]))
+                if parallel_deriv_color not in voi_lists:
+                    voi_lists[parallel_deriv_color] = []
+                voi_lists[parallel_deriv_color].append((name, old_input_list[i]))
                 inp2rhs_name[name] = name
 
-        vec_names = sorted(set(inp2rhs_name.values()))
+            matmat |= varmatmat
 
-        for rhs_name, vois in iteritems(voi_lists):
+        lin_vec_names = sorted(set(inp2rhs_name.values()))
+
+        voi_info = self._get_voi_info(voi_lists, inp2rhs_name, input_vec, output_vec, input_vois)
+
+        if matmat:
+            for vois in itervalues(voi_lists):
+                if use_rel_reduction:
+                    rel_systems = set()
+                    for voi, _ in vois:
+                        rel_systems.update(relevant[voi]['@all'][1])
+                else:
+                    rel_systems = _contains_all
+                self._compute_total_derivs_multi(totals, vois, voi_info, lin_vec_names, mode,
+                                                 output_list, old_output_list,
+                                                 output_vois, use_rel_reduction, rel_systems,
+                                                 return_format)
+            recording_iteration.stack.pop()
+            return totals
+
+        for vois in itervalues(voi_lists):
             # If Forward mode, solve linear system for each 'wrt'
             # If Adjoint mode, solve linear system for each 'of'
-            voi_info = self._get_voi_info(vois, inp2rhs_name, input_vec, output_vec, input_vois)
 
-            if matmat:
-                self._compute_total_derivs_multi(totals, vois, voi_info, vec_names, mode,
-                                                 output_list, old_output_list,
-                                                 output_vois, test_mode, return_format)
-                continue
+            if use_rel_reduction:
+                rel_systems = set()
+                for voi, _ in vois:
+                    rel_systems.update(relevant[voi]['@all'][1])
+            else:
+                rel_systems = _contains_all
 
             loc_idxs = defaultdict(lambda: -1)
 
-            max_len = max(len(v[2]) for v in voi_info.values())
+            max_len = max(len(voi_info[name][2]) for name, _ in vois)
             for i in range(max_len):
-                # this sets dinputs for the current rhs_group to 0
-                voi_info[vois[0][0]][0].set_const(0.0)
+                # this sets dinputs for the current parallel_deriv_color to 0
+                # dinputs is dresids in fwd, doutouts in rev
+                if fwd:
+                    vec_dresid['linear'].set_const(0.0)
+                    if use_rel_reduction:
+                        vec_doutput['linear'].set_const(0.0)
+                else:  # rev
+                    vec_doutput['linear'].set_const(0.0)
+                    if use_rel_reduction:
+                        vec_dinput['linear'].set_const(0.0)
 
                 for input_name, old_input_name in vois:
-                    dinputs, doutputs, idxs, max_i, min_i, loc_size, start, end, dup = \
+                    dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
                         voi_info[input_name]
                     if i >= len(idxs):
                         # reuse the last index if loop iter is larger than current var size
@@ -1346,10 +1405,10 @@ class Problem(object):
                         # need a vector for clean code, so use _views_flat.
                         dinputs._views_flat[input_name][idx - start] = 1.0
 
-                model._solve_linear(vec_names, mode)
+                model._solve_linear(lin_vec_names, mode, rel_systems)
 
                 for input_name, old_input_name in vois:
-                    dinputs, doutputs, idxs, max_i, min_i, loc_size, start, end, dup = \
+                    dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
                         voi_info[input_name]
                     if i >= len(idxs):
                         idx = idxs[-1]  # reuse the last index
@@ -1374,10 +1433,10 @@ class Problem(object):
                             if 'indices' in out_voi_meta:
                                 out_idxs = out_voi_meta['indices']
 
-                        if not test_mode and input_name not in relevant[output_name]:
+                        if use_rel_reduction and output_name not in relevant[input_name]:
                             # irrelevant output, just give zeros
                             if out_idxs is None:
-                                out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
+                                out_var_idx = abs2idx_out[output_name]
                                 deriv_val = np.zeros(sizes[iproc, out_var_idx])
                             else:
                                 deriv_val = np.zeros(len(out_idxs))
@@ -1394,7 +1453,7 @@ class Problem(object):
                                     deriv_val = deriv_val[out_idxs]
 
                             if dup and nproc > 1:
-                                out_var_idx = model._var_allprocs_abs2idx['output'][output_name]
+                                out_var_idx = abs2idx_out[output_name]
                                 root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
                                 if deriv_val is None:
                                     if out_idxs is not None:
@@ -1440,7 +1499,7 @@ class Problem(object):
                         else:
                             raise RuntimeError("unsupported return format")
 
-        recording_iteration_stack.pop()
+        recording_iteration.stack.pop()
         return totals
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
@@ -1468,7 +1527,7 @@ class Problem(object):
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, logger,
                               compact_print, system_list, global_options, totals=False,
-                              suppress_output=False):
+                              suppress_output=False, indep_key=None):
     """
     Compute the relative and absolute errors in the given derivatives and print to the logger.
 
@@ -1492,6 +1551,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
         Set to True if we are doing check_total_derivs to skip a bunch of stuff.
     suppress_output : bool
         Set to True to suppress all output. Just calculate errors and add the keys.
+    indep_key : dict of sets, optional
+        Keyed by component name, contains the of/wrt keys that are declared not dependent.
     """
     fd_desc = "{}:{}".format(global_options['method'],
                              global_options['form'])
@@ -1602,6 +1663,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
                     derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fd_norm,
                                                                         rev_error / fd_norm,
                                                                         fwd_rev_error / fd_norm)
+
+            # Skip printing the dependent keys if the derivatives are fine.
+            if indep_key is not None:
+                rel_key = (of, wrt)
+                if rel_key in indep_key[sys_name] and fd_norm < abs_error_tol:
+                    del derivative_data[sys_name][rel_key]
+                    continue
 
             if not suppress_output:
                 if compact_print:
@@ -1720,82 +1788,3 @@ def _format_error(error, tol):
     if np.isnan(error) or error < tol:
         return '{:.6e}'.format(error)
     return '{:.6e} *'.format(error)
-
-
-def get_relevant_vars(graph, desvars, responses):
-    """
-    Find all relevant vars between desvars and responses.
-
-    Both vars are assumed to be outputs (either design vars or responses).
-
-    Parameters
-    ----------
-    graph : networkx.DiGraph
-        System graph with var connection info on the edges.
-    desvars : list of str
-        Names of design variables.
-    responses : list of str
-        Names of response variables.
-
-    Returns
-    -------
-    dict
-        Dict of (dep_outputs, dep_inputs, dep_systems) keyed by design vars and responses.
-    """
-    relevant = defaultdict(dict)
-    edge_cache = {}
-
-    grev = graph.reverse()
-
-    for desvar in desvars:
-        start_sys = desvar.rsplit('.', 1)[0]
-        if start_sys not in edge_cache:
-            edge_cache[start_sys] = set(all_connected_edges(graph, start_sys))
-        start_edges = edge_cache[start_sys]
-
-        for response in responses:
-            end_sys = response.rsplit('.', 1)[0]
-            if end_sys not in edge_cache:
-                edge_cache[end_sys] = set((v, u) for u, v in
-                                          all_connected_edges(grev, end_sys))
-            end_edges = edge_cache[end_sys]
-
-            common_edges = start_edges.intersection(end_edges)
-
-            input_deps = set()
-            output_deps = set()
-            sys_deps = set()
-            for u, v in common_edges:
-                sys_deps.add(u)
-                sys_deps.add(v)
-                conns = graph[u][v]['conns']
-                output_deps.update(conns)
-                for inputs in conns.values():
-                    input_deps.update(inputs)
-
-            if sys_deps:
-                output_deps.update((desvar, response))
-                relevant[desvar][response] = relevant[response][desvar] = \
-                    (input_deps, output_deps, sys_deps)
-
-    # TODO: if we knew mode here, we would only need to compute for fwd or rev,
-    # instead of both.
-
-    # now calculate dependencies between each VOI and all other VOIs of the
-    # other type, e.g for each input VOI wrt all output VOIs.
-    for inputs, outputs in [(desvars, responses), (responses, desvars)]:
-        for inp in inputs:
-            relinp = relevant[inp]
-            if relinp:
-                total_inps = set()
-                total_outs = set()
-                total_systems = set()
-                for out in outputs:
-                    if out in relinp:
-                        inps, outs, systems = relinp[out]
-                        total_inps.update(inps)
-                        total_outs.update(outs)
-                        total_systems.update(systems)
-                relinp['@all'] = (total_inps, total_outs, total_systems)
-
-    return relevant

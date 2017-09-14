@@ -109,8 +109,9 @@ class RecordingManager(object):
             rrank = object_requesting_recording._problem.comm.rank  # root ( aka model ) rank. So this only works for
             # Compute owning ranks
             rowned = {}
-            for varname, out_var_idx in iteritems(model._var_allprocs_abs2idx['output']):
-                rowned[varname] = np.min(np.nonzero(model._var_sizes['output'][:, out_var_idx])[0][0])
+            # print("model._var_allprocs_abs2idx keys", model._var_allprocs_abs2idx.keys())
+            for varname, out_var_idx in iteritems(model._var_allprocs_abs2idx['nonlinear']['output']):
+                rowned[varname] = np.min(np.nonzero(model._var_sizes['nonlinear']['output'][:, out_var_idx])[0][0])
 
         self._record_desvars = self._record_responses = False
         self._record_objectives = self._record_constraints = False

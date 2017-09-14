@@ -105,12 +105,20 @@ class SqliteRecorder(BaseRecorder):
     def record_iteration_driver_passing_vars(self, object_requesting_recording, desvars,
                                              responses, objectives, constraints, metadata):
         """
-        Record an iteration using the driver options.
+        Record an iteration of a driver with the variables passed in.
 
         Parameters
         ----------
         object_requesting_recording: <Driver>
             The Driver object that wants to record an iteration.
+        desvars : dict
+            Dictionary containing design variables.
+        responses : dict
+            Dictionary containing response variables.
+        objectives : dict
+            Dictionary containing objective variables.
+        constraints : dict
+            Dictionary containing constraint variables.
         metadata : dict
             Dictionary containing execution metadata (e.g. iteration coordinate).
         """
