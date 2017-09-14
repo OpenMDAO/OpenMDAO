@@ -26,7 +26,10 @@ def upload(sqlite_file, token, name=None, case_id=None, suppress_output=False):
         Indicates whether or not the upload status should be printed.
     """
     reader = SqliteCaseReader(sqlite_file)
-    recorder = WebRecorder(token, name)
+    if case_id is None:
+        recorder = WebRecorder(token, name)
+    else:
+        recorder = WebRecorder(token, name, case_id=case_id)
 
     if not suppress_output:
         print('Data Uploader: Recording driver iteration data')

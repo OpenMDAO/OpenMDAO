@@ -67,6 +67,7 @@ class TestDataUploader(unittest.TestCase):
     system_iterations = None
     solver_metadata = None
     solver_iterations = None
+    update_header = False
 
     def setUp(self):
         recording_iteration.stack = []
@@ -162,7 +163,8 @@ class TestDataUploader(unittest.TestCase):
                json=self.check_solver_metadata)
         m.post(self._endpoint_base + '/' + self._default_case_id + '/solver_iterations',
                json=self.check_solver_iterations)
-
+        m.post(self._endpoint_base + '/' + '54321' + '/driver_metadata',
+               json = self.check_driver)
     def check_header(self, request, context):
         if request.headers['token'] == self._accepted_token:
             return {
@@ -179,6 +181,7 @@ class TestDataUploader(unittest.TestCase):
     def check_driver(self, request, context):
         self.recorded_metadata = True
         self.driver_data = request.body
+        self.update_header = request.headers['update']
         return {'status': 'Success'}
 
     def check_driver_iteration(self, request, context):
@@ -206,6 +209,46 @@ class TestDataUploader(unittest.TestCase):
     def check_solver_iterations(self, request, context):
         self.recorded_solver_iterations = True
         self.solver_iterations = request.body
+
+    def test_header_with_case_id(self, m):
+        self.setup_endpoints(m)
+
+        self.setup_sellar_model()
+
+        self.recorder.options['includes'] = ["p1.x"]
+        self.recorder.options['record_metadata'] = True
+        self.prob.driver.add_recorder(self.recorder)
+        self.prob.setup(check=False)
+
+        # Need this since we aren't running the model.
+        self.prob.final_setup()
+
+        self.prob.cleanup()
+        upload(self.filename, self._accepted_token, suppress_output=True, case_id='54321')
+        self.assertTrue(self.recorded_metadata)
+        self.recorded_metadata = False
+
+        self.assertEqual(self.update_header, 'True')
+
+    def test_header_without_case_id(self, m):
+        self.setup_endpoints(m)
+
+        self.setup_sellar_model()
+
+        self.recorder.options['includes'] = ["p1.x"]
+        self.recorder.options['record_metadata'] = True
+        self.prob.driver.add_recorder(self.recorder)
+        self.prob.setup(check=False)
+
+        # Need this since we aren't running the model.
+        self.prob.final_setup()
+
+        self.prob.cleanup()
+        upload(self.filename, self._accepted_token, suppress_output=True)
+        self.assertTrue(self.recorded_metadata)
+        self.recorded_metadata = False
+
+        self.assertEqual(self.update_header, 'False')
 
     def test_driver_records_metadata(self, m):
         self.setup_endpoints(m)
