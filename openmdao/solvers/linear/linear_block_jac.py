@@ -29,7 +29,6 @@ class LinearBlockJac(BlockLinearSolver):
                 b_vec += self._rhs_vecs[vec_name]
             for subsys in system._subsystems_myproc:
                 subsys._solve_linear(vec_names, mode)
-
         elif mode == 'rev':
             for subsys in system._subsystems_myproc:
                 scope_out, scope_in = system._get_scope(subsys)
