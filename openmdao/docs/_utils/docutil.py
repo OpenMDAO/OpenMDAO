@@ -191,12 +191,17 @@ The docstrings are stripped from the code
 # pylint: disable=C0103
 
 
-def get_source_code_of_class_or_method(class_or_method_path):
-    '''The function to be called a the custom Sphinx directive code
-    that includes the source code of a class or method.
-    '''
+def get_source_code_of_class_or_method(class_or_method_path, remove_docstring=True):
+    """
+    Return source code as a text string.
 
-    # the class_or_method_path could be either to a class or method
+    Parameters
+    ----------
+    class_or_method_path : str
+        Package path to the class or function.
+    remove_docstring : bool
+        Set to False to keep docstrings in the text.
+    """
 
     # first assume class and see if it works
     try:
@@ -205,6 +210,7 @@ def get_source_code_of_class_or_method(class_or_method_path):
         class_name = class_or_method_path.split('.')[-1]
         cls = getattr(module_with_class, class_name)
         source = inspect.getsource(cls)
+
     except ImportError:
         # else assume it is a path to a method
         module_path = '.'.join(class_or_method_path.split('.')[:-2])
@@ -216,9 +222,10 @@ def get_source_code_of_class_or_method(class_or_method_path):
         source = inspect.getsource(meth)
 
     # Remove docstring from source code
-    source_minus_docstrings = remove_docstrings(source)
+    if remove_docstring:
+        source = remove_docstrings(source)
 
-    return source_minus_docstrings
+    return source
 
 
 """

@@ -1,8 +1,10 @@
+.. _TheoryManual:
+
 *************
 Theory Manual
 *************
 
-This document will become the theory manual.
+The Theory Manual exists to explain some of the concepts behind OpenMDAO blue in more detail.
 
 .. toctree::
    :maxdepth: 2
