@@ -15,6 +15,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta
 
+
 class SolverInfo(object):
     """
     Communal object for storing some formatting for solver iprint.
@@ -149,7 +150,8 @@ class Solver(object):
            A recorder instance to be added to RecManager.
         """
         if MPI:
-            raise RuntimeError("Recording of Solvers when running parallel code is not supported yet")
+            raise RuntimeError("Recording of Solvers when running parallel code is not "
+                               "supported yet")
         self._rec_mgr.append(recorder)
 
     def _declare_options(self):
