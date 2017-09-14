@@ -14,6 +14,7 @@ from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockG
 from openmdao.recorders.sqlite_recorder import SqliteRecorder, format_version
 from openmdao.recorders.case_reader import CaseReader
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
+from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
     SellarDis2withDerivatives
 from openmdao.devtools.testutil import assert_rel_error
@@ -115,6 +116,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         if OPTIMIZER is None:
             raise unittest.SkipTest("pyoptsparse is not providing SLSQP")
 
+        recording_iteration.stack = []  # reset to avoid problems from earlier tests
         self.dir = mkdtemp()
         self.filename = os.path.join(self.dir, "sqlite_test")
         self.recorder = SqliteRecorder(self.filename)

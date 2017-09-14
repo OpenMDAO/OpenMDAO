@@ -628,8 +628,8 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         lines = testlogger.get('info')
 
-        self.assertTrue('9.80614' in lines[4])
-        self.assertTrue('9.80614' in lines[5])
+        self.assertTrue('9.80614' in lines[4], "'9.80614' not found in '%s'" % lines[4])
+        self.assertTrue('9.80614' in lines[5], "'9.80614' not found in '%s'" % lines[5])
 
         assert_rel_error(self, totals['con_cmp2.con2', 'px.x']['J_fwd'], [[0.09692762]], 1e-5)
         assert_rel_error(self, totals['con_cmp2.con2', 'px.x']['J_fd'], [[0.09692762]], 1e-5)

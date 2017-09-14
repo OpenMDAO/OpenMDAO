@@ -123,6 +123,15 @@ def replace_asserts_with_prints(source_code):
         #                                                  the TestCase
         assert_node.value[0].replace("print")
 
+    assert_nodes = rb.findAll("NameNode", value='assert_almost_equal')
+    for assert_node in assert_nodes:
+        assert_node = assert_node.parent
+        # If relative error tolerance is specified, there are 3 arguments
+        if len(assert_node.value[1]) == 3:
+            remove_redbaron_node(assert_node.value[1], -1)  # remove the relative error tolerance
+        remove_redbaron_node(assert_node.value[1], -1)  # remove the expected value
+        assert_node.value[0].replace("print")
+
     source_code_with_prints = rb.dumps()  # get back the string representation of the code
     return source_code_with_prints
 
@@ -589,25 +598,14 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
 
     method_source = '\n'.join(new_lines[counter:])
 
-    #rb = RedBaron(class_source_code)
-    #def_nodes = rb.find("DefNode", name=method_name)
-    #def_nodes.value.decrease_indentation(8)
-    #method_source = def_nodes.value.dumps()
-
     # Remove docstring from source code
     source_minus_docstrings = remove_docstrings(method_source)
-
-    # We are using the RedBaron module in the next two function calls
-    #    to get the code in the way we want it.
-
-    # Only want the method body. Do not want the 'def' line
-    # method_body_source = get_method_body(source_minus_docstrings)
-    # method_body_source = source_minus_docstrings
 
     #####################
     ### 2. Replace the asserts with prints -> source_minus_docstrings_with_prints_cleaned ###
     #####################
     # Replace some of the asserts with prints of the actual values
+    # This calls RedBaron
     source_minus_docstrings_with_prints = replace_asserts_with_prints(source_minus_docstrings)
 
     # remove raise SkipTest lines
@@ -637,7 +635,10 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
     #   raise call
     raise_skip_test_source_code = ""
     if '@unittest.skip' in class_source_code:
+
+        # This calls RedBaron
         skip_predicate_and_message = get_skip_predicate_and_message(class_source_code, method_name)
+
         if skip_predicate_and_message:
             # predicate, message = skip_unless_predicate_and_message
             predicate, message = skip_predicate_and_message
