@@ -304,65 +304,6 @@ class TestNewton(unittest.TestCase):
         self.assertLess(model.nonlinear_solver._iter_count, 8)
         self.assertEqual(model.linear_solver._iter_count, 0)
 
-    def test_implicit_utol(self):
-        # We are setup for reach utol termination condition quite quickly.
-
-        raise unittest.SkipTest("solver utol not implemented yet")
-
-        class CubicImplicit(ImplicitComponent):
-            """ A Simple Implicit Component.
-            f(x) = x**3 + 3x**2 -6x +18
-            """
-
-            def __init__(self):
-                super(CubicImplicit, self).__init__()
-
-                # Params
-                self.add_input('x', 0.0)
-
-                # States
-                self.add_output('z', 0.0)
-
-            def compute(self, inputs, outputs):
-                pass
-
-            def apply_nonlinear(self, inputs, outputs, resids):
-                """ Don't solve; just calculate the residual."""
-
-                x = inputs['x']
-                z = outputs['z']
-
-                resids['z'] = (z**3 + 3.0*z**2 - 6.0*z + x)*1e15
-
-            def linearize(self, inputs, outputs, partials):
-                """Analytical derivatives."""
-
-                # x = inputs['x']
-                z = outputs['z']
-
-                # State equation
-                partials[('z', 'z')] = (3.0*z**2 + 6.0*z - 6.0)*1e15
-                partials[('z', 'x')] = 1.0*1e15
-
-        prob = Problem()
-        root = prob.model = Group()
-        root.add_subsystem('p1', IndepVarComp('x', 17.4))
-        root.add_subsystem('comp', CubicImplicit())
-        root.connect('p1.x', 'comp.x')
-
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.linear_solver = ScipyIterativeSolver()
-
-        prob.setup(check=False)
-        prob['comp.z'] = -4.93191510182
-
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        assert_rel_error(self, prob['comp.z'], -4.93191510182, .00001)
-        self.assertLessEqual(prob.model.nonlinear_solver._iter_count, 4,
-                             msg='Should get there pretty quick because of utol.')
-
     def test_solve_subsystems_basic(self):
         prob = Problem()
         model = prob.model = DoubleSellar()
@@ -856,7 +797,7 @@ class TestNewtonFeatures(unittest.TestCase):
 
         model.linear_solver = LinearBlockGS()
 
-        nlgbs = model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver = NewtonSolver()
 
         prob.setup()
 
