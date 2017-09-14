@@ -101,6 +101,10 @@ func_group = {
         ('*compute*', (System,)),
         ('*linear*', (System,)),
         ('*', (Transfer,)),
+    ],
+    'linear': [
+        ('*linear*', (System,)),
+        ('*solve*', (Solver,)),
     ]
 }
 

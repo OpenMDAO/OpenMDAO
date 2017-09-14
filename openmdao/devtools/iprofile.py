@@ -2,7 +2,7 @@ from __future__ import print_function
 
 import os
 import sys
-from time import time as etime
+from timeit import default_timer as etime
 import argparse
 import json
 import atexit
@@ -90,7 +90,7 @@ def setup(prefix='iprof', methods=None, prof_dir=None, finalize=True):
         methods = func_group['openmdao']
 
     rank = MPI.COMM_WORLD.rank if MPI else 0
-    _profile_out = open("%s.%d" % (_profile_prefix, rank), 'wb')
+    _profile_out = open("%s.%s" % (_profile_prefix, rank), 'wb')
 
     if finalize:
         atexit.register(_finalize_profile)

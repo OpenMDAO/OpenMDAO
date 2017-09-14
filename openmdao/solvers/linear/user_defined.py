@@ -20,7 +20,8 @@ class LinearUserDefined(LinearSolver):
         Parameters
         ----------
         solve_function : function
-            Custom function containing the solve_linear function.
+            Custom function containing the solve_linear function. The default is None, which means
+            the name defaults to "solve_linear".
         **kwargs : dict
             Options dictionary.
         """
@@ -28,7 +29,7 @@ class LinearUserDefined(LinearSolver):
 
         self.solve_function = solve_function
 
-    def solve(self, vec_names, mode):
+    def solve(self, vec_names, mode, rel_systems=None):
         """
         Solve the linear system for the problem in self._system.
 
@@ -40,6 +41,8 @@ class LinearUserDefined(LinearSolver):
             list of vector names.
         mode : string
             Derivative mode, can be 'fwd' or 'rev'.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
 
         Returns
         -------
@@ -51,6 +54,7 @@ class LinearUserDefined(LinearSolver):
             relative error.
         """
         self._vec_names = vec_names
+        self._rel_systems = rel_systems
         self._mode = mode
 
         system = self._system
