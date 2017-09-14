@@ -70,7 +70,8 @@ setup(name='openmdao',
         'sphinx',
         'redbaron',
         'mock',
-        'requests_mock'
+        'requests_mock',
+        'tornado',
       ],
       # scripts=['bin/om-pylint.sh']
       entry_points="""
