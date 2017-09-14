@@ -44,9 +44,7 @@ def use_proc_files():
     Cause stdout/err from each MPI process to be written to [rank].out.
     """
     if MPI is not None:
-        rank = MPI.COMM_WORLD.rank
-        sname = "%s.out" % rank
-        ofile = open(sname, 'wb')
+        ofile = open("%d.out" % MPI.COMM_WORLD.rank, 'wb')
         _redirect_streams(ofile.fileno())
 
 

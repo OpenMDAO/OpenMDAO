@@ -412,7 +412,7 @@ class DistribStateImplicit(ImplicitComponent):
             if 'a' in d_i:
                     d_i['a'] -= numpy.sum(d_r['states'])
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI, "only run under MPI")
 class MPITests3(unittest.TestCase):
 
     N_PROCS = 3

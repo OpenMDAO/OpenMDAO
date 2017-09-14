@@ -81,6 +81,26 @@ class TestScipyOptimizer(unittest.TestCase):
         assert_rel_error(self, comp.JJ[3:4, 0:2], derivs[0:1, :], 1.0e-3)
         assert_rel_error(self, np.eye(2), derivs[1:3, :], 1.0e-3)
 
+    def test_deriv_wrt_self(self):
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
+
+        model.add_design_var('px.x')
+        model.add_objective('px.x')
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        # Support for a name to be in 'of' and 'wrt'
+
+        J = prob.driver._compute_total_derivs(of=['px.x'], wrt=['px.x'],
+                                                   return_format='array')
+
+        assert_rel_error(self, J, np.eye(2), 1.0e-3)
+
     def test_simple_paraboloid_unconstrained(self):
 
         prob = Problem()
