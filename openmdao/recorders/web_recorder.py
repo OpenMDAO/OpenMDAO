@@ -30,7 +30,7 @@ class WebRecorder(BaseRecorder):
     """
 
     def __init__(self, token, case_name='Case Recording',
-                 endpoint='http://www.openmdao.org/visualization', port='',
+                 endpoint='http://www.openmdao.org/visualization', port='', case_id=None,
                  suppress_output=False):
         """
         Initialize the OpenMDAOServerRecorder.
@@ -52,34 +52,38 @@ class WebRecorder(BaseRecorder):
         super(WebRecorder, self).__init__()
 
         self.model_viewer_data = None
-        self._headers = {'token': token}
+        self._headers = {'token': token, 'update': "False" }
         if port != '':
             self._endpoint = endpoint + ':' + port + '/case'
         else:
             self._endpoint = endpoint + '/case'
 
-        case_data_dict = {
-            'case_name': case_name,
-            'owner': 'temp_owner'
-        }
+        if case_id == None:
+            case_data_dict = {
+                'case_name': case_name,
+                'owner': 'temp_owner'
+            }
 
-        case_data = json.dumps(case_data_dict)
+            case_data = json.dumps(case_data_dict)
 
-        # Post case and get Case ID
-        case_request = requests.post(self._endpoint, data=case_data, headers=self._headers)
-        response = case_request.json()
-        if response['status'] != 'Failed':
-            self._case_id = str(response['case_id'])
-        else:
-            self._case_id = '-1'
-            if not suppress_output:
-                print("Failed to initialize case on server. No messages will be accepted \
-                from server for this case. Make sure you registered for a token at the \
-                given endpoint.")
-
-            if 'reasoning' in response:
+            # Post case and get Case ID
+            case_request = requests.post(self._endpoint, data=case_data, headers=self._headers)
+            response = case_request.json()
+            if response['status'] != 'Failed':
+                self._case_id = str(response['case_id'])
+            else:
+                self._case_id = '-1'
                 if not suppress_output:
-                    print("Failure reasoning: " + response['reasoning'])
+                    print("Failed to initialize case on server. No messages will be accepted \
+                    from server for this case. Make sure you registered for a token at the \
+                    given endpoint.")
+
+                if 'reasoning' in response:
+                    if not suppress_output:
+                        print("Failure reasoning: " + response['reasoning'])
+        else:
+            self._case_id = str(case_id)
+            self._headers['update'] = "True"
 
     def record_iteration_driver(self, object_requesting_recording, metadata):
         """
