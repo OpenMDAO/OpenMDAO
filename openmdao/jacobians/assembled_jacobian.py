@@ -360,7 +360,7 @@ class AssembledJacobian(Jacobian):
             else:  # rev
                 dresids = d_residuals.get_data()
                 if len(d_outputs._names) > 0 and len(d_residuals._names) > 0:
-                    d_outputs.iadd_data()
+                    d_outputs.iadd_data(int_mtx._prod(dresids, mode, int_ranges))
                 if ext_mtx is not None and \
                    len(d_inputs._names) > 0 and len(d_residuals._names) > 0:
                     d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None))
