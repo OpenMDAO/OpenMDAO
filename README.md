@@ -31,6 +31,7 @@ Here is a list of things that have not yet been fully developed in 2.x:
 * File variables
 * Active-set constraint calculation disabling
 * Brent Solver
+* CaseRecording using CSV, HDF5, and dump recorders (SqliteRecorder and WebRecorder are currently supported)
 
 Installation Instructions:
 --------------------------
