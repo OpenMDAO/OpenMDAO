@@ -498,6 +498,7 @@ class LinearSolver(Solver):
         Run the the apply_linear method on the system.
         """
         recording_iteration_stack.append(('_run_apply', 0))
+
         system = self._system
         scope_out, scope_in = system._get_scope()
         system._apply_linear(self._vec_names, self._mode, scope_out, scope_in)
