@@ -104,8 +104,9 @@ class WebRecorder(BaseRecorder):
         #                       ])
 
         super(WebRecorder, self).record_iteration_driver_passing_vars(object_requesting_recording,
-                                                                         desvars, responses,
-                                                                         objectives, constraints, metadata)
+                                                                      desvars, responses,
+                                                                      objectives, constraints,
+                                                                      metadata)
 
         desvars_array = None
         responses_array = None
@@ -170,7 +171,6 @@ class WebRecorder(BaseRecorder):
                       data=driver_iteration, headers=self._headers)
         requests.post(self._endpoint + '/' + self._case_id + '/global_iterations',
                       data=global_iteration, headers=self._headers)
-
 
     def record_iteration_driver(self, object_requesting_recording, metadata):
         """

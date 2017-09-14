@@ -2975,8 +2975,8 @@ class System(object):
 
     def is_active(self):
         """
-        Is this System active on this rank?
-        
+        Determine if the system is on the active rank.
+
         Returns
         -------
         bool
