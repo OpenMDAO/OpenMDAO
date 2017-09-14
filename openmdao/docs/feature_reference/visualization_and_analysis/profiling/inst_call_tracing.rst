@@ -15,7 +15,7 @@ console, indented based on its location in the call stack.  The current call cou
 is also displayed.   For example:
 
 
-::
+.. code-block:: none
 
    Group#1.Group.__init__ (1)
       Group#1.System.__init__ (1)

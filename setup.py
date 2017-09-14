@@ -77,7 +77,7 @@ setup(name='openmdao',
       [console_scripts]
       wingproj=openmdao.devtools.wingproj:run_wing
       webview=openmdao.devtools.webview:webview_argv
-      iprofview=openmdao.devtools.iprofile_app:prof_view
+      iprofview=openmdao.devtools.iprofile_app.iprofile_app:prof_view
       iproftotals=openmdao.devtools.iprofile:prof_totals
       iprofmem=openmdao.devtools.iprof_mem:profile_py_file
       icalltrace=openmdao.devtools.itrace:trace_py_file
