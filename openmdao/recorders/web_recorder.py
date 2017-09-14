@@ -52,13 +52,13 @@ class WebRecorder(BaseRecorder):
         super(WebRecorder, self).__init__()
 
         self.model_viewer_data = None
-        self._headers = {'token': token, 'update': "False" }
+        self._headers = {'token': token, 'update': "False"}
         if port != '':
             self._endpoint = endpoint + ':' + port + '/case'
         else:
             self._endpoint = endpoint + '/case'
 
-        if case_id == None:
+        if case_id is None:
             case_data_dict = {
                 'case_name': case_name,
                 'owner': 'temp_owner'
@@ -267,7 +267,6 @@ class WebRecorder(BaseRecorder):
                                       metadata['msg'], inputs_array, outputs_array,
                                       residuals_array)
 
-
     def _record_system_iteration(self, counter, iteration_coordinate, success, msg,
                                  inputs, outputs, residuals):
         """
@@ -352,7 +351,7 @@ class WebRecorder(BaseRecorder):
         iteration_coordinate = get_formatted_iteration_coordinate()
         self._record_solver_iteration(self._counter, iteration_coordinate, metadata['success'],
                                       metadata['msg'], self._abs_error, self._rel_error,
-                                      outputs_array, residuals_array)        
+                                      outputs_array, residuals_array)
 
     def _record_solver_iteration(self, counter, iteration_coordinate, success, msg,
                                  abs_error, rel_error, outputs, residuals):

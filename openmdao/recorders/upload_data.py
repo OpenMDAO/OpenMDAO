@@ -8,6 +8,7 @@ import argparse
 from openmdao.api import WebRecorder
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 
+
 def upload(sqlite_file, token, name=None, case_id=None, suppress_output=False):
     """
     Upload sqlite recording to the web server.
@@ -46,10 +47,11 @@ def upload(sqlite_file, token, name=None, case_id=None, suppress_output=False):
     recorder._record_driver_metadata('Driver', json.dumps(reader.driver_metadata))
     for item in reader.solver_metadata:
         recorder._record_solver_metadata(reader.solver_metadata[item]['solver_options'],
-            reader.solver_metadata[item]['solver_class'], '')
+                                         reader.solver_metadata[item]['solver_class'], '')
 
     if not suppress_output:
         print('Finished uploading')
+
 
 def _upload_system_iterations(new_list, recorder):
     """
@@ -68,19 +70,19 @@ def _upload_system_iterations(new_list, recorder):
         inputs = []
         outputs = []
         residuals = []
-        if data.inputs != None:
+        if data.inputs is not None:
             for n in data.inputs.dtype.names:
                 inputs.append({
                     'name': n,
                     'values': recorder.convert_to_list(data.inputs[n])
                 })
-        if data.outputs != None:
+        if data.outputs is not None:
             for n in data.outputs.dtype.names:
                 outputs.append({
                     'name': n,
                     'values': recorder.convert_to_list(data.outputs[n])
                 })
-        if data.residuals != None:
+        if data.residuals is not None:
             for n in data.residuals.dtype.names:
                 residuals.append({
                     'name': n,
@@ -91,7 +93,9 @@ def _upload_system_iterations(new_list, recorder):
         data.outputs = outputs
         data.residuals = residuals
         recorder._record_system_iteration(data.counter, data.iteration_coordinate,
-            data.success, data.msg, data.inputs, data.outputs, data.residuals)
+                                          data.success, data.msg, data.inputs, data.outputs,
+                                          data.residuals)
+
 
 def _upload_solver_iterations(new_list, recorder):
     """
@@ -109,13 +113,13 @@ def _upload_solver_iterations(new_list, recorder):
         data = new_list.get_case(case_key)
         outputs = []
         residuals = []
-        if data.outputs != None:
+        if data.outputs is not None:
             for n in data.outputs.dtype.names:
                 outputs.append({
                     'name': n,
                     'values': recorder.convert_to_list(data.outputs[n])
                 })
-        if data.residuals != None:
+        if data.residuals is not None:
             for n in data.residuals.dtype.names:
                 residuals.append({
                     'name': n,
@@ -125,8 +129,9 @@ def _upload_solver_iterations(new_list, recorder):
         data.outputs = outputs
         data.residuals = residuals
         recorder._record_solver_iteration(data.counter, data.iteration_coordinate,
-            data.success, data.msg, data.abs_err, data.rel_err, data.outputs,
-            data.residuals)
+                                          data.success, data.msg, data.abs_err, data.rel_err,
+                                          data.outputs, data.residuals)
+
 
 def _upload_driver_iterations(new_list, recorder):
     """
@@ -146,25 +151,25 @@ def _upload_driver_iterations(new_list, recorder):
         responses = []
         objectives = []
         constraints = []
-        if data.desvars != None:
+        if data.desvars is not None:
             for n in data.desvars.dtype.names:
                 desvars.append({
                     'name': n,
                     'values': recorder.convert_to_list(data.desvars[n])
                 })
-        if data.responses != None:
+        if data.responses is not None:
             for n in data.responses.dtype.names:
                 responses.append({
                     'name': n,
                     'values': recorder.convert_to_list(data.responses[n])
                 })
-        if data.objectives != None:
+        if data.objectives is not None:
             for n in data.objectives.dtype.names:
                 objectives.append({
                     'name': n,
                     'values': recorder.convert_to_list(data.objectives[n])
                 })
-        if data.constraints != None:
+        if data.constraints is not None:
             for n in data.constraints.dtype.names:
                 constraints.append({
                     'name': n,
@@ -176,8 +181,9 @@ def _upload_driver_iterations(new_list, recorder):
         data.objectives = objectives
         data.constraints = constraints
         recorder._record_driver_iteration(data.counter, data.iteration_coordinate,
-            data.success, data.msg, data.desvars, data.responses,
-            data.objectives, data.constraints)
+                                          data.success, data.msg, data.desvars, data.responses,
+                                          data.objectives, data.constraints)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
