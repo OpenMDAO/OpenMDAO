@@ -23,32 +23,17 @@ class LinearBlockGS(BlockLinearSolver):
         if mode == 'fwd':
             for ind, subsys in enumerate(system._subsystems_myproc):
 
-                # The changeover to DenseJacobian as the default component jacobian short-circuits
-                # the scoping of the vectors under apply_linear, so we have to be careful in
-                # cleaing up.
-                # Here, clean out internal state from this subsystem.
-                for vec_name in vec_names:
-                    subsys._vectors['output'][vec_name].set_const(0.0)
-
                 isub = system._subsystems_myproc_inds[ind]
                 for vec_name in vec_names:
                     system._transfer(vec_name, mode, isub)
                 scope_out, scope_in = system._get_scope(subsys)
-
                 subsys._apply_linear(vec_names, mode, scope_out, scope_in)
                 for vec_name in vec_names:
                     b_vec = system._vectors['residual'][vec_name]
                     b_vec *= -1.0
                     b_vec += self._rhs_vecs[vec_name]
 
-                    # Inputs need to be cleaned out before solve.
-                    system._vectors['input'][vec_name].set_const(0.0)
-
                 subsys._solve_linear(vec_names, mode)
-
-                # TODO : do we need this?
-                # for vec_name in vec_names:
-                #     system._vectors['input'][vec_name].set_const(0.0)
 
         elif mode == 'rev':
             subsystems = system._subsystems_allprocs

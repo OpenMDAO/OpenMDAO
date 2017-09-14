@@ -326,17 +326,13 @@ class AssembledJacobian(Jacobian):
         with system._unscaled_context(
                 outputs=[d_outputs], residuals=[d_residuals]):
             if mode == 'fwd':
-                if len(d_outputs._names) > 0 and len(d_residuals._names) > 0:
-                    d_residuals.iadd_data(int_mtx._prod(d_outputs.get_data(), mode, int_ranges))
-                if ext_mtx is not None and \
-                   len(d_inputs._names) > 0 and len(d_residuals._names) > 0:
+                d_residuals.iadd_data(int_mtx._prod(d_outputs.get_data(), mode, int_ranges))
+                if ext_mtx is not None:
                     d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, None))
             elif mode == 'rev':
                 dresids = d_residuals.get_data()
-                if len(d_outputs._names) > 0 and len(d_residuals._names) > 0:
-                    d_outputs.iadd_data(int_mtx._prod(dresids, mode, int_ranges))
-                if ext_mtx is not None and \
-                   len(d_inputs._names) > 0 and len(d_residuals._names) > 0:
+                d_outputs.iadd_data(int_mtx._prod(dresids, mode, int_ranges))
+                if ext_mtx is not None:
                     d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None))
 
 

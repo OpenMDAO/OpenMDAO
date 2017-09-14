@@ -249,7 +249,6 @@ class Solver(object):
             with Recording(type(self).__name__, self._iter_count, self) as rec:
                 self._iter_execute()
                 self._iter_count += 1
-
                 self._run_apply()
                 norm = self._iter_get_norm()
                 # With solvers, we want to record the norm AFTER the call, but the call needs to
@@ -499,11 +498,6 @@ class LinearSolver(Solver):
         Run the the apply_linear method on the system.
         """
         recording_iteration_stack.append(('_run_apply', 0))
-
-        # Clean up
-        # self._system._vectors['input']['linear'].set_const(0.0)
-        #self._system._vectors['output']['linear'].set_const(0.0)
-
         system = self._system
         scope_out, scope_in = system._get_scope()
         system._apply_linear(self._vec_names, self._mode, scope_out, scope_in)
@@ -555,8 +549,4 @@ class BlockLinearSolver(LinearSolver):
             raise RuntimeError("A block linear solver '%s' is being used with "
                                "an AssembledJacobian in system '%s'" %
                                (self.SOLVER, self._system.pathname))
-
-        inputs = self._system._vectors['input']
-        inputs['linear'].set_const(0.0)
-
         return super(BlockLinearSolver, self)._iter_initialize()
