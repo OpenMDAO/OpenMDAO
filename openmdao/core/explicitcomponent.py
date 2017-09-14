@@ -261,7 +261,10 @@ class ExplicitComponent(Component):
 
                     # Jacobian and vectors are all scaled, unitless
                     with self.jacobian_context() as J:
+                        print(self.pathname)
+                        print('before', d_inputs.get_data(), d_outputs.get_data(), d_residuals.get_data())
                         J._apply(d_inputs, d_outputs, d_residuals, mode)
+                        print('after', d_inputs.get_data(), d_outputs.get_data(), d_residuals.get_data())
 
                     # if we're not matrix free, we can skip the bottom of
                     # this loop because compute_jacvec_product does nothing.
