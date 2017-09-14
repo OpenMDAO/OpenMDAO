@@ -10,7 +10,7 @@ OpenMDAO Documentation
     user_guide/index.rst
     feature_reference/index.rst
     examples/index.rst
-    api_translation.rst
+    api_translation/index.rst
     theory_manual/index.rst
     _srcdocs/index.rst
     style_guide/index.rst
