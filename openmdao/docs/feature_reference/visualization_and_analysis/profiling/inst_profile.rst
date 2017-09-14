@@ -60,12 +60,6 @@ There is a *Reset* button that will take you back to the top level of the profil
 you have clicked down into a sub-call.
 
 
-To prevent popping up the web viewer immediately, use the `--noshow` option.  If you've run
-`iprofview` directly on your python script, after running there will be a file named
-`iprof.0` which contains profiling data.  Later, you can run `iprofview` directly on the
-`iprof.0` file to avoid having to re-run your script again.
-
-
 .. note::
 
    Documentation of options for all commands described here can be obtained by running the
@@ -178,7 +172,6 @@ run either `iprofview` or `iproftotals` directly on the `iprof.*` data file(s).
 
    The timing numbers obtained from instance-based profiling will not be exact due to overhead
    introduced by the python function that collects timing data.
-
 
 
 .. tags:: Tutorials, Profiling

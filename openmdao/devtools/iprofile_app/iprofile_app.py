@@ -38,7 +38,7 @@ def _parent_key(d):
 
 def stratify(call_data, sortby='time'):
     """
-    Group node data by depth and sort with a depth by time.
+    Group node data by depth and sort within a depth by parent and time.
     """
     depth_groups = []
     node_list = []  # all nodes in a single list
@@ -85,8 +85,9 @@ class Application(tornado.web.Application):
         self.depth_groups, self.node_list = stratify(self.call_data)
         self.options = options
 
-        # create a new data structure that is a dict keyed on root pathname,
-        # where each value is a list of lists of node data stored by depth (index==depth).
+        # assemble our call_data nodes into a tree structure, where each
+        # entry contains that node's call data and a dict containing each
+        # child keyed by call path.
         self.call_tree = tree = defaultdict(lambda : [None, {}])
         for path, data in iteritems(self.call_data):
             data['id'] = path
@@ -110,7 +111,7 @@ class Application(tornado.web.Application):
 
     def get_nodes(self, idx):
         """
-        Yield all children of the given root up to a depth of root depth + depth.
+        Yield all children of the given root up to a maximum number stored in options.maxcalls.
         """
         if idx == 0:
             root = self.call_tree['$total']
@@ -137,12 +138,18 @@ class Application(tornado.web.Application):
 
 class Index(tornado.web.RequestHandler):
     def get(self):
+        """
+        Load the page template and request call data nodes starting at idx=0.
+        """
         app = self.application
         self.render("iprofview.html", title=app.options.title)
 
 
 class Function(tornado.web.RequestHandler):
     def get(self, idx):
+        """
+        Request an updated list of call data nodes, rooted at the node specified by idx.
+        """
         app = self.application
         dump = json.dumps(list(app.get_nodes(int(idx))))
         self.set_header('Content-Type', 'application/json')
@@ -151,7 +158,7 @@ class Function(tornado.web.RequestHandler):
 
 def prof_view():
     """
-    Called from a command line to generate an html viewer for profile data.
+    Called from a command line to instance based profile data in a web page.
     """
 
     parser = argparse.ArgumentParser()
