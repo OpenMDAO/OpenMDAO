@@ -22,7 +22,6 @@ class LinearBlockGS(BlockLinearSolver):
 
         if mode == 'fwd':
             for ind, subsys in enumerate(system._subsystems_myproc):
-
                 isub = system._subsystems_myproc_inds[ind]
                 for vec_name in vec_names:
                     system._transfer(vec_name, mode, isub)
@@ -32,7 +31,6 @@ class LinearBlockGS(BlockLinearSolver):
                     b_vec = system._vectors['residual'][vec_name]
                     b_vec *= -1.0
                     b_vec += self._rhs_vecs[vec_name]
-
                 subsys._solve_linear(vec_names, mode)
 
         elif mode == 'rev':
