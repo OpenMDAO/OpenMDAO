@@ -76,9 +76,6 @@ def stratify(call_data, sortby='time'):
                 node['idx'] = len(node_list)
                 node_list.append(node)
 
-        # values = [(dat['x0'], dat['x1']) for dat in group[:3]]
-        # print("depth", depth, "data:", len(group), 'values:', values)
-
     return depth_groups, node_list
 
 
@@ -141,12 +138,11 @@ class Application(tornado.web.Application):
 class Index(tornado.web.RequestHandler):
     def get(self):
         app = self.application
-        self.render("iprofview.html", title="My title")
+        self.render("iprofview.html", title=app.options.title)
 
 
 class Function(tornado.web.RequestHandler):
     def get(self, idx):
-        print("func: %s" % idx)
         app = self.application
         dump = json.dumps(list(app.get_nodes(int(idx))))
         self.set_header('Content-Type', 'application/json')
@@ -173,8 +169,8 @@ def prof_view():
                              'options are: %s and "openmdao" is the default' %
                               sorted(func_group.keys()))
     parser.add_argument('-m', '--maxcalls', action='store', dest='maxcalls',
-                        default=5000, type=int,
-                        help='Maximum number of calls displayed at one time.  Default=100.')
+                        default=15000, type=int,
+                        help='Maximum number of calls displayed at one time.  Default=15000.')
     parser.add_argument('files', metavar='file', nargs='+',
                         help='Raw profile data files or a python file.')
 
@@ -193,7 +189,7 @@ def prof_view():
     print("starting server on port %d" % options.port)
 
     serve_thread  = startThread(tornado.ioloop.IOLoop.current().start)
-    #launch_thread = startThread(lambda: launch_browser(options.port))
+    launch_thread = startThread(lambda: launch_browser(options.port))
 
     while serve_thread.isAlive():
         serve_thread.join(timeout=1)

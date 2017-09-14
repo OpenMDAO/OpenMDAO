@@ -28,10 +28,6 @@ def _prof_node(parts):
         'count': parts[3],
         'tot_time': 0.,
         'tot_count': 0,
-        'pct_total': 0.,
-        'tot_pct_total': 0.,
-        'pct_parent': 0.,
-        #'child_time': 0.,
         'obj': parts[1],
         'depth': len(pathparts) - 1,
     }
@@ -270,8 +266,6 @@ def process_profile(flist):
             tree_nodes[funcpath] = node = _prof_node([funcpath, None, t, count])
 
             funcname = parts[-1]
-            # if funcname == '$parent':
-            #     continue
 
             if funcname in totals:
                 tnode = totals[funcname]
@@ -287,21 +281,9 @@ def process_profile(flist):
         short = parts[-1]
         node['tot_time'] = totals[short]['tot_time']
         node['tot_count'] = totals[short]['tot_count']
-        node['pct_parent'] = node['time'] / tree_nodes[parts[0]]['time']
-        node['pct_total'] = node['time'] / tree_nodes['$total']['time']
-        node['tot_pct_total'] = totals[short]['tot_time'] / tree_nodes['$total']['time']
         del node['obj']
-        #del node['child_time']
 
     tree_nodes['$total']['tot_time'] = tree_nodes['$total']['time']
-
-    # for funcpath, node in iteritems(tree_nodes):
-    #     parts = funcpath.rsplit('-', 1)
-    #     # D3 sums up all children to get parent value, so we need to
-    #     # zero out the parent value else we get double the value we want
-    #     # once we add in all of the times from descendants.
-    #     if parts[-1] == '$parent':
-    #         tree_nodes[parts[0]]['time'] = 0.
 
     return tree_nodes, totals
 

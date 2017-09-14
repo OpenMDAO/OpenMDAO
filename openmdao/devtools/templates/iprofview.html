@@ -14,16 +14,10 @@ rect {
   stroke: #fff;
 }
 
-/*
-we're hiding the $parent nodes, which are the ones that contain
-whatever time is required to make all of the children + $parent to
-add up to actual time recorded for the parent.  They're hidden because
-they would do nothing but confuse users, but they must exist in order for
-the child blocks to have correct visual proportions relative to each other
-using d3.partition.
-*/
-.hiderect {
-    visibility: hidden;
+button {
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 12px;
 }
 
 #tooltip {
@@ -38,6 +32,7 @@ using d3.partition.
   -webkit-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
   -moz-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
   box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+  display: none;
 }
 
 .funcpath {
@@ -60,18 +55,6 @@ using d3.partition.
     font-weight: bold;
 }
 
-.pctparent {
-    font-weight: bold;
-}
-
-.pcttotal {
-    font-weight: bold;
-}
-
-.totpcttotal {
-    font-weight: bold;
-}
-
 p {
     line-height: .2em;
 }
@@ -88,11 +71,23 @@ h1 {
 </head>
 <body>
     <header><h1>{{title}}</h1></header>
+    <button onclick="reset()">Reset</button>
+<svg>
+</svg>
+<div id="tooltip">
+    <table>
+        <tr><td>Function:</td><td class=funcpath></td></tr>
+    </table>
+    <table>
+        <tr><td>Local time:</td><td class=loctime></td><td>Local calls:</td> <td class=loccalls></td></tr>
+        <tr><td>Total time:</td><td class=tottime></td> <td>Total calls:</td> <td class=totcalls></td></tr>
+    </table>
+</div>
 <script type="text/javascript" src="http://d3js.org/d3.v4.js"></script>
 <script>
 
 var width = 960,
-    height = 500;
+    height = 800;
 
 var x = d3.scaleLinear()
     .range([0, width]);
@@ -100,8 +95,7 @@ var x = d3.scaleLinear()
 var y = d3.scaleLinear()
     .range([0, height]);
 
-var color = d3.scaleOrdinal()
-    .range(d3.schemeCategory20c);
+var color;
 
 var svg;
 
@@ -118,15 +112,26 @@ window.onresize = function() {
     resize();
 }
 
+function reset() {
+    last_d = null;
+    reload(0, resize);
+}
+
+
 function resize() {
     width = window.innerWidth;
     svg.attr("width", width);
     x = d3.scaleLinear()
         .range([0, width]);
+    y = d3.scaleLinear()
+        .range([0, height]);
 
     if (last_d !== null) {
         x.domain([last_d.x0, last_d.x1]);
         y.domain([last_d.y0, 1]).range([last_d.y0 ? 20 : 0, height]);
+    }
+    else {
+        y.domain([0, 1]).range([0, height]);
     }
 
     rect.attr("x", function(d) { return x(d.x0); })
@@ -172,9 +177,6 @@ function reload(idx, callback) {
         var loccalls = d3.select(".loccalls");
         var tottime = d3.select(".tottime");
         var totcalls = d3.select(".totcalls");
-        var pctparent = d3.select(".pctparent");
-        var pcttotal = d3.select(".pcttotal");
-        var totpcttotal = d3.select(".totpcttotal")
 
         rect = d3.select("svg").selectAll("rect")
               .data(data);
@@ -186,29 +188,17 @@ function reload(idx, callback) {
                 return color(d.id);
             })
             .on("mouseover", function(d) {
-                rect.attr("fill", function(dd) {
-                    if (d.id.split("-").slice(-1)[0] === dd.id.split("-").slice(-1)[0]) {
-                        return "magenta";
-                    }
-                    else {
-                        return color(dd.id);
-                    }
-                });
+                d3.select(this).attr("fill", "magenta");
                  funcpath.text(d.id.split("-").slice(-1));
                  loctime.text(formatTime(d.time));
                  tottime.text(formatTime(d.tot_time));
                  loccalls.text(formatCalls(d.count));
                  totcalls.text(formatCalls(d.tot_count));
-                 pctparent.text(formatPct(d.pct_parent));
-                 pcttotal.text(formatPct(d.pct_total));
-                 totpcttotal.text(formatPct(d.tot_pct_total));
                  return tooltip.style("display", "inline");
              })
             .on("mouseout", function(d) {
-                rect.attr("fill", function(dd) {
-                    return color(dd.id);
-                });
-                 return tooltip.style("display", "none");
+                d3.select(this).attr("fill", color(d.id));
+                return tooltip.style("display", "none");
             })
             .on("click", click)
             .on("mousemove", function(d) {
@@ -239,23 +229,20 @@ function reload(idx, callback) {
 
 
 window.onload = function() {
+    color = d3.scaleOrdinal()
+            .range(d3.schemeCategory20c);
     width = window.innerWidth;
-    svg = d3.select("body").append("svg")
+    svg = d3.select("svg")
         .attr("width", width)
         .attr("height", height);
+    reload(0, resize);
+    // FIXME: this second call to reload is a hack to get the rect highlighting to work after
+    // the initial load.  Without it, the highlighting doesn't start working until after
+    // reset is hit or a rect is clicked on.  Possibly some sort of D3 magic is happening
+    // that I don't understand, but this fixes it for now.
     reload(0, resize);
 };
 
 </script>
-
-<div id="tooltip">
-    <table>
-        <tr><td>Function:</td><td class=funcpath></td></tr>
-    </table>
-    <table>
-        <tr><td>Local time:</td><td class=loctime></td><td>Local calls:</td> <td class=loccalls></td><td>Pct parent:</td> <td class=pctparent></td></tr>
-        <tr><td>Total time:</td><td class=tottime></td> <td>Total calls:</td> <td class=totcalls></td><td>Pct total:</td> <td class=pcttotal></td><td>Total Pct total:</td> <td class=totpcttotal></td></tr>
-    </table>
-</div>
 </body>
 </html>
