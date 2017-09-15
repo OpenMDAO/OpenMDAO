@@ -212,6 +212,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.recorder.options['record_inputs'] = True
         self.recorder.options['record_outputs'] = True
         self.recorder.options['record_residuals'] = True
+        self.recorder.options['record_metadata'] = False
 
         self.prob.model.add_recorder(self.recorder)
 

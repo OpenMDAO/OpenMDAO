@@ -366,6 +366,7 @@ class SqliteRecorder(BaseRecorder):
         object_requesting_recording: <System>
             The System that would like to record its metadata.
         """
+        # Cannot handle PETScVector yet
         from openmdao.api import PETScVector
         if isinstance(object_requesting_recording._scaling_vecs[('input', 'norm0')]['linear'],
                       PETScVector):

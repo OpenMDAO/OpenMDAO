@@ -27,6 +27,10 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from sqlite_recorder_test_utils import _assertDriverIterationDataRecorded
 from recorder_test_utils import run_driver
 
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 if PY2:
     import cPickle as pickle
@@ -514,6 +518,9 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_driver_metadata = None
         self.assertDriverMetadataRecorded(expected_driver_metadata)
 
+    @unittest.skipIf(PETScVector is None or os.environ.get("TRAVIS"),
+                     "PETSc is required." if PETScVector is None
+                     else "Unreliable on Travis CI.")
     def test_record_system(self):
         self.setup_sellar_model()
 
@@ -1021,6 +1028,9 @@ class TestSqliteRecorder(unittest.TestCase):
                                                  expected_rel_error, expected_solver_output,
                                                  expected_solver_residuals),), self.eps)
 
+    @unittest.skipIf(PETScVector is None or os.environ.get("TRAVIS"),
+                     "PETSc is required." if PETScVector is None
+                     else "Unreliable on Travis CI.")
     def test_record_solver_linear_petsc_ksp(self):
         self.setup_sellar_model()
 
@@ -1368,6 +1378,9 @@ class TestSqliteRecorder(unittest.TestCase):
         prob['comp1.c'] = 3.
 
         comp2 = prob.model.get_subsystem('comp2')  # ImplicitComponent
+
+        self.recorder.options['record_metadata'] = False
+
         comp2.add_recorder(self.recorder)
 
         t0, t1 = run_driver(prob)
@@ -1399,7 +1412,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.recorder.options['record_inputs'] = True
         self.recorder.options['record_outputs'] = True
         self.recorder.options['record_residuals'] = True
-        self.recorder.options['record_metadata'] = True
+        self.recorder.options['record_metadata'] = False
 
         t0, t1 = run_driver(prob)
 
