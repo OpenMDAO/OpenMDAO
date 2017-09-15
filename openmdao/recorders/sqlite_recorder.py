@@ -168,7 +168,7 @@ class SqliteRecorder(BaseRecorder):
         # else:
         #     responses_array = None
         responses_array = None
-        
+
         if self._objectives_values:
             dtype_tuples = []
             for name, value in iteritems(self._objectives_values):
