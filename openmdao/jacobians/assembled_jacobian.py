@@ -339,6 +339,7 @@ class AssembledJacobian(Jacobian):
 
                     d_residuals.iadd_data(int_mtx._prod(d_outputs.get_data(), mode, int_ranges))
 
+                    # Restore masked values
                     if len(masked) > 0:
                         d_outputs.set_data(backup)
 
@@ -354,16 +355,46 @@ class AssembledJacobian(Jacobian):
 
                     d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, None))
 
+                    # Restore masked values
                     if len(masked) > 0:
                         d_inputs.set_data(backup)
 
             else:  # rev
                 dresids = d_residuals.get_data()
                 if len(d_outputs._names) > 0 and len(d_residuals._names) > 0:
+
+                    # Masking
+                    masked = [name for name in d_outputs._views if name not in d_outputs._names]
+                    if len(masked) > 0:
+                        backup = d_outputs.get_data()
+                        cache = {}
+                        for name in masked:
+                            cache[name] = d_outputs._views[name].copy()
+
                     d_outputs.iadd_data(int_mtx._prod(dresids, mode, int_ranges))
+
+                    # Restore masked values
+                    if len(masked) > 0:
+                        for name in masked:
+                            d_outputs._views[name][:] = cache[name]
+
                 if ext_mtx is not None and \
                    len(d_inputs._names) > 0 and len(d_residuals._names) > 0:
+
+                    # Masking
+                    masked = [name for name in d_inputs._views if name not in d_inputs._names]
+                    if len(masked) > 0:
+                        backup = d_inputs.get_data()
+                        cache = {}
+                        for name in masked:
+                            cache[name] = d_inputs._views[name].copy()
+
                     d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None))
+
+                    # Restore masked values
+                    if len(masked) > 0:
+                        for name in masked:
+                            d_inputs._views[name][:] = cache[name]
 
 
 class DenseJacobian(AssembledJacobian):
