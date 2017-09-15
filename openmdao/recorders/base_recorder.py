@@ -392,7 +392,6 @@ class BaseRecorder(object):
         else:
             raise ValueError("Recorders must be attached to Drivers, Systems, or Solvers.")
 
-
     def record_iteration_driver_passing_vars(self, object_requesting_recording, desvars, responses,
                                              objectives, constraints, metadata):
         """
@@ -457,7 +456,6 @@ class BaseRecorder(object):
                 self._constraints_values = constraints
         else:
             self._constraints_values = None
-
 
     def record_iteration_driver(self, object_requesting_recording, metadata):
         """
@@ -651,4 +649,3 @@ class BaseRecorder(object):
         Cleanup the recorder.
         """
         pass
-

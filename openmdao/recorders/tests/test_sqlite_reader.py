@@ -110,11 +110,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_constraint('con2', upper=0.0)
 
     def setUp(self):
-        if OPT is None:
-            raise unittest.SkipTest("pyoptsparse is not installed")
-
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SLSQP")
 
         recording_iteration.stack = []  # reset to avoid problems from earlier tests
         self.dir = mkdtemp()
@@ -163,6 +158,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertTrue(isinstance(cr, SqliteCaseReader), msg='CaseReader not'
                         ' returning the correct subclass.')
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_reading_driver_cases(self):
         """ Tests that the reader returns params correctly. """
         self.setup_sellar_model_with_optimization()
@@ -300,6 +297,8 @@ class TestSqliteCaseReader(unittest.TestCase):
                              'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|{}'
                              .format(i))
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_reading_driver_metadata(self):
         self.setup_sellar_model_with_optimization()
 

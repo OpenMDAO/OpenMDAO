@@ -101,7 +101,6 @@ class SqliteRecorder(BaseRecorder):
             self.cursor.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
                                 "solver_options BLOB, solver_class TEXT)")
 
-
     def record_iteration_driver_passing_vars(self, object_requesting_recording, desvars,
                                              responses, objectives, constraints, metadata):
         """
@@ -134,7 +133,8 @@ class SqliteRecorder(BaseRecorder):
 
         super(SqliteRecorder, self).record_iteration_driver_passing_vars(object_requesting_recording,
                                                                          desvars, responses,
-                                                                         objectives, constraints, metadata)
+                                                                         objectives, constraints,
+                                                                         metadata)
 
         # Just an example of the syntax for creating a numpy structured array
         # arr = np.zeros((1,), dtype=[('dv_x','(5,)f8'),('dv_y','(10,)f8')])
@@ -464,7 +464,8 @@ class SqliteRecorder(BaseRecorder):
         """
 
         from openmdao.api import PETScVector
-        if isinstance(object_requesting_recording._scaling_vecs[('input', 'norm0')]['linear'], PETScVector):
+        if isinstance(object_requesting_recording._scaling_vecs[('input', 'norm0')]['linear'],
+                      PETScVector):
             return  # Cannot handle PETScVector yet
 
         scaling_factors = pickle.dumps(object_requesting_recording._scaling_vecs,
