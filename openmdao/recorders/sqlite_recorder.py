@@ -131,10 +131,9 @@ class SqliteRecorder(BaseRecorder):
         #                                      ('throughput', 'f')], (2,))
         #                       ])
 
-        super(SqliteRecorder, self).record_iteration_driver_passing_vars(object_requesting_recording,
-                                                                         desvars, responses,
-                                                                         objectives, constraints,
-                                                                         metadata)
+        super(SqliteRecorder, self).record_iteration_driver_passing_vars(
+            object_requesting_recording, desvars, responses,
+            objectives, constraints, metadata)
 
         # Just an example of the syntax for creating a numpy structured array
         # arr = np.zeros((1,), dtype=[('dv_x','(5,)f8'),('dv_y','(10,)f8')])
@@ -462,7 +461,6 @@ class SqliteRecorder(BaseRecorder):
         object_requesting_recording: <System>
             The System that would like to record its metadata.
         """
-
         from openmdao.api import PETScVector
         if isinstance(object_requesting_recording._scaling_vecs[('input', 'norm0')]['linear'],
                       PETScVector):
