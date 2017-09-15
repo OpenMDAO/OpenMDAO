@@ -123,6 +123,15 @@ def replace_asserts_with_prints(source_code):
         #                                                  the TestCase
         assert_node.value[0].replace("print")
 
+    assert_nodes = rb.findAll("NameNode", value='assert_almost_equal')
+    for assert_node in assert_nodes:
+        assert_node = assert_node.parent
+        # If relative error tolerance is specified, there are 3 arguments
+        if len(assert_node.value[1]) == 3:
+            remove_redbaron_node(assert_node.value[1], -1)  # remove the relative error tolerance
+        remove_redbaron_node(assert_node.value[1], -1)  # remove the expected value
+        assert_node.value[0].replace("print")
+
     source_code_with_prints = rb.dumps()  # get back the string representation of the code
     return source_code_with_prints
 
@@ -182,12 +191,17 @@ The docstrings are stripped from the code
 # pylint: disable=C0103
 
 
-def get_source_code_of_class_or_method(class_or_method_path):
-    '''The function to be called a the custom Sphinx directive code
-    that includes the source code of a class or method.
-    '''
+def get_source_code_of_class_or_method(class_or_method_path, remove_docstring=True):
+    """
+    Return source code as a text string.
 
-    # the class_or_method_path could be either to a class or method
+    Parameters
+    ----------
+    class_or_method_path : str
+        Package path to the class or function.
+    remove_docstring : bool
+        Set to False to keep docstrings in the text.
+    """
 
     # first assume class and see if it works
     try:
@@ -196,6 +210,7 @@ def get_source_code_of_class_or_method(class_or_method_path):
         class_name = class_or_method_path.split('.')[-1]
         cls = getattr(module_with_class, class_name)
         source = inspect.getsource(cls)
+
     except ImportError:
         # else assume it is a path to a method
         module_path = '.'.join(class_or_method_path.split('.')[:-2])
@@ -207,9 +222,10 @@ def get_source_code_of_class_or_method(class_or_method_path):
         source = inspect.getsource(meth)
 
     # Remove docstring from source code
-    source_minus_docstrings = remove_docstrings(source)
+    if remove_docstring:
+        source = remove_docstrings(source)
 
-    return source_minus_docstrings
+    return source
 
 
 """
@@ -589,25 +605,14 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
 
     method_source = '\n'.join(new_lines[counter:])
 
-    #rb = RedBaron(class_source_code)
-    #def_nodes = rb.find("DefNode", name=method_name)
-    #def_nodes.value.decrease_indentation(8)
-    #method_source = def_nodes.value.dumps()
-
     # Remove docstring from source code
     source_minus_docstrings = remove_docstrings(method_source)
-
-    # We are using the RedBaron module in the next two function calls
-    #    to get the code in the way we want it.
-
-    # Only want the method body. Do not want the 'def' line
-    # method_body_source = get_method_body(source_minus_docstrings)
-    # method_body_source = source_minus_docstrings
 
     #####################
     ### 2. Replace the asserts with prints -> source_minus_docstrings_with_prints_cleaned ###
     #####################
     # Replace some of the asserts with prints of the actual values
+    # This calls RedBaron
     source_minus_docstrings_with_prints = replace_asserts_with_prints(source_minus_docstrings)
 
     # remove raise SkipTest lines
@@ -637,7 +642,10 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
     #   raise call
     raise_skip_test_source_code = ""
     if '@unittest.skip' in class_source_code:
+
+        # This calls RedBaron
         skip_predicate_and_message = get_skip_predicate_and_message(class_source_code, method_name)
+
         if skip_predicate_and_message:
             # predicate, message = skip_unless_predicate_and_message
             predicate, message = skip_predicate_and_message

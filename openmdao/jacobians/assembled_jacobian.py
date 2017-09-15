@@ -4,6 +4,8 @@ from __future__ import division
 import sys
 import numpy as np
 
+from six import iteritems
+
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import COOMatrix
@@ -79,9 +81,9 @@ class AssembledJacobian(Jacobian):
         """
         system = self._system
 
-        sizes = system._var_sizes[type_]
+        sizes = system._var_sizes['nonlinear'][type_]
         iproc = system.comm.rank
-        idx = system._var_allprocs_abs2idx[type_][abs_name]
+        idx = system._var_allprocs_abs2idx['nonlinear'][type_][abs_name]
 
         ind1 = np.sum(sizes[iproc, :idx])
         ind2 = np.sum(sizes[iproc, :idx + 1])
@@ -202,11 +204,11 @@ class AssembledJacobian(Jacobian):
 
         sizes = system._var_sizes
         iproc = system.comm.rank
-        out_size = np.sum(sizes['output'][iproc, :])
+        out_size = np.sum(sizes['nonlinear']['output'][iproc, :])
 
         int_mtx._build(out_size, out_size)
         if ext_mtx._submats:
-            in_size = np.sum(sizes['input'][iproc, :])
+            in_size = np.sum(sizes['nonlinear']['input'][iproc, :])
             ext_mtx._build(out_size, in_size)
         else:
             ext_mtx = None
@@ -259,10 +261,10 @@ class AssembledJacobian(Jacobian):
 
         sizes = system._var_sizes
         iproc = system.comm.rank
-        out_size = np.sum(sizes['output'][iproc, :])
+        out_size = np.sum(sizes['nonlinear']['output'][iproc, :])
 
         if ext_mtx._submats:
-            in_size = np.sum(sizes['input'][iproc, :])
+            in_size = np.sum(sizes['nonlinear']['input'][iproc, :])
             ext_mtx._build(out_size, in_size)
         else:
             ext_mtx = None
@@ -327,11 +329,35 @@ class AssembledJacobian(Jacobian):
                 outputs=[d_outputs], residuals=[d_residuals]):
             if mode == 'fwd':
                 if len(d_outputs._names) > 0 and len(d_residuals._names) > 0:
+
+                    # Masking
+                    masked = [name for name in d_outputs._views if name not in d_outputs._names]
+                    if len(masked) > 0:
+                        backup = d_outputs.get_data()
+                        for name in masked:
+                            d_outputs._views[name][:] = 0.0
+
                     d_residuals.iadd_data(int_mtx._prod(d_outputs.get_data(), mode, int_ranges))
+
+                    if len(masked) > 0:
+                        d_outputs.set_data(backup)
+
                 if ext_mtx is not None and \
                    len(d_inputs._names) > 0 and len(d_residuals._names) > 0:
+
+                    # Masking
+                    masked = [name for name in d_inputs._views if name not in d_inputs._names]
+                    if len(masked) > 0:
+                        backup = d_inputs.get_data()
+                        for name in masked:
+                            d_inputs._views[name][:] = 0.0
+
                     d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, None))
-            elif mode == 'rev':
+
+                    if len(masked) > 0:
+                        d_inputs.set_data(backup)
+
+            else:  # rev
                 dresids = d_residuals.get_data()
                 if len(d_outputs._names) > 0 and len(d_residuals._names) > 0:
                     d_outputs.iadd_data(int_mtx._prod(dresids, mode, int_ranges))

@@ -304,65 +304,6 @@ class TestNewton(unittest.TestCase):
         self.assertLess(model.nonlinear_solver._iter_count, 8)
         self.assertEqual(model.linear_solver._iter_count, 0)
 
-    def test_implicit_utol(self):
-        # We are setup for reach utol termination condition quite quickly.
-
-        raise unittest.SkipTest("solver utol not implemented yet")
-
-        class CubicImplicit(ImplicitComponent):
-            """ A Simple Implicit Component.
-            f(x) = x**3 + 3x**2 -6x +18
-            """
-
-            def __init__(self):
-                super(CubicImplicit, self).__init__()
-
-                # Params
-                self.add_input('x', 0.0)
-
-                # States
-                self.add_output('z', 0.0)
-
-            def compute(self, inputs, outputs):
-                pass
-
-            def apply_nonlinear(self, inputs, outputs, resids):
-                """ Don't solve; just calculate the residual."""
-
-                x = inputs['x']
-                z = outputs['z']
-
-                resids['z'] = (z**3 + 3.0*z**2 - 6.0*z + x)*1e15
-
-            def linearize(self, inputs, outputs, partials):
-                """Analytical derivatives."""
-
-                # x = inputs['x']
-                z = outputs['z']
-
-                # State equation
-                partials[('z', 'z')] = (3.0*z**2 + 6.0*z - 6.0)*1e15
-                partials[('z', 'x')] = 1.0*1e15
-
-        prob = Problem()
-        root = prob.model = Group()
-        root.add_subsystem('p1', IndepVarComp('x', 17.4))
-        root.add_subsystem('comp', CubicImplicit())
-        root.connect('p1.x', 'comp.x')
-
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.linear_solver = ScipyIterativeSolver()
-
-        prob.setup(check=False)
-        prob['comp.z'] = -4.93191510182
-
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        assert_rel_error(self, prob['comp.z'], -4.93191510182, .00001)
-        self.assertLessEqual(prob.model.nonlinear_solver._iter_count, 4,
-                             msg='Should get there pretty quick because of utol.')
-
     def test_solve_subsystems_basic(self):
         prob = Problem()
         model = prob.model = DoubleSellar()
@@ -792,6 +733,47 @@ class TestNewton(unittest.TestCase):
         msg = "Solver 'NL: Newton' on system '' failed to converge."
         self.assertEqual(str(context.exception), msg)
 
+    def test_relevancy_for_newton(self):
+
+        class TestImplCompSimple(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('a', val=1.)
+                self.add_output('x', val=0.)
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['x'] = np.exp(outputs['x']) - \
+                    inputs['a']**2 * outputs['x']**2
+
+            def linearize(self, inputs, outputs, jacobian):
+                jacobian['x', 'x'] = np.exp(outputs['x']) - \
+                    2 * inputs['a']**2 * outputs['x']
+                jacobian['x', 'a'] = -2 * inputs['a'] * outputs['x']**2
+
+
+        prob = Problem()
+        prob.model = model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        model.add_subsystem('icomp', TestImplCompSimple())
+        model.add_subsystem('ecomp', ExecComp('y = x*p', p=1.0))
+
+        model.connect('p1.x', 'ecomp.x')
+        model.connect('icomp.x', 'ecomp.p')
+
+        model.add_design_var('p1.x', 3.0)
+        model.add_objective('ecomp.y')
+
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
+
+        prob.setup(check=False)
+
+        prob.run_model()
+
+        J = prob.compute_total_derivs()
+        assert_rel_error(self, J['ecomp.y', 'p1.x'][0][0], -0.703467422498, 1e-6)
+
 
 class TestNewtonFeatures(unittest.TestCase):
 
@@ -815,7 +797,7 @@ class TestNewtonFeatures(unittest.TestCase):
 
         model.linear_solver = LinearBlockGS()
 
-        nlgbs = model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver = NewtonSolver()
 
         prob.setup()
 

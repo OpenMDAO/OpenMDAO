@@ -63,7 +63,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()
 

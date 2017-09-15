@@ -85,6 +85,7 @@ extensions = [
     'show_unittest_examples',
     'embed_code',
     'embed_test',
+    'embed_compare',
     'tags'
 ]
 

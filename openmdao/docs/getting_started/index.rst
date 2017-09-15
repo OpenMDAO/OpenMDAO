@@ -1,6 +1,10 @@
+.. _GettingStarted:
+
 ***************
 Getting Started
 ***************
+
+The purpose of this document is simply to ensure that you get OpenMDAO blue installed on your system successfully.
 
 Installation Instructions:
 

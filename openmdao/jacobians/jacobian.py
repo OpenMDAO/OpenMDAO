@@ -207,11 +207,16 @@ class Jacobian(object):
         else:
             self._subjacs[abs_key] = subjac
 
-    def _iter_abs_keys(self):
+    def _iter_abs_keys(self, vec_name):
         """
         Iterate over subjacs keyed by absolute names.
 
         This includes only subjacs that have been set and are part of the current system.
+
+        Parameters
+        ----------
+        vec_name : str
+            The name of the current RHS vector.
         """
         system = self._system
         subjacs = self._subjacs
@@ -223,9 +228,9 @@ class Jacobian(object):
         # linearize for each system which can add keys to the jacobian, so we'll need to
         # make sure we recompute the keys for each system after the first call to lineraize
         # after a new jacobian has been set.
-        for res_name in system._var_abs_names['output']:
+        for res_name in system._var_relevant_names[vec_name]['output']:
             for type_ in ('output', 'input'):
-                for name in system._var_abs_names[type_]:
+                for name in system._var_relevant_names[vec_name][type_]:
                     key = (res_name, name)
                     if key in subjacs:
                         yield key

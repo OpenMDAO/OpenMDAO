@@ -260,11 +260,6 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         u = system._outputs
         du = system._vectors['output']['linear']
 
-        # Clean out remnants of old linear solve.
-        # We need to do this now because DenseJacobian doesn't mask away outer scope
-        # connections.
-        system._vectors['input']['linear'].set_const(0.0)
-
         # Hybrid newton support.
         if self._do_subsolve and self._iter_count > 0:
 

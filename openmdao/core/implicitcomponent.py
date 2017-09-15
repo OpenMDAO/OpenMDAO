@@ -10,15 +10,22 @@ from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS, DenseJac
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.class_util import overrides_method
 
+_inst_functs = ['apply_linear', 'apply_multi_linear', 'solve_multi_linear']
+
 
 class ImplicitComponent(Component):
     """
     Class to inherit from when all output variables are implicit.
+
+    Attributes
+    ----------
+    _inst_functs : dict
+        Dictionary of names mapped to bound methods.
     """
 
     def __init__(self, **kwargs):
         """
-        Check if we are matrix-free.
+        Store some bound methods so we can detect runtime overrides.
 
         Parameters
         ----------
@@ -27,8 +34,7 @@ class ImplicitComponent(Component):
         """
         super(ImplicitComponent, self).__init__(**kwargs)
 
-        if overrides_method('guess_nonlinear', self, ImplicitComponent):
-            self._has_guess = True
+        self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
 
         # For components, default to DenseJacobian for performance.
         self._jacobian = DenseJacobian()
@@ -40,8 +46,28 @@ class ImplicitComponent(Component):
 
         Also tag component if it provides a guess_nonlinear.
         """
-        if overrides_method('apply_linear', self, ImplicitComponent):
-            self.matrix_free = True
+        self._has_guess = overrides_method('guess_nonlinear', self, ImplicitComponent)
+
+        new_apply_linear = getattr(self, 'apply_linear', None)
+        new_apply_multi_linear = getattr(self, 'apply_multi_linear', None)
+        new_solve_multi_linear = getattr(self, 'solve_multi_linear', None)
+
+        self.matrix_free = (overrides_method('apply_linear', self, ImplicitComponent) or
+                            (new_apply_linear is not None and
+                             self._inst_functs['apply_linear'] != new_apply_linear))
+        self.has_apply_multi_linear = (overrides_method('apply_multi_linear',
+                                                        self, ImplicitComponent) or
+                                       (new_apply_multi_linear is not None and
+                                        self._inst_functs['apply_multi_linear'] !=
+                                        new_apply_multi_linear))
+        self.has_solve_multi_linear = (overrides_method('solve_multi_linear',
+                                                        self, ImplicitComponent) or
+                                       (new_solve_multi_linear is not None and
+                                        self._inst_functs['solve_multi_linear'] !=
+                                        new_solve_multi_linear))
+
+        self.supports_multivecs = self.has_apply_multi_linear or self.has_solve_multi_linear
+        self.matrix_free |= self.supports_multivecs
 
     def _apply_nonlinear(self):
         """
@@ -92,7 +118,7 @@ class ImplicitComponent(Component):
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
             self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
 
-    def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -100,6 +126,8 @@ class ImplicitComponent(Component):
         ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
         mode : str
             'fwd' or 'rev'.
         scope_out : set or None
@@ -110,25 +138,46 @@ class ImplicitComponent(Component):
             If None, all are in the scope.
         """
         for vec_name in vec_names:
+            if vec_name not in self._rel_vec_names:
+                continue
+
             with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
 
                 # Jacobian and vectors are all scaled, unitless
                 with self.jacobian_context() as J:
-                    print(self.pathname)
-                    print('before', d_inputs.get_data(), d_outputs.get_data(), d_residuals.get_data())
                     J._apply(d_inputs, d_outputs, d_residuals, mode)
-                    print('after', d_inputs.get_data(), d_outputs.get_data(), d_residuals.get_data())
+
+                # if we're not matrix free, we can skip the bottom of
+                # this loop because apply_linear does nothing.
+                if not self.matrix_free:
+                    continue
 
                 # Jacobian and vectors are all unscaled, dimensional
                 with self._unscaled_context(
                         outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
                     with Recording(self.pathname + '._apply_linear', self.iter_count, self):
-                        self.apply_linear(self._inputs, self._outputs,
-                                          d_inputs, d_outputs, d_residuals, mode)
-                print('after jacvec', d_inputs.get_data(), d_outputs.get_data(), d_residuals.get_data())
+                        if d_inputs._ncol > 1:
+                            if self.has_apply_multi_linear:
+                                self.apply_multi_linear(self._inputs, self._outputs,
+                                                        d_inputs, d_residuals, mode)
+                            else:
+                                for i in range(d_inputs._ncol):
+                                    # need to make the multivecs look like regular single vecs
+                                    # since the component doesn't know about multivecs.
+                                    d_inputs._icol = i
+                                    d_outputs._icol = i
+                                    d_residuals._icol = i
+                                    self.apply_linear(self._inputs, self._outputs,
+                                                      d_inputs, d_outputs, d_residuals, mode)
+                                d_inputs._icol = None
+                                d_outputs._icol = None
+                                d_residuals._icol = None
+                        else:
+                            self.apply_linear(self._inputs, self._outputs,
+                                              d_inputs, d_outputs, d_residuals, mode)
 
-    def _solve_linear(self, vec_names, mode):
+    def _solve_linear(self, vec_names, mode, rel_systems):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -138,6 +187,8 @@ class ImplicitComponent(Component):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
 
         Returns
         -------
@@ -150,30 +201,50 @@ class ImplicitComponent(Component):
         """
         if self._linear_solver is not None:
             with Recording(self.pathname + '._solve_linear', self.iter_count, self):
-                result = self._linear_solver.solve(vec_names, mode)
+                result = self._linear_solver.solve(vec_names, mode, rel_systems)
 
             return result
 
         else:
             failed = False
-            abs_errors = []
-            rel_errors = []
+            abs_errors = [0.0]
+            rel_errors = [0.0]
             for vec_name in vec_names:
+                if vec_name not in self._rel_vec_names:
+                    continue
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
 
                 with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                     with Recording(self.pathname + '._solve_linear', self.iter_count, self):
-                        result = self.solve_linear(d_outputs, d_residuals, mode)
+                        if d_outputs._ncol > 1:
+                            if self.has_solve_multi_linear:
+                                result = self.solve_multi_linear(d_outputs, d_residuals, mode)
+                            else:
+                                for i in range(d_outputs._ncol):
+                                    # need to make the multivecs look like regular single vecs
+                                    # since the component doesn't know about multivecs.
+                                    d_outputs._icol = i
+                                    d_residuals._icol = i
+                                    result = self.solve_linear(d_outputs, d_residuals, mode)
+                                    if isinstance(result, bool):
+                                        failed |= result
+                                    elif result is not None:
+                                        failed = failed or result[0]
+                                        abs_errors.append(result[1])
+                                        rel_errors.append(result[2])
 
-                if result is None:
-                    result = False, 0., 0.
-                elif type(result) is bool:
-                    result = result, 0., 0.
+                                d_outputs._icol = None
+                                d_residuals._icol = None
+                        else:
+                            result = self.solve_linear(d_outputs, d_residuals, mode)
 
-                failed = failed or result[0]
-                abs_errors.append(result[1])
-                rel_errors.append(result[2])
+                if isinstance(result, bool):
+                    failed |= result
+                elif result is not None:
+                    failed = failed or result[0]
+                    abs_errors.append(result[1])
+                    rel_errors.append(result[2])
 
             return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 
