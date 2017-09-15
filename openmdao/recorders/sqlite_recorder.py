@@ -154,19 +154,21 @@ class SqliteRecorder(BaseRecorder):
         else:
             desvars_array = None
 
-        if self._responses_values:
-            dtype_tuples = []
-            for name, value in iteritems(self._responses_values):
-                tple = (name, '{}f8'.format(value.shape))
-                dtype_tuples.append(tple)
-
-            responses_array = np.zeros((1,), dtype=dtype_tuples)
-
-            for name, value in iteritems(self._responses_values):
-                responses_array[name] = value
-        else:
-            responses_array = None
-
+        # Cannot handle responses yet
+        # if self._responses_values:
+        #     dtype_tuples = []
+        #     for name, value in iteritems(self._responses_values):
+        #         tple = (name, '{}f8'.format(value.shape))
+        #         dtype_tuples.append(tple)
+        #
+        #     responses_array = np.zeros((1,), dtype=dtype_tuples)
+        #
+        #     for name, value in iteritems(self._responses_values):
+        #         responses_array[name] = value
+        # else:
+        #     responses_array = None
+        responses_array = None
+        
         if self._objectives_values:
             dtype_tuples = []
             for name, value in iteritems(self._objectives_values):
