@@ -1,4 +1,5 @@
 """Management of iteration stack for recording."""
+from openmdao.utils.mpi import MPI
 
 
 class _RecIteration(object):
@@ -33,7 +34,10 @@ def get_formatted_iteration_coordinate():
     for name, iter_count in recording_iteration.stack:
         iteration_coord_list.append('{}{}{}'.format(name, separator, iter_count))
 
-    rank = 0  # TODO_PARALLEL needs to be updated when we go parallel
+    if MPI and MPI.COMM_WORLD.rank > 0:
+        rank = MPI.COMM_WORLD.rank
+    else:
+        rank = 0
     formatted_iteration_coordinate = ':'.join(["rank%d" % rank,
                                                separator.join(iteration_coord_list)])
     return formatted_iteration_coordinate

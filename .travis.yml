@@ -1,6 +1,6 @@
 branches:
   only:
-    - master
+  - master
 
 sudo: false
 
@@ -28,10 +28,10 @@ addons:
     - openmpi-bin
 
 notifications:
-  email: false
   slack:
-    on_success: never
-    secure: lwAjQyviKvouLSTm2xO+AqjY3B8/5jkr/1dreeUz60T4E00llatrgZTXX6m04D2PusKvWudYPl8KLqhqawTVpM0CSOJODmbRyrn9MUxV/UlOeFTVwtl6c1EgWxoHTLh47XMnGhUh2z9Otz/2GLfMQteXXmxguX0KgNy+s++hHP8ycPDWjZ7BUVkNT+kJn6l5JYLsIW5dR/06W3Wg32cEzo7kP5tAWY4yH3YAF1tyBe1BSmMLP38IwtQKTBef6QUAaXwBgVBqFBF/h0sWgjKdwzqSMUCA1J6yrpeYHEC6Wvmwl7Yj3Lqgs6y3BNZ6v1dV1NUqPa+PC35QL043Btvv/hOAyCx24Srt1YnNT7bJg+rverIBoKKd6U2cFeBWCDSaKtpMXQyA61D/MReEGND3mtnH1mq7DcvF7cDchMAU5UH9qAHP02wbX7FLdfqs2P+X8+pA+m0ip5xRKFu3AdBUkPG6Eaoyln3a0O9SDep3gF+pgBoemGwawSazHafJjqh/tmFsQARnI8UsAIBNyWT3iK0518r4sGFmRH57csNzICBCn9fPDtQ+MRJk9mu/zLBTNI8ms/2l7mMe74hewtTWaSPvCTZd4Woq1A5Bexd4JlvFOfkyiQZgBNI97qhly9OjqW7M3UiIDlugAR4UZw396DhQ4WVq3xPC5lFD9jAwjfk=
+    secure: "TnJSd6Mu99tcACmPVSpsLI6hfYxecLCare+ileiuJa8foIzbgna/cL6/tyPUGpLGgSZkxGXoBSRXZJHonZNa7DYXmfhxBblHa0fwgdOhk4GAEDiiOUa2agaoh4F3EoTOuQIfN0eCprItfewIJtT3CHEh+PuWLifclRU9G/6byldDHKy8dPPinrLtMy91RFcXzcBFBev7EEJtJDL6odhkVsJQjmtf9E7+Up3n/tSL+egllYC0H6P7P4nCIjrNuBNDVYtfqb5QbvUgfuTFVcqMJTMsams04taYQhT4UVvVpB0rBwtP5S6w2QdAr/QTvi06ZIuFsgVAdFmRRNliXLG2qeWbQ44hWT36aehhVHvfyLuC9Bjbo5+OhKcA3qmTzCaG4JoYbsEXPVp0b31m4EKGl+yLIUoV1Zp46MTM+llWny4/mDn6o/gmtmtCpZ8S1EYDniwluelLiu3u/ZkFnadsn++ZS7GkAPkY8VpI5lpY3B2jPsAOJLaLNMHSk8oa51LAPg+2/MqCDpgCFsZUctNXdIkYR6Votts5KpDabcVFpC2NtfQLWdRh4CsvpiLcSJigUe+4aLRqxZgaahsTuL6LeSrDcHR+gqn4KYvKl4E7pUQZX+i8wRYoDvFTMIAx/F0dDZ+U+Rzr5bVORuvNc9lDjuB57vjEIvZ+djPDtBkENwo="
+    on_success: always
+    on_failure: always
 
 before_install:
 - OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux"; fi)
