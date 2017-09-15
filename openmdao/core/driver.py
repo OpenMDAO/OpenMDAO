@@ -4,10 +4,10 @@ from six import iteritems
 
 import numpy as np
 
-from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.utils.record_util import create_local_meta
+from openmdao.utils.options_dictionary import OptionsDictionary
 
 
 class Driver(object):
@@ -114,14 +114,9 @@ class Driver(object):
         self._cons = model.get_constraints(recurse=True)
 
         self._rec_mgr.startup(self)
-
-        # Only do this for now in serial. Parallel does not work yet.
-        from openmdao.utils.mpi import MPI
-
-        if not MPI:
-            if (self._rec_mgr._recorders):
-                from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
-                self._model_viewer_data = _get_viewer_data(problem)
+        if (self._rec_mgr._recorders):
+            from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
+            self._model_viewer_data = _get_viewer_data(problem)
         self._rec_mgr.record_metadata(self)
 
     def get_design_var_values(self, filter=None):
@@ -214,7 +209,7 @@ class Driver(object):
            Dictionary containing values of each response.
         """
         # TODO: finish this method when we have a driver that requires it.
-        pass
+        return {}
 
     def get_objective_values(self, filter=None):
         """

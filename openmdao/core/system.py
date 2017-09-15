@@ -2959,6 +2959,9 @@ class System(object):
         recurse : boolean
             Flag indicating if the recorder should be added to all the subsystems.
         """
+        if MPI:
+            raise RuntimeError(
+                "Recording of Systems when running parallel code is not supported yet")
         for s in self.system_iter(include_self=True, recurse=recurse):
             s._rec_mgr.append(recorder)
 
@@ -2969,3 +2972,21 @@ class System(object):
         metadata = create_local_meta(self.pathname)
         self._rec_mgr.record_iteration(self, metadata)
         self.iter_count += 1
+
+    def is_active(self):
+        """
+        Determine if the system is active on this rank.
+
+        Returns
+        -------
+        bool
+            If running under MPI, returns True if this `System` has a valid
+            communicator. Always returns True if not running under MPI.
+        """
+        return MPI is None or not (self.comm is None or
+                                   self.comm == MPI.COMM_NULL)
+
+
+def _get_vec_names(voi_dict):
+    return set(voi for voi, data in iteritems(voi_dict)
+               if data['rhs_group'] is not None)
