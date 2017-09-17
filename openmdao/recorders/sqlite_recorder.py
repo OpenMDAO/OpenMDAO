@@ -69,12 +69,12 @@ class SqliteRecorder(BaseRecorder):
 
         self.model_viewer_data = None
 
-        # isolation_level=None causes autocommit
-        self.con = sqlite3.connect(out, isolation_level=None)
-
-        self.cursor = self.con.cursor()
-
         if self._open_close_sqlite:
+            # isolation_level=None causes autocommit
+            self.con = sqlite3.connect(out, isolation_level=None)
+
+            self.cursor = self.con.cursor()
+
             self.cursor.execute("CREATE TABLE metadata( format_version INT)")
             self.cursor.execute("INSERT INTO metadata(format_version) VALUES(?)", (format_version,))
 
@@ -101,14 +101,23 @@ class SqliteRecorder(BaseRecorder):
             self.cursor.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
                                 "solver_options BLOB, solver_class TEXT)")
 
-    def record_iteration_driver(self, object_requesting_recording, metadata):
+    def record_iteration_driver_passing_vars(self, object_requesting_recording, desvars,
+                                             responses, objectives, constraints, metadata):
         """
-        Record an iteration using the driver options.
+        Record an iteration of a driver with the variables passed in.
 
         Parameters
         ----------
         object_requesting_recording: <Driver>
             The Driver object that wants to record an iteration.
+        desvars : dict
+            Dictionary containing design variables.
+        responses : dict
+            Dictionary containing response variables.
+        objectives : dict
+            Dictionary containing objective variables.
+        constraints : dict
+            Dictionary containing constraint variables.
         metadata : dict
             Dictionary containing execution metadata (e.g. iteration coordinate).
         """
@@ -122,7 +131,9 @@ class SqliteRecorder(BaseRecorder):
         #                                      ('throughput', 'f')], (2,))
         #                       ])
 
-        super(SqliteRecorder, self).record_iteration_driver(object_requesting_recording, metadata)
+        super(SqliteRecorder, self).record_iteration_driver_passing_vars(
+            object_requesting_recording, desvars, responses,
+            objectives, constraints, metadata)
 
         # Just an example of the syntax for creating a numpy structured array
         # arr = np.zeros((1,), dtype=[('dv_x','(5,)f8'),('dv_y','(10,)f8')])
@@ -143,18 +154,20 @@ class SqliteRecorder(BaseRecorder):
         else:
             desvars_array = None
 
-        if self._responses_values:
-            dtype_tuples = []
-            for name, value in iteritems(self._responses_values):
-                tple = (name, '{}f8'.format(value.shape))
-                dtype_tuples.append(tple)
-
-            responses_array = np.zeros((1,), dtype=dtype_tuples)
-
-            for name, value in iteritems(self._responses_values):
-                responses_array[name] = value
-        else:
-            responses_array = None
+        # Cannot handle responses yet
+        # if self._responses_values:
+        #     dtype_tuples = []
+        #     for name, value in iteritems(self._responses_values):
+        #         tple = (name, '{}f8'.format(value.shape))
+        #         dtype_tuples.append(tple)
+        #
+        #     responses_array = np.zeros((1,), dtype=dtype_tuples)
+        #
+        #     for name, value in iteritems(self._responses_values):
+        #         responses_array[name] = value
+        # else:
+        #     responses_array = None
+        responses_array = None
 
         if self._objectives_values:
             dtype_tuples = []
@@ -353,6 +366,12 @@ class SqliteRecorder(BaseRecorder):
         object_requesting_recording: <System>
             The System that would like to record its metadata.
         """
+        # Cannot handle PETScVector yet
+        from openmdao.api import PETScVector
+        if isinstance(object_requesting_recording._scaling_vecs[('input', 'norm0')]['linear'],
+                      PETScVector):
+            return  # Cannot handle PETScVector yet
+
         scaling_factors = pickle.dumps(object_requesting_recording._scaling_vecs,
                                        pickle.HIGHEST_PROTOCOL)
 
@@ -387,4 +406,5 @@ class SqliteRecorder(BaseRecorder):
         """
         Close `out`.
         """
-        self.con.close()
+        if self._open_close_sqlite:
+            self.con.close()

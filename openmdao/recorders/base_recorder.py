@@ -11,6 +11,7 @@ from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver, NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import recording_iteration, \
     get_formatted_iteration_coordinate
+from openmdao.utils.mpi import MPI
 
 
 class BaseRecorder(object):
@@ -372,6 +373,10 @@ class BaseRecorder(object):
         **kwargs : keyword args
             Some implementations of record_iteration need additional args.
         """
+        if not self._parallel:
+            if MPI and MPI.COMM_WORLD.rank > 0:
+                raise RuntimeError("Non-parallel recorders should not be recording on ranks > 0")
+
         self._counter += 1
 
         self._iteration_coordinate = get_formatted_iteration_coordinate()
@@ -386,6 +391,71 @@ class BaseRecorder(object):
             self.record_iteration_solver(object_requesting_recording, metadata, **kwargs)
         else:
             raise ValueError("Recorders must be attached to Drivers, Systems, or Solvers.")
+
+    def record_iteration_driver_passing_vars(self, object_requesting_recording, desvars, responses,
+                                             objectives, constraints, metadata):
+        """
+        Record an iteration of a driver with the variables passed in.
+
+        Parameters
+        ----------
+        object_requesting_recording: <Driver>
+            The Driver object that wants to record an iteration.
+        desvars : dict
+            Dictionary containing design variables.
+        responses : dict
+            Dictionary containing response variables.
+        objectives : dict
+            Dictionary containing objective variables.
+        constraints : dict
+            Dictionary containing constraint variables.
+        metadata : dict
+            Dictionary containing execution metadata (e.g. iteration coordinate).
+        """
+        # TODO: this code and the same code in record_iteration should be in a separate method
+        if not self._parallel:
+            if MPI and MPI.COMM_WORLD.rank > 0:
+                raise RuntimeError("Non-parallel recorders should not be recording on ranks > 0")
+
+        self._counter += 1
+        self._iteration_coordinate = get_formatted_iteration_coordinate()
+
+        if self.options['record_desvars']:
+            if self._filtered_driver:
+                self._desvars_values = \
+                    {name: desvars[name] for name in self._filtered_driver['des']}
+            else:
+                self._desvars_values = desvars
+        else:
+            self._desvars_values = None
+
+        # Cannot handle responses yet
+        # if self.options['record_responses']:
+        #     if self._filtered_driver:
+        #         self._responses_values = \
+        #             {name: responses[name] for name in self._filtered_driver['res']}
+        #     else:
+        #         self._responses_values = responses
+        # else:
+        #     self._responses_values = None
+
+        if self.options['record_objectives']:
+            if self._filtered_driver:
+                self._objectives_values = \
+                    {name: objectives[name] for name in self._filtered_driver['obj']}
+            else:
+                self._objectives_values = objectives
+        else:
+            self._objectives_values = None
+
+        if self.options['record_constraints']:
+            if self._filtered_driver:
+                self._constraints_values = \
+                    {name: constraints[name] for name in self._filtered_driver['con']}
+            else:
+                self._constraints_values = constraints
+        else:
+            self._constraints_values = None
 
     def record_iteration_driver(self, object_requesting_recording, metadata):
         """

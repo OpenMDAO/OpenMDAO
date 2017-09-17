@@ -85,6 +85,97 @@ class WebRecorder(BaseRecorder):
             self._case_id = str(case_id)
             self._headers['update'] = "True"
 
+    def record_iteration_driver_passing_vars(self, object_requesting_recording, desvars,
+                                             responses, objectives, constraints, metadata):
+        """
+        Record an iteration using the driver options.
+
+        Parameters
+        ----------
+        object_requesting_recording: <Driver>
+            The Driver object that wants to record an iteration.
+        metadata : dict
+            Dictionary containing execution metadata (e.g. iteration coordinate).
+        """
+        # make a nested numpy named array using the example
+        #   http://stackoverflow.com/questions/19201868/how-to-set-dtype-for-nested-numpy-ndarray
+        # e.g.
+        # table = np.array(data, dtype=[('instrument', 'S32'),
+        #                        ('filter', 'S64'),
+        #                        ('response', [('linenumber', 'i'),
+        #                                      ('wavelength', 'f'),
+        #                                      ('throughput', 'f')], (2,))
+        #                       ])
+
+        super(WebRecorder, self).record_iteration_driver_passing_vars(object_requesting_recording,
+                                                                      desvars, responses,
+                                                                      objectives, constraints,
+                                                                      metadata)
+
+        desvars_array = None
+        responses_array = None
+        objectives_array = None
+        constraints_array = None
+
+        if self.options['record_desvars']:
+            if self._desvars_values:
+                desvars_array = []
+                for name, value in iteritems(self._desvars_values):
+                    desvars_array.append({
+                        'name': name,
+                        'values': list(value)
+                    })
+
+        if self.options['record_responses']:
+            if self._responses_values:
+                responses_array = []
+                for name, value in iteritems(self._responses_values):
+                    responses_array.append({
+                        'name': name,
+                        'values': list(value)
+                    })
+
+        if self.options['record_objectives']:
+            if self._objectives_values:
+                objectives_array = []
+                for name, value in iteritems(self._objectives_values):
+                    objectives_array.append({
+                        'name': name,
+                        'values': list(value)
+                    })
+
+        if self.options['record_constraints']:
+            if self._constraints_values:
+                constraints_array = []
+                for name, value in iteritems(self._constraints_values):
+                    constraints_array.append({
+                        'name': name,
+                        'values': list(value)
+                    })
+
+        driver_iteration_dict = {
+            "counter": self._counter,
+            "iteration_coordinate": self._iteration_coordinate,
+            "success": metadata['success'],
+            "msg": metadata['msg'],
+            "desvars": self.convert_to_list(desvars_array),
+            "responses": self.convert_to_list(responses_array),
+            "objectives": self.convert_to_list(objectives_array),
+            "constraints": self.convert_to_list(constraints_array)
+        }
+
+        global_iteration_dict = {
+            'record_type': 'driver',
+            'counter': self._counter
+        }
+
+        driver_iteration = json.dumps(driver_iteration_dict)
+        global_iteration = json.dumps(global_iteration_dict)
+        requests.post(self._endpoint + '/' + self._case_id + '/driver_iterations',
+                      data=driver_iteration, headers=self._headers)
+        requests.post(self._endpoint + '/' + self._case_id + '/global_iterations',
+                      data=global_iteration, headers=self._headers)
+
     def record_iteration_driver(self, object_requesting_recording, metadata):
         """
         Record an iteration using the driver options.
