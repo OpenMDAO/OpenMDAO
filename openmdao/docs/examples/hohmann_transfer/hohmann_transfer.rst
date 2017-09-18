@@ -8,7 +8,7 @@ a simple orbital mechanics problem.  We seek the minimum possible
 delta-V to transfer a spacecraft from Low Earth Orbit (LEO) to
 geostationary orbit (GEO) using a two-impulse *Hohmann Transfer*.
 
-The Hohmann Transfer is a maneuver which minimize the delta-V for
+The Hohmann Transfer is a maneuver which minimizes the delta-V for
 transferring a spacecraft from one circular orbit to another.  Hohmann
 transfer's have a practical application in that they can be used
 to transfer satellites from LEO parking orbits to geostationary orbit.
@@ -25,7 +25,7 @@ is thus coincident with the descending node, where we will perform the
 second impulse.
 
 After the first impulse, the spacecraft coasts to apogee.  Once there
-it impulse a second burn along the velocity vector to raise perigee radius
+it performs a second impulsive burn along the velocity vector to raise perigee radius
 to the radius of GEO, thus circularizing the orbit.
 
 Simple, right?  The issue is that, unless they launch from the equator,
