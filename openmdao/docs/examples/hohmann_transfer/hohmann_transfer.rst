@@ -162,21 +162,21 @@ The first component we define computes the circular velocity given the
 radius from the center of the central body and the gravitational parameter
 of the central body.
 
-.. literalinclude:: ../../../test_suie/test_examples/test_hohmann_transfer.py
+.. literalinclude:: ../../../test_suite/test_examples/test_hohmann_transfer.py
    :pyobject: VCircComp
 
 The transfer orbit component computes the velocity magnitude at periapsis
 and apoapsis of an orbit, given the radii of periapsis and apoapsis, and
 the gravitational parameter of the central body.
 
-.. literalinclude:: ../../../test_suie/test_examples/test_hohmann_transfer.py
+.. literalinclude:: ../../../test_suite/test_examples/test_hohmann_transfer.py
    :pyobject: TransferOrbitComp
 
 The delta-V component is used to compute the delta-V performed in changing
 the velocity vector, giving the magnitudes of the initial and final velocities
 and the angle between them.
 
-.. literalinclude:: ../../../test_suie/test_examples/test_hohmann_transfer.py
+.. literalinclude:: ../../../test_suite/test_examples/test_hohmann_transfer.py
    :pyobject: DeltaVComp
 
 ~~~~~~~~~~~~~~~~~~~~~~~

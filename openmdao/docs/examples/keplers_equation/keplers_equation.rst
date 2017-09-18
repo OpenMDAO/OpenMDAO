@@ -1,4 +1,4 @@
-.. _`hohmann_tutorial`:
+.. _`keplers_eqn_tutorial`:
 
 Kepler's Equation Example - Solving an Implicit Equaiton
 ========================================================
