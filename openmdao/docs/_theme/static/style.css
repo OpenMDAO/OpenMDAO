@@ -61,6 +61,11 @@ h1, h2, h3, h4, h5, h6 {
   border-bottom: 1px solid #ccc;
 }
 
+/*default h3 is kind of screwy with negative border. Fix it.*/
+h3 {
+    margin: 1em 0 0.3em 0;
+}
+
 /*in the source docs, the header color block for "Args"*/
 th {
   /*background-color: #BFD1D4;*/
