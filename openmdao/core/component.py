@@ -13,7 +13,6 @@ from collections import OrderedDict, Iterable
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
-from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation, ContainsAll
@@ -580,7 +579,7 @@ class Component(System):
                     'method': method,
                 }
                 abs_key = rel_key2abs_key(self, rel_key)
-                meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
+                meta = self._subjacs_info[abs_key]
                 meta.update(meta_changes)
                 meta.update(kwargs)
                 self._subjacs_info[abs_key] = meta
@@ -603,7 +602,7 @@ class Component(System):
             If False, specifies no dependence between the output(s) and the
             input(s). This is only necessary in the case of a sparse global
             jacobian, because if 'dependent=False' is not specified and
-            set_subjac_info is not called for a given pair, then a dense
+            declare_partials is not called for a given pair, then a dense
             matrix of zeros will be allocated in the sparse global jacobian
             for that pair.  In the case of a dense global jacobian it doesn't
             matter because the space for a dense subjac will always be
@@ -639,7 +638,7 @@ class Component(System):
             If False, specifies no dependence between the output(s) and the
             input(s). This is only necessary in the case of a sparse global
             jacobian, because if 'dependent=False' is not specified and
-            set_subjac_info is not called for a given pair, then a dense
+            declare_partials is not called for a given pair, then a dense
             matrix of zeros will be allocated in the sparse global jacobian
             for that pair.  In the case of a dense global jacobian it doesn't
             matter because the space for a dense subjac will always be
@@ -700,7 +699,7 @@ class Component(System):
                     'dependent': dependent
                 }
                 abs_key = rel_key2abs_key(self, rel_key)
-                meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
+                meta = self._subjacs_info[abs_key]
                 meta.update(meta_changes)
                 self._check_partials_meta(abs_key, meta)
                 self._subjacs_info[abs_key] = meta

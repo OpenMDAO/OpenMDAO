@@ -13,7 +13,8 @@ from six.moves import range
 import numpy as np
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian, \
+    SUBJAC_META_DEFAULTS
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
@@ -24,6 +25,7 @@ from openmdao.utils.units import convert_units
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.logger_utils import get_logger
+
 
 _type_map = {
     'input': 'input',
@@ -1383,7 +1385,7 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._subjacs_info = {}
+        self._subjacs_info = defaultdict(lambda: SUBJAC_META_DEFAULTS.copy())
 
         if recurse:
             for subsys in self._subsystems_myproc:

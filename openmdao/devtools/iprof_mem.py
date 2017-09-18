@@ -41,7 +41,7 @@ def setup(methods=None):
     global _registered, _trace_memory, mem_usage
     if not _registered:
         from openmdao.devtools.debug import mem_usage
-        if methods is None or methods not in func_group:
+        if methods is None:
             methods = func_group['openmdao_all']
 
         mem_changes = {}
@@ -54,7 +54,7 @@ def setup(methods=None):
         _qual_cache = {}  # cache of files scanned for qualified names
 
         def print_totals():
-            count = defaultdict(set)
+            count = defaultdict(dict)
             for (self, code_obj), delta in sorted(mem_changes.items(), key=lambda x: x[1]):
                 if delta != 0.0:
                     funcname = find_qualified_name(code_obj.co_filename,
@@ -65,8 +65,14 @@ def setup(methods=None):
                         pname = ''
 
                     cname = self.__class__.__name__
-                    count[cname].add(id(self))
-                    sname = "%s#%d%s" % (self.__class__.__name__, len(count[cname]), pname)
+                    ident = id(self)
+                    if ident in count[cname]:
+                        num = count[cname][ident]
+                    else:
+                        num = len(count[cname])
+                        count[cname][ident] = num
+
+                    sname = "%s#%d%s" % (cname, num, pname)
 
                     print("%s %g MB" % ('.'.join((sname, funcname)), delta))
 

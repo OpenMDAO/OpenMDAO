@@ -15,7 +15,6 @@ from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
 from openmdao.core.component import Component
-from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.proc_allocators.proc_allocator import ProcAllocationError
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
@@ -1580,7 +1579,7 @@ class Group(System):
                     if key[1] in self._owns_approx_wrt_idx:
                         meta_changes['idx_wrt'] = self._owns_approx_wrt_idx[key[1]]
 
-                    meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+                    meta = self._subjacs_info[key]
                     meta.update(meta_changes)
                     meta.update(self._owns_approx_jac_meta)
                     self._subjacs_info[key] = meta

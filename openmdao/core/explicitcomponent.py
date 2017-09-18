@@ -8,7 +8,6 @@ from itertools import product
 
 from openmdao.core.component import Component
 from openmdao.utils.class_util import overrides_method
-from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
 
 _inst_functs = ['compute_jacvec_product', 'compute_multi_jacvec_product']
@@ -172,7 +171,7 @@ class ExplicitComponent(Component):
 
             for wrt_name, wrt_vars in (('output', outputs), ('input', inputs)):
                 for abs_key in product(outputs, wrt_vars):
-                    meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
+                    meta = self._subjacs_info[abs_key]
                     dependent = meta['dependent']
                     if meta['value'] is None and dependent:
                         out_size = np.product(self._var_abs2meta['output'][abs_key[0]]['shape'])
