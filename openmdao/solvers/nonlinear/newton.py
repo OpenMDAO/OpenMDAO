@@ -205,8 +205,6 @@ class NewtonSolver(NonlinearSolver):
                 self._solver_info.pop()
 
         if self.options['maxiter'] > 0:
-
-            system._guess_nonlinear()
             self._run_apply()
             norm = self._iter_get_norm()
         else:
