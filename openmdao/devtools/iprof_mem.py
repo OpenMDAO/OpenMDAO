@@ -55,7 +55,7 @@ def setup(methods=None):
     global _registered, _trace_memory, mem_usage
     if not _registered:
         from openmdao.devtools.debug import mem_usage
-        if methods is None or methods not in func_group:
+        if methods is None:
             methods = func_group['openmdao_all']
 
         mem_changes = {}
@@ -82,7 +82,7 @@ def setup(methods=None):
                     count[cname].add(id(self))
                     sname = "%s#%d%s" % (self.__class__.__name__, len(count[cname]), pname)
 
-                    print("%s %g MB" % ('.'.join((sname, funcname)), delta))
+                    print("%g MB %s" % (delta, '.'.join((sname, funcname))))
 
         atexit.register(print_totals)
         _registered = True
