@@ -29,6 +29,11 @@ from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
     SellarDis2withDerivatives
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
+
 if PY2:
     import cPickle as pickle
 if PY3:
@@ -383,6 +388,9 @@ class TestDataUploader(unittest.TestCase):
         self.assertEqual(driver_iteration_data['objectives'], [])
         self.assertEqual(driver_iteration_data['responses'], [])
 
+    @unittest.skipIf(PETScVector is None or os.environ.get("TRAVIS"),
+                     "PETSc is required." if PETScVector is None
+                     else "Unreliable on Travis CI.")
     def test_record_system(self, m):
         self.setup_endpoints(m)
 
