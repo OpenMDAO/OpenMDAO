@@ -286,21 +286,6 @@ class ImplicitCompTestCase(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['comp2.x'], 3.)
 
-        prob.setup(check=False)
-
-        prob['pa.a'] = 1.
-        prob['pb.b'] = -4.
-        prob['pc.c'] = 3.
-
-        # Making sure that guess_nonlinear is called early enough to eradicate this.
-        prob['comp2.x'] = np.NaN
-
-        # Just try one iteration to make sure guess_nonlinear is being called early enough
-        group.nonlinear_solver.options['maxiter'] = 1
-
-        prob.run_model()
-        assert_rel_error(self, prob['comp2.x'], 3.)
-
     def test_guess_nonlinear_transfer(self):
         # Test that data is transfered to a component before calling guess_nonlinear.
 
