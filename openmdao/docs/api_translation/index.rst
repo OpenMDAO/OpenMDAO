@@ -1,11 +1,14 @@
 .. _`api_translation`:
 
-*********************
-API Translation Guide
-*********************
+******************
+Upgrading from 1.x
+******************
 
 This guide takes how you did things in OpenMDAO Alpha and shows how to do them in the latest version of OpenMDAO.
 
+
+Build a Model
+-------------
 
 Define an Explcit Component
 ===========================
@@ -102,6 +105,9 @@ Define an Implicit Component
             return J
 
 
+Run a Model
+-----------
+
 Assemble and Run a Simple Model
 ===============================
 
@@ -164,6 +170,9 @@ Print All Solver Messages
 
     top.print_all_convergence(level=2)
 
+
+Check a Model
+-------------
 
 Specify Finite Difference for all Component Derivatives
 =======================================================
@@ -237,6 +246,9 @@ Suppress Output While Checking Partial Derivatives
       data = prob.check_partial_derivatives(out_stream=None)
 
 
+Change Derivative Behavior
+--------------------------
+
 Force Group or Model to use Finite Difference
 =============================================
 
@@ -265,6 +277,9 @@ Force Group or Model to use Finite Difference with Specific Options
       model.deriv_options['form'] = 'central'
       model.deriv_options['step_calc'] = 'relative'
 
+
+Add Design Variables
+--------------------
 
 Add a Design Variable to a Model
 ================================
@@ -297,6 +312,9 @@ Add a Design Variable with Scale and Offset that Maps [3, 5] to [0, 1]
 
     prob.add_desvar('z', scaler=0.5, adder=-3.0)
 
+
+Set Solvers
+-----------
 
 Setup a Problem Using the PetscVector
 =====================================
