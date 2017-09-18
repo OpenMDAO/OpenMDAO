@@ -59,7 +59,7 @@ class RecordingManager(object):
 
     def _gather_vars(self, root, local_vars):
         """
-        Gathers and returns only variables listed in `local_vars` from the `root` System.
+        Gather and returns only variables listed in `local_vars` from the `root` System.
         """
         # if trace:
         #     debug("gathering vars for recording in %s" % root.pathname)
