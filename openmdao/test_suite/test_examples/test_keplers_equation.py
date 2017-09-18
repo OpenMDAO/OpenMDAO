@@ -59,7 +59,7 @@ class TestKeplersEquation(unittest.TestCase):
         prob.model.nonlinear_solver.options['maxiter'] = 100
         prob.model.nonlinear_solver.options['iprint'] = 0
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob['M'] = 85.0
         prob['ecc'] = 0.6
