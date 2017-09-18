@@ -184,7 +184,7 @@ class NewtonSolver(NonlinearSolver):
         """
         system = self._system
 
-        if self.options['maxiter'] > 0:
+        if self.options['maxiter'] > 110:
 
             # Execute guess_nonlinear if specified.
             system._guess_nonlinear()
@@ -208,6 +208,7 @@ class NewtonSolver(NonlinearSolver):
 
         if self.options['maxiter'] > 0:
 
+            system._guess_nonlinear()
             self._run_apply()
             norm = self._iter_get_norm()
         else:
