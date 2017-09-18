@@ -16,29 +16,38 @@ import tornado.web
 from collections import defaultdict, deque
 from itertools import groupby
 
-from openmdao.devtools.iprofile import process_profile, profile_py_file
+from openmdao.devtools.iprofile import _process_profile, _profile_py_file
 from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _collect_methods
 
 
-def launch_browser(port):
+def _launch_browser(port):
+    """
+    Open the default web browser to localhost:<port>
+    """
     time.sleep(1)
     webbrowser.get().open('http://localhost:%s' % port)
 
-def startThread(fn):
+def _startThread(fn):
+    """
+    Start a daemon thread running the given function.
+    """
     thread = threading.Thread(target=fn)
     thread.setDaemon(True)
     thread.start()
     return thread
 
 def _parent_key(d):
+    """
+    Return the function path of the parent of function specified by 'id' in the given dict.
+    """
     parts = d['id'].rsplit('-', 1)
     if len(parts) == 1:
         return ''
     return parts[0]
 
-def stratify(call_data, sortby='time'):
+def _stratify(call_data, sortby='time'):
     """
-    Group node data by depth and sort within a depth by parent and time.
+    Group node data by depth and sort within a depth by parent and 'sortby'.
     """
     depth_groups = []
     node_list = []  # all nodes in a single list
@@ -79,10 +88,10 @@ def stratify(call_data, sortby='time'):
     return depth_groups, node_list
 
 
-class Application(tornado.web.Application):
+class _Application(tornado.web.Application):
     def __init__(self, options):
-        self.call_data, _ = process_profile(options.files)
-        self.depth_groups, self.node_list = stratify(self.call_data)
+        self.call_data, _ = _process_profile(options.files)
+        self.depth_groups, self.node_list = _stratify(self.call_data)
         self.options = options
 
         # assemble our call_data nodes into a tree structure, where each
@@ -98,8 +107,8 @@ class Application(tornado.web.Application):
             tree[path][0] = data
 
         handlers = [
-            (r"/", Index),
-            (r"/func/([0-9]+)", Function),
+            (r"/", _Index),
+            (r"/func/([0-9]+)", _Function),
         ]
 
         settings = dict(
@@ -107,7 +116,7 @@ class Application(tornado.web.Application):
              static_path=os.path.join(os.path.dirname(__file__), "static"),
         )
 
-        super(Application, self).__init__(handlers, **settings)
+        super(_Application, self).__init__(handlers, **settings)
 
     def get_nodes(self, idx):
         """
@@ -136,7 +145,7 @@ class Application(tornado.web.Application):
                     stop_adding = True
 
 
-class Index(tornado.web.RequestHandler):
+class _Index(tornado.web.RequestHandler):
     def get(self):
         """
         Load the page template and request call data nodes starting at idx=0.
@@ -145,7 +154,7 @@ class Index(tornado.web.RequestHandler):
         self.render("iprofview.html", title=app.options.title)
 
 
-class Function(tornado.web.RequestHandler):
+class _Function(tornado.web.RequestHandler):
     def get(self, idx):
         """
         Request an updated list of call data nodes, rooted at the node specified by idx.
@@ -156,7 +165,7 @@ class Function(tornado.web.RequestHandler):
         self.write(dump)
 
 
-def prof_view():
+def _prof_view():
     """
     Called from a command line to instance based profile data in a web page.
     """
@@ -187,16 +196,16 @@ def prof_view():
         if len(options.files) > 1:
             print("iprofview can only process a single python file.", file=sys.stderr)
             sys.exit(-1)
-        profile_py_file(options.files[0], methods=func_group[options.group])
+        _profile_py_file(options.files[0], methods=func_group[options.group])
         options.files = ['iprof.0']
 
-    app = Application(options)
+    app = _Application(options)
     app.listen(options.port)
 
     print("starting server on port %d" % options.port)
 
-    serve_thread  = startThread(tornado.ioloop.IOLoop.current().start)
-    launch_thread = startThread(lambda: launch_browser(options.port))
+    serve_thread  = _startThread(tornado.ioloop.IOLoop.current().start)
+    launch_thread = _startThread(lambda: _launch_browser(options.port))
 
     while serve_thread.isAlive():
         serve_thread.join(timeout=1)

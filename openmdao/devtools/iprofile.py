@@ -226,7 +226,7 @@ def _iter_raw_prof_file(rawname):
             yield path, int(count), float(elapsed)
 
 
-def process_profile(flist):
+def _process_profile(flist):
     """
     Take the generated raw profile data, potentially from multiple files,
     and combine it to get execution counts and timing data.
@@ -287,7 +287,7 @@ def process_profile(flist):
     return tree_nodes, totals
 
 
-def prof_totals():
+def _prof_totals():
     """
     Called from the command line to create a file containing total elapsed
     times and number of calls for all profiled functions.
@@ -321,10 +321,10 @@ def prof_totals():
         if len(options.files) > 1:
             print("iprofview can only process a single python file.", file=sys.stderr)
             sys.exit(-1)
-        profile_py_file(options.files[0], methods=func_group[options.group])
+        _profile_py_file(options.files[0], methods=func_group[options.group])
         options.files = ['iprof.0']
 
-    call_data, totals = process_profile(options.files)
+    call_data, totals = _process_profile(options.files)
 
     total_time = totals['$total']['tot_time']
 
@@ -342,7 +342,7 @@ def prof_totals():
             out_stream.close()
 
 
-def profile_py_file(fname=None, methods=None):
+def _profile_py_file(fname=None, methods=None):
     """
     Run instance-based profiling on the given python script.
 
