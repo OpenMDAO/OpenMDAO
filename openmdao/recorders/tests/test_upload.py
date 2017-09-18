@@ -1095,6 +1095,8 @@ class TestDataUploader(unittest.TestCase):
         prob['comp1.c'] = 3.
 
         comp2 = prob.model.get_subsystem('comp2')  # ImplicitComponent
+
+        self.recorder.options['record_metadata'] = False
         comp2.add_recorder(self.recorder)
 
         t0, t1 = run_driver(prob)
