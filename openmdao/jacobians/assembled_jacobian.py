@@ -338,13 +338,9 @@ class AssembledJacobian(Jacobian):
                     # Masking
                     masked = [name for name in d_inputs._views if name not in d_inputs._names]
                     if len(masked) > 0:
-                        print('Masked', masked, system.pathname)
                         backup = d_inputs.get_data()
                         for name in masked:
                             d_inputs._views[name][:] = 0.0
-                            for key, val in iteritems(ext_mtx._metadata):
-                                if key[1] == name:
-                                    print('Masked out', val[1], 'out of', ext_mtx._matrix.shape[1])
 
                     d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, None))
 
