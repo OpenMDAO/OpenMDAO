@@ -14,6 +14,7 @@ from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockG
 from openmdao.recorders.sqlite_recorder import SqliteRecorder, format_version
 from openmdao.recorders.case_reader import CaseReader
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
+from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
     SellarDis2withDerivatives
 from openmdao.devtools.testutil import assert_rel_error
@@ -109,12 +110,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_constraint('con2', upper=0.0)
 
     def setUp(self):
-        if OPT is None:
-            raise unittest.SkipTest("pyoptsparse is not installed")
 
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SLSQP")
-
+        recording_iteration.stack = []  # reset to avoid problems from earlier tests
         self.dir = mkdtemp()
         self.filename = os.path.join(self.dir, "sqlite_test")
         self.recorder = SqliteRecorder(self.filename)
@@ -161,6 +158,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertTrue(isinstance(cr, SqliteCaseReader), msg='CaseReader not'
                         ' returning the correct subclass.')
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_reading_driver_cases(self):
         """ Tests that the reader returns params correctly. """
         self.setup_sellar_model_with_optimization()
@@ -213,6 +212,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.recorder.options['record_inputs'] = True
         self.recorder.options['record_outputs'] = True
         self.recorder.options['record_residuals'] = True
+        self.recorder.options['record_metadata'] = False
 
         self.prob.model.add_recorder(self.recorder)
 
@@ -298,6 +298,8 @@ class TestSqliteCaseReader(unittest.TestCase):
                              'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|{}'
                              .format(i))
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_reading_driver_metadata(self):
         self.setup_sellar_model_with_optimization()
 

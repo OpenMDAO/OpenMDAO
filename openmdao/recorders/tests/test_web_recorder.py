@@ -20,6 +20,7 @@ from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, N
 from openmdao.core.problem import Problem
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.utils.record_util import format_iteration_coordinate
+from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.web_recorder import format_version
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
@@ -68,6 +69,7 @@ class TestServerRecorder(unittest.TestCase):
     solver_iterations = None
 
     def setUp(self):
+        recording_iteration.stack = []  # reset to avoid problems with earlier tests
         super(TestServerRecorder, self).setUp()
 
     def assert_array_close(self, test_val, comp_set):
@@ -405,15 +407,11 @@ class TestServerRecorder(unittest.TestCase):
         for r in residuals:
             self.assert_array_close(r, system_iterations['residuals'])
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_simple_driver_recording(self, m):
         self.setup_endpoints(m)
         recorder = WebRecorder(self._accepted_token, suppress_output=True)
-
-        if OPT is None:
-            raise unittest.SkipTest("pyoptsparse is not installed")
-
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
 
         prob = Problem()
         model = prob.model = Group()
@@ -906,16 +904,13 @@ class TestServerRecorder(unittest.TestCase):
         for o in expected_solver_output:
             self.assert_array_close(o, solver_iteration['solver_output'])
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_record_driver_system_solver(self, m):
         # Test what happens when all three types are recorded:
         #    Driver, System, and Solver
         self.setup_endpoints(m)
         recorder = WebRecorder(self._accepted_token, suppress_output=True)
-        if OPT is None:
-            raise unittest.SkipTest("pyoptsparse is not installed")
-
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
 
         self.setup_sellar_grouped_model()
 

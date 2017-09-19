@@ -18,11 +18,18 @@ class DefaultTransfer(Transfer):
     Default NumPy transfer.
     """
 
-    def _initialize_transfer(self):
+    def _initialize_transfer(self, in_vec, out_vec):
         """
         Set up the transfer; do any necessary pre-computation.
 
         Optionally implemented by the subclass.
+
+        Parameters
+        ----------
+        in_vec : <Vector>
+            reference to the input vector.
+        out_vec : <Vector>
+            reference to the output vector.
         """
         in_inds = self._in_inds
         out_inds = self._out_inds
@@ -38,7 +45,7 @@ class DefaultTransfer(Transfer):
         self._in_inds = ins
         self._out_inds = outs
 
-    def __call__(self, in_vec, out_vec, mode='fwd'):
+    def transfer(self, in_vec, out_vec, mode='fwd'):
         """
         Perform transfer.
 
@@ -58,6 +65,7 @@ class DefaultTransfer(Transfer):
         if mode == 'fwd':
             for key in in_inds:
                 in_set_name, out_set_name = key
+                # this works whether the vecs have multi columns or not due to broadcasting
                 in_vec._data[in_set_name][in_inds[key]] = \
                     out_vec._data[out_set_name][out_inds[key]]
 
@@ -94,21 +102,22 @@ class DefaultVector(Vector):
         system = self._system
         type_ = self._typ
         iproc = self._iproc
+        ncol = self._ncol
 
-        sizes_byset_t = system._var_sizes_byset[type_]
+        sizes_byset_t = system._var_sizes_byset[self._name][type_]
+        sizes_t = system._var_sizes[self._name][type_]
 
         data = {}
         indices = {}
-        for set_name in system._var_set2iset[type_]:
+        for set_name in system._num_var_byset[self._name][type_]:
             size = np.sum(sizes_byset_t[set_name][iproc, :])
-            data[set_name] = np.zeros(size)
+            data[set_name] = np.zeros(size) if ncol == 1 else np.zeros((size, ncol))
             indices[set_name] = np.zeros(size, int)
 
-        sizes_t = system._var_sizes[type_]
         abs2meta_t = system._var_abs2meta[type_]
-        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[type_]
-        allprocs_abs2idx_t = system._var_allprocs_abs2idx[type_]
-        for abs_name in system._var_abs_names[type_]:
+        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[self._name][type_]
+        allprocs_abs2idx_t = system._var_allprocs_abs2idx[self._name][type_]
+        for abs_name in system._var_relevant_names[self._name][type_]:
             set_name = abs2meta_t[abs_name]['var_set']
 
             idx_byset = allprocs_abs2idx_byset_t[abs_name]
@@ -129,13 +138,14 @@ class DefaultVector(Vector):
         """
         system = self._system
         type_ = self._typ
+        vec_name = self._name
         iproc = self._iproc
         root_vec = self._root_vector
 
         _, tmp_indices = self._create_data()
 
-        ext_sizes_t = system._ext_sizes[type_]
-        int_sizes_t = np.sum(system._var_sizes[type_][iproc, :])
+        ext_sizes_t = system._ext_sizes[vec_name][type_]
+        int_sizes_t = np.sum(system._var_sizes[vec_name][type_][iproc, :])
         old_sizes_total = np.sum([len(data) for data in itervalues(root_vec._data)])
 
         old_sizes = (
@@ -149,9 +159,11 @@ class DefaultVector(Vector):
             ext_sizes_t[1],
         )
 
-        for set_name in system._var_set2iset[type_]:
-            ext_sizes_byset_t = system._ext_sizes_byset[type_][set_name]
-            int_sizes_byset_t = np.sum(system._var_sizes_byset[type_][set_name][iproc, :])
+        sizes_byset = system._var_sizes_byset[vec_name]
+
+        for set_name in system._num_var_byset[self._name][type_]:
+            ext_sizes_byset_t = system._ext_sizes_byset[vec_name][type_][set_name]
+            int_sizes_byset_t = np.sum(sizes_byset[type_][set_name][iproc, :])
             old_sizes_total_byset = len(root_vec._data[set_name])
 
             old_sizes_byset = (
@@ -194,15 +206,15 @@ class DefaultVector(Vector):
         iproc = self._iproc
         root_vec = self._root_vector
 
-        offset = system._ext_sizes[type_][0]
+        offset = system._ext_sizes[self._name][type_][0]
+        sizes_byset = system._var_sizes_byset[self._name][type_]
 
         data = {}
         imag_data = {}
         indices = {}
-        for set_name in system._var_set2iset[type_]:
-            offset_byset = system._ext_sizes_byset[type_][set_name][0]
-            ind_byset1 = offset_byset
-            ind_byset2 = offset_byset + np.sum(system._var_sizes_byset[type_][set_name][iproc, :])
+        for set_name, sizes in iteritems(sizes_byset):
+            ind_byset1 = system._ext_sizes_byset[self._name][type_][set_name][0]
+            ind_byset2 = ind_byset1 + np.sum(sizes[iproc, :])
 
             data[set_name] = root_vec._data[set_name][ind_byset1:ind_byset2]
             indices[set_name] = root_vec._indices[set_name][ind_byset1:ind_byset2] - offset
@@ -252,6 +264,7 @@ class DefaultVector(Vector):
         system = self._system
         type_ = self._typ
         iproc = self._iproc
+        ncol = self._ncol
 
         self._views = self._names = views = {}
         self._views_flat = views_flat = {}
@@ -260,16 +273,20 @@ class DefaultVector(Vector):
         self._imag_views = imag_views = {}
         self._imag_views_flat = imag_views_flat = {}
 
-        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[type_]
-        sizes_byset_t = system._var_sizes_byset[type_]
+        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[self._name][type_]
+        sizes_byset_t = system._var_sizes_byset[self._name][type_]
         abs2meta_t = system._var_abs2meta[type_]
-        for abs_name in system._var_abs_names[type_]:
+        for abs_name in system._var_relevant_names[self._name][type_]:
             idx_byset = allprocs_abs2idx_byset_t[abs_name]
             set_name = abs2meta_t[abs_name]['var_set']
 
             ind_byset1 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset])
             ind_byset2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1])
             shape = abs2meta_t[abs_name]['shape']
+            if ncol > 1:
+                if not isinstance(shape, tuple):
+                    shape = (shape,)
+                shape = tuple(list(shape) + [ncol])
 
             views_flat[abs_name] = v = self._data[set_name][ind_byset1:ind_byset2]
             if shape != v.shape:
@@ -312,7 +329,7 @@ class DefaultVector(Vector):
         for set_name, data in iteritems(self._data):
             data += vec._data[set_name]
 
-        if self._vector_info._under_complex_step and vec._alloc_complex:
+        if vec._alloc_complex and self._vector_info._under_complex_step:
             for set_name, data in iteritems(self._imag_data):
                 data += vec._imag_data[set_name]
         return self
@@ -333,7 +350,7 @@ class DefaultVector(Vector):
         """
         for set_name, data in iteritems(self._data):
             data -= vec._data[set_name]
-        if self._vector_info._under_complex_step and vec._alloc_complex:
+        if vec._alloc_complex and self._vector_info._under_complex_step:
             for set_name, data in iteritems(self._imag_data):
                 data -= vec._imag_data[set_name]
         return self
@@ -358,8 +375,8 @@ class DefaultVector(Vector):
             for key in self._data:
                 r_data = self._data[key]
                 i_data = self._imag_data[key]
-                r_data = r_val * r_data + i_val * i_data
-                i_data = r_val * i_data + i_val * r_data
+                self._data[key] = r_val * r_data + i_val * i_data
+                self._imag_data[key] = r_val * i_data + i_val * r_data
         else:
             for data in itervalues(self._data):
                 data *= val
@@ -396,8 +413,12 @@ class DefaultVector(Vector):
         vec : <Vector>
             The vector to perform element-wise multiplication with.
         """
-        for set_name, data in iteritems(self._data):
-            data[:] *= vec._data[set_name]
+        if self._ncol == 1:
+            for set_name, data in iteritems(self._data):
+                data[:] *= vec._data[set_name]
+        else:
+            for set_name, data in iteritems(self._data):
+                data *= vec._data[set_name][:, np.newaxis]
 
     def set_vec(self, vec):
         """
@@ -442,7 +463,7 @@ class DefaultVector(Vector):
         """
         global_sum = 0
         for set_name, data in iteritems(self._data):
-            global_sum += np.dot(self._data[set_name], vec._data[set_name])
+            global_sum += np.dot(data, vec._data[set_name])
 
         return global_sum
 

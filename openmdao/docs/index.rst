@@ -13,3 +13,10 @@ OpenMDAO Documentation
     theory_manual/index.rst
     _srcdocs/index.rst
     style_guide/index.rst
+
+------------
+
+.. toctree::
+    :maxdepth: 1
+
+    api_translation/index.rst

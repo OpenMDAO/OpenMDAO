@@ -3,13 +3,15 @@
 from __future__ import division, print_function
 
 import unittest
+from six import iteritems
 
+import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, DirectSolver
+from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, NewtonSolver
 from openmdao.devtools.testutil import assert_rel_error
+from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
-from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 
 
 class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
@@ -45,7 +47,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         d_residuals.set_const(1.0)
         d_outputs.set_const(0.0)
         g1._linearize()
-        g1._solve_linear(['linear'], 'fwd')
+        g1.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
         # The empty first entry in _data is due to the dummy
@@ -59,11 +61,45 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         d_outputs.set_const(1.0)
         d_residuals.set_const(0.0)
         g1.linear_solver._linearize()
-        g1._solve_linear(['linear'], 'rev')
+        g1.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
         assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
         assert_rel_error(self, output[5], g1.expected_solution[1], 3e-15)
+
+    def test_rev_mode_bug(self):
+
+        prob = Problem()
+        prob.model = SellarDerivatives(nonlinear_solver=NewtonSolver(), linear_solver=DirectSolver())
+
+        prob.setup(check=False, mode='rev')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+        wrt = ['x', 'z']
+        of = ['obj', 'con1', 'con2']
+
+        Jbase = {}
+        Jbase['con1', 'x'] = [[-0.98061433]]
+        Jbase['con1', 'z'] = np.array([[-9.61002285, -0.78449158]])
+        Jbase['con2', 'x'] = [[0.09692762]]
+        Jbase['con2', 'z'] = np.array([[1.94989079, 1.0775421]])
+        Jbase['obj', 'x'] = [[2.98061392]]
+        Jbase['obj', 'z'] = np.array([[9.61001155, 1.78448534]])
+
+        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        for key, val in iteritems(Jbase):
+            assert_rel_error(self, J[key], val, .00001)
+
+        # In the bug, the solver mode got switched from fwd to rev when it shouldn't
+        # have been, causing a singular matrix and NaNs in the output.
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
 
 class TestDirectSolverFeature(unittest.TestCase):

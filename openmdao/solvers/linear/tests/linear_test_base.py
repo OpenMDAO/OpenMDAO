@@ -179,7 +179,7 @@ class LinearSolverTests(object):
             diff = np.linalg.norm(J['y2', 'x2'] - Jbase[2:4, 2:4])
             assert_rel_error(self, diff, 0.0, 1e-8)
 
-        def test_fan_out(self):
+        def test_fan_out_fwd(self):
             # Test derivatives for fan-out topology.
             prob = Problem()
             prob.model = FanOut()
@@ -187,6 +187,27 @@ class LinearSolverTests(object):
             prob.set_solver_print(level=0)
 
             prob.setup(check=False, mode='fwd')
+            prob.run_model()
+
+            wrt = ['p.x']
+            of = ['comp2.y', "comp3.y"]
+
+            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            assert_rel_error(self, J['comp2.y', 'p.x'], [[-6.0]], 1e-6)
+            assert_rel_error(self, J['comp3.y', 'p.x'], [[15.0]], 1e-6)
+
+            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            assert_rel_error(self, J['comp2.y', 'p.x'], [[-6.0]], 1e-6)
+            assert_rel_error(self, J['comp3.y', 'p.x'], [[15.0]], 1e-6)
+
+        def test_fan_out_rev(self):
+            # Test derivatives for fan-out topology.
+            prob = Problem()
+            prob.model = FanOut()
+            prob.model.linear_solver = self.linear_solver_class()
+            prob.set_solver_print(level=0)
+
+            prob.setup(check=False, mode='rev')
             prob.run_model()
 
             wrt = ['p.x']

@@ -31,7 +31,7 @@ class DictionaryJacobian(Jacobian):
         with self._system._unscaled_context(
                 outputs=[d_outputs], residuals=[d_residuals]):
             ncol = d_residuals._ncol
-            for abs_key in self._iter_abs_keys():
+            for abs_key in self._iter_abs_keys(d_residuals._name):
                 subjac = self._subjacs[abs_key]
 
                 if type(subjac) is np.ndarray or scipy.sparse.issparse(subjac):
@@ -58,14 +58,14 @@ class DictionaryJacobian(Jacobian):
                             re = d_residuals._views_flat[abs_key[0]]
                             op = d_outputs._views_flat[abs_key[1]]
                             if fwd:
-                                if ncol > 1:
+                                if len(re.shape) > 1:
                                     for i in range(ncol):
                                         np.add.at(re[:, i], subjac[1],
                                                   op[:, i][subjac[2]] * subjac[0])
                                 else:
                                     np.add.at(re, subjac[1], op[subjac[2]] * subjac[0])
                             else:  # rev
-                                if ncol > 1:
+                                if len(re.shape) > 1:
                                     for i in range(ncol):
                                         np.add.at(op[:, i], subjac[2],
                                                   re[:, i][subjac[1]] * subjac[0])
@@ -75,14 +75,14 @@ class DictionaryJacobian(Jacobian):
                             re = d_residuals._views_flat[abs_key[0]]
                             ip = d_inputs._views_flat[abs_key[1]]
                             if fwd:
-                                if ncol > 1:
+                                if len(re.shape) > 1:
                                     for i in range(ncol):
                                         np.add.at(re[:, i], subjac[1],
                                                   ip[:, i][subjac[2]] * subjac[0])
                                 else:
                                     np.add.at(re, subjac[1], ip[subjac[2]] * subjac[0])
                             else:  # rev
-                                if ncol > 1:
+                                if len(re.shape) > 1:
                                     for i in range(ncol):
                                         np.add.at(ip[:, i], subjac[2],
                                                   re[:, i][subjac[1]] * subjac[0])

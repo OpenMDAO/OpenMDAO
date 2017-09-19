@@ -34,7 +34,7 @@ class SellarDis1(ExplicitComponent):
         self.add_output('y1', val=1.0)
 
         # Finite difference all partials.
-        self.approx_partials('*', '*')
+        self.approx_partials('*', '*', method='fd')
 
     def compute(self, inputs, outputs):
         """

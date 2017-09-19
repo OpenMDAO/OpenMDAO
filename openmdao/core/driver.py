@@ -1,12 +1,13 @@
 """Define a base class for all Drivers in OpenMDAO."""
+from __future__ import print_function
 from six import iteritems
 
 import numpy as np
 
-from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.utils.record_util import create_local_meta
+from openmdao.utils.options_dictionary import OptionsDictionary
 
 
 class Driver(object):
@@ -113,14 +114,9 @@ class Driver(object):
         self._cons = model.get_constraints(recurse=True)
 
         self._rec_mgr.startup(self)
-
-        # Only do this for now in serial. Parallel does not work yet.
-        from openmdao.utils.mpi import MPI
-
-        if not MPI:
-            if (self._rec_mgr._recorders):
-                from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
-                self._model_viewer_data = _get_viewer_data(problem)
+        if (self._rec_mgr._recorders):
+            from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
+            self._model_viewer_data = _get_viewer_data(problem)
         self._rec_mgr.record_metadata(self)
 
     def get_design_var_values(self, filter=None):
@@ -213,7 +209,7 @@ class Driver(object):
            Dictionary containing values of each response.
         """
         # TODO: finish this method when we have a driver that requires it.
-        pass
+        return {}
 
     def get_objective_values(self, filter=None):
         """
@@ -418,33 +414,31 @@ class Driver(object):
                         istart = isize
                         isize += val.shape[1]
                         islices[ikey] = slice(istart, isize)
-
-                do_wrt = False
+                    do_wrt = False
                 ostart = osize
                 osize += oval[ikey].shape[0]
                 oslices[okey] = slice(ostart, osize)
 
             new_derivs = np.zeros((osize, isize))
 
+            relevant = prob.model._relevant
+
             # Apply driver ref/ref0 and position subjac into array jacobian.
             for okey, oval in iteritems(derivs):
+                oscaler = self._responses[okey]['scaler']
                 for ikey, val in iteritems(oval):
+                    if okey in relevant[ikey] or ikey in relevant[okey]:
+                        iscaler = self._designvars[ikey]['scaler']
 
-                    imeta = self._designvars[ikey]
-                    ometa = self._responses[okey]
+                        # Scale response side
+                        if oscaler is not None:
+                            val[:] = (oscaler * val.T).T
 
-                    iscaler = imeta['scaler']
-                    oscaler = ometa['scaler']
+                        # Scale design var side
+                        if iscaler is not None:
+                            val *= 1.0 / iscaler
 
-                    # Scale response side
-                    if oscaler is not None:
-                        val[:] = (oscaler * val.T).T
-
-                    # Scale design var side
-                    if iscaler is not None:
-                        val *= 1.0 / iscaler
-
-                    new_derivs[oslices[okey], islices[ikey]] = val
+                        new_derivs[oslices[okey], islices[ikey]] = val
 
             derivs = new_derivs
 
