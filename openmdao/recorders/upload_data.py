@@ -5,7 +5,7 @@ Script for uploading data from a local sqlite file to the web server.
 import sys
 import json
 import argparse
-from openmdao.api import WebRecorder
+from openmdao.recorders.web_recorder import WebRecorder
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 
 
