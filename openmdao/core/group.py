@@ -1725,7 +1725,7 @@ def get_relevant_vars(graph, desvars, responses, mode):
             elif desvar == response:
                 input_deps = set()
                 output_deps = set([response])
-                sys_deps = set([start_sys[0]])
+                sys_deps = set(all_ancestors(start_sys[0]))
 
             if common_edges or desvar == response:
                 if fwd:
