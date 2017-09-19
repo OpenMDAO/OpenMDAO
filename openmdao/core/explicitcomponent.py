@@ -73,14 +73,12 @@ class ExplicitComponent(Component):
         for out_abs in self._var_abs_names['output']:
             meta = abs2meta_out[out_abs]
             out_name = abs2prom_out[out_abs]
-            size = np.prod(meta['shape'])
-            arange = np.arange(size)
+            arange = np.arange(meta['size'])
 
             # No need to FD outputs wrt other outputs
             abs_key = (out_abs, out_abs)
             if abs_key in self._subjacs_info:
-                if 'method' in self._subjacs_info[abs_key]:
-                    del self._subjacs_info[abs_key]['method']
+                self._subjacs_info[abs_key]['method'] = False
             self._declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
             for other_name in other_names:
                 self._declare_partials(out_name, other_name, dependent=False)
@@ -174,8 +172,8 @@ class ExplicitComponent(Component):
                     meta = self._subjacs_info[abs_key]
                     dependent = meta['dependent']
                     if meta['value'] is None and dependent:
-                        out_size = np.product(self._var_abs2meta['output'][abs_key[0]]['shape'])
-                        in_size = np.product(self._var_abs2meta[wrt_name][abs_key[1]]['shape'])
+                        out_size = self._var_abs2meta['output'][abs_key[0]]['size']
+                        in_size = self._var_abs2meta[wrt_name][abs_key[1]]['size']
                         meta['value'] = np.zeros((out_size, in_size))
 
                     J._set_partials_meta(abs_key, meta, wrt_name == 'input')

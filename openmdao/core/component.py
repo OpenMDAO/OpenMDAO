@@ -19,6 +19,12 @@ from openmdao.utils.general_utils import format_as_float_or_array, ensure_compat
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 
 
+def _find_matches(pattern, var_list):
+    if pattern in var_list:
+        return [pattern]
+    return [name for name in var_list if fnmatchcase(name, pattern)]
+
+
 class Component(System):
     """
     Base Component class; not to be directly instantiated.
@@ -147,8 +153,8 @@ class Component(System):
             prefix = ''
 
         meta_names = {
-            'input': ('units', 'shape', 'var_set'),
-            'output': ('units', 'shape', 'var_set', 'ref', 'ref0', 'distributed'),
+            'input': ('units', 'shape', 'size', 'var_set'),
+            'output': ('units', 'shape', 'size', 'var_set', 'ref', 'ref0', 'distributed'),
         }
 
         for type_ in ['input', 'output']:
@@ -172,6 +178,9 @@ class Component(System):
 
                 # Compute abs2meta
                 abs2meta[type_][abs_name] = metadata
+
+        self._var_allprocs_prom_set = set(allprocs_prom2abs_list['input'])
+        self._var_allprocs_prom_set.update(allprocs_prom2abs_list['output'])
 
     def _setup_var_sizes(self, recurse=True):
         """
@@ -213,7 +222,7 @@ class Component(System):
                 for idx, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
                     meta = abs2meta_t[abs_name]
                     set_name = meta['var_set']
-                    size = np.prod(meta['shape'])
+                    size = meta['size']
                     idx_byset = allprocs_abs2idx_byset_t[abs_name]
 
                     sz[iproc, idx] = size
@@ -324,9 +333,9 @@ class Component(System):
         metadata = {}
 
         # value, shape: based on args, making sure they are compatible
-        metadata['value'], metadata['shape'] = ensure_compatible(name, val,
-                                                                 shape,
-                                                                 src_indices)
+        metadata['value'], metadata['shape'], metadata['size'] = ensure_compatible(name, val,
+                                                                                   shape,
+                                                                                   src_indices)
 
         # src_indices: None or ndarray
         if src_indices is None:
@@ -455,7 +464,7 @@ class Component(System):
         metadata = {}
 
         # value, shape: based on args, making sure they are compatible
-        metadata['value'], metadata['shape'] = ensure_compatible(name, val, shape)
+        metadata['value'], metadata['shape'], metadata['size'] = ensure_compatible(name, val, shape)
 
         # units, res_units: taken as is
         metadata['units'] = units
@@ -684,25 +693,25 @@ class Component(System):
             if not wrt_matches:
                 raise ValueError('No matches were found for wrt="{}"'.format(wrt_pattern))
 
-            make_copies = (multiple_items
-                           or len(of_matches) > 1
-                           or len(wrt_matches) > 1)
+            make_copies = multiple_items or len(of_matches) > 1 or len(wrt_matches) > 1
+
             # Setting this to true means that future loop iterations (i.e. if there are multiple
             # items in either of or wrt) will make copies.
             multiple_items = True
 
             for rel_key in product(of_matches, wrt_matches):
-                meta_changes = {
-                    'rows': rows,
-                    'cols': cols,
-                    'value': deepcopy(val) if make_copies else val,
-                    'dependent': dependent
-                }
                 abs_key = rel_key2abs_key(self, rel_key)
-                meta = self._subjacs_info[abs_key]
-                meta.update(meta_changes)
-                self._check_partials_meta(abs_key, meta)
-                self._subjacs_info[abs_key] = meta
+                if dependent:
+                    meta = self._subjacs_info[abs_key]
+                    if rows is not None:
+                        meta['rows'] = rows
+                    if cols is not None:
+                        meta['cols'] = cols
+                    if val is not None:
+                        meta['value'] = deepcopy(val) if make_copies else val
+                    self._check_partials_meta(abs_key, meta)
+                else:
+                    self._subjacs_info[abs_key]['dependent'] = False
 
     def _find_partial_matches(self, of, wrt):
         """
@@ -727,19 +736,12 @@ class Component(System):
         """
         of_list = [of] if isinstance(of, string_types) else of
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
-        glob_patterns = {'*', '?', '['}
-        outs = list(self._var_allprocs_prom2abs_list['output'].keys())
-        ins = list(self._var_allprocs_prom2abs_list['input'].keys())
 
-        def find_matches(pattern, var_list):
-            if glob_patterns.intersection(pattern):
-                return [name for name in var_list if fnmatchcase(name, pattern)]
-            elif pattern in var_list:
-                return [pattern]
-            return []
-
-        of_pattern_matches = [(pattern, find_matches(pattern, outs)) for pattern in of_list]
-        wrt_pattern_matches = [(pattern, find_matches(pattern, outs + ins)) for pattern in wrt_list]
+        of_pattern_matches = [(pattern, _find_matches(pattern,
+                                                      self._var_allprocs_prom2abs_list['output']))
+                              for pattern in of_list]
+        wrt_pattern_matches = [(pattern, _find_matches(pattern, self._var_allprocs_prom_set))
+                               for pattern in wrt_list]
         return of_pattern_matches, wrt_pattern_matches
 
     def _check_partials_meta(self, abs_key, meta):
@@ -755,11 +757,11 @@ class Component(System):
         """
         of, wrt = abs_key2rel_key(self, abs_key)
         if meta['dependent']:
-            out_size = np.prod(self._var_abs2meta['output'][abs_key[0]]['shape'])
+            out_size = self._var_abs2meta['output'][abs_key[0]]['size']
             if abs_key[1] in self._var_abs2meta['input']:
-                in_size = np.prod(self._var_abs2meta['input'][abs_key[1]]['shape'])
+                in_size = self._var_abs2meta['input'][abs_key[1]]['size']
             else:  # assume output (or get a KeyError)
-                in_size = np.prod(self._var_abs2meta['output'][abs_key[1]]['shape'])
+                in_size = self._var_abs2meta['output'][abs_key[1]]['size']
 
             if in_size == 0 and self.comm.rank != 0:  # 'inactive' component
                 return

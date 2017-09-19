@@ -51,6 +51,8 @@ def ensure_compatible(name, value, shape=None, indices=None):
         The value in a shape compatible with the specified shape and/or indices.
     tuple
         The resulting shape of the value.
+    int
+        The size of the value.
 
     Raises
     ------
@@ -104,7 +106,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
                          "Expected %s but got %s." %
                          (name, shape, ind_shape[:len(shape)]))
 
-    return value, shape
+    return value, shape, np.prod(shape)
 
 
 def determine_adder_scaler(ref0, ref, adder, scaler):
