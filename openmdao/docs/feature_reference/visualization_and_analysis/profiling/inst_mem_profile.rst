@@ -12,7 +12,7 @@ per-instance basis.  For example:
 
 This will generate output to the console that looks like this:
 
-::
+.. code-block:: none
 
    Group#1().System.__init__ 0.00390625 MB
    NonLinearRunOnce#1.Solver.__init__ 0.00390625 MB
@@ -62,5 +62,3 @@ the methods of most interest.
    These memory usage numbers are only estimates, based on the changes in the process memory
    measured before and after each method call.  The true memory use is difficult to determine due
    to the presence of python's own internal memory management and garbage collection.
-
-
