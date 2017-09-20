@@ -5,7 +5,7 @@ import numpy as np
 from six import iteritems
 
 from openmdao.api import ExplicitComponent
-from openmdao.api import Problem, Group, view_model, pyOptSparseDriver, IndepVarComp
+from openmdao.api import Problem, Group, view_model, IndepVarComp
 
 from openmdao.utils.mpi import MPI
 
