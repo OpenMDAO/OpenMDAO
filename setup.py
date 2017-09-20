@@ -70,16 +70,17 @@ setup(name='openmdao',
         'sphinx',
         'redbaron',
         'mock',
-        'requests_mock'
+        'requests_mock',
+        'tornado',
       ],
       # scripts=['bin/om-pylint.sh']
       entry_points="""
       [console_scripts]
       wingproj=openmdao.devtools.wingproj:run_wing
       webview=openmdao.devtools.webview:webview_argv
-      iprofview=openmdao.devtools.iprofile:prof_view
-      iproftotals=openmdao.devtools.iprofile:prof_totals
-      iprofmem=openmdao.devtools.iprof_mem:profile_py_file
-      icalltrace=openmdao.devtools.itrace:trace_py_file
+      iprofview=openmdao.devtools.iprofile_app.iprofile_app:_prof_view
+      iproftotals=openmdao.devtools.iprofile:_prof_totals
+      iprofmem=openmdao.devtools.iprof_mem:_profile_py_file
+      icalltrace=openmdao.devtools.itrace:_trace_py_file
       """
 )
