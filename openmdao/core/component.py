@@ -584,14 +584,10 @@ class Component(System):
                 raise ValueError('No matches were found for wrt="{}"'.format(wrt_pattern))
 
             for rel_key in product(of_matches, wrt_matches):
-                meta_changes = {
-                    'method': method,
-                }
                 abs_key = rel_key2abs_key(self, rel_key)
                 meta = self._subjacs_info[abs_key]
-                meta.update(meta_changes)
+                meta['method'] = method
                 meta.update(kwargs)
-                self._subjacs_info[abs_key] = meta
 
     def declare_partials(self, of, wrt, dependent=True,
                          rows=None, cols=None, val=None):
@@ -701,8 +697,9 @@ class Component(System):
 
             for rel_key in product(of_matches, wrt_matches):
                 abs_key = rel_key2abs_key(self, rel_key)
+                meta = self._subjacs_info[abs_key]
+                meta['dependent'] = dependent
                 if dependent:
-                    meta = self._subjacs_info[abs_key]
                     if rows is not None:
                         meta['rows'] = rows
                     if cols is not None:
@@ -710,8 +707,6 @@ class Component(System):
                     if val is not None:
                         meta['value'] = deepcopy(val) if make_copies else val
                     self._check_partials_meta(abs_key, meta)
-                else:
-                    self._subjacs_info[abs_key]['dependent'] = False
 
     def _find_partial_matches(self, of, wrt):
         """

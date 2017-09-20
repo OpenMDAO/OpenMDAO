@@ -1056,6 +1056,8 @@ class Problem(object):
                 if store:
                     offset = start + min_i
                     loc_idxs = irange - offset
+                else:
+                    loc_idxs = None
 
                 voi_info[input_name] = (dinputs, doutputs, irange, loc_idxs, max_i, min_i,
                                         loc_size, start, end, dup, store)

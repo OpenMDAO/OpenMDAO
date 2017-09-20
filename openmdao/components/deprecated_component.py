@@ -76,8 +76,7 @@ class Component(BaseComponent):
             # No need to FD outputs wrt other outputs
             abs_key = (out_abs, out_abs)
             if abs_key in self._subjacs_info:
-                if 'method' in self._subjacs_info[abs_key]:
-                    del self._subjacs_info[abs_key]['method']
+                self._subjacs_info[abs_key]['method'] = False
 
             # If our OpenMDAO Alpha component has any states at all, then even the non-state
             # outputs need to be flipped.

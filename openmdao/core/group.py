@@ -1585,7 +1585,6 @@ class Group(System):
                     meta = self._subjacs_info[key]
                     meta.update(meta_changes)
                     meta.update(self._owns_approx_jac_meta)
-                    self._subjacs_info[key] = meta
 
                     # Create Jacobian stub for every key pair
                     J._set_partials_meta(key, meta)

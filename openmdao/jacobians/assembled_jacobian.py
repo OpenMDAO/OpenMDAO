@@ -146,6 +146,8 @@ class AssembledJacobian(Jacobian):
                     abs_key = (res_abs_name, out_abs_name)
                     if abs_key in self._subjacs_info:
                         info, shape = self._subjacs_info[abs_key]
+                        if not info['dependent']:
+                            continue
                     else:
                         info = SUBJAC_META_DEFAULTS
                         shape = (res_size, abs2meta_out[out_abs_name]['size'])
@@ -159,6 +161,8 @@ class AssembledJacobian(Jacobian):
 
                     if abs_key in self._subjacs_info:
                         info, shape = self._subjacs_info[abs_key]
+                        if not info['dependent']:
+                            continue
                     else:
                         info = SUBJAC_META_DEFAULTS
                         shape = (res_size, abs2meta_in[in_abs_name]['size'])
