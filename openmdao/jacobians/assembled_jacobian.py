@@ -2,9 +2,10 @@
 from __future__ import division
 
 import sys
-import numpy as np
 
 from six import iteritems
+
+import numpy as np
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
@@ -338,15 +339,20 @@ class AssembledJacobian(Jacobian):
                     # Masking
                     masked = [name for name in d_inputs._views if name not in d_inputs._names]
                     if len(masked) > 0:
-                        backup = d_inputs.get_data()
+                        mask = np.zeros(d_inputs._data[0].shape, dtype=np.bool)
                         for name in masked:
-                            d_inputs._views[name][:] = 0.0
+                            for key, val in iteritems(ext_mtx._metadata):
+                                if key[1] == name:
+                                    mask[val[1]] = True
+                                    continue
 
-                    d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, None))
+                        inputs_masked = np.ma.array(d_inputs.get_data(), mask=mask)
 
-                    # Restore masked values
-                    if len(masked) > 0:
-                        d_inputs.set_data(backup)
+                        # Had to use the special dot product function from masking module
+                        d_residuals.iadd_data(np.ma.dot(ext_mtx._matrix, inputs_masked))
+
+                    else:
+                        d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, None))
 
             else:  # rev
                 dresids = d_residuals.get_data()
@@ -360,17 +366,24 @@ class AssembledJacobian(Jacobian):
                     # Masking
                     masked = [name for name in d_inputs._views if name not in d_inputs._names]
                     if len(masked) > 0:
-                        backup = d_inputs.get_data()
-                        cache = {}
+                        mask_cols = np.zeros(d_inputs._data[0].shape, dtype=np.bool)
                         for name in masked:
-                            cache[name] = d_inputs._views[name].copy()
+                            for key, val in iteritems(ext_mtx._metadata):
+                                if key[1] == name:
+                                    mask_cols[val[1]] = True
+                                    continue
 
-                    d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None))
+                        mask = np.zeros(ext_mtx._matrix.T.shape, dtype=np.bool)
+                        mask[mask_cols, :] = True
+                        masked_mtx = np.ma.array(ext_mtx._matrix, mask=mask)
 
-                    # Restore masked values
-                    if len(masked) > 0:
-                        for name in masked:
-                            d_inputs._views[name][:] = cache[name]
+                        masked_product = np.ma.multiply(masked_mtx.T, dresids).flatten()
+
+                        for set_name, data in iteritems(d_inputs._data):
+                            data += np.ma.add(data, masked_product[d_inputs._indices[set_name]])
+
+                    else:
+                        d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None))
 
 
 class DenseJacobian(AssembledJacobian):

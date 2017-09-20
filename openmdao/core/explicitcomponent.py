@@ -54,9 +54,10 @@ class ExplicitComponent(Component):
             (new_jacvec_prod is not None and
              new_jacvec_prod != self._inst_functs['compute_jacvec_product']))
 
-        # For components, default to DenseJacobian for performance.
-        self._jacobian = DenseJacobian()
-        self._owns_assembled_jac = True
+        # TODO : Uncomment these out to set default to DenseJacobian, once we have resolved further
+        # issues.
+        # self._jacobian = DenseJacobian()
+        # self._owns_assembled_jac = True
 
     def _setup_partials(self, recurse=True):
         """
