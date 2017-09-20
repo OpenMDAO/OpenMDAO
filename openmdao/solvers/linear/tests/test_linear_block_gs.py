@@ -12,6 +12,7 @@ from openmdao.api import LinearBlockGS, Problem, Group, ImplicitComponent, Indep
 from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2, \
     SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
+from openmdao.test_suite.components.sellar import SellarDerivatives
 
 
 class SimpleImp(ImplicitComponent):
@@ -141,6 +142,30 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         self.assertEqual(str(context.exception),
                          "A block linear solver 'LN: LNBGS' is being used with"
                          " an AssembledJacobian in system 'comp'")
+
+    def test_full_desvar_with_index_obj_relevance_bug(self):
+        prob = Problem()
+        prob.model = Group()
+        sub = prob.model.add_subsystem('sub', SellarDerivatives())
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.linear_solver = LinearBlockGS()
+        sub.nonlinear_solver = NonlinearBlockGS()
+        sub.linear_solver = LinearBlockGS()
+
+        prob.model.add_design_var('sub.z', lower=-100, upper=100)
+        prob.model.add_objective('sub.z', index=1)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False)
+
+        # We don't call run_driver() here because we don't
+        # actually want the optimizer to run
+        prob.run_model()
+
+        derivs = prob.compute_total_derivs(of=['sub.z'], wrt=['sub.z'])
+
+        assert_rel_error(self, derivs[('sub.z', 'sub.z')], [[0., 1.]])
 
 
 class TestBGSSolverFeature(unittest.TestCase):
