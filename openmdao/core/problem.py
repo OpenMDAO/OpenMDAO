@@ -1020,6 +1020,9 @@ class Problem(object):
 
                 in_var_idx = model._var_allprocs_abs2idx[vecname]['output'][input_name]
                 in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
+
+                dup = not in_var_meta['distributed']
+
                 start = np.sum(sizes[:iproc, in_var_idx])
                 end = np.sum(sizes[:iproc + 1, in_var_idx])
 
@@ -1035,7 +1038,7 @@ class Problem(object):
                     min_i = np.min(in_idxs)
                     loc_size = len(in_idxs)
                 else:
-                    irange = list(range(in_var_meta['global_size']))
+                    irange = np.arange(in_var_meta['global_size'], dtype=int)
                     max_i = in_var_meta['global_size'] - 1
                     min_i = 0
                     loc_size = end - start
@@ -1048,16 +1051,17 @@ class Problem(object):
                             loc_size = sz
                             break
 
-                dup = not in_var_meta['distributed']
-
                 # set totals to zeros instead of None in those cases when none
                 # of the specified indices are within the range of interest
                 # for this proc.
                 store = True if ((start <= min_i < end) or (start <= max_i < end)) else dup
 
                 if store:
-                    offset = start + min_i
-                    loc_idxs = irange - offset
+                    loc_idxs = irange
+                    if min_i > 0:
+                        loc_idxs = irange - min_i
+                else:
+                    loc_idxs = []
 
                 voi_info[input_name] = (dinputs, doutputs, irange, loc_idxs, max_i, min_i,
                                         loc_size, start, end, dup, store)
