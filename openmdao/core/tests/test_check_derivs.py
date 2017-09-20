@@ -790,13 +790,6 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertEqual(len(lines), 0)
 
     def test_two_desvar_as_con(self):
-        #
-        # TODO: This tests a bug that omitted the finite differencing of cross derivatives for
-        # cases where a design variable is also a constraint or objective. It currently
-        # fails because of another bug which will be fixed on Bret's revelance branch.
-
-        raise unittest.SkipTest('Waiting for a bug fix.')
-
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = NonlinearBlockGS()
@@ -814,10 +807,6 @@ class TestProblemCheckTotals(unittest.TestCase):
         # actually want the optimizer to run
         prob.run_model()
 
-        # XXXX
-        z = prob._compute_total_derivs()
-        print(z)
-
         testlogger = TestLogger()
         totals = prob.check_total_derivatives(method='fd', step=1.0e-1, logger=testlogger)
 
@@ -825,12 +814,84 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         assert_rel_error(self, totals['px.x', 'px.x']['J_fwd'], [[1.0]], 1e-5)
         assert_rel_error(self, totals['px.x', 'px.x']['J_fd'], [[1.0]], 1e-5)
-        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[1.0]], 1e-5)
-        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[1.0]], 1e-5)
-        assert_rel_error(self, totals['px.x', 'pz.z']['J_fwd'], [[0.0]], 1e-5)
-        assert_rel_error(self, totals['px.x', 'pz.z']['J_fd'], [[0.0]], 1e-5)
-        assert_rel_error(self, totals['pz.z', 'px.x']['J_fwd'], [[0.0]], 1e-5)
-        assert_rel_error(self, totals['pz.z', 'px.x']['J_fd'], [[0.0]], 1e-5)
+        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], np.eye(2), 1e-5)
+        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], np.eye(2), 1e-5)
+        assert_rel_error(self, totals['px.x', 'pz.z']['J_fwd'], [[0.0, 0.0]], 1e-5)
+        assert_rel_error(self, totals['px.x', 'pz.z']['J_fd'], [[0.0, 0.0]], 1e-5)
+        assert_rel_error(self, totals['pz.z', 'px.x']['J_fwd'], [[0.0], [0.0]], 1e-5)
+        assert_rel_error(self, totals['pz.z', 'px.x']['J_fd'], [[0.0], [0.0]], 1e-5)
+
+    def test_full_con_with_index_desvar(self):
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('z', lower=-100, upper=100, indices=[1])
+        prob.model.add_constraint('z', upper=0.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False)
+
+        # We don't call run_driver() here because we don't
+        # actually want the optimizer to run
+        prob.run_model()
+
+        testlogger = TestLogger()
+        totals = prob.check_total_derivatives(method='fd', step=1.0e-1, logger=testlogger)
+
+        lines = testlogger.get('info')
+
+        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[0.0], [1.0]], 1e-5)
+        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0], [1.0]], 1e-5)
+
+    def test_full_desvar_with_index_con(self):
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_constraint('z', upper=0.0, indices=[1])
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False)
+
+        # We don't call run_driver() here because we don't
+        # actually want the optimizer to run
+        prob.run_model()
+
+        testlogger = TestLogger()
+        totals = prob.check_total_derivatives(method='fd', step=1.0e-1, logger=testlogger)
+
+        lines = testlogger.get('info')
+
+        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[0.0, 1.0]], 1e-5)
+        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0, 1.0]], 1e-5)
+
+    def test_full_desvar_with_index_obj(self):
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('z', index=1)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False)
+
+        # We don't call run_driver() here because we don't
+        # actually want the optimizer to run
+        prob.run_model()
+
+        testlogger = TestLogger()
+        totals = prob.check_total_derivatives(method='fd', step=1.0e-1, logger=testlogger)
+
+        lines = testlogger.get('info')
+
+        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[0.0, 1.0]], 1e-5)
+        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0, 1.0]], 1e-5)
 
 if __name__ == "__main__":
     unittest.main()

@@ -981,6 +981,12 @@ class Problem(object):
                     if isinstance(jac, list):
                         # This is a design variable that was declared as an obj/con.
                         totals[okey, ikey] = np.eye(len(jac[0]))
+                        odx = model._owns_approx_of_idx.get(okey)
+                        idx = model._owns_approx_wrt_idx.get(ikey)
+                        if odx is not None:
+                            totals[okey, ikey] = totals[okey, ikey][odx, :]
+                        if idx is not None:
+                            totals[okey, ikey] = totals[okey, ikey][:, idx]
                     else:
                         totals[okey, ikey] = -jac
 
