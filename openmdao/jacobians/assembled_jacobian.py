@@ -348,7 +348,8 @@ class AssembledJacobian(Jacobian):
 
                         inputs_masked = np.ma.array(d_inputs.get_data(), mask=mask)
 
-                        # Had to use the special dot product function from masking module
+                        # Use the special dot product function from masking module so that you
+                        # ignore masked parts.
                         d_residuals.iadd_data(np.ma.dot(ext_mtx._matrix, inputs_masked))
 
                     else:
@@ -379,6 +380,7 @@ class AssembledJacobian(Jacobian):
 
                         masked_product = np.ma.multiply(masked_mtx.T, dresids).flatten()
 
+                        # Unfortunately, no inplace add that doesn't cast result as masked array.
                         for set_name, data in iteritems(d_inputs._data):
                             data += np.ma.add(data, masked_product[d_inputs._indices[set_name]])
 
