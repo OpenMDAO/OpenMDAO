@@ -139,7 +139,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp2.x'], 3.)
         assert_rel_error(self, prob['comp2.x'], 3.)
 
-        total_derivs = prob.compute_total_derivs(
+        total_derivs = prob.compute_totals(
             wrt=['comp1.a', 'comp1.b', 'comp1.c'],
             of=['comp2.x', 'comp3.x']
         )

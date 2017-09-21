@@ -1,4 +1,4 @@
-""" Testing for Problem.check_partials and check_total_derivatives."""
+""" Testing for Problem.check_partials and check_totals."""
 
 import unittest
 from six import iteritems
@@ -238,7 +238,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.add_output('flow:P', val=1., units='lbf/inch**2', desc="Pressure")
 
                 # Finite difference everything
-                self.approx_partials(of='*', wrt='*')
+                self.declare_partials(of='*', wrt='*', method='fd')
 
             def compute(self, inputs, outputs):
                 outputs['flow:T'] = inputs['T']
@@ -1062,7 +1062,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         # check derivatives with complex step and a larger step size.
         testlogger = TestLogger()
-        totals = prob.check_total_derivatives(method='cs', step=1.0e-1, logger=testlogger)
+        totals = prob.check_totals(method='cs', step=1.0e-1, logger=testlogger)
 
         lines = testlogger.get('info')
 
@@ -1090,7 +1090,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         # check derivatives with complex step and a larger step size.
         testlogger = TestLogger()
-        totals = prob.check_total_derivatives(method='cs', step=1.0e-1, logger=testlogger)
+        totals = prob.check_totals(method='cs', step=1.0e-1, logger=testlogger)
 
         lines = testlogger.get('info')
 
@@ -1152,13 +1152,13 @@ class TestProblemCheckTotals(unittest.TestCase):
         of = ['y1']
         wrt = ['x1']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['y1', 'x1'][0][0], Jbase[0, 1], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[0, 3], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][1][0], Jbase[2, 1], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][1][1], Jbase[2, 3], 1e-8)
 
-        totals = prob.check_total_derivatives()
+        totals = prob.check_totals()
         jac = totals[('mycomp.y1', 'x_param1.x1')]['J_fd']
         assert_rel_error(self, jac[0][0], Jbase[0, 1], 1e-8)
         assert_rel_error(self, jac[0][1], Jbase[0, 3], 1e-8)
@@ -1185,11 +1185,11 @@ class TestProblemCheckTotals(unittest.TestCase):
         of = ['y1']
         wrt = ['x1']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['y1', 'x1'][0][0], Jbase[1, 1], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[1, 3], 1e-8)
 
-        totals = prob.check_total_derivatives()
+        totals = prob.check_totals()
         jac = totals[('mycomp.y1', 'x_param1.x1')]['J_fd']
         assert_rel_error(self, jac[0][0], Jbase[1, 1], 1e-8)
         assert_rel_error(self, jac[0][1], Jbase[1, 3], 1e-8)
@@ -1215,8 +1215,8 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         # check derivatives with complex step and a larger step size.
         testlogger = TestLogger()
-        totals = prob.check_total_derivatives(method='cs', step=1.0e-1, logger=testlogger,
-                                              suppress_output=True)
+        totals = prob.check_totals(method='cs', step=1.0e-1, logger=testlogger,
+                                   suppress_output=True)
 
         data = totals['con_cmp2.con2', 'px.x']
         self.assertTrue('J_fwd' in data)
@@ -1246,7 +1246,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_model()
 
         testlogger = TestLogger()
-        totals = prob.check_total_derivatives(method='fd', step=1.0e-1, logger=testlogger)
+        totals = prob.check_totals(method='fd', step=1.0e-1, logger=testlogger)
 
         lines = testlogger.get('info')
 
@@ -1276,7 +1276,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_model()
 
         testlogger = TestLogger()
-        totals = prob.check_total_derivatives(method='fd', step=1.0e-1, logger=testlogger)
+        totals = prob.check_totals(method='fd', step=1.0e-1, logger=testlogger)
 
         lines = testlogger.get('info')
 
@@ -1300,7 +1300,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_model()
 
         testlogger = TestLogger()
-        totals = prob.check_total_derivatives(method='fd', step=1.0e-1, logger=testlogger)
+        totals = prob.check_totals(method='fd', step=1.0e-1, logger=testlogger)
 
         lines = testlogger.get('info')
 
@@ -1324,7 +1324,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_model()
 
         testlogger = TestLogger()
-        totals = prob.check_total_derivatives(method='fd', step=1.0e-1, logger=testlogger)
+        totals = prob.check_totals(method='fd', step=1.0e-1, logger=testlogger)
 
         lines = testlogger.get('info')
 

@@ -507,7 +507,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
     def test_compute_multi_jacvec_prod_fwd(self):
         p = self.setup_model(size=5, multi=False, vectorize=False, mode='fwd')
 
-        J = p.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
         assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
@@ -515,7 +515,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
     def test_compute_multi_jacvec_prod_rev(self):
         p = self.setup_model(size=5, multi=False, vectorize=False, mode='rev')
 
-        J = p.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
         assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
@@ -523,7 +523,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
     def test_compute_multi_jacvec_prod_fwd_vectorize(self):
         p = self.setup_model(size=5, multi=False, vectorize=True, mode='fwd')
 
-        J = p.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
         assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
@@ -531,7 +531,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
     def test_compute_multi_jacvec_prod_rev_vectorize(self):
         p = self.setup_model(size=5, multi=False, vectorize=True, mode='rev')
 
-        J = p.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
         assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
@@ -539,7 +539,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
     def test_compute_multi_jacvec_prod_fwd_multi(self):
         p = self.setup_model(size=5, multi=True, vectorize=False, mode='fwd')
 
-        J = p.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
         assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
@@ -547,7 +547,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
     def test_compute_multi_jacvec_prod_rev_multi(self):
         p = self.setup_model(size=5, multi=True, vectorize=False, mode='rev')
 
-        J = p.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
         assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
@@ -555,7 +555,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
     def test_compute_multi_jacvec_prod_fwd_vectorize_multi(self):
         p = self.setup_model(size=5, multi=True, vectorize=True, mode='fwd')
 
-        J = p.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
         assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
@@ -563,7 +563,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
     def test_compute_multi_jacvec_prod_rev_vectorize_multi(self):
         p = self.setup_model(size=5, multi=True, vectorize=True, mode='rev')
 
-        J = p.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
         assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)

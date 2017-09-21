@@ -761,9 +761,9 @@ class Problem(object):
 
         return partials_data
 
-    def check_total_derivatives(self, of=None, wrt=None, logger=None, compact_print=False,
-                                abs_err_tol=1e-6, rel_err_tol=1e-6, method='fd', step=1e-6,
-                                form='forward', step_calc='abs', suppress_output=False):
+    def check_totals(self, of=None, wrt=None, logger=None, compact_print=False, abs_err_tol=1e-6,
+                     rel_err_tol=1e-6, method='fd', step=1e-6, form='forward', step_calc='abs',
+                     suppress_output=False):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -812,7 +812,7 @@ class Problem(object):
         model = self.model
         global_names = False
 
-        logger = logger if logger else get_logger('check_total_derivatives')
+        logger = logger if logger else get_logger('check_totals')
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -827,7 +827,7 @@ class Problem(object):
         with self.model._scaled_context_all():
 
             # Calculate Total Derivatives
-            Jcalc = self._compute_total_derivs(of=of, wrt=wrt, global_names=global_names)
+            Jcalc = self._compute_totals(of=of, wrt=wrt, global_names=global_names)
 
             # Approximate FD
             fd_args = {
@@ -836,7 +836,7 @@ class Problem(object):
                 'step_calc': step_calc,
             }
             model.approx_total_derivs(method=method, **fd_args)
-            Jfd = self._compute_total_derivs_approx(of=of, wrt=wrt, global_names=global_names)
+            Jfd = self._compute_totals_approx(of=of, wrt=wrt, global_names=global_names)
 
         # Assemble and Return all metrics.
         data = {}
@@ -851,7 +851,7 @@ class Problem(object):
                                   {'': fd_args}, totals=True, suppress_output=suppress_output)
         return data['']
 
-    def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
+    def compute_totals(self, of=None, wrt=None, return_format='flat_dict'):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -877,17 +877,17 @@ class Problem(object):
 
         with self.model._scaled_context_all():
             if self.model._owns_approx_jac:
-                totals = self._compute_total_derivs_approx(of=of, wrt=wrt,
-                                                           return_format=return_format,
-                                                           global_names=False)
+                totals = self._compute_totals_approx(of=of, wrt=wrt,
+                                                     return_format=return_format,
+                                                     global_names=False)
             else:
-                totals = self._compute_total_derivs(of=of, wrt=wrt,
-                                                    return_format=return_format,
-                                                    global_names=False)
+                totals = self._compute_totals(of=of, wrt=wrt,
+                                              return_format=return_format,
+                                              global_names=False)
         return totals
 
-    def _compute_total_derivs_approx(self, of=None, wrt=None, return_format='flat_dict',
-                                     global_names=True):
+    def _compute_totals_approx(self, of=None, wrt=None, return_format='flat_dict',
+                               global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -910,7 +910,7 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        recording_iteration.stack.append(('_compute_total_derivs', 0))
+        recording_iteration.stack.append(('_compute_totals', 0))
         model = self.model
         mode = self._mode
         vec_dinput = model._vectors['input']
@@ -1089,9 +1089,9 @@ class Problem(object):
 
         return voi_info
 
-    def _compute_total_derivs_multi(self, totals, vois, voi_info, lin_vec_names, mode,
-                                    output_list, old_output_list, output_vois,
-                                    use_rel_reduction, rel_systems, return_format):
+    def _compute_totals_multi(self, totals, vois, voi_info, lin_vec_names, mode,
+                              output_list, old_output_list, output_vois,
+                              use_rel_reduction, rel_systems, return_format):
         fwd = mode == 'fwd'
         model = self.model
         nproc = model.comm.size
@@ -1214,8 +1214,7 @@ class Problem(object):
                 else:
                     raise RuntimeError("unsupported return format")
 
-    def _compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict',
-                              global_names=True):
+    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1238,7 +1237,7 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        recording_iteration.stack.append(('_compute_total_derivs', 0))
+        recording_iteration.stack.append(('_compute_totals', 0))
         model = self.model
         mode = self._mode
         vec_dinput = model._vectors['input']
@@ -1381,10 +1380,10 @@ class Problem(object):
                         rel_systems.update(relevant[voi]['@all'][1])
                 else:
                     rel_systems = _contains_all
-                self._compute_total_derivs_multi(totals, vois, voi_info, lin_vec_names, mode,
-                                                 output_list, old_output_list,
-                                                 output_vois, use_rel_reduction, rel_systems,
-                                                 return_format)
+                self._compute_totals_multi(totals, vois, voi_info, lin_vec_names, mode,
+                                           output_list, old_output_list,
+                                           output_vois, use_rel_reduction, rel_systems,
+                                           return_format)
             recording_iteration.stack.pop()
             return totals
 

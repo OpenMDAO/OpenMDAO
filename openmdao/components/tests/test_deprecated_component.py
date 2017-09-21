@@ -210,7 +210,7 @@ class DepCompTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['comp.f_xy'], 27.0, 1e-6)
 
-        J = prob.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = prob.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
         assert_rel_error(self, J[('comp.f_xy', 'px.x')][0][0], -3.0, 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')][0][0], 11.0, 1e-5)
 
@@ -219,7 +219,7 @@ class DepCompTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['comp.f_xy'], 27.0, 1e-6)
 
-        J = prob.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = prob.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
         assert_rel_error(self, J[('comp.f_xy', 'px.x')][0][0], -3.0, 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')][0][0], 11.0, 1e-5)
 
@@ -252,7 +252,7 @@ class DepCompTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['comp.f_xy'], 27.0, 1e-6)
 
-        J = prob.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = prob.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
         assert_rel_error(self, J[('comp.f_xy', 'px.x')][0][0], -3.0, 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')][0][0], 11.0, 1e-5)
 
@@ -261,7 +261,7 @@ class DepCompTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['comp.f_xy'], 27.0, 1e-6)
 
-        J = prob.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = prob.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
         assert_rel_error(self, J[('comp.f_xy', 'px.x')][0][0], -3.0, 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')][0][0], 11.0, 1e-5)
 
@@ -295,7 +295,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 2.666, 1e-3)
         self.assertLess(prob.model.nonlinear_solver._iter_count, 5)
 
-        J = prob.compute_total_derivs(of=['comp.y', 'comp.z'], wrt=['p1.x'])
+        J = prob.compute_totals(of=['comp.y', 'comp.z'], wrt=['p1.x'])
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
@@ -306,7 +306,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 2.666, 1e-3)
         self.assertLess(prob.model.nonlinear_solver._iter_count, 5)
 
-        J = prob.compute_total_derivs(of=['comp.y', 'comp.z'], wrt=['p1.x'])
+        J = prob.compute_totals(of=['comp.y', 'comp.z'], wrt=['p1.x'])
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
@@ -371,7 +371,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 2.666, 1e-3)
         self.assertLess(prob.model.nonlinear_solver._iter_count, 5)
 
-        J = prob.compute_total_derivs(of=['comp.y', 'comp.z'], wrt=['p1.x'])
+        J = prob.compute_totals(of=['comp.y', 'comp.z'], wrt=['p1.x'])
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
@@ -381,7 +381,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 2.666, 1e-3)
         self.assertLess(prob.model.nonlinear_solver._iter_count, 5)
 
-        J = prob.compute_total_derivs(of=['comp.y', 'comp.z'], wrt=['p1.x'])
+        J = prob.compute_totals(of=['comp.y', 'comp.z'], wrt=['p1.x'])
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
@@ -418,7 +418,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 2.666, 1e-3)
         self.assertLess(prob.model.nonlinear_solver._iter_count, 5)
 
-        J = prob.compute_total_derivs(of=['comp.y', 'comp.z'], wrt=['p1.x'])
+        J = prob.compute_totals(of=['comp.y', 'comp.z'], wrt=['p1.x'])
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
@@ -428,7 +428,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 2.666, 1e-3)
         self.assertLess(prob.model.nonlinear_solver._iter_count, 5)
 
-        J = prob.compute_total_derivs(of=['comp.y', 'comp.z'], wrt=['p1.x'])
+        J = prob.compute_totals(of=['comp.y', 'comp.z'], wrt=['p1.x'])
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
@@ -464,7 +464,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 2.666, 1e-3)
         self.assertLess(prob.model.nonlinear_solver._iter_count, 5)
 
-        J = prob.compute_total_derivs(of=['comp.y', 'comp.z'], wrt=['p1.x'])
+        J = prob.compute_totals(of=['comp.y', 'comp.z'], wrt=['p1.x'])
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
@@ -474,7 +474,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 2.666, 1e-3)
         self.assertLess(prob.model.nonlinear_solver._iter_count, 5)
 
-        J = prob.compute_total_derivs(of=['comp.y', 'comp.z'], wrt=['p1.x'])
+        J = prob.compute_totals(of=['comp.y', 'comp.z'], wrt=['p1.x'])
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 

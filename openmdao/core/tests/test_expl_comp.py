@@ -107,7 +107,7 @@ class ExplCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp3.area'], 6.)
 
         # total derivs
-        total_derivs = prob.compute_total_derivs(
+        total_derivs = prob.compute_totals(
             wrt=['comp1.length', 'comp1.width'],
             of=['comp2.area', 'comp3.area']
         )

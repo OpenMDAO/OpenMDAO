@@ -527,37 +527,6 @@ class Component(System):
 
         return metadata
 
-    def approx_partials(self, of, wrt, method='fd', **kwargs):
-        """
-        Inform the framework that the specified derivatives are to be approximated.
-
-        Parameters
-        ----------
-        of : str or list of str
-            The name of the residual(s) that derivatives are being computed for.
-            May also contain a glob pattern.
-        wrt : str or list of str
-            The name of the variables that derivatives are taken with respect to.
-            This can contain the name of any input or output variable.
-            May also contain a glob pattern.
-        method : str
-            The type of approximation that should be used. Valid options include:
-                - 'fd': Finite Difference, 'cs': Complex Step
-        **kwargs : dict
-            Keyword arguments for controlling the behavior of the approximation.
-        """
-        supported_methods = {'fd': FiniteDifference,
-                             'cs': ComplexStep}
-
-        if method not in supported_methods:
-            msg = 'Method "{}" is not supported, method must be one of {}'
-            raise ValueError(msg.format(method, supported_methods.keys()))
-
-        if method not in self._approx_schemes:
-            self._approx_schemes[method] = supported_methods[method]()
-
-        self._approximated_partials.append((of, wrt, method, kwargs))
-
     def _approx_partials(self, of, wrt, method='fd', **kwargs):
         """
         Inform the framework that the specified derivatives are to be approximated.
@@ -597,8 +566,8 @@ class Component(System):
                 meta.update(kwargs)
                 self._subjacs_info[abs_key] = meta
 
-    def declare_partials(self, of, wrt, dependent=True,
-                         rows=None, cols=None, val=None):
+    def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None,
+                         method='exact', **kwargs):
         """
         Declare information about this component's subjacobians.
 
@@ -627,12 +596,36 @@ class Component(System):
         val : float or ndarray of float or scipy.sparse
             Value of subjacobian.  If rows and cols are not None, this will
             contain the values found at each (row, col) location in the subjac.
+        method : str
+            The type of approximation that should be used. Valid options include:
+                - 'fd': Finite Difference, 'cs': Complex Step
+        **kwargs : dict
+            Keyword arguments for controlling the behavior of the approximation.
         """
-        # If only one of rows/cols is specified
-        if (rows is None) ^ (cols is None):
-            raise ValueError('If one of rows/cols is specified, then both must be specified')
+        supported_methods = {'fd': FiniteDifference,
+                             'cs': ComplexStep,
+                             'exact': None}
 
-        self._declared_partials.append((of, wrt, dependent, rows, cols, val))
+        if method not in supported_methods:
+            msg = 'Method "{}" is not supported, method must be one of {}'
+            raise ValueError(msg.format(method, supported_methods.keys()))
+
+        # Analytic Derivative for this jacobian pair
+        if method == 'exact':
+
+            # If only one of rows/cols is specified
+            if (rows is None) ^ (cols is None):
+                raise ValueError('If one of rows/cols is specified, then both must be specified')
+
+            self._declared_partials.append((of, wrt, dependent, rows, cols, val))
+
+        # Approximation of the derivative, former API call approx_partials.
+        else:
+
+            if method not in self._approx_schemes:
+                self._approx_schemes[method] = supported_methods[method]()
+
+            self._approximated_partials.append((of, wrt, method, kwargs))
 
     def _declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None):
         """

@@ -39,7 +39,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         of = ['f_xy']
         wrt = ['x', 'y']
-        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+        derivs = prob.compute_totals(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
@@ -64,7 +64,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         of = ['f_xy']
         wrt = ['x', 'y']
-        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+        derivs = prob.compute_totals(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
@@ -99,7 +99,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         of = ['f_xy']
         wrt = ['x', 'y']
-        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+        derivs = prob.compute_totals(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
@@ -136,7 +136,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         of = ['sub.comp.f_xy']
         wrt = ['p1.x', 'p2.y']
-        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+        derivs = prob.compute_totals(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['sub.comp.f_xy', 'p1.x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['sub.comp.f_xy', 'p2.y'], [[8.0]], 1e-6)
@@ -188,7 +188,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
             def setup(self):
                 super(TestImplCompArrayDense, self).setup()
-                self.approx_partials('*', '*')
+                self.declare_partials('*', '*', method='fd')
 
         prob = Problem()
         model = prob.model = Group()
@@ -238,7 +238,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         of = ['comp.x']
         wrt = ['p_rhs.rhs']
-        Jfd = prob.compute_total_derivs(of=of, wrt=wrt)
+        Jfd = prob.compute_totals(of=of, wrt=wrt)
 
         assert_rel_error(self, Jfd['comp.x', 'p_rhs.rhs'], [[1.01020408, -0.01020408], [-0.01020408,  1.01020408]], 1e-5)
 
@@ -261,7 +261,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         of = ['f_xy']
         wrt = ['x', 'y']
-        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+        derivs = prob.compute_totals(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['f_xy', 'x'], [[-5.99]], 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.01]], 1e-6)
@@ -296,7 +296,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         wrt = ['x1']
         of = ['sub2.tgtF.x3', 'sub2.tgtC.x3', 'sub2.tgtK.x3']
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
         assert_rel_error(self, J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
@@ -305,7 +305,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
         assert_rel_error(self, J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
@@ -344,7 +344,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
@@ -400,7 +400,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         of = ['y1']
         wrt = ['x1']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['y1', 'x1'][0][0], Jbase[0, 1], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[0, 3], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][2][0], Jbase[2, 1], 1e-8)
@@ -457,7 +457,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         of = ['y1']
         wrt = ['x1']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['y1', 'x1'][0][0], Jbase[0, 1], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[0, 3], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][1][0], Jbase[2, 1], 1e-8)
@@ -505,7 +505,7 @@ class TestGroupComplexStep(unittest.TestCase):
 
         of = ['f_xy']
         wrt = ['x', 'y']
-        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+        derivs = prob.compute_totals(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
@@ -538,7 +538,7 @@ class TestGroupComplexStep(unittest.TestCase):
 
         of = ['f_xy']
         wrt = ['x', 'y']
-        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+        derivs = prob.compute_totals(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
@@ -583,7 +583,7 @@ class TestGroupComplexStep(unittest.TestCase):
 
         of = ['sub.comp.f_xy']
         wrt = ['p1.x', 'p2.y']
-        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+        derivs = prob.compute_totals(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['sub.comp.f_xy', 'p1.x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['sub.comp.f_xy', 'p2.y'], [[8.0]], 1e-6)
@@ -672,7 +672,7 @@ class TestGroupComplexStep(unittest.TestCase):
 
         wrt = ['x1']
         of = ['sub2.tgtF.x3', 'sub2.tgtC.x3', 'sub2.tgtK.x3']
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
         assert_rel_error(self, J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
@@ -681,7 +681,7 @@ class TestGroupComplexStep(unittest.TestCase):
         # Check the total derivatives in reverse mode
         prob.setup(check=False, vector_class=vec_class, mode='rev')
         prob.run_model()
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
         assert_rel_error(self, J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
@@ -728,7 +728,7 @@ class TestGroupComplexStep(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
@@ -783,7 +783,7 @@ class TestGroupComplexStep(unittest.TestCase):
         of = ['y1']
         wrt = ['x1']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['y1', 'x1'][0][0], Jbase[0, 1], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[0, 3], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][1][0], Jbase[2, 1], 1e-8)
@@ -841,7 +841,7 @@ class TestGroupComplexStep(unittest.TestCase):
         of = ['y1']
         wrt = ['x1']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['y1', 'x1'][0][0], Jbase[0, 1], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[0, 3], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][2][0], Jbase[2, 1], 1e-8)
@@ -860,7 +860,7 @@ class TestComponentComplexStep(unittest.TestCase):
 
             def setup(self):
                 super(TestImplCompArrayDense, self).setup()
-                self.approx_partials('*', '*', method='cs')
+                self.declare_partials('*', '*', method='cs')
 
         prob = self.prob = Problem()
         model = prob.model = Group()
@@ -895,9 +895,9 @@ class TestComponentComplexStep(unittest.TestCase):
             def setup(self):
                 super(TestImplCompArrayDense, self).setup()
                 if self.count > 0:
-                    self.approx_partials('*', '*', method='cs')
+                    self.declare_partials('*', '*', method='cs')
                 else:
-                    self.approx_partials('*', '*', method='fd')
+                    self.declare_partials('*', '*', method='fd')
                 self.count += 1
 
         prob = self.prob = Problem()
@@ -940,7 +940,7 @@ class TestComponentComplexStep(unittest.TestCase):
                 self.add_input('x1', np.array([[7.0, 3.0], [2.4, 3.33]]))
                 self.add_output('y1', np.zeros((2, 2)))
 
-                self.approx_partials('*', '*', method='cs')
+                self.declare_partials('*', '*', method='cs')
 
             def compute(self, inputs, outputs):
 
@@ -968,7 +968,7 @@ class TestComponentComplexStep(unittest.TestCase):
 
         of = ['comp.y1']
         wrt = ['px.x']
-        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+        derivs = prob.compute_totals(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['comp.y1', 'px.x'][0][0], 1.0, 1e-6)
         assert_rel_error(self, derivs['comp.y1', 'px.x'][1][1], 3.0, 1e-6)
@@ -1020,7 +1020,7 @@ class ApproxTotalsFeature(unittest.TestCase):
 
         of = ['z']
         wrt = ['x']
-        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+        derivs = prob.compute_totals(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['z', 'x'], [[300.0]], 1e-6)
         self.assertEqual(comp2._exec_count, 3)
@@ -1067,7 +1067,7 @@ class ApproxTotalsFeature(unittest.TestCase):
 
         of = ['z']
         wrt = ['x']
-        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+        derivs = prob.compute_totals(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['z', 'x'], [[300.0]], 1e-6)
 
@@ -1113,7 +1113,7 @@ class ApproxTotalsFeature(unittest.TestCase):
 
         of = ['z']
         wrt = ['x']
-        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+        derivs = prob.compute_totals(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['z', 'x'], [[300.0]], 1e-6)
 

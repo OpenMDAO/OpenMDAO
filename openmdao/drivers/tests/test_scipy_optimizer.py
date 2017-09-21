@@ -15,7 +15,7 @@ from openmdao.test_suite.groups.sin_fitter import SineFitter
 
 class TestScipyOptimizer(unittest.TestCase):
 
-    def test_compute_total_derivs_basic_return_array(self):
+    def test_compute_totals_basic_return_array(self):
         # Make sure 'array' return_format works.
 
         prob = Problem()
@@ -34,7 +34,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         of = ['comp.f_xy']
         wrt = ['p1.x', 'p2.y']
-        derivs = prob.driver._compute_total_derivs(of=of, wrt=wrt, return_format='array')
+        derivs = prob.driver._compute_totals(of=of, wrt=wrt, return_format='array')
 
         assert_rel_error(self, derivs[0, 0], -6.0, 1e-6)
         assert_rel_error(self, derivs[0, 1], 8.0, 1e-6)
@@ -44,12 +44,12 @@ class TestScipyOptimizer(unittest.TestCase):
 
         of = ['comp.f_xy']
         wrt = ['p1.x', 'p2.y']
-        derivs = prob.driver._compute_total_derivs(of=of, wrt=wrt, return_format='array')
+        derivs = prob.driver._compute_totals(of=of, wrt=wrt, return_format='array')
 
         assert_rel_error(self, derivs[0, 0], -6.0, 1e-6)
         assert_rel_error(self, derivs[0, 1], 8.0, 1e-6)
 
-    def test_compute_total_derivs_return_array_non_square(self):
+    def test_compute_totals_return_array_non_square(self):
 
         prob = Problem()
         prob.model = model = Group()
@@ -66,7 +66,7 @@ class TestScipyOptimizer(unittest.TestCase):
         prob.setup(check=False)
         prob.run_driver()
 
-        derivs = prob.driver._compute_total_derivs(of=['comp.y1'], wrt=['px.x'],
+        derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'],
                                                    return_format='array')
 
         J = comp.JJ[0:3, 0:2]
@@ -74,7 +74,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         # Support for a name to be in 'of' and 'wrt'
 
-        derivs = prob.driver._compute_total_derivs(of=['comp.y2', 'px.x', 'comp.y1'], wrt=['px.x'],
+        derivs = prob.driver._compute_totals(of=['comp.y2', 'px.x', 'comp.y1'], wrt=['px.x'],
                                                    return_format='array')
 
         assert_rel_error(self, J, derivs[3:, :], 1.0e-3)
@@ -96,7 +96,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         # Support for a name to be in 'of' and 'wrt'
 
-        J = prob.driver._compute_total_derivs(of=['px.x'], wrt=['px.x'],
+        J = prob.driver._compute_totals(of=['px.x'], wrt=['px.x'],
                                                    return_format='array')
 
         assert_rel_error(self, J, np.eye(2), 1.0e-3)

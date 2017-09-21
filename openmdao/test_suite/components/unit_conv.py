@@ -26,7 +26,7 @@ class SrcCompFD(SrcComp):
 
     def setup(self):
         super(SrcCompFD, self).setup()
-        self.approx_partials('*', '*')
+        self.declare_partials('*', '*', method='fd')
 
     def compute_partials(self, inputs, partials):
         """ Override"""
@@ -54,7 +54,7 @@ class TgtCompFFD(TgtCompF):
 
     def setup(self):
         super(TgtCompFFD, self).setup()
-        self.approx_partials('*', '*')
+        self.declare_partials('*', '*', method='fd')
 
     def compute_partials(self, inputs, partials):
         """ Override"""
@@ -82,7 +82,7 @@ class TgtCompCFD(TgtCompC):
 
     def setup(self):
         super(TgtCompCFD, self).setup()
-        self.approx_partials('*', '*')
+        self.declare_partials('*', '*', method='fd')
 
     def compute_partials(self, inputs, partials):
         """ Override"""
@@ -110,7 +110,7 @@ class TgtCompKFD(TgtCompK):
 
     def setup(self):
         super(TgtCompKFD, self).setup()
-        self.approx_partials('*', '*')
+        self.declare_partials('*', '*', method='fd')
 
     def compute_partials(self, inputs, partials):
         """ Override"""

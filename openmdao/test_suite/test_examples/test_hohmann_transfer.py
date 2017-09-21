@@ -112,7 +112,7 @@ class TransferOrbitComp(ExplicitComponent):
 
         # We're going to be lazy and ask OpenMDAO to approximate our
         # partials with finite differencing here.
-        self.approx_partials(of='*', wrt='*', method='fd')
+        self.declare_partials(of='*', wrt='*', method='fd')
 
     def compute(self, inputs, outputs):
         mu = inputs['mu']

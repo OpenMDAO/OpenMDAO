@@ -59,7 +59,7 @@ class SellarDis1(ExplicitComponent):
 
     def _turn_on_fd(self):
         # Finite difference everything
-        self.approx_partials('*', '*')
+        self.declare_partials('*', '*', method='fd')
 
     def compute(self, inputs, outputs):
         """
@@ -130,7 +130,7 @@ class SellarDis2(ExplicitComponent):
 
     def _turn_on_fd(self):
         # Finite difference everything
-        self.approx_partials('*', '*')
+        self.declare_partials('*', '*', method='fd')
 
     def compute(self, inputs, outputs):
         """

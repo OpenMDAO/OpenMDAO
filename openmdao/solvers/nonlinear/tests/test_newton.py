@@ -771,7 +771,7 @@ class TestNewton(unittest.TestCase):
 
         prob.run_model()
 
-        J = prob.compute_total_derivs()
+        J = prob.compute_totals()
         assert_rel_error(self, J['ecomp.y', 'p1.x'][0][0], -0.703467422498, 1e-6)
 
 
