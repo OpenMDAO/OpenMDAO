@@ -14,11 +14,17 @@ _registered = False  # prevents multiple atexit registrations
 
 
 def _trace_mem_call(frame, arg, stack, context):
+    """
+    Called whenever a function is called that matches glob patterns and isinstance checks.
+    """
     memstack, _ = context
     memstack.append([frame.f_code, mem_usage()])
 
 
 def _trace_mem_ret(frame, arg, stack, context):
+    """
+    Called whenever a function returns that matches glob patterns and isinstance checks.
+    """
     memstack, mem_changes = context
     code_obj, mem_start = memstack.pop()
     delta = mem_usage() - mem_start
@@ -38,10 +44,18 @@ def _trace_mem_ret(frame, arg, stack, context):
 
 
 def setup(methods=None):
+    """
+    Setup memory profiling.
+
+    Parameters
+    ----------
+    methods : list of (glob, (classes...)) or None
+        Methods to be profiled, based on glob patterns and isinstance checks.
+    """
     global _registered, _trace_memory, mem_usage
     if not _registered:
         from openmdao.devtools.debug import mem_usage
-        if methods is None or methods not in func_group:
+        if methods is None:
             methods = func_group['openmdao_all']
 
         mem_changes = {}
@@ -68,13 +82,16 @@ def setup(methods=None):
                     count[cname].add(id(self))
                     sname = "%s#%d%s" % (self.__class__.__name__, len(count[cname]), pname)
 
-                    print("%s %g MB" % ('.'.join((sname, funcname)), delta))
+                    print("%g MB %s" % (delta, '.'.join((sname, funcname))))
 
         atexit.register(print_totals)
         _registered = True
 
 
 def start():
+    """
+    Turn on memory profiling.
+    """
     global _trace_memory
     if sys.getprofile() is not None:
         raise RuntimeError("another profile function is already active.")
@@ -84,10 +101,16 @@ def start():
 
 
 def stop():
+    """
+    Turn off memory profiling.
+    """
     sys.setprofile(None)
 
 
-def profile_py_file():
+def _profile_py_file():
+    """
+    Process command line args and perform memory profiling on a specified python file.
+    """
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-g', '--group', action='store', dest='group',
@@ -119,4 +142,4 @@ def profile_py_file():
 
 
 if __name__ == '__main__':
-    profile_py_file()
+    _profile_py_file()

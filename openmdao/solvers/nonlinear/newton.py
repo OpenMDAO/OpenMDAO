@@ -3,7 +3,7 @@
 from __future__ import print_function
 
 from openmdao.solvers.solver import NonlinearSolver
-from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration_stack
+from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration
 from openmdao.utils.general_utils import warn_deprecation
 
 
@@ -134,7 +134,7 @@ class NewtonSolver(NonlinearSolver):
         """
         Run the the apply_nonlinear method on the system.
         """
-        recording_iteration_stack.append(('_run_apply', 0))
+        recording_iteration.stack.append(('_run_apply', 0))
 
         system = self._system
 
@@ -144,7 +144,7 @@ class NewtonSolver(NonlinearSolver):
 
         system._apply_nonlinear()
 
-        recording_iteration_stack.pop()
+        recording_iteration.stack.pop()
 
         # Enable local fd
         system._owns_approx_jac = approx_status
@@ -184,6 +184,9 @@ class NewtonSolver(NonlinearSolver):
         """
         system = self._system
 
+        # Execute guess_nonlinear if specified.
+        system._guess_nonlinear()
+
         with Recording('Newton_subsolve', 0, self):
             if self.options['solve_subsystems'] and \
                (self._iter_count <= self.options['max_sub_solves']):
@@ -202,10 +205,6 @@ class NewtonSolver(NonlinearSolver):
                 self._solver_info.pop()
 
         if self.options['maxiter'] > 0:
-
-            # Execute guess_nonlinear if specified.
-            system._guess_nonlinear()
-
             self._run_apply()
             norm = self._iter_get_norm()
         else:

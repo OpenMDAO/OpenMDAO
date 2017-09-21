@@ -306,7 +306,7 @@ class TestPetscKSP(unittest.TestCase):
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
         d_residuals.set_const(1.0)
         d_outputs.set_const(0.0)
-        g1._solve_linear(['linear'], 'fwd')
+        g1.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
         # The empty first entry in _data is due to the dummy
@@ -320,7 +320,7 @@ class TestPetscKSP(unittest.TestCase):
         d_outputs.set_const(1.0)
         d_residuals.set_const(0.0)
         g1.linear_solver._linearize()
-        g1._solve_linear(['linear'], 'rev')
+        g1.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
         assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
