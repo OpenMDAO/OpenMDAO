@@ -24,6 +24,9 @@ tab = '    '
 addr_regex = re.compile(" at 0x[0-9a-fA-F]+")
 
 def _indented_print(f_locals, d, indent, excludes=('__init__',), file=sys.stdout):
+    """
+    Print trace info, indenting based on call depth.
+    """
     sindent = tab * indent
     sep = '=' if d is f_locals else ':'
 
@@ -162,7 +165,7 @@ def stop():
 
 
 @contextmanager
-def tracing(methods=None):
+def tracing(methods=None, verbose=False):
     """
     Turn on call tracing within a certain context.
 
@@ -170,9 +173,10 @@ def tracing(methods=None):
     ----------
     methods : list of (glob, (classes...)) or None
         Methods to be traced, based on glob patterns and isinstance checks.
-
+    verbose : bool
+        If True, show function locals and return values.
     """
-    setup(methods=methods)
+    setup(methods=methods, verbose=verbose)
     start()
     yield
     stop()
@@ -186,12 +190,15 @@ class tracedfunc(object):
     ----------
     methods : list of (glob, (classes...)) tuples, optional
         Methods to be traced, based on glob patterns and isinstance checks.
+    verbose : bool
+        If True, show function locals and return values.
     """
-    def __init__(self, methods=None):
+    def __init__(self, methods=None, verbose=False):
         self.methods = methods
+        self.verbose = verbose
 
     def __call__(self, func):
-        setup(methods=self.methods)
+        setup(methods=self.methods, verbose=self.verbose)
 
         def wrapped(*args, **kwargs):
             start()
@@ -200,8 +207,10 @@ class tracedfunc(object):
         return wrapped
 
 
-def trace_py_file():
-
+def _trace_py_file():
+    """
+    Process command line args and perform tracing on a specified python file.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('-g', '--group', action='store', dest='group',
                         default='openmdao',
@@ -234,4 +243,4 @@ def trace_py_file():
 
 
 if __name__ == '__main__':
-    trace_py_file()
+    _trace_py_file()

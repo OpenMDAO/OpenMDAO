@@ -51,6 +51,7 @@ class Jacobian(object):
 
         self._override_checks = False
 
+    @profile
     def _abs_key2shape(self, abs_key):
         """
         Return shape of sub-jacobian for variables making up the key tuple.

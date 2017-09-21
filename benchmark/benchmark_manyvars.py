@@ -48,6 +48,6 @@ class BM(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    prob = _build_comp(1, 500)
+    prob = _build_comp(1, 1000)
     prob.setup(check=False)
     prob.final_setup()

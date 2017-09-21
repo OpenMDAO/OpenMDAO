@@ -21,12 +21,16 @@ def _trace_mem_call(frame, arg, stack, context):
 def _trace_mem_ret(frame, arg, stack, context):
     memstack, mem_changes = context
     code_obj, mem_start = memstack.pop()
-    delta = mem_usage() - mem_start
+    usage = mem_usage()
+    delta = usage - mem_start
     if delta > 0.0:
-        if code_obj in mem_changes:
-            mem_changes[(frame.f_locals['self'], code_obj)] += delta
-        else:
-            mem_changes[(frame.f_locals['self'], code_obj)] = delta
+        # FIXME: this can allocate memory to store the code_obj data!
+        mem_changes[code_obj] += delta
+
+        # print("%g (+%g) MB %s:%d:%s" % (usage, delta,
+        #                                 code_obj.co_filename,
+        #                                 code_obj.co_firstlineno,
+        #                                 code_obj.co_name))
 
         # we only want to see deltas from the routines that actually allocate
         # memory rather than those routines and all of the routines that call
@@ -44,37 +48,20 @@ def setup(methods=None):
         if methods is None:
             methods = func_group['openmdao_all']
 
-        mem_changes = {}
+        mem_changes = defaultdict(float)
         memstack = []
         callstack = []
         _trace_memory = _create_profile_callback(callstack,  _collect_methods(methods),
                                                  do_call=_trace_mem_call, do_ret=_trace_mem_ret,
                                                  context=(memstack, mem_changes))
 
-        _qual_cache = {}  # cache of files scanned for qualified names
-
         def print_totals():
-            count = defaultdict(dict)
-            for (self, code_obj), delta in sorted(mem_changes.items(), key=lambda x: x[1]):
+            for code_obj, delta in sorted(mem_changes.items(), key=lambda x: x[1]):
                 if delta != 0.0:
-                    funcname = find_qualified_name(code_obj.co_filename,
-                                                   code_obj.co_firstlineno, _qual_cache)
-                    try:
-                        pname = '(%s)' % self.pathname
-                    except AttributeError:
-                        pname = ''
-
-                    cname = self.__class__.__name__
-                    ident = id(self)
-                    if ident in count[cname]:
-                        num = count[cname][ident]
-                    else:
-                        num = len(count[cname])
-                        count[cname][ident] = num
-
-                    sname = "%s#%d%s" % (cname, num, pname)
-
-                    print("%s %g MB" % ('.'.join((sname, funcname)), delta))
+                    print("%s:%d:%s %g MB" % (code_obj.co_filename,
+                                              code_obj.co_firstlineno,
+                                              code_obj.co_name,
+                                              delta))
 
         atexit.register(print_totals)
         _registered = True
