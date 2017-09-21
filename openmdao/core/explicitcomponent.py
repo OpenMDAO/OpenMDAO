@@ -8,7 +8,7 @@ from itertools import product
 
 from openmdao.core.component import Component
 from openmdao.utils.class_util import overrides_method
-from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS, DenseJacobian
+from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
 
 _inst_functs = ['compute_jacvec_product', 'compute_multi_jacvec_product']
