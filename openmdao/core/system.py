@@ -929,6 +929,7 @@ class System(object):
         """
         self._var_sizes = {}
         self._var_sizes_byset = {}
+        self._owning_rank = {}
 
     def _setup_global_shapes(self):
         """

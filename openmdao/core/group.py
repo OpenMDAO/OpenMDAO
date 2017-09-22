@@ -460,6 +460,19 @@ class Group(System):
                     for set_name, vsizes in iteritems(sizes_byset[type_]):
                         self.comm.Allgather(sizes_byset[type_][set_name][iproc, :], vsizes)
 
+            # compute owning ranks
+            for type_ in ('input', 'output'):
+                self._owning_rank[type_] = owns = {}
+                sizes = self._var_sizes['linear'][type_]
+                for i, name in enumerate(self._var_allprocs_abs_names[type_]):
+                    for rank in range(self.comm.size):
+                        if sizes[rank, i] > 0:
+                            owns[name] = rank
+                            break
+        else:
+            self._owning_rank['input'] = defaultdict(int)
+            self._owning_rank['output'] = defaultdict(int)
+
         self._var_sizes['nonlinear'] = self._var_sizes['linear']
         self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']
 

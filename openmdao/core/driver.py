@@ -1,5 +1,7 @@
 """Define a base class for all Drivers in OpenMDAO."""
 from __future__ import print_function
+from collections import OrderedDict
+
 from six import iteritems
 
 import numpy as np
@@ -106,12 +108,53 @@ class Driver(object):
         self._problem = problem
         model = problem.model
 
+        self._objs = objs = OrderedDict()
+        self._cons = cons = OrderedDict()
+        self._responses = model.get_responses(recurse=True)
+        for name, data in iteritems(self._responses):
+            if data['type'] == 'con':
+                cons[name] = data
+            else:
+                objs[name] = data
+
         # Gather up the information for design vars.
         self._designvars = model.get_design_vars(recurse=True)
 
-        self._responses = model.get_responses(recurse=True)
-        self._objs = model.get_objectives(recurse=True)
-        self._cons = model.get_constraints(recurse=True)
+        con_set = set()
+        obj_set = set()
+        dv_set = set()
+
+        self._remote_dvs = dv_dict = {}
+        self._remote_cons = con_dict = {}
+        self._remote_objs = obj_dict = {}
+
+        # Now determine if later we'll need to allgather cons, objs, or desvars
+        if model.comm.size > 1 and model._subsystems_allprocs:
+            out_vars = set(model._outputs._views)
+            remote_dvs = set(self._designvars) - out_vars
+            remote_cons = set(self._cons) - out_vars
+            remote_objs = set(self._objs) - out_vars
+            all_remote_vois = model.comm.allgather((remote_dvs, remote_cons, remote_objs))
+            for rem_dvs, rem_cons, rem_objs in all_remote_vois:
+                con_set.update(rem_cons)
+                obj_set.update(rem_objs)
+                dv_set.update(rem_dvs)
+
+            # If we have remote VOIs, pick an owning rank for each and use that
+            # to bcast to others later
+            owning_ranks = model._owning_rank['output']
+            sizes = model._var_sizes['nonlinear']['output']
+            for i, vname in enumerate(model._var_allprocs_abs_names['output']):
+                owner = owning_ranks[vname]
+                if vname in dv_set:
+                    dv_dict[vname] = (owner, sizes[owner, i])
+                if vname in con_set:
+                    con_dict[vname] = (owner, sizes[owner, i])
+                if vname in obj_set:
+                    obj_dict[vname] = (owner, sizes[owner, i])
+
+        self._remote_responses = self._remote_cons.copy()
+        self._remote_responses.update(self._remote_objs)
 
         self._rec_mgr.startup(self)
         if (self._rec_mgr._recorders):
@@ -136,6 +179,7 @@ class Driver(object):
            Dictionary containing values of each design variable.
         """
         designvars = {}
+        model = self._problem.model
 
         if filter:
             # pull out designvars of those names into filtered dict.
@@ -146,16 +190,30 @@ class Driver(object):
             # use all the designvars
             designvars = self._designvars
 
-        vec = self._problem.model._outputs._views_flat
+        vec = model._outputs._views_flat
         dv_dict = {}
         for name, meta in iteritems(designvars):
             scaler = meta['scaler']
             adder = meta['adder']
             indices = meta['indices']
-            if indices is None:
-                val = vec[name].copy()
+            if name in self._remote_dvs:
+                owner, size = self._remote_dvs[name]
+                if owner == model.comm.rank:
+                    if indices is None:
+                        val = vec[name]
+                    else:
+                        val = vec[name][indices]
+                else:
+                    if indices is not None:
+                        size = len(indices)
+                    val = np.empty(size)
+                model.comm.Bcast(val, root=owner)
             else:
-                val = vec[name][indices]
+                if indices is None:
+                    # TODO: make sure we really need this copy
+                    val = vec[name].copy()
+                else:
+                    val = vec[name][indices]
 
             # Scale design variable values
             if adder is not None:
@@ -178,6 +236,11 @@ class Driver(object):
         value : float or ndarray
             Value for the design variable.
         """
+        if name in self._remote_dvs:
+            owner = self._problem.model._owning_rank['output'][name]
+            if owner != self._problem.comm.rank:
+                return
+
         meta = self._designvars[name]
         scaler = meta['scaler']
         adder = meta['adder']
@@ -238,14 +301,29 @@ class Driver(object):
 
         vec = self._problem.model._outputs._views_flat
         obj_dict = {}
+        model = self._problem.model
         for name, meta in iteritems(objectives):
             scaler = meta['scaler']
             adder = meta['adder']
             indices = meta['indices']
-            if indices is None:
-                val = vec[name].copy()
+            if name in self._remote_objs:
+                owner, size = self._remote_objs[name]
+                if owner == model.comm.rank:
+                    if indices is None:
+                        val = vec[name]
+                    else:
+                        val = vec[name][indices]
+                else:
+                    if indices is not None:
+                        size = len(indices)
+                    val = np.empty(size)
+                model.comm.Bcast(val, root=owner)
             else:
-                val = vec[name][indices]
+                if indices is None:
+                    # TODO: make sure we really need this copy
+                    val = vec[name].copy()
+                else:
+                    val = vec[name][indices]
 
             # Scale objectives
             if adder is not None:
@@ -292,6 +370,7 @@ class Driver(object):
 
         vec = self._problem.model._outputs._views_flat
         con_dict = {}
+        model = self._problem.model
 
         for name, meta in iteritems(constraints):
 
@@ -311,10 +390,24 @@ class Driver(object):
             adder = meta['adder']
             indices = meta['indices']
 
-            if indices is None:
-                val = vec[name].copy()
+            if name in self._remote_cons:
+                owner, size = self._remote_cons[name]
+                if owner == model.comm.rank:
+                    if indices is None:
+                        val = vec[name]
+                    else:
+                        val = vec[name][indices]
+                else:
+                    if indices is not None:
+                        size = len(indices)
+                    val = np.empty(size)
+                model.comm.Bcast(val, root=owner)
             else:
-                val = vec[name][indices]
+                if indices is None:
+                    # TODO: make sure we really need this copy
+                    val = vec[name].copy()
+                else:
+                    val = vec[name][indices]
 
             # Scale objectives
             if adder is not None:

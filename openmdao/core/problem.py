@@ -1074,6 +1074,11 @@ class Problem(object):
                                     output_list, old_output_list, output_vois,
                                     use_rel_reduction, rel_systems, return_format):
         fwd = mode == 'fwd'
+        if fwd:
+            remote_outputs = self.driver._remote_responses
+        else:
+            remote_outputs = self.driver._remote_dvs
+
         model = self.model
         nproc = model.comm.size
         iproc = model.comm.rank
@@ -1122,10 +1127,14 @@ class Problem(object):
                     if out_idxs is None:
                         out_var_idx = \
                             model._var_allprocs_abs2idx['nonlinear']['output'][output_name]
-                        if ncol > 1:
-                            deriv_val = np.zeros((sizes[iproc, out_var_idx], ncol))
+                        if output_name in remote_outputs:
+                            _, sz = remote_outputs[output_name]
                         else:
-                            deriv_val = np.zeros(sizes[iproc, out_var_idx])
+                            sz = sizes[iproc, out_var_idx]
+                        if ncol > 1:
+                            deriv_val = np.zeros((sz, ncol))
+                        else:
+                            deriv_val = np.zeros(sz)
                     else:
                         if ncol > 1:
                             deriv_val = np.zeros((len(out_idxs), ncol))
@@ -1291,12 +1300,16 @@ class Problem(object):
             input_vec, output_vec = vec_dresid, vec_doutput
             input_vois = self.driver._designvars
             output_vois = self.driver._responses
+            remote_outputs = self.driver._remote_responses
+            remote_inputs = self.driver._remote_dvs
         else:  # rev
             input_list, output_list = of, wrt
             old_input_list, old_output_list = oldof, oldwrt
             input_vec, output_vec = vec_doutput, vec_dresid
             input_vois = self.driver._responses
             output_vois = self.driver._designvars
+            remote_inputs = self.driver._remote_responses
+            remote_outputs = self.driver._remote_dvs
 
         # Solve for derivs using linear solver.
 
@@ -1443,7 +1456,11 @@ class Problem(object):
                             # irrelevant output, just give zeros
                             if out_idxs is None:
                                 out_var_idx = abs2idx_out[output_name]
-                                deriv_val = np.zeros(sizes[iproc, out_var_idx])
+                                if output_name in remote_outputs:
+                                    _, sz = remote_outputs[output_name]
+                                    deriv_val = np.zeros(sz)
+                                else:
+                                    deriv_val = np.zeros(sizes[iproc, out_var_idx])
                             else:
                                 deriv_val = np.zeros(len(out_idxs))
                         else:  # relevant output
