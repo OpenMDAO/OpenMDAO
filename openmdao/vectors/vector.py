@@ -56,8 +56,6 @@ class Vector(object):
         Dictionary mapping absolute variable names to the ndarray views.
     _views_flat : dict
         Dictionary mapping absolute variable names to the flattened ndarray views.
-    _idxs : dict
-        Either 0 or slice(None), used so that 1-sized vectors are made floats.
     _names : set([str, ...])
         Set of variables that are relevant in the current context.
     _root_vector : Vector
@@ -430,8 +428,6 @@ class Vector(object):
 
         - _views
         - _views_flat
-        - _idxs
-
         """
         pass
 

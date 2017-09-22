@@ -14,41 +14,47 @@ _registered = False  # prevents multiple atexit registrations
 
 
 def _trace_mem_call(frame, arg, stack, context):
+    """
+    Called whenever a function is called that matches glob patterns and isinstance checks.
+    """
     memstack, _ = context
-    memstack.append([frame.f_code, mem_usage()])
+    memstack.append([(frame.f_code.co_filename,
+                     frame.f_code.co_firstlineno,
+                     frame.f_code.co_name), mem_usage()])
 
 
 def _trace_mem_ret(frame, arg, stack, context):
+    """
+    Called whenever a function returns that matches glob patterns and isinstance checks.
+    """
     memstack, mem_changes = context
-    code_obj, mem_start = memstack.pop()
+    key, mem_start = memstack.pop()
     usage = mem_usage()
     delta = usage - mem_start
     if delta > 0.0:
-        # FIXME: this can allocate memory to store the code_obj data!
-        mem_changes[code_obj] += delta
-
+        mem_changes[key][0] += delta
+        mem_changes[key][1] += 1
+        if memstack:
+            mem_changes[key][2].add(memstack[-1][0])
         # print("%g (+%g) MB %s:%d:%s" % (usage, delta,
-        #                                 code_obj.co_filename,
-        #                                 code_obj.co_firstlineno,
-        #                                 code_obj.co_name))
-
-        # we only want to see deltas from the routines that actually allocate
-        # memory rather than those routines and all of the routines that call
-        # them either directly or indirectly, so we add the current delta to
-        # the mem usage up the call stack, which will subtract it from the ancestor
-        # deltas.
-        for i in range(len(memstack)):
-            memstack[i][1] += delta
-
+        #                                 key[0], key[1], key[2]))
 
 def setup(methods=None):
+    """
+    Setup memory profiling.
+
+    Parameters
+    ----------
+    methods : list of (glob, (classes...)) or None
+        Methods to be profiled, based on glob patterns and isinstance checks.
+    """
     global _registered, _trace_memory, mem_usage
     if not _registered:
         from openmdao.devtools.debug import mem_usage
         if methods is None:
             methods = func_group['openmdao_all']
 
-        mem_changes = defaultdict(float)
+        mem_changes = defaultdict(lambda: [0., 0, set()])
         memstack = []
         callstack = []
         _trace_memory = _create_profile_callback(callstack,  _collect_methods(methods),
@@ -56,18 +62,19 @@ def setup(methods=None):
                                                  context=(memstack, mem_changes))
 
         def print_totals():
-            for code_obj, delta in sorted(mem_changes.items(), key=lambda x: x[1]):
+            for key, (delta, ncalls, parents) in sorted(mem_changes.items(), key=lambda x: x[1]):
                 if delta != 0.0:
-                    print("%s:%d:%s %g MB" % (code_obj.co_filename,
-                                              code_obj.co_firstlineno,
-                                              code_obj.co_name,
-                                              delta))
+                    print("%s:%d:%s %g MB in %d calls" % (key[0], key[1], key[2],
+                                                          delta, ncalls))
 
         atexit.register(print_totals)
         _registered = True
 
 
 def start():
+    """
+    Turn on memory profiling.
+    """
     global _trace_memory
     if sys.getprofile() is not None:
         raise RuntimeError("another profile function is already active.")
@@ -77,10 +84,16 @@ def start():
 
 
 def stop():
+    """
+    Turn off memory profiling.
+    """
     sys.setprofile(None)
 
 
-def profile_py_file():
+def _profile_py_file():
+    """
+    Process command line args and perform memory profiling on a specified python file.
+    """
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-g', '--group', action='store', dest='group',
@@ -112,4 +125,4 @@ def profile_py_file():
 
 
 if __name__ == '__main__':
-    profile_py_file()
+    _profile_py_file()

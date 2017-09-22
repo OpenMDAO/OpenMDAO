@@ -589,8 +589,7 @@ class Component(System):
                 meta['method'] = method
                 meta.update(kwargs)
 
-    def declare_partials(self, of, wrt, dependent=True,
-                         rows=None, cols=None, val=None):
+    def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None):
         """
         Declare information about this component's subjacobians.
 
