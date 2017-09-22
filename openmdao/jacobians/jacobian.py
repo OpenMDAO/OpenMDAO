@@ -278,8 +278,9 @@ class Jacobian(object):
         shape = self._abs_key2shape(abs_key)
         self._subjacs_info[abs_key] = (meta, shape)
 
-        val = meta['value']
-        if val is not None:
-            self._set_abs(abs_key, val)
-            if negate:
-                self._multiply_subjac(abs_key, -1.0)
+        if meta:
+            val = meta['value']
+            if val is not None:
+                self._set_abs(abs_key, val)
+                if negate:
+                    self._multiply_subjac(abs_key, -1.0)

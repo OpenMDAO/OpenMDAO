@@ -17,6 +17,7 @@ from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation, ContainsAll
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
+from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 
 
 def _find_matches(pattern, var_list):
@@ -586,8 +587,9 @@ class Component(System):
             for rel_key in product(of_matches, wrt_matches):
                 abs_key = rel_key2abs_key(self, rel_key)
                 meta = self._subjacs_info[abs_key]
-                meta['method'] = method
-                meta.update(kwargs)
+                if meta:
+                    meta['method'] = method
+                    meta.update(kwargs)
 
     def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None):
         """
@@ -696,9 +698,10 @@ class Component(System):
 
             for rel_key in product(of_matches, wrt_matches):
                 abs_key = rel_key2abs_key(self, rel_key)
-                meta = self._subjacs_info[abs_key]
-                meta['dependent'] = dependent
                 if dependent:
+                    meta = self._subjacs_info[abs_key]
+                    if meta is None:  # declared earlier as not dependent
+                        self._subjacs_info[abs_key] = meta = SUBJAC_META_DEFAULTS.copy()
                     if rows is not None:
                         meta['rows'] = rows
                     if cols is not None:
@@ -706,6 +709,8 @@ class Component(System):
                     if val is not None:
                         meta['value'] = deepcopy(val) if make_copies else val
                     self._check_partials_meta(abs_key, meta)
+                else:
+                    self._subjacs_info[abs_key] = None
 
     def _find_partial_matches(self, of, wrt):
         """
@@ -749,8 +754,8 @@ class Component(System):
         meta : dict
             Metadata dictionary from declare_partials.
         """
-        of, wrt = abs_key2rel_key(self, abs_key)
-        if meta['dependent']:
+        if meta:
+            of, wrt = abs_key2rel_key(self, abs_key)
             out_size = self._var_abs2meta['output'][abs_key[0]]['size']
             if abs_key[1] in self._var_abs2meta['input']:
                 in_size = self._var_abs2meta['input'][abs_key[1]]['size']
@@ -795,12 +800,15 @@ class Component(System):
         """
         with self.jacobian_context() as J:
             for key, meta in iteritems(self._subjacs_info):
-                self._check_partials_meta(key, meta)
-                J._set_partials_meta(key, meta)
+                if meta:
+                    self._check_partials_meta(key, meta)
+                    J._set_partials_meta(key, meta)
 
-                method = meta['method']
-                if method and meta['dependent']:
-                    self._approx_schemes[method].add_approximation(key, meta)
+                    method = meta['method']
+                    if method:
+                        self._approx_schemes[method].add_approximation(key, meta)
+                else:
+                    J._set_partials_meta(key, meta)
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()

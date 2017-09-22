@@ -1583,14 +1583,15 @@ class Group(System):
                         meta_changes['idx_wrt'] = self._owns_approx_wrt_idx[key[1]]
 
                     meta = self._subjacs_info[key]
-                    meta.update(meta_changes)
-                    meta.update(self._owns_approx_jac_meta)
+                    if meta:
+                        meta.update(meta_changes)
+                        meta.update(self._owns_approx_jac_meta)
 
                     # Create Jacobian stub for every key pair
                     J._set_partials_meta(key, meta)
 
                     # Create approximations, but only for the ones we need.
-                    if meta['dependent']:
+                    if meta:
 
                         # Skip indepvarcomp res wrt other srcs
                         if key[0] in ivc:

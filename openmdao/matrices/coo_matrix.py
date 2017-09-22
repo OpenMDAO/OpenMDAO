@@ -37,7 +37,7 @@ class COOMatrix(Matrix):
         metadata = self._metadata
         pre_metadata = {}
         for key, (info, irow, icol, src_indices, shape, factor) in iteritems(submats):
-            if not info['dependent']:
+            if not info:
                 continue
             val = info['value']
             rows = info['rows']

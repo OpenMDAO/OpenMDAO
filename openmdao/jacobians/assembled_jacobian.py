@@ -15,7 +15,7 @@ SUBJAC_META_DEFAULTS = {
     'rows': None,
     'cols': None,
     'value': None,
-    'dependent': True,
+    # 'dependent': True,
     'method': False,
 }
 
@@ -146,7 +146,7 @@ class AssembledJacobian(Jacobian):
                     abs_key = (res_abs_name, out_abs_name)
                     if abs_key in self._subjacs_info:
                         info, shape = self._subjacs_info[abs_key]
-                        if not info['dependent']:
+                        if not info:
                             continue
                     else:
                         info = SUBJAC_META_DEFAULTS
@@ -161,7 +161,7 @@ class AssembledJacobian(Jacobian):
 
                     if abs_key in self._subjacs_info:
                         info, shape = self._subjacs_info[abs_key]
-                        if not info['dependent']:
+                        if not info:
                             continue
                     else:
                         info = SUBJAC_META_DEFAULTS
