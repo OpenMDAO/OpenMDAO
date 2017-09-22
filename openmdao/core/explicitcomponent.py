@@ -178,7 +178,7 @@ class ExplicitComponent(Component):
 
                     J._set_partials_meta(abs_key, meta, wrt_name == 'input')
 
-                    method = meta.get('method', False)
+                    method = meta['method']
                     if method and dependent:
                         self._approx_schemes[method].add_approximation(abs_key, meta)
 

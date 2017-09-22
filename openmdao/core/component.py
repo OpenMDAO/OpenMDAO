@@ -798,7 +798,7 @@ class Component(System):
                 self._check_partials_meta(key, meta)
                 J._set_partials_meta(key, meta)
 
-                method = meta.get('method', False)
+                method = meta['method']
                 if method and meta['dependent']:
                     self._approx_schemes[method].add_approximation(key, meta)
 
