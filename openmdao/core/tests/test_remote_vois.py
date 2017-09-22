@@ -36,8 +36,6 @@ class RemoteVOITestCase(unittest.TestCase):
     def test_remote_voi(self):
         prob = Problem()
 
-        import wingdbstub
-
         prob.model.add_subsystem('par', ParallelGroup())
 
         prob.model.par.add_subsystem('G1', Mygroup())
