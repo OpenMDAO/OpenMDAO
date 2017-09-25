@@ -1,5 +1,6 @@
-This tutorial illustrates how to build and run a very simple model with explicit components.
-It explains the basic structure of your run file and shows you how to set inputs, run the model, and check the output files
+In the last tutorial, we discussed the three basic kinds of components in the OpenMDAO framework.
+This tutorial focuses on using :ref:`ExplicitComponent <comp-type-2-explicitcomp>` to build a simple analysis of a paraboloid function.
+We'll explain the basic structure of a run file and show you how to set inputs, run the model, and check the output files
 
 ******************************************
 Setting up an Simple Analysis

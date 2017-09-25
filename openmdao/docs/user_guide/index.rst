@@ -12,7 +12,7 @@ combine those components into larger models, and then run optimizations on those
 .. toctree::
     :maxdepth: 1
 
-    building_components.rst
+    component_types.rst
     first_analysis.rst
     first_optimization.rst
     sellar.rst

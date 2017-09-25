@@ -1,7 +1,7 @@
 .. _building-components:
 
 *********************************************************
-Understanding How Variables Work
+The Three Kinds of Components
 *********************************************************
 
 In general, a numerical model can be complex, multidisciplinary, and heterogeneous.
@@ -12,7 +12,8 @@ smallest unit of computational work the framework understands.
 A Simple Numerical Model
 ------------------------
 
-Let us consider the following numerical model that takes :math:`x` as an input:
+In order to understand the different kinds of components in OpenMDAO,
+let us consider the following numerical model that takes :math:`x` as an input:
 
 .. math::
 
@@ -23,42 +24,22 @@ Let us consider the following numerical model that takes :math:`x` as an input:
     z = \sin(y) .
   \end{array}
 
-OpenMDAO reformulates all numerical models into the form of a nonlinear system which drives a set of residual equations to 0.
-This is done so that all models 'look the same' to the framework,
-which helps simplify methods for converging coupled numerical models and for computing their derivatives
-(i.e., :math:`dz/dx` and :math:`dy/dx` in this case).
-If we say we want to evaluate the numerical model at :math:`x=\pi`, the reformulation would be:
 
-
-.. math::
-
-  \begin{array}{l}
-    R_x(x, y, z) = x - \pi \\
-    R_y(x, y, z) = \cos(x \cdot y) - z \cdot y \\
-    R_z(x, y, z) = z - \sin(y) .
-  \end{array}
-
-The variables in this model would be x, y, and z.
-
-.. note::
-
-    The underlying mathematics that power OpenMDAO are based on the MAUD_ architecture, which established the foundation
-    for using formulation of a problem as a system of nonlinear equations as a means to efficiently computing
-    analytic derivatives across a large multidisciplinary model.
-
-.. _MAUD: http://mdolab.engin.umich.edu/sites/default/files/Hwang_dissertation.pdf
-
-Understanding how Variables are Defined
+The Three Types of Components
 -----------------------------------------
 
-In OpenMDAO, all variables are defined as outputs of components.
-There are three types of components in OpenMDAO:
 
-1. IndepVarComp : defines independent variables (e.g., x)
-2. ExplicitComponent : defines dependent variables that are computed explicitly (e.g., z)
-3. ImplicitComponent : defines dependent variables that are computed implicitly (e.g., y)
+In our numerical model, we have three variables: :math:`x`, :math:`y`, and :math:`z`.
+Each of these variables needs to be defined as the output of a component.
+There are three basic types of components in OpenMDAO:
 
-For our example, one way to implement the numerical model would be to assign each variable its own component, as below.
+
+1. :ref:`IndepVarComp <comp-type-1-indepvarcomp>` : defines independent variables (e.g., x)
+2. :ref:`ExplicitComponent <comp-type-2-explicitcomp>`: defines dependent variables that are computed explicitly (e.g., z)
+3. :ref:`ImplicitComponent <comp-type-3-implicitcomp>` : defines dependent variables that are computed implicitly (e.g., y)
+
+
+The most strait forward way to implement the numerical model would be to assign each variable its own component, as below.
 
   ===  =================  =======  =======
   No.  Component type     Inputs   Outputs
