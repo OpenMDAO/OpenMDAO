@@ -22,9 +22,6 @@ class ExecComp4Test(ExecComp):
     lin_delay : float(0.01)
         The sleep time in seconds that will occur when apply_linear is called.
 
-    trace : bool(False)
-        If True, print some mininal trace information while running.
-
     rec_procs : tuple of the form (minprocs, maxprocs)
         Minimum and maximun MPI processes usable by this component.
 
@@ -42,13 +39,12 @@ class ExecComp4Test(ExecComp):
         will be raised.
     """
     def __init__(self, exprs, nl_delay=0.01, lin_delay=0.01,
-                 trace=False, req_procs=(1,1), fail_rank=0, fails=(),
+                 req_procs=(1,1), fail_rank=0, fails=(),
                  fail_hard=False, **kwargs):
 
         super(ExecComp4Test, self).__init__(exprs, **kwargs)
         self.nl_delay = nl_delay
         self.lin_delay = lin_delay
-        self.trace = trace
         self.num_nl_solves = 0
         self.num_apply_lins = 0
         self.req_procs = req_procs
@@ -58,35 +54,44 @@ class ExecComp4Test(ExecComp):
         self.fails = fails
         self.fail_hard = fail_hard
 
-        # make a case_rank output so that we can see in tests which rank
-        # ran a case
-        self.add_output('case_rank', 0, pass_by_obj=True)
-
     def get_req_procs(self):
         return self.req_procs
 
-    def solve_nonlinear(self, params, unknowns, resids):
-        if MPI:
-            myrank = unknowns['case_rank'] = MPI.COMM_WORLD.rank
-        else:
-            myrank = unknowns['case_rank'] = int(os.environ.get('OPENMDAO_WORKER_ID', '0'))
+    def compute(self, inputs, outputs):
+        """
+        Execute this component's assignment statements.
 
-        if self.trace:
-            print(self.pathname, "solve_nonlinear")
+        Parameters
+        ----------
+        inputs : `Vector`
+            `Vector` containing inputs.
+
+        outputs : `Vector`
+            `Vector` containing outputs.
+        """
         try:
             if myrank in self.fail_rank and self.num_nl_solves in self.fails:
                 if self.fail_hard:
                     raise RuntimeError("OMG, a critical error!")
                 else:
                     raise AnalysisError("just an analysis error")
-            super(ExecComp4Test, self).solve_nonlinear(params, unknowns, resids)
+            super(ExecComp4Test, self).compute(inputs, outputs)
             time.sleep(self.nl_delay)
         finally:
             self.num_nl_solves += 1
 
-    def apply_linear(self, params, unknowns, dparams, dunknowns, dresids, mode):
-        if self.trace:
-            print(self.pathname, "apply_linear")
-        self._apply_linear_jac(params, unknowns, dparams, dunknowns, dresids, mode)
+    def compute_partials(self, inputs, partials):
+        """
+        Use complex step method to update the given Jacobian.
+
+        Parameters
+        ----------
+        inputs : `VecWrapper`
+            `VecWrapper` containing parameters. (p)
+
+        partials : `Jacobian`
+            Contains sub-jacobians.
+        """
+        super(ExecComp4Test, self).compute_partials(inputs, partials):
         time.sleep(self.lin_delay)
         self.num_apply_lins += 1
