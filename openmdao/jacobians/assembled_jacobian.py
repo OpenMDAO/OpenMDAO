@@ -147,7 +147,7 @@ class AssembledJacobian(Jacobian):
                 if not isinstance(s, Component):
                     continue
 
-                res_size = np.prod(abs2meta_out[res_abs_name]['shape'])
+                res_size = abs2meta_out[res_abs_name]['size']
 
                 for out_abs_name in s._var_abs_names['output']:
                     out_offset, _ = out_ranges[out_abs_name]
@@ -157,8 +157,7 @@ class AssembledJacobian(Jacobian):
                         info, shape = self._subjacs_info[abs_key]
                     else:
                         info = SUBJAC_META_DEFAULTS
-                        shape = (res_size,
-                                 np.prod(abs2meta_out[out_abs_name]['shape']))
+                        shape = (res_size, abs2meta_out[out_abs_name]['size'])
 
                     int_mtx._add_submat(
                         abs_key, info, res_offset, out_offset, None, shape)
@@ -171,8 +170,7 @@ class AssembledJacobian(Jacobian):
                         info, shape = self._subjacs_info[abs_key]
                     else:
                         info = SUBJAC_META_DEFAULTS
-                        shape = (res_size,
-                                 np.prod(abs2meta_in[in_abs_name]['shape']))
+                        shape = (res_size, abs2meta_in[in_abs_name]['size'])
 
                     self._keymap[abs_key] = abs_key
 
@@ -249,7 +247,7 @@ class AssembledJacobian(Jacobian):
                                     include_self=True, typ=Component):
             for res_abs_name in s._var_abs_names['output']:
                 res_offset = self._get_var_range(res_abs_name, 'output')[0]
-                res_size = np.prod(abs2meta_out[res_abs_name]['shape'])
+                res_size = abs2meta_out[res_abs_name]['size']
 
                 for in_abs_name in s._var_abs_names['input']:
                     abs_key = (res_abs_name, in_abs_name)
@@ -259,7 +257,7 @@ class AssembledJacobian(Jacobian):
                         info, shape = self._subjacs_info[abs_key]
                     else:
                         info = SUBJAC_META_DEFAULTS
-                        shape = (res_size, np.prod(abs2meta_in[in_abs_name]['shape']))
+                        shape = (res_size, abs2meta_in[in_abs_name]['size'])
 
                     if in_abs_name not in system._conn_global_abs_in2out:
                         ext_mtx._add_submat(

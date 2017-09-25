@@ -259,7 +259,6 @@ class DefaultVector(Vector):
         Sets the following attributes:
         _views
         _views_flat
-        _idxs
         """
         system = self._system
         type_ = self._typ
