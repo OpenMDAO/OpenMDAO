@@ -192,7 +192,7 @@ class Driver(object):
             owner, size = remote_vois[name]
             if owner == comm.rank:
                 if indices is None:
-                    val = vec[name]
+                    val = vec[name].copy()
                 else:
                     val = vec[name][indices]
             else:
@@ -202,7 +202,6 @@ class Driver(object):
             comm.Bcast(val, root=owner)
         else:
             if indices is None:
-                # TODO: make sure we really need this copy
                 val = vec[name].copy()
             else:
                 val = vec[name][indices]
