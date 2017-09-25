@@ -3,7 +3,7 @@ This tutorial focuses on using :ref:`ExplicitComponent <comp-type-2-explicitcomp
 We'll explain the basic structure of a run file and show you how to set inputs, run the model, and check the output files
 
 ******************************************
-Setting up an Simple Analysis
+Setting up an Simple Explicit Analysis
 ******************************************
 
 Consider a paraboloid, defined by the explicit function
@@ -89,7 +89,9 @@ There are a few details to note here.
 First, notice the way we printed the outputs via :code:`prob['parab_comp.f_xy']` and similarly how we set the new values for `x` and `y`.
 You can both get and set values using the problem, which works with dimensional values in the units of the source variable.
 In this case, there are no units on the source (i.e. `des_vars.x`).
-You can read more about how OpenMDAO handles units and scaling here[LINK TO FEATURE DOC].
+
+.. note::
+    Detailed information on :ref:`units <units>` and :ref:`scaling <scale_outputs_and_resids>` can be found in the feature documentation.
 
 .. code::
 
