@@ -404,12 +404,12 @@ class AssembledJacobian(Jacobian):
         masked = [name for name in d_inputs._views if name not in cache_key]
         if masked:
             mask = np.zeros(d_inputs._data[0].shape, dtype=np.bool)
-            for key, val in iteritems(ext_mtx._metadata):
+            for name in masked:
 
                 # TODO: For now, we figure out where each variable in the matrix is using
                 # the matrix metadata, but this is not ideal. The framework does not provide
                 # this information cleanly, but an upcoming refactor will address this.
-                for name in masked:
+                for key, val in iteritems(ext_mtx._metadata):
                     if key[1] == name:
                         mask[val[1]] = True
                         continue
