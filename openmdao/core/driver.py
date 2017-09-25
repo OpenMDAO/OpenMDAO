@@ -162,6 +162,62 @@ class Driver(object):
             self._model_viewer_data = _get_viewer_data(problem)
         self._rec_mgr.record_metadata(self)
 
+    def _get_voi_val(self, name, meta, remote_vois):
+        """
+        Get the value of a variable of interest (objective, constraint, or design var).
+
+        This will retrieve the value if the VOI is remote.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable of interest.
+        meta : dict
+            Metadata for the variable of interest.
+        remote_vois : dict
+            Dict containing (owning_rank, size) for all remote vois of a particular
+            type (design var, constraint, or objective).
+
+        Returns
+        -------
+        float or ndarray
+            The value of the named variable of interest.
+        """
+        model = self._problem.model
+        comm = model.comm
+        vec = model._outputs._views_flat
+        indices = meta['indices']
+
+        if name in remote_vois:
+            owner, size = remote_vois[name]
+            if owner == comm.rank:
+                if indices is None:
+                    val = vec[name]
+                else:
+                    val = vec[name][indices]
+            else:
+                if indices is not None:
+                    size = len(indices)
+                val = np.empty(size)
+            comm.Bcast(val, root=owner)
+        else:
+            if indices is None:
+                # TODO: make sure we really need this copy
+                val = vec[name].copy()
+            else:
+                val = vec[name][indices]
+
+        # Scale design variable values
+        adder = meta['adder']
+        if adder is not None:
+            val += adder
+
+        scaler = meta['scaler']
+        if scaler is not None:
+            val *= scaler
+
+        return val
+
     def get_design_var_values(self, filter=None):
         """
         Return the design variable values.
@@ -178,52 +234,13 @@ class Driver(object):
         dict
            Dictionary containing values of each design variable.
         """
-        designvars = {}
-        model = self._problem.model
-
         if filter:
-            # pull out designvars of those names into filtered dict.
-            for inc in filter:
-                designvars[inc] = self._designvars[inc]
-
+            dvs = filter
         else:
             # use all the designvars
-            designvars = self._designvars
+            dvs = self._designvars
 
-        vec = model._outputs._views_flat
-        dv_dict = {}
-        for name, meta in iteritems(designvars):
-            scaler = meta['scaler']
-            adder = meta['adder']
-            indices = meta['indices']
-            if name in self._remote_dvs:
-                owner, size = self._remote_dvs[name]
-                if owner == model.comm.rank:
-                    if indices is None:
-                        val = vec[name]
-                    else:
-                        val = vec[name][indices]
-                else:
-                    if indices is not None:
-                        size = len(indices)
-                    val = np.empty(size)
-                model.comm.Bcast(val, root=owner)
-            else:
-                if indices is None:
-                    # TODO: make sure we really need this copy
-                    val = vec[name].copy()
-                else:
-                    val = vec[name][indices]
-
-            # Scale design variable values
-            if adder is not None:
-                val += adder
-            if scaler is not None:
-                val *= scaler
-
-            dv_dict[name] = val
-
-        return dv_dict
+        return {n: self._get_voi_val(n, self._designvars[n], self._remote_dvs) for n in dvs}
 
     def set_design_var(self, name, value):
         """
@@ -288,52 +305,12 @@ class Driver(object):
         dict
            Dictionary containing values of each objective.
         """
-        objectives = {}
-
         if filter:
-            # pull out objectives of those names into filtered dict.
-            for inc in filter:
-                objectives[inc] = self._objs[inc]
-
+            objs = filter
         else:
-            # use all the objectives
-            objectives = self._objs
+            objs = self._objs
 
-        vec = self._problem.model._outputs._views_flat
-        obj_dict = {}
-        model = self._problem.model
-        for name, meta in iteritems(objectives):
-            scaler = meta['scaler']
-            adder = meta['adder']
-            indices = meta['indices']
-            if name in self._remote_objs:
-                owner, size = self._remote_objs[name]
-                if owner == model.comm.rank:
-                    if indices is None:
-                        val = vec[name]
-                    else:
-                        val = vec[name][indices]
-                else:
-                    if indices is not None:
-                        size = len(indices)
-                    val = np.empty(size)
-                model.comm.Bcast(val, root=owner)
-            else:
-                if indices is None:
-                    # TODO: make sure we really need this copy
-                    val = vec[name].copy()
-                else:
-                    val = vec[name][indices]
-
-            # Scale objectives
-            if adder is not None:
-                val += adder
-            if scaler is not None:
-                val *= scaler
-
-            obj_dict[name] = val
-
-        return obj_dict
+        return {n: self._get_voi_val(n, self._objs[n], self._remote_objs) for n in objs}
 
     def get_constraint_values(self, ctype='all', lintype='all', filter=None):
         """
@@ -357,24 +334,16 @@ class Driver(object):
         dict
            Dictionary containing values of each constraint.
         """
-        constraints = {}
-
         if filter is not None:
-            # pull out objectives of those names into filtered dict.
-            for inc in filter:
-                constraints[inc] = self._cons[inc]
-
+            cons = filter
         else:
-            # use all the objectives
-            constraints = self._cons
+            cons = self._cons
 
-        vec = self._problem.model._outputs._views_flat
         con_dict = {}
-        model = self._problem.model
+        for name in cons:
+            meta = self._cons[name]
 
-        for name, meta in iteritems(constraints):
-
-            if lintype == 'linear' and meta['linear'] is False:
+            if lintype == 'linear' and not meta['linear']:
                 continue
 
             if lintype == 'nonlinear' and meta['linear']:
@@ -386,38 +355,8 @@ class Driver(object):
             if ctype == 'ineq' and meta['equals'] is not None:
                 continue
 
-            scaler = meta['scaler']
-            adder = meta['adder']
-            indices = meta['indices']
+            con_dict[name] = self._get_voi_val(name, meta, self._remote_cons)
 
-            if name in self._remote_cons:
-                owner, size = self._remote_cons[name]
-                if owner == model.comm.rank:
-                    if indices is None:
-                        val = vec[name]
-                    else:
-                        val = vec[name][indices]
-                else:
-                    if indices is not None:
-                        size = len(indices)
-                    val = np.empty(size)
-                model.comm.Bcast(val, root=owner)
-            else:
-                if indices is None:
-                    # TODO: make sure we really need this copy
-                    val = vec[name].copy()
-                else:
-                    val = vec[name][indices]
-
-            # Scale objectives
-            if adder is not None:
-                val += adder
-            if scaler is not None:
-                val *= scaler
-
-            # TODO: Need to get the allgathered values? Like:
-            # cons[name] = self._get_distrib_var(name, meta, 'constraint')
-            con_dict[name] = val
         return con_dict
 
     def run(self):

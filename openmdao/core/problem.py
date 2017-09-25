@@ -1305,14 +1305,12 @@ class Problem(object):
             input_vois = self.driver._designvars
             output_vois = self.driver._responses
             remote_outputs = self.driver._remote_responses
-            remote_inputs = self.driver._remote_dvs
         else:  # rev
             input_list, output_list = of, wrt
             old_input_list, old_output_list = oldof, oldwrt
             input_vec, output_vec = vec_doutput, vec_dresid
             input_vois = self.driver._responses
             output_vois = self.driver._designvars
-            remote_inputs = self.driver._remote_responses
             remote_outputs = self.driver._remote_dvs
 
         # Solve for derivs using linear solver.
