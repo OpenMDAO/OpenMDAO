@@ -92,6 +92,6 @@ class ExecComp4Test(ExecComp):
         partials : `Jacobian`
             Contains sub-jacobians.
         """
-        super(ExecComp4Test, self).compute_partials(inputs, partials):
+        super(ExecComp4Test, self).compute_partials(inputs, partials)
         time.sleep(self.lin_delay)
         self.num_apply_lins += 1
