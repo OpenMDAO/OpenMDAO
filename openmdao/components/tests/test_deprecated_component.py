@@ -24,6 +24,8 @@ class Paraboloid(Component):
 
         self.add_output('f_xy', val=0.0)
 
+        self.declare_partials(of='*', wrt='*')
+
     def solve_nonlinear(self, params, unknowns, resids):
         """f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
         Optimal solution (minimum): x = 6.6667; y = -7.3333
@@ -105,6 +107,9 @@ class SimpleImplicitComp(Component):
         self.maxiter = 10
         self.atol = 1.0e-12
         self.self_solve = False
+
+        # Derivatives
+        self.declare_partials(of='*', wrt='*')
 
     def solve_nonlinear(self, params, unknowns, resids):
         """ Simple iterative solve. (Babylonian method)."""

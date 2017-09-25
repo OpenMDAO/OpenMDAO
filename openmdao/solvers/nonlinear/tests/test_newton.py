@@ -685,6 +685,8 @@ class TestNewton(unittest.TestCase):
                 self.add_output('x', val=0.)
                 self.applied = False
 
+                self.declare_partials(of='*', wrt='*')
+
             def apply_nonlinear(self, inputs, outputs, residuals):
                 residuals['x'] = np.exp(outputs['x']) - \
                     inputs['a']**2 * outputs['x']**2
@@ -740,6 +742,8 @@ class TestNewton(unittest.TestCase):
             def setup(self):
                 self.add_input('a', val=1.)
                 self.add_output('x', val=0.)
+
+                self.declare_partials(of='*', wrt='*')
 
             def apply_nonlinear(self, inputs, outputs, residuals):
                 residuals['x'] = np.exp(outputs['x']) - \

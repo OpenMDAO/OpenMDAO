@@ -71,6 +71,9 @@ class LinearSystemComp(ImplicitComponent):
 
         elif partial_type == "dense":
             self.declare_partials('x', 'b', val=-np.eye(size))
+            self.declare_partials('x', 'A')
+
+        self.declare_partials('x', 'x')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """

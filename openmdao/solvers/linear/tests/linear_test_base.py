@@ -498,7 +498,7 @@ class LinearSolverTests(object):
             Jbase['obj', 'x'] = [[2.98061392]]
             Jbase['obj', 'z'] = np.array([[9.61001155, 1.78448534]])
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             for key, val in iteritems(Jbase):
                 assert_rel_error(self, J[key], val, .00001)
 
@@ -518,7 +518,7 @@ class LinearSolverTests(object):
 
             prob.run_model()
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             for key, val in iteritems(Jbase):
                 assert_rel_error(self, J[key], val, .00001)
 

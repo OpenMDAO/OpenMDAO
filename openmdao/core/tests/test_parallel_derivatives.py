@@ -534,6 +534,8 @@ class SumComp(ExplicitComponent):
         self.add_input('x', val=np.zeros(self.size))
         self.add_output('y', val=0.0)
 
+        self.declare_partials(of='*', wrt='*')
+
     def compute(self, inputs, outputs):
         outputs['y'] = np.sum(inputs['x'])
 
@@ -555,6 +557,8 @@ class SlowComp(ExplicitComponent):
     def setup(self):
         self.add_input('x', val=0.0)
         self.add_output('y', val=np.zeros(self.size))
+
+        self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
         outputs['y'] = inputs['x'] * self.mult

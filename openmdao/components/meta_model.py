@@ -334,6 +334,21 @@ class MetaModel(ExplicitComponent):
                 partials[(uname, pname)] = sjac[:, idx:idx + sz]
                 idx += sz
 
+    def _setup_partials(self, recurse=True):
+        """
+        Process all partials and approximations that the user declared.
+
+        Metamodel needs to declare its partials after inputs and outputs are known.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        super(MetaModel, self)._setup_partials()
+        self._declare_partials(of=[name[0] for name in self._surrogate_output_names],
+                               wrt=[name[0] for name in self._surrogate_input_names])
+
     def _train(self):
         """
         Train the metamodel, if necessary, using the provided training data.

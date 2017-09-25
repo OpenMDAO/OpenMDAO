@@ -625,6 +625,13 @@ class Component(System):
             if method not in self._approx_schemes:
                 self._approx_schemes[method] = supported_methods[method]()
 
+            # If rows/cols is specified
+            if rows is not None or cols is not None:
+                raise ValueError('Sparse FD specification not supported yet.')
+
+            # Need to declare the Jacobian element too.
+            self._declared_partials.append((of, wrt, True, rows, cols, val))
+
             self._approximated_partials.append((of, wrt, method, kwargs))
 
     def _declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None):

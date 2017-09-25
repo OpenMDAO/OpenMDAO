@@ -74,7 +74,7 @@ class ExplicitComponent(Component):
         abs2prom_out = self._var_abs2prom['output']
 
         # Note: These declare calls are outside of setup_partials so that users do not have to
-        # call the super version of setup_partials. This is still post-setup.
+        # call the super version of setup_partials. This is still in the final setup.
         other_names = []
         for out_abs in self._var_abs_names['output']:
             meta = abs2meta_out[out_abs]
@@ -88,6 +88,8 @@ class ExplicitComponent(Component):
                 if 'method' in self._subjacs_info[abs_key]:
                     del self._subjacs_info[abs_key]['method']
             self._declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
+
+            # TODO - probaby don't need to declare these independent wth the api switchup.
             for other_name in other_names:
                 self._declare_partials(out_name, other_name, dependent=False)
                 self._declare_partials(other_name, out_name, dependent=False)
@@ -175,10 +177,15 @@ class ExplicitComponent(Component):
             outputs = self._var_abs_names['output']
             inputs = self._var_abs_names['input']
 
+            # TODO: maybe we don't need to loop over all these.
             for wrt_name, wrt_vars in (('output', outputs), ('input', inputs)):
                 for abs_key in product(outputs, wrt_vars):
                     meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
                     dependent = meta['dependent']
+
+                    if not dependent:
+                        continue
+
                     if meta['value'] is None and dependent:
                         out_size = np.product(self._var_abs2meta['output'][abs_key[0]]['shape'])
                         in_size = np.product(self._var_abs2meta[wrt_name][abs_key[1]]['shape'])

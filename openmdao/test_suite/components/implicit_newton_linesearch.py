@@ -69,6 +69,8 @@ class ImplCompTwoStates(ImplicitComponent):
         self.maxiter = 10
         self.atol = 1.0e-12
 
+        self.declare_partials(of='*', wrt='*')
+
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
         Don't solve; just calculate the residual.
@@ -123,6 +125,8 @@ class ImplCompTwoStatesArrays(ImplicitComponent):
 
         self.maxiter = 10
         self.atol = 1.0e-12
+
+        self.declare_partials(of='*', wrt='*')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """

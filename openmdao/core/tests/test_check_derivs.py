@@ -26,6 +26,8 @@ class ParaboloidTricky(ExplicitComponent):
 
         self.scale = 1e-7
 
+        self.declare_partials(of='*', wrt='*')
+
     def compute(self, inputs, outputs):
         """
         f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
@@ -59,6 +61,8 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.add_input('x2', 5.0)
 
                 self.add_output('y', 5.5)
+
+                self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
                 """ Doesn't do much. """
@@ -107,6 +111,8 @@ class TestProblemCheckPartials(unittest.TestCase):
 
                 self.add_output('y', 5.5)
 
+                self.declare_partials(of='*', wrt='*')
+
             def compute(self, inputs, outputs):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
@@ -147,6 +153,8 @@ class TestProblemCheckPartials(unittest.TestCase):
 
                 self.add_output('y', 5.5)
 
+                self.declare_partials(of='*', wrt='*')
+
             def compute(self, inputs, outputs):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
@@ -184,6 +192,8 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.add_input('x2', 5.0)
 
                 self.add_output('y', 5.5)
+
+                self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
                 """ Doesn't do much. """
@@ -274,6 +284,8 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.add_output('flow:P', val=1., units='lbf/inch**2', desc="Pressure")
 
                 self.run_count = 0
+
+                self.declare_partials(of='*', wrt='*')
 
             def compute_partials(self, inputs, partials):
                 partials['flow:T', 'T'] = 1.
@@ -452,6 +464,9 @@ class TestProblemCheckPartials(unittest.TestCase):
                     [ 3., 4.],
                     [ 2., 3.],
                 ])
+
+                self.declare_partials(of='*', wrt='*')
+
             def apply_nonlinear(self, inputs, outputs, residuals):
                 residuals['y'] = self.mtx.dot(outputs['y']) - inputs['x']
 
@@ -490,7 +505,8 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.add_input('x', shape=(2, 2))
                 self.add_output('g', shape=(2, 2))
 
-                self.declare_partials('g', 'z', dependent=False)
+                self.declare_partials(of='g', wrt='x')
+                self.declare_partials(of='g', wrt='z', dependent=False)
 
             def compute(self, inputs, outputs):
                 outputs['g'] = 3.0*inputs['x']
@@ -529,6 +545,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.add_input('x', shape=(2, 2))
                 self.add_output('g', shape=(2, 2))
 
+                self.declare_partials(of='g', wrt='x')
                 self.declare_partials('g', 'z', dependent=False)
 
             def compute(self, inputs, outputs):
@@ -792,6 +809,8 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
                 self.add_output('y', 5.5)
 
+                self.declare_partials(of='*', wrt='*')
+
             def compute(self, inputs, outputs):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
@@ -834,6 +853,8 @@ class TestCheckPartialsFeature(unittest.TestCase):
                 self.add_input('x2', 5.0)
 
                 self.add_output('y', 5.5)
+
+                self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
                 """ Doesn't do much. """
@@ -1121,6 +1142,8 @@ class TestProblemCheckTotals(unittest.TestCase):
 
                 # Unknowns
                 self.add_output('y1', np.zeros([4]))
+
+                self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
                 """

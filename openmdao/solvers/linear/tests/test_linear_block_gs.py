@@ -20,6 +20,8 @@ class SimpleImp(ImplicitComponent):
         self.add_input('a', val=1.)
         self.add_output('x', val=0.)
 
+        self.declare_partials('*', '*')
+
     def apply_nonlinear(self, inputs, outputs, residuals):
         residuals['x'] = 3.0*inputs['a'] + 2.0*outputs['x']
 

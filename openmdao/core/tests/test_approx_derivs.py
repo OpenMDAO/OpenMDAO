@@ -369,6 +369,9 @@ class TestGroupFiniteDifference(unittest.TestCase):
                 # Unknowns
                 self.add_output('y1', np.zeros([4]))
 
+                # Derivatives
+                self.declare_partials('*', '*')
+
             def compute(self, inputs, outputs):
                 """
                 Execution.
@@ -425,6 +428,8 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
                 # Unknowns
                 self.add_output('y1', np.zeros([4]))
+
+                self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
                 """
@@ -752,6 +757,8 @@ class TestGroupComplexStep(unittest.TestCase):
                 # Unknowns
                 self.add_output('y1', np.zeros([4]))
 
+                self.declare_partials(of='*', wrt='*')
+
             def compute(self, inputs, outputs):
                 """
                 Execution.
@@ -809,6 +816,8 @@ class TestGroupComplexStep(unittest.TestCase):
 
                 # Unknowns
                 self.add_output('y1', np.zeros([4]))
+
+                self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
                 """

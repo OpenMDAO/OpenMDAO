@@ -128,8 +128,8 @@ class SimpleCompMixedFD(SimpleComp):
     def setup(self):
         super(SimpleCompMixedFD, self).setup()
 
-        self.declare_partials('f', ['y1', 'y2', 'y3'], dependent=False)
-        self.declare_partials('g', 'z', dependent=False)
+        self.declare_partials('f', ['x', 'z'])
+        self.declare_partials('g', ['y1', 'y3'])
 
         self.declare_partials('g', 'x', method='fd', **self.kwargs)
         self.declare_partials('g', 'y2', method='fd', **self.kwargs)
@@ -404,6 +404,8 @@ class TestJacobianFeatures(unittest.TestCase):
                 self.add_output('y', shape=(3,))
                 self.add_output('z', shape=(3,))
                 self.add_input('x', shape=(3,), units='degF')
+
+                self.declare_partials(of='*', wrt='*')
 
             def compute_partials(self, inputs, partials):
                 partials['y', 'x'] = self.A

@@ -23,6 +23,8 @@ class ReconfComp(ExplicitComponent):
         self.add_input('x', val=1.0)
         self.add_output('y', val=np.zeros(self.size))
 
+        self.declare_partials(of='*', wrt='*')
+
     def compute(self, inputs, outputs):
         outputs['y'] = 2 * inputs['x']
 
@@ -35,6 +37,8 @@ class Comp(ExplicitComponent):
     def setup(self):
         self.add_input('x', val=1.0)
         self.add_output('z', val=1.0)
+
+        self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
         outputs['z'] = 3 * inputs['x']

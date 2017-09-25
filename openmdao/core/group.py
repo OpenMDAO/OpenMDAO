@@ -1581,6 +1581,11 @@ class Group(System):
                         meta_changes['idx_wrt'] = self._owns_approx_wrt_idx[key[1]]
 
                     meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+
+                    # Group dependent default is True
+                    # TODO: Could be a lot of extra junk in here?
+                    meta['dependent'] = True
+
                     meta.update(meta_changes)
                     meta.update(self._owns_approx_jac_meta)
                     self._subjacs_info[key] = meta
