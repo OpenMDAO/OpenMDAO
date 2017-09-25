@@ -42,6 +42,15 @@ class Driver(object):
         Object that manages all recorders added to this driver.
     _model_viewer_data : dict
         Structure of model, used to make n2 diagram.
+    _remote_dvs : dict
+        Dict of design variables that are remote on at least one proc. Values are
+        (owning rank, size).
+    _remote_cons : dict
+        Dict of constraints that are remote on at least one proc. Values are
+        (owning rank, size).
+    _remote_objs : dict
+        Dict of objectives that are remote on at least one proc. Values are
+        (owning rank, size).
     """
 
     def __init__(self):
