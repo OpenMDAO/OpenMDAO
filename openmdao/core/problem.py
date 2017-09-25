@@ -1087,6 +1087,7 @@ class Problem(object):
         nproc = model.comm.size
         iproc = model.comm.rank
         sizes = model._var_sizes['nonlinear']['output']
+        owning_ranks = model._owning_rank['output']
 
         # this sets dinputs for the current parallel_deriv_color to 0
         voi_info[vois[0][0]][0].set_const(0.0)
@@ -1159,8 +1160,7 @@ class Problem(object):
                     if dup and nproc > 1:
                         out_var_idx = \
                             model._var_allprocs_abs2idx['nonlinear']['output'][output_name]
-                        # TODO: do during setup
-                        root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
+                        root = owning_ranks[output_name]
                         if deriv_val is None:
                             if out_idxs is not None:
                                 sz = size
@@ -1297,6 +1297,8 @@ class Problem(object):
         if not global_names:
             of = [prom2abs[name][0] for name in oldof]
             wrt = [prom2abs[name][0] for name in oldwrt]
+
+        owning_ranks = self.model._owning_rank['output']
 
         if fwd:
             input_list, output_list = wrt, of
@@ -1479,7 +1481,7 @@ class Problem(object):
 
                             if dup and nproc > 1:
                                 out_var_idx = abs2idx_out[output_name]
-                                root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
+                                root = owning_ranks[output_name]
                                 if deriv_val is None:
                                     if out_idxs is not None:
                                         sz = size
