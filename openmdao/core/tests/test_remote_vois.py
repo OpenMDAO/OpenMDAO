@@ -6,15 +6,20 @@ import time
 import random
 
 from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, \
-    ExecComp, PETScVector, pyOptSparseDriver
+    ExecComp, PETScVector
 from openmdao.utils.mpi import MPI
 from openmdao.devtools.testutil import assert_rel_error
 
 if MPI:
     from openmdao.api import PETScVector
     vector_class = PETScVector
+    try:
+        from openmdao.api import pyOptSparseDriver
+    except ImportError:
+        pyOptSparseDriver = None
 else:
     PETScVector = None
+    pyOptSparseDriver = None
 
 
 class Mygroup(Group):
@@ -28,7 +33,7 @@ class Mygroup(Group):
         self.add_constraint('c', lower=-3.)
 
 
-@unittest.skipUnless(MPI, 'MPI is not running.')
+@unittest.skipUnless(MPI and pyOptSparseDriver, 'MPI is not running.')
 class RemoteVOITestCase(unittest.TestCase):
 
     N_PROCS = 2
