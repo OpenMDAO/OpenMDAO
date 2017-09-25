@@ -384,7 +384,7 @@ class Vector(object):
                 slc = _full_slice
             else:
                 slc = (_full_slice, self._icol)
-            value, _, _ = ensure_compatible(name, value, self._views[abs_name][slc].shape)
+            value, _ = ensure_compatible(name, value, self._views[abs_name][slc].shape)
             if self._vector_info._under_complex_step:
 
                 # setitem overwrites anything you may have done with numpy indexing

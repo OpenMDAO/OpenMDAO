@@ -644,7 +644,7 @@ class Problem(object):
                             # them unless the fd is non zero. Note: subjacs_info is empty for
                             # undeclared partials on implicit components.
                             try:
-                                if comp._jacobian._subjacs_info[abs_key][0] is None:
+                                if comp._jacobian._subjacs_info[abs_key][0]['dependent'] is False:
                                     indep_key[c_name].add(rel_key)
                             except KeyError:
                                 pass

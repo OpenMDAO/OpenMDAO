@@ -15,6 +15,7 @@ from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
 from openmdao.core.component import Component
+from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.proc_allocators.proc_allocator import ProcAllocationError
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
@@ -398,9 +399,6 @@ class Group(System):
                     # Assemble in parallel allprocs_prom2abs_list
                     for prom_name, abs_names_list in iteritems(myproc_prom2abs_list[type_]):
                         allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
-
-        self._var_allprocs_prom_set = set(allprocs_prom2abs_list['input'])
-        self._var_allprocs_prom_set.update(allprocs_prom2abs_list['output'])
 
     def _setup_var_sizes(self, recurse=True):
         """
@@ -1582,16 +1580,16 @@ class Group(System):
                     if key[1] in self._owns_approx_wrt_idx:
                         meta_changes['idx_wrt'] = self._owns_approx_wrt_idx[key[1]]
 
-                    meta = self._subjacs_info[key]
-                    if meta:
-                        meta.update(meta_changes)
-                        meta.update(self._owns_approx_jac_meta)
+                    meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+                    meta.update(meta_changes)
+                    meta.update(self._owns_approx_jac_meta)
+                    self._subjacs_info[key] = meta
 
                     # Create Jacobian stub for every key pair
                     J._set_partials_meta(key, meta)
 
                     # Create approximations, but only for the ones we need.
-                    if meta:
+                    if meta['dependent']:
 
                         # Skip indepvarcomp res wrt other srcs
                         if key[0] in ivc:

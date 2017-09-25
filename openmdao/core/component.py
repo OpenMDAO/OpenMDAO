@@ -13,17 +13,11 @@ from collections import OrderedDict, Iterable
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
+from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation, ContainsAll
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
-from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
-
-
-def _find_matches(pattern, var_list):
-    if pattern in var_list:
-        return [pattern]
-    return [name for name in var_list if fnmatchcase(name, pattern)]
 
 
 class Component(System):
@@ -180,9 +174,6 @@ class Component(System):
                 # Compute abs2meta
                 abs2meta[type_][abs_name] = metadata
 
-        self._var_allprocs_prom_set = set(allprocs_prom2abs_list['input'])
-        self._var_allprocs_prom_set.update(allprocs_prom2abs_list['output'])
-
     def _setup_var_sizes(self, recurse=True):
         """
         Compute the arrays of local variable sizes for all variables/procs on this system.
@@ -334,9 +325,8 @@ class Component(System):
         metadata = {}
 
         # value, shape: based on args, making sure they are compatible
-        metadata['value'], metadata['shape'], metadata['size'] = ensure_compatible(name, val,
-                                                                                   shape,
-                                                                                   src_indices)
+        metadata['value'], metadata['shape'] = ensure_compatible(name, val, shape, src_indices)
+        metadata['size'] = np.prod(metadata['shape'])
 
         # src_indices: None or ndarray
         if src_indices is None:
@@ -465,7 +455,8 @@ class Component(System):
         metadata = {}
 
         # value, shape: based on args, making sure they are compatible
-        metadata['value'], metadata['shape'], metadata['size'] = ensure_compatible(name, val, shape)
+        metadata['value'], metadata['shape'] = ensure_compatible(name, val, shape)
+        metadata['size'] = np.prod(metadata['shape'])
 
         # units, res_units: taken as is
         metadata['units'] = units
@@ -585,13 +576,17 @@ class Component(System):
                 raise ValueError('No matches were found for wrt="{}"'.format(wrt_pattern))
 
             for rel_key in product(of_matches, wrt_matches):
+                meta_changes = {
+                    'method': method,
+                }
                 abs_key = rel_key2abs_key(self, rel_key)
-                meta = self._subjacs_info[abs_key]
-                if meta:
-                    meta['method'] = method
-                    meta.update(kwargs)
+                meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
+                meta.update(meta_changes)
+                meta.update(kwargs)
+                self._subjacs_info[abs_key] = meta
 
-    def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None):
+    def declare_partials(self, of, wrt, dependent=True,
+                         rows=None, cols=None, val=None):
         """
         Declare information about this component's subjacobians.
 
@@ -690,27 +685,25 @@ class Component(System):
             if not wrt_matches:
                 raise ValueError('No matches were found for wrt="{}"'.format(wrt_pattern))
 
-            make_copies = multiple_items or len(of_matches) > 1 or len(wrt_matches) > 1
-
+            make_copies = (multiple_items
+                           or len(of_matches) > 1
+                           or len(wrt_matches) > 1)
             # Setting this to true means that future loop iterations (i.e. if there are multiple
             # items in either of or wrt) will make copies.
             multiple_items = True
 
             for rel_key in product(of_matches, wrt_matches):
+                meta_changes = {
+                    'rows': rows,
+                    'cols': cols,
+                    'value': deepcopy(val) if make_copies else val,
+                    'dependent': dependent
+                }
                 abs_key = rel_key2abs_key(self, rel_key)
-                if dependent:
-                    meta = self._subjacs_info[abs_key]
-                    if meta is None:  # declared earlier as not dependent
-                        self._subjacs_info[abs_key] = meta = SUBJAC_META_DEFAULTS.copy()
-                    if rows is not None:
-                        meta['rows'] = rows
-                    if cols is not None:
-                        meta['cols'] = cols
-                    if val is not None:
-                        meta['value'] = deepcopy(val) if make_copies else val
-                    self._check_partials_meta(abs_key, meta)
-                else:
-                    self._subjacs_info[abs_key] = None
+                meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
+                meta.update(meta_changes)
+                self._check_partials_meta(abs_key, meta)
+                self._subjacs_info[abs_key] = meta
 
     def _find_partial_matches(self, of, wrt):
         """
@@ -735,12 +728,19 @@ class Component(System):
         """
         of_list = [of] if isinstance(of, string_types) else of
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
+        glob_patterns = {'*', '?', '['}
+        outs = list(self._var_allprocs_prom2abs_list['output'].keys())
+        ins = list(self._var_allprocs_prom2abs_list['input'].keys())
 
-        of_pattern_matches = [(pattern, _find_matches(pattern,
-                                                      self._var_allprocs_prom2abs_list['output']))
-                              for pattern in of_list]
-        wrt_pattern_matches = [(pattern, _find_matches(pattern, self._var_allprocs_prom_set))
-                               for pattern in wrt_list]
+        def find_matches(pattern, var_list):
+            if glob_patterns.intersection(pattern):
+                return [name for name in var_list if fnmatchcase(name, pattern)]
+            elif pattern in var_list:
+                return [pattern]
+            return []
+
+        of_pattern_matches = [(pattern, find_matches(pattern, outs)) for pattern in of_list]
+        wrt_pattern_matches = [(pattern, find_matches(pattern, outs + ins)) for pattern in wrt_list]
         return of_pattern_matches, wrt_pattern_matches
 
     def _check_partials_meta(self, abs_key, meta):
@@ -754,9 +754,9 @@ class Component(System):
         meta : dict
             Metadata dictionary from declare_partials.
         """
-        if meta:
-            of, wrt = abs_key2rel_key(self, abs_key)
-            out_size = self._var_abs2meta['output'][abs_key[0]]['size']
+        of, wrt = abs_key2rel_key(self, abs_key)
+        if meta['dependent']:
+            out_size = np.prod(self._var_abs2meta['output'][abs_key[0]]['shape'])
             if abs_key[1] in self._var_abs2meta['input']:
                 in_size = self._var_abs2meta['input'][abs_key[1]]['size']
             else:  # assume output (or get a KeyError)
@@ -800,15 +800,12 @@ class Component(System):
         """
         with self.jacobian_context() as J:
             for key, meta in iteritems(self._subjacs_info):
-                if meta:
-                    self._check_partials_meta(key, meta)
-                    J._set_partials_meta(key, meta)
+                self._check_partials_meta(key, meta)
+                J._set_partials_meta(key, meta)
 
-                    method = meta['method']
-                    if method:
-                        self._approx_schemes[method].add_approximation(key, meta)
-                else:
-                    J._set_partials_meta(key, meta)
+                method = meta.get('method', False)
+                if method and meta['dependent']:
+                    self._approx_schemes[method].add_approximation(key, meta)
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()
