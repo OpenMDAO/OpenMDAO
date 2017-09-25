@@ -1,11 +1,13 @@
 .. _building-components:
 
-*******************
-Building Components
-*******************
+*********************************************************
+Understanding How Variables Work
+*********************************************************
 
-The feature docs for building components explain the first step of implementing a numerical model in OpenMDAO.
-In general, a numerical model can be complex, multidisciplinary, and heterogeneous, so we decompose it into a set of components and implement it as such.
+In general, a numerical model can be complex, multidisciplinary, and heterogeneous.
+It can be decomposed into a series of smaller computations that are chained together.
+In OpenMDAO, we perform all these numerical calculations inside a `Component`, which represents the
+smallest unit of computational work the framework understands.
 
 A Simple Numerical Model
 ------------------------
@@ -21,11 +23,12 @@ Let us consider the following numerical model that takes :math:`x` as an input:
     z = \sin(y) .
   \end{array}
 
-The MAUD_ architecture (the mathematics underlying OpenMDAO) reformulates all numerical models as a nonlinear system so that all numerical models 'look the same' to the framework.
-This helps simplify methods for converging coupled numerical models and for computing their derivatives (i.e., :math:`dz/dx` and :math:`dy/dx` in this case).
+OpenMDAO reformulates all numerical models into the form of a nonlinear system which drives a set of residual equations to 0.
+This is done so that all models 'look the same' to the framework,
+which helps simplify methods for converging coupled numerical models and for computing their derivatives
+(i.e., :math:`dz/dx` and :math:`dy/dx` in this case).
 If we say we want to evaluate the numerical model at :math:`x=\pi`, the reformulation would be:
 
-.. _MAUD: http://mdolab.engin.umich.edu/sites/default/files/Hwang_dissertation.pdf
 
 .. math::
 
@@ -37,8 +40,16 @@ If we say we want to evaluate the numerical model at :math:`x=\pi`, the reformul
 
 The variables in this model would be x, y, and z.
 
-The Corresponding Components
-----------------------------
+.. note::
+
+    The underlying mathematics that power OpenMDAO are based on the MAUD_ architecture, which established the foundation
+    for using formulation of a problem as a system of nonlinear equations as a means to efficiently computing
+    analytic derivatives across a large multidisciplinary model.
+
+.. _MAUD: http://mdolab.engin.umich.edu/sites/default/files/Hwang_dissertation.pdf
+
+Understanding how Variables are Defined
+-----------------------------------------
 
 In OpenMDAO, all variables are defined as outputs of components.
 There are three types of components in OpenMDAO:
@@ -57,7 +68,8 @@ For our example, one way to implement the numerical model would be to assign eac
    3   ExplicitComponent     y        z
   ===  =================  =======  =======
 
-Another way that is also valid would be to have one component compute both y and z explicitly, which would mean that this component solves the implicit equation for y internally.
+Another way that is also valid would be to have one component compute both y and z explicitly,
+which would mean that this component solves the implicit equation for y internally.
 
   ===  =================  =======  =======
   No.  Component type     Inputs   Outputs

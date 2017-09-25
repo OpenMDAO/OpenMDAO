@@ -5,14 +5,15 @@ User Guide
 **********
 
 These tutorials serve to give an initial introduction to the OpenMDAO framework.
-They are intended to be done in sequence. Once completed,
-you will be able to construct models by linking multiple analyses together and then perform optimization on those models.
+They are intended to be read in order.
+After going through these tutorials you will know how to define components with analytic derivatives,
+combine those components into larger models, and then run optimizations on those models.
 
 .. toctree::
-   :maxdepth: 2
+    :maxdepth: 1
 
-   first_analysis.rst
-   building_components.rst
-   first_optimization.rst
-   first_mdao.rst
-   sellar.rst
+    building_components.rst
+    first_analysis.rst
+    first_optimization.rst
+    sellar.rst
+    first_mdao.rst

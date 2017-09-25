@@ -609,7 +609,7 @@ class TestNewton(unittest.TestCase):
         self.assertEqual(g1.linear_solver.lin_count, 2)
 
         prob = Problem()
-        model = prob.model = DoubleSellar()
+        model = prob.model = DoubleSeloubleSellar()
 
         # each SubSellar group converges itself
         g1 = model.get_subsystem('g1')

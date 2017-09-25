@@ -1,3 +1,5 @@
+.. _feature_grouping_components:
+
 *******************
 Grouping Components
 *******************

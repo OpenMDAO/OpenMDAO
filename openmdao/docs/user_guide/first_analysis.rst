@@ -1,11 +1,9 @@
-****************************
-Setting up a Simple Analysis
-****************************
+This tutorial illustrates how to build and run a very simple model with explicit components.
+It explains the basic structure of your run file and shows you how to set inputs, run the model, and check the output files
 
-This tutorial illustrates how to build, run, and optimize a very simple model in
-OpenMDAO. It will introduce the basic types of OpenMDAO classes, and the
-sequence in which they must be created and used and show you how to set up
-design variables, objective, and constraints for optimization.
+******************************************
+Setting up an Simple Analysis
+******************************************
 
 Consider a paraboloid, defined by the explicit function
 
@@ -40,19 +38,24 @@ As you progress to more complex models you can expect to import more classes fro
 
 Defining a Component
 ---------------------
-The component is the basic building block of a model. You will always define components as a sub-class of either `ExplicitComponent` or `ImplicitComponent`. Since our simple paraboloid function is explicit, we'll use the `ExplicitComponent`. You see three methods defined:
+The component is the basic building block of a model.
+You will always define components as a sub-class of either :ref:`ExplicitComponent <openmdao.core.explicitcomponent.py>`
+or :ref:`ImplicitComponent <openmdao.core.implicitcomponent.py>`.
+Since our simple paraboloid function is explicit, we'll use the :ref:`ExplicitComponent <openmdao.core.explicitcomponent.py>`.
+You see three methods defined:
 
     - `setup`: define all your inputs and outputs here
     - `compute`: calculation of all output values for the given inputs
     - `compute_partials`: derivatives of all the outputs values with respect to all the inputs
 
-.. note::
-
-    What about implicit functions? Check out this tutorial [TODO: LINK ME!] about using an `ImplicitComponent`
-
 
 .. embed-code::
     openmdao.test_suite.components.paraboloid.Paraboloid
+
+.. note::
+
+    We included definition of the partial derivatives in the `compute_partials` method in our definition.
+    We don't need the derivatives just to execute this simple model, but we'll use them later on when we do an optimziation.
 
 
 The Run Script
@@ -65,9 +68,9 @@ The start of the run script is denoted by the following statement:
 
 At the top of our run script, we import the remaining OpenMDAO classes that we will need to define our problem.
 
-All OpenMDAO models are built up from a hierarchy of `Group` instances that organize the components.
+All OpenMDAO models are built up from a hierarchy of :ref:`Group <openmdao.core.group.py>` instances that organize the components.
 Here the hierarchy is very simple, consisting of a single root group that holds two components.
-The first component is an `IndepVarComp` instance.
+The first component is an :ref:`IndepVarComp <openmdao.core.indepvarcomp.py>` instance.
 This is a special component that OpenMDAO provides for you to specify the independent variables in your problem.
 The second component is an instance of the `Paraboloid` class that we just defined.
 
@@ -75,7 +78,7 @@ As part of the the model hierarchy, you will also define any connections to move
 Here, we connect the design variables to the inputs on the paraboloid component.
 
 Once the model hierarchy is defined,
-we pass it to the constructor of the `Problem` class then call the `setup()` method on that problem which tells the framework to do some initial work to get the data structures in place for execution.
+we pass it to the constructor of the :ref:`Problem <openmdao.core.problem.py>` class then call the `setup()` method on that problem which tells the framework to do some initial work to get the data structures in place for execution.
 In this case, we call `run_model()` to actually perform the computation. Later, we'll see how to explicitly set drivers and will be calling `run_driver()` instead.
 
 Here we called run_model twice.
