@@ -22,6 +22,9 @@ SUBJAC_META_DEFAULTS = {
     'dependent': True,
 }
 
+# TODO : AssembledJacobians currently don't work with some of the more advanced derivatives
+# featuers, including Matrix-Matrix, Parallel Derivatives, and Multiple Varsets.
+
 
 class AssembledJacobian(Jacobian):
     """
@@ -333,12 +336,11 @@ class AssembledJacobian(Jacobian):
         with system._unscaled_context(
                 outputs=[d_outputs], residuals=[d_residuals]):
             if mode == 'fwd':
-                if len(d_outputs._names) > 0 and len(d_residuals._names) > 0:
+                if d_outputs._names and d_residuals._names:
 
                     d_residuals.iadd_data(int_mtx._prod(d_outputs.get_data(), mode, int_ranges))
 
-                if ext_mtx is not None and \
-                   len(d_inputs._names) > 0 and len(d_residuals._names) > 0:
+                if ext_mtx is not None and d_inputs._names and d_residuals._names:
 
                     # Masking
                     cache_key = tuple(d_inputs._names)
@@ -358,12 +360,11 @@ class AssembledJacobian(Jacobian):
 
             else:  # rev
                 dresids = d_residuals.get_data()
-                if len(d_outputs._names) > 0 and len(d_residuals._names) > 0:
+                if d_outputs._names and d_residuals._names:
 
                     d_outputs.iadd_data(int_mtx._prod(dresids, mode, int_ranges))
 
-                if ext_mtx is not None and \
-                   len(d_inputs._names) > 0 and len(d_residuals._names) > 0:
+                if ext_mtx is not None and d_inputs._names and d_residuals._names:
 
                     # Masking
                     cache_key = tuple(d_inputs._names)
@@ -401,14 +402,14 @@ class AssembledJacobian(Jacobian):
             External matrix
         """
         masked = [name for name in d_inputs._views if name not in cache_key]
-        if len(masked) > 0:
+        if masked:
             mask = np.zeros(d_inputs._data[0].shape, dtype=np.bool)
-            for name in masked:
+            for key, val in iteritems(ext_mtx._metadata):
 
                 # TODO: For now, we figure out where each variable in the matrix is using
                 # the matrix metadata, but this is not ideal. The framework does not provide
                 # this information cleanly, but an upcoming refactor will address this.
-                for key, val in iteritems(ext_mtx._metadata):
+                for name in masked:
                     if key[1] == name:
                         mask[val[1]] = True
                         continue
