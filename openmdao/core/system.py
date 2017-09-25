@@ -242,6 +242,9 @@ class System(object):
     #
     _has_guess : bool
         True if this system has or contains a system with a `guess_nonlinear` method defined.
+    #
+    _owning_rank : {'input': {}, 'output': {}}
+        Dict mapping var name to the lowest rank where that variable is local.
     """
 
     def __init__(self, **kwargs):
@@ -929,6 +932,7 @@ class System(object):
         """
         self._var_sizes = {}
         self._var_sizes_byset = {}
+        self._owning_rank = {}
 
     def _setup_global_shapes(self):
         """
