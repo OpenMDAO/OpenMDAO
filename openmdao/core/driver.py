@@ -51,6 +51,8 @@ class Driver(object):
     _remote_objs : dict
         Dict of objectives that are remote on at least one proc. Values are
         (owning rank, size).
+    _remote_responses : dict
+        A combined dict containing entries from _remote_cons and _remote_objs.
     """
 
     def __init__(self):
