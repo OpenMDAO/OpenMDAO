@@ -128,12 +128,12 @@ class Driver(object):
         self._remote_cons = con_dict = {}
         self._remote_objs = obj_dict = {}
 
-        # Now determine if later we'll need to allgather cons, objs, or desvars
+        # Now determine if later we'll need to allgather cons, objs, or desvars.
         if model.comm.size > 1 and model._subsystems_allprocs:
-            out_vars = set(model._outputs._views)
-            remote_dvs = set(self._designvars) - out_vars
-            remote_cons = set(self._cons) - out_vars
-            remote_objs = set(self._objs) - out_vars
+            local_out_vars = set(model._outputs._views)
+            remote_dvs = set(self._designvars) - local_out_vars
+            remote_cons = set(self._cons) - local_out_vars
+            remote_objs = set(self._objs) - local_out_vars
             all_remote_vois = model.comm.allgather((remote_dvs, remote_cons, remote_objs))
             for rem_dvs, rem_cons, rem_objs in all_remote_vois:
                 con_set.update(rem_cons)
@@ -252,14 +252,11 @@ class Driver(object):
         value : float or ndarray
             Value for the design variable.
         """
-        if name in self._remote_dvs:
-            owner = self._problem.model._owning_rank['output'][name]
-            if owner != self._problem.comm.rank:
-                return
+        if (name in self._remote_dvs and
+                self._problem.model._owning_rank['output'][name] != self._problem.comm.rank):
+            return
 
         meta = self._designvars[name]
-        scaler = meta['scaler']
-        adder = meta['adder']
         indices = meta['indices']
         if indices is None:
             indices = slice(None)
@@ -268,8 +265,11 @@ class Driver(object):
         desvar[indices] = value
 
         # Scale design variable values
+        scaler = meta['scaler']
         if scaler is not None:
             desvar[indices] *= 1.0 / scaler
+
+        adder = meta['adder']
         if adder is not None:
             desvar[indices] -= adder
 
