@@ -203,7 +203,7 @@ class Group(System):
         # If running in parallel, allgather
         if self.comm.size > 1:
             # Perform a single allgather
-            if self._subsystems_myproc[0].comm.rank == 0:
+            if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
                 raw = (num_var, num_var_byset)
             else:
                 raw = (None, None)
@@ -373,7 +373,7 @@ class Group(System):
 
         # If running in parallel, allgather
         if self.comm.size > 1:
-            if self._subsystems_myproc[0].comm.rank == 0:
+            if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
                 raw = (allprocs_abs_names, allprocs_prom2abs_list, allprocs_abs2meta)
             else:
                 raw = (
@@ -592,7 +592,7 @@ class Group(System):
 
         # If running in parallel, allgather
         if self.comm.size > 1:
-            if self._subsystems_myproc[0].comm.rank == 0:
+            if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
                 raw = global_abs_in2out
             else:
                 raw = {}
