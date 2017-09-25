@@ -6,8 +6,8 @@ import numpy as np
 from six import itervalues
 
 from openmdao.core.component import Component
-from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.utils.class_util import overrides_method
 
 _inst_functs = ['apply_linear', 'apply_multi_linear', 'solve_multi_linear']
 
@@ -34,6 +34,11 @@ class ImplicitComponent(Component):
         super(ImplicitComponent, self).__init__(**kwargs)
 
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
+
+        # TODO : Uncomment these out to set default to DenseJacobian, once we have resolved further
+        # issues and if we decide it makes sense.
+        # self._jacobian = DenseJacobian()
+        # self._owns_assembled_jac = True
 
     def _configure(self):
         """
