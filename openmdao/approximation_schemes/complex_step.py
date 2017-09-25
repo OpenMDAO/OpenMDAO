@@ -14,6 +14,8 @@ from openmdao.utils.name_maps import abs_key2rel_key
 DEFAULT_CS_OPTIONS = {
     'step': 1e-15,
     'form': 'forward',
+    'check_step': 1e-15,
+    'check_form': 'forward',
 }
 
 
