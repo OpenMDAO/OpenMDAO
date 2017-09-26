@@ -647,22 +647,20 @@ class Problem(object):
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
                                 try:
-                                    in_size = np.prod(comp._var_abs2meta['input'][wrt]['shape'])
+                                    in_size = comp._var_abs2meta['input'][wrt]['size']
                                 except KeyError:
-                                    in_size = np.prod(comp._var_abs2meta['output'][wrt]['shape'])
+                                    in_size = comp._var_abs2meta['output'][wrt]['size']
 
-                                out_size = np.prod(comp._var_abs2meta['output'][of]['shape'])
+                                out_size = comp._var_abs2meta['output'][of]['size']
                                 deriv_value = np.zeros((out_size, in_size))
 
                             if force_dense:
                                 if isinstance(deriv_value, list):
                                     try:
-                                        in_size = np.prod(
-                                            comp._var_abs2meta['input'][wrt]['shape'])
+                                        in_size = comp._var_abs2meta['input'][wrt]['size']
                                     except KeyError:
-                                        in_size = np.prod(
-                                            comp._var_abs2meta['output'][wrt]['shape'])
-                                    out_size = np.prod(comp._var_abs2meta['output'][of]['shape'])
+                                        in_size = comp._var_abs2meta['output'][wrt]['size']
+                                    out_size = comp._var_abs2meta['output'][of]['size']
                                     tmp_value = np.zeros((out_size, in_size))
                                     jac_val, jac_i, jac_j = deriv_value
                                     # if a scalar value is provided (in declare_partials),
