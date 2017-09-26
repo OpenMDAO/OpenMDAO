@@ -3,7 +3,7 @@ This tutorial focuses on using :ref:`ExplicitComponent <comp-type-2-explicitcomp
 We'll explain the basic structure of a run file and show you how to set inputs, run the model, and check the output files
 
 ******************************************
-Setting up an Simple Explicit Analysis
+Paraboloid - A Single Disciplinary Model
 ******************************************
 
 Consider a paraboloid, defined by the explicit function
@@ -20,6 +20,10 @@ The minimum of this function is located at
   x = \frac{20}{3} \quad , \quad y = -\frac{22}{3} .
 
 
+Here is a complete run file that defines this equation as a component and then executes it with different input values,
+printing the results to the console when its done.
+Take a look at the full run-script first, then we'll break it down part by part to explain what each one does.
+
 
 .. embed-code::
     openmdao.test_suite.components.paraboloid
@@ -34,8 +38,13 @@ Preamble
     from __future__ import division, print_function
     from openmdao.api import ExplicitComponent
 
-At the top of any script you'll see these lines (or lines very similar to these) which import needed classes and functions. On the first import line the `print_function` is used so the code in the script will work in Python 2 or 3. If you want to know whats going on with the division operator, check out this `detailed explanation <https://www.python.org/dev/peps/pep-0238/>`_. The second import line brings in OpenMDAO classes that are needed to build and run a model.
-As you progress to more complex models you can expect to import more classes from `openmdao.api`, but for now we only need this one to define our paraboloid component.
+At the top of any script you'll see these lines (or lines very similar to these) which import needed classes and functions.
+On the first import line the `print_function` is used so the code in the script will work in Python 2 or 3.
+If you want to know whats going on with the division operator, check out this `detailed explanation <https://www.python.org/dev/peps/pep-0238/>`_.
+
+The second import line brings in OpenMDAO classes that are needed to build and run a model.
+As you progress to more complex models you can expect to import more classes from `openmdao.api`,
+but for now we only need this one to define our paraboloid component.
 
 Defining a Component
 ---------------------
@@ -43,20 +52,22 @@ The component is the basic building block of a model.
 You will always define components as a sub-class of either :ref:`ExplicitComponent <openmdao.core.explicitcomponent.py>`
 or :ref:`ImplicitComponent <openmdao.core.implicitcomponent.py>`.
 Since our simple paraboloid function is explicit, we'll use the :ref:`ExplicitComponent <openmdao.core.explicitcomponent.py>`.
-You see three methods defined:
+You see two methods defined:
 
     - `setup`: define all your inputs and outputs here
     - `compute`: calculation of all output values for the given inputs
-    - `compute_partials`: derivatives of all the outputs values with respect to all the inputs
 
-
-.. embed-code::
-    openmdao.test_suite.components.paraboloid.Paraboloid
+In the setup method you define the inputs and outputs of the component,
+and in this case you also ask OpenMDAO to approximate all the partial derivatives (derivatives of outputs with respect to inputs) with finite difference.
 
 .. note::
 
-    We included definition of the partial derivatives in the `compute_partials` method in our definition.
-    We don't need the derivatives just to execute this simple model, but we'll use them later on when we do an optimziation.
+    One of OpenMDAO's most unique features is its support for analytic derivatives.
+    Providing analytic partial derivatives from your components can result in much more efficient optimziations.
+    We'll get to using analytic derivatives in later tutorials.
+
+.. embed-code::
+    openmdao.test_suite.components.paraboloid.Paraboloid
 
 
 The Run Script

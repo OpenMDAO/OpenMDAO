@@ -16,6 +16,9 @@ class Paraboloid(ExplicitComponent):
 
         self.add_output('f_xy', val=0.0)
 
+        # Finite difference all partials.
+        self.approx_partials('*', '*', method='fd')
+
     def compute(self, inputs, outputs):
         """
         f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
@@ -26,16 +29,6 @@ class Paraboloid(ExplicitComponent):
         y = inputs['y']
 
         outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
-
-    def compute_partials(self, inputs, partials):
-        """
-        Jacobian for our paraboloid.
-        """
-        x = inputs['x']
-        y = inputs['y']
-
-        partials['f_xy', 'x'] = 2.0*x - 6.0 + y
-        partials['f_xy', 'y'] = 2.0*y + 8.0 + x
 
 
 if __name__ == "__main__":

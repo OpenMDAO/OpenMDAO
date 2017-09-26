@@ -1,7 +1,7 @@
 This tutorial will show you how to run unconstrained and constrained optimization on the really simple paraboloid model.
 
 *******************************
-Optimization of a Simple Model
+Optimizing Paraboloid
 *******************************
 
 In OpenMDAO, optimizations are run by :code:`Drivers`.

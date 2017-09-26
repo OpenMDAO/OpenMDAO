@@ -1,13 +1,16 @@
 .. _building-components:
 
 *********************************************************
-The Three Kinds of Components
+How OpenMDAO Represents Variables
 *********************************************************
 
 In general, a numerical model can be complex, multidisciplinary, and heterogeneous.
-It can be decomposed into a series of smaller computations that are chained together.
+It can be decomposed into a series of smaller computations that are chained together by passing variables from one to the next.
+
 In OpenMDAO, we perform all these numerical calculations inside a `Component`, which represents the
-smallest unit of computational work the framework understands.
+smallest unit of computational work the framework understands. Each component will output its own set of variables.
+Depending on which type of calculation you're trying to represent, OpenMDAO provides different kinds of components
+for you to work with.
 
 A Simple Numerical Model
 ------------------------
@@ -61,7 +64,7 @@ which would mean that this component solves the implicit equation for y internal
 
 Both ways would be valid, but the first way is recommended.
 The second way requires the user to solve y and z together, and computing the derivatives of y and z with respect to x is non-trivial.
-The first way would also require implicitly solving for y, but an OpenMDAO solver could be used.
+The first way would also require implicitly solving for y, but an OpenMDAO solver could converge that for you.
 Moreover, for the first way, OpenMDAO would automatically combine and assemble the derivatives from components 2 and 3.
 
 .. tags:: Component, IndepVarComp, ImplicitComponent, ExplicitComponent

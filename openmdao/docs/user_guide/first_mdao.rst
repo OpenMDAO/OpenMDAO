@@ -1,5 +1,5 @@
 ****************************************************
-A Simple Multidisciplinary Analysis and Optimization
+Optimizing the Sellar Problem
 ****************************************************
 
 :math:`x` and :math:`z` are design variables, so we define an optimization problem as follows:
