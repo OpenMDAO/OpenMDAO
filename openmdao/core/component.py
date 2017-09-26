@@ -148,8 +148,8 @@ class Component(System):
             prefix = ''
 
         meta_names = {
-            'input': ('units', 'shape', 'var_set'),
-            'output': ('units', 'shape', 'var_set', 'ref', 'ref0', 'distributed'),
+            'input': ('units', 'shape', 'size', 'var_set'),
+            'output': ('units', 'shape', 'size', 'var_set', 'ref', 'ref0', 'distributed'),
         }
 
         for type_ in ['input', 'output']:
@@ -214,7 +214,7 @@ class Component(System):
                 for idx, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
                     meta = abs2meta_t[abs_name]
                     set_name = meta['var_set']
-                    size = np.prod(meta['shape'])
+                    size = meta['size']
                     idx_byset = allprocs_abs2idx_byset_t[abs_name]
 
                     sz[iproc, idx] = size
@@ -325,9 +325,8 @@ class Component(System):
         metadata = {}
 
         # value, shape: based on args, making sure they are compatible
-        metadata['value'], metadata['shape'] = ensure_compatible(name, val,
-                                                                 shape,
-                                                                 src_indices)
+        metadata['value'], metadata['shape'] = ensure_compatible(name, val, shape, src_indices)
+        metadata['size'] = np.prod(metadata['shape'])
 
         # src_indices: None or ndarray
         if src_indices is None:
@@ -457,6 +456,7 @@ class Component(System):
 
         # value, shape: based on args, making sure they are compatible
         metadata['value'], metadata['shape'] = ensure_compatible(name, val, shape)
+        metadata['size'] = np.prod(metadata['shape'])
 
         # units, res_units: taken as is
         metadata['units'] = units
@@ -603,7 +603,7 @@ class Component(System):
             If False, specifies no dependence between the output(s) and the
             input(s). This is only necessary in the case of a sparse global
             jacobian, because if 'dependent=False' is not specified and
-            set_subjac_info is not called for a given pair, then a dense
+            declare_partials is not called for a given pair, then a dense
             matrix of zeros will be allocated in the sparse global jacobian
             for that pair.  In the case of a dense global jacobian it doesn't
             matter because the space for a dense subjac will always be
@@ -639,7 +639,7 @@ class Component(System):
             If False, specifies no dependence between the output(s) and the
             input(s). This is only necessary in the case of a sparse global
             jacobian, because if 'dependent=False' is not specified and
-            set_subjac_info is not called for a given pair, then a dense
+            declare_partials is not called for a given pair, then a dense
             matrix of zeros will be allocated in the sparse global jacobian
             for that pair.  In the case of a dense global jacobian it doesn't
             matter because the space for a dense subjac will always be
@@ -758,9 +758,9 @@ class Component(System):
         if meta['dependent']:
             out_size = np.prod(self._var_abs2meta['output'][abs_key[0]]['shape'])
             if abs_key[1] in self._var_abs2meta['input']:
-                in_size = np.prod(self._var_abs2meta['input'][abs_key[1]]['shape'])
+                in_size = self._var_abs2meta['input'][abs_key[1]]['size']
             else:  # assume output (or get a KeyError)
-                in_size = np.prod(self._var_abs2meta['output'][abs_key[1]]['shape'])
+                in_size = self._var_abs2meta['output'][abs_key[1]]['size']
 
             if in_size == 0 and self.comm.rank != 0:  # 'inactive' component
                 return

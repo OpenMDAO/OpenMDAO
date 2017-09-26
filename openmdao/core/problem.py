@@ -652,22 +652,20 @@ class Problem(object):
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
                                 try:
-                                    in_size = np.prod(comp._var_abs2meta['input'][wrt]['shape'])
+                                    in_size = comp._var_abs2meta['input'][wrt]['size']
                                 except KeyError:
-                                    in_size = np.prod(comp._var_abs2meta['output'][wrt]['shape'])
+                                    in_size = comp._var_abs2meta['output'][wrt]['size']
 
-                                out_size = np.prod(comp._var_abs2meta['output'][of]['shape'])
+                                out_size = comp._var_abs2meta['output'][of]['size']
                                 deriv_value = np.zeros((out_size, in_size))
 
                             if force_dense:
                                 if isinstance(deriv_value, list):
                                     try:
-                                        in_size = np.prod(
-                                            comp._var_abs2meta['input'][wrt]['shape'])
+                                        in_size = comp._var_abs2meta['input'][wrt]['size']
                                     except KeyError:
-                                        in_size = np.prod(
-                                            comp._var_abs2meta['output'][wrt]['shape'])
-                                    out_size = np.prod(comp._var_abs2meta['output'][of]['shape'])
+                                        in_size = comp._var_abs2meta['output'][wrt]['size']
+                                    out_size = comp._var_abs2meta['output'][of]['size']
                                     tmp_value = np.zeros((out_size, in_size))
                                     jac_val, jac_i, jac_j = deriv_value
                                     # if a scalar value is provided (in declare_partials),
@@ -1078,10 +1076,16 @@ class Problem(object):
                                     output_list, old_output_list, output_vois,
                                     use_rel_reduction, rel_systems, return_format):
         fwd = mode == 'fwd'
+        if fwd:
+            remote_outputs = self.driver._remote_responses
+        else:
+            remote_outputs = self.driver._remote_dvs
+
         model = self.model
         nproc = model.comm.size
         iproc = model.comm.rank
         sizes = model._var_sizes['nonlinear']['output']
+        owning_ranks = model._owning_rank['output']
 
         # this sets dinputs for the current parallel_deriv_color to 0
         voi_info[vois[0][0]][0].set_const(0.0)
@@ -1126,10 +1130,14 @@ class Problem(object):
                     if out_idxs is None:
                         out_var_idx = \
                             model._var_allprocs_abs2idx['nonlinear']['output'][output_name]
-                        if ncol > 1:
-                            deriv_val = np.zeros((sizes[iproc, out_var_idx], ncol))
+                        if output_name in remote_outputs:
+                            _, sz = remote_outputs[output_name]
                         else:
-                            deriv_val = np.zeros(sizes[iproc, out_var_idx])
+                            sz = sizes[iproc, out_var_idx]
+                        if ncol > 1:
+                            deriv_val = np.zeros((sz, ncol))
+                        else:
+                            deriv_val = np.zeros(sz)
                     else:
                         if ncol > 1:
                             deriv_val = np.zeros((len(out_idxs), ncol))
@@ -1150,8 +1158,7 @@ class Problem(object):
                     if dup and nproc > 1:
                         out_var_idx = \
                             model._var_allprocs_abs2idx['nonlinear']['output'][output_name]
-                        # TODO: do during setup
-                        root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
+                        root = owning_ranks[output_name]
                         if deriv_val is None:
                             if out_idxs is not None:
                                 sz = size
@@ -1289,18 +1296,22 @@ class Problem(object):
             of = [prom2abs[name][0] for name in oldof]
             wrt = [prom2abs[name][0] for name in oldwrt]
 
+        owning_ranks = self.model._owning_rank['output']
+
         if fwd:
             input_list, output_list = wrt, of
             old_input_list, old_output_list = oldwrt, oldof
             input_vec, output_vec = vec_dresid, vec_doutput
             input_vois = self.driver._designvars
             output_vois = self.driver._responses
+            remote_outputs = self.driver._remote_responses
         else:  # rev
             input_list, output_list = of, wrt
             old_input_list, old_output_list = oldof, oldwrt
             input_vec, output_vec = vec_doutput, vec_dresid
             input_vois = self.driver._responses
             output_vois = self.driver._designvars
+            remote_outputs = self.driver._remote_dvs
 
         # Solve for derivs using linear solver.
 
@@ -1447,7 +1458,11 @@ class Problem(object):
                             # irrelevant output, just give zeros
                             if out_idxs is None:
                                 out_var_idx = abs2idx_out[output_name]
-                                deriv_val = np.zeros(sizes[iproc, out_var_idx])
+                                if output_name in remote_outputs:
+                                    _, sz = remote_outputs[output_name]
+                                    deriv_val = np.zeros(sz)
+                                else:
+                                    deriv_val = np.zeros(sizes[iproc, out_var_idx])
                             else:
                                 deriv_val = np.zeros(len(out_idxs))
                         else:  # relevant output
@@ -1464,7 +1479,7 @@ class Problem(object):
 
                             if dup and nproc > 1:
                                 out_var_idx = abs2idx_out[output_name]
-                                root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
+                                root = owning_ranks[output_name]
                                 if deriv_val is None:
                                     if out_idxs is not None:
                                         sz = size

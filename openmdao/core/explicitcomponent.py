@@ -8,8 +8,8 @@ from itertools import product
 
 from openmdao.core.component import Component
 from openmdao.utils.class_util import overrides_method
-from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 
 _inst_functs = ['compute_jacvec_product', 'compute_multi_jacvec_product']
 
@@ -54,6 +54,11 @@ class ExplicitComponent(Component):
             (new_jacvec_prod is not None and
              new_jacvec_prod != self._inst_functs['compute_jacvec_product']))
 
+        # TODO : Uncomment these out to set default to DenseJacobian, once we have resolved further
+        # issues.
+        # self._jacobian = DenseJacobian()
+        # self._owns_assembled_jac = True
+
     def _setup_partials(self, recurse=True):
         """
         Call setup_partials in components.
@@ -74,8 +79,7 @@ class ExplicitComponent(Component):
         for out_abs in self._var_abs_names['output']:
             meta = abs2meta_out[out_abs]
             out_name = abs2prom_out[out_abs]
-            size = np.prod(meta['shape'])
-            arange = np.arange(size)
+            arange = np.arange(meta['size'])
 
             # No need to FD outputs wrt other outputs
             abs_key = (out_abs, out_abs)
@@ -175,8 +179,8 @@ class ExplicitComponent(Component):
                     meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
                     dependent = meta['dependent']
                     if meta['value'] is None and dependent:
-                        out_size = np.product(self._var_abs2meta['output'][abs_key[0]]['shape'])
-                        in_size = np.product(self._var_abs2meta[wrt_name][abs_key[1]]['shape'])
+                        out_size = self._var_abs2meta['output'][abs_key[0]]['size']
+                        in_size = self._var_abs2meta[wrt_name][abs_key[1]]['size']
                         meta['value'] = np.zeros((out_size, in_size))
 
                     J._set_partials_meta(abs_key, meta, wrt_name == 'input')

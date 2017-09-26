@@ -460,6 +460,19 @@ class Group(System):
                     for set_name, vsizes in iteritems(sizes_byset[type_]):
                         self.comm.Allgather(sizes_byset[type_][set_name][iproc, :], vsizes)
 
+            # compute owning ranks
+            for type_ in ('input', 'output'):
+                self._owning_rank[type_] = owns = {}
+                sizes = self._var_sizes['linear'][type_]
+                for i, name in enumerate(self._var_allprocs_abs_names[type_]):
+                    for rank in range(self.comm.size):
+                        if sizes[rank, i] > 0:
+                            owns[name] = rank
+                            break
+        else:
+            self._owning_rank['input'] = defaultdict(int)
+            self._owning_rank['output'] = defaultdict(int)
+
         self._var_sizes['nonlinear'] = self._var_sizes['linear']
         self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']
 
@@ -697,7 +710,7 @@ class Group(System):
                 if src_indices is None and out_shape != in_shape:
                     # out_shape != in_shape is allowed if
                     # there's no ambiguity in storage order
-                    if not (np.prod(out_shape) == np.prod(in_shape)
+                    if not (np.prod(out_shape) == abs2meta_in[abs_in]['size']
                             == np.max(out_shape) == np.max(in_shape)):
                         msg = ("The source and target shapes do not match or are ambiguous"
                                " for the connection '%s' to '%s'. Expected %s but got %s.")
@@ -938,7 +951,7 @@ class Group(System):
                     global_size_out = meta_out['global_size']
                     src_indices = meta_in['src_indices']
                     if src_indices is None:
-                        src_indices = np.arange(np.prod(shape_in), dtype=int)
+                        src_indices = np.arange(meta_in['size'], dtype=int)
                     elif src_indices.ndim == 1:
                         src_indices = convert_neg(src_indices, global_size_out)
                     else:
