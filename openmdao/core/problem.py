@@ -12,8 +12,8 @@ from six.moves import range
 import numpy as np
 import scipy.sparse as sparse
 
-from openmdao.approximation_schemes.complex_step import ComplexStep
-from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
+from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
 from openmdao.components.deprecated_component import Component as DepComponent
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver
@@ -456,8 +456,9 @@ class Problem(object):
             next to them in output, making them easy to search for. Note at times there may be a
             significant relative error due to a minor absolute error.  Default is 1.0E-6.
         global_options : dict
-            Dictionary of options that override options specified in ALL components. Only
-            'form', 'step', 'step_calc', and 'method' can be specified in this way.
+            Dictionary of options that are used as default unless overridden by calling
+            set_check_partial_options on a component. Only 'form', 'step', 'step_calc', and
+            'method' can be specified in this way.
         force_dense : bool
             If True, analytic derivatives will be coerced into arrays.
         suppress_output : bool
@@ -689,38 +690,16 @@ class Problem(object):
         all_fd_options = {}
         for comp in comps:
 
-            c_name = comp.pathname
-
             # Skip IndepVarComps
             if isinstance(comp, IndepVarComp):
                 continue
 
-            fd_options = {'order': None}
-
-            # Global options take precedence over component metadata options.
-            for name in ['step', 'step_calc', 'form', 'method']:
-                ch_name = 'check_%s' % name
-                fd_options[name] = global_options.get(name, comp.metadata[ch_name])
-
-            all_fd_options[c_name] = fd_options
-            subjac_info = comp._subjacs_info
+            c_name = comp.pathname
             explicit = isinstance(comp, ExplicitComponent)
             deprecated = isinstance(comp, DepComponent)
 
-            scheme = global_options.get('method', comp.metadata['check_method'])
-            if scheme == 'fd':
-                approximation = FiniteDifference()
-
-            elif scheme == 'cs':
-                approximation = ComplexStep()
-
-                if not alloc_complex:
-                    msg = 'In order to check partials with complex step, you need to set ' + \
-                        '"force_alloc_complex" to True during setup.'
-                    raise RuntimeError(msg)
-
-            else:
-                raise ValueError('Unrecognized method: "{}"'.format(global_options['method']))
+            approximations = {'fd': FiniteDifference(),
+                              'cs': ComplexStep()}
 
             of = list(comp._var_allprocs_prom2abs_list['output'].keys())
             wrt = list(comp._var_allprocs_prom2abs_list['input'].keys())
@@ -731,15 +710,59 @@ class Problem(object):
             elif not explicit:
                 wrt.extend(of)
 
+            # Load up approximation objects with the requested settings.
+            local_opts = comp._get_check_partial_options()
             for rel_key in product(of, wrt):
                 abs_key = rel_key2abs_key(comp, rel_key)
-                approximation.add_approximation(abs_key, fd_options)
+                local_wrt = rel_key[1]
+
+                # Determine if fd or cs.
+                method = global_options.get('method', 'fd')
+                if local_wrt in local_opts:
+                    local_method = local_opts[local_wrt][0]
+                    if local_method:
+                        method = local_method
+
+                fd_options = {'order': None,
+                              'method': method}
+
+                if method == 'cs':
+                    if not alloc_complex:
+                        msg = 'In order to check partials with complex step, you need to set ' + \
+                            '"force_alloc_complex" to True during setup.'
+                        raise RuntimeError(msg)
+
+                    defaults = DEFAULT_CS_OPTIONS
+
+                    fd_options['form'] = None
+                    fd_options['step_calc'] = None
+
+                elif method == 'fd':
+                    defaults = DEFAULT_FD_OPTIONS
+
+                    fd_options['form'] = global_options.get('form', defaults['form'])
+                    fd_options['step_calc'] = global_options.get('step_calc', defaults['step_calc'])
+
+                fd_options['step'] = global_options.get('step', defaults['step'])
+
+                # Precedence: component options > global options > defaults
+                if local_wrt in local_opts:
+                    _, form, step, step_calc = local_opts[local_wrt]
+                    for name, value in zip(['form', 'step', 'step_calc'], [form, step, step_calc]):
+                        if value is not None:
+                            fd_options[name] = value
+
+                # TODO: by var not component
+                all_fd_options[c_name] = fd_options
+
+                approximations[fd_options['method']].add_approximation(abs_key, fd_options)
 
             approx_jac = {}
-            approximation._init_approximations()
+            for approximation in itervalues(approximations):
+                approximation._init_approximations()
 
-            # Peform the FD here.
-            approximation.compute_approximations(comp, jac=approx_jac)
+                # Peform the FD here.
+                approximation.compute_approximations(comp, jac=approx_jac)
 
             for rel_key, partial in iteritems(approx_jac):
                 abs_key = rel_key2abs_key(comp, rel_key)

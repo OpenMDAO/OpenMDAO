@@ -588,7 +588,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        comp.metadata['check_step'] = 1e-2
+        comp.set_check_partial_options(wrt='*', step=1e-2)
 
         prob.setup(check=False)
         prob.run_model()
@@ -638,7 +638,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        comp.metadata['check_method'] = 'cs'
+        comp.set_check_partial_options(wrt='*', method='cs')
 
         prob.setup(check=False)
         prob.run_model()
@@ -663,7 +663,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        comp.metadata['check_method'] = 'cs'
+        comp.set_check_partial_options(wrt='*', method='cs')
 
         prob.setup(check=False, force_alloc_complex=True)
         prob.run_model()
@@ -711,7 +711,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        comp.metadata['check_form'] = 'central'
+        comp.set_check_partial_options(wrt='*', form='central')
 
         prob.setup(check=False)
         prob.run_model()
@@ -761,7 +761,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        comp.metadata['check_step_calc'] = 'rel'
+        comp.set_check_partial_options(wrt='*', step_calc='rel')
 
         prob.setup(check=False)
         prob.run_model()
@@ -899,7 +899,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        comp.metadata['check_step'] = 1e-2
+        comp.set_check_partial_options(wrt='*', step=1e-2)
 
         prob.setup()
         prob.run_model()
@@ -943,7 +943,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        comp.metadata['check_method'] = 'cs'
+        comp.set_check_partial_options(wrt='*', method='cs')
 
         prob.setup(force_alloc_complex=True)
         prob.run_model()
@@ -987,7 +987,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        comp.metadata['check_form'] = 'central'
+        comp.set_check_partial_options(wrt='*', form='central')
 
         prob.setup()
         prob.run_model()
@@ -1031,7 +1031,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        comp.metadata['check_step_calc'] = 'rel'
+        comp.set_check_partial_options(wrt='*', step_calc='rel')
 
         prob.setup()
         prob.run_model()
