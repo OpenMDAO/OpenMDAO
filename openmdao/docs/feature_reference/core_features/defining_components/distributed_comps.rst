@@ -19,9 +19,8 @@ to a distributed output unless your input is equal to the size of the entire
 distributed output.  Otherwise, the assumed *src_indices* will be from 0 to
 1 less than the size of your input, which is probably not what you want.
 
-Components must either be entirely distributed or not, i.e., if a component
-has any distributed variables, they must all be distributed.  You tell the
-framework that a component is a distributed component by setting its
+If a Component has *any* distributed outputs then *all* of its outputs are distributed.
+You tell the framework that a Component is a distributed component by setting its
 *distributed* attribute to True.
 
 The following simple example shows how to create a distributed component that

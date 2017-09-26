@@ -357,7 +357,7 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
@@ -389,7 +389,7 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
@@ -421,7 +421,7 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.2654054431, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.87246623559, .00001)
 
@@ -453,7 +453,7 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001055699, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448533563, .00001)
 
@@ -485,7 +485,7 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001055699, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448533563, .00001)
 

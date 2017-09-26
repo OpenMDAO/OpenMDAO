@@ -222,8 +222,7 @@ class pyOptSparseDriver(Driver):
         con_meta = self._cons
         lcons = [key for (key, con) in iteritems(con_meta) if con['linear'] is True]
         if len(lcons) > 0:
-            _lin_jacs = problem._compute_total_derivs(of=lcons, wrt=indep_list,
-                                                      return_format='dict')
+            _lin_jacs = problem._compute_totals(of=lcons, wrt=indep_list, return_format='dict')
 
         # Add all equality constraints
         self.active_tols = {}
@@ -443,9 +442,9 @@ class pyOptSparseDriver(Driver):
         try:
 
             try:
-                sens_dict = self._compute_total_derivs(of=self._quantities,
-                                                       wrt=self._indep_list,
-                                                       return_format='dict')
+                sens_dict = self._compute_totals(of=self._quantities,
+                                                 wrt=self._indep_list,
+                                                 return_format='dict')
 
             # Let the optimizer try to handle the error
             except AnalysisError:

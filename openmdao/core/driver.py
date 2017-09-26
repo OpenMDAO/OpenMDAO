@@ -1,5 +1,7 @@
 """Define a base class for all Drivers in OpenMDAO."""
 from __future__ import print_function
+from collections import OrderedDict
+
 from six import iteritems
 
 import numpy as np
@@ -40,6 +42,17 @@ class Driver(object):
         Object that manages all recorders added to this driver.
     _model_viewer_data : dict
         Structure of model, used to make n2 diagram.
+    _remote_dvs : dict
+        Dict of design variables that are remote on at least one proc. Values are
+        (owning rank, size).
+    _remote_cons : dict
+        Dict of constraints that are remote on at least one proc. Values are
+        (owning rank, size).
+    _remote_objs : dict
+        Dict of objectives that are remote on at least one proc. Values are
+        (owning rank, size).
+    _remote_responses : dict
+        A combined dict containing entries from _remote_cons and _remote_objs.
     """
 
     def __init__(self):
@@ -106,18 +119,114 @@ class Driver(object):
         self._problem = problem
         model = problem.model
 
+        self._objs = objs = OrderedDict()
+        self._cons = cons = OrderedDict()
+        self._responses = model.get_responses(recurse=True)
+        for name, data in iteritems(self._responses):
+            if data['type'] == 'con':
+                cons[name] = data
+            else:
+                objs[name] = data
+
         # Gather up the information for design vars.
         self._designvars = model.get_design_vars(recurse=True)
 
-        self._responses = model.get_responses(recurse=True)
-        self._objs = model.get_objectives(recurse=True)
-        self._cons = model.get_constraints(recurse=True)
+        con_set = set()
+        obj_set = set()
+        dv_set = set()
+
+        self._remote_dvs = dv_dict = {}
+        self._remote_cons = con_dict = {}
+        self._remote_objs = obj_dict = {}
+
+        # Now determine if later we'll need to allgather cons, objs, or desvars.
+        if model.comm.size > 1 and model._subsystems_allprocs:
+            local_out_vars = set(model._outputs._views)
+            remote_dvs = set(self._designvars) - local_out_vars
+            remote_cons = set(self._cons) - local_out_vars
+            remote_objs = set(self._objs) - local_out_vars
+            all_remote_vois = model.comm.allgather((remote_dvs, remote_cons, remote_objs))
+            for rem_dvs, rem_cons, rem_objs in all_remote_vois:
+                con_set.update(rem_cons)
+                obj_set.update(rem_objs)
+                dv_set.update(rem_dvs)
+
+            # If we have remote VOIs, pick an owning rank for each and use that
+            # to bcast to others later
+            owning_ranks = model._owning_rank['output']
+            sizes = model._var_sizes['nonlinear']['output']
+            for i, vname in enumerate(model._var_allprocs_abs_names['output']):
+                owner = owning_ranks[vname]
+                if vname in dv_set:
+                    dv_dict[vname] = (owner, sizes[owner, i])
+                if vname in con_set:
+                    con_dict[vname] = (owner, sizes[owner, i])
+                if vname in obj_set:
+                    obj_dict[vname] = (owner, sizes[owner, i])
+
+        self._remote_responses = self._remote_cons.copy()
+        self._remote_responses.update(self._remote_objs)
 
         self._rec_mgr.startup(self)
         if (self._rec_mgr._recorders):
             from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
             self._model_viewer_data = _get_viewer_data(problem)
         self._rec_mgr.record_metadata(self)
+
+    def _get_voi_val(self, name, meta, remote_vois):
+        """
+        Get the value of a variable of interest (objective, constraint, or design var).
+
+        This will retrieve the value if the VOI is remote.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable of interest.
+        meta : dict
+            Metadata for the variable of interest.
+        remote_vois : dict
+            Dict containing (owning_rank, size) for all remote vois of a particular
+            type (design var, constraint, or objective).
+
+        Returns
+        -------
+        float or ndarray
+            The value of the named variable of interest.
+        """
+        model = self._problem.model
+        comm = model.comm
+        vec = model._outputs._views_flat
+        indices = meta['indices']
+
+        if name in remote_vois:
+            owner, size = remote_vois[name]
+            if owner == comm.rank:
+                if indices is None:
+                    val = vec[name].copy()
+                else:
+                    val = vec[name][indices]
+            else:
+                if indices is not None:
+                    size = len(indices)
+                val = np.empty(size)
+            comm.Bcast(val, root=owner)
+        else:
+            if indices is None:
+                val = vec[name].copy()
+            else:
+                val = vec[name][indices]
+
+        # Scale design variable values
+        adder = meta['adder']
+        if adder is not None:
+            val += adder
+
+        scaler = meta['scaler']
+        if scaler is not None:
+            val *= scaler
+
+        return val
 
     def get_design_var_values(self, filter=None):
         """
@@ -135,37 +244,13 @@ class Driver(object):
         dict
            Dictionary containing values of each design variable.
         """
-        designvars = {}
-
         if filter:
-            # pull out designvars of those names into filtered dict.
-            for inc in filter:
-                designvars[inc] = self._designvars[inc]
-
+            dvs = filter
         else:
             # use all the designvars
-            designvars = self._designvars
+            dvs = self._designvars
 
-        vec = self._problem.model._outputs._views_flat
-        dv_dict = {}
-        for name, meta in iteritems(designvars):
-            scaler = meta['scaler']
-            adder = meta['adder']
-            indices = meta['indices']
-            if indices is None:
-                val = vec[name].copy()
-            else:
-                val = vec[name][indices]
-
-            # Scale design variable values
-            if adder is not None:
-                val += adder
-            if scaler is not None:
-                val *= scaler
-
-            dv_dict[name] = val
-
-        return dv_dict
+        return {n: self._get_voi_val(n, self._designvars[n], self._remote_dvs) for n in dvs}
 
     def set_design_var(self, name, value):
         """
@@ -178,9 +263,11 @@ class Driver(object):
         value : float or ndarray
             Value for the design variable.
         """
+        if (name in self._remote_dvs and
+                self._problem.model._owning_rank['output'][name] != self._problem.comm.rank):
+            return
+
         meta = self._designvars[name]
-        scaler = meta['scaler']
-        adder = meta['adder']
         indices = meta['indices']
         if indices is None:
             indices = slice(None)
@@ -189,8 +276,11 @@ class Driver(object):
         desvar[indices] = value
 
         # Scale design variable values
+        scaler = meta['scaler']
         if scaler is not None:
             desvar[indices] *= 1.0 / scaler
+
+        adder = meta['adder']
         if adder is not None:
             desvar[indices] -= adder
 
@@ -225,37 +315,12 @@ class Driver(object):
         dict
            Dictionary containing values of each objective.
         """
-        objectives = {}
-
         if filter:
-            # pull out objectives of those names into filtered dict.
-            for inc in filter:
-                objectives[inc] = self._objs[inc]
-
+            objs = filter
         else:
-            # use all the objectives
-            objectives = self._objs
+            objs = self._objs
 
-        vec = self._problem.model._outputs._views_flat
-        obj_dict = {}
-        for name, meta in iteritems(objectives):
-            scaler = meta['scaler']
-            adder = meta['adder']
-            indices = meta['indices']
-            if indices is None:
-                val = vec[name].copy()
-            else:
-                val = vec[name][indices]
-
-            # Scale objectives
-            if adder is not None:
-                val += adder
-            if scaler is not None:
-                val *= scaler
-
-            obj_dict[name] = val
-
-        return obj_dict
+        return {n: self._get_voi_val(n, self._objs[n], self._remote_objs) for n in objs}
 
     def get_constraint_values(self, ctype='all', lintype='all', filter=None):
         """
@@ -279,23 +344,16 @@ class Driver(object):
         dict
            Dictionary containing values of each constraint.
         """
-        constraints = {}
-
         if filter is not None:
-            # pull out objectives of those names into filtered dict.
-            for inc in filter:
-                constraints[inc] = self._cons[inc]
-
+            cons = filter
         else:
-            # use all the objectives
-            constraints = self._cons
+            cons = self._cons
 
-        vec = self._problem.model._outputs._views_flat
         con_dict = {}
+        for name in cons:
+            meta = self._cons[name]
 
-        for name, meta in iteritems(constraints):
-
-            if lintype == 'linear' and meta['linear'] is False:
+            if lintype == 'linear' and not meta['linear']:
                 continue
 
             if lintype == 'nonlinear' and meta['linear']:
@@ -307,24 +365,8 @@ class Driver(object):
             if ctype == 'ineq' and meta['equals'] is not None:
                 continue
 
-            scaler = meta['scaler']
-            adder = meta['adder']
-            indices = meta['indices']
+            con_dict[name] = self._get_voi_val(name, meta, self._remote_cons)
 
-            if indices is None:
-                val = vec[name].copy()
-            else:
-                val = vec[name][indices]
-
-            # Scale objectives
-            if adder is not None:
-                val += adder
-            if scaler is not None:
-                val *= scaler
-
-            # TODO: Need to get the allgathered values? Like:
-            # cons[name] = self._get_distrib_var(name, meta, 'constraint')
-            con_dict[name] = val
         return con_dict
 
     def run(self):
@@ -345,8 +387,7 @@ class Driver(object):
         self.iter_count += 1
         return failure_flag
 
-    def _compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict',
-                              global_names=True):
+    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -376,8 +417,8 @@ class Driver(object):
 
         if return_format == 'dict':
 
-            derivs = prob._compute_total_derivs(of=of, wrt=wrt, return_format=return_format,
-                                                global_names=global_names)
+            derivs = prob._compute_totals(of=of, wrt=wrt, return_format=return_format,
+                                          global_names=global_names)
 
             for okey, oval in iteritems(derivs):
                 for ikey, val in iteritems(oval):
@@ -399,8 +440,8 @@ class Driver(object):
         elif return_format == 'array':
 
             # Compute the derivatives in dict format, and then convert to array.
-            derivs = prob._compute_total_derivs(of=of, wrt=wrt, return_format='dict',
-                                                global_names=global_names)
+            derivs = prob._compute_totals(of=of, wrt=wrt, return_format='dict',
+                                          global_names=global_names)
 
             # Use sizes pre-computed in derivs for ease
             osize = 0

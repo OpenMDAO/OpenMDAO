@@ -226,7 +226,7 @@ Check Partial Derivatives on All Components
 .. content-container ::
 
   .. embed-compare::
-      openmdao.core.tests.test_check_derivs.TestProblemCheckPartials.test_feature_incorrect_jacobian
+      openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_incorrect_jacobian
       check_partials
       check_partials
 
@@ -239,7 +239,7 @@ Suppress Output While Checking Partial Derivatives
 .. content-container ::
 
   .. embed-compare::
-      openmdao.core.tests.test_check_derivs.TestProblemCheckPartials.test_feature_check_partials_suppress
+      openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_check_partials_suppress
       suppress_output
       suppress_output
 

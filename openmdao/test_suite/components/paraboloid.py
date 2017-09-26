@@ -16,6 +16,8 @@ class Paraboloid(ExplicitComponent):
 
         self.add_output('f_xy', val=0.0)
 
+        self.declare_partials('*', '*')
+
     def compute(self, inputs, outputs):
         """
         f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3

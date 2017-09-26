@@ -203,7 +203,7 @@ class Group(System):
         # If running in parallel, allgather
         if self.comm.size > 1:
             # Perform a single allgather
-            if self._subsystems_myproc[0].comm.rank == 0:
+            if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
                 raw = (num_var, num_var_byset)
             else:
                 raw = (None, None)
@@ -373,7 +373,7 @@ class Group(System):
 
         # If running in parallel, allgather
         if self.comm.size > 1:
-            if self._subsystems_myproc[0].comm.rank == 0:
+            if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
                 raw = (allprocs_abs_names, allprocs_prom2abs_list, allprocs_abs2meta)
             else:
                 raw = (
@@ -459,6 +459,19 @@ class Group(System):
                     self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
                     for set_name, vsizes in iteritems(sizes_byset[type_]):
                         self.comm.Allgather(sizes_byset[type_][set_name][iproc, :], vsizes)
+
+            # compute owning ranks
+            for type_ in ('input', 'output'):
+                self._owning_rank[type_] = owns = {}
+                sizes = self._var_sizes['linear'][type_]
+                for i, name in enumerate(self._var_allprocs_abs_names[type_]):
+                    for rank in range(self.comm.size):
+                        if sizes[rank, i] > 0:
+                            owns[name] = rank
+                            break
+        else:
+            self._owning_rank['input'] = defaultdict(int)
+            self._owning_rank['output'] = defaultdict(int)
 
         self._var_sizes['nonlinear'] = self._var_sizes['linear']
         self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']
@@ -592,7 +605,7 @@ class Group(System):
 
         # If running in parallel, allgather
         if self.comm.size > 1:
-            if self._subsystems_myproc[0].comm.rank == 0:
+            if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
                 raw = global_abs_in2out
             else:
                 raw = {}
@@ -1581,6 +1594,11 @@ class Group(System):
                         meta_changes['idx_wrt'] = self._owns_approx_wrt_idx[key[1]]
 
                     meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+
+                    # Group dependent default is True
+                    # TODO: Could be a lot of extra junk in here?
+                    meta['dependent'] = True
+
                     meta.update(meta_changes)
                     meta.update(self._owns_approx_jac_meta)
                     self._subjacs_info[key] = meta
@@ -1725,7 +1743,7 @@ def get_relevant_vars(graph, desvars, responses, mode):
             elif desvar == response:
                 input_deps = set()
                 output_deps = set([response])
-                sys_deps = set([start_sys[0]])
+                sys_deps = set(all_ancestors(start_sys[0]))
 
             if common_edges or desvar == response:
                 if fwd:

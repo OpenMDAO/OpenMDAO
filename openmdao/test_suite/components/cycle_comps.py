@@ -146,7 +146,7 @@ class ExplicitCycleComp(ExplicitComponent):
                 raise unittest.SkipTest('not testing FD and matvec')
             if pd_type != 'array':
                 raise unittest.SkipTest('only dense FD supported')
-            self.approx_partials('*', '*')
+            self.declare_partials('*', '*', method='fd')
 
         elif self.metadata['jacobian_type'] != 'matvec' and pd_type != 'array':
             num_var = self.num_var

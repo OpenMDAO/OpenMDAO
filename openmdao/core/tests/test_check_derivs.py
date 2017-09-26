@@ -1,4 +1,4 @@
-""" Testing for Problem.check_partials and check_total_derivatives."""
+""" Testing for Problem.check_partials and check_totals."""
 
 import unittest
 from six import iteritems
@@ -25,6 +25,8 @@ class ParaboloidTricky(ExplicitComponent):
         self.add_output('f_xy', val=0.0)
 
         self.scale = 1e-7
+
+        self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
         """
@@ -59,6 +61,8 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.add_input('x2', 5.0)
 
                 self.add_output('y', 5.5)
+
+                self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
                 """ Doesn't do much. """
@@ -107,6 +111,8 @@ class TestProblemCheckPartials(unittest.TestCase):
 
                 self.add_output('y', 5.5)
 
+                self.declare_partials(of='*', wrt='*')
+
             def compute(self, inputs, outputs):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
@@ -147,6 +153,8 @@ class TestProblemCheckPartials(unittest.TestCase):
 
                 self.add_output('y', 5.5)
 
+                self.declare_partials(of='*', wrt='*')
+
             def compute(self, inputs, outputs):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
@@ -184,6 +192,8 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.add_input('x2', 5.0)
 
                 self.add_output('y', 5.5)
+
+                self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
                 """ Doesn't do much. """
@@ -238,7 +248,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.add_output('flow:P', val=1., units='lbf/inch**2', desc="Pressure")
 
                 # Finite difference everything
-                self.approx_partials(of='*', wrt='*')
+                self.declare_partials(of='*', wrt='*', method='fd')
 
             def compute(self, inputs, outputs):
                 outputs['flow:T'] = inputs['T']
@@ -274,6 +284,8 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.add_output('flow:P', val=1., units='lbf/inch**2', desc="Pressure")
 
                 self.run_count = 0
+
+                self.declare_partials(of='*', wrt='*')
 
             def compute_partials(self, inputs, partials):
                 partials['flow:T', 'T'] = 1.
@@ -452,6 +464,9 @@ class TestProblemCheckPartials(unittest.TestCase):
                     [ 3., 4.],
                     [ 2., 3.],
                 ])
+
+                self.declare_partials(of='*', wrt='*')
+
             def apply_nonlinear(self, inputs, outputs, residuals):
                 residuals['y'] = self.mtx.dot(outputs['y']) - inputs['x']
 
@@ -490,7 +505,8 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.add_input('x', shape=(2, 2))
                 self.add_output('g', shape=(2, 2))
 
-                self.declare_partials('g', 'z', dependent=False)
+                self.declare_partials(of='g', wrt='x')
+                self.declare_partials(of='g', wrt='z', dependent=False)
 
             def compute(self, inputs, outputs):
                 outputs['g'] = 3.0*inputs['x']
@@ -529,6 +545,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.add_input('x', shape=(2, 2))
                 self.add_output('g', shape=(2, 2))
 
+                self.declare_partials(of='g', wrt='x')
                 self.declare_partials('g', 'z', dependent=False)
 
             def compute(self, inputs, outputs):
@@ -792,6 +809,8 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
                 self.add_output('y', 5.5)
 
+                self.declare_partials(of='*', wrt='*')
+
             def compute(self, inputs, outputs):
                 """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
@@ -834,6 +853,8 @@ class TestCheckPartialsFeature(unittest.TestCase):
                 self.add_input('x2', 5.0)
 
                 self.add_output('y', 5.5)
+
+                self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
                 """ Doesn't do much. """
@@ -1062,7 +1083,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         # check derivatives with complex step and a larger step size.
         testlogger = TestLogger()
-        totals = prob.check_total_derivatives(method='cs', step=1.0e-1, logger=testlogger)
+        totals = prob.check_totals(method='cs', step=1.0e-1, logger=testlogger)
 
         lines = testlogger.get('info')
 
@@ -1090,7 +1111,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         # check derivatives with complex step and a larger step size.
         testlogger = TestLogger()
-        totals = prob.check_total_derivatives(method='cs', step=1.0e-1, logger=testlogger)
+        totals = prob.check_totals(method='cs', step=1.0e-1, logger=testlogger)
 
         lines = testlogger.get('info')
 
@@ -1122,6 +1143,8 @@ class TestProblemCheckTotals(unittest.TestCase):
                 # Unknowns
                 self.add_output('y1', np.zeros([4]))
 
+                self.declare_partials(of='*', wrt='*')
+
             def compute(self, inputs, outputs):
                 """
                 Execution.
@@ -1152,13 +1175,13 @@ class TestProblemCheckTotals(unittest.TestCase):
         of = ['y1']
         wrt = ['x1']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['y1', 'x1'][0][0], Jbase[0, 1], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[0, 3], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][1][0], Jbase[2, 1], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][1][1], Jbase[2, 3], 1e-8)
 
-        totals = prob.check_total_derivatives()
+        totals = prob.check_totals()
         jac = totals[('mycomp.y1', 'x_param1.x1')]['J_fd']
         assert_rel_error(self, jac[0][0], Jbase[0, 1], 1e-8)
         assert_rel_error(self, jac[0][1], Jbase[0, 3], 1e-8)
@@ -1185,11 +1208,11 @@ class TestProblemCheckTotals(unittest.TestCase):
         of = ['y1']
         wrt = ['x1']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['y1', 'x1'][0][0], Jbase[1, 1], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[1, 3], 1e-8)
 
-        totals = prob.check_total_derivatives()
+        totals = prob.check_totals()
         jac = totals[('mycomp.y1', 'x_param1.x1')]['J_fd']
         assert_rel_error(self, jac[0][0], Jbase[1, 1], 1e-8)
         assert_rel_error(self, jac[0][1], Jbase[1, 3], 1e-8)
@@ -1215,8 +1238,8 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         # check derivatives with complex step and a larger step size.
         testlogger = TestLogger()
-        totals = prob.check_total_derivatives(method='cs', step=1.0e-1, logger=testlogger,
-                                              suppress_output=True)
+        totals = prob.check_totals(method='cs', step=1.0e-1, logger=testlogger,
+                                   suppress_output=True)
 
         data = totals['con_cmp2.con2', 'px.x']
         self.assertTrue('J_fwd' in data)
@@ -1228,13 +1251,6 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertEqual(len(lines), 0)
 
     def test_two_desvar_as_con(self):
-        #
-        # TODO: This tests a bug that omitted the finite differencing of cross derivatives for
-        # cases where a design variable is also a constraint or objective. It currently
-        # fails because of another bug which will be fixed on Bret's revelance branch.
-
-        raise unittest.SkipTest('Waiting for a bug fix.')
-
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = NonlinearBlockGS()
@@ -1252,23 +1268,91 @@ class TestProblemCheckTotals(unittest.TestCase):
         # actually want the optimizer to run
         prob.run_model()
 
-        # XXXX
-        z = prob._compute_total_derivs()
-        print(z)
-
         testlogger = TestLogger()
-        totals = prob.check_total_derivatives(method='fd', step=1.0e-1, logger=testlogger)
+        totals = prob.check_totals(method='fd', step=1.0e-1, logger=testlogger)
 
         lines = testlogger.get('info')
 
         assert_rel_error(self, totals['px.x', 'px.x']['J_fwd'], [[1.0]], 1e-5)
         assert_rel_error(self, totals['px.x', 'px.x']['J_fd'], [[1.0]], 1e-5)
-        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[1.0]], 1e-5)
-        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[1.0]], 1e-5)
-        assert_rel_error(self, totals['px.x', 'pz.z']['J_fwd'], [[0.0]], 1e-5)
-        assert_rel_error(self, totals['px.x', 'pz.z']['J_fd'], [[0.0]], 1e-5)
-        assert_rel_error(self, totals['pz.z', 'px.x']['J_fwd'], [[0.0]], 1e-5)
-        assert_rel_error(self, totals['pz.z', 'px.x']['J_fd'], [[0.0]], 1e-5)
+        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], np.eye(2), 1e-5)
+        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], np.eye(2), 1e-5)
+        assert_rel_error(self, totals['px.x', 'pz.z']['J_fwd'], [[0.0, 0.0]], 1e-5)
+        assert_rel_error(self, totals['px.x', 'pz.z']['J_fd'], [[0.0, 0.0]], 1e-5)
+        assert_rel_error(self, totals['pz.z', 'px.x']['J_fwd'], [[0.0], [0.0]], 1e-5)
+        assert_rel_error(self, totals['pz.z', 'px.x']['J_fd'], [[0.0], [0.0]], 1e-5)
+
+    def test_full_con_with_index_desvar(self):
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('z', lower=-100, upper=100, indices=[1])
+        prob.model.add_constraint('z', upper=0.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False)
+
+        # We don't call run_driver() here because we don't
+        # actually want the optimizer to run
+        prob.run_model()
+
+        testlogger = TestLogger()
+        totals = prob.check_totals(method='fd', step=1.0e-1, logger=testlogger)
+
+        lines = testlogger.get('info')
+
+        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[0.0], [1.0]], 1e-5)
+        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0], [1.0]], 1e-5)
+
+    def test_full_desvar_with_index_con(self):
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_constraint('z', upper=0.0, indices=[1])
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False)
+
+        # We don't call run_driver() here because we don't
+        # actually want the optimizer to run
+        prob.run_model()
+
+        testlogger = TestLogger()
+        totals = prob.check_totals(method='fd', step=1.0e-1, logger=testlogger)
+
+        lines = testlogger.get('info')
+
+        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[0.0, 1.0]], 1e-5)
+        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0, 1.0]], 1e-5)
+
+    def test_full_desvar_with_index_obj(self):
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('z', index=1)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False)
+
+        # We don't call run_driver() here because we don't
+        # actually want the optimizer to run
+        prob.run_model()
+
+        testlogger = TestLogger()
+        totals = prob.check_totals(method='fd', step=1.0e-1, logger=testlogger)
+
+        lines = testlogger.get('info')
+
+        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[0.0, 1.0]], 1e-5)
+        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0, 1.0]], 1e-5)
 
 if __name__ == "__main__":
     unittest.main()

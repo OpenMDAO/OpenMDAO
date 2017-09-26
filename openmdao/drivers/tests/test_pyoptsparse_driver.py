@@ -41,6 +41,8 @@ class ParaboloidAE(ExplicitComponent):
         self.grad_iter_count = 0
         self.grad_fail_at = 100
 
+        self.declare_partials('*', '*')
+
     def compute(self, inputs, outputs):
         """f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
         Optimal solution (minimum): x = 6.6667; y = -7.3333

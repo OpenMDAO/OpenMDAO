@@ -106,9 +106,9 @@ class TestDriver(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        base = prob.compute_total_derivs(of=['obj', 'con1'], wrt=['z'])
-        derivs = prob.driver._compute_total_derivs(of=['obj_cmp.obj', 'con_cmp1.con1'], wrt=['pz.z'],
-                                                   return_format='dict')
+        base = prob.compute_totals(of=['obj', 'con1'], wrt=['z'])
+        derivs = prob.driver._compute_totals(of=['obj_cmp.obj', 'con_cmp1.con1'], wrt=['pz.z'],
+                                             return_format='dict')
         assert_rel_error(self, base[('con1', 'z')][0], derivs['con_cmp1.con1']['pz.z'][0], 1e-5)
         assert_rel_error(self, base[('obj', 'z')][0]*2.0, derivs['obj_cmp.obj']['pz.z'][0], 1e-5)
 
@@ -128,8 +128,8 @@ class TestDriver(unittest.TestCase):
         prob.setup(check=False)
         prob.run_driver()
 
-        derivs = prob.driver._compute_total_derivs(of=['comp.y1'], wrt=['px.x'],
-                                                   return_format='dict')
+        derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'],
+                                             return_format='dict')
 
         oscale = np.array([1.0/(7.0-5.2), 1.0/(11.0-6.3)])
         iscale = np.array([2.0-0.5, 3.0-1.5])
@@ -166,7 +166,7 @@ class TestDriver(unittest.TestCase):
         prob.setup(check=False)
         prob.run_driver()
 
-        derivs = prob.driver._compute_total_derivs(of=['comp.y1'], wrt=['px.x'],
+        derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'],
                                                    return_format='dict')
 
         oscale = np.array([1.0/(7.0-5.2), 1.0/(11.0-6.3), 1.0/(2.0-1.2)])

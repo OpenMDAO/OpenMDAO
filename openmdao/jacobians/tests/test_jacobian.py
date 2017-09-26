@@ -67,6 +67,7 @@ class MyExplicitComp(ExplicitComponent):
 
         partials['f', 'y'] = jac2
 
+
 class MyExplicitComp2(ExplicitComponent):
     def __init__(self, jac_type):
         super(MyExplicitComp2, self).__init__()
@@ -108,6 +109,7 @@ class MyExplicitComp2(ExplicitComponent):
 
         partials['f', 'w'] = jac
 
+
 class ExplicitSetItemComp(ExplicitComponent):
     def __init__(self, dtype, value, shape, constructor):
         self._dtype = dtype
@@ -136,6 +138,8 @@ class ExplicitSetItemComp(ExplicitComponent):
 
         self.add_input('in', val=in_val*scale)
         self.add_output('out', val=out_val*scale)
+
+        self.declare_partials(of='*', wrt='*')
 
     def compute_partials(self, inputs, partials):
         partials['out', 'in'] = self._constructor(self._value)

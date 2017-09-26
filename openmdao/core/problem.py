@@ -637,12 +637,12 @@ class Problem(object):
 
                             # Testing for pairs that are not dependent so that we suppress printing
                             # them unless the fd is non zero. Note: subjacs_info is empty for
-                            # undeclared partials on implicit components.
+                            # undeclared partials, which is the default behvaior now.
                             try:
                                 if comp._jacobian._subjacs_info[abs_key][0]['dependent'] is False:
                                     indep_key[c_name].add(rel_key)
                             except KeyError:
-                                pass
+                                indep_key[c_name].add(rel_key)
 
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
@@ -761,9 +761,9 @@ class Problem(object):
 
         return partials_data
 
-    def check_total_derivatives(self, of=None, wrt=None, logger=None, compact_print=False,
-                                abs_err_tol=1e-6, rel_err_tol=1e-6, method='fd', step=1e-6,
-                                form='forward', step_calc='abs', suppress_output=False):
+    def check_totals(self, of=None, wrt=None, logger=None, compact_print=False, abs_err_tol=1e-6,
+                     rel_err_tol=1e-6, method='fd', step=1e-6, form='forward', step_calc='abs',
+                     suppress_output=False):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -812,7 +812,7 @@ class Problem(object):
         model = self.model
         global_names = False
 
-        logger = logger if logger else get_logger('check_total_derivatives')
+        logger = logger if logger else get_logger('check_totals')
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -827,7 +827,7 @@ class Problem(object):
         with self.model._scaled_context_all():
 
             # Calculate Total Derivatives
-            Jcalc = self._compute_total_derivs(of=of, wrt=wrt, global_names=global_names)
+            Jcalc = self._compute_totals(of=of, wrt=wrt, global_names=global_names)
 
             # Approximate FD
             fd_args = {
@@ -836,7 +836,7 @@ class Problem(object):
                 'step_calc': step_calc,
             }
             model.approx_total_derivs(method=method, **fd_args)
-            Jfd = self._compute_total_derivs_approx(of=of, wrt=wrt, global_names=global_names)
+            Jfd = self._compute_totals_approx(of=of, wrt=wrt, global_names=global_names)
 
         # Assemble and Return all metrics.
         data = {}
@@ -851,7 +851,7 @@ class Problem(object):
                                   {'': fd_args}, totals=True, suppress_output=suppress_output)
         return data['']
 
-    def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
+    def compute_totals(self, of=None, wrt=None, return_format='flat_dict'):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -877,17 +877,17 @@ class Problem(object):
 
         with self.model._scaled_context_all():
             if self.model._owns_approx_jac:
-                totals = self._compute_total_derivs_approx(of=of, wrt=wrt,
-                                                           return_format=return_format,
-                                                           global_names=False)
+                totals = self._compute_totals_approx(of=of, wrt=wrt,
+                                                     return_format=return_format,
+                                                     global_names=False)
             else:
-                totals = self._compute_total_derivs(of=of, wrt=wrt,
-                                                    return_format=return_format,
-                                                    global_names=False)
+                totals = self._compute_totals(of=of, wrt=wrt,
+                                              return_format=return_format,
+                                              global_names=False)
         return totals
 
-    def _compute_total_derivs_approx(self, of=None, wrt=None, return_format='flat_dict',
-                                     global_names=True):
+    def _compute_totals_approx(self, of=None, wrt=None, return_format='flat_dict',
+                               global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -910,7 +910,7 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        recording_iteration.stack.append(('_compute_total_derivs', 0))
+        recording_iteration.stack.append(('_compute_totals', 0))
         model = self.model
         mode = self._mode
         vec_dinput = model._vectors['input']
@@ -1000,6 +1000,12 @@ class Problem(object):
                     if isinstance(jac, list):
                         # This is a design variable that was declared as an obj/con.
                         totals[okey, ikey] = np.eye(len(jac[0]))
+                        odx = model._owns_approx_of_idx.get(okey)
+                        idx = model._owns_approx_wrt_idx.get(ikey)
+                        if odx is not None:
+                            totals[okey, ikey] = totals[okey, ikey][odx, :]
+                        if idx is not None:
+                            totals[okey, ikey] = totals[okey, ikey][:, idx]
                     else:
                         totals[okey, ikey] = -jac
 
@@ -1039,6 +1045,9 @@ class Problem(object):
 
                 in_var_idx = model._var_allprocs_abs2idx[vecname]['output'][input_name]
                 in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
+
+                dup = not in_var_meta['distributed']
+
                 start = np.sum(sizes[:iproc, in_var_idx])
                 end = np.sum(sizes[:iproc + 1, in_var_idx])
 
@@ -1054,7 +1063,7 @@ class Problem(object):
                     min_i = np.min(in_idxs)
                     loc_size = len(in_idxs)
                 else:
-                    irange = list(range(in_var_meta['global_size']))
+                    irange = np.arange(in_var_meta['global_size'], dtype=int)
                     max_i = in_var_meta['global_size'] - 1
                     min_i = 0
                     loc_size = end - start
@@ -1067,30 +1076,37 @@ class Problem(object):
                             loc_size = sz
                             break
 
-                dup = not in_var_meta['distributed']
-
                 # set totals to zeros instead of None in those cases when none
                 # of the specified indices are within the range of interest
                 # for this proc.
                 store = True if ((start <= min_i < end) or (start <= max_i < end)) else dup
 
                 if store:
-                    offset = start + min_i
-                    loc_idxs = irange - offset
+                    loc_idxs = irange
+                    if min_i > 0:
+                        loc_idxs = irange - min_i
+                else:
+                    loc_idxs = []
 
                 voi_info[input_name] = (dinputs, doutputs, irange, loc_idxs, max_i, min_i,
                                         loc_size, start, end, dup, store)
 
         return voi_info
 
-    def _compute_total_derivs_multi(self, totals, vois, voi_info, lin_vec_names, mode,
-                                    output_list, old_output_list, output_vois,
-                                    use_rel_reduction, rel_systems, return_format):
+    def _compute_totals_multi(self, totals, vois, voi_info, lin_vec_names, mode,
+                              output_list, old_output_list, output_vois,
+                              use_rel_reduction, rel_systems, return_format):
         fwd = mode == 'fwd'
+        if fwd:
+            remote_outputs = self.driver._remote_responses
+        else:
+            remote_outputs = self.driver._remote_dvs
+
         model = self.model
         nproc = model.comm.size
         iproc = model.comm.rank
         sizes = model._var_sizes['nonlinear']['output']
+        owning_ranks = model._owning_rank['output']
 
         # this sets dinputs for the current parallel_deriv_color to 0
         voi_info[vois[0][0]][0].set_const(0.0)
@@ -1135,10 +1151,14 @@ class Problem(object):
                     if out_idxs is None:
                         out_var_idx = \
                             model._var_allprocs_abs2idx['nonlinear']['output'][output_name]
-                        if ncol > 1:
-                            deriv_val = np.zeros((sizes[iproc, out_var_idx], ncol))
+                        if output_name in remote_outputs:
+                            _, sz = remote_outputs[output_name]
                         else:
-                            deriv_val = np.zeros(sizes[iproc, out_var_idx])
+                            sz = sizes[iproc, out_var_idx]
+                        if ncol > 1:
+                            deriv_val = np.zeros((sz, ncol))
+                        else:
+                            deriv_val = np.zeros(sz)
                     else:
                         if ncol > 1:
                             deriv_val = np.zeros((len(out_idxs), ncol))
@@ -1159,8 +1179,7 @@ class Problem(object):
                     if dup and nproc > 1:
                         out_var_idx = \
                             model._var_allprocs_abs2idx['nonlinear']['output'][output_name]
-                        # TODO: do during setup
-                        root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
+                        root = owning_ranks[output_name]
                         if deriv_val is None:
                             if out_idxs is not None:
                                 sz = size
@@ -1208,8 +1227,7 @@ class Problem(object):
                 else:
                     raise RuntimeError("unsupported return format")
 
-    def _compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict',
-                              global_names=True):
+    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1232,7 +1250,7 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        recording_iteration.stack.append(('_compute_total_derivs', 0))
+        recording_iteration.stack.append(('_compute_totals', 0))
         model = self.model
         mode = self._mode
         vec_dinput = model._vectors['input']
@@ -1298,18 +1316,22 @@ class Problem(object):
             of = [prom2abs[name][0] for name in oldof]
             wrt = [prom2abs[name][0] for name in oldwrt]
 
+        owning_ranks = self.model._owning_rank['output']
+
         if fwd:
             input_list, output_list = wrt, of
             old_input_list, old_output_list = oldwrt, oldof
             input_vec, output_vec = vec_dresid, vec_doutput
             input_vois = self.driver._designvars
             output_vois = self.driver._responses
+            remote_outputs = self.driver._remote_responses
         else:  # rev
             input_list, output_list = of, wrt
             old_input_list, old_output_list = oldof, oldwrt
             input_vec, output_vec = vec_doutput, vec_dresid
             input_vois = self.driver._responses
             output_vois = self.driver._designvars
+            remote_outputs = self.driver._remote_dvs
 
         # Solve for derivs using linear solver.
 
@@ -1375,10 +1397,10 @@ class Problem(object):
                         rel_systems.update(relevant[voi]['@all'][1])
                 else:
                     rel_systems = _contains_all
-                self._compute_total_derivs_multi(totals, vois, voi_info, lin_vec_names, mode,
-                                                 output_list, old_output_list,
-                                                 output_vois, use_rel_reduction, rel_systems,
-                                                 return_format)
+                self._compute_totals_multi(totals, vois, voi_info, lin_vec_names, mode,
+                                           output_list, old_output_list,
+                                           output_vois, use_rel_reduction, rel_systems,
+                                           return_format)
             recording_iteration.stack.pop()
             return totals
 
@@ -1456,7 +1478,11 @@ class Problem(object):
                             # irrelevant output, just give zeros
                             if out_idxs is None:
                                 out_var_idx = abs2idx_out[output_name]
-                                deriv_val = np.zeros(sizes[iproc, out_var_idx])
+                                if output_name in remote_outputs:
+                                    _, sz = remote_outputs[output_name]
+                                    deriv_val = np.zeros(sz)
+                                else:
+                                    deriv_val = np.zeros(sizes[iproc, out_var_idx])
                             else:
                                 deriv_val = np.zeros(len(out_idxs))
                         else:  # relevant output
@@ -1473,7 +1499,7 @@ class Problem(object):
 
                             if dup and nproc > 1:
                                 out_var_idx = abs2idx_out[output_name]
-                                root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
+                                root = owning_ranks[output_name]
                                 if deriv_val is None:
                                     if out_idxs is not None:
                                         sz = size

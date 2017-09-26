@@ -18,6 +18,8 @@ class DoubleArrayComp(ExplicitComponent):
                             [-1.0, 0.0, 8.0, 1.0],
                             [1.0, 4.0, -5.0, 6.0]])
 
+        self.declare_partials('*', '*')
+
     def setup(self):
         # Params
         self.add_input('x1', np.zeros([2]))
@@ -58,6 +60,8 @@ class NonSquareArrayComp(ExplicitComponent):
                             [6.0, 2.5, 2.0, 4.0],
                             [-1.0, 0.0, 8.0, 1.0],
                             [1.0, 4.0, -5.0, 6.0]])
+
+        self.declare_partials('*', '*')
 
     def setup(self):
         # Params
