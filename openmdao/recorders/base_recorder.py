@@ -48,8 +48,10 @@ class BaseRecorder(object):
         Tells recorder whether to record the derivatives of a Solver.
     options['includes'] :  list of strings("*")
         Patterns for variables to include in recording.
-    options['excludes'] :  list of strings('')
+    options['excludes'] :  list of strings([])
         Patterns for variables to exclude in recording (processed after includes).
+    options['system_includes'] :  list of strings([])
+        Patterns for System outputs to include in recording of Driver iterations.
 
     Attributes
     ----------
@@ -59,6 +61,8 @@ class BaseRecorder(object):
         A global counter for execution order, used in iteration coordinate.
     _filtered_driver : dict
         Filtered subset of driver variables to record, based on includes/excludes.
+    _filtered_system_outputs_driver_recording : dict
+        Filtered subset of System outputs to record during Driver recording, based on system_includes.
     _filtered_solver : dict
         Filtered subset of solver variables to record, based on includes/excludes.
     _filtered_system : dict
@@ -127,6 +131,8 @@ class BaseRecorder(object):
                              desc='Set to True to record objectives at the driver level')
         self.options.declare('record_constraints', type_=bool, default=False,
                              desc='Set to True to record constraints at the driver level')
+        self.options.declare('system_includes', type_=list, default=[],
+                             desc='Patterns for System outputs to include in recording of Driver iterations')
         # Solver options
         self.options.declare('record_abs_error', type_=bool, default=True,
                              desc='Set to True to record absolute error at the solver level')
@@ -144,6 +150,7 @@ class BaseRecorder(object):
 
         # dicts in which to keep the included items for recording
         self._filtered_driver = {}
+        self._filtered_system_outputs_driver_recording = {}
         self._filtered_system = {}
         self._filtered_solver = {}
 
@@ -153,6 +160,7 @@ class BaseRecorder(object):
         self._responses_values = None
         self._objectives_values = None
         self._constraints_values = None
+        self._sysincludes_values = None
 
         # For Systems
         self._inputs = None
@@ -227,9 +235,10 @@ class BaseRecorder(object):
             }
 
         if (isinstance(object_requesting_recording, Driver)):
-            mydesvars = myobjectives = myconstraints = myresponses = set()
+            mydesvars = myobjectives = myconstraints = myresponses = mysystem_outputs = set()
             incl = self.options['includes']
             excl = self.options['excludes']
+            sys_incl = self.options['system_includes']
 
             if self.options['record_desvars']:
                 mydesvars = {n for n in object_requesting_recording._designvars
@@ -247,11 +256,17 @@ class BaseRecorder(object):
                 myresponses = {n for n in object_requesting_recording._responses
                                if self._check_path(n, incl, excl)}
 
+            if sys_incl:
+                root = object_requesting_recording._problem.model
+                mysystem_outputs = {n for n in root._outputs
+                               if self._check_path(n, sys_incl, [])}
+
             self._filtered_driver = {
                 'des': mydesvars,
                 'obj': myobjectives,
                 'con': myconstraints,
-                'res': myresponses
+                'res': myresponses,
+                'sys': mysystem_outputs
             }
 
         if (isinstance(object_requesting_recording, Solver)):
@@ -393,7 +408,7 @@ class BaseRecorder(object):
             raise ValueError("Recorders must be attached to Drivers, Systems, or Solvers.")
 
     def record_iteration_driver_passing_vars(self, object_requesting_recording, desvars, responses,
-                                             objectives, constraints, metadata):
+                                             objectives, constraints, sysvars, metadata):
         """
         Record an iteration of a driver with the variables passed in.
 
@@ -456,6 +471,16 @@ class BaseRecorder(object):
                 self._constraints_values = constraints
         else:
             self._constraints_values = None
+
+        if self.options['system_includes']:
+            if self._filtered_driver:
+                self._sysincludes_values = \
+                    {name: sysvars[name] for name in self._filtered_driver['sys']}
+            else:
+                self._sysincludes_values = sysvars
+        else:
+            self._sysincludes_values = None
+
 
     def record_iteration_driver(self, object_requesting_recording, metadata):
         """

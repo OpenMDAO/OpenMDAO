@@ -154,15 +154,17 @@ class DriverCases(BaseCases):
         con.close()
 
         idx, counter, iteration_coordinate, timestamp, success, msg, desvars_blob, responses_blob, \
-            objectives_blob, constraints_blob = row
+            objectives_blob, constraints_blob, sysincludes_blob = row
 
         desvars_array = blob_to_array(desvars_blob)
         responses_array = blob_to_array(responses_blob)
         objectives_array = blob_to_array(objectives_blob)
         constraints_array = blob_to_array(constraints_blob)
+        sysincludes_array = blob_to_array(sysincludes_blob)
 
         case = DriverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
-                          desvars_array, responses_array, objectives_array, constraints_array)
+                          desvars_array, responses_array, objectives_array, constraints_array,
+                          sysincludes_array)
 
         return case
 
