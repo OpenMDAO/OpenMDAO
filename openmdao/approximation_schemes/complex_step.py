@@ -212,13 +212,12 @@ class ComplexStep(ApproximationScheme):
             else:
                 inputs._imag_views_flat[in_name][idxs] += delta
 
-        # TODO: A full clone here (and below) is overkill.
-        cache = results_vec._clone(initialize_views=True)
+        cache = results_vec.get_data()
         run_model()
 
         # TODO: Grab only results of interest
         results = results_vec._clone(initialize_views=True)
-        results_vec.set_vec(cache)
+        results_vec.set_data(cache)
 
         for in_name, idxs, delta in input_deltas:
             if in_name in outputs._imag_views_flat:

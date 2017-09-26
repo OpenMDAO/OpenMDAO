@@ -83,11 +83,11 @@ class ApproximationScheme(object):
                 inputs._views_flat[in_name][idxs] += delta
 
         # TODO: Grab only results of interest
-        cache = results_vec._clone()
+        cache = results_vec.get_data()
         run_model()
 
         results = results_vec._clone()
-        results_vec.set_vec(cache)
+        results_vec.set_data(cache)
 
         for in_name, idxs, delta in input_deltas:
             if in_name in outputs._views_flat:

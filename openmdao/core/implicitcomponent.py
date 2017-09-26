@@ -73,8 +73,6 @@ class ImplicitComponent(Component):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
-        super(ImplicitComponent, self)._apply_nonlinear()
-
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
             with Recording(self.pathname + '._apply_nonlinear', self.iter_count, self):
                 self.apply_nonlinear(self._inputs, self._outputs, self._residuals)

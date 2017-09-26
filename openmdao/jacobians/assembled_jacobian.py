@@ -282,26 +282,35 @@ class AssembledJacobian(Jacobian):
         Read the user's sub-Jacobians and set into the global matrix.
         """
         system = self._system
+        ext_mtx = self._ext_mtx[system.pathname]
 
-        for res_abs_name in system._var_abs_names['output']:
+        if system._subjac_iters_out is None:
+            system._subjac_iters_out = []
+            system._subjac_iters_in = []
+            system._subjac_iters_in_ext = []
+            for res_abs_name in system._var_abs_names['output']:
+                for out_abs_name in system._var_abs_names['output']:
+                    abs_key = (res_abs_name, out_abs_name)
+                    if abs_key in self._subjacs:
+                        system._subjac_iters_out.append(abs_key)
 
-            for out_abs_name in system._var_abs_names['output']:
+                for in_abs_name in system._var_abs_names['input']:
+                    abs_key = (res_abs_name, in_abs_name)
+                    if abs_key in self._subjacs:
+                        if in_abs_name in system._conn_global_abs_in2out:
+                            system._subjac_iters_in.append(abs_key)
+                        elif ext_mtx is not None:
+                            system._subjac_iters_in_ext.append(abs_key)
 
-                abs_key = (res_abs_name, out_abs_name)
-                if abs_key in self._subjacs:
-                    self._int_mtx._update_submat(abs_key, self._subjacs[abs_key])
+        int_mtx = self._int_mtx
+        for abs_key in system._subjac_iters_out:
+            int_mtx._update_submat(abs_key, self._subjacs[abs_key])
 
-            for in_abs_name in system._var_abs_names['input']:
+        for abs_key in system._subjac_iters_in:
+            int_mtx._update_submat(self._keymap[abs_key], self._subjacs[abs_key])
 
-                abs_key = (res_abs_name, in_abs_name)
-                if abs_key in self._subjacs:
-
-                    if in_abs_name in system._conn_global_abs_in2out:
-                        self._int_mtx._update_submat(self._keymap[abs_key],
-                                                     self._subjacs[abs_key])
-                    elif self._ext_mtx[system.pathname] is not None:
-                        self._ext_mtx[system.pathname]._update_submat(abs_key,
-                                                                      self._subjacs[abs_key])
+        for abs_key in system._subjac_iters_in_ext:
+            ext_mtx._update_submat(abs_key, self._subjacs[abs_key])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """
