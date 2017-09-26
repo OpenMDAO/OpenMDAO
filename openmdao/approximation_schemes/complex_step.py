@@ -130,9 +130,9 @@ class ComplexStep(ApproximationScheme):
                 in_size = len(in_idx)
             else:
                 if wrt in system._var_abs2meta['input']:
-                    in_size = np.prod(system._var_abs2meta['input'][wrt]['shape'])
+                    in_size = system._var_abs2meta['input'][wrt]['size']
                 elif wrt in system._var_abs2meta['output']:
-                    in_size = np.prod(system._var_abs2meta['output'][wrt]['shape'])
+                    in_size = system._var_abs2meta['output'][wrt]['size']
 
                 in_idx = range(in_size)
 
@@ -147,7 +147,7 @@ class ComplexStep(ApproximationScheme):
                     out_idx = system._owns_approx_of_idx[of]
                     out_size = len(out_idx)
                 else:
-                    out_size = np.prod(system._var_abs2meta['output'][of]['shape'])
+                    out_size = system._var_abs2meta['output'][of]['size']
 
                 outputs.append((of, np.zeros((out_size, in_size))))
 

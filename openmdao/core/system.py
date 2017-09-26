@@ -947,7 +947,7 @@ class System(object):
             local_shape = mymeta['shape']
             if not mymeta['distributed']:
                 # not distributed, just use local shape and size
-                mymeta['global_size'] = np.prod(local_shape)
+                mymeta['global_size'] = mymeta['size']
                 mymeta['global_shape'] = local_shape
                 continue
 

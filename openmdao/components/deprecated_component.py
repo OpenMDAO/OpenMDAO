@@ -67,8 +67,7 @@ class Component(BaseComponent):
         for out_abs in self._var_abs_names['output']:
             meta = abs2meta_out[out_abs]
             out_name = abs2prom_out[out_abs]
-            size = np.prod(meta['shape'])
-            arange = np.arange(size)
+            arange = np.arange(meta['size'])
 
             # Skip all states. The user declares those derivatives.
             if out_name in self._state_names:
