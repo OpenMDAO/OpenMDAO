@@ -230,7 +230,7 @@ Check Partial Derivatives on All Components
       check_partials
       check_partials
 
-      data = prob.check_partial_derivatives()
+      data = prob.check_partials()
 
 
 Suppress Output While Checking Partial Derivatives
@@ -243,7 +243,7 @@ Suppress Output While Checking Partial Derivatives
       suppress_output
       suppress_output
 
-      data = prob.check_partial_derivatives(out_stream=None)
+      data = prob.check_partials(out_stream=None)
 
 
 Change Derivative Behavior

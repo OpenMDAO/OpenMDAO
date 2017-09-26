@@ -29,6 +29,9 @@ class DoubleArrayComp(ExplicitComponent):
         self.add_output('y1', np.zeros([2]))
         self.add_output('y2', np.zeros([2]))
 
+        # Derivs
+        self.declare_partials(of='*', wrt='*')
+
     def compute(self, inputs, outputs):
         """
         Execution.
@@ -72,6 +75,9 @@ class NonSquareArrayComp(ExplicitComponent):
         self.add_output('y1', np.zeros([3]))
         self.add_output('y2', np.zeros([1]))
 
+        # Derivs
+        self.declare_partials(of='*', wrt='*')
+
     def compute(self, inputs, outputs):
         """
         Execution.
@@ -101,6 +107,9 @@ class TestExplCompDeprecated(ExplicitComponent):
 
         self.add_input('x1', np.zeros([2]))
         self.add_output('y1', np.zeros([2]))
+
+        # Derivs
+        self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
         """

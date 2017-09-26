@@ -1591,7 +1591,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
     global_options : dict
         Dictionary containing the options for the approximation.
     totals : bool
-        Set to True if we are doing check_total_derivs to skip a bunch of stuff.
+        Set to True if we are doing check_totals to skip a bunch of stuff.
     suppress_output : bool
         Set to True to suppress all output. Just calculate errors and add the keys.
     indep_key : dict of sets, optional

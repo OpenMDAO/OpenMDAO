@@ -176,6 +176,10 @@ class ExplicitCycleComp(ExplicitComponent):
             self.declare_partials(self._cycle_names['theta_out'], self._cycle_names['theta'],
                                   **self._array2kwargs(dtheta, pd_type))
 
+        else:
+            # Declare everything
+            self.declare_partials(of='*', wrt='*')
+
     def compute(self, inputs, outputs):
         theta = inputs[self._cycle_names['theta']]
         A = _compute_A(self.size, theta)
