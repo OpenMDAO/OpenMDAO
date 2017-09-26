@@ -833,7 +833,7 @@ class Problem(object):
                 'form': form,
                 'step_calc': step_calc,
             }
-            model.approx_total_derivs(method=method, **fd_args)
+            model.approx_totals(method=method, **fd_args)
             Jfd = self._compute_totals_approx(of=of, wrt=wrt, global_names=global_names)
 
         # Assemble and Return all metrics.
@@ -952,9 +952,9 @@ class Problem(object):
         if model._approx_schemes:
             method = list(model._approx_schemes.keys())[0]
             kwargs = model._owns_approx_jac_meta
-            model.approx_total_derivs(method=method, **kwargs)
+            model.approx_totals(method=method, **kwargs)
         else:
-            model.approx_total_derivs(method='fd')
+            model.approx_totals(method='fd')
 
         # Initialization based on driver (or user) -requested "of" and "wrt".
         if not model._owns_approx_jac or model._owns_approx_of != set(of) \

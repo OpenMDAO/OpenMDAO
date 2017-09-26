@@ -185,7 +185,7 @@ class TestNewton(unittest.TestCase):
         prob = Problem()
         prob.model = SellarStateConnection(nonlinear_solver=NewtonSolver())
 
-        prob.model.approx_total_derivs(method='fd')
+        prob.model.approx_totals(method='fd')
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)

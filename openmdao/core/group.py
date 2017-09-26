@@ -1498,7 +1498,7 @@ class Group(System):
         if self._linear_solver is not None and do_ln:
             self._linear_solver._linearize()
 
-    def approx_total_derivs(self, method='fd', **kwargs):
+    def approx_totals(self, method='fd', **kwargs):
         """
         Approximate derivatives for a Group using the specified approximation method.
 

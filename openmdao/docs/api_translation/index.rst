@@ -256,8 +256,8 @@ Force Group or Model to use Finite Difference
 
   .. embed-compare::
       openmdao.core.tests.test_approx_derivs.ApproxTotalsFeature.test_basic
-      approx_total_derivs
-      approx_total_derivs
+      approx_totals
+      approx_totals
 
       model.deriv_options['type'] = 'fd'
 
@@ -269,8 +269,8 @@ Force Group or Model to use Finite Difference with Specific Options
 
   .. embed-compare::
       openmdao.core.tests.test_approx_derivs.ApproxTotalsFeature.test_arguments
-      approx_total_derivs
-      approx_total_derivs
+      approx_totals
+      approx_totals
 
       model.deriv_options['type'] = 'fd'
       model.deriv_options['step_size'] = '1e-7'

@@ -250,7 +250,7 @@ class TestUnitConversion(unittest.TestCase):
         assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
         assert_rel_error(self, J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
-        prob.model.approx_total_derivs(method='fd')
+        prob.model.approx_totals(method='fd')
         prob.setup(check=False, mode='rev')
         prob.run_model()
         J = prob.compute_totals(of=unknown_list, wrt=indep_list, return_format='dict')
