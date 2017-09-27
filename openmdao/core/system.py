@@ -245,7 +245,6 @@ class System(object):
     #
     _owning_rank : {'input': {}, 'output': {}}
         Dict mapping var name to the lowest rank where that variable is local.
-    #
     """
 
     def __init__(self, **kwargs):
