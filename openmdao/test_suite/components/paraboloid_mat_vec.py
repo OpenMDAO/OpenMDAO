@@ -15,7 +15,6 @@ class ParaboloidMatVec(Paraboloid):
         y = inputs['y'][0]
 
         if mode == 'fwd':
-            doutputs['f_xy'] = 0. # TODO: something is not getting cleared out properly here, so I have to do it?
             if 'x' in dinputs:
                 doutputs['f_xy'] += (2.0*x - 6.0 + y)*dinputs['x']
             if 'y' in dinputs:
@@ -23,6 +22,6 @@ class ParaboloidMatVec(Paraboloid):
 
         elif mode == 'rev':
             if 'x' in dinputs:
-                dinputs['x'] = (2.0*x - 6.0 + y)*doutputs['f_xy']
+                dinputs['x'] += (2.0*x - 6.0 + y)*doutputs['f_xy']
             if 'y' in dinputs:
-                dinputs['y'] = (2.0*y + 8.0 + x)*doutputs['f_xy']
+                dinputs['y'] += (2.0*y + 8.0 + x)*doutputs['f_xy']
