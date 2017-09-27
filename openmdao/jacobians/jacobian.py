@@ -69,13 +69,9 @@ class Jacobian(object):
         """
         abs2meta = self._system._var_abs2meta
 
-        meta0 = abs2meta['output'][abs_key[0]]
         if abs_key[1] in abs2meta['output']:
-            meta1 = abs2meta['output'][abs_key[1]]
-        elif abs_key[1] in abs2meta['input']:
-            meta1 = abs2meta['input'][abs_key[1]]
-
-        return (np.prod(meta0['shape']), np.prod(meta1['shape']))
+            return (abs2meta['output'][abs_key[0]]['size'], abs2meta['output'][abs_key[1]]['size'])
+        return (abs2meta['output'][abs_key[0]]['size'], abs2meta['input'][abs_key[1]]['size'])
 
     def _multiply_subjac(self, abs_key, val):
         """
