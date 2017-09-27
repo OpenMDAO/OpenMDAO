@@ -46,7 +46,7 @@ class BasicOptParaboloid(unittest.TestCase):
         assert_rel_error(self, prob['indeps.y'], -7.33333, 1e-4)
 
 
-    def test_constrainted(self):
+    def test_constrained(self):
         from openmdao.api import Problem, ScipyOptimizer, ExecComp, IndepVarComp
 
         # We'll use the component that was defined in the last tutorial
