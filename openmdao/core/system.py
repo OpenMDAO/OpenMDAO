@@ -246,12 +246,6 @@ class System(object):
     _owning_rank : {'input': {}, 'output': {}}
         Dict mapping var name to the lowest rank where that variable is local.
     #
-    _subjac_iters_out : list of (out1, out2) tuples
-        List of tuples of variable combos that match those in the AssembledJacobian.
-    _subjac_iters_in : list of (out, in) tuples
-        List of tuples of variable combos that match those in the AssembledJacobian.
-    _subjac_iters_in_ext : list of (out, in) tuples
-        List of tuples of variable combos that match those in the AssembledJacobian.
     """
 
     def __init__(self, **kwargs):
@@ -364,10 +358,6 @@ class System(object):
         self.metadata.update(kwargs)
 
         self._has_guess = False
-
-        self._subjac_iters_out = None
-        self._subjac_iters_in = None
-        self._subjac_iters_in_ext = None
 
     def _check_reconf(self):
         """

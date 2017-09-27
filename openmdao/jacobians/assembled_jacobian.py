@@ -2,6 +2,7 @@
 from __future__ import division
 
 import sys
+from collections import defaultdict
 
 from six import iteritems
 
@@ -44,6 +45,9 @@ class AssembledJacobian(Jacobian):
     _mask_caches : dict
         Contains masking arrays for when a subset of the variables are present in a vector, keyed
         by the input._names set.
+    _subjac_iters : dict
+        Mapping of system pathname to tuple of lists of absolute key tuples used to index into
+        the jacobian.
     """
 
     def __init__(self, **kwargs):
@@ -68,6 +72,8 @@ class AssembledJacobian(Jacobian):
         self._ext_mtx = {}
         self._keymap = {}
         self._mask_caches = {}
+
+        self._subjac_iters = defaultdict(lambda: None)
 
     def _get_var_range(self, abs_name, type_):
         """
@@ -283,33 +289,37 @@ class AssembledJacobian(Jacobian):
         """
         system = self._system
         ext_mtx = self._ext_mtx[system.pathname]
-
-        if system._subjac_iters_out is None:
-            system._subjac_iters_out = []
-            system._subjac_iters_in = []
-            system._subjac_iters_in_ext = []
+        iters = self._subjac_iters[system.pathname]
+        if iters is None:
+            iters_out = []
+            iters_in = []
+            iters_in_ext = []
             for res_abs_name in system._var_abs_names['output']:
                 for out_abs_name in system._var_abs_names['output']:
                     abs_key = (res_abs_name, out_abs_name)
                     if abs_key in self._subjacs:
-                        system._subjac_iters_out.append(abs_key)
+                        iters_out.append(abs_key)
 
                 for in_abs_name in system._var_abs_names['input']:
                     abs_key = (res_abs_name, in_abs_name)
                     if abs_key in self._subjacs:
                         if in_abs_name in system._conn_global_abs_in2out:
-                            system._subjac_iters_in.append(abs_key)
+                            iters_in.append(abs_key)
                         elif ext_mtx is not None:
-                            system._subjac_iters_in_ext.append(abs_key)
+                            iters_in_ext.append(abs_key)
+
+            self._subjac_iters[system.pathname] = (iters_out, iters_in, iters_in_ext)
+        else:
+            iters_out, iters_in, iters_in_ext = iters
 
         int_mtx = self._int_mtx
-        for abs_key in system._subjac_iters_out:
+        for abs_key in iters_out:
             int_mtx._update_submat(abs_key, self._subjacs[abs_key])
 
-        for abs_key in system._subjac_iters_in:
+        for abs_key in iters_in:
             int_mtx._update_submat(self._keymap[abs_key], self._subjacs[abs_key])
 
-        for abs_key in system._subjac_iters_in_ext:
+        for abs_key in iters_in_ext:
             ext_mtx._update_submat(abs_key, self._subjacs[abs_key])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
