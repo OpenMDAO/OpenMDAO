@@ -1,38 +1,56 @@
-This tutorial will show you how to run unconstrained and constrained optimization on the really simple paraboloid model.
+This tutorial will show you how to setup and run an unconstrained optimization using a component you've already defined.
+The organization of this run-script and its use of the :code:`Problem` class is the basis for executing all models in OpenMDAO.
 
-*******************************
-Optimizing Paraboloid
-*******************************
+*****************************************
+Unconstrained Optimization of Paraboloid
+*****************************************
 
-In OpenMDAO, optimizations are run by :code:`Drivers`.
-In this tutorial we'll use :code:`ScipyOptimizer` which provides an interface
-the various optimization algorithms in the scipy library. We'll use `SLSQP` which is a gradient based optimizer that
-implements a sequential quadratic programming algorithm.
 
-To start out we'll re-use the :code:`Paraboloid` component that we defined in the previous tutorial, and then we'll add
-the necessary code to define and run the optimization.
 
-Unconstrained Optimization
-***************************
+To start out we'll re-use the :code:`Paraboloid` component that we defined in the previous tutorial.
+We'll add that component, along with and :ref:`IndepVarComp <comp-type-1-indepvarcomp>`, to construct our model
+inside a :ref:`Problem <feature_run_your_model>`.
+You've already used the :code:`Problem` in the run file from the previous tutorial on the :ref:`paraboloid analysis <tutorial_paraboloid_analysis>`,
+but well take a closer look now.
+
+All analyses and optimizations in OpenMDAO are executed with the a :code:`Problem` class.
+This class serves as a container for your model and the driver you've chosen,
+and provides methods for you to :ref:`run the model <run-model>` and :ref:`run the driver <setup-and-run>`.
+It also provides a :ref:`interface for setting and getting variable values <set-and-get-variables>`.
+Every problem has one single driver associated with it. Similarly, it has one single model in it.
+
+.. figure:: images/problem_diagram.png
+   :align: center
+   :width: 50%
+   :alt: diagram of the problem structure
+
+
+The Run Script
+***********************************
 
 .. embed-test::
-    openmdao.test_suite.test_examples.basic_opt_paraboloid.BaseicOptParaboloid.test_unconstrainted
+    openmdao.test_suite.test_examples.basic_opt_paraboloid.BasicOptParaboloid.test_unconstrainted
 
-The assignment of the driver is done by setting the :code:`driver` attribute of the problem.
-Every problem has one, and only one, driver associated with it.
-The default driver is just the base :code:`Driver` class itself, which will simply execute a single :code:`run_model()`
-command.
-Here we are changing the driver to an optimizer, and changing some settings on it.
+
+Setting a Driver
+---------------------
+
+Telling OpenMDAO to use a specific optimizer is done by setting the :code:`driver` attribute of the problem.
+Here we'll use the :ref:`ScipyOptimizer <scipyoptimizer>`, and tell it to use the *SLSQP* algorithm.
 
 .. code::
 
     prob.driver = ScipyOptimizer()
     prob.driver.options['optimizer'] = 'SLSQP'
 
-The we setup the problem formulation so the optimizer knows what to vary and what to optimize.
-In these calls, you are always going to be specifying a specific variable. For :code:`add_design_var`
-the variable will always be the output of an :code:`IndepVarComp`. For `add_objective` and `add_constraint`
-the variable can be the output of any component (including an `IndepVarComp`).
+Defining the Design Variables and Objective
+---------------------------------------------------------------
+
+Next we setup the problem formulation so the optimizer knows what to vary and what objective to optimize.
+In these calls, you are always going to be specifying a specific variable. For :ref:`add_design_var <feature_add_design_var>`
+the variable will always be the output of an :ref:`IndepVarComp <comp-type-1-indepvarcomp>`.
+For :ref:`add_objective <feature_add_objective>` and :ref:`add_constraint <feature_add_constraint>`
+the variable can be the output of any component (including an :code:`IndepVarComp`).
 
 .. code::
 
@@ -40,41 +58,17 @@ the variable can be the output of any component (including an `IndepVarComp`).
         prob.model.add_design_var('indeps.y', lower=-50, upper=50)
         prob.model.add_objective('paraboloid.f_xy')
 
+.. note::
 
-Finally, we call :code:`setup` and then :code:`run_driver` to actually execute the model and use some print statements
-to interogate the final values.
-
-
-
-Constrained Optimization
-***************************
-
-If you want to add constraints to your optimization, the run script is nearly identical to the unconstrained case.
-
-.. embed-test::
-    openmdao.test_suite.test_examples.basic_opt_paraboloid.BaseicOptParaboloid.test_constrainted
+    Although these calls always point to a specific variable, that variable doesn't have to be a scalar value.
+    See the feature docs for :ref:`adding design variables, objectives, and constraints <feature_adding_des_vars_obj_con>` for more details.
 
 
-There are only two new lines of code added here, compared to the unconstrained case.
-Here we used an :code:`ExecComp` to create a new component whos output will be the value of our constraint equation,
-but could also an existing output from any component in your model.
-.. code::
+Finally, we call :ref:`setup <setup>` and then :ref:`run_driver() <setup-and-run>` to actually execute the model and use some print statements
+to interrogate the final values.
 
-    prob.model.add_subsystem('const', ExecComp('g = x + y'))
 
-.. note ::
 
-    :code:`ExecComp` is a useful utility component provided in OpenMDAO's standard library that lets you define new calculations
-    just by typing in the expression. It supports basic math operations, and even some of numpy's more advanced methods. You can work with
-    both scalar and array data as well. See the feature doc on ExecComp [TODO: add link] for some more examples of how to use it.
 
-Once you have defined the necessary constraint function, you just have to add it to the problem formulation so the driver
-knows to actually respect it. For this toy problem it turns out that the constrained optimum occurs when :math:`x = -y = 7.0`.,
-so its actually possible to get the same answer using an equality constraint set to 0.
-
-.. code::
-
-    prob.model.add_constraint('const.g', lower=0, upper 10.)
-    #prob.model.add_constraint('const.g', equals=0.)
 
 

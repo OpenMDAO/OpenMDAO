@@ -1,17 +1,18 @@
 .. _sellar:
 
+In previous tutorials, you built and optimized models comprised of only a single component.
+Now, we'll work through a slightly more complex problem that involves two disciplines and hence two main components.
+You'll learn how to group components together into a larger model and how to use
+different kinds of nonlinear solvers to converge multidisciplinary models with coupling between components.
+
 ****************************************
 Sellar - A Simple Two-Discipline Problem
 ****************************************
 
-In previous tutorials, you built and optimized models comprised of only a single component.
-Now, we'll work through a slightly more complex problem that involves two disciplines and hence two components.
-In this tutorial, you'll learn how to group components together into a larger model and how to use
-different kinds of nonlinear solvers to converge multidisciplinary models with coupling between components.
-
 The Sellar problem is a simple two discipline toy problem with each discipline described by a single
 equation. The output of each component feeds into the input of the other, which creates a coupled model that needs to
-be converged in order for the outputs to be valid. You can see an XDSM diagram describing the problem structure below:
+be converged in order for the outputs to be valid.
+You can see the coupling between the two disciplines show up through the :math:`y_1` and :math:`y_2` variables in the XDSM diagram describing the problem structure below:
 
 .. figure:: images/sellar_xdsm.png
    :align: center
@@ -23,33 +24,23 @@ be converged in order for the outputs to be valid. You can see an XDSM diagram d
 Building the Disciplinary Components
 ****************************************
 
+In the component definitions, there is a call to :ref:`approx_partials <feature_approx_partials>` in the setup method that looks like this:
 
-The first discipline is defined by the following equation:
+.. code::
 
-.. math::
+    self.approx_partials('*', '*', method='fd')
 
-    y_1(x, y_2, z_1, z_2) = z_1^2 + x_1 + z_2 - 0.2y_2
-
-This is built as an openmdao :ref:`Component <openmdao.core.component.py>` like this:
+This tells OpenMDAO to approximate all the partial derivatives of that component using finite-difference.
+The default settings will use forward difference with an absolute step size of 1e-6, but you can change the :ref:`FD settings <feature_approx_partials>` to work well for you component.
 
 .. embed-code::
     openmdao.test_suite.components.sellar_feature.SellarDis1
 
-----
-
-The second discipline is given by another equation:
-
-.. math::
-
-  y_2(x, y_1, z_1, z_2) = \sqrt{y_1} + z_1 + z_2
-
-Which is translated into a :ref:`Component <openmdao.core.component.py>` as seen here:
 
 .. embed-code::
     openmdao.test_suite.components.sellar_feature.SellarDis2
 
 
-----
 
 Grouping Components and Connecting them Together
 **************************************************
@@ -63,8 +54,8 @@ OpenMDAO how to pass data between them.
     openmdao.test_suite.components.sellar_feature.SellarMDA
 
 
-Notice that we're working with a new type of class, called a :ref:`Group <feature_grouping_components>`.
-:code:`Group` is the container that lets you build up complex model hierarchies.
+We're working with a new type of class: :ref:`Group <feature_grouping_components>`.
+This is the container that lets you build up complex model hierarchies.
 Groups can contain other groups, components, or combinations of groups and components.
 
 You can directly create instances of :code:`Group` to work with, or you can sub-class from it to define your own custom
@@ -82,14 +73,14 @@ Then inside the :code:`setup` method of :code:`SellarMDA` we're also working dir
     cycle.nonlinear_solver = NonlinearBlockGS()
 
 
-Our :code:`SellarMDA` group, when instantiated, will represent a three level hierarchy with the following structure
+Our :code:`SellarMDA` Group, when instantiated, will have a three level hierarchy with itself as the top most level.
 
 .. figure:: images/sellar_tree.png
    :align: center
    :width: 80%
    :alt: hierarchy tree for the Sellar group
 
-Why do we create the *cycle* subgroup?
+Why do we create the *cycle* sub-group?
 -------------------------------------------
 There is a circular data dependence between *d1* and *d2* that needs to be converged with a nonlinear solver in order to get a valid answer.
 Its a bit more efficient to put these two components into their own sub-group, so that we can iteratively converge them by themselves,
@@ -120,14 +111,6 @@ Promoting variables with the same name connects them
 
 The data connections in this model are made via promotion.
 OpenMDAO will look at each level of the hierarchy and find all the connect all output-input pairs with the same name.
-There are a few important details to note:
-
-    * the promoted name of an output has to be unique within that level of the hierarchy (i.e. you can't have two outputs with the same name)
-    * You are allowed to have multiple inputs promoted to the same name, but in order for a connection to be made there must also be an output with the same name. Otherwise, no connection is made.
-
-.. note::
-
-    For a more detailed set of examples for how to promote variables, check out the :ref:`feature page on adding sub-systems to a group <feature_adding_subsystem_to_a_group>`
 
 
 ExecComp is a helper component for quickly defining components for simple equations

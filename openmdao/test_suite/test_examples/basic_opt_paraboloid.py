@@ -8,7 +8,7 @@ from openmdao.api import Problem, ScipyOptimizer, ExecComp, IndepVarComp
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
-class BaseicOptParaboloid(unittest.TestCase):
+class BasicOptParaboloid(unittest.TestCase):
 
     def test_unconstrainted(self):
         from openmdao.api import Problem, ScipyOptimizer, IndepVarComp
@@ -59,6 +59,8 @@ class BaseicOptParaboloid(unittest.TestCase):
         indeps.add_output('y', -4.0)
 
         prob.model.add_subsystem('parab', Paraboloid())
+
+        # New line define the component whos output will be constrained
         prob.model.add_subsystem('const', ExecComp('g = x + y'))
 
         prob.model.connect('indeps.x', ['parab.x', 'const.x'])
@@ -71,6 +73,8 @@ class BaseicOptParaboloid(unittest.TestCase):
         prob.model.add_design_var('indeps.x', lower=-50, upper=50)
         prob.model.add_design_var('indeps.y', lower=-50, upper=50)
         prob.model.add_objective('parab.f_xy')
+
+        # New line to add the constraint to the model
         prob.model.add_constraint('const.g', lower=0, upper=10.)
         # prob.model.add_constraint('const.g', equals=0.)
 

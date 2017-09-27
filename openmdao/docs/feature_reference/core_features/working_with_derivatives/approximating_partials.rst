@@ -1,3 +1,5 @@
+.. _feature_approx_partials:
+
 *********************************
 Approximating Partial Derivatives
 *********************************

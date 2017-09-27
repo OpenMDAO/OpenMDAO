@@ -85,15 +85,15 @@ class SellarDis2(ExplicitComponent):
 
         outputs['y2'] = y1**.5 + z1 + z2
 
-
 class SellarMDA(Group):
     """
-    Group containing the Sellar MDA. This version uses the disciplines without derivatives.
+    Group containing the Sellar MDA.
     """
 
     def setup(self):
-        self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        indeps = self.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('x', 1.0)
+        indeps.add_output('z', np.array([5.0, 2.0]))
 
         cycle = self.add_subsystem('cycle', Group(), promotes=['*'])
         d1 = cycle.add_subsystem('d1', SellarDis1(), promotes_inputs=['x', 'z', 'y2'], promotes_outputs=['y1'])
@@ -108,8 +108,6 @@ class SellarMDA(Group):
 
         self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-
-
 
 
 class SellarDis1CS(ExplicitComponent):

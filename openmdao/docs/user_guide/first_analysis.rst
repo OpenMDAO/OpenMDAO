@@ -1,3 +1,5 @@
+.. _tutorial_paraboloid_analysis:
+
 In the last tutorial, we discussed the three basic kinds of components in the OpenMDAO framework.
 This tutorial focuses on using :ref:`ExplicitComponent <comp-type-2-explicitcomp>` to build a simple analysis of a paraboloid function.
 We'll explain the basic structure of a run file and show you how to set inputs, run the model, and check the output files
@@ -63,7 +65,7 @@ and in this case you also ask OpenMDAO to approximate all the partial derivative
 .. note::
 
     One of OpenMDAO's most unique features is its support for analytic derivatives.
-    Providing analytic partial derivatives from your components can result in much more efficient optimziations.
+    Providing analytic partial derivatives from your components can result in much more efficient optimizations.
     We'll get to using analytic derivatives in later tutorials.
 
 .. embed-code::

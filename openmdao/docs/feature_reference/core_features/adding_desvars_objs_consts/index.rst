@@ -1,3 +1,6 @@
+.. _feature_adding_des_vars_obj_con:
+
+
 *************************************************
 Adding Design Variables, Constraints & Objectives
 *************************************************

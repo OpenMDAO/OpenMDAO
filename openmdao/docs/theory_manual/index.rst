@@ -10,7 +10,7 @@ It provides information in a more theoretical and mathematical manner to help us
 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    implicit_transformation_of_vars.rst
    parallel_color.rst

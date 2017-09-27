@@ -7,7 +7,7 @@ How OpenMDAO Represents Variables
 In general, a numerical model can be complex, multidisciplinary, and heterogeneous.
 It can be decomposed into a series of smaller computations that are chained together by passing variables from one to the next.
 
-In OpenMDAO, we perform all these numerical calculations inside a `Component`, which represents the
+In OpenMDAO, we perform all these numerical calculations inside a :ref:`Component <feature_building_components>`, which represents the
 smallest unit of computational work the framework understands. Each component will output its own set of variables.
 Depending on which type of calculation you're trying to represent, OpenMDAO provides different kinds of components
 for you to work with.

@@ -1,3 +1,5 @@
+.. _feature_run_your_model:
+
 *******************
 Running Your Models
 *******************

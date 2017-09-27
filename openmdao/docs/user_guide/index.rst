@@ -19,6 +19,7 @@ Single Disciplinary Optimization
     component_types.rst
     first_analysis.rst
     first_optimization.rst
+    simple_constrained_opt.rst
 
 ----------------------------------
 Multi Disciplinary Optimization
@@ -28,13 +29,16 @@ Multi Disciplinary Optimization
     :maxdepth: 1
 
     sellar.rst
+    promote_vs_connect.rst
     first_mdao.rst
+
+----------------------------------
+Working with Implicit Components
+----------------------------------
 
 ----------------------------------------------------
 Providing Analytic Derivatives from your Components
 ----------------------------------------------------
 
 
-----------------------------------
-Working with Implicit Components
-----------------------------------
+
