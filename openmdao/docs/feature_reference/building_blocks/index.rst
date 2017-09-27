@@ -1,3 +1,4 @@
+.. _feature_building_blocks:
 
 ***************
 Building Blocks

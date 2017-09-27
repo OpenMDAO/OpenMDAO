@@ -1,12 +1,12 @@
-.. _UserGuide:
+.. _BasicUserGuide:
 
-**********
-User Guide
-**********
+******************
+Basic User Guide
+******************
 
 These tutorials serve to give an initial introduction to the OpenMDAO framework.
-They are intended to be read in order.
-After going through these tutorials you will know how to define components with analytic derivatives,
+They are intended to be read in order, and you should complete all of them to gain a basic understanding of the framework.
+After going through these tutorials you will know how to define components,
 combine those components into larger models, and then run optimizations on those models.
 
 ----------------------------------
@@ -19,7 +19,6 @@ Single Disciplinary Optimization
     component_types.rst
     first_analysis.rst
     first_optimization.rst
-    simple_constrained_opt.rst
 
 ----------------------------------
 Multi Disciplinary Optimization
@@ -31,14 +30,6 @@ Multi Disciplinary Optimization
     sellar.rst
     promote_vs_connect.rst
     first_mdao.rst
-
-----------------------------------
-Working with Implicit Components
-----------------------------------
-
-----------------------------------------------------
-Providing Analytic Derivatives from your Components
-----------------------------------------------------
 
 
 

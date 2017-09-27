@@ -29,7 +29,7 @@ class BasicOptParaboloid(unittest.TestCase):
 
         # setup the optimization
         prob.driver = ScipyOptimizer()
-        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['optimizer'] = 'COBYLA'
 
         prob.model.add_design_var('indeps.x', lower=-50, upper=50)
         prob.model.add_design_var('indeps.y', lower=-50, upper=50)
@@ -68,7 +68,7 @@ class BasicOptParaboloid(unittest.TestCase):
 
         # setup the optimization
         prob.driver = ScipyOptimizer()
-        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['optimizer'] = 'COBYLA'
 
         prob.model.add_design_var('indeps.x', lower=-50, upper=50)
         prob.model.add_design_var('indeps.y', lower=-50, upper=50)

@@ -1,8 +1,8 @@
-This tutorial will show you how to setup and run an unconstrained optimization using a component you've already defined.
+This tutorial will show you how to setup and run an optimization using a component you've already defined.
 The organization of this run-script and its use of the :code:`Problem` class is the basis for executing all models in OpenMDAO.
 
 *****************************************
-Unconstrained Optimization of Paraboloid
+Optimization of Paraboloid
 *****************************************
 
 
@@ -29,19 +29,32 @@ The Run Script
 ***********************************
 
 .. embed-test::
-    openmdao.test_suite.test_examples.basic_opt_paraboloid.BasicOptParaboloid.test_unconstrainted
+    openmdao.test_suite.test_examples.basic_opt_paraboloid.BasicOptParaboloid.test_constrained
 
+
+Although we defined the :code:`Paraboloid` component in a previous tutorial, we wanted to add an additional equation to our model.
+Since it was a very simple equation, we used the :ref:`ExecComp <feature_exec_comp>` to quickly add the new output to our model, so that we can constrain it.
+Once you have defined the necessary output variable, you just have to add it to the problem formulation so the driver
+knows to actually respect it. For this toy problem it turns out that the constrained optimum occurs when :math:`x = -y = 7.0`.,
+so its actually possible to get the same answer using an equality constraint set to 0.
+We included both options in the tutorial for your reference.
+
+.. note ::
+
+    :ref:`ExecComp <feature_exec_comp>` is a useful utility component provided in OpenMDAO's :ref:`standard library <feature_building_blocks>`
+    that lets you define new calculations just by typing in the expression. It supports basic math operations, and even some of numpy's more
+    advanced methods. You can work with both scalar and array data as well.
 
 Setting a Driver
 ---------------------
 
 Telling OpenMDAO to use a specific optimizer is done by setting the :code:`driver` attribute of the problem.
-Here we'll use the :ref:`ScipyOptimizer <scipyoptimizer>`, and tell it to use the *SLSQP* algorithm.
+Here we'll use the :ref:`ScipyOptimizer <scipyoptimizer>`, and tell it to use the *COBYLA* algorithm.
 
 .. code::
 
     prob.driver = ScipyOptimizer()
-    prob.driver.options['optimizer'] = 'SLSQP'
+    prob.driver.options['optimizer'] = 'COBYLA'
 
 Defining the Design Variables and Objective
 ---------------------------------------------------------------
@@ -57,6 +70,8 @@ the variable can be the output of any component (including an :code:`IndepVarCom
         prob.model.add_design_var('indeps.x', lower=-50, upper=50)
         prob.model.add_design_var('indeps.y', lower=-50, upper=50)
         prob.model.add_objective('paraboloid.f_xy')
+        prob.model.add_constraint('const.g', lower=0, upper 10.)
+        #prob.model.add_constraint('const.g', equals=0.)
 
 .. note::
 

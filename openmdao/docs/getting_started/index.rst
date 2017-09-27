@@ -14,7 +14,7 @@ Use :code:`pip` to install openmdao locally:
 
 :code:`cd blue`
 
-:code:`pip install -e .`
+:code:`pip install .`
 
 .. note::
 
@@ -33,17 +33,5 @@ Copy the code into a file named `hello_world.py` and run it by typing:
 .. embed-test::
     openmdao.test_suite.test_examples.tldr_paraboloid.TestParaboloidTLDR.test_tldr
 
-Building the docs
-*******************
 
-You can read the docs on line, so it is not necessary to build the them on your local machine.
-If you would like to build them anyway, then do the following:
-
-:code:`cd openmdao/docs`
-
-:code:`make all`
-
-This will build the docs in :code:`openmdao/docs/_build/html.`
-
-Then, just :code:`open openmdao/docs/_build/html/index.html` in a browser to begin.
 

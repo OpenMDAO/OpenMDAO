@@ -28,7 +28,7 @@ Take a look at the full run-script first, then we'll break it down part by part 
 
 
 .. embed-code::
-    openmdao.test_suite.components.paraboloid_feature
+    openmdao.test_suite.components.paraboloid
 
 
 Lets break this script down and understand each section
@@ -69,7 +69,7 @@ and in this case you also ask OpenMDAO to approximate all the partial derivative
     We'll get to using analytic derivatives in later tutorials.
 
 .. embed-code::
-    openmdao.test_suite.components.paraboloid_feature.Paraboloid
+    openmdao.test_suite.components.paraboloid.Paraboloid
 
 
 The Run Script
