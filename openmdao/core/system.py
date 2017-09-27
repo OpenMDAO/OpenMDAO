@@ -1662,9 +1662,6 @@ class System(object):
         self._owns_assembled_jac = isinstance(jacobian, AssembledJacobian)
         self._jacobian = jacobian
         self._jacobian_changed = True
-        self._subjac_iters_out = None
-        self._subjac_iters_in = None
-        self._subjac_iters_in_ext = None
 
     @contextmanager
     def _unscaled_context(self, outputs=[], residuals=[]):
