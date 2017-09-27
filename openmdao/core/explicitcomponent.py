@@ -171,7 +171,6 @@ class ExplicitComponent(Component):
             outputs = self._var_abs_names['output']
             inputs = self._var_abs_names['input']
 
-            # TODO: maybe we don't need to loop over all these.
             for wrt_name, wrt_vars in (('output', outputs), ('input', inputs)):
                 for abs_key in product(outputs, wrt_vars):
                     meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
@@ -180,7 +179,7 @@ class ExplicitComponent(Component):
                     if not dependent:
                         continue
 
-                    if meta['value'] is None and dependent:
+                    if meta['value'] is None:
                         out_size = self._var_abs2meta['output'][abs_key[0]]['size']
                         in_size = self._var_abs2meta[wrt_name][abs_key[1]]['size']
                         meta['value'] = np.zeros((out_size, in_size))
@@ -188,7 +187,7 @@ class ExplicitComponent(Component):
                     J._set_partials_meta(abs_key, meta, wrt_name == 'input')
 
                     method = meta.get('method', False)
-                    if method and dependent:
+                    if method:
                         self._approx_schemes[method].add_approximation(abs_key, meta)
 
         for approx in itervalues(self._approx_schemes):

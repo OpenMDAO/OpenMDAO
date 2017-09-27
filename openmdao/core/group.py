@@ -1595,8 +1595,9 @@ class Group(System):
 
                     meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
 
-                    # Group dependent default is True
-                    # TODO: Could be a lot of extra junk in here?
+                    # A group under approximation needs all keys from below, so set dependent to
+                    # True.
+                    # TODO: Maybe just need a subset of keys (those that go to the boundaries.)
                     meta['dependent'] = True
 
                     meta.update(meta_changes)
