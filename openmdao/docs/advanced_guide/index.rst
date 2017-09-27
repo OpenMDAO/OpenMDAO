@@ -15,8 +15,12 @@ Working with Implicit Components
 ----------------------------------
 
 ----------------------------------------------------
-Providing Analytic Derivatives from your Components
+Working with Analytic Derivatives
 ----------------------------------------------------
 
+    .. toctree::
+        :maxdepth: 1
 
-
+        partial_derivs_explicit.rst
+        partial_derivs_implicit.rst
+        derivs_of_coupled_systems.rst

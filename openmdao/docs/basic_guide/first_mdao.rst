@@ -35,42 +35,19 @@ This is the semi-quiet setting where you only get notified if the solver failed 
 There are lots of ways to :ref:`configure the solver print <solver-options>` output in your model to suite your needs.
 
 
-Why do have to set a linear solver?
-***************************************
-A linear solver is set for :code:`cycle` group as follows:
+Approximate the total derivatives with finite difference
+------------------------------------------------------------
+
+In this case we're using the `SLSQP` algorithm, which is a gradient based optimization approach.
+Up to this point none of our components have provided any analytic derivatives,
+so we'll just finite-difference across the whole model to approximate the derivatives.
+That is accompished by this line of code:
 
 .. code::
-
-    prob.model.cycle.linear_solver = DirectSolver()
-
-In this run script, the solver was set after the :code:`setup` was called on the problem.
-That was necessary because in the orignal definition of the group, the linear solver wasn't set.
-We could have also set that up directly in the group's class definition as well:
-
-.. code::
-
-    cycle = self.add_subsystem('cycle', Group(), promotes=['*'])
-    d1 = cycle.add_subsystem('d1', SellarDis1(), promotes_inputs=['x', 'z', 'y2'], promotes_outputs=['y1'])
-    d2 = cycle.add_subsystem('d2', SellarDis2(), promotes_inputs=['z', 'y1'], promotes_outputs=['y2'])
-
-    # Nonlinear Block Gauss Seidel is a gradient free solver
-    cycle.nonlinear_solver = NonlinearBlockGS()
-    cycle.linear_solver = DirectSolver()
-
-Why do you have to set a linear solver at all? In OpenMDAO linear solvers are used to compute derivatives.
-The :ref:`NonlinearBlockGS <nlbgs>` solver is gradient free and doesn't require a linear solver,
-but we're doing optimization with a gradient based optimizer in this run script.
-Any time you you're trying to optimize a model that has a non-linear solver converging multidisciplinary analysis
-somewhere in your model then you will need to add an appropriate linear solver as well, so the framework can compute total derivatives.
-
-OpenMDAO comes with a :ref:`number of different linear solvers <feature_linear_solvers>` that you can choose from.
-Understanding which linear solver to pick requires considering a number of factors and is not a simple topic.
-In many cases the :ref:`DirectSolver <directsolver>` is your best bet because it uses a lu factorization that is fairly robust.
-For larger problems with 1000's of variables in them you could also try :ref:`ScipyIterativeSolver <scipyiterativesolver>` which uses Scipy's GMRES implementation.
+    prob.model.approx_total_derivs()
 
 .. note::
-
-    Its important to realize that for this model, we set each individual component to approximate its own partial derivatives using FD.
-    But that means that OpenMDAO is still responsible for computing the total derivatives across the whole model, which requires it to solve a linear system hence it needs the linear solver.
-    If you don't want to use OpenMDAO's analytic derivatives capabilities you can tell the framework to finite-difference across the whole model instead.
-
+    We're using finite-difference here for simplicity,
+    but for larger models finite differencing results in a high computational cost and can have limited accuracy.
+    Its much better to use analytic derivatives with your models.
+    You can learn more about that in the advanced tutorials.

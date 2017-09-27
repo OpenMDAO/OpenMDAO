@@ -19,6 +19,8 @@ class TestSellarOpt(unittest.TestCase):
 
         prob.driver = ScipyOptimizer()
         prob.driver.options['optimizer'] = 'SLSQP'
+        # prob.driver.options['maxiter'] = 100
+        prob.driver.options['tol'] = 1e-8
 
         prob.model.add_design_var('x', lower=0, upper=10)
         prob.model.add_design_var('z', lower=0, upper=10)
@@ -26,13 +28,17 @@ class TestSellarOpt(unittest.TestCase):
         prob.model.add_constraint('con1', upper=0)
         prob.model.add_constraint('con2', upper=0)
 
+
         prob.setup()
         prob.set_solver_print(level=0)
 
-        # We need to add this linear solver so OpenMDAO can solve for the total derivatives across the coupled system
-        prob.model.cycle.linear_solver = DirectSolver()
+        # Ask OpenMDAO to finite-difference across the model to compute the gradients for the optimizer
+        prob.model.approx_total_derivs()
+
 
         prob.run_driver()
+
+
 
         print('minimum found at')
         assert_rel_error(self, prob['x'][0], 0., 1e-5)
