@@ -798,6 +798,89 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertLess(x_error.forward, 3e-3)
         self.assertLess(x_error.reverse, 3e-3)
 
+    def test_set_check_option_precedence(self):
+        # Test that we omit derivs declared with dependent=False
+
+        class SimpleComp1(ExplicitComponent):
+            def setup(self):
+                self.add_input('ab', 13.0)
+                self.add_input('aba', 13.0)
+                self.add_input('ba', 13.0)
+                self.add_output('y', 13.0)
+
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                ab = inputs['ab']
+                aba = inputs['aba']
+                ba = inputs['ba']
+
+                outputs['y'] = ab**3 + aba**3 + ba**3
+
+            def compute_partials(self, inputs, partials):
+                ab = inputs['ab']
+                aba = inputs['aba']
+                ba = inputs['ba']
+
+                partials['y', 'ab'] = 3.0*ab**2
+                partials['y', 'aba'] = 3.0*aba**2
+                partials['y', 'ba'] = 3.0*ba**2
+
+
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('ab', 13.0))
+        prob.model.add_subsystem('p2', IndepVarComp('aba', 13.0))
+        prob.model.add_subsystem('p3', IndepVarComp('ba', 13.0))
+        comp = prob.model.add_subsystem('comp', SimpleComp1())
+
+        prob.model.connect('p1.ab', 'comp.ab')
+        prob.model.connect('p2.aba', 'comp.aba')
+        prob.model.connect('p3.ba', 'comp.ba')
+
+        prob.setup(check=False)
+
+        comp.set_check_partial_options(wrt='a*', step=1e-2)
+        comp.set_check_partial_options(wrt='*a', step=1e-4)
+
+        prob.run_model()
+
+        data = prob.check_partials(suppress_output=True)
+
+        # Note 'aba' gets the better value from the second options call with the *a wildcard.
+        assert_rel_error(self, data['comp']['y', 'ab']['J_fd'][0][0], 507.3901, 1e-4)
+        assert_rel_error(self, data['comp']['y', 'aba']['J_fd'][0][0], 507.0039, 1e-4)
+        assert_rel_error(self, data['comp']['y', 'ba']['J_fd'][0][0], 507.0039, 1e-4)
+
+    def test_option_printing(self):
+        # Make sure we print the approximation type for each variable.
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+
+        prob.set_solver_print(level=0)
+
+        comp.set_check_partial_options(wrt='x', method='cs')
+        comp.set_check_partial_options(wrt='y', form='central')
+
+        prob.setup(check=False, force_alloc_complex=True)
+        prob.run_model()
+
+        testlogger = TestLogger()
+        prob.check_partials()
+        totals = prob.check_partials(logger=testlogger)
+
+        lines = testlogger.get('info')
+        self.assertTrue('cs' in lines[6], msg='Did you change the format for printing check derivs?')
+        self.assertTrue('fd' in lines[28], msg='Did you change the format for printing check derivs?')
+
 
 class TestCheckPartialsFeature(unittest.TestCase):
 

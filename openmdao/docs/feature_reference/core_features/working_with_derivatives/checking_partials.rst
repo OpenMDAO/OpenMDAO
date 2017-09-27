@@ -30,22 +30,16 @@ Turn off standard output and just view the derivatives in the return:
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_check_partials_suppress
 
 
-Changing Settings on a Component
---------------------------------
+Changing Settings for Inputs on a Component
+-------------------------------------------
 
-You can change the settings for the approximation scheme that will be used to compare with your component's derivatives by
-setting certain check values in the component's metadata. When these are specified, then that particular value is used for
-all approximation for the component. This allows custom tailoring the settings on a component basis. The following settings
-are available for change:
+You can change the settings for the approximation schemes that will be used to compare with your component's derivatives by
+calling the `set_check_partial_options` method.
 
-===============  ====================================================================================================
-   Name          Description
-===============  ====================================================================================================
-check_method     Method for check: "fd" for finite difference, "cs" for complex step.
-check_form       Finite difference form for check, can be "forward", "central", or backward.
-check_step       Step size for finite difference check.
-check_step_calc  Type of step calculation for check, can be "abs" for absolute (default) or "rel" for relative.
-===============  ====================================================================================================
+.. automethod:: openmdao.core.component.Component.set_check_partial_options
+    :noindex:
+
+This allows custom tailoring of the approximation settings on a variable basis.
 
 Here, we show how to set the step size. In this case, the TrickyParaboloid requires a higher step size because the values and derivatives
 are fairly large, so we give it a higher stepsize.

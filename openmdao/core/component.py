@@ -631,7 +631,7 @@ class Component(System):
         Parameters
         ----------
         wrt : str or list of str
-            The name of the variables that derivatives are taken with respect to.
+            The name or names of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain a glob pattern.
         method : str
@@ -675,7 +675,7 @@ class Component(System):
                 wrt_matches = set(find_matches(pattern, outs + ins))
                 for match in wrt_matches:
                     if match in opts:
-                        opt = match[opts]
+                        opt = opts[match]
 
                         # New assignments take precedence
                         for name, value in zip(['method', 'form', 'step', 'step_calc'],
@@ -684,7 +684,10 @@ class Component(System):
                                 opt[name] = value
 
                     else:
-                        opts[match] = (method, form, step, step_calc)
+                        opts[match] = {'method': method,
+                                       'form': form,
+                                       'step': step,
+                                       'step_calc': step_calc}
 
         return opts
 

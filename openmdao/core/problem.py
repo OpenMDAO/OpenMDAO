@@ -695,6 +695,7 @@ class Problem(object):
                 continue
 
             c_name = comp.pathname
+            all_fd_options[c_name] = {}
             explicit = isinstance(comp, ExplicitComponent)
             deprecated = isinstance(comp, DepComponent)
 
@@ -719,7 +720,7 @@ class Problem(object):
                 # Determine if fd or cs.
                 method = global_options.get('method', 'fd')
                 if local_wrt in local_opts:
-                    local_method = local_opts[local_wrt][0]
+                    local_method = local_opts[local_wrt]['method']
                     if local_method:
                         method = local_method
 
@@ -747,13 +748,12 @@ class Problem(object):
 
                 # Precedence: component options > global options > defaults
                 if local_wrt in local_opts:
-                    _, form, step, step_calc = local_opts[local_wrt]
-                    for name, value in zip(['form', 'step', 'step_calc'], [form, step, step_calc]):
+                    for name in ['form', 'step', 'step_calc']:
+                        value = local_opts[local_wrt][name]
                         if value is not None:
                             fd_options[name] = value
 
-                # TODO: by var not component
-                all_fd_options[c_name] = fd_options
+                all_fd_options[c_name][local_wrt] = fd_options
 
                 approximations[fd_options['method']].add_approximation(abs_key, fd_options)
 
@@ -1637,13 +1637,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
         sys_name = system.pathname
         explicit = False
 
-        fd_desc = "{}:{}".format(global_options[sys_name]['method'],
-                                 global_options[sys_name]['form'])
-        if compact_print:
-            check_desc = "    (Check Type: {})".format(fd_desc)
-        else:
-            check_desc = ""
-
         # Match header to appropriate type.
         if isinstance(system, Component):
             sys_type = 'Component'
@@ -1660,7 +1653,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
 
         if not suppress_output:
             logger.info('-' * (len(sys_name) + 15))
-            logger.info("{}: '{}'{}".format(sys_type, sys_name, check_desc))
+            logger.info("{}: '{}'".format(sys_type, sys_name))
             logger.info('-' * (len(sys_name) + 15))
 
             if compact_print:
@@ -1697,6 +1690,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
         sorted_keys = sorted(iterkeys(derivatives))
 
         for of, wrt in sorted_keys:
+
             derivative_info = derivatives[of, wrt]
             forward = derivative_info['J_fwd']
             if not totals:
@@ -1765,6 +1759,20 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
                             rel_err.forward_reverse,
                         ))
                 else:
+
+                    if totals:
+                        fd_desc = "{}:{}".format(global_options['']['method'],
+                                                 global_options['']['form'])
+
+                    else:
+                        fd_desc = "{}:{}".format(global_options[sys_name][wrt]['method'],
+                                                 global_options[sys_name][wrt]['form'])
+
+                    if compact_print:
+                        check_desc = "    (Check Type: {})".format(fd_desc)
+                    else:
+                        check_desc = ""
+
                     # Magnitudes
                     logger.info("  {}: '{}' wrt '{}'\n".format(sys_name, of, wrt))
                     logger.info('    Forward Magnitude : {:.6e}'.format(magnitude.forward))

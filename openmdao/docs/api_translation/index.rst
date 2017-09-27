@@ -246,6 +246,24 @@ Suppress Output While Checking Partial Derivatives
       data = prob.check_partials(out_stream=None)
 
 
+Check Partial Derivatives with Complex Step
+===========================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_method_global
+      opts
+      check_partials
+
+        prob.root.deriv_options['check_type'] = 'cs'
+
+        prob.setup()
+        prob.run()
+
+        prob.check_partials()
+
+
 Change Derivative Behavior
 --------------------------
 
