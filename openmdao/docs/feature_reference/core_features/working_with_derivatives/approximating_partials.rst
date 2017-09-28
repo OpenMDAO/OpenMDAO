@@ -1,4 +1,4 @@
-.. _feature_approx_partials:
+.. _feature_delare_partials_approx:
 
 *********************************
 Approximating Partial Derivatives

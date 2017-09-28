@@ -33,7 +33,7 @@ class TestSellarOpt(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         # Ask OpenMDAO to finite-difference across the model to compute the gradients for the optimizer
-        prob.model.approx_total_derivs()
+        prob.model.approx_totals()
 
 
         prob.run_driver()

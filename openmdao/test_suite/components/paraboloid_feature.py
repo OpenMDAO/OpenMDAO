@@ -17,7 +17,7 @@ class Paraboloid(ExplicitComponent):
         self.add_output('f_xy', val=0.0)
 
         # Finite difference all partials.
-        self.approx_partials('*', '*', method='fd')
+        self.declare_partials('*', '*', method='fd')
 
     def compute(self, inputs, outputs):
         """
