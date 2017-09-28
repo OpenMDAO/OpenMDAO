@@ -16,11 +16,6 @@ Use :code:`pip` to install openmdao locally:
 
 :code:`pip install .`
 
-.. note::
-
-    the :code:`-e` option to pip tell it to use a development install which links to the repository you just cloned.
-    that means that you don't need to re-install every time you pull down new changes to the repository.
-
 Hello world!
 *******************
 Here is a really short run file to get you started running your first optimization.

@@ -16,7 +16,7 @@ You can see the coupling between the two disciplines show up through the :math:`
 
 .. figure:: images/sellar_xdsm.png
    :align: center
-   :width: 80%
+   :width: 50%
    :alt: XDSM diagram of the Sellar problem
 
 ----

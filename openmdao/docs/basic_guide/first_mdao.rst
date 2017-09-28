@@ -32,7 +32,7 @@ Controling the Solver Print Output
 Notice the call to :code:`prob.set_solver_print()`,
 which sets the solver output to level 0.
 This is the semi-quiet setting where you only get notified if the solver failed to converge.
-There are lots of ways to :ref:`configure the solver print <solver-options>` output in your model to suite your needs.
+There are lots of ways to :ref:`configure the solver print <solver-options>` output in your model to suit your needs.
 
 
 Approximate the total derivatives with finite difference
@@ -44,9 +44,11 @@ so we'll just finite-difference across the whole model to approximate the deriva
 That is accompished by this line of code:
 
 .. code::
+
     prob.model.approx_total_derivs()
 
 .. note::
+
     We're using finite-difference here for simplicity,
     but for larger models finite differencing results in a high computational cost and can have limited accuracy.
     Its much better to use analytic derivatives with your models.

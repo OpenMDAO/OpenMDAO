@@ -50,15 +50,15 @@ The :code:`ExplicitComponent` allows you to define your equations in the explici
 The :code:`ImplicitComponent` expects you to compute all the residuals yourself in the :code:`apply_linear` method.
 Regardless of which type of component you chose, OpenMDAO sees everything in the implicit form, and treats your model as system of nonlinear equations.
 
-Multiple components can be aggregated into a hierarchy of with the :code:`Group` class.
+Multiple components can be aggregated into a hierarchy with the :code:`Group` class.
 A Group is seen by OpenMDAO as a collection of all the implicit equations from all of its children components.
-Since both :code:`Component` and :code:`Group` represent systems of nonlienar equations,
+Since both :code:`Component` and :code:`Group` represent systems of nonlinear equations,
 you call the :ref:`add_system <feature_adding_subsystem_to_a_group>` method to construct a model hierarchy.
 
 .. note::
 
     The underlying mathematics that power OpenMDAO are based on the MAUD_ architecture, which established the foundation
     for treating a multidisciplinary model as a single system of nonlinear equations as a means to efficiently computing
-    analytic derivatives across a large multidisciplinary model.
+    analytic derivatives across it.
 
 .. _MAUD: http://mdolab.engin.umich.edu/sites/default/files/Hwang_dissertation.pdf

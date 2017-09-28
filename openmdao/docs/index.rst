@@ -11,7 +11,7 @@ but the framework also has a number of parallel computing features that can work
 User Guide
 ***************************
 
-These are a collection of tutorial problems that teach you import concepts and techniques for using OpenMDAO.
+These are a collection of tutorial problems that teach you important concepts and techniques for using OpenMDAO.
 For new users, you should work through all material in **Getting Started** and **Basic User Guide**.
 That represents the minimum set of information you need to understand to be able to work with OpenMDAO models.
 

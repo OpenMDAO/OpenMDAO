@@ -4,7 +4,7 @@ import unittest
 
 from openmdao.api import Problem
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.test_suite.components.sellar import SellarNoDerivatives
+from openmdao.test_suite.components.sellar_feature import SellarMDA
 
 
 class TestSellarFeature(unittest.TestCase):
@@ -13,7 +13,7 @@ class TestSellarFeature(unittest.TestCase):
         # Just tests Newton on Sellar with FD derivs.
 
         prob = Problem()
-        prob.model = SellarNoDerivatives()
+        prob.model = SellarMDA()
 
         prob.setup(check=False)
         prob.run_model()
