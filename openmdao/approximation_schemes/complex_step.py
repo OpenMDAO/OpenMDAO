@@ -118,12 +118,20 @@ class ComplexStep(ApproximationScheme):
         # Turn on complex step.
         system._inputs._vector_info._under_complex_step = True
 
+        # create a scratch array
+        cache = system._outputs.get_data()
+        results_clone = current_vec._clone(True)
+
         for key, approximations in groupby(self._exec_list, self._key_fun):
             # groupby (along with this key function) will group all 'of's that have the same wrt and
             # step size.
             wrt, form, delta = key
             if form == 'reverse':
                 delta *= -1.0
+            fact = 1.0 / delta
+            if deriv_type == 'total':
+                # Sign difference between output and resids
+                fact = -fact
 
             if wrt in system._owns_approx_wrt_idx:
                 in_idx = system._owns_approx_wrt_idx[wrt]
@@ -154,14 +162,10 @@ class ComplexStep(ApproximationScheme):
             for i_count, idx in enumerate(in_idx):
                 # Run the Finite Difference
                 input_delta = [(wrt, idx, delta)]
-                result = self._run_point_complex(system, input_delta, deriv_type)
+                result = self._run_point_complex(system, input_delta, cache, results_clone,
+                                                 deriv_type)
 
                 for of, subjac in outputs:
-                    fact = 1.0 / delta
-                    if deriv_type == 'total':
-                        # Sign difference between output and resids
-                        fact = -fact
-
                     if of in system._owns_approx_of_idx:
                         out_idx = system._owns_approx_of_idx[of]
                         subjac[:, i_count] = result._imag_views_flat[of][out_idx] * fact
@@ -175,7 +179,7 @@ class ComplexStep(ApproximationScheme):
         # Turn off complex step.
         system._inputs._vector_info._under_complex_step = False
 
-    def _run_point_complex(self, system, input_deltas, deriv_type='partial'):
+    def _run_point_complex(self, system, input_deltas, cache, results, deriv_type='partial'):
         """
         Perturb the system inputs with a complex step, runs, and returns the results.
 
@@ -183,6 +187,10 @@ class ComplexStep(ApproximationScheme):
         ----------
         input_deltas : list
             List of (input name, indices, delta) tuples, where input name is an absolute name.
+        cache : ndarray
+            An array the same size as the system outputs that is used for temporary storage.
+        results : Vector
+            An vector cloned from the outputs vector. Used to store the results.
         deriv_type : str
             One of 'total' or 'partial', indicating if total or partial derivatives are being
             approximated.
@@ -212,11 +220,11 @@ class ComplexStep(ApproximationScheme):
             else:
                 inputs._imag_views_flat[in_name][idxs] += delta
 
-        cache = results_vec.get_data()
+        results_vec.get_data(cache)
         run_model()
 
         # TODO: Grab only results of interest
-        results = results_vec._clone(initialize_views=True)
+        results.set_vec(results_vec)
         results_vec.set_data(cache)
 
         for in_name, idxs, delta in input_deltas:
