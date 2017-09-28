@@ -45,7 +45,7 @@ class ApproximationScheme(object):
         """
         pass
 
-    def _run_point(self, system, input_deltas, deriv_type='partial'):
+    def _run_point(self, system, input_deltas, cache, deriv_type='partial'):
         """
         Alter the specified inputs by the given deltas, runs the system, and returns the results.
 
@@ -53,6 +53,8 @@ class ApproximationScheme(object):
         ----------
         input_deltas : list
             List of (input name, indices, delta) tuples, where input name is an absolute name.
+        cache : ndarray
+            An array the same size as the system outputs that is used for temporary storage.
         deriv_type : str
             One of 'total' or 'partial', indicating if total or partial derivatives are being
             approximated.
@@ -83,7 +85,7 @@ class ApproximationScheme(object):
                 inputs._views_flat[in_name][idxs] += delta
 
         # TODO: Grab only results of interest
-        cache = results_vec.get_data()
+        results_vec.get_data(cache)
         run_model()
 
         results = results_vec._clone()
