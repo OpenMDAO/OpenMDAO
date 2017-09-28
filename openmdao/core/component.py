@@ -594,8 +594,7 @@ class Component(System):
             Keyword arguments for controlling the behavior of the approximation.
         """
         supported_methods = {'fd': FiniteDifference,
-                             'cs': ComplexStep,
-                             'exact': None}
+                             'cs': ComplexStep}
 
         if method not in supported_methods:
             msg = 'Method "{}" is not supported, method must be one of {}'
