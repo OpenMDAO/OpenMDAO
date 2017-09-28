@@ -20,7 +20,6 @@ def check_config(problem, logger=None):
     ----------
     problem : Problem
         The Problem being checked.
-
     logger : object
         Logging object.
     """
