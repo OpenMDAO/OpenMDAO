@@ -35,13 +35,13 @@ class TestLinearRunOnceSolver(unittest.TestCase):
         # Make sure value is fine.
         assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
 
     def test_feature_solver(self):
@@ -61,7 +61,7 @@ class TestLinearRunOnceSolver(unittest.TestCase):
 
         of = ['f_xy']
         wrt = ['x', 'y']
-        derivs = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+        derivs = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
         assert_rel_error(self, derivs['f_xy']['x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy']['y'], [[8.0]], 1e-6)

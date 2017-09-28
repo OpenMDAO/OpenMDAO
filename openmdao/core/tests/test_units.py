@@ -48,7 +48,7 @@ class TestUnitConversion(unittest.TestCase):
         # Check the total derivatives in forward mode
         wrt = ['px1.x1']
         of = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
@@ -57,7 +57,7 @@ class TestUnitConversion(unittest.TestCase):
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
@@ -111,7 +111,7 @@ class TestUnitConversion(unittest.TestCase):
         # Check the total derivatives in forward mode
         wrt = ['px1.x1']
         of = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
@@ -120,7 +120,7 @@ class TestUnitConversion(unittest.TestCase):
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
@@ -201,14 +201,14 @@ class TestUnitConversion(unittest.TestCase):
         # Check the total derivatives in forward mode
         wrt = ['px1.x1']
         of = ['tgtF.x3']
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
 
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
 
@@ -236,7 +236,7 @@ class TestUnitConversion(unittest.TestCase):
 
         indep_list = ['x1']
         unknown_list = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
-        J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list, return_format='dict')
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list, return_format='dict')
 
         assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
@@ -244,16 +244,16 @@ class TestUnitConversion(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
-        J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list, return_format='dict')
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list, return_format='dict')
 
         assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
         assert_rel_error(self, J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
-        prob.model.approx_total_derivs(method='fd')
+        prob.model.approx_totals(method='fd')
         prob.setup(check=False, mode='rev')
         prob.run_model()
-        J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list, return_format='dict')
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list, return_format='dict')
 
         assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
@@ -354,7 +354,7 @@ class TestUnitConversion(unittest.TestCase):
         # Check the total derivatives in forward mode
         wrt = ['x1']
         of = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         assert_rel_error(self, J['tgtF.x3', 'x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3', 'x1'][0][0], 1.0, 1e-6)
@@ -363,7 +363,7 @@ class TestUnitConversion(unittest.TestCase):
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         assert_rel_error(self, J['tgtF.x3', 'x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3', 'x1'][0][0], 1.0, 1e-6)
@@ -397,7 +397,7 @@ class TestUnitConversion(unittest.TestCase):
 
         wrt = ['x1']
         of = ['sub2.tgtF.x3', 'sub2.tgtC.x3', 'sub2.tgtK.x3']
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
         assert_rel_error(self, J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
@@ -406,7 +406,7 @@ class TestUnitConversion(unittest.TestCase):
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
         assert_rel_error(self, J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
@@ -439,7 +439,7 @@ class TestUnitConversion(unittest.TestCase):
 
         wrt = ['x1']
         of = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
         assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
@@ -448,7 +448,7 @@ class TestUnitConversion(unittest.TestCase):
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
         assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)

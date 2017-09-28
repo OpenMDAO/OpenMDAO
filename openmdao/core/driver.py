@@ -387,8 +387,7 @@ class Driver(object):
         self.iter_count += 1
         return failure_flag
 
-    def _compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict',
-                              global_names=True):
+    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -418,8 +417,8 @@ class Driver(object):
 
         if return_format == 'dict':
 
-            derivs = prob._compute_total_derivs(of=of, wrt=wrt, return_format=return_format,
-                                                global_names=global_names)
+            derivs = prob._compute_totals(of=of, wrt=wrt, return_format=return_format,
+                                          global_names=global_names)
 
             for okey, oval in iteritems(derivs):
                 for ikey, val in iteritems(oval):
@@ -441,8 +440,8 @@ class Driver(object):
         elif return_format == 'array':
 
             # Compute the derivatives in dict format, and then convert to array.
-            derivs = prob._compute_total_derivs(of=of, wrt=wrt, return_format='dict',
-                                                global_names=global_names)
+            derivs = prob._compute_totals(of=of, wrt=wrt, return_format='dict',
+                                          global_names=global_names)
 
             # Use sizes pre-computed in derivs for ease
             osize = 0

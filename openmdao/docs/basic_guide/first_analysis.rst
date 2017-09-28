@@ -56,7 +56,7 @@ or :ref:`ImplicitComponent <openmdao.core.implicitcomponent.py>`.
 Since our simple paraboloid function is explicit, we'll use the :ref:`ExplicitComponent <openmdao.core.explicitcomponent.py>`.
 You see two methods defined:
 
-    - `setup`: define all your inputs and outputs here
+    - `setup`: define all your inputs and outputs here, and declare derivatives
     - `compute`: calculation of all output values for the given inputs
 
 In the setup method you define the inputs and outputs of the component,

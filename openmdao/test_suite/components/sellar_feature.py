@@ -34,7 +34,7 @@ class SellarDis1(ExplicitComponent):
         self.add_output('y1', val=1.0)
 
         # Finite difference all partials.
-        self.approx_partials('*', '*', method='fd')
+        self.declare_partials('*', '*', method='fd')
 
     def compute(self, inputs, outputs):
         """
@@ -65,7 +65,7 @@ class SellarDis2(ExplicitComponent):
         self.add_output('y2', val=1.0)
 
         # Finite difference all partials.
-        self.approx_partials('*', '*')
+        self.declare_partials('*', '*', method='fd')
 
     def compute(self, inputs, outputs):
         """
@@ -131,7 +131,7 @@ class SellarDis1CS(ExplicitComponent):
         self.add_output('y1', val=1.0)
 
         # Finite difference all partials.
-        self.approx_partials('*', '*', method='cs')
+        self.declare_partials('*', '*', method='cs')
 
     def compute(self, inputs, outputs):
         """
@@ -163,7 +163,7 @@ class SellarDis2CS(ExplicitComponent):
         self.add_output('y2', val=1.0)
 
         # Finite difference all partials.
-        self.approx_partials('*', '*', method='cs')
+        self.declare_partials('*', '*', method='cs')
 
     def compute(self, inputs, outputs):
         """

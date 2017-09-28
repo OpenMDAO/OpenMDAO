@@ -106,7 +106,7 @@ class Recording(object):
         do_recording = True
 
         for stack_item in recording_iteration.stack:
-            if stack_item[0] in ('_run_apply', '_compute_total_derivs'):
+            if stack_item[0] in ('_run_apply', '_compute_totals'):
                 do_recording = False
                 break
 

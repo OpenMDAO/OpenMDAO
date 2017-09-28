@@ -146,7 +146,7 @@ class ExplicitCycleComp(ExplicitComponent):
                 raise unittest.SkipTest('not testing FD and matvec')
             if pd_type != 'array':
                 raise unittest.SkipTest('only dense FD supported')
-            self.approx_partials('*', '*')
+            self.declare_partials('*', '*', method='fd')
 
         elif self.metadata['jacobian_type'] != 'matvec' and pd_type != 'array':
             num_var = self.num_var
@@ -175,6 +175,10 @@ class ExplicitCycleComp(ExplicitComponent):
 
             self.declare_partials(self._cycle_names['theta_out'], self._cycle_names['theta'],
                                   **self._array2kwargs(dtheta, pd_type))
+
+        else:
+            # Declare everything
+            self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
         theta = inputs[self._cycle_names['theta']]

@@ -6,9 +6,10 @@ Approximating Partial Derivatives
 
 OpenMDAO allows you to specify analytic derivatives for your models, but it is not a requirement.
 If certain partial derivatives are not available, you can ask the framework to approximate the
-derivatives by using the :code:`approx_partials` method inside :code:`setup`.
+derivatives by using the :code:`declare_partials` method inside :code:`setup` and giving it a
+method that is either 'fd' for finite diffference or 'cs' for complex step.
 
-.. automethod:: openmdao.core.component.Component.approx_partials
+.. automethod:: openmdao.core.component.Component.declare_partials
     :noindex:
 
 Usage
@@ -35,11 +36,11 @@ Complex Step
 If you have a pure python component (or an external code that can support complex inputs and outputs) then you can also choose to use
 complex step to calculate the Jacobian of that component. This will give more accurate derivatives that are insensitive to the step size.
 Like finite difference, complex step runs your component using the apply_nonlinear or solve_nonlinear functions, but it applies a step
-in the complex direction. You can activate it using the :code:`approx_partials` method inside :code:`setup`. In many cases, this will
-require no other changes to your code, as long as all of the calculation in your solve_nonlinear and apply_nonlinear support complex
-numbers. During a complex step, the incoming inputs vector will return a complex number when a variable is being stepped.
-Likewise, the outputs and residuals vectors will accept complex values. If you are allocating temporary numpy arrays, remember to
-conditionally set their dtype based on the dtype in the outputs vector.
+in the complex direction. You can activate it using the :code:`declare_partials` method inside :code:`setup` and giving it a method of 'cs'.
+In many cases, this will require no other changes to your code, as long as all of the calculation in your solve_nonlinear and
+apply_nonlinear support complex numbers. During a complex step, the incoming inputs vector will return a complex number when a variable
+is being stepped. Likewise, the outputs and residuals vectors will accept complex values. If you are allocating temporary numpy arrays,
+remember to conditionally set their dtype based on the dtype in the outputs vector.
 
 Here is how to turn on complex step for all input/output pairs in the Sellar problem:
 
@@ -54,12 +55,12 @@ Approximating Semi-Total Derivatives
 ====================================
 
 There are also times where it makes more sense to approximate the derivatives for an entire group in one shot. You can turn on
-the approximation by calling `approx_total_derivs` on any `Group`.
+the approximation by calling `approx_totals` on any `Group`.
 
-.. automethod:: openmdao.core.group.Group.approx_total_derivs
+.. automethod:: openmdao.core.group.Group.approx_totals
     :noindex:
 
-The default method is for approximating semi-total derivatives is the finite difference method. When you call the `approx_total_derivs` method on a group, OpenMDAO will
+The default method is for approximating semi-total derivatives is the finite difference method. When you call the `approx_totals` method on a group, OpenMDAO will
 generate an approximate Jacobian for the entire group during the linearization step before derivatives are calculated. OpenMDAO automatically figures out
 which inputs and output pairs are needed in this Jacobian. When `solve_linear` is called from any system that contains this system, the approximated Jacobian
 is used for the derivatives in this system.

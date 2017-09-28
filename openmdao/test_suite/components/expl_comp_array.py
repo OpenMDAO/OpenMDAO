@@ -18,6 +18,8 @@ class TestExplCompArray(ExplicitComponent):
         self.add_output('areas', val=np.ones((2, 2)))
         self.add_output('total_volume', val=1.)
 
+        self.declare_partials('*', '*')
+
     def compute(self, inputs, outputs):
         thk = self.metadata['thickness']
 

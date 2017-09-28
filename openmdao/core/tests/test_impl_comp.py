@@ -29,6 +29,8 @@ class QuadraticComp(ImplicitComponent):
         self.add_input('c', val=1.)
         self.add_output('x', val=0.)
 
+        self.declare_partials(of='*', wrt='*')
+
     def apply_nonlinear(self, inputs, outputs, residuals):
         a = inputs['a']
         b = inputs['b']
@@ -139,7 +141,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp2.x'], 3.)
         assert_rel_error(self, prob['comp2.x'], 3.)
 
-        total_derivs = prob.compute_total_derivs(
+        total_derivs = prob.compute_totals(
             wrt=['comp1.a', 'comp1.b', 'comp1.c'],
             of=['comp2.x', 'comp3.x']
         )
@@ -423,6 +425,8 @@ class ImplicitCompTestCase(unittest.TestCase):
                 self.add_input('b', val=1.)
                 self.add_input('c', val=1.)
                 self.add_output('x', val=0.)
+
+                self.declare_partials(of='*', wrt='*')
 
             def apply_nonlinear(self, inputs, outputs, residuals):
                 a = inputs['a']
