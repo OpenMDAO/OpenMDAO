@@ -180,7 +180,7 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
         of = ['area']
         wrt = ['length']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['area', 'length'][0][0], 2.0, 1e-6)
 
     def test_specify_solver(self):
@@ -210,7 +210,7 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
@@ -242,7 +242,7 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 0.0, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 0.0, .00001)
 
@@ -274,7 +274,7 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001055699, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448533563, .00001)
 

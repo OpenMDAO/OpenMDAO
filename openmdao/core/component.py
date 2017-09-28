@@ -2,7 +2,6 @@
 
 from __future__ import division
 
-from fnmatch import fnmatchcase
 import numpy as np
 from itertools import product
 from six import string_types, iteritems, itervalues
@@ -16,7 +15,7 @@ from openmdao.core.system import System
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    warn_deprecation, ContainsAll
+    warn_deprecation, ContainsAll, find_matches
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 
 
@@ -50,6 +49,8 @@ class Component(System):
         Cached storage of user-declared partials.
     _approximated_partials : list
         Cached storage of user-declared approximations.
+    _declared_partial_checks : list
+        Cached storage of user-declared check partial options.
     """
 
     def __init__(self, **kwargs):
@@ -78,6 +79,7 @@ class Component(System):
 
         self._declared_partials = []
         self._approximated_partials = []
+        self._declared_partial_checks = []
 
     def setup(self):
         """
@@ -515,37 +517,6 @@ class Component(System):
 
         return metadata
 
-    def approx_partials(self, of, wrt, method='fd', **kwargs):
-        """
-        Inform the framework that the specified derivatives are to be approximated.
-
-        Parameters
-        ----------
-        of : str or list of str
-            The name of the residual(s) that derivatives are being computed for.
-            May also contain a glob pattern.
-        wrt : str or list of str
-            The name of the variables that derivatives are taken with respect to.
-            This can contain the name of any input or output variable.
-            May also contain a glob pattern.
-        method : str
-            The type of approximation that should be used. Valid options include:
-                - 'fd': Finite Difference, 'cs': Complex Step
-        **kwargs : dict
-            Keyword arguments for controlling the behavior of the approximation.
-        """
-        supported_methods = {'fd': FiniteDifference,
-                             'cs': ComplexStep}
-
-        if method not in supported_methods:
-            msg = 'Method "{}" is not supported, method must be one of {}'
-            raise ValueError(msg.format(method, supported_methods.keys()))
-
-        if method not in self._approx_schemes:
-            self._approx_schemes[method] = supported_methods[method]()
-
-        self._approximated_partials.append((of, wrt, method, kwargs))
-
     def _approx_partials(self, of, wrt, method='fd', **kwargs):
         """
         Inform the framework that the specified derivatives are to be approximated.
@@ -585,8 +556,8 @@ class Component(System):
                 meta.update(kwargs)
                 self._subjacs_info[abs_key] = meta
 
-    def declare_partials(self, of, wrt, dependent=True,
-                         rows=None, cols=None, val=None):
+    def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None,
+                         method='exact', **kwargs):
         """
         Declare information about this component's subjacobians.
 
@@ -615,12 +586,110 @@ class Component(System):
         val : float or ndarray of float or scipy.sparse
             Value of subjacobian.  If rows and cols are not None, this will
             contain the values found at each (row, col) location in the subjac.
+        method : str
+            The type of approximation that should be used. Valid options include:
+                - 'fd': Finite Difference, 'cs': Complex Step, 'exact': use the component
+                defined analytic derivatives. Default is 'exact'.
+        **kwargs : dict
+            Keyword arguments for controlling the behavior of the approximation.
         """
-        # If only one of rows/cols is specified
-        if (rows is None) ^ (cols is None):
-            raise ValueError('If one of rows/cols is specified, then both must be specified')
+        supported_methods = {'fd': FiniteDifference,
+                             'cs': ComplexStep,
+                             'exact': None}
 
-        self._declared_partials.append((of, wrt, dependent, rows, cols, val))
+        if method not in supported_methods:
+            msg = 'Method "{}" is not supported, method must be one of {}'
+            raise ValueError(msg.format(method, supported_methods.keys()))
+
+        # Analytic Derivative for this jacobian pair
+        if method == 'exact':
+
+            # If only one of rows/cols is specified
+            if (rows is None) ^ (cols is None):
+                raise ValueError('If one of rows/cols is specified, then both must be specified')
+
+            self._declared_partials.append((of, wrt, dependent, rows, cols, val))
+
+        # Approximation of the derivative, former API call approx_partials.
+        else:
+
+            if method not in self._approx_schemes:
+                self._approx_schemes[method] = supported_methods[method]()
+
+            # If rows/cols is specified
+            if rows is not None or cols is not None:
+                raise ValueError('Sparse FD specification not supported yet.')
+
+            # Need to declare the Jacobian element too.
+            self._declared_partials.append((of, wrt, True, rows, cols, val))
+
+            self._approximated_partials.append((of, wrt, method, kwargs))
+
+    def set_check_partial_options(self, wrt, method='fd', form=None, step=None, step_calc=None):
+        """
+        Set options that will be used for checking partial derivatives.
+
+        Parameters
+        ----------
+        wrt : str or list of str
+            The name or names of the variables that derivatives are taken with respect to.
+            This can contain the name of any input or output variable.
+            May also contain a glob pattern.
+        method : str
+            Method for check: "fd" for finite difference, "cs" for complex step.
+        form : str
+            Finite difference form for check, can be "forward", "central", or "backward". Leave
+            undeclared to keep unchanged from previous or default value.
+        step : float
+            Step size for finite difference check. Leave undeclared to keep unchanged from previous
+            or default value.
+        step_calc : str
+            Type of step calculation for check, can be "abs" for absolute (default) or "rel" for
+            relative.  Leave undeclared to keep unchanged from previous or default value.
+        """
+        supported_methods = ('fd', 'cs')
+
+        if method not in supported_methods:
+            msg = 'Method "{}" is not supported, method must be one of {}'
+            raise ValueError(msg.format(method, supported_methods.keys()))
+
+        wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
+        self._declared_partial_checks.append((wrt_list, method, form, step, step_calc))
+
+    def _get_check_partial_options(self):
+        """
+        Return dictionary of partial options with pattern matches processed.
+
+        This is called by check_partials.
+
+        Returns
+        -------
+        dict(wrt : (options))
+            Dictionary keyed by name with tuples of options (method, form, step, step_calc)
+        """
+        opts = {}
+        outs = list(self._var_allprocs_prom2abs_list['output'].keys())
+        ins = list(self._var_allprocs_prom2abs_list['input'].keys())
+        for wrt_list, method, form, step, step_calc in self._declared_partial_checks:
+            for pattern in wrt_list:
+                wrt_matches = find_matches(pattern, outs + ins)
+                for match in wrt_matches:
+                    if match in opts:
+                        opt = opts[match]
+
+                        # New assignments take precedence
+                        for name, value in zip(['method', 'form', 'step', 'step_calc'],
+                                               [method, form, step, step_calc]):
+                            if value is not None:
+                                opt[name] = value
+
+                    else:
+                        opts[match] = {'method': method,
+                                       'form': form,
+                                       'step': step,
+                                       'step_calc': step_calc}
+
+        return opts
 
     def _declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None):
         """
@@ -728,16 +797,8 @@ class Component(System):
         """
         of_list = [of] if isinstance(of, string_types) else of
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
-        glob_patterns = {'*', '?', '['}
         outs = list(self._var_allprocs_prom2abs_list['output'].keys())
         ins = list(self._var_allprocs_prom2abs_list['input'].keys())
-
-        def find_matches(pattern, var_list):
-            if glob_patterns.intersection(pattern):
-                return [name for name in var_list if fnmatchcase(name, pattern)]
-            elif pattern in var_list:
-                return [pattern]
-            return []
 
         of_pattern_matches = [(pattern, find_matches(pattern, outs)) for pattern in of_list]
         wrt_pattern_matches = [(pattern, find_matches(pattern, outs + ins)) for pattern in wrt_list]

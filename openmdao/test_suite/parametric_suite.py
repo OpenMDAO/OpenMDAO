@@ -238,7 +238,7 @@ class ParameterizedInstance(object):
         of = root.total_of
         wrt = root.total_wrt
 
-        totals = self.problem.compute_total_derivs(of, wrt)
+        totals = self.problem.compute_totals(of, wrt)
         return totals
 
     def __str__(self):

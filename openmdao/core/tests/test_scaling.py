@@ -161,6 +161,8 @@ class ScalingTestComp(ImplicitComponent):
         self.add_input('x')
         self.add_output('y', val = init_state, ref=ref, res_ref=res_ref)
 
+        self.declare_partials('*', '*')
+
     def apply_nonlinear(self, inputs, outputs, residuals):
         r1, r2, c1, c2 = self.metadata['coeffs']
 
@@ -324,9 +326,6 @@ class TestScaling(unittest.TestCase):
 
         class Simple(ExplicitComponent):
 
-            def __init__(self, **kwargs):
-                super(Simple, self).__init__(**kwargs)
-
             def initialize(self):
                 self.metadata.declare('ref', default=1.0)
                 self.metadata.declare('ref0', default=0.0)
@@ -341,6 +340,8 @@ class TestScaling(unittest.TestCase):
 
                 self.add_input('x', val=1.0)
                 self.add_output('y', val=1.0, ref=ref, ref0=ref0, res_ref=res_ref)
+
+                self.declare_partials('*', '*')
 
             def compute(self, inputs, outputs):
                 outputs['y'] = 2.0*(inputs['x'] + 1.0)
@@ -655,6 +656,8 @@ class TestScaling(unittest.TestCase):
                 self.add_output('extra', val=np.zeros(2), ref=np.array([12.0, 13.0]),
                                 ref0=np.array([14.0, 17.0]))
 
+                self.declare_partials('*', '*')
+
             def apply_nonlinear(self, inputs, outputs, residuals):
                 super(ImpCompArrayScale, self).apply_nonlinear(inputs, outputs, residuals)
                 residuals['extra'] = 2.0*self.metadata['mtx'].dot(outputs['x']) - 3.0*inputs['rhs']
@@ -819,6 +822,8 @@ class TestScaling(unittest.TestCase):
             def setup(self):
                 self.add_input('x', val=6.0)
                 self.add_output('y', val=1.0, ref=100.0, res_ref=10.1)
+
+                self.declare_partials('*', '*')
 
             def apply_nonlinear(self, inputs, outputs, residuals):
                 residuals['y'] = 3.0*outputs['y'] - inputs['x']

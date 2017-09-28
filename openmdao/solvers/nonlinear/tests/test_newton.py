@@ -185,7 +185,7 @@ class TestNewton(unittest.TestCase):
         prob = Problem()
         prob.model = SellarStateConnection(nonlinear_solver=NewtonSolver())
 
-        prob.model.approx_total_derivs(method='fd')
+        prob.model.approx_totals(method='fd')
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -685,6 +685,8 @@ class TestNewton(unittest.TestCase):
                 self.add_output('x', val=0.)
                 self.applied = False
 
+                self.declare_partials(of='*', wrt='*')
+
             def apply_nonlinear(self, inputs, outputs, residuals):
                 residuals['x'] = np.exp(outputs['x']) - \
                     inputs['a']**2 * outputs['x']**2
@@ -741,6 +743,8 @@ class TestNewton(unittest.TestCase):
                 self.add_input('a', val=1.)
                 self.add_output('x', val=0.)
 
+                self.declare_partials(of='*', wrt='*')
+
             def apply_nonlinear(self, inputs, outputs, residuals):
                 residuals['x'] = np.exp(outputs['x']) - \
                     inputs['a']**2 * outputs['x']**2
@@ -771,7 +775,7 @@ class TestNewton(unittest.TestCase):
 
         prob.run_model()
 
-        J = prob.compute_total_derivs()
+        J = prob.compute_totals()
         assert_rel_error(self, J['ecomp.y', 'p1.x'][0][0], -0.703467422498, 1e-6)
 
 

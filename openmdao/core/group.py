@@ -1498,7 +1498,7 @@ class Group(System):
         if self._linear_solver is not None and do_ln:
             self._linear_solver._linearize()
 
-    def approx_total_derivs(self, method='fd', **kwargs):
+    def approx_totals(self, method='fd', **kwargs):
         """
         Approximate derivatives for a Group using the specified approximation method.
 
@@ -1594,6 +1594,12 @@ class Group(System):
                         meta_changes['idx_wrt'] = self._owns_approx_wrt_idx[key[1]]
 
                     meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+
+                    # A group under approximation needs all keys from below, so set dependent to
+                    # True.
+                    # TODO: Maybe just need a subset of keys (those that go to the boundaries.)
+                    meta['dependent'] = True
+
                     meta.update(meta_changes)
                     meta.update(self._owns_approx_jac_meta)
                     self._subjacs_info[key] = meta

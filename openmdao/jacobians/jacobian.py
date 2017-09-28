@@ -147,6 +147,12 @@ class Jacobian(object):
         """
         abs_key = key2abs_key(self._system, key)
         if abs_key is not None:
+
+            # You can only set declared subjacobians.
+            if abs_key not in self._subjacs_info:
+                msg = 'Variable name pair ("{}", "{}") must first be declared.'
+                raise KeyError(msg.format(key[0], key[1]))
+
             self._set_abs(abs_key, subjac)
         else:
             msg = 'Variable name pair ("{}", "{}") not found.'

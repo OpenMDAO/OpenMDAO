@@ -65,8 +65,8 @@ class MatMatTestCase(unittest.TestCase):
         prob.setup(vector_class=PETScVector, mode='rev')
 
         # this will hang if the bug is present.
-        J = prob.compute_total_derivs(of=['cd','cl','thickness'],
-                                      wrt=['shape','twist','alpha'])
+        J = prob.compute_totals(of=['cd','cl','thickness'],
+                                wrt=['shape','twist','alpha'])
 
 
 if __name__ == "__main__":
