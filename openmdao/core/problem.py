@@ -638,7 +638,7 @@ class Problem(object):
 
                             # Testing for pairs that are not dependent so that we suppress printing
                             # them unless the fd is non zero. Note: subjacs_info is empty for
-                            # undeclared partials, which is the default behvaior now.
+                            # undeclared partials, which is the default behavior now.
                             try:
                                 if comp._jacobian._subjacs_info[abs_key][0]['dependent'] is False:
                                     indep_key[c_name].add(rel_key)
