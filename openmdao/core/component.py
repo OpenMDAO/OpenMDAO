@@ -588,7 +588,8 @@ class Component(System):
             contain the values found at each (row, col) location in the subjac.
         method : str
             The type of approximation that should be used. Valid options include:
-                - 'fd': Finite Difference, 'cs': Complex Step
+                - 'fd': Finite Difference, 'cs': Complex Step, 'exact': use the component
+                defined analytic derivatives. Default is 'exact'.
         **kwargs : dict
             Keyword arguments for controlling the behavior of the approximation.
         """
@@ -646,8 +647,7 @@ class Component(System):
             Type of step calculation for check, can be "abs" for absolute (default) or "rel" for
             relative.  Leave undeclared to keep unchanged from previous or default value.
         """
-        supported_methods = {'fd': FiniteDifference,
-                             'cs': ComplexStep}
+        supported_methods = ('fd', 'cs', 'exact')
 
         if method not in supported_methods:
             msg = 'Method "{}" is not supported, method must be one of {}'
@@ -672,7 +672,7 @@ class Component(System):
         ins = list(self._var_allprocs_prom2abs_list['input'].keys())
         for wrt_list, method, form, step, step_calc in self._declared_partial_checks:
             for pattern in wrt_list:
-                wrt_matches = set(find_matches(pattern, outs + ins))
+                wrt_matches = find_matches(pattern, outs + ins)
                 for match in wrt_matches:
                     if match in opts:
                         opt = opts[match]

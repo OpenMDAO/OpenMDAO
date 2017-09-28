@@ -54,10 +54,6 @@ class ExecComp4Test(ExecComp):
         self.fails = fails
         self.fail_hard = fail_hard
 
-    def setup(self):
-        """ Derivative declaration."""
-        self.declare_partials('*', '*')
-
     def get_req_procs(self):
         return self.req_procs
 
