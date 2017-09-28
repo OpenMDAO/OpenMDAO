@@ -822,32 +822,32 @@ class Group(System):
                 for type_ in ['input', 'output']:
                     num = self._num_var[vec_name][type_]
                     idx1, idx2 = subsystems_var_range[type_][subsys.name]
-                    size1 = np.sum(sizes[type_][iproc, :idx1])
-                    size2 = np.sum(sizes[type_][iproc, idx2:])
+                    size_before = np.sum(sizes[type_][iproc, :idx1])
+                    size_after = np.sum(sizes[type_][iproc, idx2:])
 
                     sub_ext_num_vars[vec_name][type_] = (
                         ext_num_vars[vec_name][type_][0] + idx1,
                         ext_num_vars[vec_name][type_][1] + num - idx2,
                     )
                     sub_ext_sizes[vec_name][type_] = (
-                        ext_sizes[vec_name][type_][0] + size1,
-                        ext_sizes[vec_name][type_][1] + size2,
+                        ext_sizes[vec_name][type_][0] + size_before,
+                        ext_sizes[vec_name][type_][1] + size_after,
                     )
 
                     sub_ext_sizes_byset[vec_name][type_] = {}
                     sub_ext_num_vars_byset[vec_name][type_] = {}
                     for set_name, num in iteritems(self._num_var_byset[vec_name][type_]):
                         idx1, idx2 = subsystems_var_range_byset[type_][set_name][subsys.name]
-                        size1 = np.sum(sizes_byset[type_][set_name][iproc, :idx1])
-                        size2 = np.sum(sizes_byset[type_][set_name][iproc, idx2:])
+                        size_before = np.sum(sizes_byset[type_][set_name][iproc, :idx1])
+                        size_after = np.sum(sizes_byset[type_][set_name][iproc, idx2:])
 
                         sub_ext_num_vars_byset[vec_name][type_][set_name] = (
                             ext_num_vars_byset[vec_name][type_][set_name][0] + idx1,
                             ext_num_vars_byset[vec_name][type_][set_name][1] + num - idx2,
                         )
                         sub_ext_sizes_byset[vec_name][type_][set_name] = (
-                            ext_sizes_byset[vec_name][type_][set_name][0] + size1,
-                            ext_sizes_byset[vec_name][type_][set_name][1] + size2,
+                            ext_sizes_byset[vec_name][type_][set_name][0] + size_before,
+                            ext_sizes_byset[vec_name][type_][set_name][1] + size_after,
                         )
 
             sub_ext_num_vars['nonlinear'] = sub_ext_num_vars['linear']
