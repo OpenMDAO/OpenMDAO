@@ -41,6 +41,11 @@ class DictionaryJacobian(Jacobian):
         ----------
         vec_name : str
             The name of the current RHS vector.
+
+        Returns
+        -------
+        list
+            List of keys matching this jacobian for the current system.
         """
         system = self._system
 
