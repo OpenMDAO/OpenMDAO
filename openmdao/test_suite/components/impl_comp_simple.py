@@ -27,6 +27,10 @@ class TestImplCompSimple(ImplicitComponent):
 
 class TestImplCompSimpleDense(TestImplCompSimple):
 
+    def setup(self):
+        super(TestImplCompSimpleDense, self).setup()
+        self.declare_partials(of='*', wrt='*')
+
     def linearize(self, inputs, outputs, jacobian):
         jacobian['x', 'x'] = np.exp(outputs['x']) - \
             2 * inputs['a']**2 * outputs['x']
@@ -34,6 +38,10 @@ class TestImplCompSimpleDense(TestImplCompSimple):
 
 
 class TestImplCompSimpleSpmtx(TestImplCompSimple):
+
+    def setup(self):
+        super(TestImplCompSimpleDense, self).setup()
+        self.declare_partials(of='*', wrt='*')
 
     def linearize(self, inputs, outputs, jacobian):
         jacobian['x', 'x'] = scipy.sparse.csr_matrix((
@@ -47,6 +55,10 @@ class TestImplCompSimpleSpmtx(TestImplCompSimple):
 
 
 class TestImplCompSimpleSparse(TestImplCompSimple):
+
+    def setup(self):
+        super(TestImplCompSimpleDense, self).setup()
+        self.declare_partials(of='*', wrt='*')
 
     def linearize(self, inputs, outputs, jacobian):
         jacobian['x', 'x'] = (

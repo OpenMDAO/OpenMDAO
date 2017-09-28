@@ -112,6 +112,9 @@ class DeprecatedCycleComp(Component):
     def _init_parameterized(self):
         pass
 
+    def setup(self):
+        self.declare_partials(of='*', wrt='*')
+
     def solve_nonlinear(self, inputs, outputs, residuals):
         theta = inputs[self._cycle_names['theta']]
         A = _compute_A(self.size, theta)

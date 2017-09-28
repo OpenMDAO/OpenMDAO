@@ -18,6 +18,8 @@ class DoubleArrayComp(ExplicitComponent):
                             [-1.0, 0.0, 8.0, 1.0],
                             [1.0, 4.0, -5.0, 6.0]])
 
+        self.declare_partials('*', '*')
+
     def setup(self):
         # Params
         self.add_input('x1', np.zeros([2]))
@@ -26,6 +28,9 @@ class DoubleArrayComp(ExplicitComponent):
         # Unknowns
         self.add_output('y1', np.zeros([2]))
         self.add_output('y2', np.zeros([2]))
+
+        # Derivs
+        self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
         """
@@ -59,6 +64,8 @@ class NonSquareArrayComp(ExplicitComponent):
                             [-1.0, 0.0, 8.0, 1.0],
                             [1.0, 4.0, -5.0, 6.0]])
 
+        self.declare_partials('*', '*')
+
     def setup(self):
         # Params
         self.add_input('x1', np.zeros([2]))
@@ -67,6 +74,9 @@ class NonSquareArrayComp(ExplicitComponent):
         # Unknowns
         self.add_output('y1', np.zeros([3]))
         self.add_output('y2', np.zeros([1]))
+
+        # Derivs
+        self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
         """
@@ -97,6 +107,9 @@ class TestExplCompDeprecated(ExplicitComponent):
 
         self.add_input('x1', np.zeros([2]))
         self.add_output('y1', np.zeros([2]))
+
+        # Derivs
+        self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
         """

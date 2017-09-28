@@ -72,14 +72,14 @@ class LinearSolverTests(object):
             of = ['area']
             wrt = ['length']
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['area', 'length'], [[2.0]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob['width'] = 2.0
             prob.run_model()
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['area', 'length'], [[2.0]], 1e-6)
 
         def test_simple_matvec_subbed(self):
@@ -104,14 +104,14 @@ class LinearSolverTests(object):
             of = ['area']
             wrt = ['length']
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['area', 'length'], [[2.0]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob['width'] = 2.0
             prob.run_model()
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['area', 'length'], [[2.0]], 1e-6)
 
         def test_simple_matvec_subbed_like_multipoint(self):
@@ -137,14 +137,14 @@ class LinearSolverTests(object):
             of = ['area']
             wrt = ['length']
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['area', 'length'], [[2.0]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob['width'] = 2.0
             prob.run_model()
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['area', 'length'], [[2.0]], 1e-6)
 
         def test_double_arraycomp(self):
@@ -169,7 +169,7 @@ class LinearSolverTests(object):
             of = ['y1', 'y2']
             wrt = ['x1', 'x2']
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             diff = np.linalg.norm(J['y1', 'x1'] - Jbase[0:2, 0:2])
             assert_rel_error(self, diff, 0.0, 1e-8)
             diff = np.linalg.norm(J['y1', 'x2'] - Jbase[0:2, 2:4])
@@ -192,11 +192,11 @@ class LinearSolverTests(object):
             wrt = ['p.x']
             of = ['comp2.y', "comp3.y"]
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['comp2.y', 'p.x'], [[-6.0]], 1e-6)
             assert_rel_error(self, J['comp3.y', 'p.x'], [[15.0]], 1e-6)
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['comp2.y', 'p.x'], [[-6.0]], 1e-6)
             assert_rel_error(self, J['comp3.y', 'p.x'], [[15.0]], 1e-6)
 
@@ -213,11 +213,11 @@ class LinearSolverTests(object):
             wrt = ['p.x']
             of = ['comp2.y', "comp3.y"]
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['comp2.y', 'p.x'], [[-6.0]], 1e-6)
             assert_rel_error(self, J['comp3.y', 'p.x'], [[15.0]], 1e-6)
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['comp2.y', 'p.x'], [[-6.0]], 1e-6)
             assert_rel_error(self, J['comp3.y', 'p.x'], [[15.0]], 1e-6)
 
@@ -234,11 +234,11 @@ class LinearSolverTests(object):
             wrt = ['iv.x']
             of = ['sub.c2.y', "sub.c3.y"]
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['sub.c2.y', 'iv.x'], [[-6.0]], 1e-6)
             assert_rel_error(self, J['sub.c3.y', 'iv.x'], [[15.0]], 1e-6)
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['sub.c2.y', 'iv.x'], [[-6.0]], 1e-6)
             assert_rel_error(self, J['sub.c3.y', 'iv.x'], [[15.0]], 1e-6)
 
@@ -255,14 +255,14 @@ class LinearSolverTests(object):
             wrt = ['p1.x1', 'p2.x2']
             of = ['comp3.y']
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['comp3.y', 'p1.x1'], [[-6.0]], 1e-6)
             assert_rel_error(self, J['comp3.y', 'p2.x2'], [[35.0]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['comp3.y', 'p1.x1'], [[-6.0]], 1e-6)
             assert_rel_error(self, J['comp3.y', 'p2.x2'], [[35.0]], 1e-6)
 
@@ -279,14 +279,14 @@ class LinearSolverTests(object):
             wrt = ['iv.x1', 'iv.x2']
             of = ['c3.y']
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['c3.y', 'iv.x1'], [[-6.0]], 1e-6)
             assert_rel_error(self, J['c3.y', 'iv.x2'], [[35.0]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['c3.y', 'iv.x1'], [[-6.0]], 1e-6)
             assert_rel_error(self, J['c3.y', 'iv.x2'], [[35.0]], 1e-6)
 
@@ -306,13 +306,13 @@ class LinearSolverTests(object):
             # Make sure value is fine.
             assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['c7.y1', 'iv.x'], [[-40.75]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['c7.y1', 'iv.x'], [[-40.75]], 1e-6)
 
         def test_converge_diverge_groups(self):
@@ -331,13 +331,13 @@ class LinearSolverTests(object):
             # Make sure value is fine.
             assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['c7.y1', 'iv.x'], [[-40.75]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['c7.y1', 'iv.x'], [[-40.75]], 1e-6)
 
         def test_single_diamond(self):
@@ -353,14 +353,14 @@ class LinearSolverTests(object):
             wrt = ['iv.x']
             of = ['c4.y1', 'c4.y2']
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['c4.y1', 'iv.x'], [[25]], 1e-6)
             assert_rel_error(self, J['c4.y2', 'iv.x'], [[-40.5]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['c4.y1', 'iv.x'], [[25]], 1e-6)
             assert_rel_error(self, J['c4.y2', 'iv.x'], [[-40.5]], 1e-6)
 
@@ -378,14 +378,14 @@ class LinearSolverTests(object):
             wrt = ['iv.x']
             of = ['c4.y1', 'c4.y2']
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['c4.y1', 'iv.x'], [[25]], 1e-6)
             assert_rel_error(self, J['c4.y2', 'iv.x'], [[-40.5]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             assert_rel_error(self, J['c4.y1', 'iv.x'], [[25]], 1e-6)
             assert_rel_error(self, J['c4.y2', 'iv.x'], [[-40.5]], 1e-6)
 
@@ -417,14 +417,14 @@ class LinearSolverTests(object):
             Jbase['obj', 'x'] = [[2.98061392]]
             Jbase['obj', 'z'] = np.array([[9.61001155, 1.78448534]])
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             for key, val in iteritems(Jbase):
                 assert_rel_error(self, J[key], val, .00001)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             for key, val in iteritems(Jbase):
                 assert_rel_error(self, J[key], val, .00001)
 
@@ -453,14 +453,14 @@ class LinearSolverTests(object):
             Jbase['obj', 'x'] = [[2.98061392]]
             Jbase['obj', 'z'] = np.array([[9.61001155, 1.78448534]])
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             for key, val in iteritems(Jbase):
                 assert_rel_error(self, J[key], val, .00001)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             for key, val in iteritems(Jbase):
                 assert_rel_error(self, J[key], val, .00001)
 
@@ -498,7 +498,7 @@ class LinearSolverTests(object):
             Jbase['obj', 'x'] = [[2.98061392]]
             Jbase['obj', 'z'] = np.array([[9.61001155, 1.78448534]])
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             for key, val in iteritems(Jbase):
                 assert_rel_error(self, J[key], val, .00001)
 
@@ -518,7 +518,7 @@ class LinearSolverTests(object):
 
             prob.run_model()
 
-            J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             for key, val in iteritems(Jbase):
                 assert_rel_error(self, J[key], val, .00001)
 

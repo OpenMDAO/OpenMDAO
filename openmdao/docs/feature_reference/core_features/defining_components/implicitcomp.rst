@@ -30,7 +30,8 @@ The implementation of each method will be illustrated using a simple implicit co
 - :code:`setup()` :
 
   Declare input and output variables via :code:`add_input` and :code:`add_output`.
-  Information like variable names, sizes, units, and bounds are declared.
+  Information like variable names, sizes, units, and bounds are declared. Also, declare partial derivatives that this component provides. Here we use the wild card to say that
+  this component provides derivatives of all implicit residuals with respect to all inputs and outputs.
 
   .. embed-code::
       openmdao.core.tests.test_impl_comp.QuadraticComp.setup

@@ -156,6 +156,9 @@ class ExecComp(ExplicitComponent):
 
         self._codes = self._compile_exprs(self._exprs)
 
+        # All derivatives are defined.
+        self.declare_partials(of='*', wrt='*')
+
     def _compile_exprs(self, exprs):
         compiled = []
         for i, expr in enumerate(exprs):

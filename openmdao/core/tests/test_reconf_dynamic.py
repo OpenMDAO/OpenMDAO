@@ -66,7 +66,7 @@ class Test(unittest.TestCase):
 
         # First run the model once; counter = 1, size of y = 1
         p.run_model()
-        totals = p.compute_total_derivs(wrt=['x'], of=['y'])
+        totals = p.compute_totals(wrt=['x'], of=['y'])
         assert_rel_error(self, p['x'], 3.0)
         assert_rel_error(self, p['y'], 6.0)
         assert_rel_error(self, p['z'], 9.0)
@@ -75,7 +75,7 @@ class Test(unittest.TestCase):
 
         # Run the model again, which will trigger reconfiguration; counter = 2, size of y = 2
         p.run_model()
-        totals = p.compute_total_derivs(wrt=['x'], of=['y'])
+        totals = p.compute_totals(wrt=['x'], of=['y'])
         assert_rel_error(self, p['x'], 3.0)
         assert_rel_error(self, p['y'], 6.0 * np.ones(2))
         assert_rel_error(self, p['z'], 9.0)
@@ -94,7 +94,7 @@ class Test(unittest.TestCase):
         p['x'] = 3.
 
         p.run_model()
-        totals = p.compute_total_derivs(wrt=['x'], of=['y'])
+        totals = p.compute_totals(wrt=['x'], of=['y'])
         assert_rel_error(self, p['x'], 3.0)
         assert_rel_error(self, p['y'], 6.0)
         assert_rel_error(self, p['z'], 9.0)
