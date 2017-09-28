@@ -42,7 +42,7 @@ Defining a Component
 ---------------------
 The component is the basic building block of a model. You will always define components as a sub-class of either `ExplicitComponent` or `ImplicitComponent`. Since our simple paraboloid function is explicit, we'll use the `ExplicitComponent`. You see three methods defined:
 
-    - `setup`: define all your inputs and outputs here
+    - `setup`: define all your inputs and outputs here, and declare derivatives
     - `compute`: calculation of all output values for the given inputs
     - `compute_partials`: derivatives of all the outputs values with respect to all the inputs
 

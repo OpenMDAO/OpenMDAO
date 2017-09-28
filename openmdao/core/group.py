@@ -1498,7 +1498,7 @@ class Group(System):
         if self._linear_solver is not None and do_ln:
             self._linear_solver._linearize()
 
-    def approx_total_derivs(self, method='fd', **kwargs):
+    def approx_totals(self, method='fd', **kwargs):
         """
         Approximate derivatives for a Group using the specified approximation method.
 
@@ -1595,8 +1595,9 @@ class Group(System):
 
                     meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
 
-                    # Group dependent default is True
-                    # TODO: Could be a lot of extra junk in here?
+                    # A group under approximation needs all keys from below, so set dependent to
+                    # True.
+                    # TODO: Maybe just need a subset of keys (those that go to the boundaries.)
                     meta['dependent'] = True
 
                     meta.update(meta_changes)

@@ -12,8 +12,8 @@ from six.moves import range
 import numpy as np
 import scipy.sparse as sparse
 
-from openmdao.approximation_schemes.complex_step import ComplexStep
-from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
+from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
 from openmdao.components.deprecated_component import Component as DepComponent
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver
@@ -456,8 +456,9 @@ class Problem(object):
             next to them in output, making them easy to search for. Note at times there may be a
             significant relative error due to a minor absolute error.  Default is 1.0E-6.
         global_options : dict
-            Dictionary of options that override options specified in ALL components. Only
-            'form', 'step', 'step_calc', and 'method' can be specified in this way.
+            Dictionary of options that are used as default unless overridden by calling
+            set_check_partial_options on a component. Only 'form', 'step', 'step_calc', and
+            'method' can be specified in this way.
         force_dense : bool
             If True, analytic derivatives will be coerced into arrays.
         suppress_output : bool
@@ -689,38 +690,17 @@ class Problem(object):
         all_fd_options = {}
         for comp in comps:
 
-            c_name = comp.pathname
-
             # Skip IndepVarComps
             if isinstance(comp, IndepVarComp):
                 continue
 
-            fd_options = {'order': None}
-
-            # Global options take precedence over component metadata options.
-            for name in ['step', 'step_calc', 'form', 'method']:
-                ch_name = 'check_%s' % name
-                fd_options[name] = global_options.get(name, comp.metadata[ch_name])
-
-            all_fd_options[c_name] = fd_options
-            subjac_info = comp._subjacs_info
+            c_name = comp.pathname
+            all_fd_options[c_name] = {}
             explicit = isinstance(comp, ExplicitComponent)
             deprecated = isinstance(comp, DepComponent)
 
-            scheme = global_options.get('method', comp.metadata['check_method'])
-            if scheme == 'fd':
-                approximation = FiniteDifference()
-
-            elif scheme == 'cs':
-                approximation = ComplexStep()
-
-                if not alloc_complex:
-                    msg = 'In order to check partials with complex step, you need to set ' + \
-                        '"force_alloc_complex" to True during setup.'
-                    raise RuntimeError(msg)
-
-            else:
-                raise ValueError('Unrecognized method: "{}"'.format(global_options['method']))
+            approximations = {'fd': FiniteDifference(),
+                              'cs': ComplexStep()}
 
             of = list(comp._var_allprocs_prom2abs_list['output'].keys())
             wrt = list(comp._var_allprocs_prom2abs_list['input'].keys())
@@ -731,15 +711,58 @@ class Problem(object):
             elif not explicit:
                 wrt.extend(of)
 
+            # Load up approximation objects with the requested settings.
+            local_opts = comp._get_check_partial_options()
             for rel_key in product(of, wrt):
                 abs_key = rel_key2abs_key(comp, rel_key)
-                approximation.add_approximation(abs_key, fd_options)
+                local_wrt = rel_key[1]
+
+                # Determine if fd or cs.
+                method = global_options.get('method', 'fd')
+                if local_wrt in local_opts:
+                    local_method = local_opts[local_wrt]['method']
+                    if local_method:
+                        method = local_method
+
+                fd_options = {'order': None,
+                              'method': method}
+
+                if method == 'cs':
+                    if not alloc_complex:
+                        msg = 'In order to check partials with complex step, you need to set ' + \
+                            '"force_alloc_complex" to True during setup.'
+                        raise RuntimeError(msg)
+
+                    defaults = DEFAULT_CS_OPTIONS
+
+                    fd_options['form'] = None
+                    fd_options['step_calc'] = None
+
+                elif method == 'fd':
+                    defaults = DEFAULT_FD_OPTIONS
+
+                    fd_options['form'] = global_options.get('form', defaults['form'])
+                    fd_options['step_calc'] = global_options.get('step_calc', defaults['step_calc'])
+
+                fd_options['step'] = global_options.get('step', defaults['step'])
+
+                # Precedence: component options > global options > defaults
+                if local_wrt in local_opts:
+                    for name in ['form', 'step', 'step_calc']:
+                        value = local_opts[local_wrt][name]
+                        if value is not None:
+                            fd_options[name] = value
+
+                all_fd_options[c_name][local_wrt] = fd_options
+
+                approximations[fd_options['method']].add_approximation(abs_key, fd_options)
 
             approx_jac = {}
-            approximation._init_approximations()
+            for approximation in itervalues(approximations):
+                approximation._init_approximations()
 
-            # Peform the FD here.
-            approximation.compute_approximations(comp, jac=approx_jac)
+                # Peform the FD here.
+                approximation.compute_approximations(comp, jac=approx_jac)
 
             for rel_key, partial in iteritems(approx_jac):
                 abs_key = rel_key2abs_key(comp, rel_key)
@@ -833,7 +856,7 @@ class Problem(object):
                 'form': form,
                 'step_calc': step_calc,
             }
-            model.approx_total_derivs(method=method, **fd_args)
+            model.approx_totals(method=method, **fd_args)
             Jfd = self._compute_totals_approx(of=of, wrt=wrt, global_names=global_names)
 
         # Assemble and Return all metrics.
@@ -952,9 +975,9 @@ class Problem(object):
         if model._approx_schemes:
             method = list(model._approx_schemes.keys())[0]
             kwargs = model._owns_approx_jac_meta
-            model.approx_total_derivs(method=method, **kwargs)
+            model.approx_totals(method=method, **kwargs)
         else:
-            model.approx_total_derivs(method='fd')
+            model.approx_totals(method='fd')
 
         # Initialization based on driver (or user) -requested "of" and "wrt".
         if not model._owns_approx_jac or model._owns_approx_of != set(of) \
@@ -1591,7 +1614,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
     global_options : dict
         Dictionary containing the options for the approximation.
     totals : bool
-        Set to True if we are doing check_total_derivs to skip a bunch of stuff.
+        Set to True if we are doing check_totals to skip a bunch of stuff.
     suppress_output : bool
         Set to True to suppress all output. Just calculate errors and add the keys.
     indep_key : dict of sets, optional
@@ -1614,13 +1637,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
         sys_name = system.pathname
         explicit = False
 
-        fd_desc = "{}:{}".format(global_options[sys_name]['method'],
-                                 global_options[sys_name]['form'])
-        if compact_print:
-            check_desc = "    (Check Type: {})".format(fd_desc)
-        else:
-            check_desc = ""
-
         # Match header to appropriate type.
         if isinstance(system, Component):
             sys_type = 'Component'
@@ -1637,7 +1653,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
 
         if not suppress_output:
             logger.info('-' * (len(sys_name) + 15))
-            logger.info("{}: '{}'{}".format(sys_type, sys_name, check_desc))
+            logger.info("{}: '{}'".format(sys_type, sys_name))
             logger.info('-' * (len(sys_name) + 15))
 
             if compact_print:
@@ -1674,6 +1690,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
         sorted_keys = sorted(iterkeys(derivatives))
 
         for of, wrt in sorted_keys:
+
             derivative_info = derivatives[of, wrt]
             forward = derivative_info['J_fwd']
             if not totals:
@@ -1742,6 +1759,20 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
                             rel_err.forward_reverse,
                         ))
                 else:
+
+                    if totals:
+                        fd_desc = "{}:{}".format(global_options['']['method'],
+                                                 global_options['']['form'])
+
+                    else:
+                        fd_desc = "{}:{}".format(global_options[sys_name][wrt]['method'],
+                                                 global_options[sys_name][wrt]['form'])
+
+                    if compact_print:
+                        check_desc = "    (Check Type: {})".format(fd_desc)
+                    else:
+                        check_desc = ""
+
                     # Magnitudes
                     logger.info("  {}: '{}' wrt '{}'\n".format(sys_name, of, wrt))
                     logger.info('    Forward Magnitude : {:.6e}'.format(magnitude.forward))

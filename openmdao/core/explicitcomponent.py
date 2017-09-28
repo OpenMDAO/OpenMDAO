@@ -86,13 +86,8 @@ class ExplicitComponent(Component):
             if abs_key in self._subjacs_info:
                 if 'method' in self._subjacs_info[abs_key]:
                     del self._subjacs_info[abs_key]['method']
-            self._declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
 
-            # TODO - probaby don't need to declare these independent wth the api switchup.
-            for other_name in other_names:
-                self._declare_partials(out_name, other_name, dependent=False)
-                self._declare_partials(other_name, out_name, dependent=False)
-            other_names.append(out_name)
+            self._declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, var_set=0):
@@ -176,7 +171,6 @@ class ExplicitComponent(Component):
             outputs = self._var_abs_names['output']
             inputs = self._var_abs_names['input']
 
-            # TODO: maybe we don't need to loop over all these.
             for wrt_name, wrt_vars in (('output', outputs), ('input', inputs)):
                 for abs_key in product(outputs, wrt_vars):
                     meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
@@ -185,7 +179,7 @@ class ExplicitComponent(Component):
                     if not dependent:
                         continue
 
-                    if meta['value'] is None and dependent:
+                    if meta['value'] is None:
                         out_size = self._var_abs2meta['output'][abs_key[0]]['size']
                         in_size = self._var_abs2meta[wrt_name][abs_key[1]]['size']
                         meta['value'] = np.zeros((out_size, in_size))
@@ -193,7 +187,7 @@ class ExplicitComponent(Component):
                     J._set_partials_meta(abs_key, meta, wrt_name == 'input')
 
                     method = meta.get('method', False)
-                    if method and dependent:
+                    if method:
                         self._approx_schemes[method].add_approximation(abs_key, meta)
 
         for approx in itervalues(self._approx_schemes):

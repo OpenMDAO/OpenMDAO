@@ -731,7 +731,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=10.0, upper=11.0)
 
-        model.approx_total_derivs(method='fd')
+        model.approx_totals(method='fd')
 
         prob.setup(check=False)
         prob.run_driver()
@@ -761,7 +761,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=10.0, upper=11.0)
 
-        model.approx_total_derivs(method='cs')
+        model.approx_totals(method='cs')
 
         prob.setup(check=False)
         prob.run_driver()
@@ -849,7 +849,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=10.0, upper=11.0, ref=10.)
 
-        model.approx_total_derivs(method='fd')
+        model.approx_totals(method='fd')
 
         prob.setup(check=False)
         prob.run_driver()
@@ -879,7 +879,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=10.0, upper=11.0, ref=10.)
 
-        model.approx_total_derivs(method='cs')
+        model.approx_totals(method='cs')
 
         prob.setup(check=False)
         prob.run_driver()

@@ -2,7 +2,6 @@
 
 from __future__ import division
 
-from fnmatch import fnmatchcase
 import numpy as np
 from itertools import product
 from six import string_types, iteritems, itervalues
@@ -16,7 +15,7 @@ from openmdao.core.system import System
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    warn_deprecation, ContainsAll
+    warn_deprecation, ContainsAll, find_matches
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 
 
@@ -50,6 +49,8 @@ class Component(System):
         Cached storage of user-declared partials.
     _approximated_partials : list
         Cached storage of user-declared approximations.
+    _declared_partial_checks : list
+        Cached storage of user-declared check partial options.
     """
 
     def __init__(self, **kwargs):
@@ -78,18 +79,7 @@ class Component(System):
 
         self._declared_partials = []
         self._approximated_partials = []
-
-        # Defaults for the finite difference check used by check_partial_derivs.
-        meta = self.metadata
-        meta.declare('check_method', default='fd', values=['fd', 'cs'],
-                     desc='Method for check: "fd" for finite difference, "cs" for complex step.')
-        meta.declare('check_form', default='forward', values=['forward', 'central', 'backward'],
-                     desc='Finite difference form for check, can be "forward", "central", or '
-                     '"backward".')
-        meta.declare('check_step', default=1.0e-6, desc='Step size for finite difference check.')
-        meta.declare('check_step_calc', default='abs', values=['abs', 'rel'],
-                     desc='Type of step calculation for check, can be "abs" for absolute '
-                     '(default) or "rel" for relative.')
+        self._declared_partial_checks = []
 
     def setup(self):
         """
@@ -634,6 +624,73 @@ class Component(System):
 
             self._approximated_partials.append((of, wrt, method, kwargs))
 
+    def set_check_partial_options(self, wrt, method='fd', form=None, step=None, step_calc=None):
+        """
+        Set options that will be used for checking partial derivatives.
+
+        Parameters
+        ----------
+        wrt : str or list of str
+            The name or names of the variables that derivatives are taken with respect to.
+            This can contain the name of any input or output variable.
+            May also contain a glob pattern.
+        method : str
+            Method for check: "fd" for finite difference, "cs" for complex step.
+        form : str
+            Finite difference form for check, can be "forward", "central", or "backward". Leave
+            undeclared to keep unchanged from previous or default value.
+        step : float
+            Step size for finite difference check. Leave undeclared to keep unchanged from previous
+            or default value.
+        step_calc : str
+            Type of step calculation for check, can be "abs" for absolute (default) or "rel" for
+            relative.  Leave undeclared to keep unchanged from previous or default value.
+        """
+        supported_methods = {'fd': FiniteDifference,
+                             'cs': ComplexStep}
+
+        if method not in supported_methods:
+            msg = 'Method "{}" is not supported, method must be one of {}'
+            raise ValueError(msg.format(method, supported_methods.keys()))
+
+        wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
+        self._declared_partial_checks.append((wrt_list, method, form, step, step_calc))
+
+    def _get_check_partial_options(self):
+        """
+        Return dictionary of partial options with pattern matches processed.
+
+        This is called by check_partials.
+
+        Returns
+        -------
+        dict(wrt : (options))
+            Dictionary keyed by name with tuples of options (method, form, step, step_calc)
+        """
+        opts = {}
+        outs = list(self._var_allprocs_prom2abs_list['output'].keys())
+        ins = list(self._var_allprocs_prom2abs_list['input'].keys())
+        for wrt_list, method, form, step, step_calc in self._declared_partial_checks:
+            for pattern in wrt_list:
+                wrt_matches = set(find_matches(pattern, outs + ins))
+                for match in wrt_matches:
+                    if match in opts:
+                        opt = opts[match]
+
+                        # New assignments take precedence
+                        for name, value in zip(['method', 'form', 'step', 'step_calc'],
+                                               [method, form, step, step_calc]):
+                            if value is not None:
+                                opt[name] = value
+
+                    else:
+                        opts[match] = {'method': method,
+                                       'form': form,
+                                       'step': step,
+                                       'step_calc': step_calc}
+
+        return opts
+
     def _declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None):
         """
         Store subjacobian metadata for later use.
@@ -740,16 +797,8 @@ class Component(System):
         """
         of_list = [of] if isinstance(of, string_types) else of
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
-        glob_patterns = {'*', '?', '['}
         outs = list(self._var_allprocs_prom2abs_list['output'].keys())
         ins = list(self._var_allprocs_prom2abs_list['input'].keys())
-
-        def find_matches(pattern, var_list):
-            if glob_patterns.intersection(pattern):
-                return [name for name in var_list if fnmatchcase(name, pattern)]
-            elif pattern in var_list:
-                return [pattern]
-            return []
 
         of_pattern_matches = [(pattern, find_matches(pattern, outs)) for pattern in of_list]
         wrt_pattern_matches = [(pattern, find_matches(pattern, outs + ins)) for pattern in wrt_list]

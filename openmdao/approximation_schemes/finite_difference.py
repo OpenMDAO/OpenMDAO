@@ -18,10 +18,6 @@ DEFAULT_FD_OPTIONS = {
     'form': 'forward',
     'order': None,
     'step_calc': 'abs',
-    'check_step': 1e-6,
-    'check_form': 'forward',
-    'check_order': None,
-    'check_step_calc': 'abs',
 }
 
 DEFAULT_ORDER = {

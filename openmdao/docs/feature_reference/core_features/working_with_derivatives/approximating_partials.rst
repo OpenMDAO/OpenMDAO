@@ -53,12 +53,12 @@ Approximating Semi-Total Derivatives
 ====================================
 
 There are also times where it makes more sense to approximate the derivatives for an entire group in one shot. You can turn on
-the approximation by calling `approx_total_derivs` on any `Group`.
+the approximation by calling `approx_totals` on any `Group`.
 
-.. automethod:: openmdao.core.group.Group.approx_total_derivs
+.. automethod:: openmdao.core.group.Group.approx_totals
     :noindex:
 
-The default method is for approximating semi-total derivatives is the finite difference method. When you call the `approx_total_derivs` method on a group, OpenMDAO will
+The default method is for approximating semi-total derivatives is the finite difference method. When you call the `approx_totals` method on a group, OpenMDAO will
 generate an approximate Jacobian for the entire group during the linearization step before derivatives are calculated. OpenMDAO automatically figures out
 which inputs and output pairs are needed in this Jacobian. When `solve_linear` is called from any system that contains this system, the approximated Jacobian
 is used for the derivatives in this system.

@@ -646,5 +646,35 @@ class TestJacobian(unittest.TestCase):
         with assertRaisesRegex(self, Exception, msg):
             prob.run_model()
 
+    def test_access_undeclared_subjac(self):
+
+        class Undeclared(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_output('y', val=0.0)
+
+            def compute(self, inputs, outputs):
+                pass
+
+            def compute_partials(self, inputs, partials):
+                partials['y', 'x'] = 1.0
+
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        model.add_subsystem('comp', Undeclared())
+
+        model.connect('p1.x', 'comp.x')
+
+        prob.setup()
+        prob.run_model()
+
+        msg = 'Variable name pair \("{}", "{}"\) must first be declared.'
+        with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
+            J = prob.compute_totals(of=['comp.y'], wrt=['p.x'])
+
 if __name__ == '__main__':
     unittest.main()
