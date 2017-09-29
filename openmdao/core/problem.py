@@ -959,7 +959,7 @@ class Problem(object):
         # Linearize Model
         model._linearize()
 
-        # Convert of and wrt names from promoted to bsolute path
+        # Convert of and wrt names from promoted to absolute path
         oldwrt, oldof = wrt, of
         if not global_names:
             of = [prom2abs[name][0] for name in oldof]
