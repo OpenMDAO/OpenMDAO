@@ -45,19 +45,21 @@ class ApproximationScheme(object):
         """
         pass
 
-    def _run_point(self, system, input_deltas, cache, in_cache, result_array, deriv_type='partial'):
+    def _run_point(self, system, input_deltas, out_tmp, in_tmp, result_array, deriv_type='partial'):
         """
         Alter the specified inputs by the given deltas, runs the system, and returns the results.
 
         Parameters
         ----------
+        system : System
+            The system having its derivs approximated.
         input_deltas : list
             List of (input name, indices, delta) tuples, where input name is an absolute name.
-        cache : ndarray
-            An array the same size as the system outputs that is used for temporary storage.
-        in_cache : ndarray
-            An array the same size as the system inputs that is used for temporary storage.
-        result_array : Vector
+        out_tmp : ndarray
+            A copy of the starting outputs array used to restore the outputs to original values.
+        in_tmp : ndarray
+            A copy of the starting inputs array used to restore the inputs to original values.
+        result_array : ndarray
             An array the same size as the system outputs. Used to store the results.
         deriv_type : str
             One of 'total' or 'partial', indicating if total or partial derivatives are being
@@ -82,24 +84,20 @@ class ApproximationScheme(object):
         else:
             raise ValueError('deriv_type must be one of "total" or "partial"')
 
-        results_vec.get_data(cache)
-        inputs.get_data(in_cache)
-
-        outputs_changed = False
         for in_name, idxs, delta in input_deltas:
             if in_name in outputs._views_flat:
                 outputs._views_flat[in_name][idxs] += delta
-                outputs_changed = True
             else:
                 inputs._views_flat[in_name][idxs] += delta
 
         run_model()
 
         results_vec.get_data(result_array)
-        results_vec.set_data(cache)
-        inputs.set_data(in_cache)
+        results_vec.set_data(out_tmp)
+        inputs.set_data(in_tmp)
 
-        if outputs_changed and results_vec is not outputs:
+        # if results_vec are the residuals then we need to remove the delta's we added earlier.
+        if results_vec is not outputs:
             for in_name, idxs, delta in input_deltas:
                 if in_name in outputs._views_flat:
                     outputs._views_flat[in_name][idxs] -= delta
