@@ -85,6 +85,7 @@ deploy:
   script:
   - if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
       # cd openmdao/docs;
+      # use rsync instead of scp to just ship over differences.
       rsync -r --delete-after -v _build/html openmdao@web543.webfaction.com:webapps/bluedocs;
     fi
 after_success:
