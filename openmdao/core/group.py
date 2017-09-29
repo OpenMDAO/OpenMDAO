@@ -1506,7 +1506,7 @@ class Group(System):
         ----------
         method : str
             The type of approximation that should be used. Valid options include:
-                - 'fd': Finite Difference, 'cs': Complex Step
+            'fd': Finite Difference, 'cs': Complex Step
         **kwargs : dict
             Keyword arguments for controlling the behavior of the approximation.
         """

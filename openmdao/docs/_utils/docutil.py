@@ -203,23 +203,31 @@ def get_source_code_of_class_or_method(class_or_method_path, remove_docstring=Tr
         Set to False to keep docstrings in the text.
     """
 
-    # first assume class and see if it works
+    # First, assume module path since we want to support loading a full module as well.
     try:
-        module_path = '.'.join(class_or_method_path.split('.')[:-1])
-        module_with_class = importlib.import_module(module_path)
-        class_name = class_or_method_path.split('.')[-1]
-        cls = getattr(module_with_class, class_name)
-        source = inspect.getsource(cls)
+        module = importlib.import_module(class_or_method_path)
+        source = inspect.getsource(module)
 
     except ImportError:
-        # else assume it is a path to a method
-        module_path = '.'.join(class_or_method_path.split('.')[:-2])
-        module_with_method = importlib.import_module(module_path)
-        class_name = class_or_method_path.split('.')[-2]
-        method_name = class_or_method_path.split('.')[-1]
-        cls = getattr(module_with_method, class_name)
-        meth = getattr(cls, method_name)
-        source = inspect.getsource(meth)
+
+        # Second, assume class and see if it works
+        try:
+            module_path = '.'.join(class_or_method_path.split('.')[:-1])
+            module_with_class = importlib.import_module(module_path)
+            class_name = class_or_method_path.split('.')[-1]
+            cls = getattr(module_with_class, class_name)
+            source = inspect.getsource(cls)
+
+        except ImportError:
+
+            # else assume it is a path to a method
+            module_path = '.'.join(class_or_method_path.split('.')[:-2])
+            module_with_method = importlib.import_module(module_path)
+            class_name = class_or_method_path.split('.')[-2]
+            method_name = class_or_method_path.split('.')[-1]
+            cls = getattr(module_with_method, class_name)
+            meth = getattr(cls, method_name)
+            source = inspect.getsource(meth)
 
     # Remove docstring from source code
     if remove_docstring:
