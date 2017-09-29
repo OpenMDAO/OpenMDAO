@@ -36,7 +36,7 @@ notifications:
 
 before_install:
 - openssl aes-256-cbc -K $encrypted_67e08862e114_key -iv $encrypted_67e08862e114_iv
-  -in deploy.rsa.enc -out deploy.rsa -d && chmod 600 /tmp/deploy_rsa
+  -in deploy.rsa.enc -out /tmp/deploy.rsa -d && chmod 600 /tmp/deploy_rsa
 - OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux";
   fi)
 - if [ "$OS" = "MacOSX" ] && [ "$MPI" ]; then brew install openmpi; fi
