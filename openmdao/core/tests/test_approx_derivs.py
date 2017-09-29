@@ -480,9 +480,11 @@ class TestGroupFiniteDifference(unittest.TestCase):
                 self.add_input('x', val=0.0)
                 self.add_output('y', val=0.0)
 
+                self.declare_partials('y', 'x')
+
             def compute(self, inputs, outputs):
                 x = inputs['x']
-                y = 4.0*x
+                outputs['y'] = 4.0*x
 
 
         prob = Problem()
@@ -500,11 +502,11 @@ class TestGroupFiniteDifference(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        of = ['y']
-        wrt = ['x']
-        derivs = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
+        of = ['comp.y']
+        wrt = ['p1.x']
+        derivs = prob.driver._compute_totals(of=of, wrt=wrt, return_format='dict')
 
-        assert_rel_error(self, derivs['y']['x'], [[3.0]], 1e-6)
+        assert_rel_error(self, derivs['comp.y']['p1.x'], [[4.0]], 1e-6)
 
 
 def title(txt):
@@ -1071,7 +1073,7 @@ class ApproxTotalsFeature(unittest.TestCase):
         derivs = prob.compute_totals(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['z', 'x'], [[300.0]], 1e-6)
-        self.assertEqual(comp2._exec_count, 3)
+        self.assertEqual(comp2._exec_count, 2)
 
     def test_basic_cs(self):
 

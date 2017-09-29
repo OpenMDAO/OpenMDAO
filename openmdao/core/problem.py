@@ -956,9 +956,6 @@ class Problem(object):
             vec_doutput[vec_name].set_const(0.0)
             vec_dresid[vec_name].set_const(0.0)
 
-        # Linearize Model
-        model._linearize()
-
         # Convert of and wrt names from promoted to absolute path
         oldwrt, oldof = wrt, of
         if not global_names:
@@ -1004,7 +1001,10 @@ class Problem(object):
         model._setup_jacobians(recurse=False)
 
         model.jacobian._override_checks = True
+
+        # Linearize Model
         model._linearize()
+
         model.jacobian._override_checks = False
         approx_jac = model._jacobian._subjacs
 

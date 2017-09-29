@@ -33,7 +33,7 @@ class TestBetzLimit(unittest.TestCase):
                 self.add_output('Cp', 0.0, desc="Power Coefficient")
                 self.add_output('power', 0.0, units="W", desc="Power produced by the rotor")
 
-                # self.approx_partials('*', '*')
+                # self.declare_partials('*', '*', method='fd')
 
             def compute(self, inputs, outputs):
                 """ Considering the entire rotor as a single disc that extracts
