@@ -621,8 +621,7 @@ class TestJacobian(unittest.TestCase):
             def linearize(self, inputs, outputs, jacobian):
                 return
 
-            def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, d_residuals,
-                                       mode):
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, d_residuals, mode):
                 d_residuals['x'] += (np.exp(outputs['x']) - 2*inputs['a']**2 * outputs['x'])*d_outputs['x']
                 d_residuals['x'] += (-2 * inputs['a'] * outputs['x']**2)*d_inputs['a']
 
