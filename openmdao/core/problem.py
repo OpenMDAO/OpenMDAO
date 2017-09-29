@@ -857,7 +857,8 @@ class Problem(object):
                 'step_calc': step_calc,
             }
             model.approx_totals(method=method, **fd_args)
-            Jfd = self._compute_totals_approx(of=of, wrt=wrt, global_names=global_names)
+            Jfd = self._compute_totals_approx(of=of, wrt=wrt, global_names=global_names,
+                                              initialize=True)
 
         # Assemble and Return all metrics.
         data = {}
@@ -900,7 +901,8 @@ class Problem(object):
             if self.model._owns_approx_jac:
                 totals = self._compute_totals_approx(of=of, wrt=wrt,
                                                      return_format=return_format,
-                                                     global_names=False)
+                                                     global_names=False,
+                                                     initialize=True)
             else:
                 totals = self._compute_totals(of=of, wrt=wrt,
                                               return_format=return_format,
@@ -908,7 +910,7 @@ class Problem(object):
         return totals
 
     def _compute_totals_approx(self, of=None, wrt=None, return_format='flat_dict',
-                               global_names=True):
+                               global_names=True, initialize=False):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -925,6 +927,9 @@ class Problem(object):
             returns them in a dictionary whose keys are tuples of form (of, wrt).
         global_names : bool
             Set to True when passing in global names to skip some translation steps.
+        initialize : bool
+            Set to True to re-initialize the FD in model. This is only needed when manually
+            calling compute_totals on the problem.
 
         Returns
         -------
@@ -969,34 +974,36 @@ class Problem(object):
         # This cuts out the middleman by grabbing the Jacobian directly after linearization.
 
         # Re-initialize so that it is clean.
-        if model._approx_schemes:
-            method = list(model._approx_schemes.keys())[0]
-            kwargs = model._owns_approx_jac_meta
-            model.approx_totals(method=method, **kwargs)
-        else:
-            model.approx_totals(method='fd')
+        if initialize:
 
-        # Initialization based on driver (or user) -requested "of" and "wrt".
-        if not model._owns_approx_jac or model._owns_approx_of != set(of) \
-           or model._owns_approx_wrt != set(wrt):
-            model._owns_approx_of = set(of)
-            model._owns_approx_wrt = set(wrt)
+            if model._approx_schemes:
+                method = list(model._approx_schemes.keys())[0]
+                kwargs = model._owns_approx_jac_meta
+                model.approx_totals(method=method, **kwargs)
+            else:
+                model.approx_totals(method='fd')
 
-            # Support for indices defined on driver vars.
-            dvs = self.driver._designvars
-            cons = self.driver._cons
-            objs = self.driver._objs
+            # Initialization based on driver (or user) -requested "of" and "wrt".
+            if not model._owns_approx_jac or model._owns_approx_of != set(of) \
+               or model._owns_approx_wrt != set(wrt):
+                model._owns_approx_of = set(of)
+                model._owns_approx_wrt = set(wrt)
 
-            response_idx = {key: val['indices'] for key, val in iteritems(cons)
-                            if val['indices'] is not None}
-            for key, val in iteritems(objs):
-                if val['indices'] is not None:
-                    response_idx[key] = val['indices']
+                # Support for indices defined on driver vars.
+                dvs = self.driver._designvars
+                cons = self.driver._cons
+                objs = self.driver._objs
 
-            model._owns_approx_of_idx = response_idx
+                response_idx = {key: val['indices'] for key, val in iteritems(cons)
+                                if val['indices'] is not None}
+                for key, val in iteritems(objs):
+                    if val['indices'] is not None:
+                        response_idx[key] = val['indices']
 
-            model._owns_approx_wrt_idx = {key: val['indices'] for key, val in iteritems(dvs)
-                                          if val['indices'] is not None}
+                model._owns_approx_of_idx = response_idx
+
+                model._owns_approx_wrt_idx = {key: val['indices'] for key, val in iteritems(dvs)
+                                              if val['indices'] is not None}
 
         model._setup_jacobians(recurse=False)
 
