@@ -1,8 +1,9 @@
-
+.. _feature_exec_comp:
 .. index:: ExecComp
 
+*********
 ExecComp
---------
+*********
 
 The `ExecComp` is a component that provides a shortcut for building an ExplicitComponent that
 represents a set of simple mathematical relationships between inputs and outputs. The ExecComp
