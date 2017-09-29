@@ -42,7 +42,7 @@ There are three basic types of components in OpenMDAO:
 3. :ref:`ImplicitComponent <comp-type-3-implicitcomp>` : defines dependent variables that are computed implicitly (e.g., y)
 
 
-The most strait forward way to implement the numerical model would be to assign each variable its own component, as below.
+The most straightforward way to implement the numerical model would be to assign each variable its own component, as below.
 
   ===  =================  =======  =======
   No.  Component type     Inputs   Outputs

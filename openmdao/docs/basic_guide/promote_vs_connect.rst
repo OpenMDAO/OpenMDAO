@@ -1,7 +1,7 @@
 .. _guide_promote_vs_connect:
 
 ************************************************
-Linking variables with Promotion vs Connection
+Linking Variables with Promotion vs Connection
 ************************************************
 
 In the previous tutorial we built up a model of the Sellar problem using two disciplinary components and a few :code:`ExecComps`.
@@ -18,7 +18,7 @@ Here is how you would define the same Sellar model using:
 
 All three will give the exact same answer, but the way you address the variables will be slightly different in each one.
 
-Varoable Promotion
+Variable Promotion
 ********************
 
 .. embed-test::

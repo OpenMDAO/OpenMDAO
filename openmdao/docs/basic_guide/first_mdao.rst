@@ -27,7 +27,7 @@ All the variables we need to set up the optimization are there. So now we just n
     openmdao.test_suite.test_examples.test_sellar_opt.TestSellarOpt.test_sellar_opt
 
 
-Controling the Solver Print Output
+Controlling the Solver Print Output
 ************************************
 Notice the call to :code:`prob.set_solver_print()`,
 which sets the solver output to level 0.

@@ -7,17 +7,17 @@ Optimization of Paraboloid
 
 
 
-To start out we'll re-use the :code:`Paraboloid` component that we defined in the previous tutorial.
-We'll add that component, along with and :ref:`IndepVarComp <comp-type-1-indepvarcomp>`, to construct our model
+To start out we'll reuse the :code:`Paraboloid` component that we defined in the previous tutorial.
+We'll add that component, along with an :ref:`IndepVarComp <comp-type-1-indepvarcomp>`, to construct our model
 inside a :ref:`Problem <feature_run_your_model>`.
-You've already used the :code:`Problem` in the run file from the previous tutorial on the :ref:`paraboloid analysis <tutorial_paraboloid_analysis>`,
-but well take a closer look now.
+You've already used :code:`Problem` in the run-script from the previous tutorial on the :ref:`paraboloid analysis <tutorial_paraboloid_analysis>`,
+but we'll take a closer look now.
 
-All analyses and optimizations in OpenMDAO are executed with the a :code:`Problem` class.
+All analyses and optimizations in OpenMDAO are executed with an instance of the :code:`Problem` class.
 This class serves as a container for your model and the driver you've chosen,
 and provides methods for you to :ref:`run the model <run-model>` and :ref:`run the driver <setup-and-run>`.
 It also provides a :ref:`interface for setting and getting variable values <set-and-get-variables>`.
-Every problem has one single driver associated with it. Similarly, it has one single model in it.
+Every problem has a single driver associated with it. Similarly, it has a single model in it.
 
 .. figure:: images/problem_diagram.png
    :align: center
@@ -25,7 +25,7 @@ Every problem has one single driver associated with it. Similarly, it has one si
    :alt: diagram of the problem structure
 
 
-The Run Script
+The Run-Script
 ***********************************
 
 .. embed-test::
@@ -43,7 +43,7 @@ We included both options in the tutorial for your reference.
 
     :ref:`ExecComp <feature_exec_comp>` is a useful utility component provided in OpenMDAO's :ref:`standard library <feature_building_blocks>`
     that lets you define new calculations just by typing in the expression. It supports basic math operations, and even some of numpy's more
-    advanced methods. You can work with both scalar and array data as well.
+    advanced methods. It also supports both scalar and array data as well.
 
 Setting a Driver
 ---------------------
@@ -59,8 +59,8 @@ Here we'll use the :ref:`ScipyOptimizer <scipyoptimizer>`, and tell it to use th
 Defining the Design Variables and Objective
 ---------------------------------------------------------------
 
-Next we setup the problem formulation so the optimizer knows what to vary and what objective to optimize.
-In these calls, you are always going to be specifying a specific variable. For :ref:`add_design_var <feature_add_design_var>`
+Next we set up the problem formulation so the optimizer knows what to vary and what objective to optimize.
+In these calls, you are always going to be specifying a single variable. For :ref:`add_design_var <feature_add_design_var>`
 the variable will always be the output of an :ref:`IndepVarComp <comp-type-1-indepvarcomp>`.
 For :ref:`add_objective <feature_add_objective>` and :ref:`add_constraint <feature_add_constraint>`
 the variable can be the output of any component (including an :code:`IndepVarComp`).

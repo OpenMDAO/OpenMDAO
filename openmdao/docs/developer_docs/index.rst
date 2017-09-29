@@ -21,7 +21,7 @@ Use :code:`pip` to install openmdao locally:
     This is very useful when you're developing because when you change the code or pull new commits down from GitHub you don't necessarily need to re-run pip.
 
 
-Building the docs
+Building the Docs
 -------------------
 
 You can read the docs on line, so it is not necessary to build the them on your local machine.

@@ -72,15 +72,15 @@ and in this case you also ask OpenMDAO to approximate all the partial derivative
     openmdao.test_suite.components.paraboloid_feature.Paraboloid
 
 
-The Run Script
+The Run-Script
 ---------------------
 
-In this example we've set up the run script at the bottom of the file.
-The start of the run script is denoted by the following statement:
+In this example we've set up the run-script at the bottom of the file.
+The start of the run-script is denoted by the following statement:
 
 :code:`if __name__ == '__main__':`
 
-At the top of our run script, we import the remaining OpenMDAO classes that we will need to define our problem.
+At the top of our run-script, we import the remaining OpenMDAO classes that we will need to define our problem.
 
 All OpenMDAO models are built up from a hierarchy of :ref:`Group <openmdao.core.group.py>` instances that organize the components.
 Here the hierarchy is very simple, consisting of a single root group that holds two components.
@@ -89,15 +89,16 @@ This is a special component that OpenMDAO provides for you to specify the indepe
 The second component is an instance of the `Paraboloid` class that we just defined.
 
 As part of the the model hierarchy, you will also define any connections to move data between components in the relevant group.
-Here, we connect the design variables to the inputs on the paraboloid component.
+Here, we connect the independent variables to the inputs on the paraboloid component.
 
 Once the model hierarchy is defined,
-we pass it to the constructor of the :ref:`Problem <openmdao.core.problem.py>` class then call the `setup()` method on that problem which tells the framework to do some initial work to get the data structures in place for execution.
+we pass it to the constructor of the :ref:`Problem <openmdao.core.problem.py>` class.
+Then we call the `setup()` method on that problem which tells the framework to do some initial work to get the data structures in place for execution.
 In this case, we call `run_model()` to actually perform the computation. Later, we'll see how to explicitly set drivers and will be calling `run_driver()` instead.
 
 Here we called run_model twice.
-The first times with the initial values of 3.0 and -4.0 for `x` and `y`.
-The second time we changed those values and re-ran.
+The first time `x` and `y` have the initial values of 3.0 and -4.0 respectively.
+The second time we changed those values and then re-ran.
 There are a few details to note here.
 First, notice the way we printed the outputs via :code:`prob['parab_comp.f_xy']` and similarly how we set the new values for `x` and `y`.
 You can both get and set values using the problem, which works with dimensional values in the units of the source variable.

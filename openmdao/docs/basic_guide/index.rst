@@ -21,7 +21,7 @@ Single Disciplinary Optimization
     first_optimization.rst
 
 ----------------------------------
-Multi Disciplinary Optimization
+Multidisciplinary Optimization
 ----------------------------------
 
 .. toctree::
