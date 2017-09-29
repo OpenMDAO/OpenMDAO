@@ -190,7 +190,7 @@ class ComplexStep(ApproximationScheme):
         cache : ndarray
             An array the same size as the system outputs that is used for temporary storage.
         results : Vector
-            An vector cloned from the outputs vector. Used to store the results.
+            A vector cloned from the outputs vector. Used to store the results.
         deriv_type : str
             One of 'total' or 'partial', indicating if total or partial derivatives are being
             approximated.
