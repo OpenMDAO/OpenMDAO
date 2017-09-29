@@ -76,7 +76,8 @@ script:
 
 before_deploy:
 - eval "$(ssh-agent -s)"
-- ssh-add /tmp/deploy_rsa
+- pwd
+- ssh-add deploy_rsa
 
 deploy:
   provider: script
