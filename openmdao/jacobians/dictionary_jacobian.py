@@ -48,8 +48,9 @@ class DictionaryJacobian(Jacobian):
             List of keys matching this jacobian for the current system.
         """
         system = self._system
+        entry = (system.pathname, vec_name)
 
-        if system.pathname not in self._iter_keys:
+        if entry not in self._iter_keys:
             subjacs = self._subjacs
             keys = []
             for res_name in system._var_relevant_names[vec_name]['output']:
@@ -58,11 +59,10 @@ class DictionaryJacobian(Jacobian):
                         key = (res_name, name)
                         if key in subjacs:
                             keys.append(key)
-            self._iter_keys[system.pathname] = keys
-        else:
-            keys = self._iter_keys[system.pathname]
+            self._iter_keys[entry] = keys
+            return keys
 
-        return keys
+        return self._iter_keys[entry]
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """

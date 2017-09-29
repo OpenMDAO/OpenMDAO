@@ -6,7 +6,7 @@ The `iprofmem` command can be used to obtain an estimate of the memory usage of 
 a specified set of functions.  By default, All of the methods of core OpenMDAO classes are included.
 For example:
 
-.. code:: none
+.. code-block:: none
 
    iprofmem <your_python_script_here>
 
