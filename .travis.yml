@@ -27,6 +27,7 @@ addons:
     - openmpi-bin
     ssh_known_hosts:
     - web543.webfaction.com
+    - webfaction.com
 
 notifications:
   slack:
@@ -48,6 +49,7 @@ before_install:
   else echo "/home/travis/miniconda/bin"; fi)
 - export PATH=$PATHPREFIX:$PATH
 - export OPENMDAO_TEST_DOCS=1
+- echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
 
 install:
 - conda install --yes python=$PY numpy==1.11.2 scipy nose sphinx mock swig
@@ -81,8 +83,8 @@ before_deploy:
 - ssh-add /tmp/deploy.rsa;
 
 before_script:
+  - echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
   - echo -e "Host webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
-  - echo -e "Host github.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
 
 
 deploy:
