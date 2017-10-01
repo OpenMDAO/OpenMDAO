@@ -77,8 +77,8 @@ script:
 before_deploy:
 - eval "$(ssh-agent -s)";
 # - cd openmdao/docs;
-- chmod 600 tmp/deploy.rsa;
-- ssh-add tmp/deploy.rsa;
+- chmod 600 /tmp/deploy.rsa;
+- ssh-add /tmp/deploy.rsa;
 
 deploy:
   provider: script
