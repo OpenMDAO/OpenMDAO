@@ -69,15 +69,15 @@ script:
 # make docs first
 - cd openmdao/docs
 - make all
-- cd ../..
+# - cd ../..
 # run all openmdao tests
-- testflo -n 1 -m "ptest*"
-- testflo -n 1 --coverage --coverpkg openmdao
+# - testflo -n 1 -m "ptest*"
+# - testflo -n 1 --coverage --coverpkg openmdao
 
 before_deploy:
 - eval "$(ssh-agent -s)";
 # - cd openmdao/docs;
-- chmod 600 openmdao/docs/deploy_rsa;
+# - chmod 600 openmdao/docs/deploy_rsa;
 - ssh-add deploy_rsa;
 
 deploy:
