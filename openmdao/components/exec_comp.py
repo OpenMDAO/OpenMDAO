@@ -77,7 +77,7 @@ class ExecComp(ExplicitComponent):
 
             import numpy
             from openmdao.api import ExecComp
-            excomp = ExecComp('y=numpy.sum(x)', x=numpy.ones(10,dtype=float))
+            excomp = ExecComp('y=sum(x)', x=numpy.ones(10,dtype=float))
 
         In this example, 'y' would be assumed to be the default type of float
         and would be given the default initial value of 0.0, while 'x' would be
@@ -88,7 +88,7 @@ class ExecComp(ExplicitComponent):
 
         ::
 
-            excomp = ExecComp('y=numpy.sum(x)',
+            excomp = ExecComp('y=sum(x)',
                               x={'value': numpy.ones(10,dtype=float),
                                  'units': 'ft',
                                  'var_set': 3})
@@ -405,25 +405,51 @@ _expr_dict = {}
 # can only be used in ExecComps if derivatives are not required.  The functions
 # below don't have numpy versions (which do support complex args), otherwise
 # we'd just use those.  Some of these will be overridden if scipy is found.
-_import_functs(math, _expr_dict,
-               names=['factorial', 'fsum', 'lgamma', 'erf', 'erfc', 'gamma'])
+# _import_functs(math, _expr_dict,
+#                names=['factorial', 'fsum', 'lgamma', 'erf', 'erfc', 'gamma'])
 
 _import_functs(np, _expr_dict,
-               names=['cosh', 'ldexp', 'hypot', 'tan', 'isnan', 'log', 'fabs',
-                      'floor', 'sqrt', 'frexp', 'degrees', 'pi', 'log10',
-                      'modf', 'copysign', 'cos', 'ceil', 'isinf', 'sinh',
-                      'trunc', 'expm1', 'e', 'tanh', 'radians', 'sin', 'fmod',
-                      'exp', 'log1p', ('arcsin', 'asin'), ('arcsinh', 'asinh'),
-                      ('arctanh', 'atanh'), ('arctan', 'atan'),
-                      ('arctan2', 'atan2'), ('arccosh', 'acosh'),
-                      ('arccos', 'acos'), ('power', 'pow')])
+               names=[
+                      # Array creation
+                      'arange', 'ones', 'zeros', 'linspace',
+                      # Constants
+                      'e', 'pi',
+                      # Logic`
+                      'isinf', 'isnan',
+                      # Math operations
+                      'log', 'log10', 'log1p',
+                      ('power', 'pow'),
+                      'exp', 'expm1', 'fmax',
+                      'fmin', 'maximum', 'minimum',
+                      # Reductions
+                      'sum', 'dot', 'prod',
+                      # Linear algebra
+                      'tensordot', 'matmul',
+                      'outer', 'inner', 'kron',
+                      # Trig
+                      'sin', 'cos', 'tan', ('arcsin', 'asin'),
+                      ('arccos', 'acos'), ('arctan', 'atan'),
+                      # Hyperbolic trig
+                      'sinh', 'cosh', 'tanh', ('arcsinh', 'asinh'),
+                      ('arccosh', 'acosh')])
+
+                   
+                   # 'cosh', 'ldexp', 'hypot', 'tan', 'isnan', 'log', 'fabs',
+                   #    'floor', 'sqrt', 'frexp', 'degrees', 'pi', 'log10',
+                   #    'modf', 'copysign', 'cos', 'ceil', 'isinf', 'sinh',
+                   #    'trunc', 'expm1', 'e', 'tanh', 'radians', 'sin', 'fmod',
+                   #    'ones', 'zeros', 'arange', 'linspace',
+                   #    'exp', 'log1p', ('arcsin', 'asin'), ('arcsinh', 'asinh'),
+                   #    ('arctanh', 'atanh'), ('arctan', 'atan'),
+                   #    ('arctan2', 'atan2'), ('arccosh', 'acosh'),
+                   #    ('arccos', 'acos'), ('power', 'pow'), 'sum', 'dot'])
 
 # Note: adding cmath here in case someone wants to have an ExecComp that
 # performs some complex operation during solve_nonlinear. cmath functions
 # generally return complex numbers even if the args are floats.
-_expr_dict['cmath'] = cmath
+# _expr_dict['cmath'] = cmath
 
-_expr_dict['numpy'] = np
+# _expr_dict['numpy'] = np
 
 
 # if scipy is available, add some functions
@@ -433,7 +459,7 @@ except ImportError:
     pass
 else:
     _import_functs(scipy.special, _expr_dict,
-                   names=['gamma', 'polygamma', 'erf', 'erfc'])
+                   names=['factorial', 'erf', 'erfc'])
 
 
 # Put any functions here that need special versions to work under
