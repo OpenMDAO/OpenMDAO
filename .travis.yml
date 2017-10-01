@@ -80,6 +80,11 @@ before_deploy:
 - chmod 600 /tmp/deploy.rsa;
 - ssh-add /tmp/deploy.rsa;
 
+before_script:
+  - echo -e "Host webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+  - echo -e "Host github.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+
+
 deploy:
   provider: script
   skip_cleanup: true
