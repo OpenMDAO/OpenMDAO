@@ -82,9 +82,9 @@ before_deploy:
 - chmod 600 /tmp/deploy.rsa;
 - ssh-add /tmp/deploy.rsa;
 
-before_script:
-  - echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
-  - echo -e "Host webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+#before_script:
+#  - echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+#  - echo -e "Host webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
 
 
 deploy:
@@ -92,7 +92,9 @@ deploy:
   skip_cleanup: true
   script:
   - if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
+      cd openmdao/docs
       rsync -r --delete-after -v _build/html openmdao@web543.webfaction.com:webapps/bluedocs;
+      cd ../..
     fi
   on:
     branch: master
