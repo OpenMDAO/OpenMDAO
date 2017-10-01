@@ -10,10 +10,10 @@ os:
 language: generic
 
 env:
-- PY=2.7 MPI=1
+#- PY=2.7 MPI=1
 - PY=3.4 MPI=1
-- PY=2.7 MPI=
-- PY=3.4 MPI=
+# - PY=2.7 MPI=
+# - PY=3.4 MPI=
 
 addons:
   apt:
@@ -78,7 +78,7 @@ before_deploy:
 - eval "$(ssh-agent -s)";
 # - cd openmdao/docs;
 # - chmod 600 openmdao/docs/deploy_rsa;
-- ssh-add deploy_rsa;
+- ssh-add openmdao/docs/deploy_rsa;
 
 deploy:
   provider: script
