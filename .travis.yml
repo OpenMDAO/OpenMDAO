@@ -36,7 +36,7 @@ notifications:
 
 before_install:
 - openssl aes-256-cbc -K $encrypted_67e08862e114_key -iv $encrypted_67e08862e114_iv
-  -in deploy.rsa.enc -out deploy.rsa -d;
+  -in deploy.rsa.enc -out /tmp/deploy.rsa -d;
 - OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux";
   fi)
 - if [ "$OS" = "MacOSX" ] && [ "$MPI" ]; then brew install openmpi; fi
@@ -77,8 +77,8 @@ script:
 before_deploy:
 - eval "$(ssh-agent -s)";
 # - cd openmdao/docs;
-# - chmod 600 openmdao/docs/deploy_rsa;
-- ssh-add openmdao/docs/deploy_rsa;
+- chmod 600 tmp/deploy.rsa;
+- ssh-add tmp/deploy.rsa;
 
 deploy:
   provider: script
