@@ -29,11 +29,11 @@ _ufunc_test_data = {'abs': {'str': 'f=abs(x)',
                     'arccosh': {'str': 'f=arccosh(x)',
                              'check_func': np.arccosh,
                              'args': {'f': {'value': np.zeros(6)},
-                                      'x': {'value': 1+np.random.random(6)}}},
+                                      'x': {'value': 1.1+np.random.random(6)}}},
                     'acosh': {'str': 'f=acosh(x)',
                              'check_func': np.arccosh,
                              'args': {'f': {'value': np.zeros(6)},
-                                      'x': {'value': 1+np.random.random(6)}}},
+                                      'x': {'value': 1.1+np.random.random(6)}}},
                     'arange': {'str': 'f=arange(0,10,2)',
                              'check_val': np.arange(0,10,2),
                              'args': {'f': {'value': np.zeros(5)}}},
@@ -166,16 +166,11 @@ _ufunc_test_data = {'abs': {'str': 'f=abs(x)',
                     'pi': {'str': 'f=pi',
                            'check_val': np.pi,
                            'args': {'f': {'value': 0.0}}},
-                    'pow': {'str': 'f=pow(x, y)',
-                            'check_func': np.power,
-                            'args': {'f': {'value': np.zeros(6)},
-                                     'x': {'value': np.random.random(6)},
-                                     'y': {'value': np.random.random(6)}}},
                     'power': {'str': 'f=power(x, y)',
                               'check_func': np.power,
                               'args': {'f': {'value': np.zeros(6)},
                                        'x': {'value': np.random.random(6)},
-                                       'y': {'value': np.random.random(6)}}},
+                                       'y': {'value': np.random.random(6)+1.0}}},
                     'prod': {'str': 'f=prod(x)',
                              'check_func': np.prod,
                              'args': {'f': {'value': 0.0},
@@ -611,12 +606,11 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, prob['comp.z'], 24.0, 0.00001)
 
-    @parameterized.expand(
-        itertools.product([func_name for func_name in _expr_dict])
+    @parameterized.expand(itertools.product(
+        [func_name for func_name in _expr_dict],
+    ), testcase_func_name=lambda f, n, p: 'test_exec_comp_value_' + '_'.join(a for a in p.args)
     )
     def test_exec_comp_value(self, f):
-
-        print(f)
         test_data = _ufunc_test_data[f]
 
         prob = Problem()
@@ -636,7 +630,7 @@ class TestExecComp(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        print(f + '...', end='')
+        #print(f + '...', end='')
         if 'check_func' in test_data:
 
             check_args = []
@@ -654,24 +648,20 @@ class TestExecComp(unittest.TestCase):
         else:
             expected =  test_data['check_val']
         np.testing.assert_almost_equal(prob['f'], expected)
-        print('OK')
+        #print('OK')
 
         if 'check_val' not in test_data:
             try:
                 prob.check_partials(compact_print=True)
             except TypeError as e:
-                print(e)
                 print(f, 'does not support complex-step differentiation')
 
-    @parameterized.expand(
-        itertools.product([func_name for func_name in _expr_dict])
+    @parameterized.expand(itertools.product(
+        [func_name for func_name in _expr_dict],
+    ), testcase_func_name=lambda f, n, p: 'test_exec_comp_jac_' + '_'.join(a for a in p.args)
     )
     def test_exec_comp_jac(self, f):
 
-        # funcs = sorted([key for key in _expr_dict if key != 'ldexp'])
-        # print('\n'.join(funcs))
-        #
-        # for f in funcs:
         test_data = _ufunc_test_data[f]
 
         prob = Problem()
@@ -683,9 +673,12 @@ class TestExecComp(unittest.TestCase):
                 if arg_name == 'f':
                     continue
                 ivc.add_output(name=arg_name, val=arg_value['value'])
-                model.connect('ivc.{0}'.format(arg_name), 'comp.{0}'.format(arg_name))
+                model.connect('ivc.{0}'.format(arg_name),
+                              '{0}_comp.{1}'.format(f, arg_name))
 
-        model.add_subsystem('comp',
+        #print('component name:', '{0}_comp'.format(f))
+
+        model.add_subsystem('{0}_comp'.format(f),
                             ExecComp(test_data['str'], **test_data['args']),
                             promotes_outputs=['f'])
         prob.setup()
@@ -699,10 +692,5 @@ class TestExecComp(unittest.TestCase):
                     np.testing.assert_almost_equal(cpd[comp][var, wrt]['abs error'], 0, decimal=4)
 
 
-
-
 if __name__ == "__main__":
-    for key in _ufunc_test_data:
-        if key not in _expr_dict:
-            print(key)
-    #unittest.main()
+    unittest.main()
