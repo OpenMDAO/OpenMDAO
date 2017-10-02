@@ -583,7 +583,8 @@ class System(object):
                             if 'size' in voi:
                                 ncol = voi['size']
                             else:
-                                ncol = sizes[iproc, abs2idx[vec_name]['output'][vec_name]]
+                                owner = self._owning_rank['output'][vec_name]
+                                ncol = sizes[owner, abs2idx[vec_name]['output'][vec_name]]
                         rdct, _ = relevant[vec_name]['@all']
                         rel = rdct['output']
                 for key in ['input', 'output', 'residual']:

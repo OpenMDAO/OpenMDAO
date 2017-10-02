@@ -179,8 +179,12 @@ class PETScVector(DefaultVector):
                 # for now the petsc array is only the size of one column and we do separate
                 # transfers for each column.   Later we'll do it all at once and the petsc
                 # array will be the full size of the data array (and use the same memory).
-                self._petsc[set_name] = PETSc.Vec().createWithArray(data[:, 0].copy(),
-                                                                    comm=self._system.comm)
+                if data.size == 0:
+                    self._petsc[set_name] = PETSc.Vec().createWithArray(data.copy(),
+                                                                        comm=self._system.comm)
+                else:
+                    self._petsc[set_name] = PETSc.Vec().createWithArray(data[:, 0].copy(),
+                                                                        comm=self._system.comm)
 
             # Allocate imaginary for complex step
             if self._alloc_complex:
@@ -189,8 +193,13 @@ class PETScVector(DefaultVector):
                         self._imag_petsc[set_name] = \
                             PETSc.Vec().createWithArray(data, comm=self._system.comm)
                     else:
-                        self._imag_petsc[set_name] = \
-                            PETSc.Vec().createWithArray(data[:, 0].copy(), comm=self._system.comm)
+                        if data.size == 0:
+                            self._imag_petsc[set_name] = \
+                                PETSc.Vec().createWithArray(data.copy(), comm=self._system.comm)
+                        else:
+                            self._imag_petsc[set_name] = \
+                                PETSc.Vec().createWithArray(data[:, 0].copy(),
+                                                            comm=self._system.comm)
 
     def get_norm(self):
         """

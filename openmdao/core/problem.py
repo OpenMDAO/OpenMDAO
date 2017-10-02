@@ -1213,7 +1213,10 @@ class Problem(object):
                                 sz = size
                             else:
                                 sz = sizes[root, out_var_idx]
-                            deriv_val = np.empty(sz, dtype=float)
+                            if ncol > 1:
+                                deriv_val = np.empty((sz, ncol))
+                            else:
+                                deriv_val = np.empty(sz, dtype=float)
                         self.comm.Bcast(deriv_val, root=root)
 
                 len_val = len(deriv_val)
