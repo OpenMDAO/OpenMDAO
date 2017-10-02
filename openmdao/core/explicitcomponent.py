@@ -22,7 +22,7 @@ class ExplicitComponent(Component):
     ----------
     _inst_functs : dict
         Dictionary of names mapped to bound methods.
-    _has_derivs : bool
+    _has_compute_partials : bool
         If True, the instance overrides compute_partials.
     """
 
@@ -38,7 +38,7 @@ class ExplicitComponent(Component):
         super(ExplicitComponent, self).__init__(**kwargs)
 
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
-        self._has_derivs = overrides_method('compute_partials', self, ExplicitComponent)
+        self._has_compute_partials = overrides_method('compute_partials', self, ExplicitComponent)
 
     def _configure(self):
         """
@@ -343,7 +343,7 @@ class ExplicitComponent(Component):
         do_ln : boolean
             Flag indicating if the linear solver should be linearized.
         """
-        if not self._has_derivs and not self._approx_schemes:
+        if not self._has_compute_partials and not self._approx_schemes:
             return
 
         with self.jacobian_context() as J:
@@ -355,7 +355,7 @@ class ExplicitComponent(Component):
                 for approximation in itervalues(self._approx_schemes):
                     approximation.compute_approximations(self, jac=J)
 
-                if self._has_derivs:
+                if self._has_compute_partials:
                     # negate constant subjacs (and others that will get overwritten)
                     # back to normal
                     self._negate_jac()
