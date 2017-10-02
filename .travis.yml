@@ -10,10 +10,10 @@ os:
 language: generic
 
 env:
-- PY=2.7 MPI=1
+#- PY=2.7 MPI=1
 - PY=3.4 MPI=1
-- PY=2.7 MPI=
-- PY=3.4 MPI=
+#- PY=2.7 MPI=
+#- PY=3.4 MPI=
 
 addons:
   apt:
@@ -68,15 +68,14 @@ install:
 
 script:
 # make docs first
-- cd openmdao/docs
+- cd /home/travis/build/openmdao/docs;
 - make all
-- cd ../..
 # run all openmdao tests
-- testflo -n 1 -m "ptest*"
-- testflo -n 1 --coverage --coverpkg openmdao
+# - testflo -n 1 -m "ptest*"
+# - testflo -n 1 --coverage --coverpkg openmdao
 
 after_success:
-- cd ../..
+- cd /home/travis/build/blue
 - coveralls
 
 before_deploy:
@@ -89,9 +88,8 @@ deploy:
   skip_cleanup: true
   script:
   - if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
-      cd openmdao/docs;
+      cd /home/travis/build/openmdao/docs;
       rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/bluedocs;
-      cd ../..;
     fi
   on:
     branch: master
