@@ -607,7 +607,7 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 24.0, 0.00001)
 
     @parameterized.expand(itertools.product(
-        [func_name for func_name in _expr_dict],
+        [func_name for func_name in _expr_dict if not func_name.startswith('_')],
     ), testcase_func_name=lambda f, n, p: 'test_exec_comp_value_' + '_'.join(a for a in p.args)
     )
     def test_exec_comp_value(self, f):
@@ -630,7 +630,6 @@ class TestExecComp(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        #print(f + '...', end='')
         if 'check_func' in test_data:
 
             check_args = []
@@ -657,7 +656,7 @@ class TestExecComp(unittest.TestCase):
                 print(f, 'does not support complex-step differentiation')
 
     @parameterized.expand(itertools.product(
-        [func_name for func_name in _expr_dict],
+        [func_name for func_name in _expr_dict if not func_name.startswith('_')],
     ), testcase_func_name=lambda f, n, p: 'test_exec_comp_jac_' + '_'.join(a for a in p.args)
     )
     def test_exec_comp_jac(self, f):
@@ -675,8 +674,6 @@ class TestExecComp(unittest.TestCase):
                 ivc.add_output(name=arg_name, val=arg_value['value'])
                 model.connect('ivc.{0}'.format(arg_name),
                               '{0}_comp.{1}'.format(f, arg_name))
-
-        #print('component name:', '{0}_comp'.format(f))
 
         model.add_subsystem('{0}_comp'.format(f),
                             ExecComp(test_data['str'], **test_data['args']),
