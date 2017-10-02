@@ -69,3 +69,8 @@ class TestKeplersEquation(unittest.TestCase):
         assert_almost_equal(np.degrees(prob['E']), 115.9, decimal=1)
 
         print('E (deg) = ', np.degrees(prob['E'][0]))
+
+
+if __name__ == "__main__":
+
+    unittest.main()

@@ -1,3 +1,6 @@
+
+.. _feature_add_constraint:
+
 *******************
 Adding a Constraint
 *******************

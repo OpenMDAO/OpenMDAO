@@ -5,7 +5,7 @@ branches:
 sudo: false
 
 os:
-  - linux
+- linux
 
 language: generic
 
@@ -14,7 +14,6 @@ env:
 - PY=3.4 MPI=1
 - PY=2.7 MPI=
 - PY=3.4 MPI=
-
 
 addons:
   apt:
@@ -26,47 +25,40 @@ addons:
     - liblapack-dev
     - libopenmpi-dev
     - openmpi-bin
+    ssh_known_hosts:
+    - web543.webfaction.com
 
 notifications:
   slack:
-    secure: "TnJSd6Mu99tcACmPVSpsLI6hfYxecLCare+ileiuJa8foIzbgna/cL6/tyPUGpLGgSZkxGXoBSRXZJHonZNa7DYXmfhxBblHa0fwgdOhk4GAEDiiOUa2agaoh4F3EoTOuQIfN0eCprItfewIJtT3CHEh+PuWLifclRU9G/6byldDHKy8dPPinrLtMy91RFcXzcBFBev7EEJtJDL6odhkVsJQjmtf9E7+Up3n/tSL+egllYC0H6P7P4nCIjrNuBNDVYtfqb5QbvUgfuTFVcqMJTMsams04taYQhT4UVvVpB0rBwtP5S6w2QdAr/QTvi06ZIuFsgVAdFmRRNliXLG2qeWbQ44hWT36aehhVHvfyLuC9Bjbo5+OhKcA3qmTzCaG4JoYbsEXPVp0b31m4EKGl+yLIUoV1Zp46MTM+llWny4/mDn6o/gmtmtCpZ8S1EYDniwluelLiu3u/ZkFnadsn++ZS7GkAPkY8VpI5lpY3B2jPsAOJLaLNMHSk8oa51LAPg+2/MqCDpgCFsZUctNXdIkYR6Votts5KpDabcVFpC2NtfQLWdRh4CsvpiLcSJigUe+4aLRqxZgaahsTuL6LeSrDcHR+gqn4KYvKl4E7pUQZX+i8wRYoDvFTMIAx/F0dDZ+U+Rzr5bVORuvNc9lDjuB57vjEIvZ+djPDtBkENwo="
+    secure: TnJSd6Mu99tcACmPVSpsLI6hfYxecLCare+ileiuJa8foIzbgna/cL6/tyPUGpLGgSZkxGXoBSRXZJHonZNa7DYXmfhxBblHa0fwgdOhk4GAEDiiOUa2agaoh4F3EoTOuQIfN0eCprItfewIJtT3CHEh+PuWLifclRU9G/6byldDHKy8dPPinrLtMy91RFcXzcBFBev7EEJtJDL6odhkVsJQjmtf9E7+Up3n/tSL+egllYC0H6P7P4nCIjrNuBNDVYtfqb5QbvUgfuTFVcqMJTMsams04taYQhT4UVvVpB0rBwtP5S6w2QdAr/QTvi06ZIuFsgVAdFmRRNliXLG2qeWbQ44hWT36aehhVHvfyLuC9Bjbo5+OhKcA3qmTzCaG4JoYbsEXPVp0b31m4EKGl+yLIUoV1Zp46MTM+llWny4/mDn6o/gmtmtCpZ8S1EYDniwluelLiu3u/ZkFnadsn++ZS7GkAPkY8VpI5lpY3B2jPsAOJLaLNMHSk8oa51LAPg+2/MqCDpgCFsZUctNXdIkYR6Votts5KpDabcVFpC2NtfQLWdRh4CsvpiLcSJigUe+4aLRqxZgaahsTuL6LeSrDcHR+gqn4KYvKl4E7pUQZX+i8wRYoDvFTMIAx/F0dDZ+U+Rzr5bVORuvNc9lDjuB57vjEIvZ+djPDtBkENwo=
     on_success: always
     on_failure: always
 
 before_install:
-- OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux"; fi)
+- openssl aes-256-cbc -K $encrypted_67e08862e114_key -iv $encrypted_67e08862e114_iv
+  -in deploy.rsa.enc -out /tmp/deploy.rsa -d;
+- OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux";
+  fi)
 - if [ "$OS" = "MacOSX" ] && [ "$MPI" ]; then brew install openmpi; fi
 - wget "https://repo.continuum.io/miniconda/Miniconda-latest-$OS-x86_64.sh" -O miniconda.sh
 - chmod +x miniconda.sh
-- if [ "$OS" = "Linux" ]; then
-    ./miniconda.sh -b  -p /home/travis/miniconda;
-  fi
-- if [ "$OS" = "MacOSX" ]; then
-    ./miniconda.sh -b  -p /Users/travis/miniconda;
-  fi
-- PATHPREFIX=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "/Users/travis/miniconda/bin"; else echo "/home/travis/miniconda/bin"; fi)
+- if [ "$OS" = "Linux" ]; then ./miniconda.sh -b  -p /home/travis/miniconda; fi
+- if [ "$OS" = "MacOSX" ]; then ./miniconda.sh -b  -p /Users/travis/miniconda; fi
+- PATHPREFIX=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "/Users/travis/miniconda/bin";
+  else echo "/home/travis/miniconda/bin"; fi)
 - export PATH=$PATHPREFIX:$PATH
 - export OPENMDAO_TEST_DOCS=1
+- echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
 
 install:
 - conda install --yes python=$PY numpy==1.11.2 scipy nose sphinx mock swig
-- if [ "$OS" = "Linux" ]; then
-    if [ "$PY" = "2.7" ]; then
-        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp27-none-linux_x86_64.whl;
-    elif [ "$PY" = "3.4" ]; then
-        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py3-none-linux_x86_64.whl;
-    fi
-  fi
-- if [ "$OS" = "MacOSX" ]; then
-    if [ "$PY" = "2.7" ]; then
-        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py2-none-macosx_10_5_x86_64.whl;
-    elif [ "$PY" = "3.4" ]; then
-        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp34-none-macosx_10_5_x86_64.whl;
-    fi
-  fi
-- if [ "$MPI" ]; then
-    pip install mpi4py;
-    pip install git+https://bitbucket.org/petsc/petsc4py@3.7.0;
+- if [ "$OS" = "Linux" ]; then if [ "$PY" = "2.7" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp27-none-linux_x86_64.whl;
+  elif [ "$PY" = "3.4" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py3-none-linux_x86_64.whl;
+  fi fi
+- if [ "$OS" = "MacOSX" ]; then if [ "$PY" = "2.7" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py2-none-macosx_10_5_x86_64.whl;
+  elif [ "$PY" = "3.4" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp34-none-macosx_10_5_x86_64.whl;
+  fi fi
+- if [ "$MPI" ]; then pip install mpi4py; pip install git+https://bitbucket.org/petsc/petsc4py@3.7.0;
   fi
 - pip install redbaron
 - pip install git+https://github.com/OpenMDAO/testflo.git
@@ -76,12 +68,30 @@ install:
 
 script:
 # make docs first
-- cd openmdao/docs
+- cd openmdao/docs;
 - make all
-# run all openmdao tests
 - cd ../..
+# run all openmdao tests
 - testflo -n 1 -m "ptest*"
 - testflo -n 1 --coverage --coverpkg openmdao
 
 after_success:
-  coveralls
+- coveralls
+
+before_deploy:
+- eval "$(ssh-agent -s)";
+- chmod 600 /tmp/deploy.rsa;
+- ssh-add /tmp/deploy.rsa;
+
+deploy:
+  provider: script
+  skip_cleanup: true
+  script:
+  - if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
+      cd openmdao/docs;
+      rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/bluedocs;
+    fi
+  on:
+    branch: master
+
+

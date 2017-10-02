@@ -415,10 +415,16 @@ class Driver(object):
         """
         prob = self._problem
 
-        if return_format == 'dict':
-
-            derivs = prob._compute_totals(of=of, wrt=wrt, return_format=return_format,
+        # Compute the derivatives in dict format...
+        if prob.model._owns_approx_jac:
+            derivs = prob._compute_totals_approx(of=of, wrt=wrt, return_format='dict',
+                                                 global_names=global_names)
+        else:
+            derivs = prob._compute_totals(of=of, wrt=wrt, return_format='dict',
                                           global_names=global_names)
+
+        # ... then convert to whatever the driver needs.
+        if return_format == 'dict':
 
             for okey, oval in iteritems(derivs):
                 for ikey, val in iteritems(oval):
@@ -438,10 +444,6 @@ class Driver(object):
                         val *= 1.0 / iscaler
 
         elif return_format == 'array':
-
-            # Compute the derivatives in dict format, and then convert to array.
-            derivs = prob._compute_totals(of=of, wrt=wrt, return_format='dict',
-                                          global_names=global_names)
 
             # Use sizes pre-computed in derivs for ease
             osize = 0

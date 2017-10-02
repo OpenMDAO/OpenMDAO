@@ -588,8 +588,8 @@ class Component(System):
             contain the values found at each (row, col) location in the subjac.
         method : str
             The type of approximation that should be used. Valid options include:
-                - 'fd': Finite Difference, 'cs': Complex Step, 'exact': use the component
-                defined analytic derivatives. Default is 'exact'.
+            'fd': Finite Difference, 'cs': Complex Step, 'exact': use the component
+            defined analytic derivatives. Default is 'exact'.
         **kwargs : dict
             Keyword arguments for controlling the behavior of the approximation.
         """

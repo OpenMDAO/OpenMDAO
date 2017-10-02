@@ -4,8 +4,6 @@
 Getting Started
 ***************
 
-The purpose of this document is simply to ensure that you get OpenMDAO blue installed on your system successfully.
-
 Installation Instructions:
 
 Use :code:`git` to clone the repository:
@@ -18,12 +16,17 @@ Use :code:`pip` to install openmdao locally:
 
 :code:`pip install .`
 
-Documentation Building Instructions:
+Hello world!
+*******************
+Here is a really short run file to get you started running your first optimization.
+Copy the code into a file named `hello_world.py` and run it by typing:
 
-:code:`cd openmdao/docs`
+.. code::
 
-:code:`make all`
+    python hello_world.py
 
-This will build the docs in :code:`openmdao/docs/_build/html.`
+.. embed-test::
+    openmdao.test_suite.test_examples.tldr_paraboloid.TestParaboloidTLDR.test_tldr
 
-Then, just :code:`open openmdao/docs/_build/html/index.html` in a browser to begin.
+
+

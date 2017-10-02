@@ -1,9 +1,8 @@
+.. _feature_nonlinear_solvers:
 
 *****************
 Nonlinear Solvers
 *****************
-
-Nonlinear Solvers...
 
 .. toctree::
     :maxdepth: 1
