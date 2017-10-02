@@ -10,10 +10,10 @@ os:
 language: generic
 
 env:
-#- PY=2.7 MPI=1
+- PY=2.7 MPI=1
 - PY=3.4 MPI=1
-#- PY=2.7 MPI=
-#- PY=3.4 MPI=
+- PY=2.7 MPI=
+- PY=3.4 MPI=
 
 addons:
   apt:
@@ -72,8 +72,8 @@ script:
 - make all
 - cd ../..
 # run all openmdao tests
-# - testflo -n 1 -m "ptest*"
-# - testflo -n 1 --coverage --coverpkg openmdao
+- testflo -n 1 -m "ptest*"
+- testflo -n 1 --coverage --coverpkg openmdao
 
 after_success:
 - coveralls
