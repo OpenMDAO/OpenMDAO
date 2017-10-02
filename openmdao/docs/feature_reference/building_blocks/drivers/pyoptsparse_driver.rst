@@ -65,10 +65,6 @@ Setting a limit on the number of major iterations. Here, we set it to just a few
 You can learn more about the available options in the SNOPT_Manual_.
 
 
-NSGA2 Specific Settings
------------------------
-
-
 .. toctree::
     :maxdepth: 1
 
