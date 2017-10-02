@@ -10,10 +10,10 @@ os:
 language: generic
 
 env:
-#- PY=2.7 MPI=1
+- PY=2.7 MPI=1
 - PY=3.4 MPI=1
-# - PY=2.7 MPI=
-# - PY=3.4 MPI=
+- PY=2.7 MPI=
+- PY=3.4 MPI=
 
 addons:
   apt:
@@ -27,7 +27,6 @@ addons:
     - openmpi-bin
     ssh_known_hosts:
     - web543.webfaction.com
-    - webfaction.com
 
 notifications:
   slack:
@@ -71,10 +70,10 @@ script:
 # make docs first
 - cd openmdao/docs
 - make all
-# - cd ../..
+- cd ../..
 # run all openmdao tests
-# - testflo -n 1 -m "ptest*"
-# - testflo -n 1 --coverage --coverpkg openmdao
+- testflo -n 1 -m "ptest*"
+- testflo -n 1 --coverage --coverpkg openmdao
 
 after_success:
 - cd ../..
