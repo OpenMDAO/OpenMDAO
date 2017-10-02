@@ -22,7 +22,7 @@ class SolverInfo(object):
 
     Attributes
     ----------
-    prefix : <System>
+    prefix : str
         Prefix to prepend during this iprint.
     stack : List
         List of strings; strings are popped and appended as needed.
@@ -66,6 +66,33 @@ class SolverInfo(object):
         new_str = '| precon:'
         self.prefix += new_str
         self.stack.append(new_str)
+
+    def save_cache(self):
+        """
+        Save prefix and stack so that they can be restored later in event of an exception recovery.
+
+        Return
+        -------
+        string
+            prefix
+        list
+            stack
+        """
+        return self.prefix, self.stack
+
+    def restore_cache(self, prefix, stack):
+        """
+        Restore previously saved iprint stack names.
+
+        Parameters
+        ----------
+        prefix : <System>
+            Prefix to prepend during this iprint.
+        stack : List
+            List of strings; strings are popped and appended as needed.
+        """
+        self.prefix = prefix
+        self.stack = stack
 
 
 class Solver(object):

@@ -320,6 +320,8 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                 self._iter_execute()
                 self._iter_count += 1
                 try:
+
+                    prefix, stack = self._solver_info.save_cache()
                     self._run_apply()
                     norm = self._iter_get_norm()
 
@@ -334,6 +336,8 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                         self._analysis_error_raised = True
                         rec.abs = np.nan
                         rec.rel = np.nan
+
+                        self._solver_info.restore_cache(prefix, stack)
 
                     else:
                         exc = sys.exc_info()
