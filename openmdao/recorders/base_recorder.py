@@ -257,8 +257,23 @@ class BaseRecorder(object):
                                if self._check_path(n, incl, excl)}
 
             if sys_incl:
-                root = object_requesting_recording._problem.model
-                mysystem_outputs = {n for n in root._outputs
+                prob = object_requesting_recording._problem
+                root = prob.model
+                # Need all the outputs from all the ranks here
+                # These my* variables are sets
+                # sys_incl is not subject to the checking with incl and excl
+                mysystem_outputs = {n for n in root._outputs}
+
+                # If MPI, and on rank 0, need to gather up all the variables
+                #    even those not local to rank 0
+                if MPI:
+                    all_vars = root.comm.gather(mysystem_outputs, root=0)
+                    if MPI.COMM_WORLD.rank == 0:
+                        mysystem_outputs = all_vars[-1]
+                        for d in all_vars[:-1]:
+                            mysystem_outputs.update(d)
+
+                mysystem_outputs = {n for n in mysystem_outputs
                                if self._check_path(n, sys_incl, [])}
 
             self._filtered_driver = {

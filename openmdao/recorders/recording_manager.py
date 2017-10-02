@@ -111,6 +111,7 @@ class RecordingManager(object):
 
         self._record_desvars = self._record_responses = False
         self._record_objectives = self._record_constraints = False
+        self._record_sysvars = False
 
         for recorder in self._recorders:
             # Each of the recorders determines its self._filtered_* list of vars
@@ -135,7 +136,7 @@ class RecordingManager(object):
             if constraintnames:
                 self._record_constraints = True
             if sysinclnames:
-                self._record_system_includes = True
+                self._record_sysvars = True
 
             # now localize the lists to only
             # include local vars.  We need to do this after determining

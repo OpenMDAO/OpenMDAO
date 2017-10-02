@@ -21,6 +21,13 @@ else:
     PETScVector = None
     pyOptSparseDriver = None
 
+import pydevd
+
+from openmdao.utils.mpi import MPI
+if MPI.COMM_WORLD.rank:
+    pydevd.settrace('localhost', port=9876, stdoutToServer=True, stderrToServer=True)
+else:
+    pydevd.settrace('localhost', port=9877, stdoutToServer=True, stderrToServer=True)
 
 class Mygroup(Group):
 
