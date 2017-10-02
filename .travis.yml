@@ -76,16 +76,14 @@ script:
 # - testflo -n 1 -m "ptest*"
 # - testflo -n 1 --coverage --coverpkg openmdao
 
+after_success:
+- cd ../..
+- coveralls
+
 before_deploy:
 - eval "$(ssh-agent -s)";
-# - cd openmdao/docs;
 - chmod 600 /tmp/deploy.rsa;
 - ssh-add /tmp/deploy.rsa;
-
-#before_script:
-#  - echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
-#  - echo -e "Host webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
-
 
 deploy:
   provider: script
@@ -93,12 +91,10 @@ deploy:
   script:
   - if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
       cd openmdao/docs;
-      rsync -r --delete-after -v _build/html openmdao@web543.webfaction.com:webapps/bluedocs;
+      rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/bluedocs;
       cd ../..;
     fi
   on:
     branch: master
 
-after_success:
-- cd ../..
-- coveralls
+
