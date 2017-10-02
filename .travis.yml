@@ -35,12 +35,13 @@ notifications:
     on_failure: always
 
 before_install:
-- if ["$TRAVIS_PULL_REQUEST" = "false"];
-    then openssl aes-256-cbc -K $encrypted_67e08862e114_key -iv $encrypted_67e08862e114_iv -in deploy.rsa.enc -out /tmp/deploy.rsa -d;
+- if ["$TRAVIS_PULL_REQUEST" = "false"]; then
+    openssl aes-256-cbc -K $encrypted_67e08862e114_key -iv $encrypted_67e08862e114_iv -in deploy.rsa.enc -out /tmp/deploy.rsa -d;
   fi
-- OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux";
-  fi)
-- if [ "$OS" = "MacOSX" ] && [ "$MPI" ]; then brew install openmpi; fi
+- OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux"; fi)
+- if [ "$OS" = "MacOSX" ] && [ "$MPI" ]; then
+    brew install openmpi;
+  fi
 - wget "https://repo.continuum.io/miniconda/Miniconda-latest-$OS-x86_64.sh" -O miniconda.sh
 - chmod +x miniconda.sh
 - if [ "$OS" = "Linux" ]; then ./miniconda.sh -b  -p /home/travis/miniconda; fi
@@ -49,8 +50,8 @@ before_install:
   else echo "/home/travis/miniconda/bin"; fi)
 - export PATH=$PATHPREFIX:$PATH
 - export OPENMDAO_TEST_DOCS=1
-- if ["$TRAVIS_PULL_REQUEST" = "false"];
-    then echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
+- if ["$TRAVIS_PULL_REQUEST" = "false"]; then
+    echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
   fi
 #- echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
 
@@ -76,8 +77,8 @@ script:
 - make all
 - cd ../..
 # run all openmdao tests
-- testflo -n 1 -m "ptest*"
-- testflo -n 1 --coverage --coverpkg openmdao
+#- testflo -n 1 -m "ptest*"
+#- testflo -n 1 --coverage --coverpkg openmdao
 
 after_success:
 - coveralls
@@ -94,7 +95,7 @@ deploy:
   skip_cleanup: true
   script:
   - if ["$TRAVIS_PULL_REQUEST" = "false"]; then
-    - if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
+      if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
         cd openmdao/docs;
         rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/bluedocs;
       fi
