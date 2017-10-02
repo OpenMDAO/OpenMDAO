@@ -7,7 +7,7 @@ from parameterized import parameterized
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, ExecComp, NewtonSolver, \
-     ExplicitComponent, DefaultVector, NonlinearBlockGS
+     ExplicitComponent, DefaultVector, NonlinearBlockGS, LinearRunOnce
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -467,6 +467,47 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[0, 3], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][1][0], Jbase[2, 1], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][1][1], Jbase[2, 3], 1e-8)
+
+    def test_full_model_fd(self):
+
+        class DontCall(LinearRunOnce):
+            def solve(self, vec_names, mode, rel_systems=None):
+                raise RuntimeError("This solver should be ignored!")
+
+
+        class Simple(ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_output('y', val=0.0)
+
+                self.declare_partials('y', 'x')
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                outputs['y'] = 4.0*x
+
+
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('comp', Simple(), promotes=['x', 'y'])
+
+        model.linear_solver = DontCall()
+        model.approx_totals()
+
+        model.add_design_var('x')
+        model.add_objective('y')
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        of = ['comp.y']
+        wrt = ['p1.x']
+        derivs = prob.driver._compute_totals(of=of, wrt=wrt, return_format='dict')
+
+        assert_rel_error(self, derivs['comp.y']['p1.x'], [[4.0]], 1e-6)
+
 
 def title(txt):
     """ Provide nice title for parameterized testing."""
@@ -1032,7 +1073,7 @@ class ApproxTotalsFeature(unittest.TestCase):
         derivs = prob.compute_totals(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['z', 'x'], [[300.0]], 1e-6)
-        self.assertEqual(comp2._exec_count, 3)
+        self.assertEqual(comp2._exec_count, 2)
 
     def test_basic_cs(self):
 
