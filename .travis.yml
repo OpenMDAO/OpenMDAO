@@ -76,7 +76,6 @@ script:
 # - testflo -n 1 --coverage --coverpkg openmdao
 
 after_success:
-- cd ../..
 - coveralls
 
 before_deploy:
