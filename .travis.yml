@@ -68,7 +68,7 @@ install:
 
 script:
 # make docs first
-- cd /home/travis/build/openmdao/docs;
+- cd /home/travis/build/blue/openmdao/docs;
 - make all
 # run all openmdao tests
 # - testflo -n 1 -m "ptest*"
@@ -88,7 +88,7 @@ deploy:
   skip_cleanup: true
   script:
   - if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
-      cd /home/travis/build/openmdao/docs;
+      cd /home/travis/build/blue/openmdao/docs;
       rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/bluedocs;
     fi
   on:
