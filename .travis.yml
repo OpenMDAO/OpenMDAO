@@ -92,9 +92,9 @@ deploy:
   skip_cleanup: true
   script:
   - if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
-      cd openmdao/docs
+      cd openmdao/docs;
       rsync -r --delete-after -v _build/html openmdao@web543.webfaction.com:webapps/bluedocs;
-      cd ../..
+      cd ../..;
     fi
   on:
     branch: master
