@@ -19,11 +19,11 @@ SUBJAC_META_DEFAULTS = {
     'cols': None,
     'value': None,
     'approx': None,
-    'dependent': True,
+    'dependent': False,
 }
 
 # TODO : AssembledJacobians currently don't work with some of the more advanced derivatives
-# featuers, including Matrix-Matrix, Parallel Derivatives, and Multiple Varsets.
+# features, including Matrix-Matrix, Parallel Derivatives, and Multiple Varsets.
 
 
 class AssembledJacobian(Jacobian):

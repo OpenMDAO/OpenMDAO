@@ -41,6 +41,8 @@ class ParaboloidAE(ExplicitComponent):
         self.grad_iter_count = 0
         self.grad_fail_at = 100
 
+        self.declare_partials('*', '*')
+
     def compute(self, inputs, outputs):
         """f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
         Optimal solution (minimum): x = 6.6667; y = -7.3333
@@ -729,7 +731,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=10.0, upper=11.0)
 
-        model.approx_total_derivs(method='fd')
+        model.approx_totals(method='fd')
 
         prob.setup(check=False)
         prob.run_driver()
@@ -759,7 +761,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=10.0, upper=11.0)
 
-        model.approx_total_derivs(method='cs')
+        model.approx_totals(method='cs')
 
         prob.setup(check=False)
         prob.run_driver()
@@ -847,7 +849,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=10.0, upper=11.0, ref=10.)
 
-        model.approx_total_derivs(method='fd')
+        model.approx_totals(method='fd')
 
         prob.setup(check=False)
         prob.run_driver()
@@ -877,7 +879,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=10.0, upper=11.0, ref=10.)
 
-        model.approx_total_derivs(method='cs')
+        model.approx_totals(method='cs')
 
         prob.setup(check=False)
         prob.run_driver()

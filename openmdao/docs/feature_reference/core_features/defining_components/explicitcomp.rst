@@ -25,7 +25,8 @@ The implementation of each method will be illustrated using a simple explicit co
 - :code:`setup()` :
 
   Declare input and output variables via :code:`add_input` and :code:`add_output`.
-  Information like variable names, sizes, units, and bounds are declared.
+  Information like variable names, sizes, units, and bounds are declared. Also, declare partial derivatives that this component provides. Here we use the wild card to say that
+  this component provides derivatives of all outputs with respect to all inputs.
 
   .. embed-code::
       openmdao.core.tests.test_expl_comp.RectangleComp.setup
@@ -44,7 +45,7 @@ The implementation of each method will be illustrated using a simple explicit co
   .. embed-code::
       openmdao.core.tests.test_expl_comp.RectanglePartial.compute_partials
 
-- :code:`compute_jacvec_product(inputs, outputs, d_inputs, d_outputs, mode)` :
+- :code:`compute_jacvec_product(inputs, d_inputs, d_outputs, mode)` :
 
   [Optional] Provide the partial derivatives as a matrix-vector product. If :code:`mode` is :code:`'fwd'`, this method must compute :math:`d\_{outputs} = J \cdot d\_{inputs}`, where :math:`J` is the partial derivative Jacobian. If :code:`mode` is :code:`'rev'`, this method must compute :math:`d\_{inputs} = J^T \cdot d\_{outputs}`.
 

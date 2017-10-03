@@ -4,8 +4,8 @@ from __future__ import division
 import os
 import sys
 import warnings
+from fnmatch import fnmatchcase
 from six import string_types
-
 from collections import Iterable
 import numbers
 
@@ -308,3 +308,28 @@ def all_ancestors(pathname, delim='.'):
     yield parts[0]
     for i in range(2, len(parts) + 1):
         yield delim.join(parts[:i])
+
+
+def find_matches(pattern, var_list):
+    """
+    Return list of variable names that match given pattern.
+
+    Parameters
+    ----------
+    pattern : str
+        String pattern
+    var_list : list of str
+        List of variable names to search for pattern.
+
+    Returns
+    -------
+    list
+        Variable names that match pattern.
+    """
+    glob_patterns = {'*', '?', '['}
+
+    if glob_patterns.intersection(pattern):
+        return [name for name in var_list if fnmatchcase(name, pattern)]
+    elif pattern in var_list:
+        return [pattern]
+    return []

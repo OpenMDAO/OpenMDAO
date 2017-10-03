@@ -20,6 +20,8 @@ class SimpleImp(ImplicitComponent):
         self.add_input('a', val=1.)
         self.add_output('x', val=0.)
 
+        self.declare_partials('*', '*')
+
     def apply_nonlinear(self, inputs, outputs, residuals):
         residuals['x'] = 3.0*inputs['a'] + 2.0*outputs['x']
 
@@ -52,7 +54,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         wrt = ['length']
 
         with self.assertRaises(RuntimeError) as context:
-            prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+            prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         self.assertEqual(str(context.exception),
                          "A block linear solver 'LN: LNBGS' is being used with"
@@ -74,7 +76,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
-        deriv = prob.compute_total_derivs(of=['comp.x'], wrt=['p.a'])
+        deriv = prob.compute_totals(of=['comp.x'], wrt=['p.a'])
         self.assertEqual(deriv['comp.x', 'p.a'], -1.5)
 
     def test_implicit_cycle(self):
@@ -137,7 +139,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         prob.setup(check=False, mode='fwd')
 
         with self.assertRaises(RuntimeError) as context:
-            prob.compute_total_derivs(of=['comp.x'], wrt=['p.a'])
+            prob.compute_totals(of=['comp.x'], wrt=['p.a'])
 
         self.assertEqual(str(context.exception),
                          "A block linear solver 'LN: LNBGS' is being used with"
@@ -163,7 +165,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         # actually want the optimizer to run
         prob.run_model()
 
-        derivs = prob.compute_total_derivs(of=['sub.z'], wrt=['sub.z'])
+        derivs = prob.compute_totals(of=['sub.z'], wrt=['sub.z'])
 
         assert_rel_error(self, derivs[('sub.z', 'sub.z')], [[0., 1.]])
 
@@ -196,7 +198,7 @@ class TestBGSSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
@@ -228,7 +230,7 @@ class TestBGSSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.60230118004, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78022500547, .00001)
 
@@ -260,7 +262,7 @@ class TestBGSSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61016296175, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78456955704, .00001)
 
@@ -292,7 +294,7 @@ class TestBGSSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61016296175, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78456955704, .00001)
 

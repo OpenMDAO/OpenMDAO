@@ -212,13 +212,13 @@ class MPITests2(unittest.TestCase):
         prob.setup(vector_class=PETScVector, check=False, mode='fwd')
         prob.run_model()
 
-        J = prob.compute_total_derivs(['C2.z'], ['P.x'])
+        J = prob.compute_totals(['C2.z'], ['P.x'])
         assert_rel_error(self, J['C2.z', 'P.x'], numpy.diag([6.0, 6.0, 9.0]), 1e-6)
 
         prob.setup(vector_class=PETScVector, check=False, mode='rev')
         prob.run_model()
 
-        J = prob.compute_total_derivs(['C2.z'], ['P.x'])
+        J = prob.compute_totals(['C2.z'], ['P.x'])
         assert_rel_error(self, J['C2.z', 'P.x'], numpy.diag([6.0, 6.0, 9.0]), 1e-6)
 
     @unittest.skipUnless(MPI, "MPI is not active.")
@@ -263,14 +263,14 @@ class MPITests2(unittest.TestCase):
         diag1 = numpy.diag(diag1)
         diag2 = numpy.diag(diag2)
 
-        J = prob.compute_total_derivs(of=['C2.y', "C3.y"], wrt=['P.x'])
+        J = prob.compute_totals(of=['C2.y', "C3.y"], wrt=['P.x'])
         assert_rel_error(self, J['C2.y', 'P.x'], diag1, 1e-6)
         assert_rel_error(self, J['C3.y', 'P.x'], diag2, 1e-6)
 
         prob.setup(vector_class=PETScVector, check=False, mode='rev')
         prob.run_model()
 
-        J = prob.compute_total_derivs(of=['C2.y', "C3.y"], wrt=['P.x'])
+        J = prob.compute_totals(of=['C2.y', "C3.y"], wrt=['P.x'])
         assert_rel_error(self, J['C2.y', 'P.x'], diag1, 1e-6)
         assert_rel_error(self, J['C3.y', 'P.x'], diag2, 1e-6)
 
@@ -316,7 +316,7 @@ class MPITests2(unittest.TestCase):
         diag1 = numpy.diag([-6.0, -6.0, -3.0])
         diag2 = numpy.diag([35.0, 35.0, 17.5])
 
-        J = prob.compute_total_derivs(of=['C4.y'], wrt=['P1.x', 'P2.x'])
+        J = prob.compute_totals(of=['C4.y'], wrt=['P1.x', 'P2.x'])
         assert_rel_error(self, J['C4.y', 'P1.x'], diag1, 1e-6)
         assert_rel_error(self, J['C4.y', 'P2.x'], diag2, 1e-6)
 
@@ -324,7 +324,7 @@ class MPITests2(unittest.TestCase):
 
         prob.run_driver()
 
-        J = prob.compute_total_derivs(of=['C4.y'], wrt=['P1.x', 'P2.x'])
+        J = prob.compute_totals(of=['C4.y'], wrt=['P1.x', 'P2.x'])
         assert_rel_error(self, J['C4.y', 'P1.x'], diag1, 1e-6)
         assert_rel_error(self, J['C4.y', 'P2.x'], diag2, 1e-6)
 
@@ -428,12 +428,12 @@ class MPITests3(unittest.TestCase):
 
         p.setup(vector_class=PETScVector, mode='fwd')
         p.run_model()
-        jac = p.compute_total_derivs(of=['out_var'], wrt=['a'], return_format='dict')
+        jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
         assert_rel_error(self, jac['out_var']['a'], expected, 1e-6)
 
         p.setup(vector_class=PETScVector, mode='rev')
         p.run_model()
-        jac = p.compute_total_derivs(of=['out_var'], wrt=['a'], return_format='dict')
+        jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
         assert_rel_error(self, jac['out_var']['a'], expected, 1e-6)
 
 

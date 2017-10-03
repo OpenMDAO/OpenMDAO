@@ -396,8 +396,8 @@ class ScipyOptimizer(Driver):
         """
         try:
             quantities = list(self._objs) + list(self._cons)
-            grad = self._compute_total_derivs(of=quantities, wrt=list(self._designvars),
-                                              return_format='array')
+            grad = self._compute_totals(of=quantities, wrt=list(self._designvars),
+                                        return_format='array')
             self._grad_cache = grad
 
         except Exception as msg:

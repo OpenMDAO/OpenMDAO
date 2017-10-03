@@ -203,23 +203,31 @@ def get_source_code_of_class_or_method(class_or_method_path, remove_docstring=Tr
         Set to False to keep docstrings in the text.
     """
 
-    # first assume class and see if it works
+    # First, assume module path since we want to support loading a full module as well.
     try:
-        module_path = '.'.join(class_or_method_path.split('.')[:-1])
-        module_with_class = importlib.import_module(module_path)
-        class_name = class_or_method_path.split('.')[-1]
-        cls = getattr(module_with_class, class_name)
-        source = inspect.getsource(cls)
+        module = importlib.import_module(class_or_method_path)
+        source = inspect.getsource(module)
 
     except ImportError:
-        # else assume it is a path to a method
-        module_path = '.'.join(class_or_method_path.split('.')[:-2])
-        module_with_method = importlib.import_module(module_path)
-        class_name = class_or_method_path.split('.')[-2]
-        method_name = class_or_method_path.split('.')[-1]
-        cls = getattr(module_with_method, class_name)
-        meth = getattr(cls, method_name)
-        source = inspect.getsource(meth)
+
+        # Second, assume class and see if it works
+        try:
+            module_path = '.'.join(class_or_method_path.split('.')[:-1])
+            module_with_class = importlib.import_module(module_path)
+            class_name = class_or_method_path.split('.')[-1]
+            cls = getattr(module_with_class, class_name)
+            source = inspect.getsource(cls)
+
+        except ImportError:
+
+            # else assume it is a path to a method
+            module_path = '.'.join(class_or_method_path.split('.')[:-2])
+            module_with_method = importlib.import_module(module_path)
+            class_name = class_or_method_path.split('.')[-2]
+            method_name = class_or_method_path.split('.')[-1]
+            cls = getattr(module_with_method, class_name)
+            meth = getattr(cls, method_name)
+            source = inspect.getsource(meth)
 
     # Remove docstring from source code
     if remove_docstring:
@@ -409,8 +417,8 @@ def get_unit_test_source_and_run_outputs(method_path):
         #     File "/Applications/PyCharm CE.app/Contents/helpers/pydev/pydevd.py", line 940, in run
         #         pydev_imports.execfile(file, globals, locals)  # execute the script
         #     File "/var/folders/l3/9j86k5gn6cx0_p25kdplxgpw1l9vkk/T/tmp215aM1", line 23, in <module>
-        #         raise unittest.SkipTest("check_total_derivatives not implemented yet")
-        # unittest.case.SkipTest: check_total_derivatives not implemented yet
+        #         raise unittest.SkipTest("check_totals not implemented yet")
+        # unittest.case.SkipTest: check_totals not implemented yet
         if 'raise unittest.SkipTest' in e.output.decode('utf-8'):
             reason_for_skip = e.output.splitlines()[-1][len('unittest.case.SkipTest: '):]
             run_outputs = reason_for_skip
@@ -693,8 +701,8 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
         #     File "/Applications/PyCharm CE.app/Contents/helpers/pydev/pydevd.py", line 940, in run
         #         pydev_imports.execfile(file, globals, locals)  # execute the script
         #     File "/var/folders/l3/9j86k5gn6cx0_p25kdplxgpw1l9vkk/T/tmp215aM1", line 23, in <module>
-        #         raise unittest.SkipTest("check_total_derivatives not implemented yet")
-        # unittest.case.SkipTest: check_total_derivatives not implemented yet
+        #         raise unittest.SkipTest("check_totals not implemented yet")
+        # unittest.case.SkipTest: check_totals not implemented yet
         if 'raise unittest.SkipTest' in e.output.decode('utf-8'):
             reason_for_skip = e.output.splitlines()[-1][len('unittest.case.SkipTest: '):]
             run_outputs = reason_for_skip

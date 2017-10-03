@@ -106,7 +106,7 @@ class TestProblem(unittest.TestCase):
         with assertRaisesRegex(self, ValueError, msg):
             prob['indep.arr'] = bad_val
 
-    def test_compute_total_derivs_basic(self):
+    def test_compute_totals_basic(self):
         # Basic test for the method using default solvers on simple model.
 
         prob = Problem()
@@ -121,7 +121,7 @@ class TestProblem(unittest.TestCase):
 
         of = ['f_xy']
         wrt = ['x', 'y']
-        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+        derivs = prob.compute_totals(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
@@ -131,12 +131,12 @@ class TestProblem(unittest.TestCase):
 
         of = ['f_xy']
         wrt = ['x', 'y']
-        derivs = prob.compute_total_derivs(of=of, wrt=wrt)
+        derivs = prob.compute_totals(of=of, wrt=wrt)
 
         assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
-    def test_compute_total_derivs_basic_return_dict(self):
+    def test_compute_totals_basic_return_dict(self):
         # Make sure 'dict' return_format works.
 
         prob = Problem()
@@ -151,7 +151,7 @@ class TestProblem(unittest.TestCase):
 
         of = ['f_xy']
         wrt = ['x', 'y']
-        derivs = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+        derivs = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
         assert_rel_error(self, derivs['f_xy']['x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy']['y'], [[8.0]], 1e-6)
@@ -161,7 +161,7 @@ class TestProblem(unittest.TestCase):
 
         of = ['f_xy']
         wrt = ['x', 'y']
-        derivs = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+        derivs = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
         assert_rel_error(self, derivs['f_xy']['x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy']['y'], [[8.0]], 1e-6)
@@ -226,7 +226,7 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['f_xy'], 214.0, 1e-6)
 
-    def test_feature_check_total_derivatives_manual(self):
+    def test_feature_check_totals_manual(self):
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = NonlinearBlockGS()
@@ -235,9 +235,9 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         # manually specify which derivatives to check
-        prob.check_total_derivatives(of=['obj', 'con1'], wrt=['x', 'z'])
+        prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'])
 
-    def test_feature_check_total_derivatives_from_driver_compact(self):
+    def test_feature_check_totals_from_driver_compact(self):
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = NonlinearBlockGS()
@@ -255,9 +255,9 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         # check derivatives of all obj+constraints w.r.t all design variables
-        prob.check_total_derivatives(compact_print=True)
+        prob.check_totals(compact_print=True)
 
-    def test_feature_check_total_derivatives_from_driver(self):
+    def test_feature_check_totals_from_driver(self):
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = NonlinearBlockGS()
@@ -275,9 +275,9 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         # check derivatives of all obj+constraints w.r.t all design variables
-        prob.check_total_derivatives()
+        prob.check_totals()
 
-    def test_feature_check_total_derivatives_suppress(self):
+    def test_feature_check_totals_suppress(self):
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = NonlinearBlockGS()
@@ -295,10 +295,10 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         # check derivatives of all obj+constraints w.r.t all design variables
-        totals = prob.check_total_derivatives(suppress_output=True)
+        totals = prob.check_totals(suppress_output=True)
         print(totals)
 
-    def test_feature_check_total_derivatives_cs(self):
+    def test_feature_check_totals_cs(self):
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = NonlinearBlockGS()
@@ -316,7 +316,7 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         # check derivatives with complex step and a larger step size.
-        prob.check_total_derivatives(method='cs', step=1.0e-1)
+        prob.check_totals(method='cs', step=1.0e-1)
 
     def test_feature_run_driver(self):
         prob = Problem()

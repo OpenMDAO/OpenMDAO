@@ -178,7 +178,7 @@ class System(object):
     _owns_approx_jac : bool
         If True, this system approximated its Jacobian
     _owns_approx_jac_meta : dict
-        Stores approximation metadata (e.g., step_size) from calls to approx_total_derivs
+        Stores approximation metadata (e.g., step_size) from calls to approx_totals
     _owns_approx_of : set or None
         Overrides aproximation outputs. This is set when calculating system derivatives, and serves
         as a way to communicate the driver's output quantities to the approximation objects so that

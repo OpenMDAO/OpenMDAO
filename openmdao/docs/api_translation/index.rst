@@ -226,11 +226,11 @@ Check Partial Derivatives on All Components
 .. content-container ::
 
   .. embed-compare::
-      openmdao.core.tests.test_check_derivs.TestProblemCheckPartials.test_feature_incorrect_jacobian
+      openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_incorrect_jacobian
       check_partials
       check_partials
 
-      data = prob.check_partial_derivatives()
+      data = prob.check_partials()
 
 
 Suppress Output While Checking Partial Derivatives
@@ -239,11 +239,29 @@ Suppress Output While Checking Partial Derivatives
 .. content-container ::
 
   .. embed-compare::
-      openmdao.core.tests.test_check_derivs.TestProblemCheckPartials.test_feature_check_partials_suppress
+      openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_check_partials_suppress
       suppress_output
       suppress_output
 
-      data = prob.check_partial_derivatives(out_stream=None)
+      data = prob.check_partials(out_stream=None)
+
+
+Check Partial Derivatives with Complex Step
+===========================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_method_global
+      opts
+      check_partials
+
+        prob.root.deriv_options['check_type'] = 'cs'
+
+        prob.setup()
+        prob.run()
+
+        prob.check_partials()
 
 
 Change Derivative Behavior
@@ -256,8 +274,8 @@ Force Group or Model to use Finite Difference
 
   .. embed-compare::
       openmdao.core.tests.test_approx_derivs.ApproxTotalsFeature.test_basic
-      approx_total_derivs
-      approx_total_derivs
+      approx_totals
+      approx_totals
 
       model.deriv_options['type'] = 'fd'
 
@@ -269,8 +287,8 @@ Force Group or Model to use Finite Difference with Specific Options
 
   .. embed-compare::
       openmdao.core.tests.test_approx_derivs.ApproxTotalsFeature.test_arguments
-      approx_total_derivs
-      approx_total_derivs
+      approx_totals
+      approx_totals
 
       model.deriv_options['type'] = 'fd'
       model.deriv_options['step_size'] = '1e-7'

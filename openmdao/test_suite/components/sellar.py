@@ -55,11 +55,11 @@ class SellarDis1(ExplicitComponent):
         # Coupling output
         self.add_output('y1', val=1.0, units=units, ref=ref)
 
-        self._turn_on_fd()
+        self._do_declares()
 
-    def _turn_on_fd(self):
+    def _do_declares(self):
         # Finite difference everything
-        self.approx_partials('*', '*')
+        self.declare_partials('*', '*', method='fd')
 
     def compute(self, inputs, outputs):
         """
@@ -82,9 +82,9 @@ class SellarDis1withDerivatives(SellarDis1):
     Component containing Discipline 1 -- derivatives version.
     """
 
-    def _turn_on_fd(self):
-        # Finite difference nothing
-        pass
+    def _do_declares(self):
+        # Analytic Derivs
+        self.declare_partials(of='*', wrt='*')
 
     def compute_partials(self, inputs, partials):
         """
@@ -126,11 +126,11 @@ class SellarDis2(ExplicitComponent):
         # Coupling output
         self.add_output('y2', val=1.0, units=units, ref=ref)
 
-        self._turn_on_fd()
+        self._do_declares()
 
-    def _turn_on_fd(self):
+    def _do_declares(self):
         # Finite difference everything
-        self.approx_partials('*', '*')
+        self.declare_partials('*', '*', method='fd')
 
     def compute(self, inputs, outputs):
         """
@@ -158,9 +158,9 @@ class SellarDis2withDerivatives(SellarDis2):
     Component containing Discipline 2 -- derivatives version.
     """
 
-    def _turn_on_fd(self):
-        # Finite difference nothing
-        pass
+    def _do_declares(self):
+        # Analytic Derivs
+        self.declare_partials(of='*', wrt='*')
 
     def compute_partials(self, inputs, J):
         """
@@ -362,11 +362,13 @@ class StateConnection(ImplicitComponent):
         # States
         self.add_output('y2_command', val=1.0)
 
+        # Declare derivatives
+        self.declare_partials(of='*', wrt='*')
+
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
         Don't solve; just calculate the residual.
         """
-
         y2_actual = inputs['y2_actual']
         y2_command = outputs['y2_command']
 
@@ -482,6 +484,9 @@ class SellarImplicitDis1(ImplicitComponent):
         # Coupling output
         self.add_output('y1', val=1.0, units=units, ref=ref)
 
+        # Derivatives
+        self.declare_partials('*', '*')
+
     def apply_nonlinear(self, inputs, outputs, resids):
         """
         Evaluates the equation
@@ -537,6 +542,9 @@ class SellarImplicitDis2(ImplicitComponent):
 
         # Coupling output
         self.add_output('y2', val=1.0, units=units, ref=ref)
+
+        # Derivatives
+        self.declare_partials('*', '*')
 
     def apply_nonlinear(self, inputs, outputs, resids):
         """

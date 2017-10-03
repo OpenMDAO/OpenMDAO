@@ -42,7 +42,7 @@ class ParDerivTestCase(unittest.TestCase):
         indep_list = ['iv.x1', 'iv.x2']
         unknown_list = ['c3.y']
 
-        J = prob.compute_total_derivs(unknown_list, indep_list, return_format='dict')
+        J = prob.compute_totals(unknown_list, indep_list, return_format='dict')
         assert_rel_error(self, J['c3.y']['iv.x1'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y']['iv.x2'][0][0], 35.0, 1e-6)
 
@@ -63,7 +63,7 @@ class ParDerivTestCase(unittest.TestCase):
         indep_list = ['iv.x1', 'iv.x2']
         unknown_list = ['c3.y']
 
-        J = prob.compute_total_derivs(unknown_list, indep_list, return_format='flat_dict')
+        J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
         assert_rel_error(self, J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
 
@@ -84,7 +84,7 @@ class ParDerivTestCase(unittest.TestCase):
         unknown_list = ['c2.y', 'c3.y']
         indep_list = ['iv.x']
 
-        J = prob.compute_total_derivs(unknown_list, indep_list, return_format='flat_dict')
+        J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
         assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
@@ -105,7 +105,7 @@ class ParDerivTestCase(unittest.TestCase):
         unknown_list = ['c3.y','c2.y'] #['c2.y', 'c3.y']
         indep_list = ['iv.x']
 
-        J = prob.compute_total_derivs(unknown_list, indep_list, return_format='flat_dict')
+        J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
         assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
@@ -127,7 +127,7 @@ class ParDerivTestCase(unittest.TestCase):
         indep_list = ['iv.x1', 'iv.x2']
         unknown_list = ['c3.y']
 
-        J = prob.compute_total_derivs(unknown_list, indep_list, return_format='flat_dict')
+        J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
         assert_rel_error(self, J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
 
@@ -148,7 +148,7 @@ class ParDerivTestCase(unittest.TestCase):
         unknown_list = ['c2.y', 'c3.y']
         indep_list = ['iv.x']
 
-        J = prob.compute_total_derivs(unknown_list, indep_list, return_format='flat_dict')
+        J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
         assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
@@ -197,8 +197,8 @@ class DecoupledTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class, check=False, mode='fwd')
         prob.run_model()
 
-        J = prob.compute_total_derivs(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.zeros((asize, asize+2))
@@ -219,8 +219,8 @@ class DecoupledTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class, check=False, mode='fwd')
         prob.run_driver()
 
-        J = prob.compute_total_derivs(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.zeros((asize, asize+2))
@@ -241,8 +241,8 @@ class DecoupledTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class, check=False, mode='fwd')
         prob.run_driver()
 
-        J = prob.compute_total_derivs(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.zeros((asize, asize+2))
@@ -262,8 +262,8 @@ class DecoupledTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class, check=False, mode='rev')
         prob.run_driver()
 
-        J = prob.compute_total_derivs(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.zeros((asize, asize+2))
@@ -282,8 +282,8 @@ class DecoupledTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class, check=False, mode='rev')
         prob.run_driver()
 
-        J = prob.compute_total_derivs(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.zeros((asize, asize+2))
@@ -330,16 +330,16 @@ class IndicesTestCase(unittest.TestCase):
     def test_indices_fwd(self):
         prob = self.setup_model('fwd')
 
-        J = prob.compute_total_derivs(['c4.y', 'c5.y'], ['p.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['c4.y', 'c5.y'], ['p.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['c5.y', 'p.x'][0], np.array([20., 25.]), 1e-6)
         assert_rel_error(self, J['c4.y', 'p.x'][0], np.array([8., 0.]), 1e-6)
 
     def test_indices_rev(self):
         prob = self.setup_model('rev')
-        J = prob.compute_total_derivs(['c4.y', 'c5.y'], ['p.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['c4.y', 'c5.y'], ['p.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['c5.y', 'p.x'][0], np.array([20., 25.]), 1e-6)
         assert_rel_error(self, J['c4.y', 'p.x'][0], np.array([8., 0.]), 1e-6)
@@ -400,18 +400,18 @@ class IndicesTestCase2(unittest.TestCase):
         responses = prob.model.get_responses()
         self.assertEqual(set(responses), set(['G1.par1.c4.y', 'G1.par2.c5.y']))
 
-        J = prob.compute_total_derivs(of=['G1.par1.c4.y', 'G1.par2.c5.y'],
-                                      wrt=['G1.par1.p.x', 'G1.par2.p.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(of=['G1.par1.c4.y', 'G1.par2.c5.y'],
+                                wrt=['G1.par1.p.x', 'G1.par2.p.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['G1.par2.c5.y', 'G1.par2.p.x'][0], np.array([20., 25.]), 1e-6)
         assert_rel_error(self, J['G1.par1.c4.y', 'G1.par1.p.x'][0], np.array([8., 0.]), 1e-6)
 
     def test_indices_rev(self):
         prob = self.setup_model('rev')
-        J = prob.compute_total_derivs(['G1.par1.c4.y', 'G1.par2.c5.y'],
-                                      ['G1.par1.p.x', 'G1.par2.p.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['G1.par1.c4.y', 'G1.par2.c5.y'],
+                                ['G1.par1.p.x', 'G1.par2.p.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['G1.par2.c5.y', 'G1.par2.p.x'][0], np.array([20., 25.]), 1e-6)
         assert_rel_error(self, J['G1.par1.c4.y', 'G1.par1.p.x'][0], np.array([8., 0.]), 1e-6)
@@ -460,8 +460,8 @@ class MatMatTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class, check=False, mode='fwd')
         prob.run_driver()
 
-        J = prob.compute_total_derivs(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.eye(asize)*8.0
@@ -479,8 +479,8 @@ class MatMatTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class, check=False, mode='fwd')
         prob.run_driver()
 
-        J = prob.compute_total_derivs(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.eye(asize)*8.0
@@ -499,8 +499,8 @@ class MatMatTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class, check=False, mode='rev')
         prob.run_driver()
 
-        J = prob.compute_total_derivs(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.eye(asize)*8.0
@@ -518,8 +518,8 @@ class MatMatTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class,  check=False, mode='rev')
         prob.run_driver()
 
-        J = prob.compute_total_derivs(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.eye(asize)*8.0
@@ -533,6 +533,8 @@ class SumComp(ExplicitComponent):
     def setup(self):
         self.add_input('x', val=np.zeros(self.size))
         self.add_output('y', val=0.0)
+
+        self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
         outputs['y'] = np.sum(inputs['x'])
@@ -555,6 +557,8 @@ class SlowComp(ExplicitComponent):
     def setup(self):
         self.add_input('x', val=0.0)
         self.add_output('y', val=np.zeros(self.size))
+
+        self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
         outputs['y'] = inputs['x'] * self.mult
@@ -609,7 +613,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         p.run_model()
 
         elapsed_fwd = time.time()
-        J = p.compute_total_derivs(of, wrt, return_format='dict')
+        J = p.compute_totals(of, wrt, return_format='dict')
         elapsed_fwd = time.time() - elapsed_fwd
 
         assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
@@ -621,7 +625,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         p.run_model()
 
         elapsed_rev = time.time()
-        J = p.compute_total_derivs(of, wrt, return_format='dict')
+        J = p.compute_totals(of, wrt, return_format='dict')
         elapsed_rev = time.time() - elapsed_rev
 
         assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
@@ -684,8 +688,8 @@ class CleanupTestCase(unittest.TestCase):
         p.run_model()
 
         # test will fail if this fails to converge
-        J = p.compute_total_derivs(['con.y', 'obj.y'],
-                                   ['inputs.x'], return_format='dict')
+        J = p.compute_totals(['con.y', 'obj.y'],
+                             ['inputs.x'], return_format='dict')
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 import unittest
 
 from openmdao.api import Problem
-from openmdao.test_suite.components.sellar_feature import SellarNoDerivatives
+from openmdao.test_suite.components.sellar import SellarNoDerivatives
 from openmdao.api import view_connections
 
 class TestSellarFeature(unittest.TestCase):

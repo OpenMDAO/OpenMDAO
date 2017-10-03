@@ -1,3 +1,5 @@
+.. _feature_building_components:
+
 **********************
 Building Components
 **********************

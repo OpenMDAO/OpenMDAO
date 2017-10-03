@@ -74,7 +74,7 @@ class ExplicitComponent(Component):
         abs2prom_out = self._var_abs2prom['output']
 
         # Note: These declare calls are outside of setup_partials so that users do not have to
-        # call the super version of setup_partials. This is still post-setup.
+        # call the super version of setup_partials. This is still in the final setup.
         other_names = []
         for out_abs in self._var_abs_names['output']:
             meta = abs2meta_out[out_abs]
@@ -86,11 +86,8 @@ class ExplicitComponent(Component):
             if abs_key in self._subjacs_info:
                 if 'method' in self._subjacs_info[abs_key]:
                     del self._subjacs_info[abs_key]['method']
+
             self._declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
-            for other_name in other_names:
-                self._declare_partials(out_name, other_name, dependent=False)
-                self._declare_partials(other_name, out_name, dependent=False)
-            other_names.append(out_name)
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, var_set=0):
@@ -178,7 +175,11 @@ class ExplicitComponent(Component):
                 for abs_key in product(outputs, wrt_vars):
                     meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
                     dependent = meta['dependent']
-                    if meta['value'] is None and dependent:
+
+                    if not dependent:
+                        continue
+
+                    if meta['value'] is None:
                         out_size = self._var_abs2meta['output'][abs_key[0]]['size']
                         in_size = self._var_abs2meta[wrt_name][abs_key[1]]['size']
                         meta['value'] = np.zeros((out_size, in_size))
@@ -186,7 +187,7 @@ class ExplicitComponent(Component):
                     J._set_partials_meta(abs_key, meta, wrt_name == 'input')
 
                     method = meta.get('method', False)
-                    if method and dependent:
+                    if method:
                         self._approx_schemes[method].add_approximation(abs_key, meta)
 
         for approx in itervalues(self._approx_schemes):
@@ -274,21 +275,20 @@ class ExplicitComponent(Component):
                         d_residuals *= -1.0
                         if d_inputs._ncol > 1:
                             if self.supports_multivecs:
-                                self.compute_multi_jacvec_product(self._inputs, self._outputs,
-                                                                  d_inputs, d_residuals, mode)
+                                self.compute_multi_jacvec_product(self._inputs, d_inputs,
+                                                                  d_residuals, mode)
                             else:
                                 for i in range(d_inputs._ncol):
                                     # need to make the multivecs look like regular single vecs
                                     # since the component doesn't know about multivecs.
                                     d_inputs._icol = i
                                     d_residuals._icol = i
-                                    self.compute_jacvec_product(self._inputs, self._outputs,
-                                                                d_inputs, d_residuals, mode)
+                                    self.compute_jacvec_product(self._inputs, d_inputs,
+                                                                d_residuals, mode)
                                 d_inputs._icol = None
                                 d_residuals._icol = None
                         else:
-                            self.compute_jacvec_product(self._inputs, self._outputs,
-                                                        d_inputs, d_residuals, mode)
+                            self.compute_jacvec_product(self._inputs, d_inputs, d_residuals, mode)
                         d_residuals *= -1.0
 
     def _solve_linear(self, vec_names, mode, rel_systems):
@@ -390,8 +390,7 @@ class ExplicitComponent(Component):
         """
         pass
 
-    def compute_jacvec_product(self, inputs, outputs,
-                               d_inputs, d_outputs, mode):
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         r"""
         Compute jac-vector product. The model is assumed to be in an unscaled state.
 
@@ -404,8 +403,6 @@ class ExplicitComponent(Component):
         ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
         d_inputs : Vector
             see inputs; product must be computed only if var_name in d_inputs
         d_outputs : Vector

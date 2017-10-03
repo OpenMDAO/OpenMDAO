@@ -1,3 +1,4 @@
+.. _feature_line_search:
 
 ***********************
 Linesearch/Backtracking

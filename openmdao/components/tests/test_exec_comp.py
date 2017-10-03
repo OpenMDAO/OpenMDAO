@@ -257,13 +257,13 @@ class TestExecComp(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
-        J = prob.compute_total_derivs(['comp.y'], ['p1.x'], return_format='flat_dict')
+        J = prob.compute_totals(['comp.y'], ['p1.x'], return_format='flat_dict')
         assert_rel_error(self, J['comp.y', 'p1.x'], np.array([[6.0]]), 0.00001)
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
-        J = prob.compute_total_derivs(['comp.y'], ['p1.x'], return_format='flat_dict')
+        J = prob.compute_totals(['comp.y'], ['p1.x'], return_format='flat_dict')
         assert_rel_error(self, J['comp.y', 'p1.x'], np.array([[6.0]]), 0.00001)
 
     def test_abs_complex_step(self):
