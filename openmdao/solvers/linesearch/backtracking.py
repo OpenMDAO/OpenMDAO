@@ -210,10 +210,14 @@ class ArmijoGoldsteinLS(NonlinearSolver):
             u._enforce_bounds_wall(du, self.alpha, system._lower_bounds, system._upper_bounds)
 
         try:
+            prefix, stack = self._solver_info.save_cache()
+
             self._run_apply()
             norm = self._iter_get_norm()
 
         except AnalysisError as err:
+            self._solver_info.restore_cache(prefix, stack)
+
             if self.options['retry_on_analysis_error']:
                 self._analysis_error_raised = True
             else:
@@ -266,22 +270,28 @@ class ArmijoGoldsteinLS(NonlinearSolver):
             self._solver_info.append_solver()
 
             try:
+                prefix, stack = self._solver_info.save_cache()
+
                 for isub, subsys in enumerate(system._subsystems_allprocs):
                     system._transfer('nonlinear', 'fwd', isub)
 
                     if subsys in system._subsystems_myproc:
                         subsys._solve_nonlinear()
 
-                self._solver_info.pop()
-
                 system._apply_nonlinear()
 
             except AnalysisError as err:
+                self._solver_info.restore_cache(prefix, stack)
+
                 if self.options['retry_on_analysis_error']:
                     self._analysis_error_raised = True
+
                 else:
                     exc = sys.exc_info()
                     reraise(*exc)
+
+            finally:
+                self._solver_info.pop()
 
         u.add_scal_vec(-self.alpha, du)
         self.alpha *= self.options['rho']
@@ -322,6 +332,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                 try:
 
                     prefix, stack = self._solver_info.save_cache()
+
                     self._run_apply()
                     norm = self._iter_get_norm()
 
@@ -332,12 +343,12 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                     rec.rel = norm / norm0
 
                 except AnalysisError as err:
+                    self._solver_info.restore_cache(prefix, stack)
+
                     if self.options['retry_on_analysis_error']:
                         self._analysis_error_raised = True
                         rec.abs = np.nan
                         rec.rel = np.nan
-
-                        self._solver_info.restore_cache(prefix, stack)
 
                     else:
                         exc = sys.exc_info()

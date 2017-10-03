@@ -71,7 +71,7 @@ class SolverInfo(object):
         """
         Save prefix and stack so that they can be restored later in event of an exception recovery.
 
-        Return
+        Returns
         -------
         string
             prefix

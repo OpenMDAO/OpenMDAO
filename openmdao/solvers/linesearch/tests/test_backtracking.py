@@ -306,9 +306,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
             sys.stdout = stdout
 
         output = strout.getvalue().split('\n')
-        for out in output:
-            print(out)
-        self.assertTrue(output[26].startswith('| LS: AG 5'))
+        self.assertTrue(output[26].startswith('|  LS: AG 5'))
 
 
 class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
