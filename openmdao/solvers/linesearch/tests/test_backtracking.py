@@ -221,7 +221,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
 
         self.assertEqual(str(context.exception), 'Try Again.')
 
-    def test_deep_analysiserror_iprint(self):
+    def test_deep_analysis_error_iprint(self):
 
         class ImplCompTwoStatesAE(ImplicitComponent):
 

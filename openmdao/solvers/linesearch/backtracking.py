@@ -210,13 +210,13 @@ class ArmijoGoldsteinLS(NonlinearSolver):
             u._enforce_bounds_wall(du, self.alpha, system._lower_bounds, system._upper_bounds)
 
         try:
-            prefix, stack = self._solver_info.save_cache()
+            cache = self._solver_info.save_cache()
 
             self._run_apply()
             norm = self._iter_get_norm()
 
         except AnalysisError as err:
-            self._solver_info.restore_cache(prefix, stack)
+            self._solver_info.restore_cache(cache)
 
             if self.options['retry_on_analysis_error']:
                 self._analysis_error_raised = True
@@ -270,7 +270,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
             self._solver_info.append_solver()
 
             try:
-                prefix, stack = self._solver_info.save_cache()
+                cache = self._solver_info.save_cache()
 
                 for isub, subsys in enumerate(system._subsystems_allprocs):
                     system._transfer('nonlinear', 'fwd', isub)
@@ -281,7 +281,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                 system._apply_nonlinear()
 
             except AnalysisError as err:
-                self._solver_info.restore_cache(prefix, stack)
+                self._solver_info.restore_cache(cache)
 
                 if self.options['retry_on_analysis_error']:
                     self._analysis_error_raised = True
@@ -331,7 +331,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                 self._iter_count += 1
                 try:
 
-                    prefix, stack = self._solver_info.save_cache()
+                    cache = self._solver_info.save_cache()
 
                     self._run_apply()
                     norm = self._iter_get_norm()
@@ -343,7 +343,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                     rec.rel = norm / norm0
 
                 except AnalysisError as err:
-                    self._solver_info.restore_cache(prefix, stack)
+                    self._solver_info.restore_cache(cache)
 
                     if self.options['retry_on_analysis_error']:
                         self._analysis_error_raised = True

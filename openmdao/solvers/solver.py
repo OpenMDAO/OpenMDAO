@@ -35,6 +35,13 @@ class SolverInfo(object):
         self.prefix = ""
         self.stack = []
 
+    def clear(self):
+        """
+        Clear out the iprint stack, in case something is left over from a handled exception.
+        """
+        self.prefix = ""
+        self.stack = []
+
     def pop(self):
         """
         Remove one level of solver depth in the printing.
@@ -73,26 +80,21 @@ class SolverInfo(object):
 
         Returns
         -------
-        string
-            prefix
-        list
-            stack
+        tuple(str, list)
+            cache of current stack
         """
-        return self.prefix, self.stack
+        return (self.prefix, self.stack)
 
-    def restore_cache(self, prefix, stack):
+    def restore_cache(self, cache):
         """
         Restore previously saved iprint stack names.
 
         Parameters
         ----------
-        prefix : <System>
-            Prefix to prepend during this iprint.
-        stack : List
-            List of strings; strings are popped and appended as needed.
+        cache : tuple(str, list)
+            cache of current stack
         """
-        self.prefix = prefix
-        self.stack = stack
+        self.prefix, self.stack = cache
 
 
 class Solver(object):
