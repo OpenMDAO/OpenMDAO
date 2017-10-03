@@ -465,7 +465,7 @@ class TestShapes(unittest.TestCase):
         p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('x', val=np.arange(10)))
         p.model.add_subsystem('C1',
-                              ExecComp('y=numpy.dot(x, A)',
+                              ExecComp('y=dot(x, A)',
                                        x={'value': np.zeros((1, 10))},
                                        A={'value': np.eye(10)},
                                        y={'value': np.zeros((1, 10))}))
@@ -478,7 +478,7 @@ class TestShapes(unittest.TestCase):
         p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('x', val=np.arange(10)))
         p.model.add_subsystem('C1',
-                              ExecComp('y=numpy.dot(A, x)',
+                              ExecComp('y=dot(A, x)',
                                        x={'value': np.zeros((10, 1))},
                                        A={'value': np.eye(10)},
                                        y={'value': np.zeros((10, 1))}))
