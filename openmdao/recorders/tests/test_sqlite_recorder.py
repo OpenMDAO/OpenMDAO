@@ -1294,7 +1294,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_rel_error = 0.0,
 
         expected_solver_output = {
-            "mda.d2.y2": [3.75527777],
+            "mda.d2.y2": [3.75610187],
             "mda.d1.y1": [3.16],
         }
 

@@ -1024,7 +1024,7 @@ class TestServerRecorder(unittest.TestCase):
 
         # System recording test
         expected_inputs = []
-        expected_outputs = [{'name': 'pz.z', 'values': [1.97764, -1.13287e-15]}]
+        expected_outputs = [{'name': 'pz.z', 'values': [1.978467, -1.6464114e-13]}]
         expected_residuals = [{'name': 'pz.z', 'values': [0.0, 0.0]}]
 
         system_iteration = json.loads(self.system_iterations)
@@ -1039,10 +1039,10 @@ class TestServerRecorder(unittest.TestCase):
 
         # Solver recording test
         expected_abs_error = 3.90598e-11
-        expected_rel_error = 1.037105199e-6
+        expected_rel_error = 2.0701941e-06
 
         expected_solver_output = [
-            {'name': 'mda.d2.y2', 'values': [3.75527777]},
+            {'name': 'mda.d2.y2', 'values': [3.75610598]},
             {'name': 'mda.d1.y1', 'values': [3.16]}
         ]
 

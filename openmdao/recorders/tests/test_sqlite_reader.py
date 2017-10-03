@@ -194,7 +194,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('pz.z'))
-        np.testing.assert_almost_equal(last_case.desvars['px.x'], [0.0,],
+        np.testing.assert_almost_equal(last_case.desvars['px.x'], [-0.00309521],
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('px.x'))
