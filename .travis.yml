@@ -53,7 +53,6 @@ before_install:
 - if [[ "$TRAVIS_PULL_REQUEST" = "false" ]]; then
     echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
   fi
-#- echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
 
 install:
 - conda install --yes python=$PY numpy==1.11.2 scipy nose sphinx mock swig
@@ -77,8 +76,8 @@ script:
 - make all
 - cd ../..
 # run all openmdao tests
-#- testflo -n 1 -m "ptest*"
-#- testflo -n 1 --coverage --coverpkg openmdao
+- testflo -n 1 -m "ptest*"
+- testflo -n 1 --coverage --coverpkg openmdao
 
 after_success:
 - coveralls
@@ -102,5 +101,3 @@ deploy:
     fi
   on:
     branch: master
-
-
