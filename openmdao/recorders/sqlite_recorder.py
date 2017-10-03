@@ -60,6 +60,13 @@ class SqliteRecorder(BaseRecorder):
     def __init__(self, filepath, append=False):
         """
         Initialize the SqliteRecorder.
+
+        Parameters
+        ----------
+        filepath: str
+            Path to the recorder file.
+        append : bool
+            Optional. If True, append to an existing case recorder file.
         """
         super(SqliteRecorder, self).__init__()
 
@@ -69,6 +76,9 @@ class SqliteRecorder(BaseRecorder):
             self._open_close_sqlite = True
 
         self.model_viewer_data = None
+
+        if append:
+            raise NotImplementedError("Append feature not implemented for SqliteRecorder")
 
         if self._open_close_sqlite and not append:
             try:
