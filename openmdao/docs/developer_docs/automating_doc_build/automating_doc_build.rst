@@ -2,9 +2,13 @@
 Automating Doc Build and Deployment from Travis CI
 **************************************************
 
-The following is a process to get OpenMDAO's (or any project's) docs to build on Travis CI, and then transfer the built docs off to another server.
+The following process is a one-time setup for the owner of a project to complete.  Once it is finished, it will become
+transparent to other developers and users. The process outlined here is to get a project's docs to build on Travis CI, and then
+transfer the built docs off to a web server. (This example illustrates OpenMDAO's process.)
 The reason you'd use this method instead of just setting up readthedocs.org, is because on Travis, you can very specifically
 customize the installation of your project.  Certain advanced items in OpenMDAO 2.0 just can't be installed on readthedocs, but can be on Travis.
+Having a full install means that the docs will be more complete, because embedded tests that rely on, for instance, MPI, will actually work on Travis CI,
+whereas they currently do not on readthedocs.org.
 
 Getting Started and General Concept
 -----------------------------------
@@ -15,13 +19,12 @@ without errors on Travis on any/all platforms and Python distributions. If you�
 your `<project>/docs/_build/html` directory. The concept is simply to copy the contents of that html directory over to a
 server directory that is serving up html.  For the purposes of OpenMDAO/blue, this happens on `webXXX.webfaction.com:webapps/<doc_serving_app>`
 
+You need to make several changes to your `.travis.yml` file in order to make this happen.
+One of these steps, you will find out, is going to re-write your `.travis.yml` file and take out all the spacing,
+comments, and formatting. So if you like the way your `.travis.yml` file looks, I suggest backing up that file beforehand.
+You can then take the auto-generated lines that we’re about to generate, and stick them back in the pretty-looking `.travis.yml` file.
 
-You need to make several changes to your `.travis.yaml` file in order to make this happen.
-One of these steps, you will find out, is going to re-write your `.travis.yaml` file and take out all the spacing,
-comments, and formatting. So if you like the way your `.travis.yaml` file looks, I suggest backing up that file beforehand.
-You can then take the auto-generated lines that we’re about to generate, and stick them back in the pretty-looking .travis.yml file.
-
-To get this doc transfer automated, we need to be able to move things from Travis to our private server without any required input,
+To get this doc transfer automated, we need to be able to move built docs from Travis to our private server without any required input,
 because there is no human in the loop to type passwords or answer prompts.  This will require some ssh key wizardry.
 The overall concept is to have an encrypted key already on the Travis server, then to decrypt it, and use it to do a
 password-less transfer of the docs from Travis to our private server (in our case, Webfaction).  Here's the outline:
@@ -40,10 +43,10 @@ password-less transfer of the docs from Travis to our private server (in our cas
 Specific Commands
 -----------------
 
-The commands to do all the above look something like this:
+The commands to do the above look something like this:
 
 **1. Generate the Key**
-    Run this command from the top level of your project (in my case the `blue/` level):
+    Run this command from the top level of your project (in the example case, from the `blue/` level):
 
     ::
 
@@ -93,7 +96,7 @@ The commands to do all the above look something like this:
 
 
         Note that you will need to manually edit the file to add checks against the event $TRAVIS_PULL_REQUEST, as seen in the block below.
-        What's happening here is that we only want this whole process to happen not during every pull request, but only after a merge has occurred,
+        We do not want this whole process to happen during every pull request, but only after a merge has occurred.
         it's also an added security benefit, that these decryption processes are only run by your own account, and not by any person who can fork your code.
         There are a couple of other spots in the file where this check needs to be added, as you'll see below.
 
