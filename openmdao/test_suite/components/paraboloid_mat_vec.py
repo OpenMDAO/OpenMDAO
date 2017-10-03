@@ -8,7 +8,7 @@ class ParaboloidMatVec(Paraboloid):
         """Analytical derivatives."""
         pass
 
-    def compute_jacvec_product(self, inputs, outputs, dinputs, doutputs, mode):
+    def compute_jacvec_product(self, inputs, dinputs, doutputs, mode):
         """Returns the product of the incoming vector with the Jacobian."""
 
         x = inputs['x'][0]

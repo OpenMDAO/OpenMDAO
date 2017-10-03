@@ -152,7 +152,7 @@ class TestUnitConversion(unittest.TestCase):
                 """ Pass through."""
                 outputs['x2'] = inputs['x1']
 
-            def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
                 """ Derivative is 1.0"""
 
                 if mode == 'fwd':
@@ -172,7 +172,7 @@ class TestUnitConversion(unittest.TestCase):
                 """ Pass through."""
                 outputs['x3'] = inputs['x2']
 
-            def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
                 """ Derivative is 1.0"""
 
                 if mode == 'fwd':

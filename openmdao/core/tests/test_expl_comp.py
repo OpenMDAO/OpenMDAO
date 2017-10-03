@@ -35,8 +35,7 @@ class RectanglePartial(RectangleComp):
 
 class RectangleJacVec(RectangleComp):
 
-    def compute_jacvec_product(self, inputs, outputs,
-                               d_inputs, d_outputs, mode):
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         if mode == 'fwd':
             if 'area' in d_outputs:
                 if 'length' in d_inputs:
