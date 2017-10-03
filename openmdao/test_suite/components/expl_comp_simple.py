@@ -44,8 +44,7 @@ class TestExplCompSimpleSparse(TestExplCompSimple):
 
 class TestExplCompSimpleJacVec(TestExplCompSimple):
 
-    def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs,
-                               mode):
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
 
         length = inputs['length']
         width = inputs['width']
