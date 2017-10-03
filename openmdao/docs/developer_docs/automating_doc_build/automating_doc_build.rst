@@ -13,7 +13,7 @@ The very first thing to do is to comb through your Travis CI build logs to ensur
 working the way that you expect, and that the docs are actually building successfully and
 without errors on Travis on any/all platforms and Python distributions. If you’re using Sphinx, the docs will build into
 your `<project>/docs/_build/html` directory. The concept is simply to copy the contents of that html directory over to a
-server directory that is serving up html.  For the purposes of OpenMDAO/blue, this happens on `web543.webfaction.com:webapps/<doc_serving_app>`
+server directory that is serving up html.  For the purposes of OpenMDAO/blue, this happens on `webXXX.webfaction.com:webapps/<doc_serving_app>`
 
 
 You need to make several changes to your `.travis.yaml` file in order to make this happen.
@@ -28,7 +28,7 @@ password-less transfer of the docs from Travis to our private server (in our cas
 
     ::
 
-	1. Generate a dedicated SSH key for this job (it is easier to isolate and to revoke it if we ever must).
+	1. Generate a dedicated SSH key for this job (it is easier to later isolate and to revoke it, if we ever must).
 	2. Encrypt the private key to make it readable only by Travis CI .
 	3. Copy the public key file into the remote SSH host’s allowed_hosts file.
 	4. Modify the yaml further.
@@ -52,7 +52,7 @@ The commands to do all the above look something like this:
         -t chooses the type of key to generate, in this case, rsa
         -b  Specifies the number of bits in the key to create.  For RSA keys, the minimum
             size is 768 bits and the default is 2048 bits. I used 4096 because it was recommended by Travis.
-        -f output into this keyfile, in this case I want the key created right where I am in the dir structure.
+        -f output into this keyfile, in this case, I want the key created right where I am in the dir structure.
 
     It will spit out both a private key file and a public key file: `travis_deploy_rsa` and `travis_deploy_rsa.pub`.
 
@@ -75,11 +75,12 @@ The commands to do all the above look something like this:
 
         ::
 
-        before_install:
-            - openssl aes-256-cbc -K $encrypted_67e08862e114_key -iv $encrypted_67e08862e114_iv
-                -in travis deploy.rsa.enc -out /tmp/travis_deploy.rsa -d;
+            before_install:
+                openssl aes-256-cbc -K $encrypted_67e08862e114_key -iv $encrypted_67e08862e114_iv
+                    -in travis deploy.rsa.enc -out /tmp/travis_deploy.rsa -d;
 
-    That openssl command above command has several arguments:
+
+        That openssl command above command has several arguments:
 
         ::
 
@@ -90,9 +91,23 @@ The commands to do all the above look something like this:
             -in is the file that needs encrypting
             -out is the decrypted key file being written out
 
-    C. Finally, the command is SUPPOSED to create and assign two environment variables in the the travis settings for the repository in question.  This was a big stumbling block for me…and it is why I added the `—debug` arg to the `travis encrypt-file` command.
-        I was executing the correct command, but the identity I was signed in as (me) and the identity of the repo (OpenMDAO) didn’t match and so those env vars were never created.  Going to the travis-ci.org webpage for OpenMDAO and going into Settings and using
-        the web interface to add two new env vars is the way around this problem.  But what are the env vars called, and what will their values be?  That’s where —debug comes in:
+
+        Note that you will need to manually edit the file to add checks against the event $TRAVIS_PULL_REQUEST, as seen in the block below.
+        What's happening here is that we only want this whole process to happen not during every pull request, but only after a merge has occurred,
+        it's also an added security benefit, that these decryption processes are only run by your own account, and not by any person who can fork your code.
+        There are a couple of other spots in the file where this check needs to be added, as you'll see below.
+
+        ::
+
+            before_install:
+                - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+                    openssl aes-256-cbc -K $encrypted_67e08862e114_key -iv $encrypted_67e08862e114_iv
+                        -in travis deploy.rsa.enc -out /tmp/travis_deploy.rsa -d;
+                  fi
+
+    C. Finally, the command is supposed to create and assign two environment variables in the the Travis CI settings for the repository in question.  This was a big stumbling block for me, and it is why I added the `—debug` arg to the `travis encrypt-file` command.
+       I was executing the correct command, but the identity I was signed in as (me) and the identity of the repo (OpenMDAO) didn’t match and so those env vars were never created.  Going to the travis-ci.org webpage for OpenMDAO and going into Settings and using
+       the web interface to add two new env vars is the way around this problem.  But what are the env vars called, and what will their values be?  That’s where —debug comes in (actual values redacted):
 
         ::
 
@@ -119,10 +134,10 @@ The commands to do all the above look something like this:
             ** Storing "/Users/xxxxxxxx/.travis/config.yml"
 
 
-        The command is attempting to POST those env vars, but they don’t seem to make it to the OpenMDAO account.
-        However, the name and value are right there in the debug output, so they can easily be copied and pasted into the Travis CI web
-        interface (https://travis-ci.org/<user>/<project>/settings ). Creating these env variables must be done, because the
-        openssl decrypt command is going to refer to those env vars in the `-K` and `-iv` arguments.
+       The command is attempting to POST those env vars, but they don’t seem to make it to the OpenMDAO account.
+       However, the name and value are right there in the debug output, so they can easily be copied and pasted into the Travis CI web
+       interface (https://travis-ci.org/<user>/<project>/settings ). Creating these env variables must be done, because the
+       openssl decrypt command is going to refer to those env vars in the `-K` and `-iv` arguments.
 
 
 **3. Copy Key to Web Server**
@@ -138,18 +153,18 @@ The commands to do all the above look something like this:
      6. Make the app as type “Static Only (no .htaccess)."
      7. Click on Websites, choose openmdao_org,
      8. Choose, “reuse an existing application” and then pick your newapp and give it a url.
-     9. After a moment, a folder will appear on web543, under ~/webapps/<name>, that is accessible at openmdao.org/<url>. Keep in mind that web543.webfaction.com:webapps/<name> will be your path to copy your docs to.
+     9. After a moment, a folder will appear on webXXX, under ~/webapps/<name>, that is accessible at openmdao.org/<url>. Keep in mind that webXXX.webfaction.com:webapps/<name> will be your path to copy your docs to.
 
     B. Need to copy the public key generated above to our Webfaction server to allow passwordless entrance.
 
-     1. On web543, in the ~/.ssh folder, there is a file called authorized_keys.
+     1. On webXXX, in the ~/.ssh folder, there is a file called authorized_keys.
      2. Copy the contents of the travis_deploy_rsa.pub as an entry into the authorized_keys file.
 
-**4. Modify the YAML Further…**
+**4. Modify the YAML Further**
 
-   A. Late in the before_install section add this line:
-        `- echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config`
-        (This will turn off a human-prompt by Travis machine “are you willing to accept web543 as a host (yes/no)”)
+   A. Late in the `before_install` section add this line:
+        `- echo -e "Host <server address>\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config`
+        (This will turn off a human-prompt by Travis machine “are you willing to accept <server address> as a host (yes/no)”)
 
    B. Create a new subhead in your `addons`->`apt` called `ssh_known_hosts`, like this:
 
@@ -166,38 +181,46 @@ The commands to do all the above look something like this:
                 - libopenmpi-dev
                 - openmpi-bin
                 ssh_known_hosts:
-                - web543.webfaction.com
+                - <server address>
 
 
    C. Finally, add these sections to the end of your .travis.yml file, after your after_success section:
 
     `before_deploy` : The `before_deploy` makes sure the newly-decrypted key is the right permissions and that the Travis system is aware of it.
 
-      ::
+    ::
 
         before_deploy:
-        - eval "$(ssh-agent -s)";
-        - chmod 600 /tmp/deploy.rsa;
-        - ssh-add /tmp/deploy.rsa;
+        - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+            eval "$(ssh-agent -s)";
+            chmod 600 /tmp/deploy.rsa;
+            ssh-add /tmp/deploy.rsa;
+          fi
 
+    `deploy` is focused on actually transferring the docs.  Note there is a logic check that makes sure the doc copy only happens on ONE machine (don’t want 4 machines racing to rsync docs!), and only on a certain branch, and only after success.
 
-    `deploy` is focused on actually transferring the docs.  Note there is a section that makes sure the doc copy only happens on ONE machine (don’t want 4 machines racing to rsync docs!), and only on a certain branch, and only after success.
-
-      ::
+    ::
 
         deploy:
           provider: script
           skip_cleanup: true
           script:
-          - if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
-              cd openmdao/docs;
-              rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/bluedocs;
-            fi
+            - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+                - if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
+                    cd openmdao/docs;
+                    rsync -r --delete-after -v _build/html/* <username>@<server address>:webapps/bluedocs;
+                  fi
+              fi
           on:
             branch: master
 
-To summarize, you need to heavily edit your .travis.yml, create and `git add` an encrypted key (.enc) file.
-Your pull req should be only those files.  The rest of the work is done in the travis-ci.org settings and
-on your web server.
+**5. Commit the .travis.yml file and encrypted key file into Git**
+
+    You have now heavily edited your .travis.yml, and created an encrypted key locally.  `git add` the encrypted key (.enc) file to your repository.
+    Once you're done with everything and it all works, you should move or discard the private and public key files to make sure they do not end up in your repository.
+    A quick `git commit` should finish things up.  Your pull request to enable automation should be only those two files.
+    The remainder of the work was done in the travis-ci.org settings and on your web server.  Once this pull request is accepted to your
+    repository, you should be able to check the logs to make sure it's working.  And of course, seeing new documentation transferred up on your web server is all the
+    proof you need that things are working.
 
 
