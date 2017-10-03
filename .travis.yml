@@ -35,7 +35,7 @@ notifications:
     on_failure: always
 
 before_install:
-- if [["$TRAVIS_PULL_REQUEST" = "false"]]; then
+- if [[ "$TRAVIS_PULL_REQUEST" = "false" ]]; then
     openssl aes-256-cbc -K $encrypted_67e08862e114_key -iv $encrypted_67e08862e114_iv -in deploy.rsa.enc -out /tmp/deploy.rsa -d;
   fi
 - OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux"; fi)
@@ -50,7 +50,7 @@ before_install:
   else echo "/home/travis/miniconda/bin"; fi)
 - export PATH=$PATHPREFIX:$PATH
 - export OPENMDAO_TEST_DOCS=1
-- if [["$TRAVIS_PULL_REQUEST" = "false"]]; then
+- if [[ "$TRAVIS_PULL_REQUEST" = "false" ]]; then
     echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
   fi
 #- echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
@@ -84,7 +84,7 @@ after_success:
 - coveralls
 
 before_deploy:
-- if [["$TRAVIS_PULL_REQUEST" = "false"]]; then
+- if [[ "$TRAVIS_PULL_REQUEST" = "false" ]]; then
     eval "$(ssh-agent -s)";
     chmod 600 /tmp/deploy.rsa;
     ssh-add /tmp/deploy.rsa;
@@ -94,7 +94,7 @@ deploy:
   provider: script
   skip_cleanup: true
   script:
-  - if [["$TRAVIS_PULL_REQUEST" = "false"]]; then
+  - if [[ "$TRAVIS_PULL_REQUEST" = "false" ]]; then
       if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
         cd openmdao/docs;
         rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/bluedocs;
