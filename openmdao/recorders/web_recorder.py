@@ -109,7 +109,8 @@ class WebRecorder(BaseRecorder):
 
         super(WebRecorder, self).record_iteration_driver_passing_vars(object_requesting_recording,
                                                                       desvars, responses,
-                                                                      objectives, constraints, sysvars,
+                                                                      objectives, constraints,
+                                                                      sysvars,
                                                                       metadata)
 
         desvars_array = None

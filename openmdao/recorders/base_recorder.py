@@ -62,7 +62,7 @@ class BaseRecorder(object):
     _filtered_driver : dict
         Filtered subset of driver variables to record, based on includes/excludes.
     _filtered_system_outputs_driver_recording : dict
-        Filtered subset of System outputs to record during Driver recording, based on system_includes.
+        Filtered subset of System outputs to record during Driver recording.
     _filtered_solver : dict
         Filtered subset of solver variables to record, based on includes/excludes.
     _filtered_system : dict
@@ -132,7 +132,8 @@ class BaseRecorder(object):
         self.options.declare('record_constraints', type_=bool, default=False,
                              desc='Set to True to record constraints at the driver level')
         self.options.declare('system_includes', type_=list, default=[],
-                             desc='Patterns for System outputs to include in recording of Driver iterations')
+                             desc='Patterns for System outputs to include in '
+                             'recording of Driver iterations')
         # Solver options
         self.options.declare('record_abs_error', type_=bool, default=True,
                              desc='Set to True to record absolute error at the solver level')
@@ -256,13 +257,19 @@ class BaseRecorder(object):
                 myresponses = {n for n in object_requesting_recording._responses
                                if self._check_path(n, incl, excl)}
 
+            # get the system_includes that were requested for this Driver recording
             if sys_incl:
                 prob = object_requesting_recording._problem
                 root = prob.model
-                # Need all the outputs from all the ranks here
-                # These my* variables are sets
+                # The my* variables are sets
                 # sys_incl is not subject to the checking with incl and excl
-                mysystem_outputs = {n for n in root._outputs}
+                #   sys_incl IS the incl
+
+                # First gather all of the desired outputs
+                # The following might only be the local vars if MPI
+                # mysystem_outputs = {n for n in root._outputs}
+                mysystem_outputs = {n for n in root._outputs
+                                    if self._check_path(n, sys_incl, [])}
 
                 # If MPI, and on rank 0, need to gather up all the variables
                 #    even those not local to rank 0
@@ -272,9 +279,9 @@ class BaseRecorder(object):
                         mysystem_outputs = all_vars[-1]
                         for d in all_vars[:-1]:
                             mysystem_outputs.update(d)
-
-                mysystem_outputs = {n for n in mysystem_outputs
-                               if self._check_path(n, sys_incl, [])}
+                # Filter out only the ones we want
+                # mysystem_outputs = {n for n in mysystem_outputs
+                #                if self._check_path(n, sys_incl, [])}
 
             self._filtered_driver = {
                 'des': mydesvars,
@@ -495,7 +502,6 @@ class BaseRecorder(object):
                 self._sysincludes_values = sysvars
         else:
             self._sysincludes_values = None
-
 
     def record_iteration_driver(self, object_requesting_recording, metadata):
         """

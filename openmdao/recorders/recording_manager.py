@@ -198,10 +198,10 @@ class RecordingManager(object):
         if isinstance(object_requesting_recording, Driver):
             root = object_requesting_recording._problem.model
 
-            from  openmdao.devtools.debug import tree
+            from openmdao.devtools.debug import tree
             from six.moves import cStringIO
             f = cStringIO()
-            tree(root, include_solvers=True,stream=f)
+            tree(root, include_solvers=True, stream=f)
             txt = f.getvalue()
             outs = object_requesting_recording._problem.model._var_allprocs_abs_names['output']
             inputs, outputs, residuals = root.get_nonlinear_vectors()
