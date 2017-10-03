@@ -3,6 +3,7 @@ Class definition for SqliteRecorder, which provides dictionary backed by SQLite.
 """
 
 import io
+import os
 import sqlite3
 
 import numpy as np
@@ -56,7 +57,7 @@ class SqliteRecorder(BaseRecorder):
         Sqlite3 system cursor via the con.
     """
 
-    def __init__(self, out):
+    def __init__(self, filepath, append=False):
         """
         Initialize the SqliteRecorder.
         """
@@ -69,9 +70,13 @@ class SqliteRecorder(BaseRecorder):
 
         self.model_viewer_data = None
 
-        if self._open_close_sqlite:
+        if self._open_close_sqlite and not append:
+            try:
+                os.remove(filepath)
+            except OSError:
+                pass
             # isolation_level=None causes autocommit
-            self.con = sqlite3.connect(out, isolation_level=None)
+            self.con = sqlite3.connect(filepath, isolation_level=None)
 
             self.cursor = self.con.cursor()
 
