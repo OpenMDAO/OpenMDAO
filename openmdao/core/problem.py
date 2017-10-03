@@ -280,7 +280,7 @@ class Problem(object):
             raise RuntimeError("The `setup` method must be called before `run_model`.")
 
         self.final_setup()
-        self.model.nonlinear_solver._solver_info.clear()
+        self.model._clear_iprint()
         return self.model.run_solve_nonlinear()
 
     def run_driver(self):
@@ -296,7 +296,7 @@ class Problem(object):
             raise RuntimeError("The `setup` method must be called before `run_driver`.")
 
         self.final_setup()
-        self.model.nonlinear_solver._solver_info.clear()
+        self.model._clear_iprint()
         with self.model._scaled_context_all():
             return self.driver.run()
 
