@@ -47,3 +47,12 @@ in terms of formatting and embedding of code.
 
     style_guide/doc_style_guide.rst
     style_guide/sphinx_decorators.rst
+
+
+Automating Documentation Build/Transfer
+---------------------------------------
+
+.. toctree::
+    :maxdepth: 1
+
+    automating_doc_build/automating_doc_build.rst
