@@ -333,8 +333,8 @@ class System(object):
         self._owns_approx_wrt_idx = {}
         self._owns_approx_of_idx = {}
 
-        self._design_vars = {}
-        self._responses = {}
+        self._design_vars = OrderedDict()
+        self._responses = OrderedDict()
         self._rec_mgr = RecordingManager()
 
         self._static_mode = True
@@ -829,8 +829,8 @@ class System(object):
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}
-        self._design_vars = {}
-        self._responses = {}
+        self._design_vars = OrderedDict()
+        self._responses = OrderedDict()
 
         self._static_mode = False
         self._var_rel2data_io.update(self._static_var_rel2data_io)
@@ -2401,7 +2401,8 @@ class System(object):
 
         # Human readable error message during Driver setup.
         try:
-            out = {pro2abs[name][0]: data for name, data in iteritems(self._design_vars)}
+            out = OrderedDict((pro2abs[name][0], data) for name, data in
+                              iteritems(self._design_vars))
         except KeyError as err:
             msg = "Output not found for design variable {0} in system '{1}'."
             raise RuntimeError(msg.format(str(err), self.pathname))
@@ -2420,9 +2421,10 @@ class System(object):
                 out.update(subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes))
 
             if self.comm.size > 1 and self._subsystems_allprocs:
-                for rank, all_out in enumerate(self.comm.allgather(out)):
-                    if rank != iproc:
-                        out.update(all_out)
+                allouts = self.comm.allgather(out)
+                out = OrderedDict()
+                for rank, all_out in enumerate(allouts):
+                    out.update(all_out)
 
         return out
 
@@ -2452,7 +2454,8 @@ class System(object):
 
         # Human readable error message during Driver setup.
         try:
-            out = {prom2abs[name][0]: data for name, data in iteritems(self._responses)}
+            out = OrderedDict((prom2abs[name][0], data) for name, data in
+                              iteritems(self._responses))
         except KeyError as err:
             msg = "Output not found for response {0} in system '{1}'."
             raise RuntimeError(msg.format(str(err), self.pathname))
@@ -2471,9 +2474,10 @@ class System(object):
                 out.update(subsys.get_responses(recurse=recurse, get_sizes=get_sizes))
 
             if self.comm.size > 1 and self._subsystems_allprocs:
-                for rank, all_out in enumerate(self.comm.allgather(out)):
-                    if rank != iproc:
-                        out.update(all_out)
+                all_outs = self.comm.allgather(out)
+                out = OrderedDict()
+                for rank, all_out in enumerate(all_outs):
+                    out.update(all_out)
 
         return out
 

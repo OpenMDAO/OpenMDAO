@@ -210,7 +210,7 @@ class PETScVector(DefaultVector):
         float
             norm of this vector.
         """
-        global_sum = 0
+        global_sum = 0.
         for data in itervalues(self._data):
             global_sum += np.sum(data**2)
         return self._system.comm.allreduce(global_sum) ** 0.5
