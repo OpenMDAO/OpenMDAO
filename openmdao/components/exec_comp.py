@@ -51,11 +51,66 @@ class ExecComp(ExplicitComponent):
         type float unless the initial value for that variable is supplied
         in \*\*kwargs.  Derivatives are calculated using complex step.
 
+        The following functions are available for use in expressions:
+
+        =========================  ====================================
+        Function                   Description
+        =========================  ====================================
+        abs(x)                     Absolute value of x
+        acos(x)                    Inverse cosine of x
+        acosh(x)                   Inverse hyperbolic cosine of x
+        arange(start, stop, step)  Array creation
+        arccos(x)                  Inverse cosine of x
+        arccosh(x)                 Inverse hyperbolic cosine of x
+        arcsin(x)                  Inverse sine of x
+        arcsinh(x)                 Inverse hyperbolic sine of x
+        arctan(x)                  Inverse tangent of x
+        asin(x)                    Inverse sine of x
+        asinh(x)                   Inverse hyperbolic sine of x
+        atan(x)                    Inverse tangent of x
+        cos(x)                     Cosine of x
+        cosh(x)                    Hyperbolic cosine of x
+        dot(x, y)                  Dot-product of x and y
+        e                          Euler's number
+        erf(x)                     Error function
+        erfc(x)                    Complementary error function
+        exp(x)                     Exponential function
+        expm1(x)                   exp(x) - 1
+        factorial(x)               Factorial of all numbers in x
+        fmax(x, y)                 Element-wise maximum of x and y
+        fmin(x, y)                 Element-wise minimum of x and y
+        inner(x, y)                Inner product of arrays x and y
+        isinf(x)                   Element-wise detection of np.inf
+        isnan(x)                   Element-wise detection of np.nan
+        kron(x, y)                 Kronecker product of arrays x and y
+        linspace(x, y, N)          Numpy linear spaced array creation
+        log(x)                     Natural logarithm of x
+        log10(x)                   Base-10 logarithm of x
+        log1p(x)                   log(1+x)
+        matmul(x, y)               Matrix multiplication of x and y
+        maximum(x, y)              Element-wise maximum of x and y
+        minimum(x, y)              Element-wise minimum of x and y
+        ones(N)                    Create an array of ones
+        outer(x, y)                Outer product of x and y
+        pi                         Pi
+        power(x, y)                Element-wise x**y
+        prod(x)                    The product of all elements in x
+        sin(x)                     Sine of x
+        sinh(x)                    Hyperbolic sine of x
+        sum(x)                     The sum of all elements in x
+        tan(x)                     Tangent of x
+        tanh(x)                    Hyperbolic tangent of x
+        tensordot(x, y)            Tensor dot product of x and y
+        zeros(N)                   Create an array of zeros
+        =========================  ====================================
+
         Parameters
         ----------
         exprs : str, tuple of str or list of str
             An assignment statement or iter of them. These express how the
-            outputs are calculated based on the inputs.
+            outputs are calculated based on the inputs.  In addition to
+            standard Python operators, a subset of numpy and scipy functions
+            is supported.
 
         \*\*kwargs : dict of named args
             Initial values of variables can be set by setting a named
@@ -77,7 +132,7 @@ class ExecComp(ExplicitComponent):
 
             import numpy
             from openmdao.api import ExecComp
-            excomp = ExecComp('y=numpy.sum(x)', x=numpy.ones(10,dtype=float))
+            excomp = ExecComp('y=sum(x)', x=numpy.ones(10,dtype=float))
 
         In this example, 'y' would be assumed to be the default type of float
         and would be given the default initial value of 0.0, while 'x' would be
@@ -88,7 +143,7 @@ class ExecComp(ExplicitComponent):
 
         ::
 
-            excomp = ExecComp('y=numpy.sum(x)',
+            excomp = ExecComp('y=sum(x)',
                               x={'value': numpy.ones(10,dtype=float),
                                  'units': 'ft',
                                  'var_set': 3})
@@ -401,29 +456,21 @@ def _import_functs(mod, dct, names=None):
 # this dict will act as the local scope when we eval our expressions
 _expr_dict = {}
 
-# Note: no function in the math module supports complex args, so the following
-# can only be used in ExecComps if derivatives are not required.  The functions
-# below don't have numpy versions (which do support complex args), otherwise
-# we'd just use those.  Some of these will be overridden if scipy is found.
-_import_functs(math, _expr_dict,
-               names=['factorial', 'fsum', 'lgamma', 'erf', 'erfc', 'gamma'])
 
 _import_functs(np, _expr_dict,
-               names=['cosh', 'ldexp', 'hypot', 'tan', 'isnan', 'log', 'fabs',
-                      'floor', 'sqrt', 'frexp', 'degrees', 'pi', 'log10',
-                      'modf', 'copysign', 'cos', 'ceil', 'isinf', 'sinh',
-                      'trunc', 'expm1', 'e', 'tanh', 'radians', 'sin', 'fmod',
-                      'exp', 'log1p', ('arcsin', 'asin'), ('arcsinh', 'asinh'),
-                      ('arctanh', 'atanh'), ('arctan', 'atan'),
-                      ('arctan2', 'atan2'), ('arccosh', 'acosh'),
-                      ('arccos', 'acos'), ('power', 'pow')])
-
-# Note: adding cmath here in case someone wants to have an ExecComp that
-# performs some complex operation during solve_nonlinear. cmath functions
-# generally return complex numbers even if the args are floats.
-_expr_dict['cmath'] = cmath
-
-_expr_dict['numpy'] = np
+               names=['arange', 'ones', 'zeros', 'linspace',  # Array creation
+                      'e', 'pi',  # Constants
+                      'isinf', 'isnan',  # Logic
+                      'log', 'log10', 'log1p', 'power',  # Math operations
+                      'exp', 'expm1', 'fmax',
+                      'fmin', 'maximum', 'minimum',
+                      'sum', 'dot', 'prod',  # Reductions
+                      'tensordot', 'matmul',  # Linear algebra
+                      'outer', 'inner', 'kron',
+                      'sin', 'cos', 'tan', ('arcsin', 'asin'),  # Trig
+                      ('arccos', 'acos'), ('arctan', 'atan'),
+                      'sinh', 'cosh', 'tanh', ('arcsinh', 'asinh'),  # Hyperbolic trig
+                      ('arccosh', 'acosh')])
 
 
 # if scipy is available, add some functions
@@ -433,7 +480,7 @@ except ImportError:
     pass
 else:
     _import_functs(scipy.special, _expr_dict,
-                   names=['gamma', 'polygamma', 'erf', 'erfc'])
+                   names=['factorial', 'erf', 'erfc'])
 
 
 # Put any functions here that need special versions to work under
