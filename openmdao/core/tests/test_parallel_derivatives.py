@@ -169,7 +169,7 @@ class DecoupledTestCase(unittest.TestCase):
         G1 = root.add_subsystem('G1', ParallelGroup())
         G1.linear_solver = LinearBlockGS()
 
-        c1 = G1.add_subsystem('c1', ExecComp('y = numpy.ones(3).T*x.dot(numpy.arange(3.,6.))',
+        c1 = G1.add_subsystem('c1', ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
                                                   x=np.zeros(asize), y=np.zeros(asize)))
         c2 = G1.add_subsystem('c2', ExecComp('y = x[:%d] * 2.0' % asize,
                                         x=np.zeros(asize+2), y=np.zeros(asize)))
@@ -306,7 +306,7 @@ class IndicesTestCase(unittest.TestCase):
 
         c2 = G1.add_subsystem('c2', ExecComp('y = x * 2.0',
                                         x=np.zeros(asize), y=np.zeros(asize)))
-        c3 = G1.add_subsystem('c3', ExecComp('y = numpy.ones(3).T*x.dot(numpy.arange(3.,6.))',
+        c3 = G1.add_subsystem('c3', ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
                                         x=np.zeros(asize), y=np.zeros(asize)))
         c4 = root.add_subsystem('c4', ExecComp('y = x * 4.0',
                                           x=np.zeros(asize), y=np.zeros(asize)))
@@ -369,7 +369,7 @@ class IndicesTestCase2(unittest.TestCase):
 
         c2 = par1.add_subsystem('c2', ExecComp('y = x * 2.0',
                                         x=np.zeros(asize), y=np.zeros(asize)))
-        c3 = par2.add_subsystem('c3', ExecComp('y = numpy.ones(3).T*x.dot(numpy.arange(3.,6.))',
+        c3 = par2.add_subsystem('c3', ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
                                         x=np.zeros(asize), y=np.zeros(asize)))
         c4 = par1.add_subsystem('c4', ExecComp('y = x * 4.0',
                                           x=np.zeros(asize), y=np.zeros(asize)))
@@ -432,7 +432,7 @@ class MatMatTestCase(unittest.TestCase):
         G1 = root.add_subsystem('G1', ParallelGroup())
         G1.linear_solver = LinearBlockGS()
 
-        c1 = G1.add_subsystem('c1', ExecComp('y = numpy.ones(3).T*x.dot(numpy.arange(3.,6.))',
+        c1 = G1.add_subsystem('c1', ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
                                                   x=np.zeros(asize), y=np.zeros(asize)))
         c2 = G1.add_subsystem('c2', ExecComp('y = x * 2.0',
                                         x=np.zeros(asize), y=np.zeros(asize)))

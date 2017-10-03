@@ -35,11 +35,13 @@ notifications:
     on_failure: always
 
 before_install:
-- openssl aes-256-cbc -K $encrypted_67e08862e114_key -iv $encrypted_67e08862e114_iv
-  -in deploy.rsa.enc -out /tmp/deploy.rsa -d;
-- OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux";
-  fi)
-- if [ "$OS" = "MacOSX" ] && [ "$MPI" ]; then brew install openmpi; fi
+- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+    openssl aes-256-cbc -K $encrypted_67e08862e114_key -iv $encrypted_67e08862e114_iv -in deploy.rsa.enc -out /tmp/deploy.rsa -d;
+  fi
+- OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux"; fi)
+- if [ "$OS" = "MacOSX" ] && [ "$MPI" ]; then
+    brew install openmpi;
+  fi
 - wget "https://repo.continuum.io/miniconda/Miniconda-latest-$OS-x86_64.sh" -O miniconda.sh
 - chmod +x miniconda.sh
 - if [ "$OS" = "Linux" ]; then ./miniconda.sh -b  -p /home/travis/miniconda; fi
@@ -48,7 +50,9 @@ before_install:
   else echo "/home/travis/miniconda/bin"; fi)
 - export PATH=$PATHPREFIX:$PATH
 - export OPENMDAO_TEST_DOCS=1
-- echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+- if [[ "$TRAVIS_PULL_REQUEST" = "false" ]]; then
+    echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
+  fi
 
 install:
 - conda install --yes python=$PY numpy==1.11.2 scipy nose sphinx mock swig
@@ -79,19 +83,21 @@ after_success:
 - coveralls
 
 before_deploy:
-- eval "$(ssh-agent -s)";
-- chmod 600 /tmp/deploy.rsa;
-- ssh-add /tmp/deploy.rsa;
+- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+    eval "$(ssh-agent -s)";
+    chmod 600 /tmp/deploy.rsa;
+    ssh-add /tmp/deploy.rsa;
+  fi
 
 deploy:
   provider: script
   skip_cleanup: true
   script:
-  - if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
-      cd openmdao/docs;
-      rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/bluedocs;
+  - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+      if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
+        cd openmdao/docs;
+        rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/bluedocs;
+      fi
     fi
   on:
     branch: master
-
-
