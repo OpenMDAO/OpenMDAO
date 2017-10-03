@@ -378,10 +378,10 @@ class AssembledJacobian(Jacobian):
                         mask[mask_cols, :] = True
                         masked_mtx = np.ma.array(ext_mtx._matrix, mask=mask, fill_value=0.0)
 
-                        masked_product = np.ma.multiply(masked_mtx.T, dresids).flatten()
+                        masked_product = np.ma.dot(masked_mtx.T, dresids).flatten()
 
                         for set_name, data in iteritems(d_inputs._data):
-                            data += np.ma.filled(masked_product)
+                            data += np.ma.filled(masked_product, fill_value=0.0)
 
                     else:
                         d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None))
