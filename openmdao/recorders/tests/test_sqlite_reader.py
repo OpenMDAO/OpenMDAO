@@ -360,7 +360,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                 sorted(['root', 'mda.d1', 'pz'])
         )
         assert_rel_error(
-                        self, cr.system_metadata['root'][('output', 'phys1')]['nonlinear']._views_flat['pz.z'],
+                        self, cr.system_metadata['root'][('output', 'phys')]['nonlinear'][1]._views_flat['pz.z'],
                         [1.0, 1.0], 1.0e-3)
 
     def test_reading_solver_metadata(self):

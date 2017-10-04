@@ -307,14 +307,7 @@ class System(object):
         self._lower_bounds = None
         self._upper_bounds = None
 
-        self._scaling_vecs = {
-            ('input', 'phys0'): {}, ('input', 'phys1'): {},
-            ('input', 'norm0'): {}, ('input', 'norm1'): {},
-            ('output', 'phys0'): {}, ('output', 'phys1'): {},
-            ('output', 'norm0'): {}, ('output', 'norm1'): {},
-            ('residual', 'phys0'): {}, ('residual', 'phys1'): {},
-            ('residual', 'norm0'): {}, ('residual', 'norm1'): {},
-        }
+        self._scaling_vecs = None
 
         self._nonlinear_solver = None
         self._linear_solver = None
@@ -642,12 +635,12 @@ class System(object):
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
         root_vectors = OrderedDict([
-            (('input', 'phys0'), OrderedDict()), (('input', 'phys1'), OrderedDict()),
-            (('input', 'norm0'), OrderedDict()), (('input', 'norm1'), OrderedDict()),
-            (('output', 'phys0'), OrderedDict()), (('output', 'phys1'), OrderedDict()),
-            (('output', 'norm0'), OrderedDict()), (('output', 'norm1'), OrderedDict()),
-            (('residual', 'phys0'), OrderedDict()), (('residual', 'phys1'), OrderedDict()),
-            (('residual', 'norm0'), OrderedDict()), (('residual', 'norm1'), OrderedDict()),
+            (('input', 'phys'), OrderedDict()),
+            (('input', 'norm'), OrderedDict()),
+            (('output', 'phys'), OrderedDict()),
+            (('output', 'norm'), OrderedDict()),
+            (('residual', 'phys'), OrderedDict()),
+            (('residual', 'norm'), OrderedDict()),
         ])
 
         for key in root_vectors:
@@ -655,12 +648,16 @@ class System(object):
 
             for vec_name in self._lin_rel_vec_name_list:
                 if initial:
-                    root_vectors[key][vec_name] = vector_class(vec_name, _type_map[vec_key], self)
-
-                    if coeff_key[-1] != '0':
-                        root_vectors[key][vec_name].set_const(1.0)
+                    root_vectors[key][vec_name] = vecs = (
+                        vector_class(vec_name, _type_map[vec_key], self),
+                        vector_class(vec_name, _type_map[vec_key], self)
+                    )
+                    vecs[1].set_const(1.0)
                 else:
-                    root_vectors[key][vec_name] = self._scaling_vecs[key][vec_name]._root_vector
+                    root_vectors[key][vec_name] = (
+                        self._scaling_vecs[key][vec_name][0]._root_vector,
+                        self._scaling_vecs[key][vec_name][1]._root_vector
+                    )
 
             if initial:
                 root_vectors[key]['nonlinear'] = root_vectors[key]['linear']
@@ -1218,12 +1215,12 @@ class System(object):
             Whether to resize the root vectors - i.e, because this system is initiating a reconf.
         """
         self._scaling_vecs = vecs = OrderedDict([
-            (('input', 'phys0'), OrderedDict()), (('input', 'phys1'), OrderedDict()),
-            (('input', 'norm0'), OrderedDict()), (('input', 'norm1'), OrderedDict()),
-            (('output', 'phys0'), OrderedDict()), (('output', 'phys1'), OrderedDict()),
-            (('output', 'norm0'), OrderedDict()), (('output', 'norm1'), OrderedDict()),
-            (('residual', 'phys0'), OrderedDict()), (('residual', 'phys1'), OrderedDict()),
-            (('residual', 'norm0'), OrderedDict()), (('residual', 'norm1'), OrderedDict()),
+            (('input', 'phys'), OrderedDict()),
+            (('input', 'norm'), OrderedDict()),
+            (('output', 'phys'), OrderedDict()),
+            (('output', 'norm'), OrderedDict()),
+            (('residual', 'phys'), OrderedDict()),
+            (('residual', 'norm'), OrderedDict()),
         ])
 
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
@@ -1231,13 +1228,16 @@ class System(object):
         abs2meta_out = self._var_abs2meta['output']
 
         for vec_name in self._lin_rel_vec_name_list:
-            vector_class = root_vectors['residual', 'phys0'][vec_name].__class__
+            vector_class = root_vectors['residual', 'phys'][vec_name][0].__class__
             relvars, _ = self._relevant[vec_name]['@all']
 
             for key in vecs:
-                vecs[key][vec_name] = vector_class(
-                    vec_name, _type_map[key[0]], self, root_vectors[key][vec_name],
-                    resize=resize)
+                root = root_vectors[key][vec_name]
+                vname = _type_map[key[0]]
+                vecs[key][vec_name] = (
+                    vector_class(vec_name, vname, self, root[0], resize=resize),
+                    vector_class(vec_name, vname, self, root[1], resize=resize)
+                )
 
                 # This is necessary because scaling will not be set for inputs
                 # whose source is outside of this system. The units and scaling
@@ -1245,8 +1245,7 @@ class System(object):
                 # scaling vectors will just be 0. That will zero out input values
                 # during transfers, so the multiplier must be 1 by default.
                 if resize:
-                    if '1' in key[1]:
-                        vecs[key][vec_name].set_const(1.)
+                    vecs[key][vec_name][1].set_const(1.)
 
             for abs_name in self._var_relevant_names[vec_name]['output']:
                 meta = abs2meta_out[abs_name]
@@ -1263,15 +1262,15 @@ class System(object):
 
                 a0 = ref0
                 a1 = ref - ref0
-                vecs['output', 'phys0'][vec_name]._views[abs_name][:] = a0
-                vecs['output', 'phys1'][vec_name]._views[abs_name][:] = a1
-                vecs['output', 'norm0'][vec_name]._views[abs_name][:] = -a0 / a1
-                vecs['output', 'norm1'][vec_name]._views[abs_name][:] = 1.0 / a1
+                vecs['output', 'phys'][vec_name][0]._views[abs_name][:] = a0
+                vecs['output', 'phys'][vec_name][1]._views[abs_name][:] = a1
+                vecs['output', 'norm'][vec_name][0]._views[abs_name][:] = -a0 / a1
+                vecs['output', 'norm'][vec_name][1]._views[abs_name][:] = 1.0 / a1
 
-                vecs['residual', 'phys0'][vec_name]._views[abs_name][:] = 0.0
-                vecs['residual', 'phys1'][vec_name]._views[abs_name][:] = res_ref
-                vecs['residual', 'norm0'][vec_name]._views[abs_name][:] = 0.0
-                vecs['residual', 'norm1'][vec_name]._views[abs_name][:] = 1.0 / res_ref
+                vecs['residual', 'phys'][vec_name][0]._views[abs_name][:] = 0.0
+                vecs['residual', 'phys'][vec_name][1]._views[abs_name][:] = res_ref
+                vecs['residual', 'norm'][vec_name][0]._views[abs_name][:] = 0.0
+                vecs['residual', 'norm'][vec_name][1]._views[abs_name][:] = 1.0 / res_ref
 
             for abs_in, abs_out in iteritems(self._conn_abs_in2out):
                 if abs_in not in abs2meta_in or abs_in not in relvars['input']:
@@ -1338,10 +1337,10 @@ class System(object):
                 a0 = convert_units(ref0, units_out, units_in)
                 a1 = convert_units(ref - ref0, units_out, units_in) \
                     - convert_units(0., units_out, units_in)
-                vecs['input', 'phys0'][vec_name]._views[abs_in][:] = a0
-                vecs['input', 'phys1'][vec_name]._views[abs_in][:] = a1
-                vecs['input', 'norm0'][vec_name]._views[abs_in][:] = -a0 / a1
-                vecs['input', 'norm1'][vec_name]._views[abs_in][:] = 1.0 / a1
+                vecs['input', 'phys'][vec_name][0]._views[abs_in][:] = a0
+                vecs['input', 'phys'][vec_name][1]._views[abs_in][:] = a1
+                vecs['input', 'norm'][vec_name][0]._views[abs_in][:] = -a0 / a1
+                vecs['input', 'norm'][vec_name][1]._views[abs_in][:] = 1.0 / a1
 
         for key in vecs:
             vecs[key]['nonlinear'] = vecs[key]['linear']
@@ -1473,9 +1472,9 @@ class System(object):
         scal_vecs = self._scaling_vecs
         vec_name = vec._name
 
-        vec.elem_mult(scal_vecs[key, scale_to + '1'][vec_name])
+        vec.elem_mult(scal_vecs[key, scale_to][vec_name][1])
         if vec_name == 'nonlinear':
-            vec += scal_vecs[key, scale_to + '0'][vec_name]
+            vec += scal_vecs[key, scale_to][vec_name][0]
 
     def _transfer(self, vec_name, mode, isub=None):
         """
