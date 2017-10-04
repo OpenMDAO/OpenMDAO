@@ -165,6 +165,11 @@ class FiniteDifference(ApproximationScheme):
         else:
             raise ValueError('deriv_type must be one of "total" or "partial"')
 
+        result = system._outputs._clone(True)
+        result_array = result.get_data()
+        out_tmp = current_vec.get_data()
+        in_tmp = system._inputs.get_data()
+
         for key, approximations in groupby(self._exec_list, self._key_fun):
             # groupby (along with this key function) will group all 'of's that have the same wrt and
             # step size.
@@ -202,7 +207,7 @@ class FiniteDifference(ApproximationScheme):
 
                 in_idx = range(in_size)
 
-            result = system._outputs._clone(True)
+            result.set_vec(system._outputs)
 
             outputs = []
 
@@ -228,7 +233,9 @@ class FiniteDifference(ApproximationScheme):
                 # Run the Finite Difference
                 for delta, coeff in zip(deltas, coeffs):
                     input_delta = [(wrt, idx, delta)]
-                    result.add_scal_vec(coeff, self._run_point(system, input_delta, deriv_type))
+                    self._run_point(system, input_delta, out_tmp, in_tmp, result_array, deriv_type)
+                    result_array *= coeff
+                    result.iadd_data(result_array)
 
                 if deriv_type == 'total':
                     # Sign difference between output and resids. This arises from the definitions

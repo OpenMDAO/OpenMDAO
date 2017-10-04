@@ -4,7 +4,7 @@ Instance-based Call Tracing
 
 The `icalltrace` command can be used to print a trace of each instance method call.  For example:
 
-.. code:: none
+.. code-block:: none
 
    icalltrace <your_python_script_here>
 
@@ -75,9 +75,9 @@ yet, as in the beginning of `__init__` method, or pathname exists but still has 
 instead of its eventual value, as in the `_setup_procs` method.
 
 For more verbose output, which includes values of function locals and return values, as well as
-the number of times a function has been called. For example:
+the number of times a function has been called, use the `-v` arg. For example:
 
-.. code:: none
+.. code-block:: none
 
    icalltrace -v <your_python_script_here>
 

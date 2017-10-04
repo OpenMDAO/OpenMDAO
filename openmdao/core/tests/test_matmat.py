@@ -463,8 +463,7 @@ class JacVec(ExplicitComponent):
     def compute(self, inputs, outputs):
         outputs['f_xy'] = inputs['x'] * inputs['y']
 
-    def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs,
-                               mode):
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         if mode == 'fwd':
             if 'x' in d_inputs:
                 d_outputs['f_xy'] += d_inputs['x'] * inputs['y']
@@ -478,10 +477,9 @@ class JacVec(ExplicitComponent):
                 d_inputs['y'] += d_fxy * inputs['x']
 
 class MultiJacVec(JacVec):
-    def compute_multi_jacvec_product(self, inputs, outputs, d_inputs, d_outputs,
-                                     mode):
+    def compute_multi_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         # same as compute_jacvec_product in this case
-        self.compute_jacvec_product(inputs, outputs, d_inputs, d_outputs, mode)
+        self.compute_jacvec_product(inputs, d_inputs, d_outputs, mode)
 
 
 class ComputeMultiJacVecTestCase(unittest.TestCase):
