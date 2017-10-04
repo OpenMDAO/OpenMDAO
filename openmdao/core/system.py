@@ -1491,16 +1491,17 @@ class System(object):
             If int, perform a partial transfer for linear Gauss--Seidel.
         """
         vec_inputs = self._vectors['input'][vec_name]
-        vec_outputs = self._vectors['output'][vec_name]
 
         if mode == 'fwd':
-            direction = ('norm', 'phys')
+            self._scale_vec(vec_inputs, 'input', 'norm')
+            self._transfers[vec_name][mode, isub].transfer(vec_inputs,
+                                                           self._vectors['output'][vec_name], mode)
+            self._scale_vec(vec_inputs, 'input', 'phys')
         else:  # rev
-            direction = ('phys', 'norm')
-
-        self._scale_vec(vec_inputs, 'input', direction[0])
-        self._transfers[vec_name][mode, isub].transfer(vec_inputs, vec_outputs, mode)
-        self._scale_vec(vec_inputs, 'input', direction[1])
+            self._scale_vec(vec_inputs, 'input', 'phys')
+            self._transfers[vec_name][mode, isub].transfer(vec_inputs,
+                                                           self._vectors['output'][vec_name], mode)
+            self._scale_vec(vec_inputs, 'input', 'norm')
 
     def get_req_procs(self):
         """
