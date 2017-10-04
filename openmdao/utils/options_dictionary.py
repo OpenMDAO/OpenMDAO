@@ -94,13 +94,13 @@ class OptionsDictionary(object):
 
     def declare(self, name, default=null_object, values=None, type_=None, desc='',
                 upper=None, lower=None, is_valid=None):
-        """
+        r"""
         Declare an option.
 
         The value of the option must satisfy the following:
-        1. If values and not type_ was given when declaring, value must be in values.
-        2. If type_ and not values was given when declaring, value must be an instance of type_.
-        3. If values and type_ were given when declaring, either of the above must be true.
+        1. If values and not type was given when declaring, value must be in values.
+        2. If type and not values was given when declaring, value must be an instance of type.
+        3. If values and type were given when declaring, either of the above must be true.
 
         Parameters
         ----------
