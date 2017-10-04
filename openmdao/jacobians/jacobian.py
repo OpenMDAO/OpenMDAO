@@ -209,34 +209,6 @@ class Jacobian(object):
         else:
             self._subjacs[abs_key] = subjac
 
-    def _iter_abs_keys(self, vec_name):
-        """
-        Iterate over subjacs keyed by absolute names.
-
-        This includes only subjacs that have been set and are part of the current system.
-
-        Parameters
-        ----------
-        vec_name : str
-            The name of the current RHS vector.
-        """
-        system = self._system
-        subjacs = self._subjacs
-
-        # FIXME: these keys should really be cached in system, not as they were previously
-        # in precompute_iter_keys, since they had to be constantly recomputed whenever the
-        # jacobian's system changed.  There is an ordering issue with caching them in system
-        # because this method gets called once (for scaling) prior to the first call to
-        # linearize for each system which can add keys to the jacobian, so we'll need to
-        # make sure we recompute the keys for each system after the first call to lineraize
-        # after a new jacobian has been set.
-        for res_name in system._var_relevant_names[vec_name]['output']:
-            for type_ in ('output', 'input'):
-                for name in system._var_relevant_names[vec_name][type_]:
-                    key = (res_name, name)
-                    if key in subjacs:
-                        yield key
-
     def _initialize(self):
         """
         Allocate the global matrices.

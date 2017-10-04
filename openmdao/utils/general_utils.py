@@ -326,10 +326,8 @@ def find_matches(pattern, var_list):
     list
         Variable names that match pattern.
     """
-    glob_patterns = {'*', '?', '['}
-
-    if glob_patterns.intersection(pattern):
-        return [name for name in var_list if fnmatchcase(name, pattern)]
+    if pattern == '*':
+        return var_list
     elif pattern in var_list:
         return [pattern]
-    return []
+    return [name for name in var_list if fnmatchcase(name, pattern)]

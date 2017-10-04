@@ -4,10 +4,10 @@ from six.moves import range
 import numpy as np
 
 import time
-from openmdao.api import Problem, Group, Component, IndepVarComp, ExecComp
+from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp, ExecComp
 
 
-class Plus(Component):
+class Plus(ExplicitComponent):
     def __init__(self, adder):
         super(Plus, self).__init__()
         self.adder = float(adder)
@@ -19,7 +19,7 @@ class Plus(Component):
     def compute(self, inputs, outputs):
         outputs['f1'] = inputs['x'] + self.adder
 
-class Times(Component):
+class Times(ExplicitComponent):
     def __init__(self, scalar):
         super(Times, self).__init__()
         self.scalar = float(scalar)
@@ -42,7 +42,7 @@ class Point(Group):
         self.add_subsystem('plus', Plus(self.adder), promotes=['*'])
         self.add_subsystem('times', Times(self.scalar), promotes=['*'])
 
-class Summer(Component):
+class Summer(ExplicitComponent):
 
     def __init__(self, size):
         super(Summer, self).__init__()
