@@ -280,7 +280,6 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
         top.model.nonlinear_solver = NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 2
         top.model.nonlinear_solver.options['solve_subsystems'] = True
-        top.model.nonlinear_solver.options['solve_subsystems'] = True
         top.model.linear_solver = ScipyIterativeSolver()
 
         sub.nonlinear_solver = NewtonSolver()
