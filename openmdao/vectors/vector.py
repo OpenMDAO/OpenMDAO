@@ -186,23 +186,6 @@ class Vector(object):
         """
         return self._length
 
-    def _create_subvector(self, system):
-        """
-        Return a smaller vector for a subsystem.
-
-        Parameters
-        ----------
-        system : <System>
-            system for the subvector that is a subsystem of self._system.
-
-        Returns
-        -------
-        <Vector>
-            subvector instance.
-        """
-        return self.__class__(self._name, self._typ, system,
-                              self._root_vector)
-
     def _clone(self, initialize_views=False):
         """
         Return a copy that optionally provides view access to its data.

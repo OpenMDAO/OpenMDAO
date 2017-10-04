@@ -10,7 +10,59 @@ from openmdao.jacobians.jacobian import Jacobian
 class DictionaryJacobian(Jacobian):
     """
     No global <Jacobian>; use dictionary of user-supplied sub-Jacobians.
+
+    Attributes
+    ----------
+    _iter_keys : list of (vname, vname) tuples
+        List of tuples of variable names that match subjacs in the this Jacobian.
+
     """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
+        """
+        super(DictionaryJacobian, self).__init__(**kwargs)
+
+        self._iter_keys = {}
+
+    def _iter_abs_keys(self, vec_name):
+        """
+        Iterate over subjacs keyed by absolute names.
+
+        This includes only subjacs that have been set and are part of the current system.
+
+        Parameters
+        ----------
+        vec_name : str
+            The name of the current RHS vector.
+
+        Returns
+        -------
+        list
+            List of keys matching this jacobian for the current system.
+        """
+        system = self._system
+        entry = (system.pathname, vec_name)
+
+        if entry not in self._iter_keys:
+            subjacs = self._subjacs
+            keys = []
+            for res_name in system._var_relevant_names[vec_name]['output']:
+                for type_ in ('output', 'input'):
+                    for name in system._var_relevant_names[vec_name][type_]:
+                        key = (res_name, name)
+                        if key in subjacs:
+                            keys.append(key)
+            self._iter_keys[entry] = keys
+            return keys
+
+        return self._iter_keys[entry]
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """
