@@ -62,10 +62,13 @@ def setup(methods=None):
                                                  context=(memstack, mem_changes))
 
         def print_totals():
+            print("Memory (MB)   Calls  File:Line:Function")
+            print("---------------------------------------")
             for key, (delta, ncalls, parents) in sorted(mem_changes.items(), key=lambda x: x[1]):
                 if delta != 0.0:
-                    print("%s:%d:%s %g MB in %d calls" % (key[0], key[1], key[2],
-                                                          delta, ncalls))
+                    print("%10.4g  %7d  %s:%d:%s" % (delta, ncalls, key[0], key[1], key[2]))
+            print("---------------------------------------")
+            print("Memory (MB)   Calls  File:Line:Function")
 
         atexit.register(print_totals)
         _registered = True
