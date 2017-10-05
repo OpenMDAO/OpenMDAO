@@ -101,7 +101,7 @@ class TestBetzLimit(unittest.TestCase):
 
         # setup the optimization
         prob.driver = ScipyOptimizer()
-        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['optimizer'] = 'COBYLA'
 
         prob.model.add_design_var('a', lower=0., upper=1.)
         prob.model.add_design_var('Area', lower=0., upper=1.)

@@ -2,6 +2,7 @@
 A collection of functions for modifying the source code
 """
 
+import sys
 import os
 import re
 import tokenize
@@ -12,6 +13,7 @@ import subprocess
 import tempfile
 
 from six import StringIO, PY3
+from six.moves import cStringIO as cStringIO
 
 from redbaron import RedBaron
 
@@ -551,6 +553,53 @@ def extract_output_blocks(run_output):
         output_blocks.append('\n'.join(output_block))
     return output_blocks
 
+
+def globals_for_imports(src):
+    """
+    Generate text that creates a global for each imported class, method, or module.
+
+    It appears that sphinx royally screws up something in python, so that when exec-ing
+    code with imports, they aren't always available inside of classes or methods. This
+    can be solved by issuing a global for each class, method, or module.
+
+    Parameters
+    ----------
+    src : str
+        Source code to be tested.
+
+    Returns
+    -------
+    str
+        New code string with global statements
+    """
+    # HACK: A test had problems loading this specific user-defined class under exec+sphinx, so
+    # hacking it in.
+    new_txt = ['global Sub', 'global ImplSimple']
+
+    continuation = False
+    for line in src.split('\n'):
+        if continuation or 'import ' in line:
+
+            if continuation:
+                tail = line
+            elif ' as ' in line:
+                tail = line.split(' as ')[1]
+            else:
+                tail = line.split('import ')[1]
+
+            if ', \\' in tail:
+                continuation = True
+                tail = tail.replace(', \\', '')
+            else:
+                continuation = False
+
+            modules = tail.split(',')
+            for module in modules:
+                new_txt.append('global %s' % module.strip())
+
+    return '\n'.join(new_txt)
+
+
 def get_unit_test_source_and_run_outputs_in_out(method_path):
     '''
     1. Get the source code for a unit test method
@@ -563,14 +612,14 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
     7. Return source_minus_docstrings_with_prints_cleaned, input_blocks, output_blocks, skipped, failed
     '''
 
-    #####################
-    ### 1. Get the source code for a unit test method ###
-    #####################
+    #----------------------------------------------------------
+    # 1. Get the source code for a unit test method.
+    #----------------------------------------------------------
+
     module_path = '.'.join(method_path.split('.')[:-2])
     class_name = method_path.split('.')[-2]
     method_name = method_path.split('.')[-1]
-    if method_name == 'test_feature_promoted_sellar_set_get_inputs':
-        pass
+
     test_module = importlib.import_module(module_path)
     cls = getattr(test_module, class_name)
     try:
@@ -616,9 +665,10 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
     # Remove docstring from source code
     source_minus_docstrings = remove_docstrings(method_source)
 
-    #####################
-    ### 2. Replace the asserts with prints -> source_minus_docstrings_with_prints_cleaned ###
-    #####################
+    #-----------------------------------------------------------------------------------
+    # 2. Replace the asserts with prints -> source_minus_docstrings_with_prints_cleaned
+    #-----------------------------------------------------------------------------------
+
     # Replace some of the asserts with prints of the actual values
     # This calls RedBaron
     source_minus_docstrings_with_prints = replace_asserts_with_prints(source_minus_docstrings)
@@ -631,53 +681,37 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
     source_minus_docstrings_with_prints_cleaned = remove_initial_empty_lines_from_source(
         source_minus_docstrings_with_prints)
 
-    #####################
-    ### 4. Insert extra print statements into source_minus_docstrings_with_prints_cleaned ###
-    ###        to indicate start and end of print Out blocks -> source_with_output_start_stop_indicators ###
-    #####################
+    #-----------------------------------------------------------------------------------
+    # 4. Insert extra print statements into source_minus_docstrings_with_prints_cleaned
+    #        to indicate start and end of print Out blocks -> source_with_output_start_stop_indicators
+    #-----------------------------------------------------------------------------------
     source_with_output_start_stop_indicators = insert_output_start_stop_indicators( source_minus_docstrings_with_prints_cleaned )
 
-    #####################
-    ### 5. Run the test using source_with_out_start_stop_indicators -> run_outputs
-    #####################
+    #-----------------------------------------------------------------------------------
+    # 5. Run the test using source_with_out_start_stop_indicators -> run_outputs
+    #-----------------------------------------------------------------------------------
+
     # Get all the pieces of code needed to run the unit test method
-    module_source_code = inspect.getsource(test_module)
-    lines_before_test_cases = module_source_code.split('if __name__')[0]
-    setup_source_code = get_method_body(inspect.getsource(getattr(cls, 'setUp')))
+    global_imports = globals_for_imports(method_source)
     teardown_source_code = get_method_body(inspect.getsource(getattr(cls, 'tearDown')))
 
-    # If the test method has a skipUnless or skip decorator, we need to convert it to a
-    #   raise call
-    raise_skip_test_source_code = ""
-    if '@unittest.skip' in class_source_code:
+    code_to_run = '\n'.join([global_imports,
+                             source_with_output_start_stop_indicators,
+                             teardown_source_code])
 
-        # This calls RedBaron
-        skip_predicate_and_message = get_skip_predicate_and_message(class_source_code, method_name)
-
-        if skip_predicate_and_message:
-            # predicate, message = skip_unless_predicate_and_message
-            predicate, message = skip_predicate_and_message
-            if predicate:
-                raise_skip_test_source_code = 'import unittest\nif not {}: raise unittest.SkipTest("{}")'.format(predicate, message)
-            else:
-                raise_skip_test_source_code = 'import unittest\nraise unittest.SkipTest("{}")'.format(message)
-
-
-    code_to_run = '\n'.join([lines_before_test_cases,
-                            setup_source_code,
-                            raise_skip_test_source_code,
-                            source_with_output_start_stop_indicators,
-                            teardown_source_code])
-
-    # Write it to a file so we can run it. Tried using exec but ran into problems with that
-    fd, code_to_run_path = tempfile.mkstemp()
     skipped = False
     failed = False
     try:
-        with os.fdopen(fd, 'w') as tmp:
-            tmp.write(code_to_run)
-            tmp.close()
+
+        # Use Subprocess if we are under MPI.
         if use_mpi:
+
+            # Write it to a file so we can run it.
+            fd, code_to_run_path = tempfile.mkstemp()
+
+            with os.fdopen(fd, 'w') as tmp:
+                tmp.write(code_to_run)
+                tmp.close()
             env = os.environ.copy()
             env['USE_PROC_FILES'] = '1'
             p = subprocess.Popen(['mpirun', '-n', str(N_PROCS), 'python', code_to_run_path],
@@ -691,18 +725,20 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
             output_blocks = []
             for i in range(len(multi_out_blocks[0])):
                 output_blocks.append('\n'.join(["(rank %d) %s" % (j, m[i]) for j, m in enumerate(multi_out_blocks) if m[i]]))
+
+        # Just Exec the code for serial tests.
         else:
-            run_outputs = subprocess.check_output(['python', code_to_run_path], stderr=subprocess.STDOUT)
+            stdout = sys.stdout
+            stderr = sys.stderr
+            strout = cStringIO()
+            sys.stdout = strout
+            sys.stderr = strout
+
+            exec(code_to_run)
+            run_outputs = strout.getvalue()
+
     except subprocess.CalledProcessError as e:
-        # Get a traceback like this:
-        # Traceback (most recent call last):
-        #     File "/Applications/PyCharm CE.app/Contents/helpers/pydev/pydevd.py", line 1556, in <module>
-        #         globals = debugger.run(setup['file'], None, None, is_module)
-        #     File "/Applications/PyCharm CE.app/Contents/helpers/pydev/pydevd.py", line 940, in run
-        #         pydev_imports.execfile(file, globals, locals)  # execute the script
-        #     File "/var/folders/l3/9j86k5gn6cx0_p25kdplxgpw1l9vkk/T/tmp215aM1", line 23, in <module>
-        #         raise unittest.SkipTest("check_totals not implemented yet")
-        # unittest.case.SkipTest: check_totals not implemented yet
+        # Get a traceback.
         if 'raise unittest.SkipTest' in e.output.decode('utf-8'):
             reason_for_skip = e.output.splitlines()[-1][len('unittest.case.SkipTest: '):]
             run_outputs = reason_for_skip
@@ -710,14 +746,23 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
         else:
             run_outputs = "Running of embedded test {} in docs failed due to: \n\n{}".format(method_path, e.output.decode('utf-8'))
             failed = True
-            # print("Running of embedded test " + method_path + " in docs failed due to: " + e.output.decode('utf-8'))
-            # raise
+
     except Exception as err:
-        run_outputs = "Running of embedded test {} in docs failed due to: \n\n{}".format(method_path,
-                                                                                         str(err))
-        failed = True
+        if 'SkipTest' in code_to_run:
+            txt1 = code_to_run.split('SkipTest(')[1]
+            run_outputs = txt1.split(')')[0]
+            skipped = True
+        else:
+            msg = "Running of embedded test {} in docs failed due to: \n\n{}"
+            run_outputs = msg.format(method_path, str(err))
+            failed = True
+
     finally:
-        os.remove(code_to_run_path)
+        if use_mpi:
+            os.remove(code_to_run_path)
+        else:
+            sys.stdout = stdout
+            sys.stderr = stderr
 
     if PY3 and not use_mpi and not isinstance(run_outputs, str):
         run_outputs = "".join(map(chr, run_outputs))  # in Python 3, run_outputs is of type bytes!

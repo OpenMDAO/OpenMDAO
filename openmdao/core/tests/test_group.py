@@ -192,6 +192,9 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['G1.comp2.b'], 12.0)
 
     def test_group_getsystem_top(self):
+        from openmdao.api import Problem
+        from openmdao.core.tests.test_group import BranchGroup
+
         p = Problem(model=BranchGroup())
         p.setup()
 
@@ -202,6 +205,9 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(c2.pathname, 'Branch2.G3.comp2')
 
     def test_group_getsystem_middle(self):
+        from openmdao.api import Problem
+        from openmdao.core.tests.test_group import BranchGroup
+
         p = Problem(model=BranchGroup())
         p.setup()
 
@@ -742,6 +748,8 @@ class TestGroup(unittest.TestCase):
         assert_rel_error(self, p['C1.y'], 21.)
 
     def test_set_order_feature(self):
+        from openmdao.api import Problem, IndepVarComp, NonLinearRunOnce
+        from openmdao.core.tests.test_group import ReportOrderComp
 
         # this list will record the execution order of our C1, C2, and C3 components
         order_list = []

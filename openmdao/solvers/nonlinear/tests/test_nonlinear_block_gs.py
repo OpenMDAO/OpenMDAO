@@ -15,6 +15,11 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, \
 class TestNLBGaussSeidel(unittest.TestCase):
 
     def test_feature_set_options(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -46,6 +51,11 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_basic(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -73,6 +83,11 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_maxiter(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -101,6 +116,11 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.0542542372, .00001)
 
     def test_feature_rtol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
 
         prob = Problem()
         prob.model = SellarDerivatives()
@@ -130,6 +150,11 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_atol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()

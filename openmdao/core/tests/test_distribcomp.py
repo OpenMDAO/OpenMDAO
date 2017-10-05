@@ -355,6 +355,8 @@ class MPITests(unittest.TestCase):
 
     @unittest.skipUnless(MPI, "MPI is not active.")
     def test_distribcomp_feature(self):
+        from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp
+        from openmdao.utils.mpi import MPI
         from openmdao.utils.array_utils import evenly_distrib_idxs
 
         size = 15
@@ -521,6 +523,7 @@ class TestGroupMPI(unittest.TestCase):
     N_PROCS = 2
 
     def test_promote_distrib(self):
+        from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp, PETScVector
 
         class MyComp(ExplicitComponent):
             def setup(self):

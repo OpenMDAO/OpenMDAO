@@ -331,6 +331,13 @@ class TestPetscKSP(unittest.TestCase):
 class TestPetscKSPSolverFeature(unittest.TestCase):
 
     def test_specify_solver(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NonlinearBlockGS, PetscKSP, \
+             ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -362,6 +369,13 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
     def test_specify_ksp_type(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NonlinearBlockGS, PetscKSP, \
+             ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -394,6 +408,13 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
     def test_feature_maxiter(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NonlinearBlockGS, PetscKSP, \
+             ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -426,6 +447,13 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         assert_rel_error(self, J['obj', 'z'][0][1], 1.87246623559, .00001)
 
     def test_feature_atol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NonlinearBlockGS, PetscKSP, \
+             ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -458,6 +486,13 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448533563, .00001)
 
     def test_feature_rtol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NonlinearBlockGS, PetscKSP, \
+             ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -490,6 +525,12 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448533563, .00001)
 
     def test_specify_precon(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, LinearBlockGS, PetscKSP, \
+             NewtonSolver, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -520,6 +561,12 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_specify_precon_left(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, PetscKSP, \
+             NewtonSolver, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()

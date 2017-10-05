@@ -521,6 +521,8 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1.jacobian['y','x'], expect, 0.00001)
 
     def test_feature_simple(self):
+        from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+
         prob = Problem()
         prob.model = model = Group()
 
@@ -537,6 +539,8 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, prob['comp.y'], 3.0, 0.00001)
 
     def test_feature_array(self):
+        from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+
         prob = Problem()
         prob.model = model = Group()
 
@@ -554,6 +558,8 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, prob['comp.y'], 2.0, 0.00001)
 
     def test_feature_math(self):
+        from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+
         prob = Problem()
         prob.model = model = Group()
 
@@ -572,6 +578,8 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 1.0, 0.00001)
 
     def test_feature_numpy(self):
+        from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+
         prob = Problem()
         prob.model = model = Group()
 
@@ -587,6 +595,8 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, prob['comp.y'], 6.0, 0.00001)
 
     def test_feature_metadata(self):
+        from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+
         prob = Problem()
         prob.model = model = Group()
 

@@ -31,6 +31,8 @@ def run_model(prob):
 class TestSolverPrint(unittest.TestCase):
 
     def test_feature_iprint_neg1(self):
+        from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver
+        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
         prob.model = SellarDerivatives()
@@ -50,6 +52,8 @@ class TestSolverPrint(unittest.TestCase):
         print('done')
 
     def test_feature_iprint_0(self):
+        from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver
+        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
         prob.model = SellarDerivatives()
@@ -68,6 +72,8 @@ class TestSolverPrint(unittest.TestCase):
         prob.run_model()
 
     def test_feature_iprint_1(self):
+        from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver
+        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
         prob.model = SellarDerivatives()
@@ -85,6 +91,8 @@ class TestSolverPrint(unittest.TestCase):
         prob.run_model()
 
     def test_feature_iprint_2(self):
+        from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver
+        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
         prob.model = SellarDerivatives()
@@ -194,6 +202,9 @@ class TestSolverPrint(unittest.TestCase):
         # TODO: check output
 
     def test_feature_set_solver_print1(self):
+        from openmdao.api import Problem, IndepVarComp, NewtonSolver, ScipyIterativeSolver, \
+             LinearBlockGS
+        from openmdao.test_suite.components.double_sellar import SubSellar
 
         prob = Problem()
         model = prob.model
@@ -225,11 +236,12 @@ class TestSolverPrint(unittest.TestCase):
         prob.set_solver_print(level=2)
 
         prob.setup(check=False)
-
-        output = run_model(prob)
-        # TODO: check output
+        prob.run_model()
 
     def test_feature_set_solver_print2(self):
+        from openmdao.api import Problem, IndepVarComp, NewtonSolver, ScipyIterativeSolver, \
+             LinearBlockGS
+        from openmdao.test_suite.components.double_sellar import SubSellar
 
         prob = Problem()
         model = prob.model
@@ -262,11 +274,12 @@ class TestSolverPrint(unittest.TestCase):
         prob.set_solver_print(level=-1, type_='LN')
 
         prob.setup(check=False)
-
-        output = run_model(prob)
-        # TODO: check output
+        prob.run_model()
 
     def test_feature_set_solver_print3(self):
+        from openmdao.api import Problem, IndepVarComp, NewtonSolver, ScipyIterativeSolver, \
+             LinearBlockGS
+        from openmdao.test_suite.components.double_sellar import SubSellar
 
         prob = Problem()
         model = prob.model
@@ -299,9 +312,7 @@ class TestSolverPrint(unittest.TestCase):
         prob.set_solver_print(level=2, depth=2)
 
         prob.setup(check=False)
-
-        output = run_model(prob)
-        # TODO: check output
+        prob.run_model()
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
