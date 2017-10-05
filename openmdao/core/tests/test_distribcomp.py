@@ -84,9 +84,6 @@ class DistribCompSimple(ExplicitComponent):
         else:
             outputs['outvec'] = inputs['invec'] * 0.75
 
-    def get_req_procs(self):
-        return (2, 2)
-
 
 class DistribInputComp(ExplicitComponent):
     """Uses 2 procs and takes input var slices"""
@@ -114,9 +111,6 @@ class DistribInputComp(ExplicitComponent):
         self.add_input('invec', np.ones(self.sizes[rank], float),
                        src_indices=np.arange(start, end, dtype=int))
         self.add_output('outvec', np.ones(self.arr_size, float), shape=np.int32(self.arr_size))
-
-    def get_req_procs(self):
-        return (2, 2)
 
 
 class DistribOverlappingInputComp(ExplicitComponent):
@@ -158,9 +152,6 @@ class DistribOverlappingInputComp(ExplicitComponent):
         self.add_input('invec', np.ones(size, float),
                        src_indices=np.arange(start, end, dtype=int))
 
-    def get_req_procs(self):
-        return (2, 2)
-
 
 class DistribInputDistribOutputComp(ExplicitComponent):
     """Uses 2 procs and takes input var slices."""
@@ -185,9 +176,6 @@ class DistribInputDistribOutputComp(ExplicitComponent):
                        src_indices=np.arange(start, end, dtype=int))
         self.add_output('outvec', np.ones(sizes[rank], float))
 
-    def get_req_procs(self):
-        return (2, 2)
-
 
 class DistribNoncontiguousComp(ExplicitComponent):
     """Uses 2 procs and takes non-contiguous input var slices and has output
@@ -211,9 +199,6 @@ class DistribNoncontiguousComp(ExplicitComponent):
         self.add_input('invec', np.ones(len(idxs), float),
                        src_indices=idxs)
         self.add_output('outvec', np.ones(len(idxs), float))
-
-    def get_req_procs(self):
-        return 2, 2
 
 
 class DistribGatherComp(ExplicitComponent):
@@ -246,9 +231,6 @@ class DistribGatherComp(ExplicitComponent):
         self.add_input('invec', np.ones(self.sizes[rank], float),
                        src_indices=np.arange(start, end, dtype=int))
         self.add_output('outvec', np.ones(self.arr_size, float))
-
-    def get_req_procs(self):
-        return 2, 2
 
 
 class NonDistribGatherComp(ExplicitComponent):
@@ -384,9 +366,6 @@ class MPITests(unittest.TestCase):
                                src_indices=np.arange(start, end, dtype=int))
                 self.add_output('outvec', np.ones(sizes[rank], float))
 
-            def get_req_procs(self):
-                # require min of 2 processes, max of 5
-                return 2, 5
 
         class Summer(ExplicitComponent):
             """Sums a distributed input."""

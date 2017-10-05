@@ -61,14 +61,16 @@ class ProcAllocator(object):
         """
         self.parallel = parallel
 
-    def __call__(self, req_procs, comm):
+    def __call__(self, proc_weights, nsubs, comm):
         """
         Perform the allocation if parallel.
 
         Parameters
         ----------
-        req_procs : list of (int, int)
-            list of min/max usable procs for each subsystem.
+        proc_weights : list of float
+            list of proc weight for each subsystem.
+        nsubs : int
+            Number of subsystems of the owning system.
         comm : MPI.Comm or <FakeComm>
             communicator of the owning system.
 
@@ -83,23 +85,23 @@ class ProcAllocator(object):
         """
         if self.parallel and comm.size > 1:
             # This is a parallel group
-            return self._divide_procs(req_procs, comm)
+            return self._divide_procs(proc_weights, nsubs, comm)
         else:
             # This is a serial group - all procs get all subsystems
-            return list(range(len(req_procs))), comm, (0, comm.size)
+            return list(range(nsubs)), comm, (0, comm.size)
 
-    def _divide_procs(self, req_procs, comm, proc_range):
+    def _divide_procs(self, proc_weights, nsubs, comm):
         """
         Perform the parallel processor allocation.
 
         Parameters
         ----------
-        req_procs : list of (int, int)
-            list of min/max usable procs for each subsystem.
+        proc_weights : list of float
+            list of proc weight for each subsystem.
+        nsubs : int
+            Number of subsystems of the owning system.
         comm : MPI.Comm or <FakeComm>
             communicator of the owning system.
-        proc_range : (int, int)
-            The range of processors that the comm on this system owns, in the global index space.
 
         Returns
         -------

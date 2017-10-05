@@ -28,12 +28,6 @@ class DistributedAdder(ExplicitComponent):
 
         self.local_size = self.size = size
 
-    def get_req_procs(self):
-        """
-        min/max number of procs that this component can use
-        """
-        return (1, self.size)
-
     def setup(self):
         """
         specify the local sizes of the variables and which specific indices this specific
