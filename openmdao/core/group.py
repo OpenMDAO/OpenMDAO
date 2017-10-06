@@ -15,8 +15,8 @@ from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
 from openmdao.core.component import Component
+from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
-from openmdao.proc_allocators.proc_allocator import ProcAllocationError
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
@@ -33,6 +33,13 @@ namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
 class Group(System):
     """
     Class used to group systems together; instantiate or inherit.
+
+    Attributes
+    ----------
+    _mpi_proc_allocator : ProcAllocator
+        Object used to allocate MPI processes to subsystems.
+    proc_weights : list of float
+        Weights used to determine MPI process allocation to subsystems.
     """
 
     def __init__(self, **kwargs):
@@ -54,6 +61,8 @@ class Group(System):
             self._nonlinear_solver = NonLinearRunOnce()
         if not self._linear_solver:
             self._linear_solver = LinearRunOnce()
+        self._mpi_proc_allocator = DefaultAllocator()
+        self.proc_weights = None
 
     def setup(self):
         """
@@ -108,6 +117,20 @@ class Group(System):
 
         self.configure()
 
+    @property
+    def proc_allocator(self):
+        """
+        Get the current system's processor allocator object.
+        """
+        return self._mpi_proc_allocator
+
+    @proc_allocator.setter
+    def proc_allocator(self, value):
+        """
+        Set the processor allocator object.
+        """
+        self._mpi_proc_allocator = value
+
     def _setup_procs(self, pathname, comm):
         """
         Distribute processors and assign pathnames.
@@ -137,16 +160,10 @@ class Group(System):
         self._static_mode = True
 
         # Call the load balancing algorithm
-        try:
-            sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(
-                self._proc_weights,
-                len(self._subsystems_allprocs),
-                comm)
-        except ProcAllocationError as err:
-            raise RuntimeError("subsystem %s requested %d processes "
-                               "but got %d" %
-                               (self._subsystems_allprocs[err.sub_idx].pathname,
-                                err.requested, err.remaining))
+        sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(
+            self.proc_weights,
+            len(self._subsystems_allprocs),
+            comm)
 
         # Define local subsystems
         self._subsystems_myproc = [self._subsystems_allprocs[ind]
@@ -159,7 +176,7 @@ class Group(System):
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
-            if self.pathname is not '':
+            if self.pathname:
                 sub_pathname = '.'.join((self.pathname, subsys.name))
             else:
                 sub_pathname = subsys.name

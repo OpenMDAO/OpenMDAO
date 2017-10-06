@@ -14,7 +14,6 @@ import numpy as np
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
-from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
 from openmdao.recorders.recording_manager import RecordingManager
@@ -60,9 +59,6 @@ class System(object):
     iter_count : int
         Int that holds the number of times this system has iterated
         in a recording run.
-    #
-    _mpi_proc_allocator : <ProcAllocator>
-        Object that distributes procs among subsystems.
     #
     _subsystems_allprocs : [<System>, ...]
         List of all subsystems (children of this system).
@@ -245,9 +241,6 @@ class System(object):
     #
     _owning_rank : {'input': {}, 'output': {}}
         Dict mapping var name to the lowest rank where that variable is local.
-    #
-    _proc_weights : list of float
-        List of weights for each subsystem.  Size must match the number of subsystems.
     """
 
     def __init__(self, **kwargs):
@@ -265,8 +258,6 @@ class System(object):
         self.metadata = OptionsDictionary()
 
         self.iter_count = 0
-
-        self._mpi_proc_allocator = DefaultAllocator()
 
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
@@ -360,8 +351,6 @@ class System(object):
         self.metadata.update(kwargs)
 
         self._has_guess = False
-
-        self._proc_weights = None
 
     def _check_reconf(self):
         """
@@ -1926,20 +1915,6 @@ class System(object):
                 subsys.linear_solver._set_solver_print(level=level, type_=type_)
             if subsys.nonlinear_solver is not None and type_ != 'LN':
                 subsys.nonlinear_solver._set_solver_print(level=level, type_=type_)
-
-    @property
-    def proc_allocator(self):
-        """
-        Get the current system's processor allocator object.
-        """
-        return self._mpi_proc_allocator
-
-    @proc_allocator.setter
-    def proc_allocator(self, value):
-        """
-        Set the processor allocator object.
-        """
-        self._mpi_proc_allocator = value
 
     def _set_partials_meta(self):
         """

@@ -6,7 +6,7 @@ import warnings
 import numpy as np
 from six.moves import range
 
-from openmdao.proc_allocators.proc_allocator import ProcAllocator, ProcAllocationError
+from openmdao.proc_allocators.proc_allocator import ProcAllocator
 from openmdao.utils.mpi import MPI
 
 
@@ -43,8 +43,6 @@ class DefaultAllocator(ProcAllocator):
         if proc_weights is None:
             proc_weights = np.ones(nsubs) / nsubs
 
-        # TODO: improve this algorithm - maybe Fortran/C
-        # TODO: maybe combine the 2 cases below
         if nproc >= nsubs:
             # Define the normalized weights for all subsystems
             if len(proc_weights) == nsubs:
@@ -54,12 +52,25 @@ class DefaultAllocator(ProcAllocator):
                 raise RuntimeError("length of proc_weights (%d) does not match the number of "
                                    "subsystems (%d)" % (len(proc_weights), nsubs))
 
-            # Next-one-up algorithm to assign procs to subsystems
-            num_procs = np.ones(nsubs, int)
-            pctg_procs = np.zeros(nsubs)
-            for ind in range(nproc - nsubs):
-                pctg_procs[:] = num_procs / np.sum(num_procs)
-                num_procs[np.argmax(proc_weights - pctg_procs)] += 1
+            prod = proc_weights * nproc
+
+            # scale so smallest weight is 1.0
+            expected = prod * (1.0 / prod[np.argmin(prod)])
+
+            if np.any(prod < 1.):
+                # start everybody with 1 proc
+                num_procs = np.ones(nsubs, int)
+            else:
+                # give everybody what they asked for, except for any fractional parts
+                num_procs = np.array(np.trunc(prod), int)
+
+            left = nproc - np.sum(num_procs)
+
+            # give remaining procs to whoever has largest diff between what they want and
+            # what they have
+            for i in range(left):
+                diff = expected - num_procs
+                num_procs[np.argmax(diff)] += 1
 
             # Compute the coloring
             color = np.zeros(nproc, int)
@@ -77,45 +88,21 @@ class DefaultAllocator(ProcAllocator):
             start = list(color).index(isub)  # find lowest matching color
             sub_proc_range = [start, start + sub_comm.size]
         else:
-            # TODO: improve this algorithm - maybe Fortran/C
-            bool_unused_sub = np.ones(nsubs, bool)
             isubs_list = [[] for ind in range(nproc)]
             proc_load = np.zeros(nproc)
+            weights = proc_weights.copy()
+
             # Assign the slowest subsystem to the most free processor
             for ind in range(nsubs):
                 iproc1 = np.argmin(proc_load)
-                isub = np.argmax(proc_weights[bool_unused_sub])
-
-                bool_unused_sub[isub] = False
+                isub = np.argmax(weights)
                 isubs_list[iproc1].append(isub)
-                proc_load[iproc1] += proc_weights[isub]
+                proc_load[iproc1] += weights[isub]
+                weights[isub] = -1.  # mark negative so argmax won't pick it
 
-            # iproc1 = proc_range[0] + iproc
-            # iproc2 = proc_range[0] + iproc + 1
             # Result
             isubs = isubs_list[iproc]
             sub_comm = comm.Split(iproc)
             sub_proc_range = [comm.rank, comm.rank + sub_comm.size]
-
-        # # a 'color' is assigned to each bucket, with
-        # # an entry for each processor it will be given
-        # # e.g. [0, 1, 1, 1, 1, 2, 2, 3, 3, 3, UND, UND]
-        # color = np.full(nproc, MPI.UNDEFINED, dtype=int)
-        # comm_sizes = np.empty(nproc, int)
-        # start, end = 0, 0
-        # for i, b in enumerate(buckets):
-        #     num_procs = b[0]
-        #     end += num_procs
-        #     color[start:end] = i
-        #     comm_sizes[start:end] = num_procs
-        #     start += num_procs
-        #
-        # # create a sub-communicator for each color and
-        # # get the one assigned to our color/process
-        # rank_color = color[iproc]
-        # sub_comm = comm.Split(rank_color)
-        # sub_proc_range = (np.sum(comm_sizes[:iproc]), np.sum(comm_sizes[:iproc + 1]))
-        #
-        # isubs = [] if sub_comm == MPI.COMM_NULL else buckets[rank_color][1]
 
         return isubs, sub_comm, sub_proc_range
