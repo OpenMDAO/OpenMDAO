@@ -2990,6 +2990,12 @@ class System(object):
         return MPI is None or not (self.comm is None or
                                    self.comm == MPI.COMM_NULL)
 
+    def _clear_iprint(self):
+        """
+        Clear out the iprint stack from the solvers.
+        """
+        self.nonlinear_solver._solver_info.clear()
+
 
 def _get_vec_names(voi_dict):
     return set(voi for voi, data in iteritems(voi_dict)

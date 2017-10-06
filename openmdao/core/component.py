@@ -877,3 +877,11 @@ class Component(System):
         Does nothing on any non-implicit component.
         """
         pass
+
+    def _clear_iprint(self):
+        """
+        Clear out the iprint stack from the solvers.
+
+        Components don't have nested solvers, so do nothing to prevent errors.
+        """
+        pass

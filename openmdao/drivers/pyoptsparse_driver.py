@@ -11,6 +11,9 @@ from collections import OrderedDict
 import traceback
 
 from six import iteritems
+
+import numpy as np
+
 from pyoptsparse import Optimization
 
 from openmdao.core.analysis_error import AnalysisError
@@ -387,6 +390,7 @@ class pyOptSparseDriver(Driver):
 
                 # Let the optimizer try to handle the error
                 except AnalysisError:
+                    model._clear_iprint()
                     fail = 1
 
                 func_dict = self.get_objective_values()
@@ -448,6 +452,7 @@ class pyOptSparseDriver(Driver):
 
             # Let the optimizer try to handle the error
             except AnalysisError:
+                self._problem.model._clear_iprint()
                 fail = 1
 
                 # We need to cobble together a sens_dict of the correct size.
