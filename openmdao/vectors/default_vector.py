@@ -63,6 +63,8 @@ class DefaultTransfer(Transfer):
         out_inds = self._out_inds
 
         if mode == 'fwd':
+            do_complex = in_vec._vector_info._under_complex_step and out_vec._alloc_complex
+
             for key in in_inds:
                 in_set_name, out_set_name = key
                 # this works whether the vecs have multi columns or not due to broadcasting
@@ -71,11 +73,11 @@ class DefaultTransfer(Transfer):
 
                 # Imaginary transfer
                 # (for CS, so only need in fwd)
-                if in_vec._vector_info._under_complex_step and out_vec._alloc_complex:
+                if do_complex:
                     in_vec._imag_data[in_set_name][in_inds[key]] = \
                         out_vec._imag_data[out_set_name][out_inds[key]]
 
-        elif mode == 'rev':
+        else:  # rev
             for key in in_inds:
                 in_set_name, out_set_name = key
                 np.add.at(
