@@ -117,20 +117,6 @@ class Group(System):
 
         self.configure()
 
-    @property
-    def proc_allocator(self):
-        """
-        Get the current system's processor allocator object.
-        """
-        return self._mpi_proc_allocator
-
-    @proc_allocator.setter
-    def proc_allocator(self, value):
-        """
-        Set the processor allocator object.
-        """
-        self._mpi_proc_allocator = value
-
     def _setup_procs(self, pathname, comm):
         """
         Distribute processors and assign pathnames.
