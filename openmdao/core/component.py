@@ -149,6 +149,7 @@ class Component(System):
         else:
             prefix = ''
 
+        # the following metadata will be accessible for vars on all procs
         meta_names = {
             'input': ('units', 'shape', 'size', 'var_set'),
             'output': ('units', 'shape', 'size', 'var_set', 'ref', 'ref0', 'distributed'),
@@ -340,6 +341,8 @@ class Component(System):
         # units: taken as is
         metadata['units'] = units
 
+        self._has_input_scaling |= units is not None
+
         # desc: taken as is
         metadata['desc'] = desc
 
@@ -481,6 +484,9 @@ class Component(System):
             if not np.isscalar(item) and \
                np.atleast_1d(item).shape != metadata['shape']:
                 raise ValueError('The %s argument has the wrong shape' % msg)
+
+        self._has_output_scaling |= (ref, ref0) != (1.0, 0.0)
+        self._has_resid_scaling |= res_ref != 1.0
 
         ref = format_as_float_or_array('ref', ref, flatten=True)
         ref0 = format_as_float_or_array('ref0', ref0, flatten=True)

@@ -242,6 +242,12 @@ class System(object):
     #
     _has_guess : bool
         True if this system has or contains a system with a `guess_nonlinear` method defined.
+    _has_output_scaling : bool
+        True if this system has output scaling.
+    _has_resid_scaling : bool
+        True if this system has residual scaling.
+    _has_input_scaling : bool
+        True if this system has input scaling.
     #
     _owning_rank : {'input': {}, 'output': {}}
         Dict mapping var name to the lowest rank where that variable is local.
@@ -350,6 +356,9 @@ class System(object):
         self.metadata.update(kwargs)
 
         self._has_guess = False
+        self._has_output_scaling = False
+        self._has_resid_scaling = False
+        self._has_input_scaling = False
 
     def _check_reconf(self):
         """
