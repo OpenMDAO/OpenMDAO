@@ -791,7 +791,9 @@ class System(object):
                                               force_alloc_complex=force_alloc_complex)
         self._setup_vectors(root_vectors, resize=resize)
         self._setup_bounds(*self._get_bounds_root_vectors(vector_class, initial), resize=resize)
-        self._setup_scaling(self._get_scaling_root_vectors(vector_class, initial), resize=resize)
+        if self._has_input_scaling or self._has_output_scaling:
+            self._setup_scaling(self._get_scaling_root_vectors(vector_class, initial),
+                                resize=resize)
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
         self._setup_transfers(recurse=recurse)

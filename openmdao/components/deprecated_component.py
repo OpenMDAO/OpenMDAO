@@ -151,15 +151,19 @@ class Component(BaseComponent):
         """
         Compute residuals.
         """
-        self._scale_vec(self._inputs, 'input', 'phys')
-        self._scale_vec(self._outputs, 'output', 'phys')
-        self._scale_vec(self._residuals, 'residual', 'phys')
+        if self._has_input_scaling:
+            self._scale_vec(self._inputs, 'input', 'phys')
+        if self._has_output_scaling:
+            self._scale_vec(self._outputs, 'output', 'phys')
+            self._scale_vec(self._residuals, 'residual', 'phys')
 
         self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
 
-        self._scale_vec(self._inputs, 'input', 'norm')
-        self._scale_vec(self._outputs, 'output', 'norm')
-        self._scale_vec(self._residuals, 'residual', 'norm')
+        if self._has_input_scaling:
+            self._scale_vec(self._inputs, 'input', 'norm')
+        if self._has_output_scaling:
+            self._scale_vec(self._outputs, 'output', 'norm')
+            self._scale_vec(self._residuals, 'residual', 'norm')
 
     def _solve_nonlinear(self):
         """
@@ -179,15 +183,19 @@ class Component(BaseComponent):
         if self._nonlinear_solver is not None:
             self._nonlinear_solver.solve()
         else:
-            self._scale_vec(self._inputs, 'input', 'phys')
-            self._scale_vec(self._outputs, 'output', 'phys')
-            self._scale_vec(self._residuals, 'residual', 'phys')
+            if self._has_input_scaling:
+                self._scale_vec(self._inputs, 'input', 'phys')
+            if self._has_output_scaling:
+                self._scale_vec(self._outputs, 'output', 'phys')
+                self._scale_vec(self._residuals, 'residual', 'phys')
 
             self.solve_nonlinear(self._inputs, self._outputs, self._residuals)
 
-            self._scale_vec(self._inputs, 'input', 'norm')
-            self._scale_vec(self._outputs, 'output', 'norm')
-            self._scale_vec(self._residuals, 'residual', 'norm')
+            if self._has_input_scaling:
+                self._scale_vec(self._inputs, 'input', 'norm')
+            if self._has_output_scaling:
+                self._scale_vec(self._outputs, 'output', 'norm')
+                self._scale_vec(self._residuals, 'residual', 'norm')
 
     def _apply_linear(self, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """

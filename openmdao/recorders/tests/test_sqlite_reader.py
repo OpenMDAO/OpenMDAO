@@ -86,7 +86,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         model = self.prob.model = Group()
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0]), ref=2.0), promotes=['z'])
 
         mda = model.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
         mda.linear_solver = ScipyIterativeSolver()
@@ -361,7 +361,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         )
         assert_rel_error(
                         self, cr.system_metadata['root'][('output', 'phys')]['nonlinear'][1]._views_flat['pz.z'],
-                        [1.0, 1.0], 1.0e-3)
+                        [2.0, 2.0], 1.0e-3)
 
     def test_reading_solver_metadata(self):
         self.setup_sellar_model()

@@ -383,8 +383,7 @@ class SqliteRecorder(BaseRecorder):
         """
         # Cannot handle PETScVector yet
         from openmdao.api import PETScVector
-        if isinstance(object_requesting_recording._scaling_vecs[('input', 'norm')]['linear'][0],
-                      PETScVector):
+        if isinstance(object_requesting_recording._outputs, PETScVector):
             return  # Cannot handle PETScVector yet
 
         scaling_factors = pickle.dumps(object_requesting_recording._scaling_vecs,
