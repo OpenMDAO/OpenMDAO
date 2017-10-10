@@ -217,7 +217,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.filename = os.path.join(self.dir, "sqlite_test")
         self.recorder = SqliteRecorder(self.filename)
         # print(self.filename)  # comment out to make filename printout go away.
-        self.eps = 1e-5
+        self.eps = 1e-3
 
     def tearDown(self):
         # return  # comment out to allow db file to be removed.
@@ -1294,7 +1294,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_rel_error = 0.0,
 
         expected_solver_output = {
-            "mda.d2.y2": [3.75527777],
+            "mda.d2.y2": [3.75610187],
             "mda.d1.y1": [3.16],
         }
 

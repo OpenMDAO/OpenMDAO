@@ -74,9 +74,6 @@ class DistribExecComp(ExecComp):
 
         super(DistribExecComp, self).setup()
 
-    def get_req_procs(self):
-        return (2, None)
-
 
 class DistribCoordComp(ExplicitComponent):
     def __init__(self, **kwargs):
@@ -110,41 +107,6 @@ class DistribCoordComp(ExplicitComponent):
             outputs['outvec'] = inputs['invec'] * 2.0
         else:
             outputs['outvec'] = inputs['invec'] * 3.0
-
-    def get_req_procs(self):
-        return (2, 2)
-
-
-@unittest.skipUnless(PETScVector, "PETSc is required.")
-class MPITests1(unittest.TestCase):
-
-    N_PROCS = 1
-
-    def test_too_few_procs(self):
-        size = 3
-        group = Group()
-        group.add_subsystem('P', IndepVarComp('x', numpy.ones(size)))
-        group.add_subsystem('C1', DistribExecComp(['y=2.0*x'], arr_size=size,
-                                        x=numpy.zeros(size),
-                                        y=numpy.zeros(size)))
-        group.add_subsystem('C2', ExecComp(['z=3.0*y'],
-                                 y=numpy.zeros(size),
-                                 z=numpy.zeros(size)))
-
-        prob = Problem()
-        prob.model = group
-        prob.model.linear_solver = LinearBlockGS()
-        prob.model.connect('P.x', 'C1.x')
-        prob.model.connect('C1.y', 'C2.y')
-
-        try:
-            prob.setup(vector_class=PETScVector, check=False)
-        except Exception as err:
-            self.assertEqual(str(err),
-                             "C1 needs 2 MPI processes, but was given only 1.")
-        else:
-            if MPI:
-                self.fail("Exception expected")
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
@@ -355,9 +317,6 @@ class DistribStateImplicit(ImplicitComponent):
         self.local_size = sizes[rank]
 
         self.linear_solver = PetscKSP()
-
-    def get_req_procs(self):
-        return 1,10
 
     def solve_nonlinear(self, i, o):
         o['states'] = i['a']
