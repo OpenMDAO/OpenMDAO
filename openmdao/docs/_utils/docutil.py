@@ -510,9 +510,9 @@ def insert_output_start_stop_indicators(src):
     return ''.join(src_with_out_start_stop_indicators)
 
 def clean_up_empty_output_blocks(input_blocks, output_blocks):
-    '''Some of the blocks do not generate output. We only want to have
+    """Some of the blocks do not generate output. We only want to have
             input blocks that have outputs
-    '''
+    """
 
     new_input_blocks = []
     new_output_blocks = []
@@ -601,7 +601,11 @@ def globals_for_imports(src):
 
 
 def get_unit_test_source_and_run_outputs_in_out(method_path):
-    '''
+    """
+    Return desired source code for a single feature after testing it.
+
+    Used by embed_test.
+
     1. Get the source code for a unit test method
     2. Replace the asserts with prints -> source_minus_docstrings_with_prints_cleaned
     3. Split source_minus_docstrings_with_prints_cleaned up into groups of "In" blocks -> input_blocks
@@ -610,7 +614,27 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
     5. Run the test using source_with_out_start_stop_indicators -> run_outputs
     6. Extract from run_outputs, the Out blocks -> output_blocks
     7. Return source_minus_docstrings_with_prints_cleaned, input_blocks, output_blocks, skipped, failed
-    '''
+
+    Parameters
+    ----------
+    method_path : str
+        Module hiearchy path to the test.
+
+    Returns
+    -------
+    str
+        Cleaned source code, ready for inclusion in doc.
+    str
+        Reason that the test failed or was skipped.
+    list of str
+        List of input code blocks
+    list of str
+        List of Python output blocks
+    bool
+        True if test was skipped
+    bool
+        True if test failed
+    """
 
     #----------------------------------------------------------
     # 1. Get the source code for a unit test method.
