@@ -9,10 +9,14 @@ as well as the mapping that computes the outputs given the inputs.
 Often, however, there are incidental parameters that affect the behavior of the component
 but are not considered input variables in the sense of being computed as an output of another component.
 
-For convenience, OpenMDAO provides a way of declaring these parameters, which are referred to as *metadata*.
+OpenMDAO provides a way of declaring these parameters, which are referred to as *metadata*.
 They are declared in the 'initialize' method of the user's component,
 and the values are typically passed in upon instantiation of the component.
-Alternatively, the values can be set at any time inside or outside of the component.
+Once the values are passed in during instantiation, they are automatically set into the metadata object
+and are available for use in any method other than 'initialize'.
+
+Alternatively, the values can be set at any time, whether in any method of the component
+(except for 'initialize') or outside of the component definition after the component is instantiated.
 Metadata can be declared along with their default values and various checks for validity,
 such as a list of acceptable values or types.
 The full list of options can be found in the method signature at the bottom of this page.
