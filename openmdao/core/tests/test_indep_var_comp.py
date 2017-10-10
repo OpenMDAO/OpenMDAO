@@ -42,6 +42,8 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_simple_array(self):
         """Define one independent array variable."""
+        import numpy as np
+
         from openmdao.api import Problem, IndepVarComp
 
         array = np.array([

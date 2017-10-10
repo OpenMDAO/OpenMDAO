@@ -741,7 +741,7 @@ class TestProblem(unittest.TestCase):
         self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
 
     def test_feature_system_configure(self):
-        from openmdao.api import Problem, ImplicitComponent, NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS
+        from openmdao.api import Problem, Group, ImplicitComponent, NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS
 
         class ImplSimple(ImplicitComponent):
 
@@ -788,7 +788,7 @@ class TestProblem(unittest.TestCase):
         print(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
 
     def test_feature_post_setup_solver_configure(self):
-        from openmdao.api import Problem, ImplicitComponent, NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS
+        from openmdao.api import Problem, Group, ImplicitComponent, NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS
 
         class ImplSimple(ImplicitComponent):
 
