@@ -341,8 +341,6 @@ class Component(System):
         # units: taken as is
         metadata['units'] = units
 
-        self._has_input_scaling |= units is not None
-
         # desc: taken as is
         metadata['desc'] = desc
 
@@ -479,14 +477,25 @@ class Component(System):
         metadata['upper'] = upper
 
         # All refs: check the shape if necessary
-        for item, msg in zip([ref, ref0, res_ref],
-                             ['ref', 'ref0', 'res_ref']):
-            if not np.isscalar(item) and \
-               np.atleast_1d(item).shape != metadata['shape']:
-                raise ValueError('The %s argument has the wrong shape' % msg)
+        for item, item_name in zip([ref, ref0, res_ref], ['ref', 'ref0', 'res_ref']):
+            if not np.isscalar(item):
+                if np.atleast_1d(item).shape != metadata['shape']:
+                    raise ValueError('The %s argument has the wrong shape' % item_name)
 
-        self._has_output_scaling |= (ref, ref0) != (1.0, 0.0)
-        self._has_resid_scaling |= res_ref != 1.0
+        if np.isscalar(ref):
+            self._has_output_scaling |= ref != 1.0
+        else:
+            self._has_output_scaling |= np.any(ref != 1.0)
+
+        if np.isscalar(ref0):
+            self._has_output_scaling |= ref0 != 0.0
+        else:
+            self._has_output_scaling |= np.any(ref0 != 0.0)
+
+        if np.isscalar(res_ref):
+            self._has_resid_scaling |= res_ref != 1.0
+        else:
+            self._has_resid_scaling |= np.any(res_ref != 1.0)
 
         ref = format_as_float_or_array('ref', ref, flatten=True)
         ref0 = format_as_float_or_array('ref0', ref0, flatten=True)

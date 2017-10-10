@@ -1239,6 +1239,8 @@ class System(object):
         for vec_name in self._lin_rel_vec_name_list:
             vector_class = root_vectors['residual', 'phys'][vec_name][0].__class__
             relvars, _ = self._relevant[vec_name]['@all']
+            rel_ins = relvars['input']
+            rel_outs = relvars['output']
 
             for key in vecs:
                 root = root_vectors[key][vec_name]
@@ -1282,17 +1284,17 @@ class System(object):
                 vecs['residual', 'norm'][vec_name][1]._views[abs_name][:] = 1.0 / res_ref
 
             for abs_in, abs_out in iteritems(self._conn_abs_in2out):
-                if abs_in not in abs2meta_in or abs_in not in relvars['input']:
+                if abs_in not in abs2meta_in or abs_in not in rel_ins or abs_out not in rel_outs:
                     continue
 
                 meta_out = allprocs_abs2meta_out[abs_out]
                 meta_in = abs2meta_in[abs_in]
 
                 shape_out = meta_out['shape']
-                units_out = meta_out['units']
-                distrib_out = meta_out['distributed']
                 shape_in = meta_in['shape']
                 units_in = meta_in['units']
+                units_out = meta_out['units']
+                distrib_out = meta_out['distributed']
 
                 ref = meta_out['ref']
                 ref0 = meta_out['ref0']
