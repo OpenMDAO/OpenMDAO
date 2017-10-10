@@ -785,10 +785,10 @@ class TestNewton(unittest.TestCase):
 class TestNewtonFeatures(unittest.TestCase):
 
     def test_feature_basic(self):
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, \
-             ExecComp
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-             SellarDis2withDerivatives
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -818,10 +818,10 @@ class TestNewtonFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_maxiter(self):
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, \
-             ExecComp
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-             SellarDis2withDerivatives
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -852,10 +852,10 @@ class TestNewtonFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.0607416105, .00001)
 
     def test_feature_rtol(self):
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, \
-             ExecComp
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-             SellarDis2withDerivatives
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -886,10 +886,10 @@ class TestNewtonFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.0607416105, .00001)
 
     def test_feature_atol(self):
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, \
-             ExecComp
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-             SellarDis2withDerivatives
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -920,6 +920,8 @@ class TestNewtonFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_linear_solver(self):
+        import numpy as np
+
         from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, \
              ExecComp, DirectSolver
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
@@ -955,8 +957,9 @@ class TestNewtonFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_max_sub_solves(self):
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, \
-             ExecComp, DirectSolver, ScipyIterativeSolver
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp, DirectSolver, ScipyIterativeSolver
         from openmdao.test_suite.components.double_sellar import SubSellar
 
         prob = Problem()
@@ -992,10 +995,10 @@ class TestNewtonFeatures(unittest.TestCase):
         prob.run_model()
 
     def test_feature_err_on_maxiter(self):
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, \
-             ExecComp, AnalysisError
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-             SellarDis2withDerivatives
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp, AnalysisError
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()

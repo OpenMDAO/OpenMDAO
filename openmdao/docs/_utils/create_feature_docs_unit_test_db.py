@@ -49,9 +49,7 @@ from openmdao.docs.config_params import IGNORE_LIST
 # sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
 # table_name = 'feature_unit_tests'   # name of the table to be queried
 
-from openmdao.docs._utils.docutil import remove_docstrings, get_method_body, \
-        replace_asserts_with_prints, remove_initial_empty_lines_from_source, \
-        get_lines_before_test_cases, sqlite_file, table_name, get_unit_test_source_and_run_outputs
+from openmdao.docs._utils.docutil import sqlite_file, table_name, get_unit_test_source_and_run_outputs
 
 # pylint: disable=C0103
 

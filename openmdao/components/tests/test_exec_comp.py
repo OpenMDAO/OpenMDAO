@@ -539,6 +539,8 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, prob['comp.y'], 3.0, 0.00001)
 
     def test_feature_array(self):
+        import numpy as np
+
         from openmdao.api import IndepVarComp, Group, Problem, ExecComp
 
         prob = Problem()
@@ -558,6 +560,8 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, prob['comp.y'], 2.0, 0.00001)
 
     def test_feature_math(self):
+        import numpy as np
+
         from openmdao.api import IndepVarComp, Group, Problem, ExecComp
 
         prob = Problem()
@@ -578,6 +582,8 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 1.0, 0.00001)
 
     def test_feature_numpy(self):
+        import numpy as np
+
         from openmdao.api import IndepVarComp, Group, Problem, ExecComp
 
         prob = Problem()

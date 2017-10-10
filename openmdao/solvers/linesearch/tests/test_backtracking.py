@@ -544,8 +544,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
 class TestFeatureLineSearch(unittest.TestCase):
 
     def test_feature_specification(self):
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyIterativeSolver, \
-             ArmijoGoldsteinLS
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyIterativeSolver, ArmijoGoldsteinLS
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 
         top = Problem()
@@ -570,8 +569,9 @@ class TestFeatureLineSearch(unittest.TestCase):
         assert_rel_error(self, top['comp.z'], 1.5, 1e-8)
 
     def test_feature_boundscheck_basic(self):
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyIterativeSolver, \
-             BoundsEnforceLS
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyIterativeSolver, BoundsEnforceLS
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = Problem()
@@ -599,8 +599,9 @@ class TestFeatureLineSearch(unittest.TestCase):
         assert_rel_error(self, top['comp.z'][2], [1.5], 1e-8)
 
     def test_feature_boundscheck_vector(self):
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyIterativeSolver, \
-             BoundsEnforceLS
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyIterativeSolver, BoundsEnforceLS
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = Problem()
@@ -629,8 +630,9 @@ class TestFeatureLineSearch(unittest.TestCase):
         assert_rel_error(self, top['comp.z'][2], [1.5], 1e-8)
 
     def test_feature_boundscheck_wall(self):
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyIterativeSolver, \
-             BoundsEnforceLS
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyIterativeSolver, BoundsEnforceLS
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = Problem()
@@ -659,8 +661,9 @@ class TestFeatureLineSearch(unittest.TestCase):
         assert_rel_error(self, top['comp.z'][2], [2.65], 1e-8)
 
     def test_feature_boundscheck_scalar(self):
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyIterativeSolver, \
-             BoundsEnforceLS
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyIterativeSolver, BoundsEnforceLS
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = Problem()
@@ -690,8 +693,9 @@ class TestFeatureLineSearch(unittest.TestCase):
         print(top['comp.z'][2])
 
     def test_feature_print_bound_enforce(self):
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyIterativeSolver, \
-             BoundsEnforceLS
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyIterativeSolver, BoundsEnforceLS
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = Problem()

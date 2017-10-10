@@ -417,8 +417,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['sub.comp2.y'], 77., 1e-5)
 
     def test_guess_nonlinear_feature(self):
-        from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, NewtonSolver, \
-                                 ScipyIterativeSolver
+        from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, NewtonSolver, ScipyIterativeSolver
 
         class ImpWithInitial(ImplicitComponent):
 

@@ -602,6 +602,8 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
     N_PROCS = 2
 
     def test_fwd_vs_rev(self):
+        import time
+
         import numpy as np
 
         from openmdao.api import Problem, PETScVector

@@ -583,6 +583,10 @@ class TestGroup(unittest.TestCase):
                          "d1: 'promotes_outputs' failed to find any matches for the following names or patterns: ['bar', 'blammo'].")
 
     def test_promote_src_indices(self):
+        import numpy as np
+
+        from openmdao.api import ExplicitComponent, Problem, IndepVarComp
+
         class MyComp1(ExplicitComponent):
             def setup(self):
                 # this input will connect to entries 0, 1, and 2 of its source
@@ -619,6 +623,10 @@ class TestGroup(unittest.TestCase):
         assert_rel_error(self, p['C2.y'], 8.)
 
     def test_promote_src_indices_nonflat(self):
+        import numpy as np
+
+        from openmdao.api import ExplicitComponent, Problem, IndepVarComp
+
         class MyComp(ExplicitComponent):
             def setup(self):
                 # We want to pull the following 4 values out of the source:

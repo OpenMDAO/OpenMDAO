@@ -37,6 +37,9 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['comp.f_xy'], -15.0)
 
     def test_set_2d_array(self):
+        import numpy as np
+
+        from openmdao.api import Problem, IndepVarComp, Group
 
         prob = Problem(model=Group())
         model = prob.model
@@ -343,7 +346,9 @@ class TestProblem(unittest.TestCase):
         prob.check_totals(method='cs', step=1.0e-1)
 
     def test_feature_run_driver(self):
-        from openmdao.api import Problem, NonlinearBlockGS
+        import numpy as np
+
+        from openmdao.api import Problem, NonlinearBlockGS, ScipyOptimizer
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
@@ -427,6 +432,8 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['d2.y1'], 27.3049178437, 1e-6)
 
     def test_feature_set_get_array(self):
+        import numpy as np
+
         from openmdao.api import Problem, NonlinearBlockGS
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
@@ -734,8 +741,7 @@ class TestProblem(unittest.TestCase):
         self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
 
     def test_feature_system_configure(self):
-        from openmdao.api import Problem, ImplicitComponent, NewtonSolver, ScipyIterativeSolver, \
-             NonlinearBlockGS
+        from openmdao.api import Problem, ImplicitComponent, NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS
 
         class ImplSimple(ImplicitComponent):
 
@@ -782,8 +788,7 @@ class TestProblem(unittest.TestCase):
         print(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
 
     def test_feature_post_setup_solver_configure(self):
-        from openmdao.api import Problem, ImplicitComponent, NewtonSolver, ScipyIterativeSolver, \
-             NonlinearBlockGS
+        from openmdao.api import Problem, ImplicitComponent, NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS
 
         class ImplSimple(ImplicitComponent):
 

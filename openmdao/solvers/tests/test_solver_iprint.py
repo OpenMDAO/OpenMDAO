@@ -36,11 +36,13 @@ class TestSolverPrint(unittest.TestCase):
 
         prob = Problem()
         prob.model = SellarDerivatives()
+
+        prob.setup()
+
         newton = prob.model.nonlinear_solver = NewtonSolver()
         scipy = prob.model.linear_solver = ScipyIterativeSolver()
 
         newton.options['maxiter'] = 2
-        prob.setup(check=False)
 
         # use a real bad initial guess
         prob['y1'] = 10000
@@ -49,7 +51,6 @@ class TestSolverPrint(unittest.TestCase):
         newton.options['iprint'] = -1
         scipy.options['iprint'] = -1
         prob.run_model()
-        print('done')
 
     def test_feature_iprint_0(self):
         from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver
@@ -57,11 +58,13 @@ class TestSolverPrint(unittest.TestCase):
 
         prob = Problem()
         prob.model = SellarDerivatives()
+
+        prob.setup()
+
         newton = prob.model.nonlinear_solver = NewtonSolver()
         scipy = prob.model.linear_solver = ScipyIterativeSolver()
 
         newton.options['maxiter'] = 1
-        prob.setup(check=False)
 
         prob['y1'] = 10000
         prob['y2'] = -26
@@ -77,11 +80,13 @@ class TestSolverPrint(unittest.TestCase):
 
         prob = Problem()
         prob.model = SellarDerivatives()
+
+        prob.setup()
+
         newton = prob.model.nonlinear_solver = NewtonSolver()
         scipy = prob.model.linear_solver = ScipyIterativeSolver()
 
         newton.options['maxiter'] = 20
-        prob.setup(check=False)
 
         prob['y1'] = 10000
         prob['y2'] = -26
@@ -96,11 +101,13 @@ class TestSolverPrint(unittest.TestCase):
 
         prob = Problem()
         prob.model = SellarDerivatives()
+
+        prob.setup()
+
         newton = prob.model.nonlinear_solver = NewtonSolver()
         scipy = prob.model.linear_solver = ScipyIterativeSolver()
 
         newton.options['maxiter'] = 20
-        prob.setup(check=False)
 
         prob['y1'] = 10000
         prob['y2'] = -20
@@ -202,8 +209,9 @@ class TestSolverPrint(unittest.TestCase):
         # TODO: check output
 
     def test_feature_set_solver_print1(self):
-        from openmdao.api import Problem, IndepVarComp, NewtonSolver, ScipyIterativeSolver, \
-             LinearBlockGS
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyIterativeSolver, LinearBlockGS
         from openmdao.test_suite.components.double_sellar import SubSellar
 
         prob = Problem()
@@ -235,12 +243,13 @@ class TestSolverPrint(unittest.TestCase):
 
         prob.set_solver_print(level=2)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
     def test_feature_set_solver_print2(self):
-        from openmdao.api import Problem, IndepVarComp, NewtonSolver, ScipyIterativeSolver, \
-             LinearBlockGS
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyIterativeSolver, LinearBlockGS
         from openmdao.test_suite.components.double_sellar import SubSellar
 
         prob = Problem()
@@ -273,12 +282,13 @@ class TestSolverPrint(unittest.TestCase):
         prob.set_solver_print(level=2)
         prob.set_solver_print(level=-1, type_='LN')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
     def test_feature_set_solver_print3(self):
-        from openmdao.api import Problem, IndepVarComp, NewtonSolver, ScipyIterativeSolver, \
-             LinearBlockGS
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyIterativeSolver, LinearBlockGS
         from openmdao.test_suite.components.double_sellar import SubSellar
 
         prob = Problem()
@@ -311,7 +321,7 @@ class TestSolverPrint(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.set_solver_print(level=2, depth=2)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
 

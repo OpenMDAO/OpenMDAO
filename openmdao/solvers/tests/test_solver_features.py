@@ -39,8 +39,7 @@ class TestSolverFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_specify_subgroup_solvers(self):
-        from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver, DirectSolver, \
-             NonlinearBlockGS
+        from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver, DirectSolver, NonlinearBlockGS, LinearBlockGS
         from openmdao.test_suite.components.double_sellar import DoubleSellar
 
         prob = Problem()

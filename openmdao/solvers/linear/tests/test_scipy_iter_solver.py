@@ -187,6 +187,8 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
         assert_rel_error(self, J['area', 'length'][0][0], 2.0, 1e-6)
 
     def test_specify_solver(self):
+        import numpy as np
+
         from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, \
              NonlinearBlockGS, ExecComp
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
@@ -223,10 +225,10 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
     def test_feature_maxiter(self):
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, \
-             NonlinearBlockGS, ExecComp
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-             SellarDis2withDerivatives
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, NonlinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -260,10 +262,10 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
         assert_rel_error(self, J['obj', 'z'][0][1], 0.0, .00001)
 
     def test_feature_atol(self):
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, \
-             NonlinearBlockGS, ExecComp
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-             SellarDis2withDerivatives
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, NonlinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -297,6 +299,8 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448533563, .00001)
 
     def test_specify_precon(self):
+        import numpy as np
+
         from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, NewtonSolver, \
              LinearBlockGS, ExecComp
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
