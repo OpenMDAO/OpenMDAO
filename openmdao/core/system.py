@@ -243,9 +243,7 @@ class System(object):
     _has_guess : bool
         True if this system has or contains a system with a `guess_nonlinear` method defined.
     _has_output_scaling : bool
-        True if this system has output scaling.
-    _has_resid_scaling : bool
-        True if this system has residual scaling.
+        True if this system has output/resid scaling.
     _has_input_scaling : bool
         True if this system has input scaling.
     #
@@ -357,7 +355,6 @@ class System(object):
 
         self._has_guess = False
         self._has_output_scaling = False
-        self._has_resid_scaling = False
         self._has_input_scaling = False
 
     def _check_reconf(self):
@@ -1701,10 +1698,13 @@ class System(object):
         residuals : list of residual <Vector> objects
             List of residual vectors to apply the unit and scaling conversions.
         """
-        for vec in outputs:
-            self._scale_vec(vec, 'output', 'phys')
-        for vec in residuals:
-            self._scale_vec(vec, 'residual', 'phys')
+        has_scaling = self._has_output_scaling
+
+        if has_scaling:
+            for vec in outputs:
+                self._scale_vec(vec, 'output', 'phys')
+            for vec in residuals:
+                self._scale_vec(vec, 'residual', 'phys')
 
         yield
 
@@ -1714,7 +1714,8 @@ class System(object):
             if vec._vector_info._under_complex_step:
                 vec._remove_complex_views()
 
-            self._scale_vec(vec, 'output', 'norm')
+            if has_scaling:
+                self._scale_vec(vec, 'output', 'norm')
 
         for vec in residuals:
 
@@ -1722,35 +1723,40 @@ class System(object):
             if vec._vector_info._under_complex_step:
                 vec._remove_complex_views()
 
-            self._scale_vec(vec, 'residual', 'norm')
+            if has_scaling:
+                self._scale_vec(vec, 'residual', 'norm')
 
     @contextmanager
     def _unscaled_context_all(self):
         """
         Context manager that temporarily puts all vectors and Jacobians in an unscaled state.
         """
-        for vec_type in ['output', 'residual']:
-            for vec in self._vectors[vec_type].values():
-                self._scale_vec(vec, vec_type, 'phys')
+        if self._has_output_scaling:
+            for vec_type in ['output', 'residual']:
+                for vec in self._vectors[vec_type].values():
+                    self._scale_vec(vec, vec_type, 'phys')
         yield
-        for vec_type in ['output', 'residual']:
-            for vec in self._vectors[vec_type].values():
-                self._scale_vec(vec, vec_type, 'norm')
+        if self._has_output_scaling:
+            for vec_type in ['output', 'residual']:
+                for vec in self._vectors[vec_type].values():
+                    self._scale_vec(vec, vec_type, 'norm')
 
     @contextmanager
     def _scaled_context_all(self):
         """
         Context manager that temporarily puts all vectors and Jacobians in a scaled state.
         """
-        for vec_type in ['output', 'residual']:
-            for vec in self._vectors[vec_type].values():
-                self._scale_vec(vec, vec_type, 'norm')
+        if self._has_output_scaling:
+            for vec_type in ['output', 'residual']:
+                for vec in self._vectors[vec_type].values():
+                    self._scale_vec(vec, vec_type, 'norm')
 
         yield
 
-        for vec_type in ['output', 'residual']:
-            for vec in self._vectors[vec_type].values():
-                self._scale_vec(vec, vec_type, 'phys')
+        if self._has_output_scaling:
+            for vec_type in ['output', 'residual']:
+                for vec in self._vectors[vec_type].values():
+                    self._scale_vec(vec, vec_type, 'phys')
 
     @contextmanager
     def _matvec_context(self, vec_name, scope_out, scope_in, mode, clear=True):

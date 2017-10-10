@@ -337,6 +337,8 @@ class Group(System):
         if recurse:
             for subsys in self._subsystems_myproc:
                 subsys._setup_var_data(recurse)
+                if subsys._has_output_scaling:
+                    self._has_output_scaling = True
 
         for subsys in self._subsystems_myproc:
             var_maps = subsys._get_maps(subsys._var_allprocs_prom2abs_list)
@@ -374,19 +376,23 @@ class Group(System):
         # If running in parallel, allgather
         if self.comm.size > 1:
             if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
-                raw = (allprocs_abs_names, allprocs_prom2abs_list, allprocs_abs2meta)
+                raw = (allprocs_abs_names, allprocs_prom2abs_list, allprocs_abs2meta,
+                       self._has_output_scaling)
             else:
                 raw = (
                     {'input': [], 'output': []},
                     {'input': {}, 'output': {}},
-                    {'input': {}, 'output': {}})
+                    {'input': {}, 'output': {}},
+                    False
+                )
             gathered = self.comm.allgather(raw)
 
             for type_ in ['input', 'output']:
                 allprocs_abs_names[type_] = []
                 allprocs_prom2abs_list[type_] = defaultdict(list)
 
-            for myproc_abs_names, myproc_prom2abs_list, myproc_abs2meta in gathered:
+            for myproc_abs_names, myproc_prom2abs_list, myproc_abs2meta, has_scaling in gathered:
+                self._has_output_scaling |= has_scaling
 
                 for type_ in ['input', 'output']:
 

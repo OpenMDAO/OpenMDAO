@@ -494,9 +494,9 @@ class Component(System):
             self._has_output_scaling |= np.any(ref0 != 0.0)
 
         if np.isscalar(res_ref):
-            self._has_resid_scaling |= res_ref != 1.0
+            self._has_output_scaling |= res_ref != 1.0
         else:
-            self._has_resid_scaling |= np.any(res_ref != 1.0)
+            self._has_output_scaling |= np.any(res_ref != 1.0)
 
         ref = format_as_float_or_array('ref', ref, flatten=True)
         ref0 = format_as_float_or_array('ref0', ref0, flatten=True)
