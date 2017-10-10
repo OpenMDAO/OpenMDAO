@@ -14,7 +14,6 @@ import numpy as np
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
-from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
 from openmdao.recorders.recording_manager import RecordingManager
@@ -60,9 +59,6 @@ class System(object):
     iter_count : int
         Int that holds the number of times this system has iterated
         in a recording run.
-    #
-    _mpi_proc_allocator : <ProcAllocator>
-        Object that distributes procs among subsystems.
     #
     _subsystems_allprocs : [<System>, ...]
         List of all subsystems (children of this system).
@@ -263,8 +259,6 @@ class System(object):
 
         self.iter_count = 0
 
-        self._mpi_proc_allocator = DefaultAllocator()
-
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
         self._subsystems_myproc_inds = []
@@ -333,8 +327,8 @@ class System(object):
         self._owns_approx_wrt_idx = {}
         self._owns_approx_of_idx = {}
 
-        self._design_vars = {}
-        self._responses = {}
+        self._design_vars = OrderedDict()
+        self._responses = OrderedDict()
         self._rec_mgr = RecordingManager()
 
         self._static_mode = True
@@ -583,7 +577,8 @@ class System(object):
                             if 'size' in voi:
                                 ncol = voi['size']
                             else:
-                                ncol = sizes[iproc, abs2idx[vec_name]['output'][vec_name]]
+                                owner = self._owning_rank['output'][vec_name]
+                                ncol = sizes[owner, abs2idx[vec_name]['output'][vec_name]]
                         rdct, _ = relevant[vec_name]['@all']
                         rel = rdct['output']
                 for key in ['input', 'output', 'residual']:
@@ -702,6 +697,10 @@ class System(object):
             initial = True
             recurse = True
             resize = False
+
+            self.pathname = ''
+            self.comm = comm
+            self._relevant = None
         # 2. Partial setup called in the system initiating the reconfiguration.
         elif setup_mode == 'reconf':
             initial = False
@@ -717,9 +716,8 @@ class System(object):
 
         # If we're only updating and not recursing, processors don't need to be redistributed
         if recurse:
-            pathname, comm = self._get_initial_procs(comm, initial)
             # Besides setting up the processors, this method also builds the model hierarchy.
-            self._setup_procs(pathname, comm)
+            self._setup_procs(self.pathname, comm)
 
         # Recurse model from the bottom to the top for configuring.
         self._configure()
@@ -730,8 +728,6 @@ class System(object):
         self._setup_var_data(recurse=recurse)
         self._setup_vec_names(mode, self._vec_names, self._vois)
         self._setup_global_connections(recurse=recurse)
-        if initial:
-            self._relevant = None
         self._setup_relevance(mode, self._relevant)
         self._setup_vars(recurse=recurse)
         self._setup_var_index_ranges(self._get_initial_var_indices(initial), recurse=recurse)
@@ -828,8 +824,8 @@ class System(object):
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}
-        self._design_vars = {}
-        self._responses = {}
+        self._design_vars = OrderedDict()
+        self._responses = OrderedDict()
 
         self._static_mode = False
         self._var_rel2data_io.update(self._static_var_rel2data_io)
@@ -839,11 +835,6 @@ class System(object):
         self._responses.update(self._static_responses)
         self.setup()
         self._static_mode = True
-
-        minp, maxp = self.get_req_procs()
-        if MPI and comm is not None and comm != MPI.COMM_NULL and comm.size < minp:
-            raise RuntimeError("%s needs %d MPI processes, but was given only %d." %
-                               (self.pathname, minp, comm.size))
 
     def _setup_vars(self, recurse=True):
         """
@@ -932,7 +923,7 @@ class System(object):
         """
         self._var_sizes = {}
         self._var_sizes_byset = {}
-        self._owning_rank = {}
+        self._owning_rank = {'input': defaultdict(int), 'output': defaultdict(int)}
 
     def _setup_global_shapes(self):
         """
@@ -1503,23 +1494,6 @@ class System(object):
         self._transfers[vec_name][mode, isub].transfer(vec_inputs, vec_outputs, mode)
         self._scale_vec(vec_inputs, 'input', direction[1])
 
-    def get_req_procs(self):
-        """
-        Return the min and max MPI processes usable by this System.
-
-        This should be overridden by Components that require more than
-        1 process.
-
-        Returns
-        -------
-        tuple : (int, int or None)
-            A tuple of the form (min_procs, max_procs), indicating the min
-            and max processors usable by this `System`.  max_procs can be None,
-            indicating all available procs can be used.
-        """
-        # by default, systems only require 1 proc
-        return (1, 1)
-
     def _get_maps(self, prom_names):
         """
         Define variable maps based on promotes lists.
@@ -1941,20 +1915,6 @@ class System(object):
                 subsys.linear_solver._set_solver_print(level=level, type_=type_)
             if subsys.nonlinear_solver is not None and type_ != 'LN':
                 subsys.nonlinear_solver._set_solver_print(level=level, type_=type_)
-
-    @property
-    def proc_allocator(self):
-        """
-        Get the current system's processor allocator object.
-        """
-        return self._mpi_proc_allocator
-
-    @proc_allocator.setter
-    def proc_allocator(self, value):
-        """
-        Set the processor allocator object.
-        """
-        self._mpi_proc_allocator = value
 
     def _set_partials_meta(self):
         """
@@ -2400,28 +2360,29 @@ class System(object):
 
         # Human readable error message during Driver setup.
         try:
-            out = {pro2abs[name][0]: data for name, data in iteritems(self._design_vars)}
+            out = OrderedDict((pro2abs[name][0], data) for name, data in
+                              iteritems(self._design_vars))
         except KeyError as err:
             msg = "Output not found for design variable {0} in system '{1}'."
             raise RuntimeError(msg.format(str(err), self.pathname))
 
-        iproc = self.comm.rank
         if get_sizes:
             # Size them all
             sizes = self._var_sizes['nonlinear']['output']
             abs2idx = self._var_allprocs_abs2idx['nonlinear']['output']
             for name in out:
                 if 'size' not in out[name]:
-                    out[name]['size'] = sizes[iproc, abs2idx[name]]
+                    out[name]['size'] = sizes[self._owning_rank['output'][name], abs2idx[name]]
 
         if recurse:
             for subsys in self._subsystems_myproc:
                 out.update(subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes))
 
             if self.comm.size > 1 and self._subsystems_allprocs:
-                for rank, all_out in enumerate(self.comm.allgather(out)):
-                    if rank != iproc:
-                        out.update(all_out)
+                allouts = self.comm.allgather(out)
+                out = OrderedDict()
+                for rank, all_out in enumerate(allouts):
+                    out.update(all_out)
 
         return out
 
@@ -2451,28 +2412,29 @@ class System(object):
 
         # Human readable error message during Driver setup.
         try:
-            out = {prom2abs[name][0]: data for name, data in iteritems(self._responses)}
+            out = OrderedDict((prom2abs[name][0], data) for name, data in
+                              iteritems(self._responses))
         except KeyError as err:
             msg = "Output not found for response {0} in system '{1}'."
             raise RuntimeError(msg.format(str(err), self.pathname))
 
-        iproc = self.comm.rank
         if get_sizes:
             # Size them all
             sizes = self._var_sizes['nonlinear']['output']
             abs2idx = self._var_allprocs_abs2idx['nonlinear']['output']
             for name in out:
                 if 'size' not in out[name]:
-                    out[name]['size'] = sizes[iproc, abs2idx[name]]
+                    out[name]['size'] = sizes[self._owning_rank['output'][name], abs2idx[name]]
 
         if recurse:
             for subsys in self._subsystems_myproc:
                 out.update(subsys.get_responses(recurse=recurse, get_sizes=get_sizes))
 
             if self.comm.size > 1 and self._subsystems_allprocs:
-                for rank, all_out in enumerate(self.comm.allgather(out)):
-                    if rank != iproc:
-                        out.update(all_out)
+                all_outs = self.comm.allgather(out)
+                out = OrderedDict()
+                for rank, all_out in enumerate(all_outs):
+                    out.update(all_out)
 
         return out
 
@@ -2989,6 +2951,12 @@ class System(object):
         """
         return MPI is None or not (self.comm is None or
                                    self.comm == MPI.COMM_NULL)
+
+    def _clear_iprint(self):
+        """
+        Clear out the iprint stack from the solvers.
+        """
+        self.nonlinear_solver._solver_info.clear()
 
 
 def _get_vec_names(voi_dict):

@@ -672,8 +672,7 @@ class Component(System):
         ins = list(self._var_allprocs_prom2abs_list['input'].keys())
         for wrt_list, method, form, step, step_calc in self._declared_partial_checks:
             for pattern in wrt_list:
-                wrt_matches = find_matches(pattern, outs + ins)
-                for match in wrt_matches:
+                for match in find_matches(pattern, outs + ins):
                     if match in opts:
                         opt = opts[match]
 
@@ -797,8 +796,8 @@ class Component(System):
         """
         of_list = [of] if isinstance(of, string_types) else of
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
-        outs = list(self._var_allprocs_prom2abs_list['output'].keys())
-        ins = list(self._var_allprocs_prom2abs_list['input'].keys())
+        outs = list(self._var_allprocs_prom2abs_list['output'])
+        ins = list(self._var_allprocs_prom2abs_list['input'])
 
         of_pattern_matches = [(pattern, find_matches(pattern, outs)) for pattern in of_list]
         wrt_pattern_matches = [(pattern, find_matches(pattern, outs + ins)) for pattern in wrt_list]
@@ -876,5 +875,13 @@ class Component(System):
         Provide initial guess for states.
 
         Does nothing on any non-implicit component.
+        """
+        pass
+
+    def _clear_iprint(self):
+        """
+        Clear out the iprint stack from the solvers.
+
+        Components don't have nested solvers, so do nothing to prevent errors.
         """
         pass

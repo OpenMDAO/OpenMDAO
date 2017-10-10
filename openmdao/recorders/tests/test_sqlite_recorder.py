@@ -217,7 +217,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.filename = os.path.join(self.dir, "sqlite_test")
         self.recorder = SqliteRecorder(self.filename)
         # print(self.filename)  # comment out to make filename printout go away.
-        self.eps = 1e-5
+        self.eps = 1e-3
 
     def tearDown(self):
         # return  # comment out to allow db file to be removed.
@@ -1294,7 +1294,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_rel_error = 0.0,
 
         expected_solver_output = {
-            "mda.d2.y2": [3.75527777],
+            "mda.d2.y2": [3.75610187],
             "mda.d1.y1": [3.16],
         }
 
@@ -1546,6 +1546,45 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
                                            expected_objectives, expected_constraints, expected_sysincludes),), self.eps)
 
+    def test_recorder_file_already_exists_no_append(self):
+
+        self.setup_sellar_model()
+
+        self.recorder.options['record_metadata'] = True
+        self.recorder.options['record_desvars'] = True
+        self.recorder.options['record_responses'] = False
+        self.recorder.options['record_objectives'] = False
+        self.recorder.options['record_constraints'] = False
+        self.prob.driver.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+        self.prob.run_driver()
+        self.prob.cleanup()
+
+        # Open up a new instance of the recorder but with the same filename
+        self.setup_sellar_model()
+        recorder = SqliteRecorder(self.filename)
+        recorder.options['record_metadata'] = True
+        recorder.options['record_desvars'] = True
+        recorder.options['record_responses'] = False
+        recorder.options['record_objectives'] = False
+        recorder.options['record_constraints'] = False
+        self.prob.driver.add_recorder(recorder)
+
+        self.prob.setup(check=False)
+        t0, t1 = run_driver(self.prob)
+        self.prob.cleanup()
+
+        # Do a simple test to see if recording second time was OK
+        coordinate = [0, 'Driver', (0, )]
+
+        expected_desvars = {
+                            "px.x": [1.0, ],
+                            "pz.z": [5.0, 2.0]
+                           }
+
+        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars,
+                                           None, None, None),), self.eps)
 
 if __name__ == "__main__":
     unittest.main()

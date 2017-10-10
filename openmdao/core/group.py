@@ -15,8 +15,8 @@ from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
 from openmdao.core.component import Component
+from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
-from openmdao.proc_allocators.proc_allocator import ProcAllocationError
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
@@ -33,6 +33,13 @@ namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
 class Group(System):
     """
     Class used to group systems together; instantiate or inherit.
+
+    Attributes
+    ----------
+    _mpi_proc_allocator : ProcAllocator
+        Object used to allocate MPI processes to subsystems.
+    proc_weights : list of float
+        Weights used to determine MPI process allocation to subsystems.
     """
 
     def __init__(self, **kwargs):
@@ -54,6 +61,8 @@ class Group(System):
             self._nonlinear_solver = NonLinearRunOnce()
         if not self._linear_solver:
             self._linear_solver = LinearRunOnce()
+        self._mpi_proc_allocator = DefaultAllocator()
+        self.proc_weights = None
 
     def setup(self):
         """
@@ -136,15 +145,11 @@ class Group(System):
         self.setup()
         self._static_mode = True
 
-        req_procs = [s.get_req_procs() for s in self._subsystems_allprocs]
         # Call the load balancing algorithm
-        try:
-            sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(req_procs, comm)
-        except ProcAllocationError as err:
-            raise RuntimeError("subsystem %s requested %d processes "
-                               "but got %d" %
-                               (self._subsystems_allprocs[err.sub_idx].pathname,
-                                err.requested, err.remaining))
+        sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(
+            self.proc_weights,
+            len(self._subsystems_allprocs),
+            comm)
 
         # Define local subsystems
         self._subsystems_myproc = [self._subsystems_allprocs[ind]
@@ -157,7 +162,7 @@ class Group(System):
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
-            if self.pathname is not '':
+            if self.pathname:
                 sub_pathname = '.'.join((self.pathname, subsys.name))
             else:
                 sub_pathname = subsys.name
@@ -469,9 +474,6 @@ class Group(System):
                         if sizes[rank, i] > 0:
                             owns[name] = rank
                             break
-        else:
-            self._owning_rank['input'] = defaultdict(int)
-            self._owning_rank['output'] = defaultdict(int)
 
         self._var_sizes['nonlinear'] = self._var_sizes['linear']
         self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']
@@ -1242,62 +1244,6 @@ class Group(System):
                              (self.pathname, sorted(dupes)))
 
         subsystems[:] = [olddict[name] for name in new_order]
-
-    def get_req_procs(self):
-        """
-        Return the min and max MPI processes usable by this Group.
-
-        Returns
-        -------
-        tuple : (int, int or None)
-            A tuple of the form (min_procs, max_procs), indicating the min
-            and max processors usable by this <Group>.  max_procs can be None,
-            indicating all available procs can be used.
-        """
-        # NOTE: this must only be called BEFORE _subsystems_allprocs and
-        # _static_subsystems_allprocs have been combined, else we may
-        # double count some subsystems and mess up the proc allocation.
-
-        if self._static_subsystems_allprocs or self._subsystems_allprocs:
-            if self._mpi_proc_allocator.parallel:
-                # for a parallel group, we add up all of the required procs
-                min_procs, max_procs = 0, 0
-
-                for sub in chain(self._static_subsystems_allprocs,
-                                 self._subsystems_allprocs):
-                    sub_min, sub_max = sub.get_req_procs()
-                    if sub_min > min_procs:
-                        min_procs = sub_min
-                    if max_procs is not None:
-                        if sub_max is None:
-                            max_procs = None
-                        else:
-                            max_procs += sub_max
-
-                if min_procs == 0:
-                    min_procs = 1
-
-                if max_procs == 0:
-                    max_procs = 1
-
-                return (min_procs, max_procs)
-            else:
-                # for a serial group, we take the max required procs
-                min_procs, max_procs = 1, 1
-
-                for sub in chain(self._static_subsystems_allprocs,
-                                 self._subsystems_allprocs):
-                    sub_min, sub_max = sub.get_req_procs()
-                    min_procs = max(min_procs, sub_min)
-                    if max_procs is not None:
-                        if sub_max is None:
-                            max_procs = None
-                        else:
-                            max_procs = max(max_procs, sub_max)
-
-                return (min_procs, max_procs)
-        else:
-            return super(Group, self).get_req_procs()
 
     def get_subsystem(self, name):
         """

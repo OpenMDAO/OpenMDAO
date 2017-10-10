@@ -498,7 +498,7 @@ class TestGroup(unittest.TestCase):
     def test_connect_src_indices_noflat(self):
         p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('x', np.arange(12).reshape((4,3))))
-        p.model.add_subsystem('C1', ExecComp('y=numpy.sum(x)*2.0', x=np.zeros((2,2))))
+        p.model.add_subsystem('C1', ExecComp('y=sum(x)*2.0', x=np.zeros((2,2))))
 
         # connect C1.x to entries (0,0), (-1,1), (2,1), (1,1) of indep.x
         p.model.connect('indep.x', 'C1.x',
@@ -1090,7 +1090,7 @@ class TestConnect(unittest.TestCase):
     def test_bad_indices_shape(self):
         p = Problem()
         p.model.add_subsystem('IV', IndepVarComp('x', np.arange(12).reshape((4,3))))
-        p.model.add_subsystem('C1', ExecComp('y=numpy.sum(x)*2.0', x=np.zeros((2,2))))
+        p.model.add_subsystem('C1', ExecComp('y=sum(x)*2.0', x=np.zeros((2,2))))
 
         p.model.connect('IV.x', 'C1.x', src_indices=[(1, 1)])
 
