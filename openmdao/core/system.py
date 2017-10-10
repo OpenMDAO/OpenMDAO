@@ -1282,75 +1282,77 @@ class System(object):
                 vecs['residual', 'norm'][vec_name][0]._views[abs_name][:] = 0.0
                 vecs['residual', 'norm'][vec_name][1]._views[abs_name][:] = 1.0 / res_ref
 
-            for abs_in, abs_out in iteritems(self._conn_abs_in2out):
-                if abs_in not in abs2meta_in or abs_in not in rel_ins or abs_out not in rel_outs:
-                    continue
+            if self._has_input_scaling:
+                for abs_in, abs_out in iteritems(self._conn_abs_in2out):
+                    if (abs_in not in abs2meta_in or abs_in not in rel_ins or
+                            abs_out not in rel_outs):
+                        continue
 
-                meta_out = allprocs_abs2meta_out[abs_out]
-                meta_in = abs2meta_in[abs_in]
+                    meta_out = allprocs_abs2meta_out[abs_out]
+                    meta_in = abs2meta_in[abs_in]
 
-                shape_out = meta_out['shape']
-                shape_in = meta_in['shape']
-                units_in = meta_in['units']
-                units_out = meta_out['units']
-                distrib_out = meta_out['distributed']
+                    shape_out = meta_out['shape']
+                    shape_in = meta_in['shape']
+                    units_in = meta_in['units']
+                    units_out = meta_out['units']
+                    distrib_out = meta_out['distributed']
 
-                ref = meta_out['ref']
-                ref0 = meta_out['ref0']
+                    ref = meta_out['ref']
+                    ref0 = meta_out['ref0']
 
-                src_indices = meta_in['src_indices']
+                    src_indices = meta_in['src_indices']
 
-                if src_indices is not None:
-                    if not (np.isscalar(ref) and np.isscalar(ref0)):
-                        global_shape_out = meta_out['global_shape']
-                        if src_indices.ndim != 1:
-                            if len(shape_out) == 1 or shape_in == src_indices.shape:
-                                src_indices = src_indices.flatten()
-                                src_indices = convert_neg(src_indices, src_indices.size)
-                            else:
-                                entries = [list(range(x)) for x in shape_in]
-                                cols = np.vstack(src_indices[i] for i in product(*entries))
-                                dimidxs = [convert_neg(cols[:, i], global_shape_out[i])
-                                           for i in range(cols.shape[1])]
-                                src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
+                    if src_indices is not None:
+                        if not (np.isscalar(ref) and np.isscalar(ref0)):
+                            global_shape_out = meta_out['global_shape']
+                            if src_indices.ndim != 1:
+                                if len(shape_out) == 1 or shape_in == src_indices.shape:
+                                    src_indices = src_indices.flatten()
+                                    src_indices = convert_neg(src_indices, src_indices.size)
+                                else:
+                                    entries = [list(range(x)) for x in shape_in]
+                                    cols = np.vstack(src_indices[i] for i in product(*entries))
+                                    dimidxs = [convert_neg(cols[:, i], global_shape_out[i])
+                                               for i in range(cols.shape[1])]
+                                    src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
 
-                        # TODO: if either ref or ref0 are not scalar and the output is
-                        # distributed, we need to do a scatter
-                        # to obtain the values needed due to global src_indices
-                        if distrib_out:
-                            raise RuntimeError("vector scalers with distrib vars "
-                                               "not supported yet.")
+                            # TODO: if either ref or ref0 are not scalar and the output is
+                            # distributed, we need to do a scatter
+                            # to obtain the values needed due to global src_indices
+                            if distrib_out:
+                                raise RuntimeError("vector scalers with distrib vars "
+                                                   "not supported yet.")
 
+                            if not np.isscalar(ref):
+                                ref = ref[src_indices]
+                            if not np.isscalar(ref0):
+                                ref0 = ref0[src_indices]
+                    else:
                         if not np.isscalar(ref):
-                            ref = ref[src_indices]
+                            ref = ref.reshape(shape_out)
                         if not np.isscalar(ref0):
-                            ref0 = ref0[src_indices]
-                else:
-                    if not np.isscalar(ref):
-                        ref = ref.reshape(shape_out)
-                    if not np.isscalar(ref0):
-                        ref0 = ref0.reshape(shape_out)
+                            ref0 = ref0.reshape(shape_out)
 
-                # Compute scaling arrays for inputs using a0 and a1
-                # Example:
-                #   Let x, x_src, x_tgt be the dimensionless variable,
-                #   variable in source units, and variable in target units, resp.
-                #   x_src = a0 + a1 x
-                #   x_tgt = b0 + b1 x
-                #   x_tgt = g(x_src) = d0 + d1 x_src
-                #   b0 + b1 x = d0 + d1 a0 + d1 a1 x
-                #   b0 = d0 + d1 a0
-                #   b0 = g(a0)
-                #   b1 = d0 + d1 a1 - d0
-                #   b1 = g(a1) - g(0)
+                    # Compute scaling arrays for inputs using a0 and a1
+                    # Example:
+                    #   Let x, x_src, x_tgt be the dimensionless variable,
+                    #   variable in source units, and variable in target units, resp.
+                    #   x_src = a0 + a1 x
+                    #   x_tgt = b0 + b1 x
+                    #   x_tgt = g(x_src) = d0 + d1 x_src
+                    #   b0 + b1 x = d0 + d1 a0 + d1 a1 x
+                    #   b0 = d0 + d1 a0
+                    #   b0 = g(a0)
+                    #   b1 = d0 + d1 a1 - d0
+                    #   b1 = g(a1) - g(0)
 
-                a0 = convert_units(ref0, units_out, units_in)
-                a1 = convert_units(ref - ref0, units_out, units_in) \
-                    - convert_units(0., units_out, units_in)
-                vecs['input', 'phys'][vec_name][0]._views[abs_in][:] = a0
-                vecs['input', 'phys'][vec_name][1]._views[abs_in][:] = a1
-                vecs['input', 'norm'][vec_name][0]._views[abs_in][:] = -a0 / a1
-                vecs['input', 'norm'][vec_name][1]._views[abs_in][:] = 1.0 / a1
+                    a0 = convert_units(ref0, units_out, units_in)
+                    a1 = convert_units(ref - ref0, units_out, units_in) \
+                        - convert_units(0., units_out, units_in)
+                    vecs['input', 'phys'][vec_name][0]._views[abs_in][:] = a0
+                    vecs['input', 'phys'][vec_name][1]._views[abs_in][:] = a1
+                    vecs['input', 'norm'][vec_name][0]._views[abs_in][:] = -a0 / a1
+                    vecs['input', 'norm'][vec_name][1]._views[abs_in][:] = 1.0 / a1
 
         for key in vecs:
             vecs[key]['nonlinear'] = vecs[key]['linear']
