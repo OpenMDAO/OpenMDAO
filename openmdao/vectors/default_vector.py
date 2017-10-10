@@ -440,7 +440,7 @@ class DefaultVector(Vector):
         """
         if self._ncol == 1:
             for set_name, data in iteritems(self._data):
-                data[:] *= vec._data[set_name]
+                data *= vec._data[set_name]
         else:
             for set_name, data in iteritems(self._data):
                 data *= vec._data[set_name][:, np.newaxis]

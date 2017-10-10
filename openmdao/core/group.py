@@ -670,7 +670,10 @@ class Group(System):
         # Now that both implicit & explicit connections have been added,
         # check unit/shape compatibility, but only for connections that are
         # either owned by (implicit) or declared by (explicit) this Group.
-        # This way, we don't repeat the error checking in multiple groups
+        # This way, we don't repeat the error checking in multiple groups.
+        # Also, since we're checking input/output units here, set _has_input_scaling
+        # to True for the target system if units are defined and different, or if
+        # ref or ref0 are defined for the output.
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
         allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
         abs2meta_in = self._var_abs2meta['input']
@@ -691,6 +694,25 @@ class Group(System):
                                        " incompatible with input units of "
                                        "'%s' for '%s'." %
                                        (out_units, abs_out, in_units, abs_in))
+
+                # if connected output has scaling then we need input scaling
+                needs_input_scaling = False
+                ref = allprocs_abs2meta_out[abs_out]['ref']
+                if np.isscalar(ref):
+                    needs_input_scaling = ref != 1.0
+                else:
+                    needs_input_scaling = np.any(ref != 1.0)
+
+                ref0 = allprocs_abs2meta_out[abs_out]['ref0']
+                if np.isscalar(ref0):
+                    needs_input_scaling = ref0 != 0.0
+                else:
+                    needs_input_scaling = np.any(ref0 != 0.0)
+
+                # if units are defined and different, we need input scaling
+                if needs_input_scaling or (in_units and in_units != out_units):
+                    in_subsys = abs_in[path_len:].split('.', 1)[0]
+                    getattr(self, in_subsys)._has_input_scaling = True
             elif in_units is not None:
                 warnings.warn("Input '%s' with units of '%s' is "
                               "connected to output '%s' which has "
