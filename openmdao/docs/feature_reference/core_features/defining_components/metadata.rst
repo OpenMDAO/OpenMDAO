@@ -19,7 +19,10 @@ Alternatively, the values can be set at any time, whether in any method of the c
 (except for 'initialize') or outside of the component definition after the component is instantiated.
 Metadata can be declared along with their default values and various checks for validity,
 such as a list of acceptable values or types.
-The full list of options can be found in the method signature at the bottom of this page.
+The full list of options can be found in the method signature below.
+
+.. automethod:: openmdao.utils.options_dictionary.OptionsDictionary.declare
+    :noindex:
 
 A simple example
 ----------------
@@ -27,7 +30,7 @@ A simple example
 A common use of metadata is to specify the shape or size of the component's input and output variables.
 
 .. embed-code::
-    openmdao.utils.tests.test_options_dictionary_feature.VectorDoublingComp
+    openmdao.test_suite.components.metadata_feature_vector
 
 .. embed-test::
     openmdao.utils.tests.test_options_dictionary_feature.TestOptionsDictionaryFeature.test_simple
@@ -47,7 +50,7 @@ One reason why using metadata is convenient is that a default value can be speci
 making it optional to pass the value in during component instantiation.
 
 .. embed-code::
-    openmdao.utils.tests.test_options_dictionary_feature.LinearCombinationComp
+    openmdao.test_suite.components.metadata_feature_lincomb
 
 .. embed-test::
     openmdao.utils.tests.test_options_dictionary_feature.TestOptionsDictionaryFeature.test_with_default
@@ -67,20 +70,12 @@ the default value and the value passed in must be one of the values OR an instan
 This is illustrated in the following example.
 
 .. embed-code::
-    openmdao.utils.tests.test_options_dictionary_feature.UnitaryFunctionComp
+    openmdao.test_suite.components.metadata_feature_function
 
 .. embed-test::
     openmdao.utils.tests.test_options_dictionary_feature.TestOptionsDictionaryFeature.test_values_and_types
 
 In this example, it is convenient to specify a list of acceptable values of the 'func' metadata,
 but also to provide a valid type if it is not one of these acceptable values.
-
-
-Method Signature
-----------------
-
-.. automethod:: openmdao.utils.options_dictionary.OptionsDictionary.declare
-    :noindex:
-
 
 .. tags:: Metadata
