@@ -50,11 +50,7 @@ console, indented based on its location in the call stack. For example:
         Group#1().System._setup
             Group#1().System._get_initial_procs
             Group#1().Group._setup_procs
-                IndepVarComp#1().System.get_req_procs
-                Propulsor#1().Group.get_req_procs
-                    Propulsor#1().System.get_req_procs
                 IndepVarComp#1().System._setup_procs
-                    IndepVarComp#1(des_vars).System.get_req_procs
                 Propulsor#1().Group._setup_procs
                     FlightConditions#1.Group.__init__
                         FlightConditions#1.System.__init__

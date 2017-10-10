@@ -36,9 +36,6 @@ class ADFLOWComp(ExplicitComponent):
     def compute_partials(self, inputs, partials):
         pass
 
-    def get_req_procs(self):
-        return (1,4)
-
 
 @unittest.skipUnless(MPI, "Only works under MPI.")
 class MatMatTestCase(unittest.TestCase):

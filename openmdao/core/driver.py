@@ -491,27 +491,6 @@ class Driver(object):
 
         return derivs
 
-    def get_req_procs(self, model):
-        """
-        Return min and max MPI processes usable by this Driver for the model.
-
-        This should be overridden by Drivers that can use more processes than
-        the model uses, e.g., DOEDriver.
-
-        Parameters
-        ----------
-        model : <System>
-            Top level <System> that contains the entire model.
-
-        Returns
-        -------
-        tuple : (int, int or None)
-            A tuple of the form (min_procs, max_procs), indicating the min
-            and max processors usable by this `Driver` and the given model.
-            max_procs can be None, indicating all available procs can be used.
-        """
-        return model.get_req_procs()
-
     def record_iteration(self):
         """
         Record an iteration of the current Driver.

@@ -64,9 +64,10 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         children = [_get_tree_dict(s, component_execution_orders, component_execution_index)
                     for s in system._subsystems_myproc]
         if system.comm.size > 1:
-            sub_comm = system._subsystems_myproc[0].comm
-            if sub_comm.rank != 0:
-                children = []
+            if system._subsystems_myproc:
+                sub_comm = system._subsystems_myproc[0].comm
+                if sub_comm.rank != 0:
+                    children = []
             children_lists = system.comm.allgather(children)
 
             children = []
