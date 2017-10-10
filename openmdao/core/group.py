@@ -658,6 +658,12 @@ class Group(System):
         else:
             path_len = len(pathname) + 1
 
+        allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
+        allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
+
+        # Check input/output units here, and set _has_input_scaling
+        # to True for this Group if units are defined and different, or if
+        # ref or ref0 are defined for the output.
         for abs_in, abs_out in iteritems(global_abs_in2out):
             # First, check that this system owns both the input and output.
             if abs_in[:len(pathname)] == pathname and abs_out[:len(pathname)] == pathname:
@@ -667,15 +673,40 @@ class Group(System):
                 if out_subsys != in_subsys:
                     abs_in2out[abs_in] = abs_out
 
+            # if connected output has scaling then we need input scaling
+            if not self._has_input_scaling:
+                out_units = allprocs_abs2meta_out[abs_out]['units']
+                in_units = allprocs_abs2meta_in[abs_in]['units']
+
+                needs_input_scaling = False
+                ref = allprocs_abs2meta_out[abs_out]['ref']
+                if np.isscalar(ref):
+                    needs_input_scaling = ref != 1.0
+                else:
+                    needs_input_scaling = np.any(ref != 1.0)
+
+                if not needs_input_scaling:
+                    ref0 = allprocs_abs2meta_out[abs_out]['ref0']
+                    if np.isscalar(ref0):
+                        needs_input_scaling = ref0 != 0.0
+                    else:
+                        needs_input_scaling = np.any(ref0 != 0.0)
+
+                if not needs_input_scaling:
+                    res_ref = allprocs_abs2meta_out[abs_out]['res_ref']
+                    if np.isscalar(res_ref):
+                        needs_input_scaling = res_ref != 1.0
+                    else:
+                        needs_input_scaling = np.any(res_ref != 1.0)
+
+                # if units are defined and different, we need input scaling
+                if needs_input_scaling or (in_units and in_units != out_units):
+                    self._has_input_scaling = True
+
         # Now that both implicit & explicit connections have been added,
         # check unit/shape compatibility, but only for connections that are
         # either owned by (implicit) or declared by (explicit) this Group.
         # This way, we don't repeat the error checking in multiple groups.
-        # Also, since we're checking input/output units here, set _has_input_scaling
-        # to True for the target system if units are defined and different, or if
-        # ref or ref0 are defined for the output.
-        allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
-        allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
         abs2meta_in = self._var_abs2meta['input']
         abs2meta_out = self._var_abs2meta['output']
 
@@ -694,25 +725,6 @@ class Group(System):
                                        " incompatible with input units of "
                                        "'%s' for '%s'." %
                                        (out_units, abs_out, in_units, abs_in))
-
-                # if connected output has scaling then we need input scaling
-                needs_input_scaling = False
-                ref = allprocs_abs2meta_out[abs_out]['ref']
-                if np.isscalar(ref):
-                    needs_input_scaling = ref != 1.0
-                else:
-                    needs_input_scaling = np.any(ref != 1.0)
-
-                ref0 = allprocs_abs2meta_out[abs_out]['ref0']
-                if np.isscalar(ref0):
-                    needs_input_scaling = ref0 != 0.0
-                else:
-                    needs_input_scaling = np.any(ref0 != 0.0)
-
-                # if units are defined and different, we need input scaling
-                if needs_input_scaling or (in_units and in_units != out_units):
-                    in_subsys = abs_in[path_len:].split('.', 1)[0]
-                    getattr(self, in_subsys)._has_input_scaling = True
             elif in_units is not None:
                 warnings.warn("Input '%s' with units of '%s' is "
                               "connected to output '%s' which has "

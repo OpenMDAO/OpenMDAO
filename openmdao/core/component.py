@@ -150,9 +150,10 @@ class Component(System):
             prefix = ''
 
         # the following metadata will be accessible for vars on all procs
-        meta_names = {
+        global_meta_names = {
             'input': ('units', 'shape', 'size', 'var_set'),
-            'output': ('units', 'shape', 'size', 'var_set', 'ref', 'ref0', 'distributed'),
+            'output': ('units', 'shape', 'size', 'var_set',
+                       'ref', 'ref0', 'res_ref', 'distributed'),
         }
 
         for type_ in ['input', 'output']:
@@ -171,7 +172,7 @@ class Component(System):
                 # Compute allprocs_abs2meta
                 allprocs_abs2meta[type_][abs_name] = {
                     meta_name: metadata[meta_name]
-                    for meta_name in meta_names[type_]
+                    for meta_name in global_meta_names[type_]
                 }
 
                 # Compute abs2meta

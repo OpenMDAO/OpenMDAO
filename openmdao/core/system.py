@@ -1504,15 +1504,27 @@ class System(object):
         vec_inputs = self._vectors['input'][vec_name]
 
         if mode == 'fwd':
-            self._scale_vec(vec_inputs, 'input', 'norm')
-            self._transfers[vec_name][mode, isub].transfer(vec_inputs,
-                                                           self._vectors['output'][vec_name], mode)
-            self._scale_vec(vec_inputs, 'input', 'phys')
+            if self._has_input_scaling:
+                self._scale_vec(vec_inputs, 'input', 'norm')
+                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
+                                                               self._vectors['output'][vec_name],
+                                                               mode)
+                self._scale_vec(vec_inputs, 'input', 'phys')
+            else:
+                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
+                                                               self._vectors['output'][vec_name],
+                                                               mode)
         else:  # rev
-            self._scale_vec(vec_inputs, 'input', 'phys')
-            self._transfers[vec_name][mode, isub].transfer(vec_inputs,
-                                                           self._vectors['output'][vec_name], mode)
-            self._scale_vec(vec_inputs, 'input', 'norm')
+            if self._has_input_scaling:
+                self._scale_vec(vec_inputs, 'input', 'phys')
+                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
+                                                               self._vectors['output'][vec_name],
+                                                               mode)
+                self._scale_vec(vec_inputs, 'input', 'norm')
+            else:
+                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
+                                                               self._vectors['output'][vec_name],
+                                                               mode)
 
     def get_req_procs(self):
         """
