@@ -10,6 +10,11 @@ from openmdao.utils.name_maps import name2abs_name
 
 
 _full_slice = slice(None)
+_type_map = {
+    'input': 'input',
+    'output': 'output',
+    'residual': 'output'
+}
 
 
 class VectorInfo(object):
@@ -46,6 +51,8 @@ class Vector(object):
         The name of the vector: 'nonlinear', 'linear', or right-hand side name.
     _typ : str
         Type: 'input' for input vectors; 'output' for output/residual vectors.
+    _kind : str
+        Specific kind of vector, either 'input', 'output', or 'residual'.
     _system : System
         Pointer to the owning system.
     _iproc : int
@@ -91,7 +98,7 @@ class Vector(object):
 
     _vector_info = VectorInfo()
 
-    def __init__(self, name, typ, system, root_vector=None, resize=False, alloc_complex=False,
+    def __init__(self, name, kind, system, root_vector=None, resize=False, alloc_complex=False,
                  ncol=1, relevant=None):
         """
         Initialize all attributes.
@@ -100,8 +107,8 @@ class Vector(object):
         ----------
         name : str
             The name of the vector: 'nonlinear', 'linear', or right-hand side name.
-        typ : str
-            Type: 'input' for input vectors; 'output' for output/residual vectors.
+        kind : str
+            The kind of vector, 'input', 'output', or 'residual'.
         system : <System>
             Pointer to the owning system.
         root_vector : <Vector>
@@ -117,7 +124,8 @@ class Vector(object):
             and dependent systems.
         """
         self._name = name
-        self._typ = typ
+        self._typ = _type_map[kind]
+        self._kind = kind
         self._ncol = ncol
         self._icol = None
         self._relevant = relevant

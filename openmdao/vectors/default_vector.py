@@ -268,7 +268,7 @@ class DefaultVector(Vector):
         root_vector : Vector or None
             the root's vector instance or None, if we are at the root.
         """
-        if root_vector is None:
+        if root_vector is None:  # we're the root
             self._data, self._indices = self._create_data()
 
             # Allocate imaginary for complex step
@@ -288,8 +288,12 @@ class DefaultVector(Vector):
         """
         system = self._system
         type_ = self._typ
+        kind = self._kind
         iproc = self._iproc
         ncol = self._ncol
+
+        do_scaling = ((type_ == 'input' and system._has_input_scaling) or
+                      (type_ == 'output' and system._has_output_scaling))
 
         self._views = self._names = views = {}
         self._views_flat = views_flat = {}
@@ -325,6 +329,9 @@ class DefaultVector(Vector):
                     v = v.view()
                     v.shape = shape
                 imag_views[abs_name] = v
+
+            # if do_scaling:
+            #     factors = system._scale_factors[abs_name][kind]
 
     def _clone_data(self):
         """
