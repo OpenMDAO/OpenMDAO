@@ -65,7 +65,7 @@ all: mock redbaron
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 
 	# post-game clean-up
-	rm feature_docs_unit_test_db.sqlite
+	# rm feature_docs_unit_test_db.sqlite
 
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
