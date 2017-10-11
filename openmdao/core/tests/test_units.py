@@ -71,6 +71,9 @@ class TestUnitConversion(unittest.TestCase):
         # this test passes as long as it doesn't raise an exception
 
     def test_speed(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp
+        from openmdao.core.tests.test_units import SpeedComp
+
         comp = IndepVarComp()
         comp.add_output('distance', val=1., units='m')
         comp.add_output('time', val=1., units='s')

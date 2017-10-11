@@ -73,6 +73,14 @@ class ExplCompTestCase(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
+    def test_feature_simple(self):
+        from openmdao.api import Problem
+        from openmdao.core.tests.test_expl_comp import RectangleComp
+
+        prob = Problem(RectangleComp())
+        prob.setup(check=False)
+        prob.run_model()
+
     def test_compute_and_list(self):
         prob = Problem(RectangleGroup())
         prob.setup(check=False)

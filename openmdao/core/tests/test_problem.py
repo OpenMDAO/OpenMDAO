@@ -18,6 +18,8 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDeriv
 class TestProblem(unittest.TestCase):
 
     def test_feature_simple_run_once_no_promote(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
         model = prob.model = Group()
@@ -35,6 +37,9 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['comp.f_xy'], -15.0)
 
     def test_set_2d_array(self):
+        import numpy as np
+
+        from openmdao.api import Problem, IndepVarComp, Group
 
         prob = Problem(model=Group())
         model = prob.model
@@ -167,6 +172,9 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy']['y'], [[8.0]], 1e-6)
 
     def test_feature_set_indeps(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
         prob = Problem()
 
         model = prob.model = Group()
@@ -182,6 +190,8 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['f_xy'], 214.0, 1e-6)
 
     def test_feature_numpyvec_setup(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
         model = prob.model = Group()
@@ -211,6 +221,8 @@ class TestProblem(unittest.TestCase):
 
     @unittest.skipUnless(PETScVector, "PETSc is required.")
     def test_feature_petsc_setup(self):
+        from openmdao.api import Problem, Group, IndepVarComp, PETScVector
+        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
         model = prob.model = Group()
@@ -227,6 +239,9 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['f_xy'], 214.0, 1e-6)
 
     def test_feature_check_totals_manual(self):
+        from openmdao.api import Problem, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = NonlinearBlockGS()
@@ -238,6 +253,9 @@ class TestProblem(unittest.TestCase):
         prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'])
 
     def test_feature_check_totals_from_driver_compact(self):
+        from openmdao.api import Problem, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = NonlinearBlockGS()
@@ -258,6 +276,9 @@ class TestProblem(unittest.TestCase):
         prob.check_totals(compact_print=True)
 
     def test_feature_check_totals_from_driver(self):
+        from openmdao.api import Problem, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = NonlinearBlockGS()
@@ -278,6 +299,9 @@ class TestProblem(unittest.TestCase):
         prob.check_totals()
 
     def test_feature_check_totals_suppress(self):
+        from openmdao.api import Problem, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = NonlinearBlockGS()
@@ -299,6 +323,9 @@ class TestProblem(unittest.TestCase):
         print(totals)
 
     def test_feature_check_totals_cs(self):
+        from openmdao.api import Problem, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = NonlinearBlockGS()
@@ -319,6 +346,11 @@ class TestProblem(unittest.TestCase):
         prob.check_totals(method='cs', step=1.0e-1)
 
     def test_feature_run_driver(self):
+        import numpy as np
+
+        from openmdao.api import Problem, NonlinearBlockGS, ScipyOptimizer
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
         prob = Problem()
         model = prob.model = SellarDerivatives()
         model.nonlinear_solver = NonlinearBlockGS()
@@ -343,6 +375,8 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['obj'], 3.18339395, 1e-2)
 
     def test_feature_promoted_sellar_set_get_outputs(self):
+        from openmdao.api import Problem, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
         prob.model = SellarDerivatives()
@@ -359,6 +393,8 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 27.3049178437, 1e-6)
 
     def test_feature_not_promoted_sellar_set_get_outputs(self):
+        from openmdao.api import Problem, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDerivativesConnected
 
         prob = Problem()
         prob.model = SellarDerivativesConnected()
@@ -375,6 +411,8 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['d1.y1'], 27.3049178437, 1e-6)
 
     def test_feature_promoted_sellar_set_get_inputs(self):
+        from openmdao.api import Problem, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
         prob.model = SellarDerivatives()
@@ -394,6 +432,11 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['d2.y1'], 27.3049178437, 1e-6)
 
     def test_feature_set_get_array(self):
+        import numpy as np
+
+        from openmdao.api import Problem, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = NonlinearBlockGS()
@@ -423,6 +466,8 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 8.14191301549, 1e-6)
 
     def test_feature_residuals(self):
+        from openmdao.api import Problem, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
         prob.model = SellarDerivatives()
@@ -696,6 +741,7 @@ class TestProblem(unittest.TestCase):
         self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
 
     def test_feature_system_configure(self):
+        from openmdao.api import Problem, Group, ImplicitComponent, NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS
 
         class ImplSimple(ImplicitComponent):
 
@@ -742,6 +788,7 @@ class TestProblem(unittest.TestCase):
         print(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
 
     def test_feature_post_setup_solver_configure(self):
+        from openmdao.api import Problem, Group, ImplicitComponent, NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS
 
         class ImplSimple(ImplicitComponent):
 
