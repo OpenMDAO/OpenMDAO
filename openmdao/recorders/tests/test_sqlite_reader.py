@@ -186,15 +186,18 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Test to see if the access by case keys works:
         seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|6')
-        np.testing.assert_almost_equal(seventh_slsqp_iteration_case.desvars['pz.z'], [1.9776389,  0.],
+        np.testing.assert_almost_equal(seventh_slsqp_iteration_case.desvars['pz.z'], [1.97846296,  -2.21388305e-13],
+                                       decimal=2,
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('pz.z'))
-        np.testing.assert_almost_equal(last_case.desvars['pz.z'], [1.9776389,  0.],
+        np.testing.assert_almost_equal(last_case.desvars['pz.z'], [1.97846296,  -2.21388305e-13],
+                                       decimal=2,
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('pz.z'))
-        np.testing.assert_almost_equal(last_case.desvars['px.x'], [0.0,],
+        np.testing.assert_almost_equal(last_case.desvars['px.x'], [-0.00309521],
+                                       decimal=2,
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('px.x'))

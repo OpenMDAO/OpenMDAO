@@ -280,6 +280,7 @@ class Problem(object):
             raise RuntimeError("The `setup` method must be called before `run_model`.")
 
         self.final_setup()
+        self.model._clear_iprint()
         return self.model.run_solve_nonlinear()
 
     def run_driver(self):
@@ -295,6 +296,7 @@ class Problem(object):
             raise RuntimeError("The `setup` method must be called before `run_driver`.")
 
         self.final_setup()
+        self.model._clear_iprint()
         with self.model._scaled_context_all():
             return self.driver.run()
 
@@ -1213,7 +1215,10 @@ class Problem(object):
                                 sz = size
                             else:
                                 sz = sizes[root, out_var_idx]
-                            deriv_val = np.empty(sz, dtype=float)
+                            if ncol > 1:
+                                deriv_val = np.empty((sz, ncol))
+                            else:
+                                deriv_val = np.empty(sz, dtype=float)
                         self.comm.Bcast(deriv_val, root=root)
 
                 len_val = len(deriv_val)
