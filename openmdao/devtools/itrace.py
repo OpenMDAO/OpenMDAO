@@ -30,7 +30,7 @@ def _indented_print(f_locals, d, indent, excludes=('__init__',), file=sys.stdout
     sindent = tab * indent
     sep = '=' if d is f_locals else ':'
 
-    for name in sorted(d):
+    for name in sorted(d, key=lambda a: str(a)):
         if name not in excludes:
             if isinstance(d[name], (dict, OrderedDict)):
                 f = cStringIO()

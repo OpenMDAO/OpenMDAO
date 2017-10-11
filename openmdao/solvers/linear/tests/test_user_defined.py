@@ -35,9 +35,6 @@ class DistribStateImplicit(ImplicitComponent):
         self.linear_solver = PetscKSP()
         self.linear_solver.precon = LinearUserDefined(self.mysolve)
 
-    def get_req_procs(self):
-        return 1,10
-
     def solve_nonlinear(self, i, o):
         o['states'] = i['a']
 
@@ -218,9 +215,6 @@ class TestUserDefinedSolver(unittest.TestCase):
 
                 self.linear_solver = PetscKSP()
                 self.linear_solver.precon = LinearUserDefined(solve_function=self.mysolve)
-
-            def get_req_procs(self):
-                return 1,10
 
             def solve_nonlinear(self, i, o):
                 o['states'] = i['a']
