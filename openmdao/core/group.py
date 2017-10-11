@@ -706,7 +706,7 @@ class Group(System):
                         needs_input_scaling = np.any(res_ref != 1.0)
 
                 # if units are defined and different, we need input scaling
-                if needs_input_scaling or (in_units and in_units != out_units):
+                if needs_input_scaling or (in_units and out_units and in_units != out_units):
                     self._has_input_scaling = True
 
         # Now that both implicit & explicit connections have been added,
