@@ -1,7 +1,11 @@
 from six import iteritems
 from docutils import nodes
-from sphinx.util.compat import Directive
+from docutils.statemachine import ViewList
 
+import sphinx
+
+from sphinx.util.compat import Directive
+from sphinx.util.nodes import nested_parse_with_titles
 
 class EmbedOptionsDirective(Directive):
     """
@@ -59,39 +63,64 @@ class EmbedOptionsDirective(Directive):
 
             outputs.append([name, default, values, types, desc])
 
-        lines = []
-        lines.append(' ' * embed_num_indent
-            + '.. list-table:: List of options\n')
-        lines.append(' ' * embed_num_indent
-            + ' ' * 2 + ':header-rows: 1\n')
-        lines.append(' ' * embed_num_indent
-            + ' ' * 2 + ':widths: 15, 10, 20, 20, 30\n')
-        lines.append(' ' * embed_num_indent
-            + ' ' * 2 + ':stub-columns: 0\n')
-        lines.append('\n')
-        lines.append(' ' * embed_num_indent
-            + ' ' * 2 + '*  -  Option\n')
-        lines.append(' ' * embed_num_indent
-            + ' ' * 2 + '   -  Default\n')
-        lines.append(' ' * embed_num_indent
-            + ' ' * 2 + '   -  Acceptable values\n')
-        lines.append(' ' * embed_num_indent
-            + ' ' * 2 + '   -  Acceptable types\n')
-        lines.append(' ' * embed_num_indent
-            + ' ' * 2 + '   -  Description\n')
+        lines = ViewList()
+
+        col_heads = ['Option', 'Default', 'Acceptable values', 'Acceptable Types', 'Description']
+
+        max_sizes = {}
+        for j, col in enumerate(col_heads):
+            max_sizes[j] = len(col)
 
         for output in outputs:
-            for entry in [output[0]]:
-                lines.append(' ' * embed_num_indent
-                    + ' ' * 2 + '*  -  %s\n' % entry)
-            for entry in output[1:]:
-                lines.append(' ' * embed_num_indent
-                    + ' ' * 2 + '   -  %s\n' % entry)
+            for j, item in enumerate(output):
+                length = len(str(item))
+                if max_sizes[j] < length:
+                    max_sizes[j] = length
 
-        table = nodes.Text(lines, lines)
-        doc_nodes.append(table)
-        return doc_nodes
+        header = ""
+        titles = ""
+        for key, val in iteritems(max_sizes):
+            header += '=' * val + ' '
+
+        for j, head in enumerate(col_heads):
+            titles += "%s " % head
+            size = max_sizes[j]
+            space = size - len(head)
+            if space > 0:
+                titles += space*' '
+
+        lines.append(header, "options table", 1)
+        lines.append(titles, "options table", 2)
+        lines.append(header, "options table", 3)
+
+        n = 3
+        for output in outputs:
+            line = ""
+            for j, item in enumerate(output):
+                line += "%s " % str(item)
+                size = max_sizes[j]
+                space = size - len(str(item))
+                if space > 0:
+                    line += space*' '
+
+            lines.append(line, "options table", n)
+            n += 1
+
+        lines.append(header, "options table", n)
+
+        # Create a node.
+        node = nodes.section()
+        node.document = self.state.document
+
+        # Parse the rst.
+        nested_parse_with_titles(self.state, lines, node)
+
+        # And return the result.
+        return node.children
+
 
 def setup(app):
     """add custom directive into Sphinx so that it is found during document parsing"""
     app.add_directive('embed-options', EmbedOptionsDirective)
+
+    return {'version': sphinx.__display_version__, 'parallel_read_safe': True}
