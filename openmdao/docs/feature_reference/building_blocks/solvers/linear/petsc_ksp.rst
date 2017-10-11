@@ -22,6 +22,11 @@ Here, we calculate the total derivatives across the Sellar system.
 Options
 -------
 
+.. embed-options::
+    openmdao.solvers.linear.petsc_ksp
+    PetscKSP
+    options
+
 - maxiter
 
   This lets you specify the maximum number of GMRES (or other algorithm) iterations to apply. The default maximum is 100, which

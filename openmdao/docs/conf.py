@@ -11,50 +11,50 @@ from openmdao.docs._utils.patch import do_monkeypatch
 
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
-# start off running the monkeypatch to keep options/parameters
-# usable in docstring for autodoc.
-
-
-def __init__(self, docstring, config={}):
-    """
-    init
-    """
-    docstring = textwrap.dedent(docstring).split('\n')
-
-    self._doc = Reader(docstring)
-    self._parsed_data = {
-        'Signature': '',
-        'Summary': [''],
-        'Extended Summary': [],
-        'Parameters': [],
-        'Options': [],
-        'Returns': [],
-        'Yields': [],
-        'Raises': [],
-        'Warns': [],
-        'Other Parameters': [],
-        'Attributes': [],
-        'Methods': [],
-        'See Also': [],
-        'Notes': [],
-        'Warnings': [],
-        'References': '',
-        'Examples': '',
-        'index': {}
-    }
-
-    try:
-        self._parse()
-    except ParseError as e:
-        e.docstring = orig_docstring
-        raise
-
-    # In creation of docs, remove private Attributes (beginning with '_')
-    # with a crazy list comprehension
-    self._parsed_data["Attributes"][:] = [att for att in self._parsed_data["Attributes"]
-                                          if not att[0].startswith('_')]
-
-NumpyDocString.__init__ = __init__
+# # start off running the monkeypatch to keep options/parameters
+# # usable in docstring for autodoc.
+#
+#
+# def __init__(self, docstring, config={}):
+#     """
+#     init
+#     """
+#     docstring = textwrap.dedent(docstring).split('\n')
+#
+#     self._doc = Reader(docstring)
+#     self._parsed_data = {
+#         'Signature': '',
+#         'Summary': [''],
+#         'Extended Summary': [],
+#         'Parameters': [],
+#         'Options': [],
+#         'Returns': [],
+#         'Yields': [],
+#         'Raises': [],
+#         'Warns': [],
+#         'Other Parameters': [],
+#         'Attributes': [],
+#         'Methods': [],
+#         'See Also': [],
+#         'Notes': [],
+#         'Warnings': [],
+#         'References': '',
+#         'Examples': '',
+#         'index': {}
+#     }
+#
+#     try:
+#         self._parse()
+#     except ParseError as e:
+#         e.docstring = orig_docstring
+#         raise
+#
+#     # In creation of docs, remove private Attributes (beginning with '_')
+#     # with a crazy list comprehension
+#     self._parsed_data["Attributes"][:] = [att for att in self._parsed_data["Attributes"]
+#                                           if not att[0].startswith('_')]
+#
+# NumpyDocString.__init__ = __init__
 
 do_monkeypatch()
 
@@ -67,7 +67,7 @@ sys.path.insert(0, os.path.abspath('./_exts'))
 
 # -- General configuration ------------------------------------------------
 
-# If your documentation needs a minimal Sphinx version, state it here.
+# If your documentation needs apwd minimal Sphinx version, state it here.
 needs_sphinx = '1.5'
 
 # Add any Sphinx extension module names here, as strings. They can be
@@ -84,6 +84,7 @@ extensions = [
     'numpydoc',
     'show_unittest_examples',
     'embed_code',
+    'embed_options',
     'embed_test',
     'embed_compare',
     'tags'
