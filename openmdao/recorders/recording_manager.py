@@ -198,23 +198,13 @@ class RecordingManager(object):
         if isinstance(object_requesting_recording, Driver):
             root = object_requesting_recording._problem.model
 
-            from openmdao.devtools.debug import tree
-            from six.moves import cStringIO
-            f = cStringIO()
-            tree(root, include_solvers=True, stream=f)
-            txt = f.getvalue()
-            outs = object_requesting_recording._problem.model._var_allprocs_abs_names['output']
-            inputs, outputs, residuals = root.get_nonlinear_vectors()
-
-            # outputs._names is what we want
-
             desvars = object_requesting_recording.get_design_var_values()
             responses = object_requesting_recording.get_response_values()
             objectives = object_requesting_recording.get_objective_values()
             constraints = object_requesting_recording.get_constraint_values()
+            inputs, outputs, residuals = root.get_nonlinear_vectors()
             sysvars = outputs._names
             # desvars and others are all dicts with names of vars as keys and ndarrays as values
-            # object_requesting_recording._problem['px.x'] ndarray
 
             if MPI:
                 desvarnames = self._vars_to_record['desvarnames']

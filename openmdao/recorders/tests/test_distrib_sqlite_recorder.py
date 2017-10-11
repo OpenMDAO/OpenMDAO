@@ -7,14 +7,6 @@ from tempfile import mkdtemp
 
 import numpy as np
 
-# import pydevd
-# from openmdao.utils.mpi import MPI
-# if MPI.COMM_WORLD.rank:
-#     pydevd.settrace('localhost', port=9876, stdoutToServer=True, stderrToServer=True)
-# else:
-#     pydevd.settrace('localhost', port=9877, stdoutToServer=True, stderrToServer=True)
-
-
 from openmdao.utils.mpi import MPI
 from openmdao.devtools.testutil import assert_rel_error
 
@@ -35,11 +27,6 @@ from openmdao.api import ExecComp, ExplicitComponent, Problem, \
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from sqlite_recorder_test_utils import _assertDriverIterationDataRecorded
 from recorder_test_utils import run_driver
-
-# try:
-#     from openmdao.vectors.petsc_vector import PETScVector
-# except ImportError:
-#     PETScVector = None
 
 class DistributedAdder(ExplicitComponent):
     """
@@ -130,14 +117,12 @@ class DistributedRecorderTest(unittest.TestCase):
     def setUp(self):
         self.dir = mkdtemp()
         self.filename = os.path.join(self.dir, "sqlite_test")
-        print('self.filename',self.filename)
         self.recorder = SqliteRecorder(self.filename)
         self.eps = 1e-5
 
     def tearDown(self):
         try:
-            pass
-            # rmtree(self.dir)
+            rmtree(self.dir)
         except OSError as e:
             # If directory already deleted, keep going
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):

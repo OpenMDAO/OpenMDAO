@@ -1,6 +1,7 @@
 branches:
   only:
   - master
+  - add_system_vars_to_driver_recording
 
 sudo: false
 

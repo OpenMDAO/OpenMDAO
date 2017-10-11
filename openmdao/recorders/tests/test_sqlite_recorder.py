@@ -1584,7 +1584,7 @@ class TestSqliteRecorder(unittest.TestCase):
                            }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars,
-                                           None, None, None),), self.eps)
+                                           None, None, None, None),), self.eps)
 
 if __name__ == "__main__":
     unittest.main()
