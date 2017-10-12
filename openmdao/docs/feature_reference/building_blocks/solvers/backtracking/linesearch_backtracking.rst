@@ -89,6 +89,7 @@ Here are a few examples of this option:
 .. embed-test::
     openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_boundscheck_wall
 
+
 Control Options
 ---------------
 

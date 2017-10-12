@@ -7,18 +7,21 @@ import sphinx
 from sphinx.util.compat import Directive
 from sphinx.util.nodes import nested_parse_with_titles
 
+
 class EmbedOptionsDirective(Directive):
     """
     EmbedOptionsDirective is a custom directive to allow an OptionsDictionary
     to be shown in a nice table form.  An example usage would look like this:
 
     .. embed-options::
-        openmdao.solvers.linear.petsc_ksp , PetscKSP , options
+        openmdao.solvers.linear.petsc_ksp
+        PetscKSP
+        options
 
-    The 3 arguments are the module, the class path, and name of the options dictionary.
+    The 3 arguments are the module path, the class name, and name of the options dictionary.
 
-    What the above will do is replace the directive and its args with the block of code
-    for the class or method desired.
+    What the above will do is replace the directive and its args with a list of options
+    for the desired class.
 
     """
 
@@ -33,8 +36,6 @@ class EmbedOptionsDirective(Directive):
             class_name = self.arguments[1]
         if self.arguments and self.arguments[2]:
             attribute_name = self.arguments[2]
-        embed_num_indent = 3
-        doc_nodes = []
 
         exec('from {} import {}'.format(module_path, class_name), globals())
         exec('obj = {}()'.format(class_name), globals())
@@ -49,13 +50,19 @@ class EmbedOptionsDirective(Directive):
             types = option_data['type_']
             desc = option_data['desc']
 
-            if types is not None:
+            if types is None:
+                types = "N/A"
+
+            elif types is not None:
                 if not isinstance(types, (tuple, list)):
                     types = (types,)
 
                 types = [type_.__name__ for type_ in types]
 
-            if values is not None:
+            if values is None:
+                values = "N/A"
+
+            elif values is not None:
                 if not isinstance(values, (tuple, list)):
                     values = (values,)
 
@@ -65,7 +72,7 @@ class EmbedOptionsDirective(Directive):
 
         lines = ViewList()
 
-        col_heads = ['Option', 'Default', 'Acceptable values', 'Acceptable Types', 'Description']
+        col_heads = ['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description']
 
         max_sizes = {}
         for j, col in enumerate(col_heads):
