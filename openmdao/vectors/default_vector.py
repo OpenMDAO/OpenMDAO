@@ -475,22 +475,6 @@ class DefaultVector(Vector):
             for set_name, data in iteritems(self._data):
                 data += val * vec._data[set_name]
 
-    def elem_mult(self, vec):
-        """
-        Perform element-wise multiplication and store the result in this vector.
-
-        Parameters
-        ----------
-        vec : <Vector>
-            The vector to perform element-wise multiplication with.
-        """
-        if self._ncol == 1:
-            for set_name, data in iteritems(self._data):
-                data *= vec._data[set_name]
-        else:
-            for set_name, data in iteritems(self._data):
-                data *= vec._data[set_name][:, np.newaxis]
-
     def set_vec(self, vec):
         """
         Set the value of this vector to that of the incoming vector.

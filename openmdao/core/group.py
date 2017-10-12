@@ -961,8 +961,6 @@ class Group(System):
                         rev_xfer_in[isub][key] = []
                         rev_xfer_out[isub][key] = []
 
-            allprocs_abs2idx_in = self._var_allprocs_abs2idx[vec_name]['input']
-            allprocs_abs2idx_out = self._var_allprocs_abs2idx[vec_name]['output']
             allprocs_abs2idx_byset_in = self._var_allprocs_abs2idx_byset[vec_name]['input']
             allprocs_abs2idx_byset_out = self._var_allprocs_abs2idx_byset[vec_name]['output']
             sizes_byset_in = self._var_sizes_byset[vec_name]['input']

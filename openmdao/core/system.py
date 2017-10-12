@@ -415,29 +415,6 @@ class System(object):
         """
         pass
 
-    def _get_initial_procs(self, comm, initial):
-        """
-        Get initial values for pathname and comm.
-
-        Parameters
-        ----------
-        comm : MPI.Comm or <FakeComm>
-            The MPI communicator.
-        initial : bool
-            Whether we are reconfiguring - i.e., whether the model has been previously setup.
-
-        Returns
-        -------
-        str
-            Global name of the system, including the path.
-        MPI.Comm or <FakeComm>
-            The MPI communicator.
-        """
-        if not initial:
-            return self.pathname, self.comm
-        else:
-            return '', comm
-
     def _get_initial_var_indices(self, initial):
         """
         Get initial values for _var_set2iset.
@@ -2798,43 +2775,6 @@ class System(object):
         """
         pass
 
-    def initialize_processors(self):
-        """
-        Run after repartitioning/rebalancing. (Optional user-defined method).
-
-        Available attributes:
-            name
-            pathname
-            comm
-            metadata (local and global)
-        """
-        pass
-
-    def initialize_variables(self):
-        """
-        Declare inputs and outputs. (Required method for components).
-
-        Available attributes:
-            name
-            pathname
-            comm
-            metadata (local and global)
-        """
-        pass
-
-    def initialize_partials(self):
-        """
-        Declare Jacobian structure/approximations. (Optional method for components).
-
-        Available attributes:
-            name
-            pathname
-            comm
-            metadata (local and global)
-            variable names
-        """
-        pass
-
     def _list_states(self):
         """
         Return list of all states at and below this system.
@@ -2893,8 +2833,3 @@ class System(object):
         Clear out the iprint stack from the solvers.
         """
         self.nonlinear_solver._solver_info.clear()
-
-
-def _get_vec_names(voi_dict):
-    return set(voi for voi, data in iteritems(voi_dict)
-               if data['rhs_group'] is not None)
