@@ -24,11 +24,14 @@ def run_test():
     """
 
     sys.path.append('.')
-    testspec = sys.argv[1]
+    if len(sys.argv) > 1:
+        testspec = sys.argv[1]
+        parts = testspec.split(':')
 
-    parts = testspec.split(':')
-    if len(parts) != 2:
-        print('Usage: run_test my_file_path:my_test_case.test_func_name')
+    if len(sys.argv) != 2 or len(parts) != 2:
+        print('Usage: run_test my_file_path:my_test_case.test_func_name\n'
+              '            OR\n'
+              '       run_test my_file_path:test_func_name')
         sys.exit(-1)
 
     modpath, funcpath = parts
