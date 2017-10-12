@@ -108,6 +108,7 @@ class TestSellarMDAPromoteConnect(unittest.TestCase):
 
     def test_sellar_mda_promote_connect(self):
         import numpy as np
+
         from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS
         from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
 

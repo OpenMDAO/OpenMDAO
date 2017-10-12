@@ -615,6 +615,9 @@ class TestScipyOptimizer(unittest.TestCase):
 class TestScipyOptimizerFeatures(unittest.TestCase):
 
     def test_feature_basic(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -638,6 +641,9 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
 
     def test_feature_optimizer(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -660,6 +666,9 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
 
     def test_feature_maxiter(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -681,6 +690,9 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
 
     def test_feature_tol(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
         prob = Problem()
         model = prob.model = Group()
 
