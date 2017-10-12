@@ -73,9 +73,3 @@ Here are a few examples of this option:
 
 .. embed-test::
     openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_boundscheck_wall
-
-**maxiter**
-
-  The "maxiter" option is a termination criteria that specifies the maximum number of backtracking steps to allow.
-
-.. tags:: linesearch, backtracking
