@@ -105,6 +105,10 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 class TestDirectSolverFeature(unittest.TestCase):
 
     def test_specify_solver(self):
+
+        from openmdao.api import Problem, DirectSolver
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
         prob = Problem()
         model = prob.model = SellarDerivatives()
 

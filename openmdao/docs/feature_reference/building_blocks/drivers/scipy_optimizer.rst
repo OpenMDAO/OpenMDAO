@@ -10,10 +10,19 @@ optimizer to find the minimum of the Paraboloid problem.
   .. embed-test::
       openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizerFeatures.test_feature_basic
 
-Options
--------
 
-- optimizer
+ScipyOptimizer Options
+-------------------------
+
+.. embed-options::
+    openmdao.drivers.scipy_optimizer
+    ScipyOptimizer
+    options
+
+ScipyOptimizer Option Examples
+------------------------------
+
+**optimizer**
 
   The "optimize" option lets you choose which optimizer to use. The ScipyOptimizer driver supports all
   of the optimizers in scipy.optimize except for 'dogleg' and 'trust-ncg'. Generally, the optimizers that
@@ -24,7 +33,7 @@ Options
   .. embed-test::
       openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizerFeatures.test_feature_optimizer
 
-- maxiter
+**maxiter**
 
   The "maxiter" option is used to specify the maxinum number of major iterations before termination. It
   is generally a valid option across all of the available options.
@@ -32,7 +41,7 @@ Options
   .. embed-test::
       openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizerFeatures.test_feature_maxiter
 
-- tol
+**tol**
 
   The "tol" option allows you to specify the tolerance for termination.
 

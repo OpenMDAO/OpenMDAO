@@ -3,17 +3,24 @@
 # containing dir.
 import sys
 import os
+import importlib
 import textwrap
+
 from numpydoc.docscrape import NumpyDocString, Reader
 from mock import Mock
+
 from openmdao.docs.config_params import MOCK_MODULES, IGNORE_LIST
 from openmdao.docs._utils.patch import do_monkeypatch
 
-sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
+# Only mock the ones that don't import.
+for mod_name in MOCK_MODULES:
+    try:
+        importlib.import_module(mod_name)
+    except ImportError:
+        sys.modules.update({mod_name: Mock()})
 
 # start off running the monkeypatch to keep options/parameters
 # usable in docstring for autodoc.
-
 
 def __init__(self, docstring, config={}):
     """
@@ -84,6 +91,7 @@ extensions = [
     'numpydoc',
     'show_unittest_examples',
     'embed_code',
+    'embed_options',
     'embed_test',
     'embed_compare',
     'tags'

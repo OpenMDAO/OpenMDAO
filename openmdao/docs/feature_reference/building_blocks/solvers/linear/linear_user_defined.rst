@@ -39,5 +39,13 @@ method to a LinearUserDefined solver.
 .. embed-test::
     openmdao.solvers.linear.tests.test_user_defined.TestUserDefinedSolver.test_feature
 
+LinearUserDefined Options
+-------------------------
+
+.. embed-options::
+    openmdao.solvers.linear.user_defined
+    LinearUserDefined
+    options
+
 .. tags:: Solver, LinearSolver
 

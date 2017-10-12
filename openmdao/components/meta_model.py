@@ -88,7 +88,7 @@ class MetaModel(ExplicitComponent):
         self._input_size += input_size
 
         train_name = 'train:%s' % name
-        self.metadata.declare(train_name, desc='Training data for %s' % name)
+        self.metadata.declare(train_name, default=None, desc='Training data for %s' % name)
         if training_data is not None:
             self.metadata[train_name] = training_data
 
@@ -135,7 +135,7 @@ class MetaModel(ExplicitComponent):
             metadata['default_surrogate'] = True
 
         train_name = 'train:%s' % name
-        self.metadata.declare(train_name, desc='Training data for %s' % name)
+        self.metadata.declare(train_name, default=None, desc='Training data for %s' % name)
         if training_data is not None:
             self.metadata[train_name] = training_data
 

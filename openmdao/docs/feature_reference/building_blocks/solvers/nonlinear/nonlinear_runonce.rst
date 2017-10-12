@@ -20,4 +20,12 @@ Here is an example of using an NonLinearRunOnce solver for a simple model with t
 .. embed-test::
     openmdao.solvers.nonlinear.tests.test_nonlinear_runonce.TestNonLinearRunOnceSolver.test_feature_solver
 
+NonLinearRunOnce Options
+------------------------
+
+.. embed-options::
+    openmdao.solvers.nonlinear.nonlinear_runonce
+    NonLinearRunOnce
+    options
+
 .. tags:: Solver, NonlinearSolver

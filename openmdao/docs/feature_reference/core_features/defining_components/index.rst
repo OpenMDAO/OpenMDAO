@@ -14,3 +14,4 @@ Building Components
     distributed_comps.rst
     units.rst
     scaling.rst
+    metadata.rst

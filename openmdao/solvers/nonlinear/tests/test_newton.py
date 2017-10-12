@@ -41,6 +41,9 @@ class TestNewton(unittest.TestCase):
         """ Feature test for slotting a Newton solver and using it to solve
         Sellar.
         """
+        from openmdao.api import Problem, NewtonSolver
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
         prob = Problem()
         prob.model = SellarDerivatives(nonlinear_solver=NewtonSolver())
 
@@ -782,6 +785,10 @@ class TestNewton(unittest.TestCase):
 class TestNewtonFeatures(unittest.TestCase):
 
     def test_feature_basic(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -811,6 +818,10 @@ class TestNewtonFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_maxiter(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -841,6 +852,10 @@ class TestNewtonFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.0607416105, .00001)
 
     def test_feature_rtol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -871,6 +886,10 @@ class TestNewtonFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.0607416105, .00001)
 
     def test_feature_atol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -901,6 +920,12 @@ class TestNewtonFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_linear_solver(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, \
+             ExecComp, DirectSolver
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -932,6 +957,11 @@ class TestNewtonFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_max_sub_solves(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp, DirectSolver, ScipyIterativeSolver
+        from openmdao.test_suite.components.double_sellar import SubSellar
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -965,6 +995,10 @@ class TestNewtonFeatures(unittest.TestCase):
         prob.run_model()
 
     def test_feature_err_on_maxiter(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp, AnalysisError
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -994,6 +1028,37 @@ class TestNewtonFeatures(unittest.TestCase):
             prob.run_model()
         except AnalysisError:
             pass
+
+    def test_solve_subsystems_basic(self):
+        from openmdao.api import Problem, NewtonSolver, DirectSolver, ScipyIterativeSolver
+        from openmdao.test_suite.components.double_sellar import DoubleSellar
+
+        prob = Problem()
+        model = prob.model = DoubleSellar()
+
+        g1 = model.get_subsystem('g1')
+        g1.nonlinear_solver = NewtonSolver()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = DirectSolver()
+
+        g2 = model.get_subsystem('g2')
+        g2.nonlinear_solver = NewtonSolver()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = DirectSolver()
+
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyIterativeSolver()
+
+        model.nonlinear_solver.options['solve_subsystems'] = True
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
+        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+
 
 if __name__ == "__main__":
     unittest.main()

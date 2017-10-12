@@ -45,6 +45,8 @@ class TestLinearRunOnceSolver(unittest.TestCase):
         assert_rel_error(self, J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
 
     def test_feature_solver(self):
+        from openmdao.api import Problem, Group, IndepVarComp, LinearRunOnce
+        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
         model = prob.model = Group()

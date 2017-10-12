@@ -20,10 +20,18 @@ the Newton solver sets all inputs in all systems and subsystems that it contains
 the gradient driving the residuals to convergence.  After each iteration, the iteration count and the residual norm are
 checked to see if termination has been satisfied.
 
-Options
--------
+NewtonSolver Options
+--------------------
 
-- maxiter
+.. embed-options::
+    openmdao.solvers.nonlinear.newton
+    NewtonSolver
+    options
+
+NewtonSolver Option Examples
+----------------------------
+
+**maxiter**
 
   This lets you specify the maximum number of Newton iterations to apply. In this example, we
   cut it back from the default (10) to 2 so that it terminates a few iterations earlier and doesn't
@@ -32,7 +40,7 @@ Options
   .. embed-test::
       openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_maxiter
 
-- atol
+**atol**
 
   Here, we set the absolute tolerance to a looser value that will trigger an earlier termination. After
   each iteration, the norm of the residuals is calculated by calling `apply_nonlinear` on implicit
@@ -42,7 +50,7 @@ Options
   .. embed-test::
       openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_atol
 
-- rtol
+**rtol**
 
   Here, we set the relative tolerance to a looser value that will trigger an earlier termination. After
   each iteration, the norm of the residuals is calculated by calling `apply_nonlinear` on implicit
@@ -52,7 +60,7 @@ Options
   .. embed-test::
       openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_rtol
 
-- solve_subsystems
+**solve_subsystems**
 
   If you set this option to True, the NewtonSolver will call `solve_nonlinear` on all of its subsystems. You can
   use this to solve difficult multi-level problems by attaching solvers to subsystems. This assures that those
@@ -63,9 +71,9 @@ Options
   its subsystems.
 
   .. embed-test::
-      openmdao.solvers.nonlinear.tests.test_newton.TestNewton.test_solve_subsystems_basic
+      openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_solve_subsystems_basic
 
-- max_sub_solves
+**max_sub_solves**
 
   This option is used in conjuction with the "solve_subsystems" option. It controls the number of iterations for which
   the NewtonSolver will allow subsystems to solve themselves. When the iteration count exceeds `max_sub_solves`,  Newton
@@ -77,7 +85,7 @@ Options
   .. embed-test::
       openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_max_sub_solves
 
-- err_on_maxiter
+**err_on_maxiter**
 
   If you set this to True, then when the solver hits the iteration limit without meeting the tolerance criteria, it
   will raise an AnalysisError exception. This is mainly important when coupled with a higher level solver or
