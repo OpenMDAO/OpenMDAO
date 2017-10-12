@@ -45,10 +45,7 @@ def __init__(self, docstring, config={}):
     self._parsed_data["Attributes"][:] = [att for att in self._parsed_data["Attributes"]
                                           if not att[0].startswith('_')]
 
-#NumpyDocString.__init__ = __init__
 
-# monkeypatch to make our docstrings allow "Options"
-# __init__ is set in conf.py, but is replaced below.
 def _parse(self):
     """
     parse
