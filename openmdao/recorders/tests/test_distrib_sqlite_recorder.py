@@ -7,20 +7,20 @@ from tempfile import mkdtemp
 
 import numpy as np
 
+from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
-from openmdao.devtools.testutil import assert_rel_error
 
 if MPI:
     from openmdao.api import PETScVector
     vector_class = PETScVector
-    try:
-        from openmdao.api import pyOptSparseDriver
-    except ImportError:
-        pyOptSparseDriver = None
 else:
     PETScVector = None
-    pyOptSparseDriver = None
 
+# check that pyoptsparse is installed. if it is, try to use SLSQP.
+OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
+
+if OPTIMIZER:
+    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 from openmdao.api import ExecComp, ExplicitComponent, Problem, \
     Group, ParallelGroup, IndepVarComp, SqliteRecorder
@@ -194,6 +194,8 @@ class DistributedRecorderTest(unittest.TestCase):
             self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
                                                      expected_objectives, None, None),), self.eps)
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_recording_remote_voi(self):
 
         prob = Problem()

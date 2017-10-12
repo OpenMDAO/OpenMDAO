@@ -42,7 +42,6 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-    optimizers = {'pyoptsparse': pyOptSparseDriver}
 
 def run_driver(problem):
     t0 = time.time()
