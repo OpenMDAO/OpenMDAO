@@ -1179,12 +1179,6 @@ class System(object):
             ref = meta['ref']
             ref0 = meta['ref0']
             res_ref = meta['res_ref']
-            if not np.isscalar(ref):
-                ref = ref.flatten()
-            if not np.isscalar(ref0):
-                ref0 = ref0.flatten()
-            if not np.isscalar(res_ref):
-                res_ref = res_ref.flatten()
 
             a0 = ref0
             a1 = ref - ref0
@@ -1238,11 +1232,6 @@ class System(object):
 
                         ref = ref[src_indices]
                         ref0 = ref0[src_indices]
-                else:
-                    if not np.isscalar(ref):
-                        ref = ref.flatten()  # ref.reshape(shape_out)
-                    if not np.isscalar(ref0):
-                        ref0 = ref0.flatten()  # ref0.reshape(shape_out)
 
                 # Compute scaling arrays for inputs using a0 and a1
                 # Example:
@@ -2098,34 +2087,54 @@ class System(object):
             msg = "If specified, indices must be a sequence of integers."
             raise ValueError(msg)
 
-        # Convert lower to ndarray/float as necessary
-        lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.max,
-                                         flatten=True)
-
-        # Convert upper to ndarray/float as necessary
-        upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max,
-                                         flatten=True)
-
-        # Convert equals to ndarray/float as necessary
-        if equals is not None:
-            equals = format_as_float_or_array('equals', equals, flatten=True)
-
-        # Scale the bounds
-        if lower is not None:
-            lower = (lower + adder) * scaler
-
-        if upper is not None:
-            upper = (upper + adder) * scaler
-
-        if equals is not None:
-            equals = (equals + adder) * scaler
-
         if self._static_mode:
             responses = self._static_responses
         else:
             responses = self._responses
 
         responses[name] = resp = OrderedDict()
+
+        resp['name'] = name
+        resp['ref'] = ref
+        resp['ref0'] = ref0
+        resp['type'] = type_
+
+        if type_ == 'con':
+            # Convert lower to ndarray/float as necessary
+            lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.max,
+                                             flatten=True)
+
+            # Convert upper to ndarray/float as necessary
+            upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max,
+                                             flatten=True)
+
+            # Convert equals to ndarray/float as necessary
+            if equals is not None:
+                equals = format_as_float_or_array('equals', equals, flatten=True)
+
+            # Scale the bounds
+            if lower is not None:
+                lower = (lower + adder) * scaler
+
+            if upper is not None:
+                upper = (upper + adder) * scaler
+
+            if equals is not None:
+                equals = (equals + adder) * scaler
+
+            resp['lower'] = lower
+            resp['upper'] = upper
+            resp['equals'] = equals
+            resp['linear'] = linear
+            if indices is not None:
+                resp['size'] = len(indices)
+                indices = np.atleast_1d(indices)
+            resp['indices'] = indices
+        else:  # 'obj'
+            if index is not None:
+                resp['size'] = 1
+                index = np.array([index], dtype=int)
+            resp['indices'] = index
 
         if isinstance(scaler, np.ndarray):
             if np.all(scaler == 1.0):
@@ -2141,25 +2150,6 @@ class System(object):
             adder = None
         resp['adder'] = adder
 
-        resp['name'] = name
-        resp['ref'] = ref
-        resp['ref0'] = ref0
-        resp['type'] = type_
-
-        if type_ == 'con':
-            resp['lower'] = lower
-            resp['upper'] = upper
-            resp['equals'] = equals
-            resp['linear'] = linear
-            if indices is not None:
-                resp['size'] = len(indices)
-                indices = np.atleast_1d(indices)
-            resp['indices'] = indices
-        else:  # 'obj'
-            if index is not None:
-                resp['size'] = 1
-                index = np.array([index], dtype=int)
-            resp['indices'] = index
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['vectorize_derivs'] = vectorize_derivs
         if vectorize_derivs and parallel_deriv_color is None:
