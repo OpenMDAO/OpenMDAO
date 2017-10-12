@@ -94,6 +94,10 @@ class Vector(object):
     _relevant : dict
         Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
         and dependent systems.
+    _do_scaling : bool
+        True if this vector performs scaling.
+    _scaling : dict
+        Contains scale factors to convert data arrays.
     """
 
     _vector_info = VectorInfo()
@@ -151,6 +155,11 @@ class Vector(object):
             self._imag_views = {}
             self._complex_view_cache = {}
             self._imag_views_flat = {}
+
+        self._do_scaling = ((self._typ == 'input' and system._has_input_scaling) or
+                            (self._typ == 'output' and system._has_output_scaling))
+
+        self._scaling = {}
 
         if root_vector is None:
             self._root_vector = self
@@ -483,6 +492,19 @@ class Vector(object):
             this vector times val is added to self.
         """
         pass
+
+    def scale(self, scale_to):
+        scaling = self._scaling[scale_to]
+        if self._ncol == 1:
+            for set_name, data in iteritems(self._data):
+                data *= scaling[set_name][1]
+                if scaling[set_name][0] is not None:  # nonlinear only
+                    data += scaling[set_name][0]
+        else:
+            for set_name, data in iteritems(self._data):
+                data *= scaling[set_name][1][:, np.newaxis]
+                if scaling[set_name][0] is not None:  # nonlinear only
+                    data += scaling[set_name][0]
 
     def set_vec(self, vec):
         """

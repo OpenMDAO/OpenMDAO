@@ -29,7 +29,7 @@ class SellarDis1(ExplicitComponent):
         super(SellarDis1, self).__init__()
         self.execution_count = 0
         self._units = units
-        self._scaling = scaling
+        self._do_scaling = scaling
 
     def setup(self):
 
@@ -38,7 +38,7 @@ class SellarDis1(ExplicitComponent):
         else:
             units = None
 
-        if self._scaling:
+        if self._do_scaling:
             ref = .1
         else:
             ref = 1.
@@ -104,7 +104,7 @@ class SellarDis2(ExplicitComponent):
         super(SellarDis2, self).__init__()
         self.execution_count = 0
         self._units = units
-        self._scaling = scaling
+        self._do_scaling = scaling
 
     def setup(self):
         if self._units:
@@ -112,7 +112,7 @@ class SellarDis2(ExplicitComponent):
         else:
             units = None
 
-        if self._scaling:
+        if self._do_scaling:
             ref = .18
         else:
             ref = 1.
@@ -459,7 +459,7 @@ class SellarImplicitDis1(ImplicitComponent):
         super(SellarImplicitDis1, self).__init__()
         self.execution_count = 0
         self._units = units
-        self._scaling = scaling
+        self._do_scaling = scaling
 
     def setup(self):
         if self._units:
@@ -467,7 +467,7 @@ class SellarImplicitDis1(ImplicitComponent):
         else:
             units = None
 
-        if self._scaling is None:
+        if self._do_scaling is None:
             ref = 1.
         else:
             ref = .1
@@ -521,7 +521,7 @@ class SellarImplicitDis2(ImplicitComponent):
         super(SellarImplicitDis2, self).__init__()
         self.execution_count = 0
         self._units = units
-        self._scaling = scaling
+        self._do_scaling = scaling
 
     def setup(self):
         if self._units:
@@ -529,7 +529,7 @@ class SellarImplicitDis2(ImplicitComponent):
         else:
             units = None
 
-        if self._scaling is None:
+        if self._do_scaling is None:
             ref = 1.0
         else:
             ref = .18

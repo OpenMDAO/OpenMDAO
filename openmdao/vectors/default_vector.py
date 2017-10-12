@@ -96,6 +96,9 @@ class DefaultVector(Vector):
         """
         Allocate list of arrays, one for each var_set.
 
+        This happens only in the top level system.  Child systems use views of the arrays
+        we allocate here.
+
         Returns
         -------
         [ndarray[:], ...]
@@ -234,7 +237,13 @@ class DefaultVector(Vector):
         data = {}
         imag_data = {}
         indices = {}
+        scaling = {}
+        if self._do_scaling:
+            scaling['phys'] = {}
+            scaling['norm'] = {}
+
         nsets = len(sizes_byset)  # if we only have 1 varset, we can do some speedups
+
         for set_name, sizes in iteritems(sizes_byset):
             ind_byset1 = system._ext_sizes_byset[self._name][type_][set_name][0]
             ind_byset2 = ind_byset1 + np.sum(sizes[iproc, :])
@@ -253,7 +262,17 @@ class DefaultVector(Vector):
                     shape = root_vec._data[set_name][ind_byset1:ind_byset2].shape
                     imag_data[set_name] = np.zeros(shape)
 
-        return data, imag_data, indices
+            if self._do_scaling:
+                for typ in ('phys', 'norm'):
+                    root_scale = root_vec._scaling[typ][set_name]
+                    rs0 = root_scale[0]
+                    if rs0 is None:
+                        scaling[typ][set_name] = (rs0, root_scale[1][ind_byset1:ind_byset2])
+                    else:
+                        scaling[typ][set_name] = (rs0[ind_byset1:ind_byset2],
+                                                  root_scale[1][ind_byset1:ind_byset2])
+
+        return data, imag_data, scaling, indices
 
     def _initialize_data(self, root_vector):
         """
@@ -271,12 +290,26 @@ class DefaultVector(Vector):
         if root_vector is None:  # we're the root
             self._data, self._indices = self._create_data()
 
+            # TODO: have residual vecs use same array as output vecs
+            if self._do_scaling:
+                self._scaling = {'phys': {}, 'norm': {}}
+                for set_name, data in iteritems(self._data):
+                    dphys1 = np.ones(data.size)
+                    dnorm1 = np.ones(data.size)
+                    if self._name == 'nonlinear':
+                        dphys0 = np.zeros(data.size)
+                        dnorm0 = np.zeros(data.size)
+                    else:
+                        dphys0 = dnorm0 = None
+                    self._scaling['phys'][set_name] = (dphys0, dphys1)
+                    self._scaling['norm'][set_name] = (dnorm0, dnorm1)
+
             # Allocate imaginary for complex step
             if self._alloc_complex:
                 self._imag_data = deepcopy(self._data)
 
         else:
-            self._data, self._imag_data, self._indices = self._extract_data()
+            self._data, self._imag_data, self._scaling, self._indices = self._extract_data()
 
     def _initialize_views(self):
         """
@@ -291,9 +324,10 @@ class DefaultVector(Vector):
         kind = self._kind
         iproc = self._iproc
         ncol = self._ncol
-
-        do_scaling = ((type_ == 'input' and system._has_input_scaling) or
-                      (type_ == 'output' and system._has_output_scaling))
+        do_scaling = self._do_scaling
+        if do_scaling:
+            factors = system._scale_factors
+            scaling = self._scaling
 
         self._views = self._names = views = {}
         self._views_flat = views_flat = {}
@@ -330,8 +364,13 @@ class DefaultVector(Vector):
                     v.shape = shape
                 imag_views[abs_name] = v
 
-            # if do_scaling:
-            #     factors = system._scale_factors[abs_name][kind]
+            if do_scaling:
+                for scaleto in ('phys', 'norm'):
+                    scale0, scale1 = factors[abs_name][kind, scaleto]
+                    vec = scaling[scaleto][set_name]
+                    if vec[0] is not None:
+                        vec[0][ind_byset1:ind_byset2] = scale0
+                    vec[1][ind_byset1:ind_byset2] = scale1
 
     def _clone_data(self):
         """
