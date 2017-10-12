@@ -1314,6 +1314,10 @@ class TestPyoptSparseFeature(unittest.TestCase):
             raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
 
     def test_basic(self):
+        import numpy as np
+
+        from openmdao.api import Problem, pyOptSparseDriver
+        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = Problem()
         model = prob.model = SellarDerivativesGrouped()
@@ -1335,6 +1339,10 @@ class TestPyoptSparseFeature(unittest.TestCase):
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
 
     def test_settings_print(self):
+        import numpy as np
+
+        from openmdao.api import Problem, pyOptSparseDriver
+        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = Problem()
         model = prob.model = SellarDerivativesGrouped()
@@ -1358,6 +1366,10 @@ class TestPyoptSparseFeature(unittest.TestCase):
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
 
     def test_slsqp_atol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, pyOptSparseDriver
+        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = Problem()
         model = prob.model = SellarDerivativesGrouped()
@@ -1381,6 +1393,10 @@ class TestPyoptSparseFeature(unittest.TestCase):
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
 
     def test_slsqp_maxit(self):
+        import numpy as np
+
+        from openmdao.api import Problem, pyOptSparseDriver
+        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = Problem()
         model = prob.model = SellarDerivativesGrouped()
@@ -1405,6 +1421,10 @@ class TestPyoptSparseFeature(unittest.TestCase):
 
     @unittest.skipIf(OPTIMIZER in [None, "SLSQP"], "pyoptsparse is not providing SNOPT" )
     def test_snopt_atol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, pyOptSparseDriver
+        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = Problem()
         model = prob.model = SellarDerivativesGrouped()
@@ -1429,6 +1449,10 @@ class TestPyoptSparseFeature(unittest.TestCase):
 
     @unittest.skipIf(OPTIMIZER in [None, "SLSQP"], "pyoptsparse is not providing SNOPT" )
     def test_snopt_maxit(self):
+        import numpy as np
+
+        from openmdao.api import Problem, pyOptSparseDriver
+        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = Problem()
         model = prob.model = SellarDerivativesGrouped()

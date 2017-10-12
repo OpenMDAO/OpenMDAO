@@ -3,58 +3,65 @@
 # containing dir.
 import sys
 import os
+import importlib
 import textwrap
+
 from numpydoc.docscrape import NumpyDocString, Reader
 from mock import Mock
+
 from openmdao.docs.config_params import MOCK_MODULES, IGNORE_LIST
 from openmdao.docs._utils.patch import do_monkeypatch
 
-sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
+# Only mock the ones that don't import.
+for mod_name in MOCK_MODULES:
+    try:
+        importlib.import_module(mod_name)
+    except ImportError:
+        sys.modules.update({mod_name: Mock()})
 
-# # start off running the monkeypatch to keep options/parameters
-# # usable in docstring for autodoc.
-#
-#
-# def __init__(self, docstring, config={}):
-#     """
-#     init
-#     """
-#     docstring = textwrap.dedent(docstring).split('\n')
-#
-#     self._doc = Reader(docstring)
-#     self._parsed_data = {
-#         'Signature': '',
-#         'Summary': [''],
-#         'Extended Summary': [],
-#         'Parameters': [],
-#         'Options': [],
-#         'Returns': [],
-#         'Yields': [],
-#         'Raises': [],
-#         'Warns': [],
-#         'Other Parameters': [],
-#         'Attributes': [],
-#         'Methods': [],
-#         'See Also': [],
-#         'Notes': [],
-#         'Warnings': [],
-#         'References': '',
-#         'Examples': '',
-#         'index': {}
-#     }
-#
-#     try:
-#         self._parse()
-#     except ParseError as e:
-#         e.docstring = orig_docstring
-#         raise
-#
-#     # In creation of docs, remove private Attributes (beginning with '_')
-#     # with a crazy list comprehension
-#     self._parsed_data["Attributes"][:] = [att for att in self._parsed_data["Attributes"]
-#                                           if not att[0].startswith('_')]
-#
-# NumpyDocString.__init__ = __init__
+# start off running the monkeypatch to keep options/parameters
+# usable in docstring for autodoc.
+
+def __init__(self, docstring, config={}):
+    """
+    init
+    """
+    docstring = textwrap.dedent(docstring).split('\n')
+
+    self._doc = Reader(docstring)
+    self._parsed_data = {
+        'Signature': '',
+        'Summary': [''],
+        'Extended Summary': [],
+        'Parameters': [],
+        'Options': [],
+        'Returns': [],
+        'Yields': [],
+        'Raises': [],
+        'Warns': [],
+        'Other Parameters': [],
+        'Attributes': [],
+        'Methods': [],
+        'See Also': [],
+        'Notes': [],
+        'Warnings': [],
+        'References': '',
+        'Examples': '',
+        'index': {}
+    }
+
+    try:
+        self._parse()
+    except ParseError as e:
+        e.docstring = orig_docstring
+        raise
+
+    # In creation of docs, remove private Attributes (beginning with '_')
+    # with a crazy list comprehension
+    self._parsed_data["Attributes"][:] = [att for att in self._parsed_data["Attributes"]
+                                          if not att[0].startswith('_')]
+
+NumpyDocString.__init__ = __init__
 
 do_monkeypatch()
 

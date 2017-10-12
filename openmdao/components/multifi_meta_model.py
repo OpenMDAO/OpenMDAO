@@ -124,7 +124,8 @@ class MultiFiMetaModel(MetaModel):
         for fi in range(self._nfi):
             if fi > 0:
                 name_with_fi = 'train:' + _get_name_fi(name, fi)
-                self.metadata.declare(name_with_fi, desc='Training data for %s' % name_with_fi)
+                self.metadata.declare(
+                    name_with_fi, default=None, desc='Training data for %s' % name_with_fi)
                 self._input_sizes[fi] += input_size
 
     def add_output(self, name, val=1.0, **kwargs):
@@ -178,7 +179,8 @@ class MultiFiMetaModel(MetaModel):
         for fi in range(self._nfi):
             if fi > 0:
                 name_with_fi = 'train:' + _get_name_fi(name, fi)
-                self.metadata.declare(name_with_fi, desc='Training data for %s' % name_with_fi)
+                self.metadata.declare(
+                    name_with_fi, default=None, desc='Training data for %s' % name_with_fi)
 
     def _train(self):
         """

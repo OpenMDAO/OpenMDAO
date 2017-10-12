@@ -439,6 +439,8 @@ class TestBalanceComp(unittest.TestCase):
             assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_feature_scalar(self):
+        from numpy.testing import assert_almost_equal
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NewtonSolver, DirectSolver, DenseJacobian, BalanceComp
 
         n = 1
 
@@ -486,6 +488,11 @@ class TestBalanceComp(unittest.TestCase):
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
     def test_feature_vector(self):
+        import numpy as np
+        from numpy.testing import assert_almost_equal
+
+        from openmdao.api import Problem, Group, ExecComp, NewtonSolver, DirectSolver, DenseJacobian, BalanceComp
+
         n = 100
 
         prob = Problem(model=Group())

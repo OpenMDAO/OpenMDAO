@@ -31,4 +31,4 @@ processes.
 
 
 .. embed-test::
-  openmdao.core.tests.test_distribcomp.MPITests.test_distribcomp_feature
+  openmdao.core.tests.test_distribcomp.MPIFeatureTests.test_distribcomp_feature

@@ -71,7 +71,7 @@ NewtonSolver Option Examples
   its subsystems.
 
   .. embed-test::
-      openmdao.solvers.nonlinear.tests.test_newton.TestNewton.test_solve_subsystems_basic
+      openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_solve_subsystems_basic
 
 **max_sub_solves**
 
