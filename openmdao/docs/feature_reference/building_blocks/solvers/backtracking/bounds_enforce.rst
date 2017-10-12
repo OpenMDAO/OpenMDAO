@@ -5,7 +5,7 @@ Bounds Enforce
 
 Description of BoundsEnforce.
 
-Bounds Enforce Options
+BoundsEnforce Options
 ----------------------
 
 .. embed-options::

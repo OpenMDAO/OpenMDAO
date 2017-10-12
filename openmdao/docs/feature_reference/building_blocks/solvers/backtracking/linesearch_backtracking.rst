@@ -89,31 +89,30 @@ Here are a few examples of this option:
 .. embed-test::
     openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_boundscheck_wall
 
-
 Control Options
 ---------------
 
-- maxiter
+**maxiter**
 
   The "maxiter" option is a termination criteria that specifies the maximum number of backtracking steps to allow.
 
-- alpha
+**alpha**
 
   The "alpha" option is used to specify the initial length of the Newton step. Since NewtonSolver assumes a
   stepsize of 1.0, this value usually shouldn't be changed.
 
-- rho
+**rho**
 
   The "rho" option controls how far to backtrack in each successive backtracking step. It is applied as a multiplier to
   the step, so a higher value (approaching 1.0) is a very small step, while a low value takes you close to the initial
   point. The default value is 0.5.
 
-- c
+**c**
 
   In the `ArmijoGoldsteinLS`, the "c" option is a multiplier on the slope check. Setting it to a smaller value means a more
   gentle slope will satisfy the condition and terminate.
 
-- print_bound_enforce
+**print_bound_enforce**
 
   When the "print_bound_enforce" option is set to True, the line-search will print the name and values of any variables
   that exceeded their lower or upper bounds and were drawn back during bounds enforcement.

@@ -74,7 +74,7 @@ sys.path.insert(0, os.path.abspath('./_exts'))
 
 # -- General configuration ------------------------------------------------
 
-# If your documentation needs apwd minimal Sphinx version, state it here.
+# If your documentation needs a minimal Sphinx version, state it here.
 needs_sphinx = '1.5'
 
 # Add any Sphinx extension module names here, as strings. They can be
