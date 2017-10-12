@@ -299,8 +299,6 @@ class System(object):
         self._lower_bounds = None
         self._upper_bounds = None
 
-        self._scaling_vecs = None
-
         self._nonlinear_solver = None
         self._linear_solver = None
 
@@ -618,52 +616,6 @@ class System(object):
             upper = vector_class('nonlinear', 'output', self)
 
         return lower, upper
-
-    # def _get_scaling_root_vectors(self, vector_class, initial):
-    #     """
-    #     Get the root vectors for the scaling vectors.
-    #
-    #     Parameters
-    #     ----------
-    #     vector_class : Vector
-    #         The Vector class used to instantiate the root vectors.
-    #     initial : bool
-    #         Whether we are reconfiguring - i.e., whether the model has been previously setup.
-    #
-    #     Returns
-    #     -------
-    #     dict of dict of Vector
-    #         Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
-    #     """
-    #     root_vectors = OrderedDict([
-    #         (('input', 'phys'), OrderedDict()),
-    #         (('input', 'norm'), OrderedDict()),
-    #         (('output', 'phys'), OrderedDict()),
-    #         (('output', 'norm'), OrderedDict()),
-    #         (('residual', 'phys'), OrderedDict()),
-    #         (('residual', 'norm'), OrderedDict()),
-    #     ])
-    #
-    #     for key in root_vectors:
-    #         vec_key, _ = key
-    #
-    #         for vec_name in self._lin_rel_vec_name_list:
-    #             if initial:
-    #                 root_vectors[key][vec_name] = vecs = (
-    #                     vector_class(vec_name, vec_key, self),
-    #                     vector_class(vec_name, vec_key, self)
-    #                 )
-    #                 vecs[1].set_const(1.0)
-    #             else:
-    #                 root_vectors[key][vec_name] = (
-    #                     self._scaling_vecs[key][vec_name][0]._root_vector,
-    #                     self._scaling_vecs[key][vec_name][1]._root_vector
-    #                 )
-    #
-    #         if initial:
-    #             root_vectors[key]['nonlinear'] = root_vectors[key]['linear']
-    #
-    #     return root_vectors
 
     def resetup(self, setup_mode='full'):
         """
