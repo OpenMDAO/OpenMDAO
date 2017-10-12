@@ -19,7 +19,6 @@ for mod_name in MOCK_MODULES:
     except ImportError:
         sys.modules.update({mod_name: Mock()})
 
-
 # start off running the monkeypatch to keep options/parameters
 # usable in docstring for autodoc.
 
@@ -92,6 +91,7 @@ extensions = [
     'numpydoc',
     'show_unittest_examples',
     'embed_code',
+    'embed_options',
     'embed_test',
     'embed_compare',
     'tags'
