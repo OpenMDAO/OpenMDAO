@@ -2057,7 +2057,7 @@ class System(object):
 
         if name in self._responses or name in self._static_responses:
             typemap = {'con': 'Constraint', 'obj': 'Objective'}
-            msg = '{0} \'{1}\' already exists.'.format(typemap[type], name)
+            msg = '{0} \'{1}\' already exists.'.format(typemap[type_], name)
             raise RuntimeError(msg.format(name))
 
         # Convert ref/ref0 to ndarray/float as necessary
@@ -2092,12 +2092,7 @@ class System(object):
         else:
             responses = self._responses
 
-        responses[name] = resp = OrderedDict()
-
-        resp['name'] = name
-        resp['ref'] = ref
-        resp['ref0'] = ref0
-        resp['type'] = type_
+        resp = OrderedDict()
 
         if type_ == 'con':
             # Convert lower to ndarray/float as necessary
@@ -2150,10 +2145,17 @@ class System(object):
             adder = None
         resp['adder'] = adder
 
+        resp['name'] = name
+        resp['ref'] = ref
+        resp['ref0'] = ref0
+        resp['type'] = type_
+
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['vectorize_derivs'] = vectorize_derivs
         if vectorize_derivs and parallel_deriv_color is None:
             resp['parallel_deriv_color'] = '@matmat'
+
+        responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
