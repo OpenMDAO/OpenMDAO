@@ -195,13 +195,6 @@ class DistributedRecorderTest(unittest.TestCase):
                                                      expected_objectives, None, None),), self.eps)
 
     def test_recording_remote_voi(self):
-        import pydevd
-
-        # from openmdao.utils.mpi import MPI
-        # if MPI.COMM_WORLD.rank:
-        #     pydevd.settrace('localhost', port=9877, stdoutToServer=True, stderrToServer=True)
-        # else:
-        #     pydevd.settrace('localhost', port=9876, stdoutToServer=True, stderrToServer=True)
 
         prob = Problem()
 
