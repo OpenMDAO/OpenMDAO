@@ -1228,11 +1228,11 @@ class System(object):
             ref0 = meta['ref0']
             res_ref = meta['res_ref']
             if not np.isscalar(ref):
-                ref = ref.flatten()  # ref.reshape(shape)
+                ref = ref.flatten()
             if not np.isscalar(ref0):
-                ref0 = ref0.flatten()  # ref0.reshape(shape)
+                ref0 = ref0.flatten()
             if not np.isscalar(res_ref):
-                res_ref = res_ref.flatten()  # res_ref.reshape(shape)
+                res_ref = res_ref.flatten()
 
             a0 = ref0
             a1 = ref - ref0
@@ -1244,8 +1244,12 @@ class System(object):
             }
 
         if self._has_input_scaling:
-            for abs_in, abs_out in iteritems(self._conn_abs_in2out):
+            for abs_in, abs_out in iteritems(self._conn_global_abs_in2out):
                 meta_out = allprocs_meta_out[abs_out]
+                if abs_in not in abs2meta_in:
+                    # we only perform scaling on local arrays, so skip
+                    continue
+
                 meta_in = abs2meta_in[abs_in]
 
                 shape_out = meta_out['shape']
@@ -1311,154 +1315,6 @@ class System(object):
                 }
 
         return scale_factors
-
-    # def _setup_scaling(self, root_vectors, resize=False):
-    #     """
-    #     Compute all scaling vectors for all vec names.
-    #
-    #     Parameters
-    #     ----------
-    #     root_vectors : dict of dict of Vector
-    #         Root vectors: first key is scaling direction; second key is vec_name.
-    #     resize : bool
-    #         Whether to resize the root vectors - i.e, because this system is initiating a reconf.
-    #     """
-    #     return
-    #     self._scaling_vecs = vecs = OrderedDict([
-    #         (('input', 'phys'), OrderedDict()),
-    #         (('input', 'norm'), OrderedDict()),
-    #         (('output', 'phys'), OrderedDict()),
-    #         (('output', 'norm'), OrderedDict()),
-    #         (('residual', 'phys'), OrderedDict()),
-    #         (('residual', 'norm'), OrderedDict()),
-    #     ])
-    #
-    #     allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
-    #     abs2meta_in = self._var_abs2meta['input']
-    #     abs2meta_out = self._var_abs2meta['output']
-    #
-    #     for vec_name in self._lin_rel_vec_name_list:
-    #         vector_class = root_vectors['residual', 'phys'][vec_name][0].__class__
-    #         relvars, _ = self._relevant[vec_name]['@all']
-    #         rel_ins = relvars['input']
-    #         rel_outs = relvars['output']
-    #
-    #         for key in vecs:
-    #             kind, _ = key
-    #             root = root_vectors[key][vec_name]
-    #             vecs[key][vec_name] = (
-    #                 vector_class(vec_name, kind, self, root[0], resize=resize),
-    #                 vector_class(vec_name, kind, self, root[1], resize=resize)
-    #             )
-    #
-    #             # This is necessary because scaling will not be set for inputs
-    #             # whose source is outside of this system. The units and scaling
-    #             # for those sources are not available, so those components of the
-    #             # scaling vectors will just be 0. That will zero out input values
-    #             # during transfers, so the multiplier must be 1 by default.
-    #             if resize:
-    #                 vecs[key][vec_name][1].set_const(1.)
-    #
-    #         for abs_name in self._var_relevant_names[vec_name]['output']:
-    #             meta = abs2meta_out[abs_name]
-    #             shape = meta['shape']
-    #             ref = meta['ref']
-    #             ref0 = meta['ref0']
-    #             res_ref = meta['res_ref']
-    #             if not np.isscalar(ref):
-    #                 ref = ref.reshape(shape)
-    #             if not np.isscalar(ref0):
-    #                 ref0 = ref0.reshape(shape)
-    #             if not np.isscalar(res_ref):
-    #                 res_ref = res_ref.reshape(shape)
-    #
-    #             a0 = ref0
-    #             a1 = ref - ref0
-    #             vecs['output', 'phys'][vec_name][0]._views[abs_name][:] = a0
-    #             vecs['output', 'phys'][vec_name][1]._views[abs_name][:] = a1
-    #             vecs['output', 'norm'][vec_name][0]._views[abs_name][:] = -a0 / a1
-    #             vecs['output', 'norm'][vec_name][1]._views[abs_name][:] = 1.0 / a1
-    #
-    #             vecs['residual', 'phys'][vec_name][0]._views[abs_name][:] = 0.0
-    #             vecs['residual', 'phys'][vec_name][1]._views[abs_name][:] = res_ref
-    #             vecs['residual', 'norm'][vec_name][0]._views[abs_name][:] = 0.0
-    #             vecs['residual', 'norm'][vec_name][1]._views[abs_name][:] = 1.0 / res_ref
-    #
-    #         if self._has_input_scaling:
-    #             for abs_in, abs_out in iteritems(self._conn_abs_in2out):
-    #                 if (abs_in not in abs2meta_in or abs_in not in rel_ins or
-    #                         abs_out not in rel_outs):
-    #                     continue
-    #
-    #                 meta_out = allprocs_abs2meta_out[abs_out]
-    #                 meta_in = abs2meta_in[abs_in]
-    #
-    #                 shape_out = meta_out['shape']
-    #                 shape_in = meta_in['shape']
-    #                 units_in = meta_in['units']
-    #                 units_out = meta_out['units']
-    #                 distrib_out = meta_out['distributed']
-    #
-    #                 ref = meta_out['ref']
-    #                 ref0 = meta_out['ref0']
-    #
-    #                 src_indices = meta_in['src_indices']
-    #
-    #                 if src_indices is not None:
-    #                     if not (np.isscalar(ref) and np.isscalar(ref0)):
-    #                         global_shape_out = meta_out['global_shape']
-    #                         if src_indices.ndim != 1:
-    #                             if len(shape_out) == 1 or shape_in == src_indices.shape:
-    #                                 src_indices = src_indices.flatten()
-    #                                 src_indices = convert_neg(src_indices, src_indices.size)
-    #                             else:
-    #                                 entries = [list(range(x)) for x in shape_in]
-    #                                 cols = np.vstack(src_indices[i] for i in product(*entries))
-    #                                 dimidxs = [convert_neg(cols[:, i], global_shape_out[i])
-    #                                            for i in range(cols.shape[1])]
-    #                                 src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
-    #
-    #                         # TODO: if either ref or ref0 are not scalar and the output is
-    #                         # distributed, we need to do a scatter
-    #                         # to obtain the values needed due to global src_indices
-    #                         if distrib_out:
-    #                             raise RuntimeError("vector scalers with distrib vars "
-    #                                                "not supported yet.")
-    #
-    #                         ref = ref[src_indices]
-    #                         ref0 = ref0[src_indices]
-    #                 else:
-    #                     if not np.isscalar(ref):
-    #                         ref = ref.reshape(shape_out)
-    #                     if not np.isscalar(ref0):
-    #                         ref0 = ref0.reshape(shape_out)
-    #
-    #                 # Compute scaling arrays for inputs using a0 and a1
-    #                 # Example:
-    #                 #   Let x, x_src, x_tgt be the dimensionless variable,
-    #                 #   variable in source units, and variable in target units, resp.
-    #                 #   x_src = a0 + a1 x
-    #                 #   x_tgt = b0 + b1 x
-    #                 #   x_tgt = g(x_src) = d0 + d1 x_src
-    #                 #   b0 + b1 x = d0 + d1 a0 + d1 a1 x
-    #                 #   b0 = d0 + d1 a0
-    #                 #   b0 = g(a0)
-    #                 #   b1 = d0 + d1 a1 - d0
-    #                 #   b1 = g(a1) - g(0)
-    #
-    #                 a0 = convert_units(ref0, units_out, units_in)
-    #                 a1 = convert_units(ref - ref0, units_out, units_in) \
-    #                     - convert_units(0., units_out, units_in)
-    #                 vecs['input', 'phys'][vec_name][0]._views[abs_in][:] = a0
-    #                 vecs['input', 'phys'][vec_name][1]._views[abs_in][:] = a1
-    #                 vecs['input', 'norm'][vec_name][0]._views[abs_in][:] = -a0 / a1
-    #                 vecs['input', 'norm'][vec_name][1]._views[abs_in][:] = 1.0 / a1
-    #
-    #     for key in vecs:
-    #         vecs[key]['nonlinear'] = vecs[key]['linear']
-    #
-    #     for subsys in self._subsystems_myproc:
-    #         subsys._setup_scaling(root_vectors)
 
     def _setup_transfers(self, recurse=True):
         """
