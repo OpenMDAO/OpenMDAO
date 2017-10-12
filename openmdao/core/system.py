@@ -1580,15 +1580,6 @@ class System(object):
         for abs_name, meta in iteritems(self._var_abs2meta['output']):
             self._outputs._views[abs_name][:] = meta['value']
 
-    def _scale_vec(self, vec, key, scale_to):
-        vec.scale(scale_to)
-        # scal_vecs = self._scaling_vecs
-        # vec_name = vec._name
-        #
-        # vec.elem_mult(scal_vecs[key, scale_to][vec_name][1])
-        # if vec_name == 'nonlinear':
-        #     vec += scal_vecs[key, scale_to][vec_name][0]
-
     def _transfer(self, vec_name, mode, isub=None):
         """
         Perform a vector transfer.
@@ -1607,22 +1598,22 @@ class System(object):
 
         if mode == 'fwd':
             if self._has_input_scaling:
-                self._scale_vec(vec_inputs, 'input', 'norm')
+                vec_inputs.scale('norm')
                 self._transfers[vec_name][mode, isub].transfer(vec_inputs,
                                                                self._vectors['output'][vec_name],
                                                                mode)
-                self._scale_vec(vec_inputs, 'input', 'phys')
+                vec_inputs.scale('phys')
             else:
                 self._transfers[vec_name][mode, isub].transfer(vec_inputs,
                                                                self._vectors['output'][vec_name],
                                                                mode)
         else:  # rev
             if self._has_input_scaling:
-                self._scale_vec(vec_inputs, 'input', 'phys')
+                vec_inputs.scale('phys')
                 self._transfers[vec_name][mode, isub].transfer(vec_inputs,
                                                                self._vectors['output'][vec_name],
                                                                mode)
-                self._scale_vec(vec_inputs, 'input', 'norm')
+                vec_inputs.scale('norm')
             else:
                 self._transfers[vec_name][mode, isub].transfer(vec_inputs,
                                                                self._vectors['output'][vec_name],
@@ -1790,9 +1781,9 @@ class System(object):
 
         if has_scaling:
             for vec in outputs:
-                self._scale_vec(vec, 'output', 'phys')
+                vec.scale('phys')
             for vec in residuals:
-                self._scale_vec(vec, 'residual', 'phys')
+                vec.scale('phys')
 
         yield
 
@@ -1803,7 +1794,7 @@ class System(object):
                 vec._remove_complex_views()
 
             if has_scaling:
-                self._scale_vec(vec, 'output', 'norm')
+                vec.scale('norm')
 
         for vec in residuals:
 
@@ -1812,7 +1803,7 @@ class System(object):
                 vec._remove_complex_views()
 
             if has_scaling:
-                self._scale_vec(vec, 'residual', 'norm')
+                vec.scale('norm')
 
     @contextmanager
     def _unscaled_context_all(self):
@@ -1822,12 +1813,14 @@ class System(object):
         if self._has_output_scaling:
             for vec_type in ['output', 'residual']:
                 for vec in self._vectors[vec_type].values():
-                    self._scale_vec(vec, vec_type, 'phys')
+                    vec.scale('phys')
+
         yield
+
         if self._has_output_scaling:
             for vec_type in ['output', 'residual']:
                 for vec in self._vectors[vec_type].values():
-                    self._scale_vec(vec, vec_type, 'norm')
+                    vec.scale('norm')
 
     @contextmanager
     def _scaled_context_all(self):
@@ -1837,14 +1830,14 @@ class System(object):
         if self._has_output_scaling:
             for vec_type in ['output', 'residual']:
                 for vec in self._vectors[vec_type].values():
-                    self._scale_vec(vec, vec_type, 'norm')
+                    vec.scale('norm')
 
         yield
 
         if self._has_output_scaling:
             for vec_type in ['output', 'residual']:
                 for vec in self._vectors[vec_type].values():
-                    self._scale_vec(vec, vec_type, 'phys')
+                    vec.scale('phys')
 
     @contextmanager
     def _matvec_context(self, vec_name, scope_out, scope_in, mode, clear=True):

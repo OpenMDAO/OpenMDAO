@@ -494,6 +494,14 @@ class Vector(object):
         pass
 
     def scale(self, scale_to):
+        """
+        Scale this vector to normalized or physical form.
+
+        Parameters
+        ----------
+        scale_to : str
+            Values are "phys" or "norm" to scale to physical or normalized.
+        """
         scaling = self._scaling[scale_to]
         if self._ncol == 1:
             for set_name, data in iteritems(self._data):
