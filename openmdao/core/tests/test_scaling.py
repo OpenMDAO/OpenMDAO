@@ -870,6 +870,8 @@ class TestScaling(unittest.TestCase):
         assert_rel_error(self, prob['comp.y'], 2.0)
 
     def test_feature1(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.core.tests.test_scaling import ScalingExample1
 
         prob = Problem()
         model = prob.model = Group()
@@ -892,6 +894,8 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, val, 6.0)
 
     def test_feature2(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.core.tests.test_scaling import ScalingExample2
 
         prob = Problem()
         model = prob.model = Group()
@@ -914,6 +918,8 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, val, 6000.0)
 
     def test_feature3(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.core.tests.test_scaling import ScalingExample3
 
         prob = Problem()
         model = prob.model = Group()
@@ -936,6 +942,8 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, val, (1-6000.)/6000.)
 
     def test_feature_vector(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.core.tests.test_scaling import ScalingExampleVector
 
         prob = Problem()
         model = prob.model = Group()

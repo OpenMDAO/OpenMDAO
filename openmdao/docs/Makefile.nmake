@@ -27,9 +27,7 @@ html-update:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 
 all:
-	python _utils/create_feature_docs_unit_test_db.py
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)\html
-	rm feature_docs_unit_test_db.sqlite
 	IF EXIST $(BUILDDIR) rmdir /s /q $(BUILDDIR)
 	IF EXIST tags rmdir /s /q tags
 	@echo

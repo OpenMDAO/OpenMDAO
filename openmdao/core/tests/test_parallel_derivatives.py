@@ -602,6 +602,13 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
     N_PROCS = 2
 
     def test_fwd_vs_rev(self):
+        import time
+
+        import numpy as np
+
+        from openmdao.api import Problem, PETScVector
+        from openmdao.core.tests.test_parallel_derivatives import PartialDependGroup
+
         size = 4
 
         of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']

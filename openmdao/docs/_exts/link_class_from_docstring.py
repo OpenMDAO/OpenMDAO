@@ -4,7 +4,7 @@ import openmdao
 import pkgutil
 import inspect
 import re
-from openmdao.docs.config_params import MOCK_MODULES, IGNORE_LIST
+from openmdao.docs.config_params import IGNORE_LIST
 
 # first, we will need a dict that contains full pathnames to every class.
 # we construct that here, once, then use it for lookups in om_process_docstring

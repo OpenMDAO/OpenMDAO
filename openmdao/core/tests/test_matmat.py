@@ -159,7 +159,7 @@ class LGLFit(ExplicitComponent):
     an approximation of arclength.
     """
     def initialize(self):
-        self.metadata.declare(name='num_nodes', required=True, type_=int)
+        self.metadata.declare(name='num_nodes', type_=int)
 
     def setup(self):
         n = self.metadata['num_nodes']
@@ -188,7 +188,7 @@ class LGLFit(ExplicitComponent):
 class DefectComp(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare(name='num_nodes', required=True, type_=int)
+        self.metadata.declare(name='num_nodes', type_=int)
 
     def setup(self):
         n = self.metadata['num_nodes']
@@ -208,7 +208,7 @@ class DefectComp(ExplicitComponent):
 class ArcLengthFunction(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare(name='num_nodes', required=True, type_=int)
+        self.metadata.declare(name='num_nodes', type_=int)
 
     def setup(self):
         n = self.metadata['num_nodes']
@@ -232,7 +232,7 @@ class ArcLengthQuadrature(ExplicitComponent):
     Computes the arclength of a polynomial segment whose values are given at the LGL nodes.
     """
     def initialize(self):
-        self.metadata.declare(name='num_nodes', required=True, type_=int)
+        self.metadata.declare(name='num_nodes', type_=int)
 
     def setup(self):
         n = self.metadata['num_nodes']
@@ -303,7 +303,7 @@ class Phase(Group):
 class Summer(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare('n_phases', type_=int, required=True)
+        self.metadata.declare('n_phases', type_=int)
 
     def setup(self):
         self.add_output('total_arc_length')

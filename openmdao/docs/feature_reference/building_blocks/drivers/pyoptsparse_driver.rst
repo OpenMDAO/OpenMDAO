@@ -20,6 +20,15 @@ In this simple example, we use the SLSQP optimizer to minimize the objective of 
 Optimizer Settings
 ==================
 
+pyOptSparseDriver Options
+-------------------------
+
+.. embed-options::
+    openmdao.drivers.pyoptsparse_driver
+    pyOptSparseDriver
+    options
+
+
 The optimizers have a small number of unified options that can be controlled using the "options" dictionary. We have already shown how
 to set the optimizer name. Next, the `print_results` option can be used to turn on or off the echoing of the pyoptsparse results when
 the optimization finishes. The default is True, but here we turn it off.

@@ -438,6 +438,10 @@ class MetaModelTestCase(unittest.TestCase):
 
     def test_metamodel_feature(self):
         # create a MetaModel, specifying surrogates for the outputs
+        import numpy as np
+
+        from openmdao.api import Problem, MetaModel, FloatKrigingSurrogate
+
         trig = MetaModel()
         trig.add_input('x', 0.)
         trig.add_output('sin_x', 0., surrogate=FloatKrigingSurrogate())
@@ -463,6 +467,9 @@ class MetaModelTestCase(unittest.TestCase):
 
     def test_metamodel_feature2d(self):
         # similar to previous example, but output is 2d
+        import numpy as np
+
+        from openmdao.api import Problem, MetaModel, FloatKrigingSurrogate
 
         # create a MetaModel that predicts sine and cosine as an array
         trig = MetaModel(default_surrogate=FloatKrigingSurrogate())
@@ -498,6 +505,9 @@ class MetaModelTestCase(unittest.TestCase):
         # Its as if you stamped out n copies of metamodel, ran n scalars
         # through its input, then muxed all those outputs into one contiguous
         # array but you skip all the n-copies thing and do it all as an array
+        import numpy as np
+
+        from openmdao.api import Problem, MetaModel, FloatKrigingSurrogate
 
         size = 3
 
@@ -524,6 +534,10 @@ class MetaModelTestCase(unittest.TestCase):
 
     def test_metamodel_feature_vector2d(self):
         # similar to previous example, but processes 3 inputs/outputs at a time
+        import numpy as np
+
+        from openmdao.api import Problem, MetaModel, FloatKrigingSurrogate
+
         size = 3
 
         # create a vectorized MetaModel for sine and cosine

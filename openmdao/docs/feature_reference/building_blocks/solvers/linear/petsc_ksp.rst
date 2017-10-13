@@ -19,10 +19,18 @@ Here, we calculate the total derivatives across the Sellar system.
 .. embed-test::
     openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_specify_solver
 
-Options
--------
+PetscKSP Options
+----------------
 
-- maxiter
+.. embed-options::
+    openmdao.solvers.linear.petsc_ksp
+    PetscKSP
+    options
+
+PetscKSP Option Examples
+------------------------
+
+**maxiter**
 
   This lets you specify the maximum number of GMRES (or other algorithm) iterations to apply. The default maximum is 100, which
   is much higher than the other linear solvers because each multiplication by the system Jacobian is considered
@@ -37,7 +45,9 @@ Options
   .. embed-test::
       openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_feature_maxiter
 
-- atol
+
+
+**atol**
 
   Here, we set the absolute tolerance to a much tighter value (default is 1.0e-12) to show what happens. In
   practice, the tolerance serves a dual role in GMRES. In addition to being a termination criteria, the tolerance
@@ -50,7 +60,7 @@ Options
   .. embed-test::
       openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_feature_atol
 
-- rtol
+**rtol**
 
   Here, we set the absolute tolerance to a much tighter value (default is 1.0e-12) to show what happens. In
   practice, the tolerance serves a dual role in GMRES. In addition to being a termination criteria, the tolerance
@@ -63,7 +73,7 @@ Options
   .. embed-test::
       openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_feature_rtol
 
-- ksp_type
+**ksp_type**
 
   You can specify which PETSc algorithm to use in place of 'fgmres' by settng the "ksp_type" in the options
   dictionary.  Here, we use 'gmres' instead.

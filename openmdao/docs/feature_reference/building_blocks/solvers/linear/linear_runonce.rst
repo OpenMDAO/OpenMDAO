@@ -21,4 +21,13 @@ the <Paraboloid> component.
 .. embed-test::
     openmdao.solvers.linear.tests.test_linear_runonce.TestLinearRunOnceSolver.test_feature_solver
 
+
+LinearRunOnce Options
+----------------------
+
+.. embed-options::
+    openmdao.solvers.linear.linear_runonce
+    LinearRunOnce
+    options
+
 .. tags:: Solver, LinearSolver

@@ -11,6 +11,12 @@ from openmdao.api import Problem, Group, IndepVarComp, BalanceComp, \
 class TestKeplersEquation(unittest.TestCase):
 
     def test_result(self):
+        import numpy as np
+        from numpy.testing import assert_almost_equal
+
+        from openmdao.api import Problem, Group, IndepVarComp, BalanceComp, \
+            ExecComp, DirectSolver, NewtonSolver, DenseJacobian
+
         prob = Problem(model=Group())
 
         ivc = IndepVarComp()

@@ -33,6 +33,8 @@ class TestNonLinearRunOnceSolver(unittest.TestCase):
         assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
 
     def test_feature_solver(self):
+        from openmdao.api import Problem, Group, NonLinearRunOnce, IndepVarComp
+        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
         model = prob.model = Group()

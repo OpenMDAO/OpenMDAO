@@ -885,6 +885,10 @@ class TestProblemCheckPartials(unittest.TestCase):
 class TestCheckPartialsFeature(unittest.TestCase):
 
     def test_feature_incorrect_jacobian(self):
+        import numpy as np
+
+        from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem
+
         class MyComp(ExplicitComponent):
             def setup(self):
                 self.add_input('x1', 3.0)
@@ -930,6 +934,10 @@ class TestCheckPartialsFeature(unittest.TestCase):
         assert_rel_error(self, x2_error.reverse, 9., 1e-8)
 
     def test_feature_check_partials_suppress(self):
+        import numpy as np
+
+        from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem
+
         class MyComp(ExplicitComponent):
             def setup(self):
                 self.add_input('x1', 3.0)
@@ -968,6 +976,10 @@ class TestCheckPartialsFeature(unittest.TestCase):
         print(data)
 
     def test_set_step_on_comp(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
+        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
+
         prob = Problem()
         prob.model = Group()
 
@@ -990,6 +1002,10 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials()
 
     def test_set_step_global(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
+        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
+
         prob = Problem()
         prob.model = Group()
 
@@ -1012,6 +1028,10 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(global_options=opts)
 
     def test_set_method_on_comp(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
+        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
+
         prob = Problem()
         prob.model = Group()
 
@@ -1034,6 +1054,10 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials()
 
     def test_set_method_global(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
+        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
+
         prob = Problem()
         prob.model = Group()
 
@@ -1056,6 +1080,10 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(global_options=opts)
 
     def test_set_form_on_comp(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
+        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
+
         prob = Problem()
         prob.model = Group()
 
@@ -1078,6 +1106,10 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials()
 
     def test_set_form_global(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
+        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
+
         prob = Problem()
         prob.model = Group()
 
@@ -1100,6 +1132,10 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(global_options=opts)
 
     def test_set_step_calc_on_comp(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
+        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
+
         prob = Problem()
         prob.model = Group()
 
@@ -1122,6 +1158,9 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials()
 
     def test_set_step_calc_global(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
+
         prob = Problem()
         prob.model = Group()
 
