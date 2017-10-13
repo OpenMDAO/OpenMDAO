@@ -279,9 +279,6 @@ class BaseRecorder(object):
                         mysystem_outputs = all_vars[-1]
                         for d in all_vars[:-1]:
                             mysystem_outputs.update(d)
-                # Filter out only the ones we want
-                # mysystem_outputs = {n for n in mysystem_outputs
-                #                if self._check_path(n, sys_incl, [])}
 
             self._filtered_driver = {
                 'des': mydesvars,
