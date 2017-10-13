@@ -3,19 +3,23 @@
 Bounds Enforce
 **************
 
-The BoundsEnforce linesearch only backtracks until variables that violate their upper and lower bounds.
+The BoundsEnforceLS linesearch only backtracks until variables that violate their upper and lower bounds.
 
-BoundsEnforce Options
-----------------------
+BoundsEnforceLS Options
+-----------------------
 
 .. embed-options::
     openmdao.solvers.linesearch.backtracking
     BoundsEnforceLS
     options
 
+
+BoundsEnforceLS Option Examples
+-------------------------------
+
 **bound_enforcement**
 
-The BoundsEnforce subsolver includes the `bound_enforcement` option in the options dictionary. This option has a dual role:
+The BoundsEnforceLS subsolver includes the `bound_enforcement` option in the options dictionary. This option has a dual role:
 
 1. Behavior of the the non-bounded variables when the bounded ones are capped.
 2. Direction of the further backtracking.
@@ -23,7 +27,7 @@ The BoundsEnforce subsolver includes the `bound_enforcement` option in the optio
 There are three difference bounds enforcement schemes available in this option.
 
 With "vector" bounds enforcement, the solution in the output vector is pulled back to a point where none of the
-variables violate any upper or lower bounds. Further backtracking continues along this vector back towards the
+variables violate any upper or lower bounds. Further backtracking continues along the Newton gradient direction vector back towards the
 initial point.
 
 .. image:: BT1.jpg

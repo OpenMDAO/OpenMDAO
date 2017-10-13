@@ -3,7 +3,7 @@
 Armijo-Goldstein
 ****************
 
-The ArmijoGoldsteinLS linesearch Checks bounds and backtracks to point that satisfies them. From there,
+The ArmijoGoldsteinLS linesearch Checks bounds and backtracks to a point that satisfies them. From there,
 further backtracking is performed until the termination criteria are satisfied.
 The main termination criteria is the Amijo-Goldstein condition, which checks for a sufficient
 decrease from the initial point by measuring the slope. There is also an iteration maximum.
@@ -16,6 +16,10 @@ Armijo-Goldstein Options
     ArmijoGoldsteinLS
     options
 
+
+Armijo-Goldstein Option Examples
+--------------------------------
+
 **bound_enforcement**
 
 The ArmijoGoldsteinLS subsolver includes the `bound_enforcement` option in the options dictionary. This option has a dual role:
@@ -26,7 +30,7 @@ The ArmijoGoldsteinLS subsolver includes the `bound_enforcement` option in the o
 There are three difference bounds enforcement schemes available in this option.
 
 With "vector" bounds enforcement, the solution in the output vector is pulled back to a point where none of the
-variables violate any upper or lower bounds. Further backtracking continues along this vector back towards the
+variables violate any upper or lower bounds. Further backtracking continues along the Newton gradient direction vector back towards the
 initial point.
 
 .. image:: BT1.jpg
@@ -40,9 +44,6 @@ it still moves in the direction of the initial point.
 With "wall" bounds enforcement, only the variables that violate their bounds are pulled back to feasible values; the
 remaining values are kept at the Newton-stepped point. Further backtracking only occurs in the direction of the non-violating
 variables, so that it will move along the wall.
-
-Note: when using the `BoundsEnforceLS` line search, the `scalar` and `wall` methods are exactly the same because no further
-backtracking is performed.
 
 .. image:: BT3.jpg
 
