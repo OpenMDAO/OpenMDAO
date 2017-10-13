@@ -156,8 +156,9 @@ class Vector(object):
             self._complex_view_cache = {}
             self._imag_views_flat = {}
 
-        self._do_scaling = ((self._typ == 'input' and system._has_input_scaling) or
-                            (self._typ == 'output' and system._has_output_scaling))
+        self._do_scaling = ((kind == 'input' and system._has_input_scaling) or
+                            (kind == 'output' and system._has_output_scaling) or
+                            (kind == 'residual' and system._has_resid_scaling))
 
         self._scaling = {}
 

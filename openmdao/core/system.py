@@ -233,7 +233,9 @@ class System(object):
     _has_guess : bool
         True if this system has or contains a system with a `guess_nonlinear` method defined.
     _has_output_scaling : bool
-        True if this system has output/resid scaling.
+        True if this system has output scaling.
+    _has_resid_scaling : bool
+        True if this system has resid scaling.
     _has_input_scaling : bool
         True if this system has input scaling.
     #
@@ -341,6 +343,7 @@ class System(object):
 
         self._has_guess = False
         self._has_output_scaling = False
+        self._has_resid_scaling = False
         self._has_input_scaling = False
 
     def _check_reconf(self):
@@ -530,7 +533,7 @@ class System(object):
                 if nl_alloc_complex:
                     break
 
-            if self._has_input_scaling or self._has_output_scaling:
+            if self._has_input_scaling or self._has_output_scaling or self._has_resid_scaling:
                 self._scale_factors = self._compute_root_scale_factors()
             else:
                 self._scale_factors = {}
@@ -716,9 +719,6 @@ class System(object):
                                               force_alloc_complex=force_alloc_complex)
         self._setup_vectors(root_vectors, resize=resize)
         self._setup_bounds(*self._get_bounds_root_vectors(vector_class, initial), resize=resize)
-        # if self._has_input_scaling or self._has_output_scaling:
-        #     self._setup_scaling(self._get_scaling_root_vectors(vector_class, initial),
-        #                         resize=resize)
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
         self._setup_transfers(recurse=recurse)
@@ -1551,11 +1551,10 @@ class System(object):
         residuals : list of residual <Vector> objects
             List of residual vectors to apply the unit and scaling conversions.
         """
-        has_scaling = self._has_output_scaling
-
-        if has_scaling:
+        if self._has_output_scaling:
             for vec in outputs:
                 vec.scale('phys')
+        if self._has_resid_scaling:
             for vec in residuals:
                 vec.scale('phys')
 
@@ -1567,7 +1566,7 @@ class System(object):
             if vec._vector_info._under_complex_step:
                 vec._remove_complex_views()
 
-            if has_scaling:
+            if self._has_output_scaling:
                 vec.scale('norm')
 
         for vec in residuals:
@@ -1576,7 +1575,7 @@ class System(object):
             if vec._vector_info._under_complex_step:
                 vec._remove_complex_views()
 
-            if has_scaling:
+            if self._has_resid_scaling:
                 vec.scale('norm')
 
     @contextmanager
@@ -1585,16 +1584,20 @@ class System(object):
         Context manager that temporarily puts all vectors and Jacobians in an unscaled state.
         """
         if self._has_output_scaling:
-            for vec_type in ['output', 'residual']:
-                for vec in self._vectors[vec_type].values():
-                    vec.scale('phys')
+            for vec in self._vectors['output'].values():
+                vec.scale('phys')
+        if self._has_resid_scaling:
+            for vec in self._vectors['residual'].values():
+                vec.scale('phys')
 
         yield
 
         if self._has_output_scaling:
-            for vec_type in ['output', 'residual']:
-                for vec in self._vectors[vec_type].values():
-                    vec.scale('norm')
+            for vec in self._vectors['output'].values():
+                vec.scale('norm')
+        if self._has_resid_scaling:
+            for vec in self._vectors['residual'].values():
+                vec.scale('norm')
 
     @contextmanager
     def _scaled_context_all(self):
@@ -1602,16 +1605,20 @@ class System(object):
         Context manager that temporarily puts all vectors and Jacobians in a scaled state.
         """
         if self._has_output_scaling:
-            for vec_type in ['output', 'residual']:
-                for vec in self._vectors[vec_type].values():
-                    vec.scale('norm')
+            for vec in self._vectors['output'].values():
+                vec.scale('norm')
+        if self._has_resid_scaling:
+            for vec in self._vectors['residual'].values():
+                vec.scale('norm')
 
         yield
 
         if self._has_output_scaling:
-            for vec_type in ['output', 'residual']:
-                for vec in self._vectors[vec_type].values():
-                    vec.scale('phys')
+            for vec in self._vectors['output'].values():
+                vec.scale('phys')
+        if self._has_resid_scaling:
+            for vec in self._vectors['residual'].values():
+                vec.scale('phys')
 
     @contextmanager
     def _matvec_context(self, vec_name, scope_out, scope_in, mode, clear=True):

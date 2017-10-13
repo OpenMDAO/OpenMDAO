@@ -155,6 +155,7 @@ class Component(BaseComponent):
             self._inputs.scale('phys')
         if self._has_output_scaling:
             self._outputs.scale('phys')
+        if self._has_resid_scaling:
             self._residuals.scale('phys')
 
         self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
@@ -163,6 +164,7 @@ class Component(BaseComponent):
             self._inputs.scale('norm')
         if self._has_output_scaling:
             self._outputs.scale('norm')
+        if self._has_resid_scaling:
             self._residuals.scale('norm')
 
     def _solve_nonlinear(self):
