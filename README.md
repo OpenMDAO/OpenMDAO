@@ -19,11 +19,12 @@ make sure you pull these updates often
 Features of OpenMDAO 1.7.x Not Yet in 2.x
 -----------------------------------------
 
-Be aware that this is a PRE-ALPHA. 
-Not all the features of 1.7.x exist in blue yet. 
+Be aware that this is a PRE-ALPHA.
+Not all the features of 1.7.x exist in blue yet.
 Here is a list of things that have not yet been fully developed in 2.x:
 
 * Pass-by-object variables
+* automatic ordering of groups/components based on data connections
 * DOE (Design of Experiment) driver and all other case drivers
 * Parallel Finite Difference
 * File-wrapping utilities
