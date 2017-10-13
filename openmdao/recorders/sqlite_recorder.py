@@ -99,7 +99,7 @@ class SqliteRecorder(BaseRecorder):
             self.cursor.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
                                 "counter INT,iteration_coordinate TEXT, timestamp REAL, "
                                 "success INT, msg TEXT, desvars BLOB, responses BLOB, "
-                                "objectives BLOB, constraints BLOB)")
+                                "objectives BLOB, constraints BLOB, sysincludes BLOB)")
             self.cursor.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
                                 "counter INT, iteration_coordinate TEXT,  timestamp REAL, "
                                 "success INT, msg TEXT, inputs BLOB, outputs BLOB, "
@@ -117,7 +117,7 @@ class SqliteRecorder(BaseRecorder):
                                 "solver_options BLOB, solver_class TEXT)")
 
     def record_iteration_driver_passing_vars(self, object_requesting_recording, desvars,
-                                             responses, objectives, constraints, metadata):
+                                             responses, objectives, constraints, sysvars, metadata):
         """
         Record an iteration of a driver with the variables passed in.
 
@@ -148,7 +148,7 @@ class SqliteRecorder(BaseRecorder):
 
         super(SqliteRecorder, self).record_iteration_driver_passing_vars(
             object_requesting_recording, desvars, responses,
-            objectives, constraints, metadata)
+            objectives, constraints, sysvars, metadata)
 
         # Just an example of the syntax for creating a numpy structured array
         # arr = np.zeros((1,), dtype=[('dv_x','(5,)f8'),('dv_y','(10,)f8')])
@@ -210,19 +210,33 @@ class SqliteRecorder(BaseRecorder):
         else:
             constraints_array = None
 
+        if self._sysincludes_values:
+            dtype_tuples = []
+            for name, value in iteritems(self._sysincludes_values):
+                tple = (name, '{}f8'.format(value.shape))
+                dtype_tuples.append(tple)
+
+            sysincludes_array = np.zeros((1,), dtype=dtype_tuples)
+
+            for name, value in iteritems(self._sysincludes_values):
+                sysincludes_array[name] = value
+        else:
+            sysincludes_array = None
+
         desvars_blob = array_to_blob(desvars_array)
         responses_blob = array_to_blob(responses_array)
         objectives_blob = array_to_blob(objectives_array)
         constraints_blob = array_to_blob(constraints_array)
+        sysincludes_blob = array_to_blob(sysincludes_array)
 
         self.cursor.execute("INSERT INTO driver_iterations(counter, iteration_coordinate, "
                             "timestamp, success, msg, desvars , responses , objectives , "
-                            "constraints ) VALUES(?,?,?,?,?,?,?,?,?)",
+                            "constraints, sysincludes ) VALUES(?,?,?,?,?,?,?,?,?,?)",
                             (self._counter, self._iteration_coordinate,
                              metadata['timestamp'], metadata['success'],
                              metadata['msg'], desvars_blob,
                              responses_blob, objectives_blob,
-                             constraints_blob))
+                             constraints_blob, sysincludes_blob))
         self.con.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
                          ('driver', self.cursor.lastrowid))
 

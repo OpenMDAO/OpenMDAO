@@ -86,7 +86,7 @@ class WebRecorder(BaseRecorder):
             self._headers['update'] = "True"
 
     def record_iteration_driver_passing_vars(self, object_requesting_recording, desvars,
-                                             responses, objectives, constraints, metadata):
+                                             responses, objectives, constraints, sysvars, metadata):
         """
         Record an iteration using the driver options.
 
@@ -110,12 +110,14 @@ class WebRecorder(BaseRecorder):
         super(WebRecorder, self).record_iteration_driver_passing_vars(object_requesting_recording,
                                                                       desvars, responses,
                                                                       objectives, constraints,
+                                                                      sysvars,
                                                                       metadata)
 
         desvars_array = None
         responses_array = None
         objectives_array = None
         constraints_array = None
+        sysincludes_array = None
 
         if self.options['record_desvars']:
             if self._desvars_values:
@@ -153,6 +155,15 @@ class WebRecorder(BaseRecorder):
                         'values': list(value)
                     })
 
+        if self.options['system_includes']:
+            if self._sysincludes_values:
+                sysincludes_array = []
+                for name, value in iteritems(self._sysincludes_values):
+                    sysincludes_array.append({
+                        'name': name,
+                        'values': list(value)
+                    })
+
         driver_iteration_dict = {
             "counter": self._counter,
             "iteration_coordinate": self._iteration_coordinate,
@@ -161,7 +172,8 @@ class WebRecorder(BaseRecorder):
             "desvars": self.convert_to_list(desvars_array),
             "responses": self.convert_to_list(responses_array),
             "objectives": self.convert_to_list(objectives_array),
-            "constraints": self.convert_to_list(constraints_array)
+            "constraints": self.convert_to_list(constraints_array),
+            "sysincludes": self.convert_to_list(sysincludes_array),
         }
 
         global_iteration_dict = {

@@ -181,9 +181,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(cr.system_cases.num_cases, 0)
         self.assertEqual(cr.solver_cases.num_cases, 0)
 
-        # Test values from one case, the last case
-        last_case = cr.driver_cases.get_case(-1)
-
         # Test to see if the access by case keys works:
         seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|6')
         np.testing.assert_almost_equal(seventh_slsqp_iteration_case.desvars['pz.z'], [1.97846296,  -2.21388305e-13],
@@ -191,8 +188,10 @@ class TestSqliteCaseReader(unittest.TestCase):
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('pz.z'))
-        np.testing.assert_almost_equal(last_case.desvars['pz.z'], [1.97846296,  -2.21388305e-13],
-                                       decimal=2,
+
+        # Test values from one case, the last case
+        last_case = cr.driver_cases.get_case(-1)
+        np.testing.assert_almost_equal(last_case.desvars['pz.z'], [1.9776389,  0.],
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('pz.z'))
@@ -394,6 +393,54 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(cr.solver_metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
         self.assertEqual(cr.solver_metadata['root.NonlinearBlockGS']['solver_options']['maxiter'],10)
         self.assertEqual(cr.solver_metadata['root.LinearRunOnce']['solver_class'],'LinearRunOnce')
+
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
+    def test_reading_driver_recording_with_system_vars(self):
+
+        self.setup_sellar_grouped_model()
+
+        self.prob.driver = pyOptSparseDriver()
+        self.prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            self.prob.driver.opt_settings['ACC'] = 1e-9
+
+        self.prob.driver.add_recorder(self.recorder)
+        self.recorder.options['record_desvars'] = True
+        self.recorder.options['record_responses'] = True
+        self.recorder.options['record_objectives'] = True
+        self.recorder.options['record_constraints'] = True
+        self.recorder.options['system_includes'] = ['mda.d2.y2',]
+
+        self.prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            self.prob.driver.opt_settings['ACC'] = 1e-9
+
+        self.prob.setup(check=False)
+        self.prob.run_driver()
+        self.prob.cleanup()
+
+        cr = CaseReader(self.filename)
+
+        # Test values from one case, the last case
+        last_case = cr.driver_cases.get_case(-1)
+        np.testing.assert_almost_equal(last_case.desvars['pz.z'],
+                                       self.prob['pz.z'],
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('pz.z'))
+        np.testing.assert_almost_equal(last_case.desvars['px.x'],
+                                       self.prob['px.x'],
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('px.x'))
+        np.testing.assert_almost_equal(last_case.sysincludes['mda.d2.y2'],
+                                       self.prob['mda.d2.y2'],
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('mda.d2.y2'))
+
+
 
 if __name__ == "__main__":
     unittest.main()
