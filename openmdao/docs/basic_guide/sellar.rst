@@ -24,14 +24,14 @@ You can see the coupling between the two disciplines show up through the :math:`
 Building the Disciplinary Components
 ****************************************
 
-In the component definitions, there is a call to :ref:`declare_partials <feature_delare_partials_approx>` in the setup method that looks like this:
+In the component definitions, there is a call to :ref:`declare_partials <feature_declare_partials_approx>` in the setup method that looks like this:
 
 .. code::
 
     self.declare_partials('*', '*', method='fd')
 
 This tells OpenMDAO to approximate all the partial derivatives of that component using finite-difference.
-The default settings will use forward difference with an absolute step size of 1e-6, but you can change the :ref:`FD settings <feature_delare_partials_approx>` to work well for your component.
+The default settings will use forward difference with an absolute step size of 1e-6, but you can change the :ref:`FD settings <feature_declare_partials_approx>` to work well for your component.
 
 .. embed-code::
     openmdao.test_suite.components.sellar_feature.SellarDis1

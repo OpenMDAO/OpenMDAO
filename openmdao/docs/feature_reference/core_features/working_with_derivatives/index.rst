@@ -9,4 +9,5 @@ Working with Derivatives
     checking_partials.rst
     sparse_partials.rst
     specifying_partials.rst
+    approximating_totals.rst
     check_total_derivatives.rst
