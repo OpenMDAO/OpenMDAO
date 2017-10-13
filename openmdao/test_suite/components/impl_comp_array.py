@@ -20,6 +20,8 @@ class TestImplCompArray(ImplicitComponent):
         self.add_input('rhs', val=np.ones(2))
         self.add_output('x', val=np.zeros(2))
 
+        self.declare_partials(of='*', wrt='*')
+
     def apply_nonlinear(self, inputs, outputs, residuals):
         residuals['x'] = self.mtx.dot(outputs['x']) - inputs['rhs']
 

@@ -159,7 +159,7 @@ class LGLFit(ExplicitComponent):
     an approximation of arclength.
     """
     def initialize(self):
-        self.metadata.declare(name='num_nodes', required=True, type_=int)
+        self.metadata.declare(name='num_nodes', type_=int)
 
     def setup(self):
         n = self.metadata['num_nodes']
@@ -188,7 +188,7 @@ class LGLFit(ExplicitComponent):
 class DefectComp(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare(name='num_nodes', required=True, type_=int)
+        self.metadata.declare(name='num_nodes', type_=int)
 
     def setup(self):
         n = self.metadata['num_nodes']
@@ -208,7 +208,7 @@ class DefectComp(ExplicitComponent):
 class ArcLengthFunction(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare(name='num_nodes', required=True, type_=int)
+        self.metadata.declare(name='num_nodes', type_=int)
 
     def setup(self):
         n = self.metadata['num_nodes']
@@ -232,7 +232,7 @@ class ArcLengthQuadrature(ExplicitComponent):
     Computes the arclength of a polynomial segment whose values are given at the LGL nodes.
     """
     def initialize(self):
-        self.metadata.declare(name='num_nodes', required=True, type_=int)
+        self.metadata.declare(name='num_nodes', type_=int)
 
     def setup(self):
         n = self.metadata['num_nodes']
@@ -303,7 +303,7 @@ class Phase(Group):
 class Summer(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare('n_phases', type_=int, required=True)
+        self.metadata.declare('n_phases', type_=int)
 
     def setup(self):
         self.add_output('total_arc_length')
@@ -463,8 +463,7 @@ class JacVec(ExplicitComponent):
     def compute(self, inputs, outputs):
         outputs['f_xy'] = inputs['x'] * inputs['y']
 
-    def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs,
-                               mode):
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         if mode == 'fwd':
             if 'x' in d_inputs:
                 d_outputs['f_xy'] += d_inputs['x'] * inputs['y']
@@ -478,10 +477,9 @@ class JacVec(ExplicitComponent):
                 d_inputs['y'] += d_fxy * inputs['x']
 
 class MultiJacVec(JacVec):
-    def compute_multi_jacvec_product(self, inputs, outputs, d_inputs, d_outputs,
-                                     mode):
+    def compute_multi_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         # same as compute_jacvec_product in this case
-        self.compute_jacvec_product(inputs, outputs, d_inputs, d_outputs, mode)
+        self.compute_jacvec_product(inputs, d_inputs, d_outputs, mode)
 
 
 class ComputeMultiJacVecTestCase(unittest.TestCase):
@@ -507,7 +505,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
     def test_compute_multi_jacvec_prod_fwd(self):
         p = self.setup_model(size=5, multi=False, vectorize=False, mode='fwd')
 
-        J = p.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
         assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
@@ -515,7 +513,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
     def test_compute_multi_jacvec_prod_rev(self):
         p = self.setup_model(size=5, multi=False, vectorize=False, mode='rev')
 
-        J = p.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
         assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
@@ -523,7 +521,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
     def test_compute_multi_jacvec_prod_fwd_vectorize(self):
         p = self.setup_model(size=5, multi=False, vectorize=True, mode='fwd')
 
-        J = p.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
         assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
@@ -531,7 +529,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
     def test_compute_multi_jacvec_prod_rev_vectorize(self):
         p = self.setup_model(size=5, multi=False, vectorize=True, mode='rev')
 
-        J = p.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
         assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
@@ -539,7 +537,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
     def test_compute_multi_jacvec_prod_fwd_multi(self):
         p = self.setup_model(size=5, multi=True, vectorize=False, mode='fwd')
 
-        J = p.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
         assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
@@ -547,7 +545,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
     def test_compute_multi_jacvec_prod_rev_multi(self):
         p = self.setup_model(size=5, multi=True, vectorize=False, mode='rev')
 
-        J = p.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
         assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
@@ -555,7 +553,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
     def test_compute_multi_jacvec_prod_fwd_vectorize_multi(self):
         p = self.setup_model(size=5, multi=True, vectorize=True, mode='fwd')
 
-        J = p.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
         assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
@@ -563,7 +561,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
     def test_compute_multi_jacvec_prod_rev_vectorize_multi(self):
         p = self.setup_model(size=5, multi=True, vectorize=True, mode='rev')
 
-        J = p.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
         assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)

@@ -1,3 +1,5 @@
+.. _feature_add_objective:
+
 *******************
 Adding an Objective
 *******************

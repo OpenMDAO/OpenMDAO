@@ -439,6 +439,8 @@ class TestBalanceComp(unittest.TestCase):
             assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_feature_scalar(self):
+        from numpy.testing import assert_almost_equal
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NewtonSolver, DirectSolver, DenseJacobian, BalanceComp
 
         n = 1
 
@@ -486,6 +488,11 @@ class TestBalanceComp(unittest.TestCase):
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
     def test_feature_vector(self):
+        import numpy as np
+        from numpy.testing import assert_almost_equal
+
+        from openmdao.api import Problem, Group, ExecComp, NewtonSolver, DirectSolver, DenseJacobian, BalanceComp
+
         n = 100
 
         prob = Problem(model=Group())
@@ -526,70 +533,6 @@ class TestBalanceComp(unittest.TestCase):
         print(prob['balance.x'])
         print('expected')
         print(-c/b)
-
-    def test_feature_kepler(self):
-        prob = Problem(model=Group())
-
-        ivc = IndepVarComp()
-
-        ivc.add_output(name='M',
-                       val=85.0,
-                       units='deg',
-                       desc='Mean anomaly')
-
-        ivc.add_output(name='ecc',
-                       val=0.6,
-                       units=None,
-                       desc='orbit eccentricity')
-
-        bal = BalanceComp(name='E', val=0.0,
-                          units='rad', rhs_name='M', eq_units='rad')
-
-        # Override the guess_nonlinear method, always initialize E to the value of M
-        def guess_func(inputs, outputs, residuals):
-            outputs['E'] = inputs['M']
-
-        bal.guess_nonlinear = guess_func
-
-        # ExecComp used to compute the LHS of Kepler's equation.
-        lhs_comp = ExecComp('k=E - ecc * sin(E)',
-                            k={'value': 0.0, 'units': 'rad'},
-                            E={'value': 0.0, 'units': 'rad'},
-                            ecc={'value': 0.0})
-
-        prob.model.add_subsystem(name='ivc', subsys=ivc, promotes_outputs=['M', 'ecc'])
-
-        prob.model.add_subsystem(name='balance', subsys=bal,
-                                 promotes_inputs=['M'],
-                                 promotes_outputs=['E'])
-
-        prob.model.add_subsystem(name='lhs', subsys=lhs_comp,
-                                 promotes_inputs=['E', 'ecc'])
-
-        # Explicit connections
-        prob.model.connect('lhs.k', 'balance.lhs:E')
-
-        # Setup solvers
-        prob.model.linear_solver = DirectSolver()
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
-        prob.model.jacobian = DenseJacobian()
-
-        prob.setup(check=False)
-
-        prob.run_model()
-
-        assert_almost_equal(np.degrees(prob['E']), 115.9, decimal=1)
-
-        ecc = prob['ecc']
-        M = prob['M']
-        E = prob['E']
-
-        print('ecc', ecc)
-        print('M (deg)', M)
-        print('E (deg)', np.degrees(E))
-
 
 
 if __name__ == '__main__':  # pragma: no cover

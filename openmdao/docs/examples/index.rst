@@ -4,9 +4,16 @@
 Examples
 ********
 
-This document is intended to show code snippets as-is, giving
-examples of ways to accomplish tasks in OpenMDAO with little to no explanation.
+This document is intended to show run-files that provide
+techniques for using certain features in combination or examples of solving cannonical problems in OpenMDAO.
 If you need to learn the basics of how things work, please see the :ref:`User Guide <UserGuide>`.
 
+
+
 .. toctree::
-   :maxdepth: 2
+    :maxdepth: 1
+
+    tldr_paraboloid.rst
+    betz_limit/betz.rst
+    hohmann_transfer/hohmann_transfer.rst
+    keplers_equation/keplers_equation.rst

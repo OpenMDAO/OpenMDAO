@@ -15,6 +15,10 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, \
 class TestNLBGaussSeidel(unittest.TestCase):
 
     def test_feature_set_options(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -46,6 +50,10 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_basic(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -73,6 +81,10 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_maxiter(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -101,6 +113,10 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.0542542372, .00001)
 
     def test_feature_rtol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives, SellarDerivatives
 
         prob = Problem()
         prob.model = SellarDerivatives()
@@ -130,6 +146,10 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_atol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -266,46 +286,6 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
         assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
-
-    def test_run_apply(self):
-        # This test makes sure that we correctly apply the "run_apply" flag
-        # to all targets in the "broken" connection, even when they are
-        # nested in Groups.
-        # Note, this is a rather implementation-specific bug. It is not
-        # certain that a new implementation will need this test.
-
-        raise unittest.SkipTest("Test specific to implementation of double-run prevention.")
-
-        prob = Problem()
-        root = prob.model = Group()
-
-        sub1 = root.add_subsystem('sub1', Group())
-        sub2 = root.add_subsystem('sub2', Group())
-
-        s1p1 = sub1.add_subsystem('p1', Paraboloid())
-        s1p2 = sub1.add_subsystem('p2', Paraboloid())
-        s2p1 = sub2.add_subsystem('p1', Paraboloid())
-        s2p2 = sub2.add_subsystem('p2', Paraboloid())
-
-        root.connect('sub1.p1.f_xy', 'sub2.p1.x')
-        root.connect('sub1.p2.f_xy', 'sub2.p1.y')
-        root.connect('sub1.p1.f_xy', 'sub2.p2.x')
-        root.connect('sub1.p2.f_xy', 'sub2.p2.y')
-        root.connect('sub2.p1.f_xy', 'sub1.p1.x')
-        root.connect('sub2.p2.f_xy', 'sub1.p1.y')
-        root.connect('sub2.p1.f_xy', 'sub1.p2.x')
-        root.connect('sub2.p2.f_xy', 'sub1.p2.y')
-
-        root.nonlinear_solver = NonlinearBlockGS()
-        root.linear_solver = ScipyIterativeSolver()
-
-        prob.setup(check=False)
-        prob.set_solver_print(level=0)
-
-        # Will be True in one group and False in the other, depending on
-        # where it cuts.
-        self.assertTrue(s1p1._run_apply != s2p1._run_apply)
-        self.assertTrue(s1p2._run_apply != s2p2._run_apply)
 
     def test_NLBGS_Aitken(self):
 

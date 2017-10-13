@@ -13,6 +13,8 @@ class TestExplCompSimple(ExplicitComponent):
         self.add_input('width', val=1., desc='width of rectangle')
         self.add_output('area', val=1., desc='area of rectangle')
 
+        self.declare_partials('*', '*')
+
     def compute(self, inputs, outputs):
         outputs['area'] = inputs['length'] * inputs['width']
 
@@ -42,8 +44,7 @@ class TestExplCompSimpleSparse(TestExplCompSimple):
 
 class TestExplCompSimpleJacVec(TestExplCompSimple):
 
-    def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs,
-                               mode):
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
 
         length = inputs['length']
         width = inputs['width']

@@ -12,6 +12,8 @@ class SrcComp(ExplicitComponent):
         self.add_input('x1', 100.0)
         self.add_output('x2', 100.0, units='degC')
 
+        self.declare_partials('*', '*')
+
     def compute(self, inputs, outputs):
         """ Pass through."""
         outputs['x2'] = inputs['x1']
@@ -25,8 +27,10 @@ class SrcCompFD(SrcComp):
     """Source provides degrees Celsius."""
 
     def setup(self):
-        super(SrcCompFD, self).setup()
-        self.approx_partials('*', '*')
+        self.add_input('x1', 100.0)
+        self.add_output('x2', 100.0, units='degC')
+
+        self.declare_partials('*', '*', method='fd')
 
     def compute_partials(self, inputs, partials):
         """ Override"""
@@ -39,6 +43,8 @@ class TgtCompF(ExplicitComponent):
     def setup(self):
         self.add_input('x2', 100.0, units='degF')
         self.add_output('x3', 100.0)
+
+        self.declare_partials('*', '*')
 
     def compute(self, inputs, outputs):
         """ Pass through."""
@@ -53,8 +59,10 @@ class TgtCompFFD(TgtCompF):
     """Source provides degrees Celsius."""
 
     def setup(self):
-        super(TgtCompFFD, self).setup()
-        self.approx_partials('*', '*')
+        self.add_input('x2', 100.0, units='degF')
+        self.add_output('x3', 100.0)
+
+        self.declare_partials('*', '*', method='fd')
 
     def compute_partials(self, inputs, partials):
         """ Override"""
@@ -67,6 +75,8 @@ class TgtCompC(ExplicitComponent):
     def setup(self):
         self.add_input('x2', 100.0, units='degC')
         self.add_output('x3', 100.0)
+
+        self.declare_partials('*', '*')
 
     def compute(self, inputs, outputs):
         """ Pass through."""
@@ -81,8 +91,10 @@ class TgtCompCFD(TgtCompC):
     """Source provides degrees Celsius."""
 
     def setup(self):
-        super(TgtCompCFD, self).setup()
-        self.approx_partials('*', '*')
+        self.add_input('x2', 100.0, units='degC')
+        self.add_output('x3', 100.0)
+
+        self.declare_partials('*', '*', method='fd')
 
     def compute_partials(self, inputs, partials):
         """ Override"""
@@ -95,6 +107,8 @@ class TgtCompK(ExplicitComponent):
     def setup(self):
         self.add_input('x2', 100.0, units='degK')
         self.add_output('x3', 100.0)
+
+        self.declare_partials('*', '*')
 
     def compute(self, inputs, outputs):
         """ Pass through."""
@@ -109,8 +123,10 @@ class TgtCompKFD(TgtCompK):
     """Source provides degrees Celsius."""
 
     def setup(self):
-        super(TgtCompKFD, self).setup()
-        self.approx_partials('*', '*')
+        self.add_input('x2', 100.0, units='degK')
+        self.add_output('x3', 100.0)
+
+        self.declare_partials('*', '*', method='fd')
 
     def compute_partials(self, inputs, partials):
         """ Override"""
@@ -127,6 +143,8 @@ class TgtCompFMulti(ExplicitComponent):
         self.add_output('_x3', 100.0)
         self.add_output('x3', 100.0)
         self.add_output('x3_', 100.0)
+
+        self.declare_partials('*', '*')
 
     def compute(self, inputs, outputs):
         """ Pass through."""

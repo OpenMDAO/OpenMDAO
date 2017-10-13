@@ -7,15 +7,26 @@ from tempfile import mkdtemp
 
 import numpy as np
 
-from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp, SqliteRecorder
+from openmdao.utils.general_utils import set_pyoptsparse_opt
+from openmdao.utils.mpi import MPI
+
+if MPI:
+    from openmdao.api import PETScVector
+    vector_class = PETScVector
+else:
+    PETScVector = None
+
+# check that pyoptsparse is installed. if it is, try to use SLSQP.
+OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
+
+if OPTIMIZER:
+    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+
+from openmdao.api import ExecComp, ExplicitComponent, Problem, \
+    Group, ParallelGroup, IndepVarComp, SqliteRecorder
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from sqlite_recorder_test_utils import _assertDriverIterationDataRecorded
 from recorder_test_utils import run_driver
-
-try:
-    from openmdao.vectors.petsc_vector import PETScVector
-except ImportError:
-    PETScVector = None
 
 class DistributedAdder(ExplicitComponent):
     """
@@ -27,12 +38,6 @@ class DistributedAdder(ExplicitComponent):
         self.distributed = True
 
         self.local_size = self.size = size
-
-    def get_req_procs(self):
-        """
-        min/max number of procs that this component can use
-        """
-        return (1, self.size)
 
     def setup(self):
         """
@@ -84,6 +89,16 @@ class Summer(ExplicitComponent):
         outputs['sum'] = np.sum(inputs['y'])
 
 
+
+class Mygroup(Group):
+
+    def setup(self):
+        self.add_subsystem('indep_var_comp', IndepVarComp('x'), promotes=['*'])
+        self.add_subsystem('Cy', ExecComp('y=2*x'), promotes=['*'])
+        self.add_subsystem('Cc', ExecComp('c=x+2'), promotes=['*'])
+
+        self.add_design_var('x')
+        self.add_constraint('c', lower=-3.)
 
 
 
@@ -177,7 +192,83 @@ class DistributedRecorderTest(unittest.TestCase):
             }
 
             self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
-                                                     expected_objectives, None),), self.eps)
+                                                     expected_objectives, None, None),), self.eps)
+
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
+    def test_recording_remote_voi(self):
+
+        prob = Problem()
+
+        prob.model.add_subsystem('par', ParallelGroup())
+
+        prob.model.par.add_subsystem('G1', Mygroup())
+        prob.model.par.add_subsystem('G2', Mygroup())
+
+        prob.model.add_subsystem('Obj', ExecComp('obj=y1+y2'))
+
+        prob.model.connect('par.G1.y', 'Obj.y1')
+        prob.model.connect('par.G2.y', 'Obj.y2')
+
+        prob.model.add_objective('Obj.obj')
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+        self.recorder.options['record_desvars'] = True
+        self.recorder.options['record_responses'] = True
+        self.recorder.options['record_objectives'] = True
+        self.recorder.options['record_constraints'] = True
+        self.recorder.options['system_includes'] = ['par.G1.Cy.y','par.G2.Cy.y']
+
+        prob.driver.add_recorder(self.recorder)
+
+        prob.setup(vector_class=PETScVector)
+        t0, t1 = run_driver(prob)
+        prob.cleanup()
+
+        # Since the test will compare the last case recorded, just check the
+        #   current values in the problem. This next section is about getting those values
+
+        # These involve collective gathers so all ranks need to run this
+        expected_desvars = prob.driver.get_design_var_values()
+        expected_objectives = prob.driver.get_objective_values()
+        expected_constraints = prob.driver.get_constraint_values()
+
+        # Determine the expected values for the sysincludes
+        # this gets all of the outputs but just locally
+        rrank = prob.comm.rank  # root ( aka model ) rank.
+        rowned = prob.model._owning_rank['output']
+        # names of sysincl vars on this rank
+        local_sysinclnames = [n for n in self.recorder.options['system_includes'] if rrank == rowned[n]]
+        # Get values for vars on this rank
+        inputs, outputs, residuals = prob.model.get_nonlinear_vectors()
+        #   Potential local sysvars are in this
+        sysvars = outputs._names
+        # Just get the values for the sysincl vars on this rank
+        local_sysvars = {c: sysvars[c] for c in local_sysinclnames}
+        # Gather up the values for all the sysincl vars on all ranks
+        all_vars = prob.model.comm.gather(local_sysvars, root=0)
+
+        if prob.comm.rank == 0:
+            # Only on rank 0 do we have all the values and only on rank 0
+            #   are we doing the testing.
+            # The all_vars variable is list of dicts from rank 0,1,... In this case just ranks 0 and 1
+            dct = all_vars[-1]
+            for d in all_vars[:-1]:
+                dct.update(d)
+
+            expected_sysincludes = {
+                'par.G1.Cy.y': dct['par.G1.Cy.y'],
+                'par.G2.Cy.y': dct['par.G2.Cy.y'],
+            }
+
+
+        if prob.comm.rank == 0:
+            coordinate = [0, 'SLSQP', (49,)]
+            self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
+                                                     expected_objectives, expected_constraints,
+                                                     expected_sysincludes),), self.eps)
 
 
 if __name__ == "__main__":

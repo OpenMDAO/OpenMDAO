@@ -64,9 +64,10 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         children = [_get_tree_dict(s, component_execution_orders, component_execution_index)
                     for s in system._subsystems_myproc]
         if system.comm.size > 1:
-            sub_comm = system._subsystems_myproc[0].comm
-            if sub_comm.rank != 0:
-                children = []
+            if system._subsystems_myproc:
+                sub_comm = system._subsystems_myproc[0].comm
+                if sub_comm.rank != 0:
+                    children = []
             children_lists = system.comm.allgather(children)
 
             children = []
@@ -135,8 +136,8 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
                 exe_src = component_execution_orders[src_subsystem]
                 exe_low = min(exe_tgt,exe_src)
                 exe_high = max(exe_tgt,exe_src)
-                subg = G.subgraph(li)
-                for n in subg.nodes():
+                subg = G.subgraph(li).copy()
+                for n in list(subg.nodes()):
                     exe_order = component_execution_orders[n]
                     if(exe_order < exe_low or exe_order > exe_high):
                         subg.remove_node(n)

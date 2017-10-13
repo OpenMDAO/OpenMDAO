@@ -1,3 +1,5 @@
+.. _feature_building_components:
+
 **********************
 Building Components
 **********************
@@ -12,3 +14,4 @@ Building Components
     distributed_comps.rst
     units.rst
     scaling.rst
+    metadata.rst

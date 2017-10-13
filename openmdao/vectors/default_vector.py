@@ -63,6 +63,8 @@ class DefaultTransfer(Transfer):
         out_inds = self._out_inds
 
         if mode == 'fwd':
+            do_complex = in_vec._vector_info._under_complex_step and out_vec._alloc_complex
+
             for key in in_inds:
                 in_set_name, out_set_name = key
                 # this works whether the vecs have multi columns or not due to broadcasting
@@ -71,11 +73,11 @@ class DefaultTransfer(Transfer):
 
                 # Imaginary transfer
                 # (for CS, so only need in fwd)
-                if in_vec._vector_info._under_complex_step and out_vec._alloc_complex:
+                if do_complex:
                     in_vec._imag_data[in_set_name][in_inds[key]] = \
                         out_vec._imag_data[out_set_name][out_inds[key]]
 
-        elif mode == 'rev':
+        else:  # rev
             for key in in_inds:
                 in_set_name, out_set_name = key
                 np.add.at(
@@ -109,26 +111,31 @@ class DefaultVector(Vector):
 
         data = {}
         indices = {}
+        nsets = len(sizes_byset_t)  # if we only have 1 varset, we can do some speedups
         for set_name in system._num_var_byset[self._name][type_]:
             size = np.sum(sizes_byset_t[set_name][iproc, :])
             data[set_name] = np.zeros(size) if ncol == 1 else np.zeros((size, ncol))
-            indices[set_name] = np.zeros(size, int)
+            if nsets == 1:
+                indices[set_name] = slice(None)
+            else:
+                indices[set_name] = np.zeros(size, int)
 
-        abs2meta_t = system._var_abs2meta[type_]
-        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[self._name][type_]
-        allprocs_abs2idx_t = system._var_allprocs_abs2idx[self._name][type_]
-        for abs_name in system._var_relevant_names[self._name][type_]:
-            set_name = abs2meta_t[abs_name]['var_set']
+        if nsets > 1:
+            abs2meta_t = system._var_abs2meta[type_]
+            allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[self._name][type_]
+            allprocs_abs2idx_t = system._var_allprocs_abs2idx[self._name][type_]
+            for abs_name in system._var_relevant_names[self._name][type_]:
+                set_name = abs2meta_t[abs_name]['var_set']
 
-            idx_byset = allprocs_abs2idx_byset_t[abs_name]
-            ind_byset1 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset])
-            ind_byset2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1])
+                idx_byset = allprocs_abs2idx_byset_t[abs_name]
+                ind_byset1 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset])
+                ind_byset2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1])
 
-            idx = allprocs_abs2idx_t[abs_name]
-            ind1 = np.sum(sizes_t[iproc, :idx])
-            ind2 = np.sum(sizes_t[iproc, :idx + 1])
+                idx = allprocs_abs2idx_t[abs_name]
+                ind1 = np.sum(sizes_t[iproc, :idx])
+                ind2 = np.sum(sizes_t[iproc, :idx + 1])
 
-            indices[set_name][ind_byset1:ind_byset2] = np.arange(ind1, ind2)
+                indices[set_name][ind_byset1:ind_byset2] = np.arange(ind1, ind2)
 
         return data, indices
 
@@ -160,6 +167,18 @@ class DefaultVector(Vector):
         )
 
         sizes_byset = system._var_sizes_byset[vec_name]
+        nsets = len(sizes_byset)
+
+        if nsets > 1:
+            for set_name in system._num_var_byset[self._name][type_]:
+                if isinstance(tmp_indices[set_name], slice):
+                    start, stop, _ = tmp_indices[set_name].indices(old_sizes_total)
+                    tmp_indices[set_name] = np.arange(start, stop, dtype=int)
+
+                if isinstance(root_vec._indices[set_name], slice):
+                    start, stop, _ = \
+                        root_vec._indices[set_name].indices(root_vec._data[set_name].size)
+                    root_vec._indices[set_name] = np.arange(start, stop, dtype=int)
 
         for set_name in system._num_var_byset[self._name][type_]:
             ext_sizes_byset_t = system._ext_sizes_byset[vec_name][type_][set_name]
@@ -183,12 +202,15 @@ class DefaultVector(Vector):
                 root_vec._data[set_name][old_sizes_byset[0] + old_sizes_byset[1]:],
             ])
 
-            root_vec._indices[set_name] = np.concatenate([
-                root_vec._indices[set_name][:old_sizes_byset[0]],
-                tmp_indices[set_name] + new_sizes[0],
-                root_vec._indices[set_name][old_sizes_byset[0] + old_sizes_byset[1]:]
-                    + new_sizes[1] - old_sizes[1],
-            ])
+            if nsets == 1:
+                root_vec._indices[set_name] = slice(None)
+            else:
+                root_vec._indices[set_name] = np.concatenate([
+                    root_vec._indices[set_name][:old_sizes_byset[0]],
+                    tmp_indices[set_name] + new_sizes[0],
+                    root_vec._indices[set_name][old_sizes_byset[0] + old_sizes_byset[1]:]
+                        + new_sizes[1] - old_sizes[1],
+                ])
 
         root_vec._initialize_views()
 
@@ -212,12 +234,16 @@ class DefaultVector(Vector):
         data = {}
         imag_data = {}
         indices = {}
+        nsets = len(sizes_byset)  # if we only have 1 varset, we can do some speedups
         for set_name, sizes in iteritems(sizes_byset):
             ind_byset1 = system._ext_sizes_byset[self._name][type_][set_name][0]
             ind_byset2 = ind_byset1 + np.sum(sizes[iproc, :])
 
             data[set_name] = root_vec._data[set_name][ind_byset1:ind_byset2]
-            indices[set_name] = root_vec._indices[set_name][ind_byset1:ind_byset2] - offset
+            if nsets == 1:
+                indices[set_name] = slice(None)
+            else:
+                indices[set_name] = root_vec._indices[set_name][ind_byset1:ind_byset2] - offset
 
             # Extract view for imaginary part too
             if self._alloc_complex:
@@ -259,7 +285,6 @@ class DefaultVector(Vector):
         Sets the following attributes:
         _views
         _views_flat
-        _idxs
         """
         system = self._system
         type_ = self._typ
@@ -415,7 +440,7 @@ class DefaultVector(Vector):
         """
         if self._ncol == 1:
             for set_name, data in iteritems(self._data):
-                data[:] *= vec._data[set_name]
+                data *= vec._data[set_name]
         else:
             for set_name, data in iteritems(self._data):
                 data *= vec._data[set_name][:, np.newaxis]

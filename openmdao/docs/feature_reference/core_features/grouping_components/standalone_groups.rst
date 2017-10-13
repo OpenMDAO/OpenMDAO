@@ -2,7 +2,7 @@
 Building Models with Standalone Groups
 **************************************
 
-So far we have showed how to build groups, add subsystems to them, and connect variables in your run script. You can also
+So far we have showed how to build groups, add subsystems to them, and connect variables in your run-script. You can also
 create custom groups that can be instantiated as part of larger models. To do this, create a new class that inherits from
 Group and give it one method named "setup". Inside this method, you can add subsystems, make connections, and modify the
 group level linear and nonlinear solvers.

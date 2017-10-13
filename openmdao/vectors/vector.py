@@ -56,8 +56,6 @@ class Vector(object):
         Dictionary mapping absolute variable names to the ndarray views.
     _views_flat : dict
         Dictionary mapping absolute variable names to the flattened ndarray views.
-    _idxs : dict
-        Either 0 or slice(None), used so that 1-sized vectors are made floats.
     _names : set([str, ...])
         Set of variables that are relevant in the current context.
     _root_vector : Vector
@@ -188,23 +186,6 @@ class Vector(object):
         """
         return self._length
 
-    def _create_subvector(self, system):
-        """
-        Return a smaller vector for a subsystem.
-
-        Parameters
-        ----------
-        system : <System>
-            system for the subvector that is a subsystem of self._system.
-
-        Returns
-        -------
-        <Vector>
-            subvector instance.
-        """
-        return self.__class__(self._name, self._typ, system,
-                              self._root_vector)
-
     def _clone(self, initialize_views=False):
         """
         Return a copy that optionally provides view access to its data.
@@ -242,7 +223,7 @@ class Vector(object):
         """
         if new_array is None:
             ncol = self._ncol
-            new_array = np.zeros(self._length) if ncol == 1 else np.zeros((self._length, ncol))
+            new_array = np.empty(self._length) if ncol == 1 else np.zeros((self._length, ncol))
 
         for set_name, data in iteritems(self._data):
             new_array[self._indices[set_name]] = data
@@ -386,7 +367,7 @@ class Vector(object):
                 slc = _full_slice
             else:
                 slc = (_full_slice, self._icol)
-            value, shape = ensure_compatible(name, value, self._views[abs_name][slc].shape)
+            value, _ = ensure_compatible(name, value, self._views[abs_name][slc].shape)
             if self._vector_info._under_complex_step:
 
                 # setitem overwrites anything you may have done with numpy indexing
@@ -430,8 +411,6 @@ class Vector(object):
 
         - _views
         - _views_flat
-        - _idxs
-
         """
         pass
 
