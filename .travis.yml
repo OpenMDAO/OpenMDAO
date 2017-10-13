@@ -14,6 +14,7 @@ env:
 - PY=3.4 MPI=1
 - PY=2.7 MPI=
 - PY=3.4 MPI=
+- PY=3.6 MPI=
 
 addons:
   apt:
