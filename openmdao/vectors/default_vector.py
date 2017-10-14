@@ -121,7 +121,7 @@ class DefaultVector(Vector):
             if nsets == 1:
                 indices[set_name] = slice(None)
             else:
-                indices[set_name] = np.zeros(size, int)
+                indices[set_name] = np.empty(size, int)
 
         if nsets > 1:
             abs2meta_t = system._var_abs2meta[type_]
@@ -290,19 +290,26 @@ class DefaultVector(Vector):
         if root_vector is None:  # we're the root
             self._data, self._indices = self._create_data()
 
-            # TODO: have residual vecs use same array as output vecs
             if self._do_scaling:
                 self._scaling = {'phys': {}, 'norm': {}}
                 for set_name, data in iteritems(self._data):
-                    dphys1 = np.ones(data.size)
-                    dnorm1 = np.ones(data.size)
-                    if self._name == 'nonlinear':
-                        dphys0 = np.zeros(data.size)
-                        dnorm0 = np.zeros(data.size)
+                    if self._name == 'linear':
+                        # reuse the nonlinear scaling vecs since they're the same as ours
+                        nlvec = self._system._root_vecs[self._kind]['nonlinear']
+                        self._scaling['phys'][set_name] = (None,
+                                                           nlvec._scaling['phys'][set_name][1])
+                        self._scaling['norm'][set_name] = (None,
+                                                           nlvec._scaling['norm'][set_name][1])
                     else:
-                        dphys0 = dnorm0 = None
-                    self._scaling['phys'][set_name] = (dphys0, dphys1)
-                    self._scaling['norm'][set_name] = (dnorm0, dnorm1)
+                        dphys1 = np.ones(data.size)
+                        dnorm1 = np.ones(data.size)
+                        if self._name == 'nonlinear':
+                            dphys0 = np.zeros(data.size)
+                            dnorm0 = np.zeros(data.size)
+                        else:
+                            dphys0 = dnorm0 = None
+                        self._scaling['phys'][set_name] = (dphys0, dphys1)
+                        self._scaling['norm'][set_name] = (dnorm0, dnorm1)
 
             # Allocate imaginary for complex step
             if self._alloc_complex:

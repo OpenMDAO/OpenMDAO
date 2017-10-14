@@ -514,9 +514,11 @@ class System(object):
         dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
-        root_vectors = {'input': OrderedDict(),
-                        'output': OrderedDict(),
-                        'residual': OrderedDict()}
+        # save root vecs as an attribute so that we can reuse the nonlinear scaling vecs in the
+        # linear root vec
+        self._root_vecs = root_vectors = {'input': OrderedDict(),
+                                          'output': OrderedDict(),
+                                          'residual': OrderedDict()}
 
         if initial:
             relevant = self._relevant
