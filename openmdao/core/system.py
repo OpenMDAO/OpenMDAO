@@ -19,7 +19,7 @@ from openmdao.utils.general_utils import determine_adder_scaler, \
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.units import convert_units
+from openmdao.utils.units import get_conversion
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.logger_utils import get_logger
@@ -1154,13 +1154,10 @@ class System(object):
 
         for abs_name in self._var_allprocs_abs_names['output']:
             meta = allprocs_meta_out[abs_name]
-            shape = meta['shape']
-            ref = meta['ref']
             ref0 = meta['ref0']
             res_ref = meta['res_ref']
-
             a0 = ref0
-            a1 = ref - ref0
+            a1 = meta['ref'] - ref0
             scale_factors[abs_name] = {
                 ('output', 'phys'): (a0, a1),
                 ('output', 'norm'): (-a0 / a1, 1.0 / a1),
@@ -1177,12 +1174,6 @@ class System(object):
 
                 meta_in = abs2meta_in[abs_in]
 
-                shape_out = meta_out['shape']
-                shape_in = meta_in['shape']
-                units_in = meta_in['units']
-                units_out = meta_out['units']
-                distrib_out = meta_out['distributed']
-
                 ref = meta_out['ref']
                 ref0 = meta_out['ref0']
 
@@ -1192,7 +1183,8 @@ class System(object):
                     if not (np.isscalar(ref) and np.isscalar(ref0)):
                         global_shape_out = meta_out['global_shape']
                         if src_indices.ndim != 1:
-                            if len(shape_out) == 1 or shape_in == src_indices.shape:
+                            shape_in = meta_in['shape']
+                            if len(meta_out['shape']) == 1 or shape_in == src_indices.shape:
                                 src_indices = src_indices.flatten()
                                 src_indices = convert_neg(src_indices, src_indices.size)
                             else:
@@ -1205,7 +1197,7 @@ class System(object):
                         # TODO: if either ref or ref0 are not scalar and the output is
                         # distributed, we need to do a scatter
                         # to obtain the values needed due to global src_indices
-                        if distrib_out:
+                        if meta_out['distributed']:
                             raise RuntimeError("vector scalers with distrib vars "
                                                "not supported yet.")
 
@@ -1225,9 +1217,16 @@ class System(object):
                 #   b1 = d0 + d1 a1 - d0
                 #   b1 = g(a1) - g(0)
 
-                a0 = convert_units(ref0, units_out, units_in)
-                a1 = convert_units(ref - ref0, units_out, units_in) \
-                    - convert_units(0., units_out, units_in)
+                units_in = meta_in['units']
+                units_out = meta_out['units']
+
+                if units_in is None or units_out is None or units_in == units_out:
+                    a0 = ref0
+                    a1 = ref - ref0
+                else:
+                    factor, offset = get_conversion(units_out, units_in)
+                    a0 = (ref0 + offset) * factor
+                    a1 = (ref - ref0) * factor
 
                 scale_factors[abs_in] = {
                     ('input', 'phys'): (a0, a1),
