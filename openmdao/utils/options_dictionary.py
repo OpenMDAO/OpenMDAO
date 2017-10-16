@@ -93,7 +93,7 @@ class OptionsDictionary(object):
             raise ValueError("Function is_valid returns False for {}.".format(name))
 
     def declare(self, name, default=null_object, values=None, type_=None, desc='',
-                upper=None, lower=None, is_valid=None, required=False):
+                upper=None, lower=None, is_valid=None):
         r"""
         Declare an option.
 
