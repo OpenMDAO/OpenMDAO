@@ -21,6 +21,7 @@ else:
     vector_class = DefaultVector
 
 
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
 class ParDerivTestCase(unittest.TestCase):
 
     N_PROCS = 2
@@ -153,6 +154,7 @@ class ParDerivTestCase(unittest.TestCase):
         assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
 
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
 class DecoupledTestCase(unittest.TestCase):
     N_PROCS = 2
     asize = 3
@@ -249,7 +251,6 @@ class DecoupledTestCase(unittest.TestCase):
         expected[:,:asize] = np.eye(asize)*8.0
         assert_rel_error(self, J['Con2.y', 'Indep2.x'], expected, 1e-6)
 
-
     def test_serial_rev(self):
         asize = self.asize
         prob = self.setup_model()
@@ -290,6 +291,8 @@ class DecoupledTestCase(unittest.TestCase):
         expected[:,:asize] = np.eye(asize)*8.0
         assert_rel_error(self, J['Con2.y', 'Indep2.x'], expected, 1e-6)
 
+
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
 class IndicesTestCase(unittest.TestCase):
 
     N_PROCS = 2
@@ -345,6 +348,7 @@ class IndicesTestCase(unittest.TestCase):
         assert_rel_error(self, J['c4.y', 'p.x'][0], np.array([8., 0.]), 1e-6)
 
 
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
 class IndicesTestCase2(unittest.TestCase):
 
     N_PROCS = 2
@@ -417,6 +421,7 @@ class IndicesTestCase2(unittest.TestCase):
         assert_rel_error(self, J['G1.par1.c4.y', 'G1.par1.p.x'][0], np.array([8., 0.]), 1e-6)
 
 
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
 class MatMatTestCase(unittest.TestCase):
     N_PROCS = 2
     asize = 3
@@ -486,7 +491,6 @@ class MatMatTestCase(unittest.TestCase):
         expected = np.eye(asize)*8.0
         assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
 
-
     def test_parallel_rev(self):
         asize = self.asize
         prob = self.setup_model()
@@ -524,6 +528,7 @@ class MatMatTestCase(unittest.TestCase):
         assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.eye(asize)*8.0
         assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
+
 
 class SumComp(ExplicitComponent):
     def __init__(self, size):
@@ -570,6 +575,7 @@ class SlowComp(ExplicitComponent):
         time.sleep(self.delay)
         super(SlowComp, self)._apply_linear(vec_names, rel_systems, mode, scope_out, scope_in)
 
+
 class PartialDependGroup(Group):
     def setup(self):
         size = 4
@@ -597,7 +603,7 @@ class PartialDependGroup(Group):
         self.add_constraint('ParallelGroup1.Con2.y', upper=0.0, parallel_deriv_color=color)
 
 
-@unittest.skipUnless(MPI, "MPI is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ParDerivColorFeatureTestCase(unittest.TestCase):
     N_PROCS = 2
 
