@@ -985,27 +985,27 @@ class Problem(object):
             else:
                 model.approx_totals(method='fd')
 
-            # Initialization based on driver (or user) -requested "of" and "wrt".
-            if not model._owns_approx_jac or model._owns_approx_of != set(of) \
-               or model._owns_approx_wrt != set(wrt):
-                model._owns_approx_of = set(of)
-                model._owns_approx_wrt = set(wrt)
+        # Initialization based on driver (or user) -requested "of" and "wrt".
+        if not model._owns_approx_jac or model._owns_approx_of != set(of) \
+           or model._owns_approx_wrt != set(wrt):
+            model._owns_approx_of = set(of)
+            model._owns_approx_wrt = set(wrt)
 
-                # Support for indices defined on driver vars.
-                dvs = self.driver._designvars
-                cons = self.driver._cons
-                objs = self.driver._objs
+            # Support for indices defined on driver vars.
+            dvs = self.driver._designvars
+            cons = self.driver._cons
+            objs = self.driver._objs
 
-                response_idx = {key: val['indices'] for key, val in iteritems(cons)
-                                if val['indices'] is not None}
-                for key, val in iteritems(objs):
-                    if val['indices'] is not None:
-                        response_idx[key] = val['indices']
+            response_idx = {key: val['indices'] for key, val in iteritems(cons)
+                            if val['indices'] is not None}
+            for key, val in iteritems(objs):
+                if val['indices'] is not None:
+                    response_idx[key] = val['indices']
 
-                model._owns_approx_of_idx = response_idx
+            model._owns_approx_of_idx = response_idx
 
-                model._owns_approx_wrt_idx = {key: val['indices'] for key, val in iteritems(dvs)
-                                              if val['indices'] is not None}
+            model._owns_approx_wrt_idx = {key: val['indices'] for key, val in iteritems(dvs)
+                                          if val['indices'] is not None}
 
         model._setup_jacobians(recurse=False)
 

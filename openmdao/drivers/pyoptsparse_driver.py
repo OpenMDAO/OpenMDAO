@@ -225,7 +225,7 @@ class pyOptSparseDriver(Driver):
         con_meta = self._cons
         lcons = [key for (key, con) in iteritems(con_meta) if con['linear'] is True]
         if len(lcons) > 0:
-            _lin_jacs = problem._compute_totals(of=lcons, wrt=indep_list, return_format='dict')
+            _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list, return_format='dict')
 
         # Add all equality constraints
         self.active_tols = {}

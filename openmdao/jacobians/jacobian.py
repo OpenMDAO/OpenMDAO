@@ -92,6 +92,9 @@ class Jacobian(object):
             self._subjacs[abs_key].data *= val  # DOK not supported
         elif len(jac) == 3:
             self._subjacs[abs_key][0] *= val
+        else:
+            self._subjacs[abs_key] *= val
+
 
     def __contains__(self, key):
         """
