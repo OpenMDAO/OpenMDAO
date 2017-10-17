@@ -150,8 +150,7 @@ def _find_named_value(system, name):
     return _notfound
 
 
-def tree(top, show_solvers=True, show_colors=True,
-         get_vals=None, filter=None, stream=sys.stdout):
+def tree(top, show_solvers=True, show_colors=True, filter=None, max_depth=0, stream=sys.stdout):
     """
     Dump the model tree structure to the given stream.
 
@@ -166,12 +165,12 @@ def tree(top, show_solvers=True, show_colors=True,
         If True, include solvers in the tree.
     show_colors : bool
         If True and stream is a terminal that supports it, display in color.
-    get_vals : iter of str or None
-        A collection of names of attributes or vector variables that will be displayed
-        at each node in the tree where they exist.
     filter : function(System)
-        A function taking a System arg and returning True/False.  If True is returned,
-        that system will be displayed.
+        A function taking a System arg and returning None or an iter of (name, value) tuples.
+        If None is returned, that system will not be displayed.  Otherwise, the system will
+        be displayed along with any name, value pairs returned from the filter, if any.
+    max_depth : int
+        Maximum depth for display.
     stream : File-like
         Where dump output will go.
     """
@@ -186,9 +185,17 @@ def tree(top, show_solvers=True, show_colors=True,
         top = top.model
 
     for s in top.system_iter(include_self=True, recurse=True):
-        if filter is not None and not filter(s):
-            continue
+        if filter is None:
+            ret = ()
+        else:
+            ret = filter(s)
+            if ret is None:
+                continue
+
         depth = len(s.pathname.split('.')) if s.pathname else 0
+        if max_depth != 0 and depth > max_depth:
+            continue
+
         indent = '    ' * (depth + tab)
         print(indent, file=stream, end='')
 
@@ -196,28 +203,26 @@ def tree(top, show_solvers=True, show_colors=True,
         if isinstance(s, Group):
             cprint("%s " % type(s).__name__, color=Fore.GREEN + Style.BRIGHT)
             cprint("%s" % s.name)
-
-            if show_solvers:
-                lnsolver = type(s.linear_solver).__name__
-                nlsolver = type(s.nonlinear_solver).__name__
-
-                if lnsolver != "LinearRunOnce":
-                    cprint("  LN: ")
-                    cprint(lnsolver, color=Fore.MAGENTA + Style.BRIGHT)
-                if nlsolver != "NonLinearRunOnce":
-                    cprint("  NL: ")
-                    cprint(nlsolver, color=Fore.MAGENTA + Style.BRIGHT)
-            print()
         else:
             cprint("%s " % type(s).__name__, color=Fore.CYAN + Style.BRIGHT)
-            cprint("%s\n" % s.name)
+            cprint("%s" % s.name)
 
-        if get_vals:
-            vindent = indent + '  '
-            for name in get_vals:
-                val = _find_named_value(s, name)
-                if val is not _notfound:
-                    print("%s%s: %s" % (vindent, name, val))
+        if show_solvers:
+            lnsolver = type(s.linear_solver).__name__
+            nlsolver = type(s.nonlinear_solver).__name__
+
+            if s.linear_solver is not None and lnsolver != "LinearRunOnce":
+                cprint("  LN: ")
+                cprint(lnsolver, color=Fore.MAGENTA + Style.BRIGHT)
+            if s.nonlinear_solver is not None and nlsolver != "NonLinearRunOnce":
+                cprint("  NL: ")
+                cprint(nlsolver, color=Fore.MAGENTA + Style.BRIGHT)
+        print()
+
+        vindent = indent + '  '
+        for name, val in ret:
+            print("%s%s: %s" % (vindent, name, val))
+
 
 def config_summary(problem, stream=sys.stdout):
     """
