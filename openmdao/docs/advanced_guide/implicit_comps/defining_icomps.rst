@@ -1,5 +1,5 @@
 *********************************************************************
-Defining Models with Implicit Components
+Building Models with Implicit Components
 *********************************************************************
 
 This tutorial will show you how to define implicit components and build models with them.
@@ -23,7 +23,7 @@ In other words, V1 and V2 are defined implicitly by the following residual equat
 
 .. math::
 
-   \mathcal{R_{node}} = \sum I_{in} - \sum I_{out} = 0 .
+   \mathcal{R_{node_j}} = \sum_k I_{k}^{in} - \sum_k I_{k}^{out} = 0 .
 
 To build this model we're going to define three different components:
 
@@ -44,27 +44,32 @@ These components will each declare some metadata to allow you to pass in the rel
 .. embed-code::
      openmdao.test_suite.test_examples.test_circuit_analysis.Diode
 
+.. note::
+    since we've provided default values for the metadata, they won't be required arguments when instantiating :code:`Resistor` or :code:`Diode`.
+    Check out the :ref:`Feature Manual <FeatureManual>` for more details on how to use :ref:`component metadata <component_metadata>`.
+
 
 ImplicitComponent - Node
 ***************************************
 
-The :code:`Node` component inherits from :ref:`ImplicitComponent <comp-type-3-implicitcomp>`, which has a different interface than :code:`ExpicitComp`.
-Rather than compute its outputs, it defines a residual function via the :code:`apply_nonlinear` method.
-:code:`apply_nonlinear` will populate the :code:`residual` vector using the values from  :code:`inputs` and :code:`outputs` vectors.
-You'll notice that we still defined *V* as an output of the :code:`Node` component, albeit one that is implicitly defined.
+The :code:`Node` component inherits from :ref:`ImplicitComponent <comp-type-3-implicitcomp>`, which has a different interface than :ref:`ExplicitComponent <comp-type-2-explicitcomp>`.
+Rather than compute its outputs, it computes residuals via the :code:`apply_nonlinear` method.
+:code:`apply_nonlinear` populates the :code:`residual` vector using the values from  :code:`inputs` and :code:`outputs` vectors.
+Notice that we still defined *V* as an output of the :code:`Node` component, albeit one that is implicitly defined.
 
 
 .. embed-code::
      openmdao.test_suite.test_examples.test_circuit_analysis.Node
 
-All implicit components must defined the :code:`apply_nonlinear` method, because OpenMDAO needs to be able to evaluate the residual function.
-But it not a requirement that every :ref:`ImplicitComponent <comp-type-3-implicitcomp>`  define the :code:`solve_nonlienar` method.
-In fact, for the :code:`Node` component, it is not even possible to define :code:`solve_nonlienar` at all because *V* does not show up directly
+All implicit components must define the :code:`apply_nonlinear` method,
+but it not a requirement that every :ref:`ImplicitComponent <comp-type-3-implicitcomp>`  define the :code:`solve_nonlienar` method.
+In fact for the :code:`Node` component, it is not even possible to define a :code:`solve_nonlienar` because *V* does not show up directly
 in the residual function.
+So the implicit function represented by instances of the :code:`Node` component must be converged at a higher level in the model hierarchy.
 
 There are cases where it is possible, and even adventageous, to define the :code:`solve_nonlinear` method.
 For example, when a component is performing an engineering analysis with its own specialized nonlinear solver routines (e.g. CFD or FEM),
-then it makes sense to expose those methods to OpenMDAO so it can make use of them.
+then it makes sense to expose those to OpenMDAO via :code:`solve_nonlinear` so OpenMDAO can make use of them.
 Just remember that :code:`apply_nonlinear` must be defined regardless of whether you also define :code:`solve_nonlinear`.
 
 .. note::
@@ -76,11 +81,74 @@ Just remember that :code:`apply_nonlinear` must be defined regardless of whether
 
 
 
-Building the Circuit Group
-***************************************
+Building the Circuit Group and Solving it with NewtonSolver
+***********************************************************
 
-We can combine the :code:`Resistor`, :code:`Diode`, and :code:`Node` into the circuit pictured above using a group.
+We can combine the :code:`Resistor`, :code:`Diode`, and :code:`Node` into the circuit pictured above using a :ref:`Group <feature_grouping_components>`.
+Adding components and connecting their variables is all the same as what you've seen before in the :ref:`Sellar - Two Discipline <sellar>` tutorial.
+What is new here is the addition use of the nonlinear :ref:`NewtonSolver <nlnewton>` and linear :ref:`DirectSolver <directsolver>` to converge the system.
+
+In previous tutorials we had used a gradient free :ref:`NonlinearBlockGaussSeidel <nlbgs>` solver, but that won't work here.
+Just above we discussed that the :code:`Node` class does, and in fact can not, define its own :code:`solve_nonlinear` method.
+Hence, there would be no calculations for the GaussSeidel solver to iterate on.
+Instead we use the Newton solver at :code:`Circuit` level, which uses jacobian information compute group level updates for all the variables simultaneously.
+The Newton solver's use of that jacobian information is why we need to declare a linear solver in this case.
+
+.. note::
+    OpenMDAO provides a library of :ref:`linear solvers <feature_linear_solvers>` that are useful in different advanced scenarios.
+    For many problems, especially problems built from components with mostly scalar variables the :ref:`DirectSolver <directsolver>`
+    will be both the most efficient and the easiest to use.
+    We recommend you stick with :ref:`DirectSolver <directsolver>` unless you have a good reason to switch.
 
 
-.. embed-code::
-     openmdao.test_suite.test_examples.test_circuit_analysis.Node
+.. embed-test::
+    openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_plain_newton
+    :no-split:
+
+
+Modifying Solver Settings in Your Run Script
+***********************************************************
+
+In the above run script, we set some initial guess values: :code:`prob['n1.V']=10` and :code:`prob['n2.V']=1`.
+If you try to play around with those initial guesses a bit, you will see that convergence is really sensitive to
+the initial guess you used for *n2.V*.
+Here is a second run-script that uses the same :code:`Circuit` group we defined previously, but modifies some solvers settings and initial guesses.
+If we set the initial guess for :code:`prob['n2.V']=1e-3`, then the model starts out with a massive residual.
+It also converges much more slowly so althought we gave it more than twice the number of iterations it doesn't even get close to a converged answer.
+
+
+.. embed-test::
+    openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_plain_newton_many_iter
+    :no-split:
+
+
+.. note::
+
+   You actually can get this model to converge. But you have to set the options for :code:`maxiter`=400 and :code:`rtol`=1e-100.
+   You need to set set the `rtol` value to be so low to prevent premature termination.
+
+
+Tweaking Newton Solver Settings to Get More Robust Convergence
+****************************************************************
+
+The :ref:`NewtonSolver <nlnewton>` has a lot of features that allow you to modify its behavior to handle more challenging problems.
+We're going to look at two of the most important ones here:
+
+    #. :ref:`LineSearches <feature_line_search>`
+    #. the *solve_subsystems* option
+
+If we use both of these in combination here, we can dramatically improve the solver robustness for this problem.
+The line search option makes sure that the solver doesn't take too big of a step. The *solve_subsystems* option allows
+the :code:`Resistor` and :code:`Diode` components (the two :code:`ExplicitComponents`) to help the convergence by updating their own output values given their inputs.
+When you use :ref:`NewtonSolver <nlnewton>` on models with a lot of :code:`ExplicitComponents` you may find that turning on *solve_subsystems* may help convergence,
+but you need to be careful about the :ref:`execution order <feature_set_order>` when you try this.
+
+.. note::
+
+    For this case, we used the :ref:`ArmijoGoldsteinLS <feature_amijo_goldstein>`, which basically limits step sizes so that the residual always goes down.
+    For many problems you might want to use :ref:`BoundsEnforceLS <feature_bounds_enforce>` instead, which only activates the
+    line search to enforce upper and lower bounds on the outputs in the model.
+
+.. embed-test::
+    openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_advanced_newton
+    :no-split:

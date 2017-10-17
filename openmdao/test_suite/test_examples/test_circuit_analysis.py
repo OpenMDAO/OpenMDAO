@@ -3,7 +3,7 @@ import numpy as np
 
 import unittest
 
-from openmdao.api import ExplicitComponent, ImplicitComponent
+from openmdao.api import ExplicitComponent, ImplicitComponent, Group, NewtonSolver, DirectSolver
 
 from openmdao.devtools.testutil import assert_rel_error
 
@@ -72,13 +72,36 @@ class Node(ImplicitComponent):
         for i_conn in range(self.metadata['n_out']):
             r['V'] -= i['I_out:{}'.format(i_conn)]
 
+# note: This is defined twice in the file. Once so you can import it, and once inside a test that gets included in the docs.
+class Circuit(Group):
+
+    def setup(self):
+        self.add_subsystem('n1', Node(n_in=1, n_out=2), promotes_inputs=[('I_in:0', 'I_in')])
+        self.add_subsystem('n2', Node())  # leaving defaults
+
+        self.add_subsystem('R1', Resistor(R=100.), promotes_inputs=[('V_out', 'Vg')])
+        self.add_subsystem('R2', Resistor(R=10000.))
+        self.add_subsystem('D1', Diode(), promotes_inputs=[('V_out', 'Vg')])
+
+        self.connect('n1.V', ['R1.V_in', 'R2.V_in'])
+        self.connect('R1.I', 'n1.I_out:0')
+        self.connect('R2.I', 'n1.I_out:1')
+
+        self.connect('n2.V', ['R2.V_out', 'D1.V_in'])
+        self.connect('R2.I', 'n2.I_in:0')
+        self.connect('D1.I', 'n2.I_out:0')
+
+        self.nonlinear_solver = NewtonSolver()
+        self.nonlinear_solver.options['iprint'] = 2
+        self.nonlinear_solver.options['maxiter'] = 20
+        self.linear_solver = DirectSolver()
+
 class TestCircuit(unittest.TestCase):
 
-    def test_circuit(self):
+    def test_circuit_plain_newton(self):
 
 
-        from openmdao.api import Group, NewtonSolver, DirectSolver, \
-            ArmijoGoldsteinLS, Problem, IndepVarComp
+        from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarComp
 
         from openmdao.test_suite.test_examples.test_circuit_analysis import Resistor, Diode, Node
 
@@ -102,11 +125,7 @@ class TestCircuit(unittest.TestCase):
 
                 self.nonlinear_solver = NewtonSolver()
                 self.nonlinear_solver.options['iprint'] = 2
-                self.nonlinear_solver.options['maxiter'] = 1000
-                self.nonlinear_solver.options['solve_subsystems'] = True
-                self.nonlinear_solver.linesearch = ArmijoGoldsteinLS()
-                self.nonlinear_solver.linesearch.options['maxiter'] = 10
-                self.nonlinear_solver.linesearch.options['iprint'] = 2
+                self.nonlinear_solver.options['maxiter'] = 20
                 self.linear_solver = DirectSolver()
 
 
@@ -124,7 +143,7 @@ class TestCircuit(unittest.TestCase):
 
         # set some initial guesses
         p['circuit.n1.V'] = 10.
-        p['circuit.n2.V'] = 1e-3
+        p['circuit.n2.V'] = 1.
 
         p.run_model()
 
@@ -135,6 +154,82 @@ class TestCircuit(unittest.TestCase):
         assert_rel_error(self, p['circuit.D1.I'], 0.00091697, 1e-5)
         #'Sanity check: shoudl sum to .1 Amps
         assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
+
+
+    def test_circuit_plain_newton_many_iter(self):
+
+        from openmdao.api import Problem, IndepVarComp
+
+        from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
+
+        p = Problem()
+        model = p.model
+
+        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
+        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('circuit', Circuit())
+
+        model.connect('source.I', 'circuit.I_in')
+        model.connect('ground.V', 'circuit.Vg')
+
+        p.setup()
+
+        # you can change the NewtonSolver settings in circuit after setup is called
+        newton = p.model.circuit.nonlinear_solver
+        newton.options['maxiter'] = 50
+
+        # set some initial guesses
+        p['circuit.n1.V'] = 10.
+        p['circuit.n2.V'] = 1e-3
+
+        p.run_model()
+
+        assert_rel_error(self, p['circuit.n1.V'], 9.98744708, 1e-5)
+        assert_rel_error(self, p['circuit.n2.V'], 8.73215484, 1e-5)
+        #'Sanity check: shoudl sum to .1 Amps
+        assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], 0.09987447, 1e-6)
+
+    def test_circuit_advanced_newton(self):
+        from openmdao.api import Group, NewtonSolver, DirectSolver, ArmijoGoldsteinLS, Problem, IndepVarComp
+
+        from openmdao.api import Problem, IndepVarComp
+
+        from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
+
+        p = Problem()
+        model = p.model
+
+        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
+        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('circuit', Circuit())
+
+        model.connect('source.I', 'circuit.I_in')
+        model.connect('ground.V', 'circuit.Vg')
+
+        p.setup()
+
+        # you can change the NewtonSolver settings in circuit after setup is called
+        newton = p.model.circuit.nonlinear_solver
+        newton.options['iprint'] = 2
+        newton.options['maxiter'] = 10
+        newton.options['solve_subsystems'] = True
+        newton.linesearch = ArmijoGoldsteinLS()
+        newton.linesearch.options['maxiter'] = 10
+        newton.linesearch.options['iprint'] = 2
+
+        # set some initial guesses
+        p['circuit.n1.V'] = 10.
+        p['circuit.n2.V'] = 1e-3
+
+        p.run_model()
+
+        assert_rel_error(self, p['circuit.n1.V'], 9.90830282, 1e-5)
+        assert_rel_error(self, p['circuit.n2.V'], 0.73858486, 1e-5)
+        assert_rel_error(self, p['circuit.R1.I'], 0.09908303, 1e-5)
+        assert_rel_error(self, p['circuit.R2.I'], 0.00091697, 1e-5)
+        assert_rel_error(self, p['circuit.D1.I'], 0.00091697, 1e-5)
+        # 'Sanity check: shoudl sum to .1 Amps
+        assert_rel_error(self, p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
 
 if __name__ == "__main__":
