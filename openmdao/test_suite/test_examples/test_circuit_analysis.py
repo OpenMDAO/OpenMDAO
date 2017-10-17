@@ -20,9 +20,9 @@ class Resistor(ExplicitComponent):
         self.declare_partials('I', 'V_in', method='fd')
         self.declare_partials('I', 'V_out', method='fd')
 
-    def compute(self, i, o):
-        deltaV = i['V_in'] - i['V_out']
-        o['I'] = deltaV / self.metadata['R']
+    def compute(self, inputs, outputs):
+        deltaV = inputs['V_in'] - inputs['V_out']
+        outputs['I'] = deltaV / self.metadata['R']
 
 
 class Diode(ExplicitComponent):
@@ -38,11 +38,11 @@ class Diode(ExplicitComponent):
         self.declare_partials('I', 'V_in', method='fd')
         self.declare_partials('I', 'V_out', method='fd')
 
-    def compute(self, i, o):
-        deltaV = i['V_in'] - i['V_out']
+    def compute(self, inputs, outputs):
+        deltaV = inputs['V_in'] - inputs['V_out']
         Is = self.metadata['Is']
         Vt = self.metadata['Vt']
-        o['I'] = Is * np.exp(deltaV / Vt - 1)
+        outputs['I'] = Is * np.exp(deltaV / Vt - 1)
 
 
 class Node(ImplicitComponent):
@@ -65,12 +65,12 @@ class Node(ImplicitComponent):
         #      because the residual doesn't directly depend on it
         self.declare_partials('V', 'I*', method='fd')
 
-    def apply_nonlinear(self, i, o, r):
-        r['V'] = 0.
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        residuals['V'] = 0.
         for i_conn in range(self.metadata['n_in']):
-            r['V'] += i['I_in:{}'.format(i_conn)]
+            residuals['V'] += inputs['I_in:{}'.format(i_conn)]
         for i_conn in range(self.metadata['n_out']):
-            r['V'] -= i['I_out:{}'.format(i_conn)]
+            residuals['V'] -= inputs['I_out:{}'.format(i_conn)]
 
 # note: This is defined twice in the file. Once so you can import it, and once inside a test that gets included in the docs.
 class Circuit(Group):
@@ -95,6 +95,7 @@ class Circuit(Group):
         self.nonlinear_solver.options['iprint'] = 2
         self.nonlinear_solver.options['maxiter'] = 20
         self.linear_solver = DirectSolver()
+
 
 class TestCircuit(unittest.TestCase):
 
@@ -190,9 +191,7 @@ class TestCircuit(unittest.TestCase):
         assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], 0.09987447, 1e-6)
 
     def test_circuit_advanced_newton(self):
-        from openmdao.api import Group, NewtonSolver, DirectSolver, ArmijoGoldsteinLS, Problem, IndepVarComp
-
-        from openmdao.api import Problem, IndepVarComp
+        from openmdao.api import ArmijoGoldsteinLS, Problem, IndepVarComp
 
         from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
 

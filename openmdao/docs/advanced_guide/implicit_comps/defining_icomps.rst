@@ -8,7 +8,7 @@ We'll work through them using a nonlinear circuit analysis example problem.
 Circuit analysis
 ********************
 
-Consider a simple electrical circuit made up from two resistors, diode, and a constant current source.
+Consider a simple electrical circuit made up from two resistors, a diode, and a constant current source.
 Our goal is to solve for the steady-state voltages at node 1 and node 2.
 
 .. figure:: images/circuit_diagram.png
@@ -16,7 +16,7 @@ Our goal is to solve for the steady-state voltages at node 1 and node 2.
    :width: 50%
    :alt: diagram of a simple circuit with two resistors and one diode
 
-In order to find the voltages we'll employ kirchoff's law and solve for the voltages needed at each node to drive the net-current 0.
+In order to find the voltages we'll employ Kirchoff's law and solve for the voltages needed at each node to drive the net-current to 0.
 
 This means that the voltages at each node are *state variables* for the analysis.
 In other words, V1 and V2 are defined implicitly by the following residual equation:
@@ -45,7 +45,7 @@ These components will each declare some metadata to allow you to pass in the rel
      openmdao.test_suite.test_examples.test_circuit_analysis.Diode
 
 .. note::
-    since we've provided default values for the metadata, they won't be required arguments when instantiating :code:`Resistor` or :code:`Diode`.
+    Since we've provided default values for the metadata, they won't be required arguments when instantiating :code:`Resistor` or :code:`Diode`.
     Check out the :ref:`Feature Manual <FeatureManual>` for more details on how to use :ref:`component metadata <component_metadata>`.
 
 
@@ -53,8 +53,9 @@ ImplicitComponent - Node
 ***************************************
 
 The :code:`Node` component inherits from :ref:`ImplicitComponent <comp-type-3-implicitcomp>`, which has a different interface than :ref:`ExplicitComponent <comp-type-2-explicitcomp>`.
-Rather than compute its outputs, it computes residuals via the :code:`apply_nonlinear` method.
-:code:`apply_nonlinear` populates the :code:`residual` vector using the values from  :code:`inputs` and :code:`outputs` vectors.
+Rather than compute the values of its outputs, it computes residuals via the :code:`apply_nonlinear` method.
+When those residuals has been driven to zero, the values of the outputs will be implicitly known.
+:code:`apply_nonlinear` populates the :code:`residual` vector using values from  :code:`inputs` and :code:`outputs` vectors.
 Notice that we still defined *V* as an output of the :code:`Node` component, albeit one that is implicitly defined.
 
 
@@ -62,12 +63,12 @@ Notice that we still defined *V* as an output of the :code:`Node` component, alb
      openmdao.test_suite.test_examples.test_circuit_analysis.Node
 
 All implicit components must define the :code:`apply_nonlinear` method,
-but it not a requirement that every :ref:`ImplicitComponent <comp-type-3-implicitcomp>`  define the :code:`solve_nonlienar` method.
-In fact for the :code:`Node` component, it is not even possible to define a :code:`solve_nonlienar` because *V* does not show up directly
+but it is not a requirement that every :ref:`ImplicitComponent <comp-type-3-implicitcomp>`  define the :code:`solve_nonlinear` method.
+In fact for the :code:`Node` component, it is not even possible to define a :code:`solve_nonlinear` because *V* does not show up directly
 in the residual function.
 So the implicit function represented by instances of the :code:`Node` component must be converged at a higher level in the model hierarchy.
 
-There are cases where it is possible, and even adventageous, to define the :code:`solve_nonlinear` method.
+There are cases where it is possible, and even advantageous, to define the :code:`solve_nonlinear` method.
 For example, when a component is performing an engineering analysis with its own specialized nonlinear solver routines (e.g. CFD or FEM),
 then it makes sense to expose those to OpenMDAO via :code:`solve_nonlinear` so OpenMDAO can make use of them.
 Just remember that :code:`apply_nonlinear` must be defined regardless of whether you also define :code:`solve_nonlinear`.
@@ -89,9 +90,9 @@ Adding components and connecting their variables is all the same as what you've 
 What is new here is the addition use of the nonlinear :ref:`NewtonSolver <nlnewton>` and linear :ref:`DirectSolver <directsolver>` to converge the system.
 
 In previous tutorials we had used a gradient free :ref:`NonlinearBlockGaussSeidel <nlbgs>` solver, but that won't work here.
-Just above we discussed that the :code:`Node` class does, and in fact can not, define its own :code:`solve_nonlinear` method.
+Just above we discussed that the :code:`Node` class does not, and in fact can not, define its own :code:`solve_nonlinear` method.
 Hence, there would be no calculations for the GaussSeidel solver to iterate on.
-Instead we use the Newton solver at :code:`Circuit` level, which uses jacobian information compute group level updates for all the variables simultaneously.
+Instead we use the Newton solver at :code:`Circuit` level, which uses jacobian information to compute group level updates for all the variables simultaneously.
 The Newton solver's use of that jacobian information is why we need to declare a linear solver in this case.
 
 .. note::
@@ -114,7 +115,7 @@ If you try to play around with those initial guesses a bit, you will see that co
 the initial guess you used for *n2.V*.
 Here is a second run-script that uses the same :code:`Circuit` group we defined previously, but modifies some solvers settings and initial guesses.
 If we set the initial guess for :code:`prob['n2.V']=1e-3`, then the model starts out with a massive residual.
-It also converges much more slowly so althought we gave it more than twice the number of iterations it doesn't even get close to a converged answer.
+It also converges much more slowly so although we gave it more than twice the number of iterations it doesn't even get close to a converged answer.
 
 
 .. embed-test::
@@ -124,8 +125,8 @@ It also converges much more slowly so althought we gave it more than twice the n
 
 .. note::
 
-   You actually can get this model to converge. But you have to set the options for :code:`maxiter`=400 and :code:`rtol`=1e-100.
-   You need to set set the `rtol` value to be so low to prevent premature termination.
+   You actually can get this model to converge. But you have to set the options for :code:`maxiter=400` and :code:`rtol=1e-100`.
+   You need to set the :code:`rtol` value to be so low to prevent premature termination.
 
 
 Tweaking Newton Solver Settings to Get More Robust Convergence
@@ -134,7 +135,7 @@ Tweaking Newton Solver Settings to Get More Robust Convergence
 The :ref:`NewtonSolver <nlnewton>` has a lot of features that allow you to modify its behavior to handle more challenging problems.
 We're going to look at two of the most important ones here:
 
-    #. :ref:`LineSearches <feature_line_search>`
+    #. :ref:`Line searches <feature_line_search>`
     #. the *solve_subsystems* option
 
 If we use both of these in combination here, we can dramatically improve the solver robustness for this problem.
@@ -152,3 +153,8 @@ but you need to be careful about the :ref:`execution order <feature_set_order>` 
 .. embed-test::
     openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_advanced_newton
     :no-split:
+
+
+.. note::
+    This tutorial used finite-difference to approximate the partial derivatives for all the components.
+    Check out :ref:`this example <circuit_analysis_examples>` if you want to see the same problem solved with analytic derivatives.
