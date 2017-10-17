@@ -110,6 +110,35 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_constraint('con1', upper=0.0)
         model.add_constraint('con2', upper=0.0)
 
+    def setup_sellar_grouped_scaled_model(self):
+        self.prob = Problem()
+
+        model = self.prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0]), ref=2.0), promotes=['z'])
+
+        mda = model.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
+        mda.linear_solver = ScipyIterativeSolver()
+        mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                            z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        mda.nonlinear_solver = NonlinearBlockGS()
+        model.linear_solver = LinearBlockGS()
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
     def setUp(self):
 
         recording_iteration.stack = []  # reset to avoid problems from earlier tests
@@ -192,7 +221,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Test values from one case, the last case
         last_case = cr.driver_cases.get_case(-1)
-        np.testing.assert_almost_equal(last_case.desvars['pz.z'], [1.9776389,  0.],
+        np.testing.assert_almost_equal(last_case.desvars['pz.z'], self.prob['z'],
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('pz.z'))
@@ -329,7 +358,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         if OPTIMIZER is None:
             raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
 
-        self.setup_sellar_grouped_model()
+        self.setup_sellar_grouped_scaled_model()
 
         self.prob.driver = pyOptSparseDriver()
         self.prob.driver.options['optimizer'] = OPTIMIZER
