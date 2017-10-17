@@ -11,6 +11,9 @@ from six.moves import zip_longest
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group, System
 
+# an object used to detect when a named value isn't found
+_notfound = object()
+
 def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma: no cover
     """Print out the distributed idxs for each variable in input and output vecs.
 
@@ -116,7 +119,39 @@ def _get_color_printer(stream=sys.stdout, colors=True):
     return color_print, Fore, Back, Style
 
 
-def tree(top, show_solvers=True, show_components=True, show_colors=True, stream=sys.stdout):
+def _find_named_value(system, name):
+    """
+    Given a name, return the value of an attribute or vector variable.
+
+    Parameters
+    ----------
+    system : System
+        The System being searched for the value.
+    name : str
+        The name of the value.
+
+    Returns
+    -------
+    object
+        The value found, or _notfound.
+    """
+
+    # first, look for an attribute by that name
+    val = getattr(system, name, _notfound)
+    if val is not _notfound:
+        return val
+
+    # now look in the vectors
+    if name in system._outputs:
+        return system._outputs[name]
+    elif name in system._inputs:
+        return system._inputs[name]
+
+    return _notfound
+
+
+def tree(top, show_solvers=True, show_colors=True,
+         get_vals=None, filter=None, stream=sys.stdout):
     """
     Dump the model tree structure to the given stream.
 
@@ -129,30 +164,32 @@ def tree(top, show_solvers=True, show_components=True, show_colors=True, stream=
         The top object in the tree.
     show_solvers : bool
         If True, include solvers in the tree.
-    show_components : bool
-        If True, include Components in the tree.
     show_colors : bool
         If True and stream is a terminal that supports it, display in color.
+    get_vals : iter of str or None
+        A collection of names of attributes or vector variables that will be displayed
+        at each node in the tree where they exist.
+    filter : function(System)
+        A function taking a System arg and returning True/False.  If True is returned,
+        that system will be displayed.
     stream : File-like
         Where dump output will go.
     """
     cprint, Fore, Back, Style = _get_color_printer(stream, show_colors)
 
-    if show_components:
-        typ = System
-    else:
-        typ = Group
-
     tab = 0
     if isinstance(top, Problem):
-        cprint('Driver: ', color=Fore.CYAN + Style.BRIGHT)
-        cprint(type(top.driver).__name__, color=Fore.MAGENTA, end='\n')
+        if filter is None:
+            cprint('Driver: ', color=Fore.CYAN + Style.BRIGHT)
+            cprint(type(top.driver).__name__, color=Fore.MAGENTA, end='\n')
+            tab += 1
         top = top.model
-        tab += 1
 
-    for s in top.system_iter(include_self=True, recurse=True, typ=typ):
+    for s in top.system_iter(include_self=True, recurse=True):
+        if filter is not None and not filter(s):
+            continue
         depth = len(s.pathname.split('.')) if s.pathname else 0
-        indent = '   ' * (depth + tab)
+        indent = '    ' * (depth + tab)
         print(indent, file=stream, end='')
 
         info = ''
@@ -174,6 +211,13 @@ def tree(top, show_solvers=True, show_components=True, show_colors=True, stream=
         else:
             cprint("%s " % type(s).__name__, color=Fore.CYAN + Style.BRIGHT)
             cprint("%s\n" % s.name)
+
+        if get_vals:
+            vindent = indent + '  '
+            for name in get_vals:
+                val = _find_named_value(s, name)
+                if val is not _notfound:
+                    print("%s%s: %s" % (vindent, name, val))
 
 def config_summary(problem, stream=sys.stdout):
     """
