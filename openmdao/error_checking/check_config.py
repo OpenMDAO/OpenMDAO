@@ -47,9 +47,9 @@ def _check_dataflow(group, logger):
     logger : object
         The object that manages logging output.
     """
-    sub2i = {sub.name: i for i, sub in enumerate(group._subsystems_allprocs)}
     graph = group.compute_sys_graph(comps_only=False)
     sccs = get_sccs_topo(graph)
+    sub2i = {sub.name: i for i, sub in enumerate(group._subsystems_allprocs)}
     cycles = [sorted(s, key=lambda n: sub2i[n]) for s in sccs if len(s) > 1]
     cycle_idxs = {}
 
