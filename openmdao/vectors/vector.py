@@ -223,7 +223,7 @@ class Vector(object):
         """
         if new_array is None:
             ncol = self._ncol
-            new_array = np.zeros(self._length) if ncol == 1 else np.zeros((self._length, ncol))
+            new_array = np.empty(self._length) if ncol == 1 else np.zeros((self._length, ncol))
 
         for set_name, data in iteritems(self._data):
             new_array[self._indices[set_name]] = data

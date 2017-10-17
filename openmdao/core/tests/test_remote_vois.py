@@ -21,7 +21,6 @@ else:
     PETScVector = None
     pyOptSparseDriver = None
 
-
 class Mygroup(Group):
 
     def setup(self):
