@@ -10,7 +10,7 @@ from tempfile import mkdtemp, mkstemp
 import numpy as np
 
 from openmdao.test_suite.components.sellar import SellarDerivatives
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS, ScipyIterativeSolver
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS, ScipyIterativeSolver, LinearBlockGS
 from openmdao.recorders.sqlite_recorder import SqliteRecorder, format_version
 from openmdao.recorders.case_reader import CaseReader
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
@@ -73,14 +73,44 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
         self.prob.model.nonlinear_solver = NonlinearBlockGS()
+        self.prob.model.linear_solver = LinearBlockGS()
 
-        self.prob.model.add_design_var('x', lower=-100, upper=100)
-        self.prob.model.add_design_var('z', lower=-100, upper=100)
+        self.prob.model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        self.prob.model.add_design_var('x', lower=0.0, upper=10.0)
         self.prob.model.add_objective('obj')
-        self.prob.model.add_constraint('con1')
-        self.prob.model.add_constraint('con2')
+        self.prob.model.add_constraint('con1', upper=0.0)
+        self.prob.model.add_constraint('con2', upper=0.0)
 
     def setup_sellar_grouped_model(self):
+        self.prob = Problem()
+
+        model = self.prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        mda = model.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
+        mda.linear_solver = ScipyIterativeSolver()
+        mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                            z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        mda.nonlinear_solver = NonlinearBlockGS()
+        model.linear_solver = LinearBlockGS()
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+    def setup_sellar_grouped_scaled_model(self):
         self.prob = Problem()
 
         model = self.prob.model = Group()
@@ -101,7 +131,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         mda.nonlinear_solver = NonlinearBlockGS()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = LinearBlockGS()
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
         model.add_design_var('x', lower=0.0, upper=10.0)
@@ -191,7 +221,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Test values from one case, the last case
         last_case = cr.driver_cases.get_case(-1)
-        np.testing.assert_almost_equal(last_case.desvars['pz.z'], [1.9776389,  0.],
+        np.testing.assert_almost_equal(last_case.desvars['pz.z'], self.prob['z'],
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('pz.z'))
@@ -328,7 +358,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         if OPTIMIZER is None:
             raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
 
-        self.setup_sellar_grouped_model()
+        self.setup_sellar_grouped_scaled_model()
 
         self.prob.driver = pyOptSparseDriver()
         self.prob.driver.options['optimizer'] = OPTIMIZER
@@ -388,11 +418,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(
                 sorted(cr.solver_metadata.keys()),
-                sorted(['root.LinearRunOnce', 'root.NonlinearBlockGS', 'd1.NonlinearBlockGS'])
+                sorted(['root.LinearBlockGS', 'root.NonlinearBlockGS', 'd1.NonlinearBlockGS'])
         )
         self.assertEqual(cr.solver_metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
         self.assertEqual(cr.solver_metadata['root.NonlinearBlockGS']['solver_options']['maxiter'],10)
-        self.assertEqual(cr.solver_metadata['root.LinearRunOnce']['solver_class'],'LinearRunOnce')
+        self.assertEqual(cr.solver_metadata['root.LinearBlockGS']['solver_class'],'LinearBlockGS')
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
