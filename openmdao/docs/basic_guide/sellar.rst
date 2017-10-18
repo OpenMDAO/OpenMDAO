@@ -1,18 +1,21 @@
-.. _sellar:
-
 In previous tutorials, you built and optimized models comprised of only a single component.
 Now, we'll work through a slightly more complex problem that involves two disciplines and hence two main components.
 You'll learn how to group components together into a larger model and how to use
-different kinds of nonlinear solvers to converge multidisciplinary models with coupling between components.
+a :ref:`NonlinearBlockGaussSeidel <nlbgs>` nonlinear solver to converge a group with coupled components.
 
-****************************************
-Sellar - A Simple Two-Discipline Problem
-****************************************
+.. _sellar:
 
-The Sellar problem is a simple two discipline toy problem with each discipline described by a single
-equation. The output of each component feeds into the input of the other, which creates a coupled model that needs to
+***********************************************************
+Sellar - A Two-Discipline Problem with a Nonlinear Solver
+***********************************************************
+
+The Sellar problem is a two discipline toy problem with each discipline described by a single equation.
+There isn't any physical significance to the equations, its just compact example to use as a means of understanding
+simple coupled models.
+The output of each component feeds into the input of the other, which creates a coupled model that needs to
 be converged in order for the outputs to be valid.
-You can see the coupling between the two disciplines show up through the :math:`y_1` and :math:`y_2` variables in the XDSM diagram describing the problem structure below:
+You can see the coupling between the two disciplines show up through the :math:`y_1` and :math:`y_2` variables in the
+`XDSM <http://mdolab.engin.umich.edu/content/xdsm-overview>`_ diagram describing the problem structure below:
 
 .. figure:: images/sellar_xdsm.png
    :align: center
@@ -110,7 +113,7 @@ Promoting variables with the same name connects them
 -----------------------------------------------------
 
 The data connections in this model are made via promotion.
-OpenMDAO will look at each level of the hierarchy and find all the connect all output-input pairs with the same name.
+OpenMDAO will look at each level of the hierarchy and connect all output-input pairs with the same name.
 
 
 ExecComp is a helper component for quickly defining components for simple equations
