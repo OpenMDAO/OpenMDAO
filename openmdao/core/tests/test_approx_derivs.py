@@ -548,6 +548,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
+
 def title(txt):
     """ Provide nice title for parameterized testing."""
     return str(txt).split('.')[-1].replace("'", '').replace('>', '')

@@ -291,6 +291,11 @@ class AssembledJacobian(Jacobian):
         ext_mtx = self._ext_mtx[system.pathname]
         iters = self._subjac_iters[system.pathname]
         if iters is None:
+
+            # This is the level where the AssembledJacobian is slotted.
+            # The of and wrt are the inputs and outputs that it sees, if they are in the subjacs.
+            # TODO - For top level FD, the subjacs might not contain all derivs.
+
             iters_out = []
             iters_in = []
             iters_in_ext = []
@@ -314,7 +319,16 @@ class AssembledJacobian(Jacobian):
 
         int_mtx = self._int_mtx
         for abs_key in iters_out:
-            int_mtx._update_submat(abs_key, self._subjacs[abs_key])
+            if iters is None and abs_key not in int_mtx._submats:
+
+                # This happens when the input is an indepvarcomp that is contained in the system.
+                for tgt, src in iteritems(system._conn_global_abs_in2out):
+                    of, wrt = abs_key
+                    if src == wrt and (of, tgt) in int_mtx._submats:
+                        int_mtx._update_submat((of, tgt), self._subjacs[abs_key])
+
+            else:
+                int_mtx._update_submat(abs_key, self._subjacs[abs_key])
 
         for abs_key in iters_in:
             int_mtx._update_submat(self._keymap[abs_key], self._subjacs[abs_key])

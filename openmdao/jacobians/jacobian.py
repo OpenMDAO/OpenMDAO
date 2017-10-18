@@ -171,11 +171,18 @@ class Jacobian(object):
         subjac : int or float or ndarray or sparse matrix
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
-        if not issparse(subjac) and not self._override_checks:
+        if not issparse(subjac):
             # np.promote_types will choose the smallest dtype that can contain both arguments
             subjac = np.atleast_1d(subjac)
             safe_dtype = np.promote_types(subjac.dtype, float)
             subjac = subjac.astype(safe_dtype, copy=False)
+
+            # Bail here so that we allow top level jacobians to be of reduced size when indices are
+            # specified on driver vars.
+            if self._override_checks:
+                self._subjacs[abs_key] = subjac
+                return
+
             if abs_key in self._subjacs_info:
                 subjac_info = self._subjacs_info[abs_key][0]
                 rows = subjac_info['rows']
