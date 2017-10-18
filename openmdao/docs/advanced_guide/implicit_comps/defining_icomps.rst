@@ -55,7 +55,7 @@ ImplicitComponent - Node
 The :code:`Node` component inherits from :ref:`ImplicitComponent <comp-type-3-implicitcomp>`, which has a different interface than :ref:`ExplicitComponent <comp-type-2-explicitcomp>`.
 Rather than compute the values of its outputs, it computes residuals via the :code:`apply_nonlinear` method.
 When those residuals has been driven to zero, the values of the outputs will be implicitly known.
-:code:`apply_nonlinear` populates the :code:`residual` vector using values from  :code:`inputs` and :code:`outputs` vectors.
+:code:`apply_nonlinear` computes the :code:`residuals` using values from  :code:`inputs` and :code:`outputs`.
 Notice that we still defined *V* as an output of the :code:`Node` component, albeit one that is implicitly defined.
 
 
