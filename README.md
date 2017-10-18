@@ -1,9 +1,9 @@
 
-[![Build Status](https://travis-ci.org/OpenMDAO/blue.svg?branch=master)](https://travis-ci.org/OpenMDAO/blue)   [![Build status](https://ci.appveyor.com/api/projects/status/33kct0irhbgcg8m1?svg=true
-)](https://ci.appveyor.com/project/OpenMDAO/blue/branch/master)  [![Coverage Status](https://coveralls.io/repos/github/OpenMDAO/blue/badge.svg?branch=master)](https://coveralls.io/github/OpenMDAO/blue?branch=master)
+[![Build Status](https://travis-ci.org/OpenMDAO/OpenMDAO.svg?branch=master)](https://travis-ci.org/OpenMDAO/OpenMDAO)   [![Build status](https://ci.appveyor.com/api/projects/status/33kct0irhbgcg8m1?svg=true
+)](https://ci.appveyor.com/project/OpenMDAO/OpenMDAO/branch/master)  [![Coverage Status](https://coveralls.io/repos/github/OpenMDAO/OpenMDAO/badge.svg?branch=master)](https://coveralls.io/github/OpenMDAO/OpenMDAO?branch=master)
 
 #OpenMDAO 2.0
-This is the PRE-ALPHA version of OpenMDAO 2.0
+This is an ALPHA version of OpenMDAO 2.0
 
 Our docs are available at [http://openmdao.org/twodocs](http://openmdao.org/twodocs)
 
@@ -11,15 +11,25 @@ Important Note:
 ---------------
 
 While the API is MOSTLY stable, we reserve the right to change things as needed.
-Production runs should still be done in 1.7.x for now.
 
 We will be making very frequent updates to this code. If you’re going to try it,
-make sure you pull these updates often
+make sure you pull these updates often.
+
+Our previous code, OpenMDAO 1.7.3, is a completely different codebase,
+with a repository at https://github.com/OpenMDAO/OpenMDAO1
+
+The OpenMDAO 1.7.3 codebase repo has been renamed to OpenMDAO1, and it resides at https://github.com/OpenMDAO/OpenMDAO1
+
+The OpenMDAO 2.0.x code has taken the name OpenMDAO, 
+and it resides at https://github.com/OpenMDAO/OpenMDAO.
+
+Installation of 2.0.x code will now work with `pip install openmdao`.  
+Installation of 1.7.3 code will now only work with a version specifier: `pip install openmdao==1.7.3`
 
 Features of OpenMDAO 1.7.x Not Yet in 2.x
 -----------------------------------------
 
-Be aware that this is a PRE-ALPHA. 
+Be aware that this is an Alpha. 
 Not all the features of 1.7.x exist in blue yet. 
 Here is a list of things that have not yet been fully developed in 2.x:
 
