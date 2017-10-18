@@ -174,11 +174,12 @@ class Jacobian(object):
             subjac = np.atleast_1d(subjac)
             safe_dtype = np.promote_types(subjac.dtype, float)
             subjac = subjac.astype(safe_dtype, copy=False)
-            if abs_key not in self._subjacs_info:
-                rows = None
-            else:
+            if abs_key in self._subjacs_info:
                 subjac_info = self._subjacs_info[abs_key][0]
                 rows = subjac_info['rows']
+            else:
+                rows = None
+
             if rows is None:
                 # Dense subjac
                 shape = self._abs_key2shape(abs_key)

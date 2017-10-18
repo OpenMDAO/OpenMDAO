@@ -98,7 +98,7 @@ class TestDataUploader(unittest.TestCase):
             self.assertTrue(False, 'Expected to find a value with a unique name in the comp_set,\
              but found 0 or more than 1 instead')
             return
-        np.testing.assert_almost_equal(test_val['values'], values_arr[0]['values'], decimal=5)
+        np.testing.assert_almost_equal(test_val['values'], values_arr[0]['values'], decimal=3)
 
     def setup_sellar_model(self):
         self.prob = Problem()
@@ -115,12 +115,13 @@ class TestDataUploader(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
         self.prob.model.nonlinear_solver = NonlinearBlockGS()
+        self.prob.model.linear_solver = LinearBlockGS()
 
-        self.prob.model.add_design_var('x', lower=-100, upper=100)
-        self.prob.model.add_design_var('z', lower=-100, upper=100)
+        self.prob.model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        self.prob.model.add_design_var('x', lower=0.0, upper=10.0)
         self.prob.model.add_objective('obj')
-        self.prob.model.add_constraint('con1')
-        self.prob.model.add_constraint('con2')
+        self.prob.model.add_constraint('con1', upper=0.0)
+        self.prob.model.add_constraint('con2', upper=0.0)
 
     def setup_sellar_grouped_model(self):
         self.prob = Problem()
@@ -731,8 +732,8 @@ class TestDataUploader(unittest.TestCase):
 
         solver_iteration = json.loads(self.solver_iterations)
 
-        expected_abs_error = 5.041402548755789e-06
-        expected_rel_error = 1.3876088080160474e-07
+        expected_abs_error = 2.1677810075550974e-10
+        expected_rel_error = 5.966657077752565e-12
         self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
         self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
         self.assertEqual(solver_iteration['solver_residuals'], [])
@@ -1043,7 +1044,7 @@ class TestDataUploader(unittest.TestCase):
 
         # System recording test
         expected_inputs = []
-        expected_outputs = [{'name': 'pz.z', 'values': [1.97764, -1.13287e-15]}]
+        expected_outputs = [{'name': 'pz.z', 'values': [1.978467, -1.64641e-13]}]
         expected_residuals = [{'name': 'pz.z', 'values': [0.0, 0.0]}]
 
         system_iteration = json.loads(self.system_iterations)
@@ -1058,10 +1059,10 @@ class TestDataUploader(unittest.TestCase):
 
         # Solver recording test
         expected_abs_error = 3.90598e-11
-        expected_rel_error = 1.037105199e-6
+        expected_rel_error = 2.0701941158e-06
 
         expected_solver_output = [
-            {'name': 'mda.d2.y2', 'values': [3.75527777]},
+            {'name': 'mda.d2.y2', 'values': [3.75610598]},
             {'name': 'mda.d1.y1', 'values': [3.16]}
         ]
 
@@ -1072,8 +1073,8 @@ class TestDataUploader(unittest.TestCase):
 
         solver_iteration = json.loads(self.solver_iterations)
 
-        self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
-        self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
+        np.testing.assert_almost_equal(expected_abs_error, solver_iteration['abs_err'], decimal=5)
+        np.testing.assert_almost_equal(expected_rel_error, solver_iteration['rel_err'], decimal=5)
 
         for o in expected_solver_output:
             self.assert_array_close(o, solver_iteration['solver_output'])

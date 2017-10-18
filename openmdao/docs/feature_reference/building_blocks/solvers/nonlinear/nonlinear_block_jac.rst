@@ -29,10 +29,18 @@ checked to see if termination has been satisfied.
 
 You can control the termination criteria for the solver using the following options:
 
-Options
--------
+NonlinearBlockJac Options
+-------------------------
 
-- maxiter
+.. embed-options::
+    openmdao.solvers.nonlinear.nonlinear_block_jac
+    NonlinearBlockJac
+    options
+
+NonlinearBlockJac Option Examples
+---------------------------------
+
+**maxiter**
 
   This lets you specify the maximum number of Jacobi iterations to apply. In this example, we
   cut it back from the default (10) to 2 so that it terminates a few iterations earlier and doesn't
@@ -41,7 +49,7 @@ Options
   .. embed-test::
       openmdao.solvers.nonlinear.tests.test_nonlinear_block_jac.TestNLBlockJacobi.test_feature_maxiter
 
-- atol
+**atol**
 
   Here, we set the absolute tolerance to a looser value that will trigger an earlier termination. After
   each iteration, the norm of the residuals is calculated by calling `apply_nonlinear` on implicit
@@ -51,7 +59,7 @@ Options
   .. embed-test::
       openmdao.solvers.nonlinear.tests.test_nonlinear_block_jac.TestNLBlockJacobi.test_feature_atol
 
-- rtol
+**rtol**
 
   Here, we set the relative tolerance to a looser value that will trigger an earlier termination. After
   each iteration, the norm of the residuals is calculated by calling `apply_nonlinear` on implicit

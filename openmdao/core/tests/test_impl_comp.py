@@ -417,6 +417,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['sub.comp2.y'], 77., 1e-5)
 
     def test_guess_nonlinear_feature(self):
+        from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, NewtonSolver, ScipyIterativeSolver
 
         class ImpWithInitial(ImplicitComponent):
 
@@ -491,9 +492,31 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp2.x'], 3.)
 
 
+class QuadGroup(Group):
+    def setup(self):
+        comp1 = self.add_subsystem('comp1', IndepVarComp())
+        comp1.add_output('a', 1.0)
+        comp1.add_output('b', 1.0)
+        comp1.add_output('c', 1.0)
+
+        sub = self.add_subsystem('sub', Group())
+        sub.add_subsystem('comp2', QuadraticComp())
+        sub.add_subsystem('comp3', QuadraticComp())
+
+        self.connect('comp1.a', 'sub.comp2.a')
+        self.connect('comp1.b', 'sub.comp2.b')
+        self.connect('comp1.c', 'sub.comp2.c')
+        self.connect('comp1.a', 'sub.comp3.a')
+        self.connect('comp1.b', 'sub.comp3.b')
+        self.connect('comp1.c', 'sub.comp3.c')
+
+
 class ListFeatureTestCase(unittest.TestCase):
 
     def setUp(self):
+        from openmdao.api import Group, Problem, IndepVarComp
+        from openmdao.core.tests.test_impl_comp import QuadraticComp
+
         group = Group()
 
         comp1 = group.add_subsystem('comp1', IndepVarComp())
@@ -512,7 +535,6 @@ class ListFeatureTestCase(unittest.TestCase):
         group.connect('comp1.b', 'sub.comp3.b')
         group.connect('comp1.c', 'sub.comp3.c')
 
-        global prob  # so we don't need `self.` in feature doc
         prob = Problem(model=group)
         prob.setup()
 
@@ -522,21 +544,93 @@ class ListFeatureTestCase(unittest.TestCase):
         prob.run_model()
 
     def test_list_inputs(self):
+        from openmdao.api import Problem
+        from openmdao.core.tests.test_impl_comp import QuadGroup
+
+        prob = Problem()
+        prob.model = QuadGroup()
+        prob.setup()
+
+        prob['comp1.a'] = 1.
+        prob['comp1.b'] = -4.
+        prob['comp1.c'] = 3.
+        prob.run_model()
+
         prob.model.list_inputs()
 
     def test_list_outputs(self):
+        from openmdao.api import Problem
+        from openmdao.core.tests.test_impl_comp import QuadGroup
+
+        prob = Problem()
+        prob.model = QuadGroup()
+        prob.setup()
+
+        prob['comp1.a'] = 1.
+        prob['comp1.b'] = -4.
+        prob['comp1.c'] = 3.
+        prob.run_model()
+
         prob.model.list_outputs()
 
     def test_list_explicit_outputs(self):
+        from openmdao.api import Problem
+        from openmdao.core.tests.test_impl_comp import QuadGroup
+
+        prob = Problem()
+        prob.model = QuadGroup()
+        prob.setup()
+
+        prob['comp1.a'] = 1.
+        prob['comp1.b'] = -4.
+        prob['comp1.c'] = 3.
+        prob.run_model()
+
         prob.model.list_outputs(implicit=False)
 
     def test_list_implicit_outputs(self):
+        from openmdao.api import Problem
+        from openmdao.core.tests.test_impl_comp import QuadGroup
+
+        prob = Problem()
+        prob.model = QuadGroup()
+        prob.setup()
+
+        prob['comp1.a'] = 1.
+        prob['comp1.b'] = -4.
+        prob['comp1.c'] = 3.
+        prob.run_model()
+
         prob.model.list_outputs(explicit=False)
 
     def test_list_residuals(self):
+        from openmdao.api import Problem
+        from openmdao.core.tests.test_impl_comp import QuadGroup
+
+        prob = Problem()
+        prob.model = QuadGroup()
+        prob.setup()
+
+        prob['comp1.a'] = 1.
+        prob['comp1.b'] = -4.
+        prob['comp1.c'] = 3.
+        prob.run_model()
+
         prob.model.list_residuals()
 
     def test_list_return_value(self):
+        from openmdao.api import Problem
+        from openmdao.core.tests.test_impl_comp import QuadGroup
+
+        prob = Problem()
+        prob.model = QuadGroup()
+        prob.setup()
+
+        prob['comp1.a'] = 1.
+        prob['comp1.b'] = -4.
+        prob['comp1.c'] = 3.
+        prob.run_model()
+
         # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
@@ -567,6 +661,18 @@ class ListFeatureTestCase(unittest.TestCase):
         ])
 
     def test_list_no_values(self):
+        from openmdao.api import Problem
+        from openmdao.core.tests.test_impl_comp import QuadGroup
+
+        prob = Problem()
+        prob.model = QuadGroup()
+        prob.setup()
+
+        prob['comp1.a'] = 1.
+        prob['comp1.b'] = -4.
+        prob['comp1.c'] = 3.
+        prob.run_model()
+
         # list inputs
         inputs = prob.model.list_inputs(values=False)
         self.assertEqual(sorted(inputs), [

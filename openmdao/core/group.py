@@ -15,8 +15,8 @@ from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
 from openmdao.core.component import Component
+from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
-from openmdao.proc_allocators.proc_allocator import ProcAllocationError
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
@@ -33,6 +33,13 @@ namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
 class Group(System):
     """
     Class used to group systems together; instantiate or inherit.
+
+    Attributes
+    ----------
+    _mpi_proc_allocator : ProcAllocator
+        Object used to allocate MPI processes to subsystems.
+    proc_weights : list of float
+        Weights used to determine MPI process allocation to subsystems.
     """
 
     def __init__(self, **kwargs):
@@ -54,6 +61,8 @@ class Group(System):
             self._nonlinear_solver = NonLinearRunOnce()
         if not self._linear_solver:
             self._linear_solver = LinearRunOnce()
+        self._mpi_proc_allocator = DefaultAllocator()
+        self.proc_weights = None
 
     def setup(self):
         """
@@ -136,15 +145,11 @@ class Group(System):
         self.setup()
         self._static_mode = True
 
-        req_procs = [s.get_req_procs() for s in self._subsystems_allprocs]
         # Call the load balancing algorithm
-        try:
-            sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(req_procs, comm)
-        except ProcAllocationError as err:
-            raise RuntimeError("subsystem %s requested %d processes "
-                               "but got %d" %
-                               (self._subsystems_allprocs[err.sub_idx].pathname,
-                                err.requested, err.remaining))
+        sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(
+            self.proc_weights,
+            len(self._subsystems_allprocs),
+            comm)
 
         # Define local subsystems
         self._subsystems_myproc = [self._subsystems_allprocs[ind]
@@ -157,7 +162,7 @@ class Group(System):
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
-            if self.pathname is not '':
+            if self.pathname:
                 sub_pathname = '.'.join((self.pathname, subsys.name))
             else:
                 sub_pathname = subsys.name
@@ -337,6 +342,8 @@ class Group(System):
         if recurse:
             for subsys in self._subsystems_myproc:
                 subsys._setup_var_data(recurse)
+                self._has_output_scaling |= subsys._has_output_scaling
+                self._has_resid_scaling |= subsys._has_resid_scaling
 
         for subsys in self._subsystems_myproc:
             var_maps = subsys._get_maps(subsys._var_allprocs_prom2abs_list)
@@ -374,19 +381,25 @@ class Group(System):
         # If running in parallel, allgather
         if self.comm.size > 1:
             if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
-                raw = (allprocs_abs_names, allprocs_prom2abs_list, allprocs_abs2meta)
+                raw = (allprocs_abs_names, allprocs_prom2abs_list, allprocs_abs2meta,
+                       self._has_output_scaling, self._has_resid_scaling)
             else:
                 raw = (
                     {'input': [], 'output': []},
                     {'input': {}, 'output': {}},
-                    {'input': {}, 'output': {}})
+                    {'input': {}, 'output': {}},
+                    False,
+                    False
+                )
             gathered = self.comm.allgather(raw)
 
             for type_ in ['input', 'output']:
                 allprocs_abs_names[type_] = []
                 allprocs_prom2abs_list[type_] = defaultdict(list)
 
-            for myproc_abs_names, myproc_prom2abs_list, myproc_abs2meta in gathered:
+            for myproc_abs_names, myproc_prom2abs_list, myproc_abs2meta, oscale, rscale in gathered:
+                self._has_output_scaling |= oscale
+                self._has_resid_scaling |= rscale
 
                 for type_ in ['input', 'output']:
 
@@ -469,9 +482,6 @@ class Group(System):
                         if sizes[rank, i] > 0:
                             owns[name] = rank
                             break
-        else:
-            self._owning_rank['input'] = defaultdict(int)
-            self._owning_rank['output'] = defaultdict(int)
 
         self._var_sizes['nonlinear'] = self._var_sizes['linear']
         self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']
@@ -658,6 +668,12 @@ class Group(System):
         else:
             path_len = len(pathname) + 1
 
+        allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
+        allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
+
+        # Check input/output units here, and set _has_input_scaling
+        # to True for this Group if units are defined and different, or if
+        # ref or ref0 are defined for the output.
         for abs_in, abs_out in iteritems(global_abs_in2out):
             # First, check that this system owns both the input and output.
             if abs_in[:len(pathname)] == pathname and abs_out[:len(pathname)] == pathname:
@@ -667,12 +683,44 @@ class Group(System):
                 if out_subsys != in_subsys:
                     abs_in2out[abs_in] = abs_out
 
+            # if connected output has scaling then we need input scaling
+            if not self._has_input_scaling:
+                out_units = allprocs_abs2meta_out[abs_out]['units']
+                in_units = allprocs_abs2meta_in[abs_in]['units']
+
+                # if units are defined and different, we need input scaling.
+                needs_input_scaling = (in_units and out_units and in_units != out_units)
+
+                # we also need it if a connected output has any scaling.
+                if not needs_input_scaling:
+                    out_meta = allprocs_abs2meta_out[abs_out]
+
+                    ref = out_meta['ref']
+                    if np.isscalar(ref):
+                        needs_input_scaling = ref != 1.0
+                    else:
+                        needs_input_scaling = np.any(ref != 1.0)
+
+                    if not needs_input_scaling:
+                        ref0 = out_meta['ref0']
+                        if np.isscalar(ref0):
+                            needs_input_scaling = ref0 != 0.0
+                        else:
+                            needs_input_scaling = np.any(ref0)
+
+                        if not needs_input_scaling:
+                            res_ref = out_meta['res_ref']
+                            if np.isscalar(res_ref):
+                                needs_input_scaling = res_ref != 1.0
+                            else:
+                                needs_input_scaling = np.any(res_ref != 1.0)
+
+                self._has_input_scaling = needs_input_scaling
+
         # Now that both implicit & explicit connections have been added,
         # check unit/shape compatibility, but only for connections that are
         # either owned by (implicit) or declared by (explicit) this Group.
-        # This way, we don't repeat the error checking in multiple groups
-        allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
-        allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
+        # This way, we don't repeat the error checking in multiple groups.
         abs2meta_in = self._var_abs2meta['input']
         abs2meta_out = self._var_abs2meta['output']
 
@@ -915,8 +963,6 @@ class Group(System):
                         rev_xfer_in[isub][key] = []
                         rev_xfer_out[isub][key] = []
 
-            allprocs_abs2idx_in = self._var_allprocs_abs2idx[vec_name]['input']
-            allprocs_abs2idx_out = self._var_allprocs_abs2idx[vec_name]['output']
             allprocs_abs2idx_byset_in = self._var_allprocs_abs2idx_byset[vec_name]['input']
             allprocs_abs2idx_byset_out = self._var_allprocs_abs2idx_byset[vec_name]['output']
             sizes_byset_in = self._var_sizes_byset[vec_name]['input']
@@ -1242,62 +1288,6 @@ class Group(System):
                              (self.pathname, sorted(dupes)))
 
         subsystems[:] = [olddict[name] for name in new_order]
-
-    def get_req_procs(self):
-        """
-        Return the min and max MPI processes usable by this Group.
-
-        Returns
-        -------
-        tuple : (int, int or None)
-            A tuple of the form (min_procs, max_procs), indicating the min
-            and max processors usable by this <Group>.  max_procs can be None,
-            indicating all available procs can be used.
-        """
-        # NOTE: this must only be called BEFORE _subsystems_allprocs and
-        # _static_subsystems_allprocs have been combined, else we may
-        # double count some subsystems and mess up the proc allocation.
-
-        if self._static_subsystems_allprocs or self._subsystems_allprocs:
-            if self._mpi_proc_allocator.parallel:
-                # for a parallel group, we add up all of the required procs
-                min_procs, max_procs = 0, 0
-
-                for sub in chain(self._static_subsystems_allprocs,
-                                 self._subsystems_allprocs):
-                    sub_min, sub_max = sub.get_req_procs()
-                    if sub_min > min_procs:
-                        min_procs = sub_min
-                    if max_procs is not None:
-                        if sub_max is None:
-                            max_procs = None
-                        else:
-                            max_procs += sub_max
-
-                if min_procs == 0:
-                    min_procs = 1
-
-                if max_procs == 0:
-                    max_procs = 1
-
-                return (min_procs, max_procs)
-            else:
-                # for a serial group, we take the max required procs
-                min_procs, max_procs = 1, 1
-
-                for sub in chain(self._static_subsystems_allprocs,
-                                 self._subsystems_allprocs):
-                    sub_min, sub_max = sub.get_req_procs()
-                    min_procs = max(min_procs, sub_min)
-                    if max_procs is not None:
-                        if sub_max is None:
-                            max_procs = None
-                        else:
-                            max_procs = max(max_procs, sub_max)
-
-                return (min_procs, max_procs)
-        else:
-            return super(Group, self).get_req_procs()
 
     def get_subsystem(self, name):
         """

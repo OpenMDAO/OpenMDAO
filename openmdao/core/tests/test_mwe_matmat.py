@@ -14,6 +14,7 @@ try:
 except ImportError:
     PETScVector = None
 
+
 class ADFLOWComp(ExplicitComponent):
 
     def setup(self):
@@ -36,11 +37,8 @@ class ADFLOWComp(ExplicitComponent):
     def compute_partials(self, inputs, partials):
         pass
 
-    def get_req_procs(self):
-        return (1,4)
 
-
-@unittest.skipUnless(MPI, "Only works under MPI.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MatMatTestCase(unittest.TestCase):
     N_PROCS = 4
 

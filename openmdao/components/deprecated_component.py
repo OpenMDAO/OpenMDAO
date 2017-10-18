@@ -151,15 +151,21 @@ class Component(BaseComponent):
         """
         Compute residuals.
         """
-        self._scale_vec(self._inputs, 'input', 'phys')
-        self._scale_vec(self._outputs, 'output', 'phys')
-        self._scale_vec(self._residuals, 'residual', 'phys')
+        if self._has_input_scaling:
+            self._inputs.scale('phys')
+        if self._has_output_scaling:
+            self._outputs.scale('phys')
+        if self._has_resid_scaling:
+            self._residuals.scale('phys')
 
         self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
 
-        self._scale_vec(self._inputs, 'input', 'norm')
-        self._scale_vec(self._outputs, 'output', 'norm')
-        self._scale_vec(self._residuals, 'residual', 'norm')
+        if self._has_input_scaling:
+            self._inputs.scale('norm')
+        if self._has_output_scaling:
+            self._outputs.scale('norm')
+        if self._has_resid_scaling:
+            self._residuals.scale('norm')
 
     def _solve_nonlinear(self):
         """
@@ -179,15 +185,19 @@ class Component(BaseComponent):
         if self._nonlinear_solver is not None:
             self._nonlinear_solver.solve()
         else:
-            self._scale_vec(self._inputs, 'input', 'phys')
-            self._scale_vec(self._outputs, 'output', 'phys')
-            self._scale_vec(self._residuals, 'residual', 'phys')
+            if self._has_input_scaling:
+                self._inputs.scale('phys')
+            if self._has_output_scaling:
+                self._outputs.scale('phys')
+                self._residuals.scale('phys')
 
             self.solve_nonlinear(self._inputs, self._outputs, self._residuals)
 
-            self._scale_vec(self._inputs, 'input', 'norm')
-            self._scale_vec(self._outputs, 'output', 'norm')
-            self._scale_vec(self._residuals, 'residual', 'norm')
+            if self._has_input_scaling:
+                self._inputs.scale('norm')
+            if self._has_output_scaling:
+                self._outputs.scale('norm')
+                self._residuals.scale('norm')
 
     def _apply_linear(self, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
@@ -268,8 +278,8 @@ class Component(BaseComponent):
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
 
-                self._scale_vec(d_outputs, 'output', 'phys')
-                self._scale_vec(d_residuals, 'residual', 'phys')
+                d_outputs.scale('phys')
+                d_residuals.scale('phys')
 
             self.solve_linear(self._vectors['output'],
                               self._vectors['residual'],
@@ -288,8 +298,8 @@ class Component(BaseComponent):
                             elif mode == 'rev':
                                 d_residuals[name] = d_outputs[name]
 
-                self._scale_vec(d_outputs, 'output', 'norm')
-                self._scale_vec(d_residuals, 'residual', 'norm')
+                d_outputs.scale('norm')
+                d_residuals.scale('norm')
 
             return False, 0., 0.
 

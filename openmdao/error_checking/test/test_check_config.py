@@ -119,7 +119,7 @@ class TestCheckConfig(unittest.TestCase):
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 3)
 
-        self.assertEqual(warnings[0], "Group '' has the following cycles: [['C4', 'G1']]")
+        self.assertEqual(warnings[0], "Group '' has the following cycles: [['G1', 'C4']]")
         self.assertEqual(warnings[1], "System 'C3' executes out-of-order with respect to its source systems ['C4']")
         self.assertEqual(warnings[2], "System 'G1.C1' executes out-of-order with respect to its source systems ['G1.C2']")
 
@@ -168,24 +168,26 @@ class TestCheckConfig(unittest.TestCase):
                 root.connect("C%d.y" % i, "C%d.a" % (i+1))
             root.connect("C%d.y" % end, "C%d.a" % start)
 
-        make_cycle(root, 1, 3)
+        G1 = root.add_subsystem('G1', Group())
 
-        root.add_subsystem("N1", MyComp())
+        make_cycle(G1, 1, 3)
 
-        make_cycle(root, 11, 13)
+        G1.add_subsystem("N1", MyComp())
 
-        root.add_subsystem("N2", MyComp())
+        make_cycle(G1, 11, 13)
 
-        make_cycle(root, 21, 23)
+        G1.add_subsystem("N2", MyComp())
 
-        root.add_subsystem("N3", MyComp())
+        make_cycle(G1, 21, 23)
 
-        root.connect("N1.z", "C12.b")
-        root.connect("C13.z", "N2.b")
-        root.connect("N2.z", "C21.b")
-        root.connect("C23.z", "N3.b")
-        root.connect("N3.z", "C2.b")
-        root.connect("C11.z", "C3.b")
+        G1.add_subsystem("N3", MyComp())
+
+        G1.connect("N1.z", "C12.b")
+        G1.connect("C13.z", "N2.b")
+        G1.connect("N2.z", "C21.b")
+        G1.connect("C23.z", "N3.b")
+        G1.connect("N3.z", "C2.b")
+        G1.connect("C11.z", "C3.b")
 
         testlogger = TestLogger()
         p.setup(logger=testlogger)
@@ -197,9 +199,9 @@ class TestCheckConfig(unittest.TestCase):
         self.assertEqual(len(warnings), 4)
 
         self.assertTrue("The following inputs are not connected:" in warnings[0])
-        self.assertEqual(warnings[1], "Group '' has the following cycles: [['C11', 'C12', 'C13'], ['C21', 'C22', 'C23'], ['C1', 'C2', 'C3']]")
-        self.assertEqual(warnings[2], "System 'C2' executes out-of-order with respect to its source systems ['N3']")
-        self.assertEqual(warnings[3], "System 'C3' executes out-of-order with respect to its source systems ['C11']")
+        self.assertEqual(warnings[1], "Group 'G1' has the following cycles: [['C13', 'C12', 'C11'], ['C23', 'C22', 'C21'], ['C3', 'C2', 'C1']]")
+        self.assertEqual(warnings[2], "System 'G1.C2' executes out-of-order with respect to its source systems ['G1.N3']")
+        self.assertEqual(warnings[3], "System 'G1.C3' executes out-of-order with respect to its source systems ['G1.C11']")
 
 
 if __name__ == "__main__":

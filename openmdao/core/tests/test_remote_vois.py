@@ -33,7 +33,8 @@ class Mygroup(Group):
         self.add_constraint('c', lower=-3.)
 
 
-@unittest.skipUnless(MPI and pyOptSparseDriver, 'MPI is not running.')
+@unittest.skipUnless(MPI and PETScVector and pyOptSparseDriver,
+                     "MPI, PETSc and pyoptsparse are required.")
 class RemoteVOITestCase(unittest.TestCase):
 
     N_PROCS = 2

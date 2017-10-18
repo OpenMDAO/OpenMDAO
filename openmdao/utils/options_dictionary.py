@@ -2,6 +2,17 @@
 from __future__ import division, print_function
 
 
+class Null(object):
+    """
+    Dummy class instantiated to check whether the default argument is given.
+    """
+
+    pass
+
+
+null_object = Null()
+
+
 class OptionsDictionary(object):
     """
     Dictionary with pre-declaration of keys for value-checking and default values.
@@ -81,31 +92,28 @@ class OptionsDictionary(object):
         if is_valid is not None and not is_valid(value):
             raise ValueError("Function is_valid returns False for {}.".format(name))
 
-    def declare(self, name, default=None, values=None, type_=None, desc='', required=False,
+    def declare(self, name, default=null_object, values=None, type_=None, desc='',
                 upper=None, lower=None, is_valid=None):
-        """
+        r"""
         Declare an option.
 
         The value of the option must satisfy the following:
-        1. If values and not type_ was given when declaring, value must be in values.
-        2. If type_ and not values was given when declaring, value must be an instance of type_.
-        3. If values and type_ were given when declaring, either of the above must be true.
+        1. If values and not type was given when declaring, value must be in values.
+        2. If type and not values was given when declaring, value must be an instance of type.
+        3. If values and type were given when declaring, either of the above must be true.
 
         Parameters
         ----------
         name : str
             Name of the option.
-        default : object or None
+        default : object or Null
             Optional default value that must be valid under the above 3 conditions.
         values : set or list or tuple or None
             Optional list of acceptable option values.
-        type_ : type or tuple of types or None
+        type_ : type or set/list/tuple of types or None
             Optional type or list of acceptable option types.
         desc : str
             Optional description of the option.
-        required : bool
-            Whether the key must be set prior to reading its value
-            (as opposed to just using the default).
         upper : float or None
             Maximum allowable value.
         lower : float or None
@@ -115,8 +123,10 @@ class OptionsDictionary(object):
         """
         if values is not None and not isinstance(values, (set, list, tuple)):
             raise TypeError("'values' must be of type None, list, or tuple - not %s." % values)
-        if type_ is not None and not isinstance(type_, (type, tuple)):
+        if type_ is not None and not isinstance(type_, (type, set, list, tuple)):
             raise TypeError("'type_' must be None, a type or a tuple  - not %s." % type_)
+
+        default_provided = default != null_object
 
         self._dict[name] = {
             'value': default,
@@ -126,11 +136,11 @@ class OptionsDictionary(object):
             'upper': upper,
             'lower': lower,
             'is_valid': is_valid,
-            'has_been_set': not required,  # If not required, has_been_set is True from the getgo
+            'has_been_set': default_provided,
         }
 
         # If a default is given, check for validity
-        if default is not None:
+        if default_provided:
             self._assert_valid(name, default)
 
     def update(self, in_dict):

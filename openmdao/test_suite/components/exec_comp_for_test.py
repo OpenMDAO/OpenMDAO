@@ -54,9 +54,6 @@ class ExecComp4Test(ExecComp):
         self.fails = fails
         self.fail_hard = fail_hard
 
-    def get_req_procs(self):
-        return self.req_procs
-
     def compute(self, inputs, outputs):
         """
         Execute this component's assignment statements.

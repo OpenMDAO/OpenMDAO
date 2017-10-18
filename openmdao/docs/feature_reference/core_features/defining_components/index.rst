@@ -1,8 +1,8 @@
 .. _feature_building_components:
 
-**********************
-Building Components
-**********************
+**************************
+Working with Components
+**************************
 
 .. toctree::
     :maxdepth: 1
@@ -14,3 +14,4 @@ Building Components
     distributed_comps.rst
     units.rst
     scaling.rst
+    metadata.rst

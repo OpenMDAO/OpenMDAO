@@ -3,6 +3,7 @@ Class definition for SqliteRecorder, which provides dictionary backed by SQLite.
 """
 
 import io
+import os
 import sqlite3
 
 import numpy as np
@@ -56,9 +57,16 @@ class SqliteRecorder(BaseRecorder):
         Sqlite3 system cursor via the con.
     """
 
-    def __init__(self, out):
+    def __init__(self, filepath, append=False):
         """
         Initialize the SqliteRecorder.
+
+        Parameters
+        ----------
+        filepath: str
+            Path to the recorder file.
+        append : bool
+            Optional. If True, append to an existing case recorder file.
         """
         super(SqliteRecorder, self).__init__()
 
@@ -69,40 +77,46 @@ class SqliteRecorder(BaseRecorder):
 
         self.model_viewer_data = None
 
-        if self._open_close_sqlite:
-            # isolation_level=None causes autocommit
-            self.con = sqlite3.connect(out, isolation_level=None)
+        if append:
+            raise NotImplementedError("Append feature not implemented for SqliteRecorder")
 
-            self.cursor = self.con.cursor()
+        if self._open_close_sqlite and not append:
+            try:
+                os.remove(filepath)
+            except OSError:
+                pass
+            self.con = sqlite3.connect(filepath)
+            with self.con:
+                self.cursor = self.con.cursor()
+                self.cursor.execute("CREATE TABLE metadata( format_version INT)")
+                self.cursor.execute("INSERT INTO metadata(format_version) VALUES(?)",
+                                    (format_version,))
 
-            self.cursor.execute("CREATE TABLE metadata( format_version INT)")
-            self.cursor.execute("INSERT INTO metadata(format_version) VALUES(?)", (format_version,))
+                # used to keep track of the order of the case records across all three tables
+                self.cursor.execute("CREATE TABLE global_iterations(id INTEGER PRIMARY KEY, "
+                                    "record_type TEXT, rowid INT)")
+                self.cursor.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
+                                    "counter INT,iteration_coordinate TEXT, timestamp REAL, "
+                                    "success INT, msg TEXT, desvars BLOB, responses BLOB, "
+                                    "objectives BLOB, constraints BLOB, sysincludes BLOB)")
+                self.cursor.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
+                                    "counter INT, iteration_coordinate TEXT,  timestamp REAL, "
+                                    "success INT, msg TEXT, inputs BLOB, outputs BLOB, "
+                                    "residuals BLOB)")
+                self.cursor.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, "
+                                    "counter INT, iteration_coordinate TEXT, timestamp REAL, "
+                                    "success INT, msg TEXT, abs_err REAL, rel_err REAL, "
+                                    "solver_output BLOB, solver_residuals BLOB)")
 
-            # used to keep track of the order of the case records across all three tables
-            self.cursor.execute("CREATE TABLE global_iterations(id INTEGER PRIMARY KEY, "
-                                "record_type TEXT, rowid INT)")
-            self.cursor.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
-                                "counter INT,iteration_coordinate TEXT, timestamp REAL, "
-                                "success INT, msg TEXT, desvars BLOB, responses BLOB, "
-                                "objectives BLOB, constraints BLOB)")
-            self.cursor.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
-                                "counter INT, iteration_coordinate TEXT,  timestamp REAL, "
-                                "success INT, msg TEXT, inputs BLOB, outputs BLOB, "
-                                "residuals BLOB)")
-            self.cursor.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, "
-                                "counter INT, iteration_coordinate TEXT, timestamp REAL, "
-                                "success INT, msg TEXT, abs_err REAL, rel_err REAL, "
-                                "solver_output BLOB, solver_residuals BLOB)")
-
-            self.cursor.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
-                                "model_viewer_data BLOB)")
-            self.cursor.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY,"
-                                " scaling_factors BLOB)")
-            self.cursor.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
-                                "solver_options BLOB, solver_class TEXT)")
+                self.cursor.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
+                                    "model_viewer_data BLOB)")
+                self.cursor.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY,"
+                                    " scaling_factors BLOB)")
+                self.cursor.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
+                                    "solver_options BLOB, solver_class TEXT)")
 
     def record_iteration_driver_passing_vars(self, object_requesting_recording, desvars,
-                                             responses, objectives, constraints, metadata):
+                                             responses, objectives, constraints, sysvars, metadata):
         """
         Record an iteration of a driver with the variables passed in.
 
@@ -133,7 +147,7 @@ class SqliteRecorder(BaseRecorder):
 
         super(SqliteRecorder, self).record_iteration_driver_passing_vars(
             object_requesting_recording, desvars, responses,
-            objectives, constraints, metadata)
+            objectives, constraints, sysvars, metadata)
 
         # Just an example of the syntax for creating a numpy structured array
         # arr = np.zeros((1,), dtype=[('dv_x','(5,)f8'),('dv_y','(10,)f8')])
@@ -195,21 +209,36 @@ class SqliteRecorder(BaseRecorder):
         else:
             constraints_array = None
 
+        if self._sysincludes_values:
+            dtype_tuples = []
+            for name, value in iteritems(self._sysincludes_values):
+                tple = (name, '{}f8'.format(value.shape))
+                dtype_tuples.append(tple)
+
+            sysincludes_array = np.zeros((1,), dtype=dtype_tuples)
+
+            for name, value in iteritems(self._sysincludes_values):
+                sysincludes_array[name] = value
+        else:
+            sysincludes_array = None
+
         desvars_blob = array_to_blob(desvars_array)
         responses_blob = array_to_blob(responses_array)
         objectives_blob = array_to_blob(objectives_array)
         constraints_blob = array_to_blob(constraints_array)
+        sysincludes_blob = array_to_blob(sysincludes_array)
 
-        self.cursor.execute("INSERT INTO driver_iterations(counter, iteration_coordinate, "
-                            "timestamp, success, msg, desvars , responses , objectives , "
-                            "constraints ) VALUES(?,?,?,?,?,?,?,?,?)",
-                            (self._counter, self._iteration_coordinate,
-                             metadata['timestamp'], metadata['success'],
-                             metadata['msg'], desvars_blob,
-                             responses_blob, objectives_blob,
-                             constraints_blob))
-        self.con.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
-                         ('driver', self.cursor.lastrowid))
+        with self.con:
+            self.cursor.execute("INSERT INTO driver_iterations(counter, iteration_coordinate, "
+                                "timestamp, success, msg, desvars , responses , objectives , "
+                                "constraints, sysincludes ) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                                (self._counter, self._iteration_coordinate,
+                                 metadata['timestamp'], metadata['success'],
+                                 metadata['msg'], desvars_blob,
+                                 responses_blob, objectives_blob,
+                                 constraints_blob, sysincludes_blob))
+            self.con.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
+                             ('driver', self.cursor.lastrowid))
 
     def record_iteration_system(self, object_requesting_recording, metadata):
         """
@@ -271,15 +300,16 @@ class SqliteRecorder(BaseRecorder):
         outputs_blob = array_to_blob(outputs_array)
         residuals_blob = array_to_blob(residuals_array)
 
-        self.cursor.execute("INSERT INTO system_iterations(counter, iteration_coordinate, "
-                            "timestamp, success, msg, inputs , outputs , residuals ) "
-                            "VALUES(?,?,?,?,?,?,?,?)",
-                            (self._counter, self._iteration_coordinate,
-                             metadata['timestamp'], metadata['success'],
-                             metadata['msg'], inputs_blob,
-                             outputs_blob, residuals_blob))
-        self.cursor.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
-                            ('system', self.cursor.lastrowid))
+        with self.con:
+            self.cursor.execute("INSERT INTO system_iterations(counter, iteration_coordinate, "
+                                "timestamp, success, msg, inputs , outputs , residuals ) "
+                                "VALUES(?,?,?,?,?,?,?,?)",
+                                (self._counter, self._iteration_coordinate,
+                                 metadata['timestamp'], metadata['success'],
+                                 metadata['msg'], inputs_blob,
+                                 outputs_blob, residuals_blob))
+            self.cursor.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
+                                ('system', self.cursor.lastrowid))
 
     def record_iteration_solver(self, object_requesting_recording, metadata, **kwargs):
         """
@@ -329,17 +359,18 @@ class SqliteRecorder(BaseRecorder):
         outputs_blob = array_to_blob(outputs_array)
         residuals_blob = array_to_blob(residuals_array)
 
-        self.cursor.execute("INSERT INTO solver_iterations(counter, iteration_coordinate, "
-                            "timestamp, success, msg, abs_err, rel_err, solver_output, "
-                            "solver_residuals) VALUES(?,?,?,?,?,?,?,?,?)",
-                            (self._counter, self._iteration_coordinate,
-                             metadata['timestamp'],
-                             metadata['success'], metadata['msg'],
-                             self._abs_error, self._rel_error,
-                             outputs_blob, residuals_blob))
+        with self.con:
+            self.cursor.execute("INSERT INTO solver_iterations(counter, iteration_coordinate, "
+                                "timestamp, success, msg, abs_err, rel_err, solver_output, "
+                                "solver_residuals) VALUES(?,?,?,?,?,?,?,?,?)",
+                                (self._counter, self._iteration_coordinate,
+                                 metadata['timestamp'],
+                                 metadata['success'], metadata['msg'],
+                                 self._abs_error, self._rel_error,
+                                 outputs_blob, residuals_blob))
 
-        self.cursor.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
-                            ('solver', self.cursor.lastrowid))
+            self.cursor.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
+                                ('solver', self.cursor.lastrowid))
 
     def record_metadata_driver(self, object_requesting_recording):
         """
@@ -354,8 +385,9 @@ class SqliteRecorder(BaseRecorder):
         model_viewer_data = pickle.dumps(object_requesting_recording._model_viewer_data,
                                          pickle.HIGHEST_PROTOCOL)
 
-        self.con.execute("INSERT INTO driver_metadata(id, model_viewer_data) "
-                         "VALUES(?,?)", (driver_class, sqlite3.Binary(model_viewer_data)))
+        with self.con:
+            self.con.execute("INSERT INTO driver_metadata(id, model_viewer_data) "
+                             "VALUES(?,?)", (driver_class, sqlite3.Binary(model_viewer_data)))
 
     def record_metadata_system(self, object_requesting_recording):
         """
@@ -368,18 +400,24 @@ class SqliteRecorder(BaseRecorder):
         """
         # Cannot handle PETScVector yet
         from openmdao.api import PETScVector
-        if isinstance(object_requesting_recording._scaling_vecs[('input', 'norm0')]['linear'],
-                      PETScVector):
+        if PETScVector and isinstance(object_requesting_recording._outputs, PETScVector):
             return  # Cannot handle PETScVector yet
 
-        scaling_factors = pickle.dumps(object_requesting_recording._scaling_vecs,
+        # collect scaling arrays
+        scaling_vecs = {}
+        for kind, odict in iteritems(object_requesting_recording._vectors):
+            scaling_vecs[kind] = scaling = {}
+            for vecname, vec in iteritems(odict):
+                scaling[vecname] = vec._scaling
+        scaling_factors = pickle.dumps(scaling_vecs,
                                        pickle.HIGHEST_PROTOCOL)
 
         path = object_requesting_recording.pathname
         if not path:
             path = 'root'
-        self.con.execute("INSERT INTO system_metadata(id, scaling_factors) VALUES(?,?)",
-                         (path, sqlite3.Binary(scaling_factors)))
+        with self.con:
+            self.con.execute("INSERT INTO system_metadata(id, scaling_factors) VALUES(?,?)",
+                             (path, sqlite3.Binary(scaling_factors)))
 
     def record_metadata_solver(self, object_requesting_recording):
         """
@@ -398,9 +436,10 @@ class SqliteRecorder(BaseRecorder):
 
         solver_options = pickle.dumps(object_requesting_recording.options,
                                       pickle.HIGHEST_PROTOCOL)
-        self.con.execute(
-            "INSERT INTO solver_metadata(id, solver_options, solver_class) "
-            "VALUES(?,?,?)", (id, sqlite3.Binary(solver_options), solver_class))
+        with self.con:
+            self.con.execute(
+                "INSERT INTO solver_metadata(id, solver_options, solver_class) "
+                "VALUES(?,?,?)", (id, sqlite3.Binary(solver_options), solver_class))
 
     def close(self):
         """

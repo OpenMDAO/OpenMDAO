@@ -18,10 +18,18 @@ Here, we calculate the total derivatives across the Sellar system.
 .. embed-test::
     openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyIterativeSolverFeature.test_specify_solver
 
-Options
--------
+ScipyIterativeSolver Options
+----------------------------
 
-- maxiter
+.. embed-options::
+    openmdao.solvers.linear.scipy_iter_solver
+    ScipyIterativeSolver
+    options
+
+ScipyIterativeSolver Option Examples
+------------------------------------
+
+**maxiter**
 
   This lets you specify the maximum number of GMRES iterations to apply. The default maximum is 1000, which
   is much higher than the other linear solvers because each multiplication by the system Jacobian is considered
@@ -36,7 +44,7 @@ Options
   .. embed-test::
       openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyIterativeSolverFeature.test_feature_maxiter
 
-- atol
+**atol**
 
   Here, we set the absolute tolerance to a much tighter value (default is 1.0e-12) to show what happens. In
   practice, the tolerance serves a dual role in GMRES. In addition to being a termination criteria, the tolerance
@@ -49,7 +57,7 @@ Options
   .. embed-test::
       openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyIterativeSolverFeature.test_feature_atol
 
-- rtol
+**rtol**
 
   The 'rtol' setting is not supported by Scipy GMRES.
 

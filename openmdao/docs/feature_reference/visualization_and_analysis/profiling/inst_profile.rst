@@ -90,15 +90,11 @@ runtime and total number of calls for each profiled function.  For example:
         1    0.000000   0.00 <Solver#7._declare_options>
         1    0.000000   0.00 <Solver#9._declare_options>
         1    0.000000   0.00 <Solver#15._declare_options>
-        1    0.000000   0.00 design.fan.<System.get_req_procs>
-        1    0.000000   0.00 design.nozz.<System.get_req_procs>
-        2    0.000000   0.00 design.shaft.<System.get_req_procs>
         1    0.000000   0.00 design.fc.ambient.<System.initialize>
         1    0.000000   0.00 <Solver#16._declare_options>
         1    0.000000   0.00 design.fc.conv.<System.initialize>
         1    0.000000   0.00 <Solver#20._declare_options>
         1    0.000000   0.00 <Solver#21._declare_options>
-        2    0.000000   0.00 design.fc.conv.fs.<System.get_req_procs>
         1    0.000000   0.00 <Solver#25._declare_options>
         1    0.000000   0.00 design.fc.ambient.readAtmTable.<System.initialize>
       ...

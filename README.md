@@ -2,11 +2,10 @@
 [![Build Status](https://travis-ci.org/OpenMDAO/blue.svg?branch=master)](https://travis-ci.org/OpenMDAO/blue)   [![Build status](https://ci.appveyor.com/api/projects/status/33kct0irhbgcg8m1?svg=true
 )](https://ci.appveyor.com/project/OpenMDAO/blue/branch/master)  [![Coverage Status](https://coveralls.io/repos/github/OpenMDAO/blue/badge.svg?branch=master)](https://coveralls.io/github/OpenMDAO/blue?branch=master)
 
-# blue
+#OpenMDAO 2.0
 This is the PRE-ALPHA version of OpenMDAO 2.0
-(we have codenamed it 'blue').
 
-Our docs are available at [http://openmdao.org/bluedocs](http://openmdao.org/bluedocs)
+Our docs are available at [http://openmdao.org/twodocs](http://openmdao.org/twodocs)
 
 Important Note:
 ---------------
@@ -20,11 +19,12 @@ make sure you pull these updates often
 Features of OpenMDAO 1.7.x Not Yet in 2.x
 -----------------------------------------
 
-Be aware that this is a PRE-ALPHA. 
-Not all the features of 1.7.x exist in blue yet. 
+Be aware that this is a PRE-ALPHA.
+Not all the features of 1.7.x exist in blue yet.
 Here is a list of things that have not yet been fully developed in 2.x:
 
 * Pass-by-object variables
+* automatic ordering of groups/components based on data connections
 * DOE (Design of Experiment) driver and all other case drivers
 * Parallel Finite Difference
 * File-wrapping utilities

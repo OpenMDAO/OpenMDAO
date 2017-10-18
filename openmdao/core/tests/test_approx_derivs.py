@@ -1029,6 +1029,9 @@ class TestComponentComplexStep(unittest.TestCase):
 class ApproxTotalsFeature(unittest.TestCase):
 
     def test_basic(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, ExplicitComponent
 
         class CompOne(ExplicitComponent):
 
@@ -1076,6 +1079,9 @@ class ApproxTotalsFeature(unittest.TestCase):
         self.assertEqual(comp2._exec_count, 2)
 
     def test_basic_cs(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, ExplicitComponent
 
         class CompOne(ExplicitComponent):
 
@@ -1122,6 +1128,9 @@ class ApproxTotalsFeature(unittest.TestCase):
         assert_rel_error(self, derivs['z', 'x'], [[300.0]], 1e-6)
 
     def test_arguments(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, ExplicitComponent
 
         class CompOne(ExplicitComponent):
 
@@ -1169,6 +1178,10 @@ class ApproxTotalsFeature(unittest.TestCase):
 
     def test_sellarCS(self):
         # Just tests Newton on Sellar with FD derivs.
+        import numpy as np
+
+        from openmdao.api import Problem
+        from openmdao.test_suite.components.sellar_feature import SellarNoDerivativesCS
 
         prob = Problem()
         prob.model = SellarNoDerivativesCS()
