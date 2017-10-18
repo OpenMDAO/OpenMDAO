@@ -91,7 +91,7 @@ class DriverCase(Case):
     """
 
     def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, desvars,
-                 responses, objectives, constraints):
+                 responses, objectives, constraints, sysincludes):
         """
         Initialize.
         """
@@ -102,6 +102,7 @@ class DriverCase(Case):
         self.responses = responses[0] if responses.dtype.names else None
         self.objectives = objectives[0] if objectives.dtype.names else None
         self.constraints = constraints[0] if constraints.dtype.names else None
+        self.sysincludes = sysincludes[0] if sysincludes.dtype.names else None
 
 
 class SystemCase(Case):

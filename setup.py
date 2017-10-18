@@ -85,5 +85,6 @@ setup(name='openmdao',
       iproftotals=openmdao.devtools.iprofile:_prof_totals
       iprofmem=openmdao.devtools.iprof_mem:_profile_py_file
       icalltrace=openmdao.devtools.itrace:_trace_py_file
+      run_test=openmdao.devtools.run_test:run_test
       """
 )

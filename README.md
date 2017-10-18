@@ -30,10 +30,12 @@ Features of OpenMDAO 1.7.x Not Yet in 2.x
 -----------------------------------------
 
 Be aware that this is an Alpha. 
-Not all the features of 1.7.x exist in blue yet. 
+Not all the features of 1.7.x exist in 2.x yet. 
+
 Here is a list of things that have not yet been fully developed in 2.x:
 
 * Pass-by-object variables
+* automatic ordering of groups/components based on data connections
 * DOE (Design of Experiment) driver and all other case drivers
 * Parallel Finite Difference
 * File-wrapping utilities
@@ -47,11 +49,11 @@ Installation Instructions:
 
 Use git to clone the repository:
 
-`git clone http://github.com/OpenMDAO/blue`
+`git clone http://github.com/OpenMDAO/OpenMDAO`
 
 Use pip to install openmdao locally:
 
-`cd blue`
+`cd OpenMDAO`
 
 `pip install .`
 

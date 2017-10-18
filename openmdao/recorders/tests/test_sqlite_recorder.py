@@ -42,7 +42,6 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-    optimizers = {'pyoptsparse': pyOptSparseDriver}
 
 def run_driver(problem):
     t0 = time.time()
@@ -297,12 +296,13 @@ class TestSqliteRecorder(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
         self.prob.model.nonlinear_solver = NonlinearBlockGS()
+        self.prob.model.linear_solver = LinearBlockGS()
 
-        self.prob.model.add_design_var('x', lower=-100, upper=100)
-        self.prob.model.add_design_var('z', lower=-100, upper=100)
+        self.prob.model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        self.prob.model.add_design_var('x', lower=0.0, upper=10.0)
         self.prob.model.add_objective('obj')
-        self.prob.model.add_constraint('con1')
-        self.prob.model.add_constraint('con2')
+        self.prob.model.add_constraint('con1', upper=0.0)
+        self.prob.model.add_constraint('con2', upper=0.0)
 
     def setup_sellar_grouped_model(self):
         self.prob = Problem()
@@ -357,7 +357,7 @@ class TestSqliteRecorder(unittest.TestCase):
                            }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars,
-                                           None, None, None),), self.eps)
+                                           None, None, None, None),), self.eps)
 
     def test_add_recorder_after_setup(self):
 
@@ -384,7 +384,7 @@ class TestSqliteRecorder(unittest.TestCase):
                            }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars,
-                                           None, None, None),), self.eps)
+                                           None, None, None, None),), self.eps)
 
     def test_only_objectives_recorded(self):
 
@@ -406,7 +406,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_objectives = {"obj_cmp.obj": [28.58830817, ]}
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), None, None,
-                                           expected_objectives, None),), self.eps)
+                                           expected_objectives, None, None),), self.eps)
 
     def test_only_constraints_recorded(self):
 
@@ -431,7 +431,7 @@ class TestSqliteRecorder(unittest.TestCase):
                             }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), None, None, None,
-                                           expected_constraints), ), self.eps)
+                                           expected_constraints, None), ), self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
@@ -481,7 +481,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_constraints = {"con.c": [-15.0, ], }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
-                                           expected_objectives, expected_constraints),), self.eps)
+                                           expected_objectives, expected_constraints, None),), self.eps)
 
     def test_driver_records_metadata(self):
         self.setup_sellar_model()
@@ -614,7 +614,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_constraints = {"con.c": prob['con.c'], }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
-                                           expected_objectives, expected_constraints), ), self.eps)
+                                           expected_objectives, expected_constraints, None), ), self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
@@ -664,7 +664,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_constraints = {"con.c": prob['con.c'], }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
-                                                 expected_objectives, expected_constraints), ), self.eps)
+                                                 expected_objectives, expected_constraints, None), ), self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
@@ -903,10 +903,10 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (9,)]
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,)]
 
-        expected_abs_error = 5.041402548755789e-06
-        expected_rel_error = 1.3876088080160474e-07
+        expected_abs_error = 2.1677810075550974e-10
+        expected_rel_error = 5.966657077752565e-12
         expected_solver_residuals = None
         expected_solver_output = None
 
@@ -1273,7 +1273,7 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
-                                           expected_objectives, expected_constraints),), self.eps)
+                                           expected_objectives, expected_constraints, None),), self.eps)
 
         # System recording test
         coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
@@ -1496,6 +1496,56 @@ class TestSqliteRecorder(unittest.TestCase):
             ]
         )
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
+    def test_driver_recording_with_system_vars(self):
+
+        self.setup_sellar_grouped_model()
+
+        self.prob.driver = pyOptSparseDriver()
+        self.prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            self.prob.driver.opt_settings['ACC'] = 1e-9
+
+        self.prob.driver.add_recorder(self.recorder)
+        self.recorder.options['record_desvars'] = True
+        self.recorder.options['record_responses'] = True
+        self.recorder.options['record_objectives'] = True
+        self.recorder.options['record_constraints'] = True
+        self.recorder.options['system_includes'] = ['mda.d2.y2',]
+
+        self.prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            self.prob.driver.opt_settings['ACC'] = 1e-9
+
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+
+        # Driver recording test
+        coordinate = [0, 'SLSQP', (7, )]
+
+        expected_desvars = {
+                            "pz.z": self.prob['pz.z'],
+                            "px.x": self.prob['px.x']
+        }
+
+        expected_objectives = {"obj_cmp.obj": self.prob['obj_cmp.obj'], }
+
+        expected_constraints = {
+                                 "con_cmp1.con1": self.prob['con_cmp1.con1'],
+                                 "con_cmp2.con2": self.prob['con_cmp2.con2'],
+        }
+
+        expected_sysincludes = {
+                                 'mda.d2.y2': self.prob['mda.d2.y2'],
+        }
+
+        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
+                                           expected_objectives, expected_constraints, expected_sysincludes),), self.eps)
+
     def test_recorder_file_already_exists_no_append(self):
 
         self.setup_sellar_model()
@@ -1534,7 +1584,7 @@ class TestSqliteRecorder(unittest.TestCase):
                            }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars,
-                                           None, None, None),), self.eps)
+                                           None, None, None, None),), self.eps)
 
 if __name__ == "__main__":
     unittest.main()

@@ -49,7 +49,8 @@ def _check_dataflow(group, logger):
     """
     graph = group.compute_sys_graph(comps_only=False)
     sccs = get_sccs_topo(graph)
-    cycles = [sorted(s) for s in sccs if len(s) > 1]
+    sub2i = {sub.name: i for i, sub in enumerate(group._subsystems_allprocs)}
+    cycles = [sorted(s, key=lambda n: sub2i[n]) for s in sccs if len(s) > 1]
     cycle_idxs = {}
 
     if cycles:
@@ -59,6 +60,8 @@ def _check_dataflow(group, logger):
             # keep track of cycles so we can detect when a system in
             # one cycle is out of order with a system in a different cycle.
             for s in cycle:
+                if group.pathname:
+                    s = '.'.join((group.pathname, s))
                 cycle_idxs[s] = i
 
     ubcs = _get_out_of_order_subs(group, group._conn_global_abs_in2out)

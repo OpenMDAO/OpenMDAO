@@ -105,13 +105,15 @@ cur.execute("SELECT * FROM driver_iterations")
 rows = cur.fetchall()
 
 for row in rows:
-    idx, counter, iteration_coordinate, timestamp, success, msg, desvars_blob, responses_blob, objectives_blob, constraints_blob = row
+    idx, counter, iteration_coordinate, timestamp, success, msg, desvars_blob, responses_blob, objectives_blob, \
+        constraints_blob, sysincludes_blob = row
     print_header( 'Coord: {}'.format(iteration_coordinate), '-')
     print_counter(idx, counter)
     print_blob('Desvars', desvars_blob )
     print_blob('Responses', responses_blob )
     print_blob('Objectives', objectives_blob )
     print_blob('Constraints', constraints_blob)
+    print_blob('Sys Includes', sysincludes_blob)
 
 # Print System recordings: inputs, outputs, residuals
 print_header('System Iterations', '=')

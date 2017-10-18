@@ -12,7 +12,7 @@ def _assertDriverIterationDataRecorded(test, db_cur, expected, tolerance):
     """
     # iterate through the cases
     for coord, (t0, t1), desvars_expected, responses_expected, objectives_expected, \
-            constraints_expected in expected:
+            constraints_expected, sysincludes_expected in expected:
         iter_coord = format_iteration_coordinate(coord)
 
         # from the database, get the actual data recorded
@@ -26,12 +26,13 @@ def _assertDriverIterationDataRecorded(test, db_cur, expected, tolerance):
 
 
         counter, global_counter, iteration_coordinate, timestamp, success, msg, desvars_blob,\
-            responses_blob, objectives_blob, constraints_blob = row_actual
+            responses_blob, objectives_blob, constraints_blob, sysincludes_blob = row_actual
 
         desvars_actual = blob_to_array(desvars_blob)
         responses_actual = blob_to_array(responses_blob)
         objectives_actual = blob_to_array(objectives_blob)
         constraints_actual = blob_to_array(constraints_blob)
+        sysincludes_actual = blob_to_array(sysincludes_blob)
 
         # Does the timestamp make sense?
         test.assertTrue(t0 <= timestamp and timestamp <= t1)
@@ -44,6 +45,7 @@ def _assertDriverIterationDataRecorded(test, db_cur, expected, tolerance):
             ('responses', responses_actual, responses_expected),
             ('objectives', objectives_actual, objectives_expected),
             ('constraints', constraints_actual, constraints_expected),
+            ('sysincludes', sysincludes_actual, sysincludes_expected),
         ):
 
             if expected is None:
