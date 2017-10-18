@@ -1,3 +1,4 @@
+.. _feature_amijo_goldstein:
 
 ****************
 Armijo-Goldstein
