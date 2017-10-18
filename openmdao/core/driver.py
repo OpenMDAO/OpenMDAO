@@ -8,13 +8,30 @@ import numpy as np
 
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.utils.record_util import create_local_meta
+from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.options_dictionary import OptionsDictionary
 
 
 class Driver(object):
     """
     Top-level container for the systems and drivers.
+
+    Options
+    -------
+    options['record_metadata'] :  bool(True)
+        Tells recorder whether to record variable attribute metadata.
+    options['record_desvars'] :  bool(True)
+        Tells recorder whether to record the desvars of the Driver.
+    options['record_responses'] :  bool(False)
+        Tells recorder whether to record the responses of the Driver.
+    options['record_objectives'] :  bool(False)
+        Tells recorder whether to record the objectives of the Driver.
+    options['record_constraints'] :  bool(False)
+        Tells recorder whether to record the constraints of the Driver.
+    options['includes'] :  list of strings("*")
+        Patterns for variables to include in recording.
+    options['excludes'] :  list of strings('')
+        Patterns for variables to exclude in recording (processed after includes).
 
     Attributes
     ----------
@@ -67,6 +84,23 @@ class Driver(object):
         self._objs = None
         self._responses = None
         self.options = OptionsDictionary()
+
+        ###########################
+        self.options.declare('record_metadata', type_=bool, desc='Record metadata', default=True)
+        self.options.declare('record_desvars', type_=bool, default=True,
+                             desc='Set to True to record design variables at the driver level')
+        self.options.declare('record_responses', type_=bool, default=False,
+                             desc='Set to True to record responses at the driver level')
+        self.options.declare('record_objectives', type_=bool, default=False,
+                             desc='Set to True to record objectives at the driver level')
+        self.options.declare('record_constraints', type_=bool, default=False,
+                             desc='Set to True to record constraints at the driver level')
+        self.options.declare('includes', type_=list, default=['*'],
+                             desc='Patterns for variables to include in recording')
+        self.options.declare('excludes', type_=list, default=[],
+                             desc='Patterns for vars to exclude in recording '
+                                  '(processed post-includes)')
+        ###########################
 
         # What the driver supports.
         self.supports = OptionsDictionary()
@@ -166,6 +200,96 @@ class Driver(object):
 
         self._remote_responses = self._remote_cons.copy()
         self._remote_responses.update(self._remote_objs)
+
+
+        #########################################
+        mydesvars = myobjectives = myconstraints = myresponses = set()
+        incl = self.options['includes']
+        excl = self.options['excludes']
+
+        if self.options['record_desvars']:
+            mydesvars = {n for n in self._designvars
+                         if check_path(n, incl, excl)}
+
+        if self.options['record_objectives']:
+            myobjectives = {n for n in self._objs
+                            if check_path(n, incl, excl)}
+
+        if self.options['record_constraints']:
+            myconstraints = {n for n in self._cons
+                             if check_path(n, incl, excl)}
+
+        if self.options['record_responses']:
+            myresponses = {n for n in self._responses
+                           if check_path(n, incl, excl)}
+
+        self._filtered_vars_to_record = {
+            'des': mydesvars,
+            'obj': myobjectives,
+            'con': myconstraints,
+            'res': myresponses
+        }
+
+        desvarnames = self._filtered_vars_to_record['des']
+        responsenames = self._filtered_vars_to_record['res']
+        objectivenames = self._filtered_vars_to_record['obj']
+        constraintnames = self._filtered_vars_to_record['con']
+
+        if desvarnames:
+            self._record_desvars = True
+        if responsenames:
+            self._record_responses = True
+        if objectivenames:
+            self._record_objectives = True
+        if constraintnames:
+            self._record_constraints = True
+
+        prob = self._problem
+        model = prob.model
+        if MPI:
+            # TODO Eventually, we think we can get rid of this next check. But to be safe,
+            #       we are leaving it in there.
+            if not model.is_active():
+                raise RuntimeError(
+                    "RecordingManager.startup should never be called when "
+                    "running in parallel on an inactive System")
+            rrank = prob.comm.rank  # root ( aka model ) rank.
+
+            rowned = model._owning_rank['output']
+
+
+
+        # now localize the lists to only
+        # include local vars.  We need to do this after determining
+        # if any mpi procs need to record each of the vars.
+        # If none of them do, we can skip the mpi gather
+        # for that group of vars.
+        if MPI:
+            desvarnames = [n for n in desvarnames if rrank == rowned[n]]
+            responsenames = [n for n in responsenames if rrank == rowned[n]]
+            objectivenames = [n for n in objectivenames if rrank == rowned[n]]
+            constraintnames = [n for n in constraintnames if rrank == rowned[n]]
+
+            # reduce the filter set for any parallel recorders to only
+            # those variables that are owned by that rank
+            if recorder._parallel:
+                recorder._filtered_driver['des'] = desvarnames
+                recorder._filtered_driver['res'] = responsenames
+                recorder._filtered_driver['obj'] = objectivenames
+                recorder._filtered_driver['con'] = constraintnames
+
+        # These are cumulative lists of vars to record across all recorders that are
+        #     managed by this recording manager
+        self._vars_to_record['desvarnames'].update(desvarnames)
+        self._vars_to_record['responsenames'].update(responsenames)
+        self._vars_to_record['objectivenames'].update(objectivenames)
+        self._vars_to_record['constraintnames'].update(constraintnames)
+
+        #########################################
+
+
+
+
 
         self._rec_mgr.startup(self)
         if (self._rec_mgr._recorders):

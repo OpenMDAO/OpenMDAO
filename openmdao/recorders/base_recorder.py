@@ -93,12 +93,12 @@ class BaseRecorder(object):
         """
         self.options = OptionsDictionary()
         # Options common to all objects
-        self.options.declare('record_metadata', type_=bool, desc='Record metadata', default=True)
-        self.options.declare('includes', type_=list, default=['*'],
-                             desc='Patterns for variables to include in recording')
-        self.options.declare('excludes', type_=list, default=[],
-                             desc='Patterns for vars to exclude in recording '
-                                  '(processed post-includes)')
+        # self.options.declare('record_metadata', type_=bool, desc='Record metadata', default=True)
+        # self.options.declare('includes', type_=list, default=['*'],
+        #                      desc='Patterns for variables to include in recording')
+        # self.options.declare('excludes', type_=list, default=[],
+        #                      desc='Patterns for vars to exclude in recording '
+        #                           '(processed post-includes)')
 
         # Old options that will be deprecated
         self.options.declare('record_unknowns', type_=bool, default=False,
@@ -119,14 +119,14 @@ class BaseRecorder(object):
         self.options.declare('record_derivatives', type_=bool, default=False,
                              desc='Set to True to record derivatives at the system level')
         # Driver options
-        self.options.declare('record_desvars', type_=bool, default=True,
-                             desc='Set to True to record design variables at the driver level')
-        self.options.declare('record_responses', type_=bool, default=False,
-                             desc='Set to True to record responses at the driver level')
-        self.options.declare('record_objectives', type_=bool, default=False,
-                             desc='Set to True to record objectives at the driver level')
-        self.options.declare('record_constraints', type_=bool, default=False,
-                             desc='Set to True to record constraints at the driver level')
+        # self.options.declare('record_desvars', type_=bool, default=True,
+        #                      desc='Set to True to record design variables at the driver level')
+        # self.options.declare('record_responses', type_=bool, default=False,
+        #                      desc='Set to True to record responses at the driver level')
+        # self.options.declare('record_objectives', type_=bool, default=False,
+        #                      desc='Set to True to record objectives at the driver level')
+        # self.options.declare('record_constraints', type_=bool, default=False,
+        #                      desc='Set to True to record constraints at the driver level')
         # Solver options
         self.options.declare('record_abs_error', type_=bool, default=True,
                              desc='Set to True to record absolute error at the solver level')
@@ -226,33 +226,33 @@ class BaseRecorder(object):
                 'r': myresiduals
             }
 
-        if (isinstance(object_requesting_recording, Driver)):
-            mydesvars = myobjectives = myconstraints = myresponses = set()
-            incl = self.options['includes']
-            excl = self.options['excludes']
-
-            if self.options['record_desvars']:
-                mydesvars = {n for n in object_requesting_recording._designvars
-                             if self._check_path(n, incl, excl)}
-
-            if self.options['record_objectives']:
-                myobjectives = {n for n in object_requesting_recording._objs
-                                if self._check_path(n, incl, excl)}
-
-            if self.options['record_constraints']:
-                myconstraints = {n for n in object_requesting_recording._cons
-                                 if self._check_path(n, incl, excl)}
-
-            if self.options['record_responses']:
-                myresponses = {n for n in object_requesting_recording._responses
-                               if self._check_path(n, incl, excl)}
-
-            self._filtered_driver = {
-                'des': mydesvars,
-                'obj': myobjectives,
-                'con': myconstraints,
-                'res': myresponses
-            }
+        # if (isinstance(object_requesting_recording, Driver)):
+        #     mydesvars = myobjectives = myconstraints = myresponses = set()
+        #     incl = self.options['includes']
+        #     excl = self.options['excludes']
+        #
+        #     if self.options['record_desvars']:
+        #         mydesvars = {n for n in object_requesting_recording._designvars
+        #                      if self._check_path(n, incl, excl)}
+        #
+        #     if self.options['record_objectives']:
+        #         myobjectives = {n for n in object_requesting_recording._objs
+        #                         if self._check_path(n, incl, excl)}
+        #
+        #     if self.options['record_constraints']:
+        #         myconstraints = {n for n in object_requesting_recording._cons
+        #                          if self._check_path(n, incl, excl)}
+        #
+        #     if self.options['record_responses']:
+        #         myresponses = {n for n in object_requesting_recording._responses
+        #                        if self._check_path(n, incl, excl)}
+        #
+        #     self._filtered_driver = {
+        #         'des': mydesvars,
+        #         'obj': myobjectives,
+        #         'con': myconstraints,
+        #         'res': myresponses
+        #     }
 
         if (isinstance(object_requesting_recording, Solver)):
             myoutputs = myresiduals = set()

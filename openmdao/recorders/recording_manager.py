@@ -119,45 +119,45 @@ class RecordingManager(object):
             if not recorder._parallel:
                 self._has_serial_recorders = True
 
-            desvarnames = recorder._filtered_driver['des']
-            responsenames = recorder._filtered_driver['res']
-            objectivenames = recorder._filtered_driver['obj']
-            constraintnames = recorder._filtered_driver['con']
-
-            if desvarnames:
-                self._record_desvars = True
-            if responsenames:
-                self._record_responses = True
-            if objectivenames:
-                self._record_objectives = True
-            if constraintnames:
-                self._record_constraints = True
-
-            # now localize the lists to only
-            # include local vars.  We need to do this after determining
-            # if any mpi procs need to record each of the vars.
-            # If none of them do, we can skip the mpi gather
-            # for that group of vars.
-            if MPI:
-                desvarnames = [n for n in desvarnames if rrank == rowned[n]]
-                responsenames = [n for n in responsenames if rrank == rowned[n]]
-                objectivenames = [n for n in objectivenames if rrank == rowned[n]]
-                constraintnames = [n for n in constraintnames if rrank == rowned[n]]
-
-                # reduce the filter set for any parallel recorders to only
-                # those variables that are owned by that rank
-                if recorder._parallel:
-                    recorder._filtered_driver['des'] = desvarnames
-                    recorder._filtered_driver['res'] = responsenames
-                    recorder._filtered_driver['obj'] = objectivenames
-                    recorder._filtered_driver['con'] = constraintnames
-
-            # These are cumulative lists of vars to record across all recorders that are
-            #     managed by this recording manager
-            self._vars_to_record['desvarnames'].update(desvarnames)
-            self._vars_to_record['responsenames'].update(responsenames)
-            self._vars_to_record['objectivenames'].update(objectivenames)
-            self._vars_to_record['constraintnames'].update(constraintnames)
+            # desvarnames = recorder._filtered_driver['des']
+            # responsenames = recorder._filtered_driver['res']
+            # objectivenames = recorder._filtered_driver['obj']
+            # constraintnames = recorder._filtered_driver['con']
+            #
+            # if desvarnames:
+            #     self._record_desvars = True
+            # if responsenames:
+            #     self._record_responses = True
+            # if objectivenames:
+            #     self._record_objectives = True
+            # if constraintnames:
+            #     self._record_constraints = True
+            #
+            # # now localize the lists to only
+            # # include local vars.  We need to do this after determining
+            # # if any mpi procs need to record each of the vars.
+            # # If none of them do, we can skip the mpi gather
+            # # for that group of vars.
+            # if MPI:
+            #     desvarnames = [n for n in desvarnames if rrank == rowned[n]]
+            #     responsenames = [n for n in responsenames if rrank == rowned[n]]
+            #     objectivenames = [n for n in objectivenames if rrank == rowned[n]]
+            #     constraintnames = [n for n in constraintnames if rrank == rowned[n]]
+            #
+            #     # reduce the filter set for any parallel recorders to only
+            #     # those variables that are owned by that rank
+            #     if recorder._parallel:
+            #         recorder._filtered_driver['des'] = desvarnames
+            #         recorder._filtered_driver['res'] = responsenames
+            #         recorder._filtered_driver['obj'] = objectivenames
+            #         recorder._filtered_driver['con'] = constraintnames
+            #
+            # # These are cumulative lists of vars to record across all recorders that are
+            # #     managed by this recording manager
+            # self._vars_to_record['desvarnames'].update(desvarnames)
+            # self._vars_to_record['responsenames'].update(responsenames)
+            # self._vars_to_record['objectivenames'].update(objectivenames)
+            # self._vars_to_record['constraintnames'].update(constraintnames)
 
     def close(self):
         """

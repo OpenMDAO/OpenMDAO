@@ -337,10 +337,10 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.setup_sellar_model()
 
-        self.recorder.options['record_desvars'] = True
-        self.recorder.options['record_responses'] = False
-        self.recorder.options['record_objectives'] = False
-        self.recorder.options['record_constraints'] = False
+        self.prob.driver.options['record_desvars'] = True
+        self.prob.driver.options['record_responses'] = False
+        self.prob.driver.options['record_objectives'] = False
+        self.prob.driver.options['record_constraints'] = False
         self.prob.driver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
