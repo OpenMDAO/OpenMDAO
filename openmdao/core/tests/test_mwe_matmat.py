@@ -14,6 +14,7 @@ try:
 except ImportError:
     PETScVector = None
 
+
 class ADFLOWComp(ExplicitComponent):
 
     def setup(self):
@@ -37,7 +38,7 @@ class ADFLOWComp(ExplicitComponent):
         pass
 
 
-@unittest.skipUnless(MPI, "Only works under MPI.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MatMatTestCase(unittest.TestCase):
     N_PROCS = 4
 
