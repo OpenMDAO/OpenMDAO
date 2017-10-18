@@ -30,10 +30,10 @@ class DirectSolver(LinearSolver):
         system = self._system
 
         if system._owns_assembled_jac or system._views_assembled_jac:
-            ranges = system._jacobian._view_ranges[system.pathname]
             mtx = system._jacobian._int_mtx
             # Perform dense or sparse lu factorization
             if isinstance(mtx, DenseMatrix):
+                ranges = system._jacobian._view_ranges[system.pathname]
                 matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
                 np.set_printoptions(precision=3)
                 self._lup = scipy.linalg.lu_factor(matrix)

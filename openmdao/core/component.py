@@ -401,13 +401,13 @@ class Component(System):
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no upper bound.
             Default is None.
-        ref : float
+        ref : float or ndarray
             Scaling parameter. The value in the user-defined units of this output variable when
             the scaled value is 1. Default is 1.
-        ref0 : float
+        ref0 : float or ndarray
             Scaling parameter. The value in the user-defined units of this output variable when
             the scaled value is 0. Default is 0.
-        res_ref : float
+        res_ref : float or ndarray
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
         var_set : hashable object
@@ -491,12 +491,12 @@ class Component(System):
         if np.isscalar(ref0):
             self._has_output_scaling |= ref0 != 0.0
         else:
-            self._has_output_scaling |= np.any(ref0 != 0.0)
+            self._has_output_scaling |= np.any(ref0)
 
         if np.isscalar(res_ref):
-            self._has_output_scaling |= res_ref != 1.0
+            self._has_resid_scaling |= res_ref != 1.0
         else:
-            self._has_output_scaling |= np.any(res_ref != 1.0)
+            self._has_resid_scaling |= np.any(res_ref != 1.0)
 
         ref = format_as_float_or_array('ref', ref, flatten=True)
         ref0 = format_as_float_or_array('ref0', ref0, flatten=True)

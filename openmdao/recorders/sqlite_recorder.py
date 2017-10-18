@@ -403,7 +403,13 @@ class SqliteRecorder(BaseRecorder):
         if PETScVector and isinstance(object_requesting_recording._outputs, PETScVector):
             return  # Cannot handle PETScVector yet
 
-        scaling_factors = pickle.dumps(object_requesting_recording._scaling_vecs,
+        # collect scaling arrays
+        scaling_vecs = {}
+        for kind, odict in iteritems(object_requesting_recording._vectors):
+            scaling_vecs[kind] = scaling = {}
+            for vecname, vec in iteritems(odict):
+                scaling[vecname] = vec._scaling
+        scaling_factors = pickle.dumps(scaling_vecs,
                                        pickle.HIGHEST_PROTOCOL)
 
         path = object_requesting_recording.pathname
