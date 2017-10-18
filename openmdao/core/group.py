@@ -38,8 +38,8 @@ class Group(System):
     ----------
     _mpi_proc_allocator : ProcAllocator
         Object used to allocate MPI processes to subsystems.
-    proc_weights : list of float
-        Weights used to determine MPI process allocation to subsystems.
+    _proc_info : dict of subsys_name: (min_procs, max_procs, weight)
+        Information used to determine MPI process allocation to subsystems.
     """
 
     def __init__(self, **kwargs):
@@ -62,7 +62,7 @@ class Group(System):
         if not self._linear_solver:
             self._linear_solver = LinearRunOnce()
         self._mpi_proc_allocator = DefaultAllocator()
-        self.proc_weights = None
+        self._proc_info = {}
 
     def setup(self):
         """
@@ -145,11 +145,11 @@ class Group(System):
         self.setup()
         self._static_mode = True
 
+        proc_info = [self._proc_info[s.name] for s in self._subsystems_allprocs]
+
         # Call the load balancing algorithm
         sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(
-            self.proc_weights,
-            len(self._subsystems_allprocs),
-            comm)
+            proc_info, len(self._subsystems_allprocs), comm)
 
         # Define local subsystems
         self._subsystems_myproc = [self._subsystems_allprocs[ind]
@@ -1112,7 +1112,8 @@ class Group(System):
         return self.add_subsystem(name, subsys, promotes=promotes)
 
     def add_subsystem(self, name, subsys, promotes=None,
-                      promotes_inputs=None, promotes_outputs=None):
+                      promotes_inputs=None, promotes_outputs=None,
+                      min_procs=1, max_procs=None, proc_weight=1.0):
         """
         Add a subsystem.
 
@@ -1137,6 +1138,14 @@ class Group(System):
             variables to 'promote' up to this group. If an entry is a tuple of
             the form (old_name, new_name), this will rename the variable in
             the parent group.
+        min_procs : int
+            Minimum number of MPI processes usable by the subsystem. Defaults to 1.
+        max_procs : int or None
+            Maximum number of MPI processes usable by the subsystem.  A value
+            of None (the default) indicates there is no maximum limit.
+        proc_weight : float
+            Weight given to the subsystem when allocating available MPI processes
+            to all subsystems.  Default is 1.0.
 
         Returns
         -------
@@ -1181,6 +1190,8 @@ class Group(System):
             subsystems_allprocs = self._subsystems_allprocs
 
         subsystems_allprocs.append(subsys)
+
+        self._proc_info[name] = (min_procs, max_procs, proc_weight)
 
         setattr(self, name, subsys)
 

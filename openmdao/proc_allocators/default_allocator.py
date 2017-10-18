@@ -15,16 +15,14 @@ class DefaultAllocator(ProcAllocator):
     Default processor allocator.
     """
 
-    def _divide_procs(self, proc_weights, nsubs, comm):
+    def _divide_procs(self, proc_info, comm):
         """
         Perform the parallel processor allocation.
 
         Parameters
         ----------
-        proc_weights : list of float
-            list of proc weight for each subsystem.
-        nsubs : int
-            Number of subsystems of the owning System.
+        proc_info : list of (min_procs, max_procs, weight)
+            Information used to determine MPI process allocation to subsystems.
         comm : MPI.Comm or <FakeComm>
             communicator of the owning System.
 
@@ -40,17 +38,14 @@ class DefaultAllocator(ProcAllocator):
         iproc = comm.rank
         nproc = comm.size
 
-        if proc_weights is None:
-            proc_weights = np.ones(nsubs) / nsubs
+        nsubs = len(proc_info)
+
+        proc_weights = np.array([weight for _, _, weight in proc_info])
+        min_procs = np.array([minp for minp, _, _ in proc_info], dtype=int)
 
         if nproc >= nsubs:
             # Define the normalized weights for all subsystems
-            if len(proc_weights) == nsubs:
-                proc_weights = np.atleast_1d(proc_weights)
-                proc_weights /= np.sum(proc_weights)
-            else:
-                raise RuntimeError("length of proc_weights (%d) does not match the number of "
-                                   "subsystems (%d)" % (len(proc_weights), nsubs))
+            proc_weights /= np.sum(proc_weights)
 
             prod = proc_weights * nproc
 
@@ -58,8 +53,8 @@ class DefaultAllocator(ProcAllocator):
             expected = prod * (1.0 / prod[np.argmin(prod)])
 
             if np.any(prod < 1.):
-                # start everybody with 1 proc
-                num_procs = np.ones(nsubs, int)
+                # start everybody with their min procs
+                num_procs = np.array([minp for minp, _, _ in proc_info], dtype=int)
             else:
                 # give everybody what they asked for, except for any fractional parts
                 num_procs = np.array(np.trunc(prod), int)
@@ -87,7 +82,7 @@ class DefaultAllocator(ProcAllocator):
             sub_comm = comm.Split(isub)
             start = list(color).index(isub)  # find lowest matching color
             sub_proc_range = [start, start + sub_comm.size]
-        else:
+        else:  # number of procs < number of subsystems
             isubs_list = [[] for ind in range(nproc)]
             proc_load = np.zeros(nproc)
             weights = proc_weights.copy()
