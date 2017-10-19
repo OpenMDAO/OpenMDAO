@@ -322,8 +322,8 @@ class AssembledJacobian(Jacobian):
             if iters is None and abs_key not in int_mtx._submats:
 
                 # This happens when the input is an indepvarcomp that is contained in the system.
+                of, wrt = abs_key
                 for tgt, src in iteritems(system._conn_global_abs_in2out):
-                    of, wrt = abs_key
                     if src == wrt and (of, tgt) in int_mtx._submats:
                         int_mtx._update_submat((of, tgt), self._subjacs[abs_key])
                         break
