@@ -211,45 +211,45 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
 
     #grab the libraries
     with open(os.path.join(libs_dir, "awesomplete.js"), "r") as f:
-        awesomplete = "%s" % (f.read())
+        awesomplete = f.read()
     with open(os.path.join(libs_dir, "d3.v4.min.js"), "r") as f:
-        d3 = "%s" % (f.read())
+        d3 = f.read()
     with open(os.path.join(libs_dir, "http.js"), "r") as f:
-        http = "%s" % (f.read())
+        http = f.read()
     with open(os.path.join(libs_dir, "jquery-3.2.1.min.js"), "r") as f:
-        jquery = "%s" % (f.read())
+        jquery = f.read()
     with open(os.path.join(libs_dir, "vkBeautify.js"), "r") as f:
-        vk_beautify = "%s" % (f.read())
+        vk_beautify = f.read()
 
     #grab the src
     with open(os.path.join(src_dir, "constants.js"), "r") as f:
-        constants = "%s" % (f.read())
+        constants = f.read()
     with open(os.path.join(src_dir, "context-menu.js"), "r") as f:
-        context_menu = "%s" % (f.read())
+        context_menu = f.read()
     with open(os.path.join(src_dir, "draw.js"), "r") as f:
-        draw = "%s" % (f.read())
+        draw = f.read()
     with open(os.path.join(src_dir, "legend.js"), "r") as f:
-        legend = "%s" % (f.read())
+        legend = f.read()
     with open(os.path.join(src_dir, "modal.js"), "r") as f:
-        modal = "%s" % (f.read())
+        modal = f.read()
     with open(os.path.join(src_dir, "ptN2.js"), "r") as f:
-        pt_n2 = "%s" % (f.read())
+        pt_n2 = f.read()
     with open(os.path.join(src_dir, "search.js"), "r") as f:
-        search = "%s" % (f.read())
+        search = f.read()
     with open(os.path.join(src_dir, "svg.js"), "r") as f:
-        svg = "%s" % (f.read())
+        svg = f.read()
 
     #grab the style
     with open(os.path.join(style_dir, "awesomplete.css"), "r") as f:
-        awesomplete_style = "%s" % (f.read())
+        awesomplete_style = f.read()
     with open(os.path.join(style_dir, "partition_tree.css"), "r") as f:
-        partition_tree_style = "%s" % (f.read())
+        partition_tree_style = f.read()
     with open(os.path.join(style_dir, "fontello.woff"), "rb") as f:
         encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
 
     #grab the index.html
     with open(os.path.join(vis_dir, "index.html"), "r") as f:
-        index = "%s" % (f.read())
+        index = f.read()
 
     #grab the model viewer data
     model_viewer_data = 'var modelData = %s' % json.dumps(_get_viewer_data(problem_or_filename))
