@@ -95,12 +95,13 @@ class TestServerRecorder(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
         self.prob.model.nonlinear_solver = NonlinearBlockGS()
+        self.prob.model.linear_solver = LinearBlockGS()
 
-        self.prob.model.add_design_var('x', lower=-100, upper=100)
-        self.prob.model.add_design_var('z', lower=-100, upper=100)
+        self.prob.model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        self.prob.model.add_design_var('x', lower=0.0, upper=10.0)
         self.prob.model.add_objective('obj')
-        self.prob.model.add_constraint('con1')
-        self.prob.model.add_constraint('con2')
+        self.prob.model.add_constraint('con1', upper=0.0)
+        self.prob.model.add_constraint('con2', upper=0.0)
 
     def setup_sellar_grouped_model(self):
         self.prob = Problem()
@@ -715,8 +716,8 @@ class TestServerRecorder(unittest.TestCase):
 
         solver_iteration = json.loads(self.solver_iterations)
 
-        expected_abs_error = 5.041402548755789e-06
-        expected_rel_error = 1.3876088080160474e-07
+        expected_abs_error = 2.1677810075550974e-10
+        expected_rel_error = 5.966657077752565e-12
         self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
         self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
         self.assertEqual(solver_iteration['solver_residuals'], [])

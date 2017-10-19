@@ -20,6 +20,11 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
     var katexInputDivElement = document.getElementById("katexInputDiv");
     var katexInputElement = document.getElementById("katexInput");
 
+    mouseOverOnDiagN2 = MouseoverOnDiagN2;
+    mouseOverOffDiagN2 = MouseoverOffDiagN2;
+    mouseClickN2 = MouseClickN2;
+    mouseOutN2 = MouseoutN2;
+
     CreateDomLayout();
     CreateToolbar();
 
@@ -1380,7 +1385,6 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
         DrawRect(-leftTextWidthR - PTREE_N2_GAP_PX, n2Dy * d.r, leftTextWidthR, n2Dy, RED_ARROW_COLOR); //highlight var name
         DrawRect(-leftTextWidthC - PTREE_N2_GAP_PX, n2Dy * d.c, leftTextWidthC, n2Dy, GREEN_ARROW_COLOR); //highlight var name
     }
-    mouseOverOffDiagN2 = MouseoverOffDiagN2;
 
     function MouseoverOnDiagN2(d) {
         //d=hovered element
@@ -1470,13 +1474,9 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
         }
     }
 
-    mouseOverOnDiagN2 = MouseoverOnDiagN2;
-
     function MouseoutN2() {
         n2Group.selectAll(".n2_hover_elements").remove();
     }
-
-    mouseOutN2 = MouseoutN2;
 
     function MouseClickN2(d) {
         toggleMenuOff();
@@ -1490,8 +1490,6 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
                 .attr("class", newClassName);
         }
     }
-
-    mouseClickN2 = MouseClickN2;
 
     function ReturnToRootButtonClick() {
         backButtonHistory.push({ "el": zoomedElement });

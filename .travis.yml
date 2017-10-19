@@ -14,6 +14,7 @@ env:
 - PY=3.4 MPI=1
 - PY=2.7 MPI=
 - PY=3.4 MPI=
+- PY=3.6 MPI=
 
 addons:
   apt:
@@ -30,9 +31,7 @@ addons:
 
 notifications:
   slack:
-    secure: TnJSd6Mu99tcACmPVSpsLI6hfYxecLCare+ileiuJa8foIzbgna/cL6/tyPUGpLGgSZkxGXoBSRXZJHonZNa7DYXmfhxBblHa0fwgdOhk4GAEDiiOUa2agaoh4F3EoTOuQIfN0eCprItfewIJtT3CHEh+PuWLifclRU9G/6byldDHKy8dPPinrLtMy91RFcXzcBFBev7EEJtJDL6odhkVsJQjmtf9E7+Up3n/tSL+egllYC0H6P7P4nCIjrNuBNDVYtfqb5QbvUgfuTFVcqMJTMsams04taYQhT4UVvVpB0rBwtP5S6w2QdAr/QTvi06ZIuFsgVAdFmRRNliXLG2qeWbQ44hWT36aehhVHvfyLuC9Bjbo5+OhKcA3qmTzCaG4JoYbsEXPVp0b31m4EKGl+yLIUoV1Zp46MTM+llWny4/mDn6o/gmtmtCpZ8S1EYDniwluelLiu3u/ZkFnadsn++ZS7GkAPkY8VpI5lpY3B2jPsAOJLaLNMHSk8oa51LAPg+2/MqCDpgCFsZUctNXdIkYR6Votts5KpDabcVFpC2NtfQLWdRh4CsvpiLcSJigUe+4aLRqxZgaahsTuL6LeSrDcHR+gqn4KYvKl4E7pUQZX+i8wRYoDvFTMIAx/F0dDZ+U+Rzr5bVORuvNc9lDjuB57vjEIvZ+djPDtBkENwo=
-    on_success: always
-    on_failure: always
+    secure: Dd+tpZkz48Q47Y+PtdL4b+KAs55PsvWjt9ybhip6xljhA5kVsba9oZS+KsAC8RLWSzVJLOSjz3Cu3MsRym4sTd/g4Pbqyh0ldK2Xnl+n2JOgpPFSXtFuH4Ln3uWB6kYtUK6+aGIC8qhbvEt8tukTBT0RduEmdRyVIZ3oN7YjETPSZXvujeiUFLssfpZW2mqoA/tIgJHFSlySAp6J5694t2Z/p8sHOrK8G/Nm+qlk4xqXHvJ3xablcSBG4BZCrpqmMMdTLXBt2E2K9Rc1P2ZBIrSHVWfSLx+4n79U2385+og7miN1Zuf3gY3YuGKIwnBTtEzTu20905idkr4QdKELCBEcU4azdznwjvUkXWkiFAJII9UELTluSQmZX602zWk4AgJNeHxhN3EbBSMezfYVZjprhlAlwnZZv6t4qAkvuzb7KOA4s679xWzWOBOn1wkynfIF8A66APqssveyz/PvZHSjnHQoLgMU+kwzoX759o0Z/HuRlhCcjv0W9DWxU2bFNi/zVh9YyvR8fG15biGthzOyuf+CHjxohw+J6M+YdR1RIf1g/60nGUPHx4j4SN3kEFPmEDxzZT/f349gvaZGOmKXBi0wH8iY/i9RinM9LJB4t6chj2MkKwUA26bYaVaIO6FYPfE7r+tTG6OXdck4voCs/s4aa9VKEX97yhh0i9g=
 
 before_install:
 - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
