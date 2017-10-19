@@ -6,6 +6,7 @@ from six import iteritems
 import networkx as nx
 import shutil
 from collections import OrderedDict
+import base64
 
 try:
     import h5py
@@ -168,9 +169,9 @@ def view_tree(*args, **kwargs):
     view_model(*args, **kwargs)
 
 
-def view_model(problem_or_filename, outfile='visualization', show_browser=True):
+def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embeddable=False):
     """
-    Generates a directory containing a tree viewer Optionally pops up a web browser to
+    Generates an HTML file containing a tree viewer. Optionally pops up a web browser to
     view the file.
 
     Parameters
@@ -180,33 +181,104 @@ def view_model(problem_or_filename, outfile='visualization', show_browser=True):
         string : The filename of the case recorder file containing the data required to build the tree.
 
     outfile : str, optional
-        The path of the output folder.  Defaults to current directory + 'visualization'.
+        The name of the final output file
 
     show_browser : bool, optional
         If True, pop up the system default web browser to view the generated html file.
         Defaults to True.
+
+    embeddable : bool, optional
+        If True, gives a single HTML file that doesn't have the <html>, <DOCTYPE>, <body>
+        and <head> tags. If False, gives a single, standalone HTML file for viewing.
     """
-    cur_dir = os.getcwd()
-    if outfile == 'visualization':
-        outfile = os.path.join(cur_dir, outfile)
+    html_begin_tags = """
+                      <html>
+                      <head>
+                        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+                      </head>
+                      <body>\n
+                      """
+    html_end_tags = """
+                    </body>
+                    </html>
+                    """
 
-    model_data_filename = 'model_data.js'
-    folder_name = outfile
     code_dir = os.path.dirname(os.path.abspath(__file__))
-    model_viewer_data = _get_viewer_data(problem_or_filename)
-    model_data = json.dumps(model_viewer_data)
+    vis_dir = os.path.join(code_dir, "visualization")
+    libs_dir = os.path.join(vis_dir, "libs")
+    src_dir = os.path.join(vis_dir, "src")
+    style_dir = os.path.join(vis_dir, "style")
 
-    if os.path.isdir(folder_name):
-        shutil.rmtree(folder_name)
+    #grab the libraries
+    with open(os.path.join(libs_dir, "awesomplete.js"), "r") as f:
+        awesomplete = f.read()
+    with open(os.path.join(libs_dir, "d3.v4.min.js"), "r") as f:
+        d3 = f.read()
+    with open(os.path.join(libs_dir, "http.js"), "r") as f:
+        http = f.read()
+    with open(os.path.join(libs_dir, "jquery-3.2.1.min.js"), "r") as f:
+        jquery = f.read()
+    with open(os.path.join(libs_dir, "vkBeautify.js"), "r") as f:
+        vk_beautify = f.read()
 
-    shutil.copytree(src=code_dir + '/visualization', dst=folder_name)
+    #grab the src
+    with open(os.path.join(src_dir, "constants.js"), "r") as f:
+        constants = f.read()
+    with open(os.path.join(src_dir, "context-menu.js"), "r") as f:
+        context_menu = f.read()
+    with open(os.path.join(src_dir, "draw.js"), "r") as f:
+        draw = f.read()
+    with open(os.path.join(src_dir, "legend.js"), "r") as f:
+        legend = f.read()
+    with open(os.path.join(src_dir, "modal.js"), "r") as f:
+        modal = f.read()
+    with open(os.path.join(src_dir, "ptN2.js"), "r") as f:
+        pt_n2 = f.read()
+    with open(os.path.join(src_dir, "search.js"), "r") as f:
+        search = f.read()
+    with open(os.path.join(src_dir, "svg.js"), "r") as f:
+        svg = f.read()
 
-    model_data_dir = os.path.join(folder_name, model_data_filename)
-    with open(model_data_dir, 'w') as f:
-        f.write('var modelData = %s' % model_data)
+    #grab the style
+    with open(os.path.join(style_dir, "awesomplete.css"), "r") as f:
+        awesomplete_style = f.read()
+    with open(os.path.join(style_dir, "partition_tree.css"), "r") as f:
+        partition_tree_style = f.read()
+    with open(os.path.join(style_dir, "fontello.woff"), "rb") as f:
+        encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
 
+    #grab the index.html
+    with open(os.path.join(vis_dir, "index.html"), "r") as f:
+        index = f.read()
+
+    #grab the model viewer data
+    model_viewer_data = 'var modelData = %s' % json.dumps(_get_viewer_data(problem_or_filename))
+
+    #add the necessary HTML tags if we aren't embedding
+    if not embeddable:
+        index = html_begin_tags + index + html_end_tags
+
+    #put all style and JS into index
+    index = index.replace('{{awesomplete_style}}', awesomplete_style)
+    index = index.replace('{{partition_tree_style}}', partition_tree_style)
+    index = index.replace('{{fontello}}', encoded_font)
+    index = index.replace('{{d3_lib}}', d3)
+    index = index.replace('{{awesomplete_lib}}', awesomplete)
+    index = index.replace('{{vk_beautify_lib}}', vk_beautify)
+    index = index.replace('{{model_data}}', model_viewer_data)
+    index = index.replace('{{constants_lib}}', constants)
+    index = index.replace('{{modal_lib}}', modal)
+    index = index.replace('{{svg_lib}}', svg)
+    index = index.replace('{{search_lib}}', search)
+    index = index.replace('{{legend_lib}}', legend)
+    index = index.replace('{{draw_lib}}', draw)
+    index = index.replace('{{context_menu_lib}}', context_menu)
+    index = index.replace('{{ptn2_lib}}', pt_n2)
+
+    with open(outfile, 'w') as f:
+        f.write(index)
+
+    #open it up in the browser
     if show_browser:
         from openmdao.devtools.webview import webview
-        view_path = os.path.join(cur_dir, folder_name)
-        view_path = os.path.join(view_path, 'index.html')
-        webview(view_path)
+        webview(outfile)
