@@ -1,0 +1,61 @@
+---------------------------------------------------------------------------------------------------
+Release Notes for OpenMDAO 2.0.0
+October 19, 2017
+----------------------------------
+First public release of 2.0.0.
+
+
+New Features:
+-------------------------------
+(first release... so EVERYTHING!)
+- Drivers:
+    - ScipyOptimizer
+    - PyoptSparseOptimizer
+- Solvers:
+    - Nonlinear:
+        - NonlinearBlockGS
+        - NonlinearBlockJac
+        - NonlinearRunOnce
+        - NewtonSolver
+    - Linear:
+        - LinearBlockGS
+        - LinearBlockJac
+        - LinearRunOnce
+        - DirectSolver
+        - PetscKSP
+        - ScipyIterativeSolver
+        - LinearUserDefined
+    - LineSearch
+        - AmijoGoldsetinLS
+        - BoundsEnforceLS
+- Components:
+    - MetModel
+    - ExecComp
+    - BalanceComp
+    - LinearSystemComp
+
+- General Capability:
+    - Implicit/Explicit Components
+    - Serial and Parallel Groups
+    - Parallel distributed components (components that need an MPI comm)
+    - Unit conversions
+    - Variable scaling
+    - Specifying component metadata
+    - analytic derivatives
+
+
+Currently Missing Features that existed in 1.7.3:
+-------------------------------------------------
+- Pass-by-object variables (anything that is not a float)
+- File Variables
+- automatic ordering of groups/components based on connections
+- Design of Experiments Driver (DOE)
+- Parallel Finite Difference
+- File-Wrapping utility library & External Code Component
+- Approximate active set constraint calculation skipping
+- Brent Solver
+- CaseRecorders for CSV, HDF5, and dump formats
+
+Bug Fixes
+----------
+N/A
