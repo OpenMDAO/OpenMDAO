@@ -508,7 +508,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         assert_rel_error(self, derivs['comp.y']['p1.x'], [[4.0]], 1e-6)
 
-    def test_newton_under_full_model_fd(self):
+    def test_newton_with_densejac_under_full_model_fd(self):
         # Basic sellar test.
 
         prob = self.prob = Problem()
