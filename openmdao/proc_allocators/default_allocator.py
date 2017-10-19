@@ -43,14 +43,18 @@ class DefaultAllocator(ProcAllocator):
         proc_weights = np.array([weight for _, _, weight in proc_info])
         min_procs = np.array([minp for minp, _, _ in proc_info], dtype=int)
 
+        # Define the normalized weights for all subsystems
+        proc_weights /= np.sum(proc_weights)
+
+        # prod sums to nproc
+        prod = proc_weights * nproc
+
+        # scale so smallest weight is 1.0
+        expected = prod * (1.0 / prod[np.argmin(prod)])
+
+        min_needed = np.array([minp for minp, _, _ in proc_info], dtype=int)
+
         if nproc >= nsubs:
-            # Define the normalized weights for all subsystems
-            proc_weights /= np.sum(proc_weights)
-
-            prod = proc_weights * nproc
-
-            # scale so smallest weight is 1.0
-            expected = prod * (1.0 / prod[np.argmin(prod)])
 
             if np.any(prod < 1.):
                 # start everybody with their min procs
@@ -66,6 +70,8 @@ class DefaultAllocator(ProcAllocator):
             for i in range(left):
                 diff = expected - num_procs
                 num_procs[np.argmax(diff)] += 1
+
+            print("    num_procs:", num_procs)
 
             # Compute the coloring
             color = np.zeros(nproc, int)
@@ -94,6 +100,8 @@ class DefaultAllocator(ProcAllocator):
                 isubs_list[iproc1].append(isub)
                 proc_load[iproc1] += weights[isub]
                 weights[isub] = -1.  # mark negative so argmax won't pick it
+
+            print(isubs_list)
 
             # Result
             isubs = isubs_list[iproc]
