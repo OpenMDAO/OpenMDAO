@@ -2,10 +2,36 @@
 [![Build Status](https://travis-ci.org/OpenMDAO/OpenMDAO.svg?branch=master)](https://travis-ci.org/OpenMDAO/OpenMDAO)   [![Build status](https://ci.appveyor.com/api/projects/status/33kct0irhbgcg8m1?svg=true
 )](https://ci.appveyor.com/project/OpenMDAO/OpenMDAO/branch/master)  [![Coverage Status](https://coveralls.io/repos/github/OpenMDAO/OpenMDAO/badge.svg?branch=master)](https://coveralls.io/github/OpenMDAO/OpenMDAO?branch=master)
 
-#OpenMDAO 2.0
+
+
+
+OpenMDAO Naming/Legacy OpenMDAO
+-------------------------------
+
+PLEASE NOTE: Until recently, this repository was named OpenMDAO/blue. If you had cloned that repository, please update 
+your repository remotes to reflect these changes.
+
+The OpenMDAO 1.7.3 codebase repo has been renamed to OpenMDAO1, and it resides 
+at https://github.com/OpenMDAO/OpenMDAO1
+
+The OpenMDAO 2.0.x code has taken the name OpenMDAO, 
+and it resides at https://github.com/OpenMDAO/OpenMDAO.
+
+Installation of 2.0.x code will now work with `pip install openmdao`.  
+Installation of 1.7.3 code will now only work with a version specifier: `pip install openmdao==1.7.3`
+
+To use the OpenMDAO v0.x legacy version
+ (versions 0.13.0 and older) of the OpenMDAO-Framework, go here:
+https://github.com/OpenMDAO/OpenMDAO-Framework
+
+
+# OpenMDAO 2.0
 This is an ALPHA version of OpenMDAO 2.0
 
-Our docs are available at [http://openmdao.org/twodocs](http://openmdao.org/twodocs)
+Our latest docs are available at [http://openmdao.org/twodocs](http://openmdao.org/twodocs)
+Our archived docs are available at [http://openmdao.org/twodocs/versions](http://openmdao.org/twodocs/versions)
+
+
 
 Important Note:
 ---------------

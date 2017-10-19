@@ -7,11 +7,11 @@ Developer install
 
 Use :code:`git` to clone the repository:
 
-:code:`git clone http://github.com/OpenMDAO/blue`
+:code:`git clone http://github.com/OpenMDAO/OpenMDAO`
 
 Use :code:`pip` to install openmdao locally:
 
-:code:`cd blue`
+:code:`cd OpenMDAO`
 
 :code:`pip install -e .`
 
@@ -39,7 +39,7 @@ Then, just :code:`open openmdao/docs/_build/html/index.html` in a browser to beg
 Documentation Style Guide
 ----------------------------
 
-This document exists to help OpenMDAO blue documentation writers to follow appropriate guidelines
+This document exists to help OpenMDAO 2.x.x documentation writers to follow appropriate guidelines
 in terms of formatting and embedding of code.
 
 .. toctree::
