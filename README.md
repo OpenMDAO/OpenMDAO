@@ -9,7 +9,7 @@ OpenMDAO Naming/Legacy OpenMDAO
 -------------------------------
 
 PLEASE NOTE: Until recently, this repository was named OpenMDAO/blue. If you had cloned that repository, please update 
-your repository remotes to reflect these changes.
+your repository name and remotes to reflect these changes.
 
 The OpenMDAO 1.7.3 codebase repo has been renamed to OpenMDAO1, and it resides 
 at https://github.com/OpenMDAO/OpenMDAO1
@@ -41,16 +41,6 @@ While the API is MOSTLY stable, we reserve the right to change things as needed.
 We will be making very frequent updates to this code. If you’re going to try it,
 make sure you pull these updates often.
 
-Our previous code, OpenMDAO 1.7.3, is a completely different codebase,
-with a repository at https://github.com/OpenMDAO/OpenMDAO1
-
-The OpenMDAO 1.7.3 codebase repo has been renamed to OpenMDAO1, and it resides at https://github.com/OpenMDAO/OpenMDAO1
-
-The OpenMDAO 2.0.x code has taken the name OpenMDAO, 
-and it resides at https://github.com/OpenMDAO/OpenMDAO.
-
-Installation of 2.0.x code will now work with `pip install openmdao`.  
-Installation of 1.7.3 code will now only work with a version specifier: `pip install openmdao==1.7.3`
 
 Features of OpenMDAO 1.7.x Not Yet in 2.x
 -----------------------------------------
