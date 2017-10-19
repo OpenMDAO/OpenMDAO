@@ -29,19 +29,19 @@ New Features:
         - AmijoGoldsetinLS
         - BoundsEnforceLS
 - Components:
-    - MetModel
+    - MetaModel
     - ExecComp
     - BalanceComp
     - LinearSystemComp
 
 - General Capability:
-    - Implicit/Explicit Components
+    - Implicit and Explicit Components
     - Serial and Parallel Groups
     - Parallel distributed components (components that need an MPI comm)
     - Unit conversions
     - Variable scaling
     - Specifying component metadata
-    - analytic derivatives
+    - Analytic derivatives
 
 
 Currently Missing Features that existed in 1.7.3:
@@ -54,7 +54,7 @@ Currently Missing Features that existed in 1.7.3:
 - File-Wrapping utility library & External Code Component
 - Approximate active set constraint calculation skipping
 - Brent Solver
-- CaseRecorders for CSV, HDF5, and dump formats
+- CaseRecorders for CSV, HDF5, and Dump formats
 
 Bug Fixes
 ----------
