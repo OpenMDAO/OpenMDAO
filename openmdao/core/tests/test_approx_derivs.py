@@ -314,7 +314,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
     def test_sellar(self):
         # Basic sellar test.
 
-        prob = self.prob = Problem()
+        prob = Problem()
         model = prob.model = Group()
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
@@ -511,7 +511,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
     def test_newton_with_densejac_under_full_model_fd(self):
         # Basic sellar test.
 
-        prob = self.prob = Problem()
+        prob = Problem()
         model = prob.model = Group()
         sub = model.add_subsystem('sub', Group(), promotes=['*'])
 
