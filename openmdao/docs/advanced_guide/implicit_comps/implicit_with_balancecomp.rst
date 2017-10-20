@@ -68,4 +68,5 @@ Add the following code to your run script to generate an :math:`N^2` diagram tha
     view_model(p)
 
 
-[TOOD: Embed the N2 diagram here!!!!!!!]
+.. raw:: html
+    :file: n2.html

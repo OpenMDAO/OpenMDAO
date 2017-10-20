@@ -49,13 +49,13 @@ class TestNonlinearCircuit(unittest.TestCase):
                 self.declare_partials('I', 'V_in')
                 self.declare_partials('I', 'V_out')
 
-            def compute(self, i, o):
+            def compute(self, inputs, outputs):
                 deltaV = inputs['V_in'] - inputs['V_out']
                 Is = self.metadata['Is']
                 Vt = self.metadata['Vt']
-                o['I'] = Is * np.exp(deltaV / Vt - 1)
+                outputs['I'] = Is * np.exp(deltaV / Vt - 1)
 
-            def compute_partials(self, i, J):
+            def compute_partials(self, inputs, J):
                 deltaV = inputs['V_in'] - inputs['V_out']
                 Is = self.metadata['Is']
                 Vt = self.metadata['Vt']
@@ -86,7 +86,7 @@ class TestNonlinearCircuit(unittest.TestCase):
                     #      because the residual doesn't directly depend on it
 
             def apply_nonlinear(self, inputs, outputs, residuals):
-                r['V'] = 0.
+                residuals['V'] = 0.
                 for i_conn in range(self.metadata['n_in']):
                     residuals['V'] += inputs['I_in:{}'.format(i_conn)]
                 for i_conn in range(self.metadata['n_out']):

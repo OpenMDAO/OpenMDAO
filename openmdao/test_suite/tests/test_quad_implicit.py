@@ -38,7 +38,7 @@ class TestQuadImplicit(unittest.TestCase):
                 J_fwd = wrt['J_fwd']
                 J_fd = wrt['J_fd']
                 if J_fd > 1e-5:
-                    err = np.abs(J_fwd-J_fd)/J_fdzX
+                    err = np.abs(J_fwd-J_fd)/J_fd
                 else:
                     err = np.abs(J_fwd-J_fd)
                 self.assertLess(err, 1e-4)
