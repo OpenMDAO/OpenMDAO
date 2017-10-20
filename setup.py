@@ -1,5 +1,4 @@
 from distutils.core import setup
-import setuptools
 
 setup(name='openmdao',
       version='2.0.0',
