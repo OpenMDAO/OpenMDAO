@@ -1,4 +1,5 @@
 from distutils.core import setup
+import setuptools
 
 setup(name='openmdao',
       version='2.0.0',
@@ -28,6 +29,7 @@ setup(name='openmdao',
       url='http://openmdao.org',
       download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/2.0.0',
       license='Apache License, Version 2.0',
+      include_package_data=True,  # this will use MANIFEST.in during install where we specify additional files
       packages=[
           'openmdao',
           'openmdao.approximation_schemes',
@@ -60,7 +62,6 @@ setup(name='openmdao',
           'openmdao.devtools': ['*.wpr', '*.html'],
           'openmdao.devtools.problem_viewer': ['*.css', '*.js', '*.template',
                                                '*.woff'],
-          'openmdao.devtools.problem_viewer.visualization':['libs/*','src/*','style/*'],
           'openmdao.docs': ['*.py', '_utils/*.py'],
           'openmdao.utils': ['unit_library.ini'],
           'openmdao.test_suite': ['*.py', '*/*.py'],
