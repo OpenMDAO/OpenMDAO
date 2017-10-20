@@ -169,7 +169,7 @@ def view_tree(*args, **kwargs):
     view_model(*args, **kwargs)
 
 
-def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embeddable=False):
+def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embeddable=False, draw_potential_connections=True):
     """
     Generates an HTML file containing a tree viewer. Optionally pops up a web browser to
     view the file.
@@ -190,6 +190,10 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
     embeddable : bool, optional
         If True, gives a single HTML file that doesn't have the <html>, <DOCTYPE>, <body>
         and <head> tags. If False, gives a single, standalone HTML file for viewing.
+   
+    draw_potential_connections : bool, optional
+        If true, allows connections to be printed at the bottom of the N2 diagram.
+        Defaults to True.
     """
     html_begin_tags = """
                       <html>
@@ -274,7 +278,11 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
     index = index.replace('{{draw_lib}}', draw)
     index = index.replace('{{context_menu_lib}}', context_menu)
     index = index.replace('{{ptn2_lib}}', pt_n2)
-
+    if draw_potential_connections:
+        index = index.replace('{{draw_potential_connections}}', 'true')
+    else:
+        index = index.replace('{{draw_potential_connections}}', 'false')
+        
     with open(outfile, 'w') as f:
         f.write(index)
 
