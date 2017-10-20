@@ -178,7 +178,8 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
     ----------
     problem_or_filename : Either a Problem() or a string
         Problem() : The Problem (after problem.setup()) for the desired tree.
-        string : The filename of the case recorder file containing the data required to build the tree.
+        string : The filename of the case recorder file containing the data required to
+         build the tree.
 
     outfile : str, optional
         The name of the final output file
@@ -190,10 +191,10 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
     embeddable : bool, optional
         If True, gives a single HTML file that doesn't have the <html>, <DOCTYPE>, <body>
         and <head> tags. If False, gives a single, standalone HTML file for viewing.
-   
+
     draw_potential_connections : bool, optional
-        If true, allows connections to be printed at the bottom of the N2 diagram.
-        Defaults to True.
+        If true, allows connections to be drawn on the N2 that do not currently exist
+        in the model. Defaults to True.
     """
     html_begin_tags = """
                       <html>
