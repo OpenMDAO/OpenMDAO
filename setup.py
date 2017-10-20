@@ -3,7 +3,10 @@ from distutils.core import setup
 setup(name='openmdao',
       version='2.0.0',
       description="OpenMDAO v2.0 framework infrastructure",
-      long_description="""\
+      long_description="""OpenMDAO is an open-source high-performance computing platform 
+        for systems analysis and multidisciplinary optimization, written in Python. It 
+        enables you to decompose your models, making them easier to build and maintain, 
+        while still solving them in a tightly coupled manner with efficient parallel numerical methods.
       """,
       classifiers=[
         'Development Status :: 3 - Alpha',
@@ -16,7 +19,7 @@ setup(name='openmdao',
         'Topic :: Scientific/Engineering',
         'Programming Language :: Python',
         'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: Implementation :: CPython',
       ],
       keywords='optimization multidisciplinary multi-disciplinary analysis',
@@ -57,6 +60,7 @@ setup(name='openmdao',
           'openmdao.devtools': ['*.wpr', '*.html'],
           'openmdao.devtools.problem_viewer': ['*.css', '*.js', '*.template',
                                                '*.woff'],
+          'openmdao.devtools.problem_viewer.visualization':['libs/*','src/*','style/*'],
           'openmdao.docs': ['*.py', '_utils/*.py'],
           'openmdao.utils': ['unit_library.ini'],
           'openmdao.test_suite': ['*.py', '*/*.py'],
