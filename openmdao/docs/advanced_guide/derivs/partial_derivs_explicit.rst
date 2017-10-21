@@ -1,19 +1,19 @@
 .. _advanced_guide_partial_derivs_explicit:
 
-OpenMDAO considers component derivatives to be **partial-derivatives**.
-The framework uses these partial-derivatives in order to compute the **total-derivatives** across your whole model.
-This tutorial is focused on how to define the partial-derivatives* for instances of :ref:`ExplicitComponent <comp-type-2-explicitcomp>`.
+OpenMDAO considers component derivatives to be **partial derivatives**.
+The framework uses these partial derivatives in order to compute the **total derivatives** across your whole model.
+This tutorial is focused on how to define the partial derivatives for components that inherit from :ref:`ExplicitComponent <comp-type-2-explicitcomp>`.
 
 
 
 ****************************************************
-Defining Partial-Derivatives on Explicit Components
+Defining partial derivatives on Explicit Components
 ****************************************************
 
-For any :ref:`ExplicitComponent <comp-type-2-explicitcomp>` instance you are going to provide derivatives of the **outputs with respect to the inputs**.
+For any :ref:`ExplicitComponent <comp-type-2-explicitcomp>` you are going to provide derivatives of the **outputs with respect to the inputs**.
 Whenever you are going to define derivatives, there are two things you're required to do:
 
-    #. delclare the partial-derivatives via :code:`declare_partials`
+    #. declare the partial derivatives via :code:`declare_partials`
     #. specify their values via :code:`compute_partials`
 
 Here is a example, based on the :ref:`Betz Limit Example <betz_limit_tutorial>`:
@@ -44,8 +44,8 @@ So generally its better to be more specific and declare only the non-zero partia
 After you declare the non-zero partial derivatives, you need to implement the :code:`compute_partials` method to perform the actual
 derivative computations.
 OpenMDAO will call this method whenever it needs to work with the partial derivatives.
-The values are stored in the Jacobian object, :code:`J`, and get used in the linear solutions that are necessary to compute model level total-derivatives.
-This API results in the actual assembly of the jacobian matrix in memory.
+The values are stored in the Jacobian object, :code:`J`, and get used in the linear solutions that are necessary to compute model level total derivatives.
+This API results in the assembly of a Jacobian matrix in memory.
 It is the most appropriate way to declare derivatives in the vast majority of circumstances, and you should use it unless you have a good reason not to.
 
 Providing derivatives using the matrix-free API
@@ -55,16 +55,17 @@ Sometimes you don't want to assemble the full partial-derivative Jacobian of you
 We're not going to discuss why this might be the case in this tutorial.
 For now lets just say that if matrix-assembly won't work for your application you are likely already well aware of this issue.
 If you can't imagine why you would want to use a matrix-free API, then don't worry about this.
-If that is the case, there is matrix-free API you can use. See the :ref:`ExplicitComponent <comp-type-2-explicitcomp>` reference for an example of how to use it.
+If you do need to work matrix-free there is a different API that you can use.
+See the :ref:`ExplicitComponent <comp-type-2-explicitcomp>` reference for an example of how to use it.
 
 
 How Do I Know if My Derivatives Are Correct?
 **************************************************
 
-Its really important, if you are going to provide analytic derivatives, that you make sure they are correct.
+It is really important, if you are going to provide analytic derivatives, that you make sure they are correct.
 Nothing else will screw up the convergence of your analysis or optimization more quickly that bad derivatives.
-OpenMDAO provides a way to check your partial-derivatives so you can make sure they are right.
-Any time you implement analytic derivatives, or change the non-linear equations of your analysis you should check your partial-derivatives this way.
+OpenMDAO provides a way to check your partial derivatives so you can make sure they are right.
+Any time you implement analytic derivatives, or change the non-linear equations of your analysis you should check your partial derivatives this way.
 
 .. embed-test::
     openmdao.test_suite.test_examples.test_betz_limit.TestBetzLimit.test_betz_derivatives
@@ -75,7 +76,7 @@ Any time you implement analytic derivatives, or change the non-linear equations 
     It has some options to give you more detailed outputs for debugging and to let you limit which components get tested.
     You should look over the complete :ref:`check_partials doc <feature_check_partials>` before you start doing heavy development with derivatives.
 
-There is a lot of information there, including infromation about both forward and reverse derivatives.
+There is a lot of information there, including checks for both forward and reverse derivatives.
 If you've taken our advice and stuck with the :code:`compute_partials` method, then you can ignore all the reverse stuff.
 For now, just take a look at the third to last column, which shows the norm of the difference between the analytic derivatives Jacobian and one that was approximated using finite-difference.
 Here all the numbers are really small, and that's what you want to see.

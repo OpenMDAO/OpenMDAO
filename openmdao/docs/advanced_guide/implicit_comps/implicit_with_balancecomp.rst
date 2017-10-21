@@ -2,7 +2,7 @@ In the :ref:`previous tutorial <defining_icomps_tutorial>`, we built up a model 
 a combination of :ref:`ImplicitComponent <comp-type-3-implicitcomp>` and :ref:`ExplicitComponent <comp-type-2-explicitcomp>` instances.
 In that tutorial, all of the implicit relationships in the model came directly from the physics of the model itself.
 
-However, you often need to add implicit relatiships to models by driving the values of two separate variables to be equal to eachother.
+However, you often need to add implicit relationships to models by driving the values of two separate variables to be equal to each other.
 In this tutorial we'll show you how to do that using the :ref:`BalanceComp <balancecomp_feature>`.
 
 **************************************************************
@@ -44,7 +44,7 @@ Lastly, since we added an :ref:`ImplicitComponent <comp-type-3-implicitcomp>` at
 .. note::
 
     BalanceComp can handle more than just :math:`lhs-rhs=0`. It has a number of inputs that let you tweak that behavior.
-    It can support multiple residuals, and array variables as well. Check out the :ref:`feature doc <balancecomp_feature>` on it for details.
+    It can support multiple residuals, and array variables as well. Check out the :ref:`documentation <balancecomp_feature>` on it for details.
 
 .. embed-test::
     openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source

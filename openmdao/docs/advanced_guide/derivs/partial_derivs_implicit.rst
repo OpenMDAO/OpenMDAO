@@ -8,7 +8,7 @@ For :ref:`ImplicitComponent <comp-type-3-implicitcomp>` instances you will provi
 Note that this is slightly different than what you do for :ref:`ExplicitComponent instances <advanced_guide_partial_derivs_explicit>`, but
 the general procedure is similar:
 
-    #. delclare the partial-derivatives via :code:`declare_partials`
+    #. declare the partial-derivatives via :code:`declare_partials`
     #. specify their values via :code:`linearize`
 
 Residual values are computed in the :code:`apply_nonlinear` method, so those equations are the ones you will differentiate.
@@ -22,7 +22,7 @@ Here is a simple example to consider:
 
 
 In this component :code:`x` is an output and you take derivatives with respect to it.
-This might seem a bit strange to you, if you're used to thinking about things from an :ref:`ExplicitComponent instances <advanced_guide_partial_derivs_explicit>` perspective.
+This might seem a bit strange to you if you're used to thinking about things from an :ref:`ExplicitComponent <advanced_guide_partial_derivs_explicit>` perspective.
 But for implicit components its necessary because the values of those output are determined by a solver, like :ref:`NewtonSolver <nlnewton>`, which will need to know those derivatives.
 They are also necessary for the total derivative computations across the whole model.
 So if your residual is a function of one or more of the component outputs, make sure you provide those partials to OpenMDAO.
