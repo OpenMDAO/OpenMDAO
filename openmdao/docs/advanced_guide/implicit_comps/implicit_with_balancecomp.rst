@@ -18,7 +18,7 @@ circuit with a current source of .1 Amps. Here is a reminder of what the circuit
    :alt: diagram of a simple circuit with two resistors and one diode
 
 When we solved that circuit, the resulting voltage at *node 1* was 9.9 Volts.
-Lets say you wanted to power this circuit off a 1.5 Volt battery, instead of a current source.
+Lets say you wanted to power this circuit with a 1.5-Volt battery, instead of a current source.
 We can make a small modification to our original model to capture this new setup.
 
 Given any value for :code:`source.I`, this model outputs the value for :code:`n1.V` that balances the model.
@@ -27,7 +27,7 @@ The voltage at the ground is also known via :code:`ground.V`. So the voltage acr
 .. math::
     V_{source} = V1 - V0
 
-So to represent a voltage source with a specific voltage we can add an additional state variable and residual equation to our model:
+So to represent a voltage source with a specific voltage, we can add an additional state variable and residual equation to our model:
 
 .. math::
     \mathcal{R}_{batt} = V1 - V0 - V_{source}^{*}
@@ -37,7 +37,8 @@ where :math:`V_{source}^{*}`, the desired source voltage, is given by the user a
 We could write a new component, inheriting from :ref:`ImplicitComponent <comp-type-3-implicitcomp>`, to include this new relationship into the model.
 But OpenMDAO provides :ref:`BalanceComp <balancecomp_feature>`, a general utility component, designed specifically for this type of situation.
 
-What we're going to do is add a :code:`BalanceComp` to the top level of the model that will drive the input current to the circuit to force a delta-V across the battery to be what we want.
+What we're going to do is add a :ref:`BalanceComp <balancecomp_feature>` to the top level of the model.
+The :code:`BalanceComp` will define a residual that will drive the source current to force the delta-V across the battery to be what we want.
 We'll also add an :ref:`ExecComp <feature_exec_comp>` to compute that delta-V from the ground voltage and the voltage at node 1 and then connect everything up.
 Lastly, since we added an :ref:`ImplicitComponent <comp-type-3-implicitcomp>` at the top level of the model, we'll also move the :ref:`NewtonSolver <nlnewton>` up to the top level of the model too.
 
