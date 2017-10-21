@@ -23,7 +23,7 @@ setup(name='openmdao',
       author='OpenMDAO Team',
       author_email='openmdao@openmdao.org',
       url='http://openmdao.org',
-      #download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/1.7.2',
+      download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/2.0.0',
       license='Apache License, Version 2.0',
       packages=[
           'openmdao',
