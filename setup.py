@@ -1,7 +1,7 @@
 from distutils.core import setup
 
 setup(name='openmdao',
-      version='2.0.1',
+      version='2.0.2',
       description="OpenMDAO v2.0 framework infrastructure",
       long_description="""OpenMDAO is an open-source high-performance computing platform 
         for systems analysis and multidisciplinary optimization, written in Python. It 
@@ -28,7 +28,6 @@ setup(name='openmdao',
       url='http://openmdao.org',
       download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/2.0.0',
       license='Apache License, Version 2.0',
-      include_package_data=True,  # this will use MANIFEST.in during install where we specify additional files
       packages=[
           'openmdao',
           'openmdao.approximation_schemes',
@@ -59,8 +58,9 @@ setup(name='openmdao',
       ],
       package_data={
           'openmdao.devtools': ['*.wpr', '*.html'],
-          'openmdao.devtools.problem_viewer': ['*.css', '*.js', '*.template',
-                                               '*.woff'],
+          'openmdao.devtools.problem_viewer': ['visualization/libs/*.js', 'visualization/src/*.js',
+                                               'visualization/style/*.css', 'visualization/style/*.woff',
+                                               'visualization/*.html'],
           'openmdao.docs': ['*.py', '_utils/*.py'],
           'openmdao.utils': ['unit_library.ini'],
           'openmdao.test_suite': ['*.py', '*/*.py'],
