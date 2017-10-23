@@ -27,4 +27,5 @@ Copy the code into a file named `hello_world.py` and run it by typing:
 
 .. embed-test::
     openmdao.test_suite.test_examples.tldr_paraboloid.TestParaboloidTLDR.test_tldr
+    :no-split:
 
