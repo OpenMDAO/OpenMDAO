@@ -1,6 +1,8 @@
-*******************
-Grouping Components
-*******************
+.. _feature_grouping_components:
+
+**********************
+Working with Groups
+**********************
 
 .. toctree::
     :maxdepth: 1

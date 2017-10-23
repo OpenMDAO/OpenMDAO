@@ -20,6 +20,8 @@ class RectangleComp(ExplicitComponent):
         self.add_input('width', val=1.)
         self.add_output('area', val=1.)
 
+        self.declare_partials('*', '*')
+
     def compute(self, inputs, outputs):
         outputs['area'] = inputs['length'] * inputs['width']
 
@@ -33,8 +35,7 @@ class RectanglePartial(RectangleComp):
 
 class RectangleJacVec(RectangleComp):
 
-    def compute_jacvec_product(self, inputs, outputs,
-                               d_inputs, d_outputs, mode):
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         if mode == 'fwd':
             if 'area' in d_outputs:
                 if 'length' in d_inputs:
@@ -68,6 +69,14 @@ class RectangleGroup(Group):
 class ExplCompTestCase(unittest.TestCase):
 
     def test_simple(self):
+        prob = Problem(RectangleComp())
+        prob.setup(check=False)
+        prob.run_model()
+
+    def test_feature_simple(self):
+        from openmdao.api import Problem
+        from openmdao.core.tests.test_expl_comp import RectangleComp
+
         prob = Problem(RectangleComp())
         prob.setup(check=False)
         prob.run_model()
@@ -107,7 +116,7 @@ class ExplCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp3.area'], 6.)
 
         # total derivs
-        total_derivs = prob.compute_total_derivs(
+        total_derivs = prob.compute_totals(
             wrt=['comp1.length', 'comp1.width'],
             of=['comp2.area', 'comp3.area']
         )

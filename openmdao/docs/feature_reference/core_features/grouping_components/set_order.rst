@@ -1,3 +1,5 @@
+.. _feature_set_order:
+
 ******************************************
 Setting the Order of Subsystems in a Group
 ******************************************

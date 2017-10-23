@@ -24,10 +24,13 @@ tab = '    '
 addr_regex = re.compile(" at 0x[0-9a-fA-F]+")
 
 def _indented_print(f_locals, d, indent, excludes=('__init__',), file=sys.stdout):
+    """
+    Print trace info, indenting based on call depth.
+    """
     sindent = tab * indent
     sep = '=' if d is f_locals else ':'
 
-    for name in sorted(d):
+    for name in sorted(d, key=lambda a: str(a)):
         if name not in excludes:
             if isinstance(d[name], (dict, OrderedDict)):
                 f = cStringIO()
@@ -50,7 +53,7 @@ def _trace_call(frame, arg, stack, context):
     """
     This is called after we have matched based on glob pattern and isinstance check.
     """
-    qual_cache, method_counts, class_counts = context
+    qual_cache, method_counts, class_counts, verbose = context
     funcname = find_qualified_name(frame.f_code.co_filename,
                                    frame.f_code.co_firstlineno, qual_cache)
 
@@ -68,8 +71,11 @@ def _trace_call(frame, arg, stack, context):
     method_counts[fullname] += 1
 
     indent = tab * (len(stack)-1)
-    print("%s%s (%d)" % (indent, fullname, method_counts[fullname]))
-    _indented_print(frame.f_locals, frame.f_locals, len(stack)-1)
+    if verbose:
+        print("%s%s (%d)" % (indent, fullname, method_counts[fullname]))
+        _indented_print(frame.f_locals, frame.f_locals, len(stack)-1)
+    else:
+        print("%s%s" % (indent, fullname))
     sys.stdout.flush()
 
 
@@ -79,7 +85,7 @@ def _trace_return(frame, arg, stack, context):
 
     This only happens if show_return is True when setup() is called.
     """
-    qual_cache, method_counts, class_counts = context
+    qual_cache, method_counts, class_counts, _ = context
     funcname = find_qualified_name(frame.f_code.co_filename,
                                    frame.f_code.co_firstlineno, qual_cache)
 
@@ -104,7 +110,7 @@ def _trace_return(frame, arg, stack, context):
     sys.stdout.flush()
 
 
-def setup(methods=None, show_return=False):
+def setup(methods=None, verbose=False):
     """
     Setup call tracing.
 
@@ -112,27 +118,31 @@ def setup(methods=None, show_return=False):
     ----------
     methods : list of (glob, (classes...)) or None
         Methods to be traced, based on glob patterns and isinstance checks.
-
+    verbose : bool
+        If True, show function locals and return values.
     """
     global _registered, _trace_calls
     if not _registered:
-        if methods is None or methods not in func_group:
+        if methods is None:
             methods = func_group['openmdao']
         elif isinstance(methods, string_types):
-            methods = func_group[methods]
+            methods = func_group.get(methods)
+            if methods is None:
+                methods = func_group['openmdao']
 
         call_stack = []
         qual_cache = {}
         method_counts = defaultdict(int)
         class_counts = defaultdict(set)
-        if show_return:
+        if verbose:
             do_ret = _trace_return
         else:
             do_ret = None
         _trace_calls = _create_profile_callback(call_stack, _collect_methods(methods),
                                                 do_call=_trace_call,
                                                 do_ret=do_ret,
-                                                context=(qual_cache, method_counts, class_counts))
+                                                context=(qual_cache, method_counts,
+                                                         class_counts, verbose))
 
 
 def start():
@@ -155,7 +165,7 @@ def stop():
 
 
 @contextmanager
-def tracing(methods=None):
+def tracing(methods=None, verbose=False):
     """
     Turn on call tracing within a certain context.
 
@@ -163,9 +173,10 @@ def tracing(methods=None):
     ----------
     methods : list of (glob, (classes...)) or None
         Methods to be traced, based on glob patterns and isinstance checks.
-
+    verbose : bool
+        If True, show function locals and return values.
     """
-    setup(methods=methods)
+    setup(methods=methods, verbose=verbose)
     start()
     yield
     stop()
@@ -179,12 +190,15 @@ class tracedfunc(object):
     ----------
     methods : list of (glob, (classes...)) tuples, optional
         Methods to be traced, based on glob patterns and isinstance checks.
+    verbose : bool
+        If True, show function locals and return values.
     """
-    def __init__(self, methods=None):
+    def __init__(self, methods=None, verbose=False):
         self.methods = methods
+        self.verbose = verbose
 
     def __call__(self, func):
-        setup(methods=self.methods)
+        setup(methods=self.methods, verbose=self.verbose)
 
         def wrapped(*args, **kwargs):
             start()
@@ -193,13 +207,17 @@ class tracedfunc(object):
         return wrapped
 
 
-def trace_py_file():
-
+def _trace_py_file():
+    """
+    Process command line args and perform tracing on a specified python file.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('-g', '--group', action='store', dest='group',
                         default='openmdao',
                         help='Determines which group of methods will be tracked. Default is "openmdao".'
                               ' Options are: %s' % sorted(func_group.keys()))
+    parser.add_argument('-v', '--verbose', action='store_true', dest='verbose',
+                        help="Show function locals and return values.")
     parser.add_argument('file', metavar='file', nargs=1,
                         help='Python file to profile.')
 
@@ -208,7 +226,7 @@ def trace_py_file():
     progname = options.file[0]
     sys.path.insert(0, os.path.dirname(progname))
 
-    setup(methods=func_group[options.group])
+    setup(methods=func_group[options.group], verbose=options.verbose)
     with open(progname, 'rb') as fp:
         code = compile(fp.read(), progname, 'exec')
 
@@ -225,4 +243,4 @@ def trace_py_file():
 
 
 if __name__ == '__main__':
-    trace_py_file()
+    _trace_py_file()

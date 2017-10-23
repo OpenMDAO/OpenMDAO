@@ -9,10 +9,11 @@ import numpy as np
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
-from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration_stack
+from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.utils.record_util import create_local_meta
+from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.record_util import create_local_meta
 
 
 class SolverInfo(object):
@@ -21,7 +22,7 @@ class SolverInfo(object):
 
     Attributes
     ----------
-    prefix : <System>
+    prefix : str
         Prefix to prepend during this iprint.
     stack : List
         List of strings; strings are popped and appended as needed.
@@ -30,6 +31,13 @@ class SolverInfo(object):
     def __init__(self):
         """
         Initialize.
+        """
+        self.prefix = ""
+        self.stack = []
+
+    def clear(self):
+        """
+        Clear out the iprint stack, in case something is left over from a handled exception.
         """
         self.prefix = ""
         self.stack = []
@@ -65,6 +73,28 @@ class SolverInfo(object):
         new_str = '| precon:'
         self.prefix += new_str
         self.stack.append(new_str)
+
+    def save_cache(self):
+        """
+        Save prefix and stack so that they can be restored later in event of an exception recovery.
+
+        Returns
+        -------
+        tuple(str, list)
+            cache of current stack
+        """
+        return (self.prefix, self.stack)
+
+    def restore_cache(self, cache):
+        """
+        Restore previously saved iprint stack names.
+
+        Parameters
+        ----------
+        cache : tuple(str, list)
+            cache of current stack
+        """
+        self.prefix, self.stack = cache
 
 
 class Solver(object):
@@ -148,6 +178,9 @@ class Solver(object):
         recorder : <BaseRecorder>
            A recorder instance to be added to RecManager.
         """
+        if MPI:
+            raise RuntimeError(
+                "Recording of Solvers when running parallel code is not supported yet")
         self._rec_mgr.append(recorder)
 
     def _declare_options(self):
@@ -418,9 +451,9 @@ class NonlinearSolver(Solver):
         """
         Run the the apply_nonlinear method on the system.
         """
-        recording_iteration_stack.append(('_run_apply', 0))
+        recording_iteration.stack.append(('_run_apply', 0))
         self._system._apply_nonlinear()
-        recording_iteration_stack.pop()
+        recording_iteration.stack.pop()
 
     def _iter_get_norm(self):
         """
@@ -437,9 +470,26 @@ class NonlinearSolver(Solver):
 class LinearSolver(Solver):
     """
     Base class for linear solvers.
+
+    Attributes
+    ----------
+    _rel_systems : set of str
+        Names of systems relevant to the current solve.
     """
 
-    def solve(self, vec_names, mode):
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
+        """
+        super(LinearSolver, self).__init__(**kwargs)
+        self._rel_systems = None
+
+    def solve(self, vec_names, mode, rel_systems=None):
         """
         Run the solver.
 
@@ -449,6 +499,8 @@ class LinearSolver(Solver):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
 
         Returns
         -------
@@ -460,6 +512,7 @@ class LinearSolver(Solver):
             error at the first iteration.
         """
         self._vec_names = vec_names
+        self._rel_systems = rel_systems
         self._mode = mode
         return self._run_iterator()
 
@@ -497,13 +550,13 @@ class LinearSolver(Solver):
         """
         Run the the apply_linear method on the system.
         """
-        recording_iteration_stack.append(('_run_apply', 0))
+        recording_iteration.stack.append(('_run_apply', 0))
 
         system = self._system
         scope_out, scope_in = system._get_scope()
-        system._apply_linear(self._vec_names, self._mode, scope_out, scope_in)
+        system._apply_linear(self._vec_names, self._rel_systems, self._mode, scope_out, scope_in)
 
-        recording_iteration_stack.pop()
+        recording_iteration.stack.pop()
 
     def _iter_get_norm(self):
         """
@@ -523,9 +576,10 @@ class LinearSolver(Solver):
 
         norm = 0
         for vec_name in self._vec_names:
-            b_vec = b_vecs[vec_name]
-            b_vec -= self._rhs_vecs[vec_name]
-            norm += b_vec.get_norm()**2
+            if vec_name in system._rel_vec_names:
+                b_vec = b_vecs[vec_name]
+                b_vec -= self._rhs_vecs[vec_name]
+                norm += b_vec.get_norm()**2
 
         return norm ** 0.5
 

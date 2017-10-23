@@ -1,9 +1,8 @@
+.. _feature_linear_solvers:
 
 **************
 Linear Solvers
 **************
-
-Linear Solvers
 
 .. toctree::
     :maxdepth: 1

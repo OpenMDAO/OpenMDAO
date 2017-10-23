@@ -13,6 +13,10 @@ from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, Sel
 class TestNLBlockJacobi(unittest.TestCase):
 
     def test_feature_basic(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockJac, LinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -41,6 +45,10 @@ class TestNLBlockJacobi(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_maxiter(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockJac, LinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -71,6 +79,10 @@ class TestNLBlockJacobi(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.0542542372, .00001)
 
     def test_feature_rtol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockJac, LinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -101,6 +113,10 @@ class TestNLBlockJacobi(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.0569142166, .00001)
 
     def test_feature_atol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockJac, LinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()

@@ -25,6 +25,3 @@ MPI and give it 2 processes using the following command:
 
   This will only work if you've installed the mpi4py and petsc4py python packages, which are not installed by default
   in OpenMDAO.
-
-
-

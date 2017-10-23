@@ -3,11 +3,11 @@ OpenMDAO Wrapper for the scipy.optimize.minimize family of local optimizers.
 """
 
 from __future__ import print_function
-import sys
 from collections import OrderedDict
 import traceback
+import sys
 
-from six import itervalues, iteritems
+from six import itervalues, iteritems, reraise
 from six.moves import range
 
 import numpy as np
@@ -76,6 +76,8 @@ class ScipyOptimizer(Driver):
         Cached result of constraint derivatives because scipy asks for them in a separate function.
     _objs : dict
         Contains all objective info.
+    _exc_info : 3 item tuple
+        Storage for exception and traceback information.
     """
 
     def __init__(self):
@@ -117,6 +119,7 @@ class ScipyOptimizer(Driver):
         self.objs = None
         self.fail = False
         self.iter_count = 0
+        self._exc_info = None
 
     def _setup_driver(self, problem):
         """
@@ -262,6 +265,9 @@ class ScipyOptimizer(Driver):
                           # callback=None,
                           options=self.opt_settings)
 
+        if self._exc_info is not None:
+            self._reraise()
+
         self.result = result
         self.fail = False if self.result.success else True
 
@@ -308,12 +314,8 @@ class ScipyOptimizer(Driver):
             self._con_cache = self.get_constraint_values()
 
         except Exception as msg:
-            tb = traceback.format_exc()
-
-            # Exceptions seem to be swallowed by the C code, so this
-            # should give the user more info than the dreaded "segfault"
-            print("Exception: %s" % str(msg))
-            print(70 * "=", tb, 70 * "=")
+            self._exc_info = sys.exc_info()
+            return 0
 
         # print("Functions calculated")
         # print(x_new)
@@ -342,6 +344,9 @@ class ScipyOptimizer(Driver):
         float
             Value of the constraint function.
         """
+        if self._exc_info is not None:
+            self._reraise()
+
         if name.startswith('2bl-'):
             name = name[4:]
             dbl_side = True
@@ -391,17 +396,13 @@ class ScipyOptimizer(Driver):
         """
         try:
             quantities = list(self._objs) + list(self._cons)
-            grad = self._compute_total_derivs(of=quantities, wrt=list(self._designvars),
-                                              return_format='array')
+            grad = self._compute_totals(of=quantities, wrt=list(self._designvars),
+                                        return_format='array')
             self._grad_cache = grad
 
         except Exception as msg:
-            tb = traceback.format_exc()
-
-            # Exceptions seem to be swallowed by the C code, so this
-            # should give the user more info than the dreaded "segfault"
-            print("Exception: %s" % str(msg), file=sys.stderr)
-            print(70 * "=", tb, 70 * "=", file=sys.stderr)
+            self._exc_info = sys.exc_info()
+            return np.array([[]])
 
         # print("Gradients calculated")
         # print(x_new)
@@ -430,6 +431,9 @@ class ScipyOptimizer(Driver):
         float
             Gradient of the constraint function wrt all params.
         """
+        if self._exc_info is not None:
+            self._reraise()
+
         if name.startswith('2bl-'):
             name = name[4:]
             dbl_side = True
@@ -458,3 +462,11 @@ class ScipyOptimizer(Driver):
             return -grad[grad_idx, :]
         else:
             return grad[grad_idx, :]
+
+    def _reraise(self):
+        """
+        Reraise any exception encountered when scipy calls back into our method.
+        """
+        exc = self._exc_info
+        self._exc_info = None
+        reraise(*exc)

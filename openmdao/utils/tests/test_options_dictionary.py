@@ -45,15 +45,6 @@ class TestOptionsDict(unittest.TestCase):
         self.dict['test3'] = 'a'
         self.assertEqual(self.dict['test3'], 'a')
 
-    def test_required(self):
-        self.dict.declare('test', required=True)
-
-        with self.assertRaises(RuntimeError) as context:
-            self.dict['test']
-
-        expected_msg = "Entry 'test' is required but has not been set."
-        self.assertEqual(expected_msg, str(context.exception))
-
     def test_isvalid(self):
         self.dict.declare('even_test', type_=int, is_valid=lambda x: x%2 == 0)
         self.dict['even_test'] = 2

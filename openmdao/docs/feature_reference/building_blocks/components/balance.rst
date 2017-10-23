@@ -1,5 +1,7 @@
 .. index:: BalanceComp Example
 
+.. _balancecomp_feature:
+
 *****************
 Balance Component
 *****************
@@ -84,20 +86,4 @@ they need not be connected.
 .. embed-test::
     openmdao.components.tests.test_balance_comp.TestBalanceComp.test_feature_vector
 
-A Practical Example:  Solving Kepler's Equation
------------------------------------------------
-
-This example uses the Balance component to convert mean anomaly to eccentric anomaly
-by use of Kepler's equation.
-
-.. math::
-
-    M = E - ecc \cdot \sin{E}
-
-Here M is the mean anomaly, E is the eccentric anomaly, and ecc is the eccentricity of the orbit.
-
-.. embed-test::
-    openmdao.components.tests.test_balance_comp.TestBalanceComp.test_feature_kepler
-
-
-.. tags:: BalanceComp, Examples
+.. tags:: BalanceComp

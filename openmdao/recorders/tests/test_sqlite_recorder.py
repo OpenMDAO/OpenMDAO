@@ -20,9 +20,17 @@ from openmdao.devtools.testutil import assert_rel_error
 from openmdao.utils.record_util import format_iteration_coordinate
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.sqlite_recorder import format_version, blob_to_array
+from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
     SellarDis2withDerivatives
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from sqlite_recorder_test_utils import _assertDriverIterationDataRecorded
+from recorder_test_utils import run_driver
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 if PY2:
     import cPickle as pickle
@@ -34,8 +42,6 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-    optimizers = {'pyoptsparse': pyOptSparseDriver}
-
 
 def run_driver(problem):
     t0 = time.time()
@@ -43,61 +49,6 @@ def run_driver(problem):
     t1 = time.time()
 
     return t0, t1
-
-
-def _assertDriverIterationDataRecorded(test, db_cur, expected, tolerance):
-    """
-        Expected can be from multiple cases.
-    """
-    # iterate through the cases
-    for coord, (t0, t1), desvars_expected, responses_expected, objectives_expected, \
-            constraints_expected in expected:
-        iter_coord = format_iteration_coordinate(coord)
-
-        # from the database, get the actual data recorded
-        db_cur.execute("SELECT * FROM driver_iterations WHERE "
-                       "iteration_coordinate=:iteration_coordinate",
-                       {"iteration_coordinate": iter_coord})
-        row_actual = db_cur.fetchone()
-
-        test.assertTrue(row_actual, 'Driver iterations table does not contain the requested iteration coordinate: "{}"'.format(iter_coord))
-
-
-        counter, global_counter, iteration_coordinate, timestamp, success, msg, desvars_blob,\
-            responses_blob, objectives_blob, constraints_blob = row_actual
-
-        desvars_actual = blob_to_array(desvars_blob)
-        responses_actual = blob_to_array(responses_blob)
-        objectives_actual = blob_to_array(objectives_blob)
-        constraints_actual = blob_to_array(constraints_blob)
-
-        # Does the timestamp make sense?
-        test.assertTrue(t0 <= timestamp and timestamp <= t1)
-
-        test.assertEqual(success, 1)
-        test.assertEqual(msg, '')
-
-        for vartype, actual, expected in (
-            ('desvars', desvars_actual, desvars_expected),
-            ('responses', responses_actual, responses_expected),
-            ('objectives', objectives_actual, objectives_expected),
-            ('constraints', constraints_actual, constraints_expected),
-        ):
-
-            if expected is None:
-                test.assertEqual(actual, np.array(None, dtype=object))
-            else:
-                # Check to see if the number of values in actual and expected match
-                test.assertEqual(len(actual[0]), len(expected))
-                for key, value in iteritems(expected):
-                    # Check to see if the keys in the actual and expected match
-                    test.assertTrue(key in actual[0].dtype.names,
-                                    '{} variable not found in actual data'
-                                    ' from recorder'.format(key))
-                    # Check to see if the values in actual and expected match
-                    assert_rel_error(test, actual[0][key], expected[key], tolerance)
-        return
-
 
 def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
     """
@@ -260,17 +211,12 @@ class TestSqliteRecorder(unittest.TestCase):
     CaseRecorder
     """
     def setUp(self):
-        if OPT is None:
-            raise unittest.SkipTest("pyoptsparse is not installed")
-
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SLSQP")
-
+        recording_iteration.stack = []
         self.dir = mkdtemp()
         self.filename = os.path.join(self.dir, "sqlite_test")
         self.recorder = SqliteRecorder(self.filename)
         # print(self.filename)  # comment out to make filename printout go away.
-        self.eps = 1e-5
+        self.eps = 1e-3
 
     def tearDown(self):
         # return  # comment out to allow db file to be removed.
@@ -350,12 +296,13 @@ class TestSqliteRecorder(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
         self.prob.model.nonlinear_solver = NonlinearBlockGS()
+        self.prob.model.linear_solver = LinearBlockGS()
 
-        self.prob.model.add_design_var('x', lower=-100, upper=100)
-        self.prob.model.add_design_var('z', lower=-100, upper=100)
+        self.prob.model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        self.prob.model.add_design_var('x', lower=0.0, upper=10.0)
         self.prob.model.add_objective('obj')
-        self.prob.model.add_constraint('con1')
-        self.prob.model.add_constraint('con2')
+        self.prob.model.add_constraint('con1', upper=0.0)
+        self.prob.model.add_constraint('con2', upper=0.0)
 
     def setup_sellar_grouped_model(self):
         self.prob = Problem()
@@ -410,7 +357,7 @@ class TestSqliteRecorder(unittest.TestCase):
                            }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars,
-                                           None, None, None),), self.eps)
+                                           None, None, None, None),), self.eps)
 
     def test_add_recorder_after_setup(self):
 
@@ -437,7 +384,7 @@ class TestSqliteRecorder(unittest.TestCase):
                            }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars,
-                                           None, None, None),), self.eps)
+                                           None, None, None, None),), self.eps)
 
     def test_only_objectives_recorded(self):
 
@@ -459,7 +406,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_objectives = {"obj_cmp.obj": [28.58830817, ]}
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), None, None,
-                                           expected_objectives, None),), self.eps)
+                                           expected_objectives, None, None),), self.eps)
 
     def test_only_constraints_recorded(self):
 
@@ -484,15 +431,11 @@ class TestSqliteRecorder(unittest.TestCase):
                             }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), None, None, None,
-                                           expected_constraints), ), self.eps)
+                                           expected_constraints, None), ), self.eps)
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_simple_driver_recording(self):
-
-        if OPT is None:
-            raise unittest.SkipTest("pyoptsparse is not installed")
-
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
 
         prob = Problem()
         model = prob.model = Group()
@@ -538,7 +481,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_constraints = {"con.c": [-15.0, ], }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
-                                           expected_objectives, expected_constraints),), self.eps)
+                                           expected_objectives, expected_constraints, None),), self.eps)
 
     def test_driver_records_metadata(self):
         self.setup_sellar_model()
@@ -575,6 +518,9 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_driver_metadata = None
         self.assertDriverMetadataRecorded(expected_driver_metadata)
 
+    @unittest.skipIf(PETScVector is None or os.environ.get("TRAVIS"),
+                     "PETSc is required." if PETScVector is None
+                     else "Unreliable on Travis CI.")
     def test_record_system(self):
         self.setup_sellar_model()
 
@@ -622,12 +568,9 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
                                                  expected_outputs, expected_residuals),), self.eps)
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_includes(self):
-        if OPT is None:
-            raise unittest.SkipTest("pyoptsparse is not installed")
-
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
 
         prob = Problem()
         model = prob.model = Group()
@@ -671,14 +614,11 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_constraints = {"con.c": prob['con.c'], }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
-                                           expected_objectives, expected_constraints), ), self.eps)
+                                           expected_objectives, expected_constraints, None), ), self.eps)
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_includes_post_setup(self):
-        if OPT is None:
-            raise unittest.SkipTest("pyoptsparse is not installed")
-
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
 
         prob = Problem()
         model = prob.model = Group()
@@ -724,14 +664,11 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_constraints = {"con.c": prob['con.c'], }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
-                                                 expected_objectives, expected_constraints), ), self.eps)
+                                                 expected_objectives, expected_constraints, None), ), self.eps)
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_record_system_with_hierarchy(self):
-        if OPT is None:
-            raise unittest.SkipTest("pyoptsparse is not installed")
-
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
         self.setup_sellar_grouped_model()
 
         self.prob.driver = pyOptSparseDriver()
@@ -966,10 +903,10 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (9,)]
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,)]
 
-        expected_abs_error = 5.041402548755789e-06
-        expected_rel_error = 1.3876088080160474e-07
+        expected_abs_error = 2.1677810075550974e-10
+        expected_rel_error = 5.966657077752565e-12
         expected_solver_residuals = None
         expected_solver_output = None
 
@@ -1091,6 +1028,9 @@ class TestSqliteRecorder(unittest.TestCase):
                                                  expected_rel_error, expected_solver_output,
                                                  expected_solver_residuals),), self.eps)
 
+    @unittest.skipIf(PETScVector is None or os.environ.get("TRAVIS"),
+                     "PETSc is required." if PETScVector is None
+                     else "Unreliable on Travis CI.")
     def test_record_solver_linear_petsc_ksp(self):
         self.setup_sellar_model()
 
@@ -1271,15 +1211,12 @@ class TestSqliteRecorder(unittest.TestCase):
                                                  expected_rel_error, expected_solver_output,
                                                  expected_solver_residuals),), self.eps)
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_record_driver_system_solver(self):
 
         # Test what happens when all three types are recorded:
         #    Driver, System, and Solver
-        if OPT is None:
-            raise unittest.SkipTest("pyoptsparse is not installed")
-
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
 
         self.setup_sellar_grouped_model()
 
@@ -1336,7 +1273,7 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
-                                           expected_objectives, expected_constraints),), self.eps)
+                                           expected_objectives, expected_constraints, None),), self.eps)
 
         # System recording test
         coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
@@ -1357,7 +1294,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_rel_error = 0.0,
 
         expected_solver_output = {
-            "mda.d2.y2": [3.75527777],
+            "mda.d2.y2": [3.75610187],
             "mda.d1.y1": [3.16],
         }
 
@@ -1370,14 +1307,11 @@ class TestSqliteRecorder(unittest.TestCase):
                                                  expected_rel_error, expected_solver_output,
                                                  expected_solver_residuals),), self.eps)
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_global_counter(self):
 
         # The case recorder maintains a global counter across all recordings
-        if OPT is None:
-            raise unittest.SkipTest("pyoptsparse is not installed")
-
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
 
         self.setup_sellar_grouped_model()
 
@@ -1444,6 +1378,9 @@ class TestSqliteRecorder(unittest.TestCase):
         prob['comp1.c'] = 3.
 
         comp2 = prob.model.get_subsystem('comp2')  # ImplicitComponent
+
+        self.recorder.options['record_metadata'] = False
+
         comp2.add_recorder(self.recorder)
 
         t0, t1 = run_driver(prob)
@@ -1475,7 +1412,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.recorder.options['record_inputs'] = True
         self.recorder.options['record_outputs'] = True
         self.recorder.options['record_residuals'] = True
-        self.recorder.options['record_metadata'] = True
+        self.recorder.options['record_metadata'] = False
 
         t0, t1 = run_driver(prob)
 
@@ -1502,14 +1439,11 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
                                                  expected_outputs, expected_residuals),), self.eps)
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_record_system_recursively(self):
         # Test adding recorders to all Systems using the recurse option
         #    to add_recorder
-        if OPT is None:
-            raise unittest.SkipTest("pyoptsparse is not installed")
-
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
 
         self.setup_sellar_grouped_model()
 
@@ -1562,7 +1496,95 @@ class TestSqliteRecorder(unittest.TestCase):
             ]
         )
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
+    def test_driver_recording_with_system_vars(self):
 
+        self.setup_sellar_grouped_model()
+
+        self.prob.driver = pyOptSparseDriver()
+        self.prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            self.prob.driver.opt_settings['ACC'] = 1e-9
+
+        self.prob.driver.add_recorder(self.recorder)
+        self.recorder.options['record_desvars'] = True
+        self.recorder.options['record_responses'] = True
+        self.recorder.options['record_objectives'] = True
+        self.recorder.options['record_constraints'] = True
+        self.recorder.options['system_includes'] = ['mda.d2.y2',]
+
+        self.prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            self.prob.driver.opt_settings['ACC'] = 1e-9
+
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+
+        # Driver recording test
+        coordinate = [0, 'SLSQP', (7, )]
+
+        expected_desvars = {
+                            "pz.z": self.prob['pz.z'],
+                            "px.x": self.prob['px.x']
+        }
+
+        expected_objectives = {"obj_cmp.obj": self.prob['obj_cmp.obj'], }
+
+        expected_constraints = {
+                                 "con_cmp1.con1": self.prob['con_cmp1.con1'],
+                                 "con_cmp2.con2": self.prob['con_cmp2.con2'],
+        }
+
+        expected_sysincludes = {
+                                 'mda.d2.y2': self.prob['mda.d2.y2'],
+        }
+
+        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
+                                           expected_objectives, expected_constraints, expected_sysincludes),), self.eps)
+
+    def test_recorder_file_already_exists_no_append(self):
+
+        self.setup_sellar_model()
+
+        self.recorder.options['record_metadata'] = True
+        self.recorder.options['record_desvars'] = True
+        self.recorder.options['record_responses'] = False
+        self.recorder.options['record_objectives'] = False
+        self.recorder.options['record_constraints'] = False
+        self.prob.driver.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+        self.prob.run_driver()
+        self.prob.cleanup()
+
+        # Open up a new instance of the recorder but with the same filename
+        self.setup_sellar_model()
+        recorder = SqliteRecorder(self.filename)
+        recorder.options['record_metadata'] = True
+        recorder.options['record_desvars'] = True
+        recorder.options['record_responses'] = False
+        recorder.options['record_objectives'] = False
+        recorder.options['record_constraints'] = False
+        self.prob.driver.add_recorder(recorder)
+
+        self.prob.setup(check=False)
+        t0, t1 = run_driver(self.prob)
+        self.prob.cleanup()
+
+        # Do a simple test to see if recording second time was OK
+        coordinate = [0, 'Driver', (0, )]
+
+        expected_desvars = {
+                            "px.x": [1.0, ],
+                            "pz.z": [5.0, 2.0]
+                           }
+
+        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars,
+                                           None, None, None, None),), self.eps)
 
 if __name__ == "__main__":
     unittest.main()

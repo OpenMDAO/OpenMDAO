@@ -2,7 +2,7 @@ from __future__ import division
 import numpy as np
 import unittest
 
-from openmdao.api import Problem, ExplicitComponent, Group, DefaultVector
+from openmdao.api import Problem, ExplicitComponent, Group, ParallelGroup, DefaultVector
 from openmdao.devtools.testutil import assert_rel_error
 
 try:
@@ -50,7 +50,7 @@ class Comp4(ExplicitComponent):
         self.add_output('v4', var_set=4)
 
 
-class GroupG(Group):
+class GroupG(ParallelGroup):
 
     def __init__(self):
         super(GroupG, self).__init__()
@@ -66,7 +66,6 @@ class TestNumpyVec(unittest.TestCase):
         group = GroupG()
         self.p = Problem(group).setup(DefaultVector, check=False)
         self.p.final_setup()
-        self.p.model.proc_allocator.parallel = True
 
     def test_prom_names(self):
         root = self.p.model
@@ -135,7 +134,6 @@ class TestPetscVec(TestNumpyVec):
     def setUp(self):
         group = GroupG()
         self.p = Problem(group).setup(PETScVector, check=False)
-        self.p.model.proc_allocator.parallel = True
         self.p.final_setup()
 
 

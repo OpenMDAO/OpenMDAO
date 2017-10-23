@@ -23,20 +23,17 @@ command.  For example:
    iprofview <your_python_script_here>
 
 
-This will collect the profiling data and pop up an icicle viewer in a web browser.  The
-web browser views a file called `profile_icicle.html` that can be saved for later viewing.
-The file should be viewable in any browser.
-The profiling data needed for the viewer is included directly in the file,
-so the file can be passed around and viewed by other people.  It does
-however require network access in order to load the d3 library.
+This will collect the profiling data, start a web server, and pop up an icicle viewer
+in a web browser.
 
-By default, a browser will pop up immediately to view the file.  To disable
-that, use the `--noshow` option.  You can use `-t` to set a custom title,
-for example:
+
+Generally it's best to just use all of the defaults, but if necessary you can change the
+server port number using the `-p` option, or change the title of the displayed page
+using the `-t` option, for example:
 
 ::
 
-    iprofview <your_python_script_here> -t "Instance Profile for propulsor.py"
+    iprofview <your_python_script_here> -p 8801 -t "Instance Profile for propulsor.py"
 
 
 You should then see something like this:
@@ -50,8 +47,7 @@ You should then see something like this:
 
 In the viewer, hovering over a box will show the
 function pathname, the local and total elapsed time for that function, and the
-local and total number of calls for that function. Also, all occurrences of that
-particular function will be highlighted.  Clicking on a box will
+local and total number of calls for that function.  Clicking on a box will
 collapse the view so that that box's function will become the top box
 and only functions called by that function will be visible.  The top
 box before any box has been collapsed is called `$total` and does not represent a
@@ -59,6 +55,9 @@ real function. Instead, it shows the total time that profiling was
 active. If there are gaps below a parent block, i.e. its child blocks don't cover the entire
 space below the parent, that gap represents the time exclusive to the parent or time
 taken up by functions called by the parent that are not being profiled.
+
+There is a *Reset* button that will take you back to the top level of the profile after
+you have clicked down into a sub-call.
 
 
 .. note::
@@ -91,15 +90,11 @@ runtime and total number of calls for each profiled function.  For example:
         1    0.000000   0.00 <Solver#7._declare_options>
         1    0.000000   0.00 <Solver#9._declare_options>
         1    0.000000   0.00 <Solver#15._declare_options>
-        1    0.000000   0.00 design.fan.<System.get_req_procs>
-        1    0.000000   0.00 design.nozz.<System.get_req_procs>
-        2    0.000000   0.00 design.shaft.<System.get_req_procs>
         1    0.000000   0.00 design.fc.ambient.<System.initialize>
         1    0.000000   0.00 <Solver#16._declare_options>
         1    0.000000   0.00 design.fc.conv.<System.initialize>
         1    0.000000   0.00 <Solver#20._declare_options>
         1    0.000000   0.00 <Solver#21._declare_options>
-        2    0.000000   0.00 design.fc.conv.fs.<System.get_req_procs>
         1    0.000000   0.00 <Solver#25._declare_options>
         1    0.000000   0.00 design.fc.ambient.readAtmTable.<System.initialize>
       ...
@@ -132,20 +127,16 @@ runtime and total number of calls for each profiled function.  For example:
 
 
 Note that the totals are sorted with the largest values at the end so that when
-running `iproftotals` in a terminal the most important functions will show up without having to scroll to the top of
-the output, which can be large. Also note that the function names are a combination of the OpenMDAO pathname (when
-available) plus the function name qualified by the owning class, or the class name followed by an instance id plus
-the function name.
+running `iproftotals` in a terminal the most important functions will show up without having to
+scroll to the top of the output, which can be large. Also note that the function names are a
+combination of the OpenMDAO pathname (when available) plus the function name qualified by the owning
+class, or the class name followed by an instance id plus the function name.
 
+.. note::
 
-Running either `iprofview` or `iproftotals` will generate by default a file called `iprof.0` in your
-current directory.  Either script can be run directly on the `iprof.0` file and will generate the
-same outputs as running your python script.  For example:
-
-.. code::
-
-   iprofview iprof.0
-
+    Running either `iprofview` or `iproftotals` will generate by default a file called `iprof.0` in your
+    current directory.  Either script can be run directly on the `iprof.0` file and will generate the
+    same outputs as running your python script.
 
 
 If you want more control over the profiling process, you can import `openmdao.devtools.iprofile` and manually
@@ -177,7 +168,6 @@ run either `iprofview` or `iproftotals` directly on the `iprof.*` data file(s).
 
    The timing numbers obtained from instance-based profiling will not be exact due to overhead
    introduced by the python function that collects timing data.
-
 
 
 .. tags:: Tutorials, Profiling

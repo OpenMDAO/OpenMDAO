@@ -2,7 +2,7 @@ from __future__ import print_function
 
 import os
 import sys
-from time import time as etime
+from timeit import default_timer as etime
 import argparse
 import json
 import atexit
@@ -20,19 +20,16 @@ from openmdao.devtools.webview import webview
 from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _collect_methods
 
 
-def _prof_node(parts):
+def _prof_node(fpath, parts):
+    pathparts = fpath.split('-')
     return {
-        'name': parts[0],
-        'short_name': parts[0].rsplit('@', 1)[-1],
-        'time': parts[2],
-        'count': parts[3],
+        'id': fpath,
+        'time': parts[1],
+        'count': parts[2],
         'tot_time': 0.,
         'tot_count': 0,
-        'pct_total': 0.,
-        'tot_pct_total': 0.,
-        'pct_parent': 0.,
-        'child_time': 0.,
-        'obj': parts[1],
+        'obj': parts[0],
+        'depth': len(pathparts) - 1,
     }
 
 _profile_prefix = None
@@ -93,7 +90,7 @@ def setup(prefix='iprof', methods=None, prof_dir=None, finalize=True):
         methods = func_group['openmdao']
 
     rank = MPI.COMM_WORLD.rank if MPI else 0
-    _profile_out = open("%s.%d" % (_profile_prefix, rank), 'wb')
+    _profile_out = open("%s.%s" % (_profile_prefix, rank), 'wb')
 
     if finalize:
         atexit.register(_finalize_profile)
@@ -116,7 +113,7 @@ def start():
     _profile_start = etime()
     _call_stack.append(('$total', _profile_start, None))
     if '$total' not in _inst_data:
-        _inst_data['$total'] = ['$total', None, 0., 0]
+        _inst_data['$total'] = [None, 0., 0]
 
     if sys.getprofile() is not None:
         raise RuntimeError("another profile function is already active.")
@@ -136,8 +133,8 @@ def stop():
     _call_stack.pop()
 
     _profile_total += (etime() - _profile_start)
-    _inst_data['$total'][2] = _profile_total
-    _inst_data['$total'][3] += 1
+    _inst_data['$total'][1] = _profile_total
+    _inst_data['$total'][2] += 1
     _profile_start = None
 
 
@@ -160,15 +157,15 @@ def _instance_profile_callback(frame, event, arg):
         _, start, oldframe = _call_stack[-1]
         if oldframe is frame:
             final = etime()
-            path = '@'.join(s[0] for s in _call_stack)
+            path = '-'.join(s[0] for s in _call_stack)
             if path not in _inst_data:
-                _inst_data[path] = [path, frame.f_locals['self'], 0., 0]
+                _inst_data[path] = pdata = [frame.f_locals['self'], 0., 0]
+            else:
+                pdata = _inst_data[path]
+            pdata[1] += final - start
+            pdata[2] += 1
 
             _call_stack.pop()
-
-            pdata = _inst_data[path]
-            pdata[2] += final - start
-            pdata[3] += 1
 
 
 def _finalize_profile():
@@ -184,9 +181,8 @@ def _finalize_profile():
     cache = {}
     idents = defaultdict(dict)  # map idents to a smaller number
     for funcpath, data in iteritems(_inst_data):
-        _inst_data[funcpath] = _prof_node(data)
-        data = _inst_data[funcpath]
-        parts = funcpath.rsplit('@', 1)
+        _inst_data[funcpath] = data = _prof_node(funcpath, data)
+        parts = funcpath.rsplit('-', 1)
         fname = parts[-1]
         if fname == '$total':
             continue
@@ -209,36 +205,13 @@ def _finalize_profile():
             _obj_map[fname] = '.'.join((name, "<%s.%s>" % (qclass, qname)))
 
     _obj_map['$total'] = '$total'
-    _obj_map['$parent'] = '$parent'
-
-    # compute child times
-    for funcpath, data in iteritems(_inst_data):
-        parts = funcpath.rsplit('@', 1)
-        if len(parts) > 1:
-            _inst_data[parts[0]]['child_time'] += data['time']
-
-    # in order to make the D3 partition layout give accurate proportions, we can only put values
-    # into leaf nodes because the parent node values get overridden by the sum of the children. To
-    # get around this, we create a child for each non-leaf node with the name '$parent' and put the
-    # time exclusive to the parent into that child, so that when all of the children are summed, they'll
-    # add up to the correct time for the parent and the visual proportions of the parent will be correct.
-
-    # compute child timings
-    parnodes = []
-    for funcpath, node in iteritems(_inst_data):
-        if node['child_time'] > 0.:
-            parts = funcpath.split('@')
-            pparts = parts + ['$parent']
-            chname = '@'.join(pparts)
-            ex_child_node = _prof_node([chname, None, node['time'] - node['child_time'], 1])
-            parnodes.append((chname, ex_child_node))
 
     rank = MPI.COMM_WORLD.rank if MPI else 0
 
     fname = os.path.basename(_profile_prefix)
     with open("%s.%d" % (fname, rank), 'w') as f:
-        for name, data in chain(iteritems(_inst_data), parnodes):
-            new_name = '@'.join([_obj_map[s] for s in name.split('@')])
+        for name, data in iteritems(_inst_data):
+            new_name = '-'.join([_obj_map[s] for s in name.split('-')])
             f.write("%s %d %f\n" % (new_name, data['count'], data['time']))
 
 
@@ -253,7 +226,7 @@ def _iter_raw_prof_file(rawname):
             yield path, int(count), float(elapsed)
 
 
-def process_profile(flist):
+def _process_profile(flist):
     """
     Take the generated raw profile data, potentially from multiple files,
     and combine it to get execution counts and timing data.
@@ -270,6 +243,7 @@ def process_profile(flist):
     totals = {}
 
     tree_nodes = {}
+    tree_parts = []
 
     for fname in flist:
         ext = os.path.splitext(fname)[1]
@@ -281,52 +255,39 @@ def process_profile(flist):
 
         for funcpath, count, t in _iter_raw_prof_file(fname):
 
-            parts = funcpath.split('@')
+            parts = funcpath.split('-')
 
             # for multi-file MPI profiles, decorate names with the rank
             if nfiles > 1 and dec:
                 parts = ["%s%s" % (p,dec) for p in parts]
-                funcpath = '@'.join(parts)
+                funcpath = '-'.join(parts)
 
-            tree_nodes[funcpath] = node = _prof_node([funcpath, None, t, count])
+            tree_nodes[funcpath] = node = _prof_node(funcpath, [None, t, count])
 
             funcname = parts[-1]
-            if funcname == '$parent':
-                continue
 
             if funcname in totals:
                 tnode = totals[funcname]
             else:
-                totals[funcname] = tnode = _prof_node([funcpath, None, 0., 0])
+                totals[funcname] = tnode = _prof_node(funcpath, [None, 0., 0])
 
             tnode['tot_time'] += t
             tnode['tot_count'] += count
 
-    for funcpath, node in iteritems(tree_nodes):
-        parts = funcpath.rsplit('@', 1)
-        if parts[-1] != '$parent':
-            node['tot_time'] = totals[parts[-1]]['tot_time']
-            node['tot_count'] = totals[parts[-1]]['tot_count']
-            node['pct_parent'] = node['time'] / tree_nodes[parts[0]]['time']
-            node['pct_total'] = node['time'] / tree_nodes['$total']['time']
-            node['tot_pct_total'] = totals[parts[-1]]['tot_time'] / tree_nodes['$total']['time']
+            tree_parts.append((parts, node))
+
+    for parts, node in tree_parts:
+        short = parts[-1]
+        node['tot_time'] = totals[short]['tot_time']
+        node['tot_count'] = totals[short]['tot_count']
         del node['obj']
-        del node['child_time']
 
     tree_nodes['$total']['tot_time'] = tree_nodes['$total']['time']
 
-    for funcpath, node in iteritems(tree_nodes):
-        parts = funcpath.rsplit('@', 1)
-        # D3 sums up all children to get parent value, so we need to
-        # zero out the parent value else we get double the value we want
-        # once we add in all of the times from descendants.
-        if parts[-1] == '$parent':
-            tree_nodes[parts[0]]['time'] = 0.
-
-    return list(tree_nodes.values()), totals
+    return tree_nodes, totals
 
 
-def prof_totals():
+def _prof_totals():
     """
     Called from the command line to create a file containing total elapsed
     times and number of calls for all profiled functions.
@@ -339,10 +300,11 @@ def prof_totals():
     parser.add_argument('-g', '--group', action='store', dest='group',
                         default='openmdao',
                         help='Determines which group of methods will be tracked.')
+    parser.add_argument('-m', '--maxcalls', action='store', dest='maxcalls', type=int,
+                        default=999999,
+                        help='Max number of results to display.')
     parser.add_argument('files', metavar='file', nargs='*',
                         help='Raw profile data files or a python file.')
-
-    #TODO: add arg to set max number of results (starting at largest)
 
     options = parser.parse_args()
 
@@ -359,10 +321,10 @@ def prof_totals():
         if len(options.files) > 1:
             print("iprofview can only process a single python file.", file=sys.stderr)
             sys.exit(-1)
-        profile_py_file(options.files[0], methods=func_group[options.group])
+        _profile_py_file(options.files[0], methods=func_group[options.group])
         options.files = ['iprof.0']
 
-    _, totals = process_profile(options.files)
+    call_data, totals = _process_profile(options.files)
 
     total_time = totals['$total']['tot_time']
 
@@ -371,8 +333,8 @@ def prof_totals():
         out_stream.write("\nTotal     Total           Function\n")
         out_stream.write("Calls     Time (s)    %   Name\n")
 
-        for func, data in sorted([(k,v) for k,v in iteritems(totals)],
-                                    key=lambda x:x[1]['tot_time']):
+        calls = sorted(totals.items(), key=lambda x : x[1]['tot_time'])
+        for func, data in calls[-options.maxcalls:]:
             out_stream.write("%6d %11f %6.2f %s\n" %
                                (data['tot_count'], data['tot_time'], (data['tot_time']/total_time*100.), func))
     finally:
@@ -380,54 +342,7 @@ def prof_totals():
             out_stream.close()
 
 
-def prof_view():
-    """
-    Called from a command line to generate an html viewer for profile data.
-    """
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--noshow', action='store_true', dest='noshow',
-                        help="Don't pop up a browser to view the data.")
-    parser.add_argument('-t', '--title', action='store', dest='title',
-                        default='Profile of Method Calls by Instance',
-                        help='Title to be displayed above profiling view.')
-    parser.add_argument('-g', '--group', action='store', dest='group',
-                        default='openmdao',
-                        help='Determines which group of methods will be tracked. Current '
-                             'options are: %s and "openmdao" is the default' %
-                              sorted(func_group.keys()))
-    parser.add_argument('files', metavar='file', nargs='+',
-                        help='Raw profile data files or a python file.')
-
-    options = parser.parse_args()
-
-    if options.files[0].endswith('.py'):
-        if len(options.files) > 1:
-            print("iprofview can only process a single python file.", file=sys.stderr)
-            sys.exit(-1)
-        profile_py_file(options.files[0], methods=func_group[options.group])
-        options.files = ['iprof.0']
-
-    call_graph, _ = process_profile(options.files)
-
-    viewer = "icicle.html"
-    code_dir = os.path.dirname(os.path.abspath(__file__))
-
-    with open(os.path.join(code_dir, viewer), "r") as f:
-        template = f.read()
-
-    graphjson = json.dumps(call_graph)
-
-    outfile = 'profile_' + viewer
-    with open(outfile, 'w') as f:
-        template = template.replace('$call_graph_data', graphjson)
-        f.write(template.replace('$title', options.title))
-
-    if not options.noshow:
-        webview(outfile)
-
-
-def profile_py_file(fname=None, methods=None):
+def _profile_py_file(fname=None, methods=None):
     """
     Run instance-based profiling on the given python script.
 

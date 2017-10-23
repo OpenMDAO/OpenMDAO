@@ -20,6 +20,9 @@ class Component(BaseComponent):
         list of names of the states (deprecated OpenMDAO 1.0 concept).
     _output_names : [str, ...]
         list of names of the outputs (deprecated OpenMDAO 1.0 concept).
+    _initial_apply_linear : bound_method
+        Reference to this instance's apply_linear method, if any, for later
+        comparison to detect runtime overrides.
     """
 
     def __init__(self, **kwargs):
@@ -34,14 +37,23 @@ class Component(BaseComponent):
         super(Component, self).__init__(**kwargs)
         self._state_names = []
         self._output_names = []
-
-        if overrides_method('apply_linear', self, Component):
-            self.matrix_free = True
+        self._initial_apply_linear = getattr(self, 'apply_linear', None)
 
         warn_deprecation('Components should inherit from ImplicitComponent '
                          'or ExplicitComponent. This class provides '
                          'backwards compatibility with OpenMDAO <= 1.x as '
                          'this Component class is deprecated')
+
+    def _configure(self):
+        """
+        Configure this system to assign children settings.
+
+        Also tag component if it provides a guess_nonlinear.
+        """
+        new_apply_linear = getattr(self, 'apply_linear', None)
+        self.matrix_free = (overrides_method('apply_linear', self, Component) or
+                            (new_apply_linear is not None and new_apply_linear !=
+                             self._initial_apply_linear))
 
     def _setup_partials(self, recurse=True):
         super(Component, self)._setup_partials()
@@ -55,8 +67,7 @@ class Component(BaseComponent):
         for out_abs in self._var_abs_names['output']:
             meta = abs2meta_out[out_abs]
             out_name = abs2prom_out[out_abs]
-            size = np.prod(meta['shape'])
-            arange = np.arange(size)
+            arange = np.arange(meta['size'])
 
             # Skip all states. The user declares those derivatives.
             if out_name in self._state_names:
@@ -140,15 +151,21 @@ class Component(BaseComponent):
         """
         Compute residuals.
         """
-        self._scale_vec(self._inputs, 'input', 'phys')
-        self._scale_vec(self._outputs, 'output', 'phys')
-        self._scale_vec(self._residuals, 'residual', 'phys')
+        if self._has_input_scaling:
+            self._inputs.scale('phys')
+        if self._has_output_scaling:
+            self._outputs.scale('phys')
+        if self._has_resid_scaling:
+            self._residuals.scale('phys')
 
         self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
 
-        self._scale_vec(self._inputs, 'input', 'norm')
-        self._scale_vec(self._outputs, 'output', 'norm')
-        self._scale_vec(self._residuals, 'residual', 'norm')
+        if self._has_input_scaling:
+            self._inputs.scale('norm')
+        if self._has_output_scaling:
+            self._outputs.scale('norm')
+        if self._has_resid_scaling:
+            self._residuals.scale('norm')
 
     def _solve_nonlinear(self):
         """
@@ -168,17 +185,21 @@ class Component(BaseComponent):
         if self._nonlinear_solver is not None:
             self._nonlinear_solver.solve()
         else:
-            self._scale_vec(self._inputs, 'input', 'phys')
-            self._scale_vec(self._outputs, 'output', 'phys')
-            self._scale_vec(self._residuals, 'residual', 'phys')
+            if self._has_input_scaling:
+                self._inputs.scale('phys')
+            if self._has_output_scaling:
+                self._outputs.scale('phys')
+                self._residuals.scale('phys')
 
             self.solve_nonlinear(self._inputs, self._outputs, self._residuals)
 
-            self._scale_vec(self._inputs, 'input', 'norm')
-            self._scale_vec(self._outputs, 'output', 'norm')
-            self._scale_vec(self._residuals, 'residual', 'norm')
+            if self._has_input_scaling:
+                self._inputs.scale('norm')
+            if self._has_output_scaling:
+                self._outputs.scale('norm')
+                self._residuals.scale('norm')
 
-    def _apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product.
 
@@ -186,6 +207,8 @@ class Component(BaseComponent):
         ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
         mode : str
             'fwd' or 'rev'.
         scope_out : set or None
@@ -196,12 +219,19 @@ class Component(BaseComponent):
             If None, all are in the scope.
         """
         for vec_name in vec_names:
+            if vec_name not in self._rel_vec_names:
+                continue
             with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
 
                 with self.jacobian_context():
                     self._jacobian._apply(d_inputs, d_outputs, d_residuals,
                                           mode)
+
+                # if we're not matrix free, we can skip the bottom of
+                # this loop because apply_linear does nothing.
+                if not self.matrix_free:
+                    continue
 
                 with self._unscaled_context(
                         outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
@@ -217,7 +247,7 @@ class Component(BaseComponent):
                         for name in d_inputs:
                             d_inputs[name] *= -1.0
 
-    def _solve_linear(self, vec_names, mode):
+    def _solve_linear(self, vec_names, mode, rel_systems):
         """
         Apply inverse jac product.
 
@@ -227,6 +257,8 @@ class Component(BaseComponent):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
 
         Returns
         -------
@@ -238,20 +270,24 @@ class Component(BaseComponent):
             absolute error.
         """
         if self._linear_solver is not None:
-            return self._linear_solver(vec_names, mode)
+            return self._linear_solver(vec_names, mode, rel_systems)
         else:
             for vec_name in vec_names:
+                if vec_name not in self._rel_vec_names:
+                    continue
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
 
-                self._scale_vec(d_outputs, 'output', 'phys')
-                self._scale_vec(d_residuals, 'residual', 'phys')
+                d_outputs.scale('phys')
+                d_residuals.scale('phys')
 
             self.solve_linear(self._vectors['output'],
                               self._vectors['residual'],
                               vec_names, mode)
 
             for vec_name in vec_names:
+                if vec_name not in self._rel_vec_names:
+                    continue
 
                 # skip for pure explicit components.
                 if len(self._state_names) > 0:
@@ -262,8 +298,8 @@ class Component(BaseComponent):
                             elif mode == 'rev':
                                 d_residuals[name] = d_outputs[name]
 
-                self._scale_vec(d_outputs, 'output', 'norm')
-                self._scale_vec(d_residuals, 'residual', 'norm')
+                d_outputs.scale('norm')
+                d_residuals.scale('norm')
 
             return False, 0., 0.
 

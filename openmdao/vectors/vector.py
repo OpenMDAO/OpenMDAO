@@ -9,6 +9,14 @@ from openmdao.utils.general_utils import ensure_compatible
 from openmdao.utils.name_maps import name2abs_name
 
 
+_full_slice = slice(None)
+_type_map = {
+    'input': 'input',
+    'output': 'output',
+    'residual': 'output'
+}
+
+
 class VectorInfo(object):
     """
     Communal object for storing some global information in the vectors.
@@ -43,6 +51,8 @@ class Vector(object):
         The name of the vector: 'nonlinear', 'linear', or right-hand side name.
     _typ : str
         Type: 'input' for input vectors; 'output' for output/residual vectors.
+    _kind : str
+        Specific kind of vector, either 'input', 'output', or 'residual'.
     _system : System
         Pointer to the owning system.
     _iproc : int
@@ -53,8 +63,6 @@ class Vector(object):
         Dictionary mapping absolute variable names to the ndarray views.
     _views_flat : dict
         Dictionary mapping absolute variable names to the flattened ndarray views.
-    _idxs : dict
-        Either 0 or slice(None), used so that 1-sized vectors are made floats.
     _names : set([str, ...])
         Set of variables that are relevant in the current context.
     _root_vector : Vector
@@ -80,12 +88,22 @@ class Vector(object):
         Temporary storage of complex views used by in-place numpy operations.
     _ncol : int
         Number of columns for multi-vectors.
+    _icol : int or None
+        If not None, specifies the 'active' column of a multivector when interfaceing with
+        a component that does not support multivectors.
+    _relevant : dict
+        Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
+        and dependent systems.
+    _do_scaling : bool
+        True if this vector performs scaling.
+    _scaling : dict
+        Contains scale factors to convert data arrays.
     """
 
     _vector_info = VectorInfo()
 
-    def __init__(self, name, typ, system, root_vector=None, resize=False, alloc_complex=False,
-                 ncol=1):
+    def __init__(self, name, kind, system, root_vector=None, resize=False, alloc_complex=False,
+                 ncol=1, relevant=None):
         """
         Initialize all attributes.
 
@@ -93,8 +111,8 @@ class Vector(object):
         ----------
         name : str
             The name of the vector: 'nonlinear', 'linear', or right-hand side name.
-        typ : str
-            Type: 'input' for input vectors; 'output' for output/residual vectors.
+        kind : str
+            The kind of vector, 'input', 'output', or 'residual'.
         system : <System>
             Pointer to the owning system.
         root_vector : <Vector>
@@ -105,10 +123,16 @@ class Vector(object):
             Whether to allocate any imaginary storage to perform complex step. Default is False.
         ncol : int
             Number of columns for multi-vectors.
+        relevant : dict
+            Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
+            and dependent systems.
         """
         self._name = name
-        self._typ = typ
+        self._typ = _type_map[kind]
+        self._kind = kind
         self._ncol = ncol
+        self._icol = None
+        self._relevant = relevant
 
         self._system = system
 
@@ -132,6 +156,12 @@ class Vector(object):
             self._complex_view_cache = {}
             self._imag_views_flat = {}
 
+        self._do_scaling = ((kind == 'input' and system._has_input_scaling) or
+                            (kind == 'output' and system._has_output_scaling) or
+                            (kind == 'residual' and system._has_resid_scaling))
+
+        self._scaling = {}
+
         if root_vector is None:
             self._root_vector = self
         else:
@@ -147,7 +177,7 @@ class Vector(object):
         self._initialize_data(root_vector)
         self._initialize_views()
 
-        self._length = np.sum(self._system._var_sizes[self._typ][self._iproc, :])
+        self._length = np.sum(self._system._var_sizes[self._name][self._typ][self._iproc, :])
 
     def __str__(self):
         """
@@ -173,23 +203,6 @@ class Vector(object):
             Total flattened length of this vector.
         """
         return self._length
-
-    def _create_subvector(self, system):
-        """
-        Return a smaller vector for a subsystem.
-
-        Parameters
-        ----------
-        system : <System>
-            system for the subvector that is a subsystem of self._system.
-
-        Returns
-        -------
-        <Vector>
-            subvector instance.
-        """
-        return self.__class__(self._name, self._typ, system,
-                              self._root_vector)
 
     def _clone(self, initialize_views=False):
         """
@@ -227,7 +240,8 @@ class Vector(object):
             Array combining the data of all the varsets.
         """
         if new_array is None:
-            new_array = np.zeros(self._length)
+            ncol = self._ncol
+            new_array = np.empty(self._length) if ncol == 1 else np.zeros((self._length, ncol))
 
         for set_name, data in iteritems(self._data):
             new_array[self._indices[set_name]] = data
@@ -329,14 +343,27 @@ class Vector(object):
         if abs_name is not None:
             if self._vector_info._under_complex_step:
                 if self._typ == 'input':
-                    return self._views[abs_name] + 1j * self._imag_views[abs_name]
+                    if self._icol is None:
+                        return self._views[abs_name] + 1j * self._imag_views[abs_name]
+                    else:
+                        return self._views[abs_name][:, self._icol] + \
+                            1j * self._imag_views[abs_name][:, self._icol]
                 else:
                     if abs_name not in self._complex_view_cache:
-                        self._complex_view_cache[abs_name] = self._views[abs_name] + \
-                            1j * self._imag_views[abs_name]
+                        if self._icol is None:
+                            self._complex_view_cache[abs_name] = self._views[abs_name] + \
+                                1j * self._imag_views[abs_name]
+                        else:
+                            self._complex_view_cache[abs_name][:, self._icol] = \
+                                self._views[abs_name][:, self._icol] + \
+                                1j * self._imag_views[abs_name][:, self._icol]
+                            return self._complex_view_cache[abs_name][:, self._icol]
                     return self._complex_view_cache[abs_name]
 
-            return self._views[abs_name]
+            if self._icol is None:
+                return self._views[abs_name]
+            else:
+                return self._views[abs_name][:, self._icol]
         else:
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
@@ -354,7 +381,11 @@ class Vector(object):
         """
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
-            value, shape = ensure_compatible(name, value, self._views[abs_name].shape)
+            if self._icol is None:
+                slc = _full_slice
+            else:
+                slc = (_full_slice, self._icol)
+            value, _ = ensure_compatible(name, value, self._views[abs_name][slc].shape)
             if self._vector_info._under_complex_step:
 
                 # setitem overwrites anything you may have done with numpy indexing
@@ -363,10 +394,10 @@ class Vector(object):
                 except KeyError:
                     pass
 
-                self._views[abs_name][:] = value.real
-                self._imag_views[abs_name][:] = value.imag
+                self._views[abs_name][slc] = value.real
+                self._imag_views[abs_name][slc] = value.imag
             else:
-                self._views[abs_name][:] = value
+                self._views[abs_name][slc] = value
         else:
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
@@ -398,8 +429,6 @@ class Vector(object):
 
         - _views
         - _views_flat
-        - _idxs
-
         """
         pass
 
@@ -464,6 +493,27 @@ class Vector(object):
             this vector times val is added to self.
         """
         pass
+
+    def scale(self, scale_to):
+        """
+        Scale this vector to normalized or physical form.
+
+        Parameters
+        ----------
+        scale_to : str
+            Values are "phys" or "norm" to scale to physical or normalized.
+        """
+        scaling = self._scaling[scale_to]
+        if self._ncol == 1:
+            for set_name, data in iteritems(self._data):
+                data *= scaling[set_name][1]
+                if scaling[set_name][0] is not None:  # nonlinear only
+                    data += scaling[set_name][0]
+        else:
+            for set_name, data in iteritems(self._data):
+                data *= scaling[set_name][1][:, np.newaxis]
+                if scaling[set_name][0] is not None:  # nonlinear only
+                    data += scaling[set_name][0]
 
     def set_vec(self, vec):
         """
@@ -621,10 +671,6 @@ class Transfer(object):
 
     Attributes
     ----------
-    _in_vec : Vector
-        pointer to the input vector.
-    _out_vec : Vector
-        pointer to the output vector.
     _in_inds : int ndarray
         input indices for the transfer.
     _out_inds : int ndarray
@@ -650,13 +696,11 @@ class Transfer(object):
         comm : MPI.Comm or <FakeComm>
             communicator of the system that owns this transfer.
         """
-        self._in_vec = in_vec
-        self._out_vec = out_vec
         self._in_inds = in_inds
         self._out_inds = out_inds
         self._comm = comm
 
-        self._initialize_transfer()
+        self._initialize_transfer(in_vec, out_vec)
 
     def __str__(self):
         """
@@ -672,11 +716,18 @@ class Transfer(object):
         except Exception as err:
             return "<error during call to Transfer.__str__: %s" % err
 
-    def _initialize_transfer(self):
+    def _initialize_transfer(self, in_vec, out_vec):
         """
         Set up the transfer; do any necessary pre-computation.
 
         Optionally implemented by the subclass.
+
+        Parameters
+        ----------
+        in_vec : <Vector>
+            reference to the input vector.
+        out_vec : <Vector>
+            reference to the output vector.
         """
         pass
 

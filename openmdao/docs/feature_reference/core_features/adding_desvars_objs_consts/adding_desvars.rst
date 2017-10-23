@@ -1,3 +1,5 @@
+.. _feature_add_design_var:
+
 ***********************
 Adding Design Variables
 ***********************

@@ -34,7 +34,7 @@ class SellarDis1(ExplicitComponent):
         self.add_output('y1', val=1.0)
 
         # Finite difference all partials.
-        self.approx_partials('*', '*')
+        self.declare_partials('*', '*', method='fd')
 
     def compute(self, inputs, outputs):
         """
@@ -65,7 +65,7 @@ class SellarDis2(ExplicitComponent):
         self.add_output('y2', val=1.0)
 
         # Finite difference all partials.
-        self.approx_partials('*', '*')
+        self.declare_partials('*', '*', method='fd')
 
     def compute(self, inputs, outputs):
         """
@@ -85,19 +85,22 @@ class SellarDis2(ExplicitComponent):
 
         outputs['y2'] = y1**.5 + z1 + z2
 
-
-class SellarNoDerivatives(Group):
+class SellarMDA(Group):
     """
-    Group containing the Sellar MDA. This version uses the disciplines without derivatives.
+    Group containing the Sellar MDA.
     """
 
     def setup(self):
-        self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        indeps = self.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('x', 1.0)
+        indeps.add_output('z', np.array([5.0, 2.0]))
 
-        cycle = self.add_subsystem('cycle', Group(), promotes=['x', 'z', 'y1', 'y2'])
-        d1 = cycle.add_subsystem('d1', SellarDis1(), promotes=['x', 'z', 'y1', 'y2'])
-        d2 = cycle.add_subsystem('d2', SellarDis2(), promotes=['z', 'y1', 'y2'])
+        cycle = self.add_subsystem('cycle', Group(), promotes=['*'])
+        d1 = cycle.add_subsystem('d1', SellarDis1(), promotes_inputs=['x', 'z', 'y2'], promotes_outputs=['y1'])
+        d2 = cycle.add_subsystem('d2', SellarDis2(), promotes_inputs=['z', 'y1'], promotes_outputs=['y2'])
+
+        # Nonlinear Block Gauss Seidel is a gradient free solver
+        cycle.nonlinear_solver = NonlinearBlockGS()
 
         self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
                            z=np.array([0.0, 0.0]), x=0.0),
@@ -105,9 +108,6 @@ class SellarNoDerivatives(Group):
 
         self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-
-        self.nonlinear_solver = NonlinearBlockGS()
-        self.linear_solver = ScipyIterativeSolver()
 
 
 class SellarDis1CS(ExplicitComponent):
@@ -131,7 +131,7 @@ class SellarDis1CS(ExplicitComponent):
         self.add_output('y1', val=1.0)
 
         # Finite difference all partials.
-        self.approx_partials('*', '*', method='cs')
+        self.declare_partials('*', '*', method='cs')
 
     def compute(self, inputs, outputs):
         """
@@ -163,7 +163,7 @@ class SellarDis2CS(ExplicitComponent):
         self.add_output('y2', val=1.0)
 
         # Finite difference all partials.
-        self.approx_partials('*', '*', method='cs')
+        self.declare_partials('*', '*', method='cs')
 
     def compute(self, inputs, outputs):
         """
@@ -221,3 +221,5 @@ class DoubleSellar(Group):
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
         self.nonlinear_solver = NewtonSolver()
         self.linear_solver = DirectSolver()
+
+

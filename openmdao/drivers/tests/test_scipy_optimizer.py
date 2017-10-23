@@ -15,7 +15,7 @@ from openmdao.test_suite.groups.sin_fitter import SineFitter
 
 class TestScipyOptimizer(unittest.TestCase):
 
-    def test_compute_total_derivs_basic_return_array(self):
+    def test_compute_totals_basic_return_array(self):
         # Make sure 'array' return_format works.
 
         prob = Problem()
@@ -34,7 +34,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         of = ['comp.f_xy']
         wrt = ['p1.x', 'p2.y']
-        derivs = prob.driver._compute_total_derivs(of=of, wrt=wrt, return_format='array')
+        derivs = prob.driver._compute_totals(of=of, wrt=wrt, return_format='array')
 
         assert_rel_error(self, derivs[0, 0], -6.0, 1e-6)
         assert_rel_error(self, derivs[0, 1], 8.0, 1e-6)
@@ -44,12 +44,12 @@ class TestScipyOptimizer(unittest.TestCase):
 
         of = ['comp.f_xy']
         wrt = ['p1.x', 'p2.y']
-        derivs = prob.driver._compute_total_derivs(of=of, wrt=wrt, return_format='array')
+        derivs = prob.driver._compute_totals(of=of, wrt=wrt, return_format='array')
 
         assert_rel_error(self, derivs[0, 0], -6.0, 1e-6)
         assert_rel_error(self, derivs[0, 1], 8.0, 1e-6)
 
-    def test_compute_total_derivs_return_array_non_square(self):
+    def test_compute_totals_return_array_non_square(self):
 
         prob = Problem()
         prob.model = model = Group()
@@ -66,7 +66,7 @@ class TestScipyOptimizer(unittest.TestCase):
         prob.setup(check=False)
         prob.run_driver()
 
-        derivs = prob.driver._compute_total_derivs(of=['comp.y1'], wrt=['px.x'],
+        derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'],
                                                    return_format='array')
 
         J = comp.JJ[0:3, 0:2]
@@ -74,12 +74,32 @@ class TestScipyOptimizer(unittest.TestCase):
 
         # Support for a name to be in 'of' and 'wrt'
 
-        derivs = prob.driver._compute_total_derivs(of=['comp.y2', 'px.x', 'comp.y1'], wrt=['px.x'],
+        derivs = prob.driver._compute_totals(of=['comp.y2', 'px.x', 'comp.y1'], wrt=['px.x'],
                                                    return_format='array')
 
         assert_rel_error(self, J, derivs[3:, :], 1.0e-3)
         assert_rel_error(self, comp.JJ[3:4, 0:2], derivs[0:1, :], 1.0e-3)
         assert_rel_error(self, np.eye(2), derivs[1:3, :], 1.0e-3)
+
+    def test_deriv_wrt_self(self):
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
+
+        model.add_design_var('px.x')
+        model.add_objective('px.x')
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        # Support for a name to be in 'of' and 'wrt'
+
+        J = prob.driver._compute_totals(of=['px.x'], wrt=['px.x'],
+                                                   return_format='array')
+
+        assert_rel_error(self, J, np.eye(2), 1.0e-3)
 
     def test_simple_paraboloid_unconstrained(self):
 
@@ -595,6 +615,9 @@ class TestScipyOptimizer(unittest.TestCase):
 class TestScipyOptimizerFeatures(unittest.TestCase):
 
     def test_feature_basic(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -618,6 +641,9 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
 
     def test_feature_optimizer(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -640,6 +666,9 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
 
     def test_feature_maxiter(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -661,6 +690,9 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
 
     def test_feature_tol(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
         prob = Problem()
         model = prob.model = Group()
 

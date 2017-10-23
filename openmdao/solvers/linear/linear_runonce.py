@@ -12,7 +12,7 @@ class LinearRunOnce(LinearBlockGS):
 
     SOLVER = 'LN: RUNONCE'
 
-    def solve(self, vec_names, mode):
+    def solve(self, vec_names, mode, rel_systems=None):
         """
         Run the solver.
 
@@ -32,6 +32,7 @@ class LinearRunOnce(LinearBlockGS):
         """
         self._vec_names = vec_names
         self._mode = mode
+        self._rel_systems = rel_systems
         system = self._system
 
         # Pre-processing
@@ -42,7 +43,8 @@ class LinearRunOnce(LinearBlockGS):
             b_vecs = system._vectors['output']
 
         for vec_name in self._vec_names:
-            self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
+            if vec_name in system._rel_vec_names:
+                self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
 
         with Recording('LinearRunOnce', 0, self) as rec:
             # Single iteration of GS

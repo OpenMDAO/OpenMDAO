@@ -1,9 +1,12 @@
 from distutils.core import setup
 
 setup(name='openmdao',
-      version='2.0.0',
+      version='2.0.2',
       description="OpenMDAO v2.0 framework infrastructure",
-      long_description="""\
+      long_description="""OpenMDAO is an open-source high-performance computing platform 
+        for systems analysis and multidisciplinary optimization, written in Python. It 
+        enables you to decompose your models, making them easier to build and maintain, 
+        while still solving them in a tightly coupled manner with efficient parallel numerical methods.
       """,
       classifiers=[
         'Development Status :: 3 - Alpha',
@@ -16,14 +19,14 @@ setup(name='openmdao',
         'Topic :: Scientific/Engineering',
         'Programming Language :: Python',
         'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: Implementation :: CPython',
       ],
       keywords='optimization multidisciplinary multi-disciplinary analysis',
       author='OpenMDAO Team',
       author_email='openmdao@openmdao.org',
       url='http://openmdao.org',
-      #download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/1.7.2',
+      download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/2.0.0',
       license='Apache License, Version 2.0',
       packages=[
           'openmdao',
@@ -45,6 +48,9 @@ setup(name='openmdao',
           'openmdao.solvers.linesearch',
           'openmdao.solvers.nonlinear',
           'openmdao.test_suite',
+          'openmdao.test_suite.components',
+          'openmdao.test_suite.groups',
+          'openmdao.test_suite.test_examples',
           'openmdao.utils',
           'openmdao.vectors',
           'openmdao.surrogate_models',
@@ -52,8 +58,9 @@ setup(name='openmdao',
       ],
       package_data={
           'openmdao.devtools': ['*.wpr', '*.html'],
-          'openmdao.devtools.problem_viewer': ['*.css', '*.js', '*.template',
-                                               '*.woff'],
+          'openmdao.devtools.problem_viewer': ['visualization/libs/*.js', 'visualization/src/*.js',
+                                               'visualization/style/*.css', 'visualization/style/*.woff',
+                                               'visualization/*.html'],
           'openmdao.docs': ['*.py', '_utils/*.py'],
           'openmdao.utils': ['unit_library.ini'],
           'openmdao.test_suite': ['*.py', '*/*.py'],
@@ -70,16 +77,18 @@ setup(name='openmdao',
         'sphinx',
         'redbaron',
         'mock',
-        'requests_mock'
+        'requests_mock',
+        'tornado',
       ],
       # scripts=['bin/om-pylint.sh']
       entry_points="""
       [console_scripts]
       wingproj=openmdao.devtools.wingproj:run_wing
       webview=openmdao.devtools.webview:webview_argv
-      iprofview=openmdao.devtools.iprofile:prof_view
-      iproftotals=openmdao.devtools.iprofile:prof_totals
-      iprofmem=openmdao.devtools.iprof_mem:profile_py_file
-      icalltrace=openmdao.devtools.itrace:trace_py_file
+      iprofview=openmdao.devtools.iprofile_app.iprofile_app:_prof_view
+      iproftotals=openmdao.devtools.iprofile:_prof_totals
+      iprofmem=openmdao.devtools.iprof_mem:_profile_py_file
+      icalltrace=openmdao.devtools.itrace:_trace_py_file
+      run_test=openmdao.devtools.run_test:run_test
       """
 )

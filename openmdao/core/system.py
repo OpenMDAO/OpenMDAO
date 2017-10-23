@@ -2,7 +2,7 @@
 from __future__ import division
 
 from contextlib import contextmanager
-from collections import OrderedDict, Iterable
+from collections import OrderedDict, Iterable, defaultdict
 from fnmatch import fnmatchcase
 import sys
 from itertools import product
@@ -14,33 +14,15 @@ import numpy as np
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
-from openmdao.proc_allocators.default_allocator import DefaultAllocator
-from openmdao.vectors.default_multi_vector import DefaultMultiVector
-try:
-    from openmdao.vectors.petsc_multi_vector import PETScMultiVector
-except ImportError:
-    class PETScMultiVector(object):
-        """
-        A dummy class so we can do isinstance checks.
-        """
-
-        pass
-
-from openmdao.utils.general_utils import \
-    determine_adder_scaler, format_as_float_or_array, warn_deprecation
+from openmdao.utils.general_utils import determine_adder_scaler, \
+    format_as_float_or_array, warn_deprecation, ContainsAll
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.units import convert_units
+from openmdao.utils.units import get_conversion
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.logger_utils import get_logger
-
-_type_map = {
-    'input': 'input',
-    'output': 'output',
-    'residual': 'output'
-}
 
 
 class System(object):
@@ -72,9 +54,6 @@ class System(object):
         Int that holds the number of times this system has iterated
         in a recording run.
     #
-    _mpi_proc_allocator : <ProcAllocator>
-        Object that distributes procs among subsystems.
-    #
     _subsystems_allprocs : [<System>, ...]
         List of all subsystems (children of this system).
     _subsystems_myproc : [<System>, ...]
@@ -86,12 +65,12 @@ class System(object):
         List of ranges of each myproc subsystem's processors relative to those of this system.
     _subsystems_var_range : {'input': list of (int, int), 'output': list of (int, int)}
         List of ranges of each myproc subsystem's allprocs variables relative to this system.
-    _subsystems_var_range_byset : {'input': list of dict, 'output': list of dict}
+    _subsystems_var_range_byset : {<vec_name>: {'input': list of dict, 'output': list of dict}, ...}
         Same as above, but by var_set name.
     #
-    _num_var : {'input': int, 'output': int}
+    _num_var : {<vec_name>: {'input': int, 'output': int}, ...}
         Number of allprocs variables owned by this system.
-    _num_var_byset : {'input': dict of int, 'output': dict of int}
+    _num_var_byset : {<vec_name>: {'input': dict of int, 'output': dict of int}, ...}
         Same as above, but by var_set name.
     _var_set2iset : {'input': dict, 'output': dict}
         Dictionary mapping the var_set name to the var_set index.
@@ -119,7 +98,7 @@ class System(object):
     _var_allprocs_abs2idx : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
-    _var_allprocs_abs2idx_byset : {'input': dict of dict, 'output': dict of dict}
+    _var_allprocs_abs2idx_byset : {<vec_name>:{'input': dict of dict, 'output': dict of dict}, ...}
         Same as above, but by var_set name.
     #
     _var_sizes : {'input': ndarray, 'output': ndarray}
@@ -148,13 +127,11 @@ class System(object):
         Same as above, but by var_set name.
     #
     _vec_names : [str, ...]
-        List of names of the vectors (i.e., the right-hand sides).
+        List of names of all vectors, including the nonlinear vector.
+    _lin_vec_names : [str, ...]
+        List of names of the linear vectors (i.e., the right-hand sides).
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         Dictionaries of vectors keyed by vec_name.
-    _excluded_vars_out : dict of set
-        Set of output variable absolute names not relevant for each vec_name.
-    _excluded_vars_in : dict of set
-        Set of input variable absolute names not relevant for each vec_name.
     #
     _inputs : <Vector>
         The inputs vector; points to _vectors['input']['nonlinear'].
@@ -191,7 +168,7 @@ class System(object):
     _owns_approx_jac : bool
         If True, this system approximated its Jacobian
     _owns_approx_jac_meta : dict
-        Stores approximation metadata (e.g., step_size) from calls to approx_total_derivs
+        Stores approximation metadata (e.g., step_size) from calls to approx_totals
     _owns_approx_of : set or None
         Overrides aproximation outputs. This is set when calculating system derivatives, and serves
         as a way to communicate the driver's output quantities to the approximation objects so that
@@ -238,8 +215,32 @@ class System(object):
     _reconfigured : bool
         If True, this system has reconfigured, and the immediate parent should update.
     #
+    supports_multivecs : bool
+        If True, this system overrides compute_multi_jacvec_product (if an ExplicitComponent),
+        or solve_multi_linear/apply_multi_linear (if an ImplicitComponent).
+    #
+    _relevant : dict
+        Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
+        and dependent systems.
+    _vois : dict
+        Either design vars or responses metadata, depending on the direction of
+        derivatives.
+    _mode : str
+        Indicates derivative direction for the model, either 'fwd' or 'rev'.
+    _scope_cache : dict
+        Cache for variables in the scope of various mat-vec products.
+    #
     _has_guess : bool
         True if this system has or contains a system with a `guess_nonlinear` method defined.
+    _has_output_scaling : bool
+        True if this system has output scaling.
+    _has_resid_scaling : bool
+        True if this system has resid scaling.
+    _has_input_scaling : bool
+        True if this system has input scaling.
+    #
+    _owning_rank : {'input': {}, 'output': {}}
+        Dict mapping var name to the lowest rank where that variable is local.
     """
 
     def __init__(self, **kwargs):
@@ -258,32 +259,28 @@ class System(object):
 
         self.iter_count = 0
 
-        self._mpi_proc_allocator = DefaultAllocator()
-
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
         self._subsystems_myproc_inds = []
         self._subsystems_proc_range = []
-        self._subsystems_var_range = {'input': [], 'output': []}
-        self._subsystems_var_range_byset = {'input': [], 'output': []}
 
         self._num_var = {'input': 0, 'output': 0}
-        self._num_var_byset = {'input': {}, 'output': {}}
+        self._num_var_byset = None
         self._var_set2iset = OrderedDict([('input', {}), ('output', {})])
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
-        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
+        self._var_allprocs_prom2abs_list = None
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_abs2meta = {'input': {}, 'output': {}}
 
         self._var_allprocs_abs2idx = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2idx_byset = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2idx_byset = None
 
-        self._var_sizes = {'input': None, 'output': None}
-        self._var_sizes_byset = {'input': {}, 'output': {}}
+        self._var_sizes = None
+        self._var_sizes_byset = None
 
         self._manual_connections = {}
         self._conn_global_abs_in2out = {}
@@ -295,8 +292,6 @@ class System(object):
         self._ext_sizes_byset = {'input': {}, 'output': {}}
 
         self._vectors = {'input': {}, 'output': {}, 'residual': {}}
-        self._excluded_vars_out = set()
-        self._excluded_vars_in = set()
 
         self._inputs = None
         self._outputs = None
@@ -305,15 +300,6 @@ class System(object):
 
         self._lower_bounds = None
         self._upper_bounds = None
-
-        self._scaling_vecs = {
-            ('input', 'phys0'): {}, ('input', 'phys1'): {},
-            ('input', 'norm0'): {}, ('input', 'norm1'): {},
-            ('output', 'phys0'): {}, ('output', 'phys1'): {},
-            ('output', 'norm0'): {}, ('output', 'norm1'): {},
-            ('residual', 'phys0'): {}, ('residual', 'phys1'): {},
-            ('residual', 'norm0'): {}, ('residual', 'norm1'): {},
-        }
 
         self._nonlinear_solver = None
         self._linear_solver = None
@@ -332,8 +318,8 @@ class System(object):
         self._owns_approx_wrt_idx = {}
         self._owns_approx_of_idx = {}
 
-        self._design_vars = {}
-        self._responses = {}
+        self._design_vars = OrderedDict()
+        self._responses = OrderedDict()
         self._rec_mgr = RecordingManager()
 
         self._static_mode = True
@@ -343,11 +329,22 @@ class System(object):
         self._static_responses = {}
 
         self._reconfigured = False
+        self.supports_multivecs = False
+
+        self._relevant = None
+        self._vec_names = None
+        self._vois = None
+        self._mode = None
+
+        self._scope_cache = {}
 
         self.initialize()
         self.metadata.update(kwargs)
 
         self._has_guess = False
+        self._has_output_scaling = False
+        self._has_resid_scaling = False
+        self._has_input_scaling = False
 
     def _check_reconf(self):
         """
@@ -421,29 +418,6 @@ class System(object):
         """
         pass
 
-    def _get_initial_procs(self, comm, initial):
-        """
-        Get initial values for pathname and comm.
-
-        Parameters
-        ----------
-        comm : MPI.Comm or <FakeComm>
-            The MPI communicator.
-        initial : bool
-            Whether we are reconfiguring - i.e., whether the model has been previously setup.
-
-        Returns
-        -------
-        str
-            Global name of the system, including the path.
-        MPI.Comm or <FakeComm>
-            The MPI communicator.
-        """
-        if not initial:
-            return self.pathname, self.comm
-        else:
-            return '', comm
-
     def _get_initial_var_indices(self, initial):
         """
         Get initial values for _var_set2iset.
@@ -464,7 +438,7 @@ class System(object):
             set2iset = {}
             for type_ in ['input', 'output']:
                 set2iset[type_] = {}
-                for iset, set_name in enumerate(self._num_var_byset[type_]):
+                for iset, set_name in enumerate(self._num_var_byset['nonlinear'][type_]):
                     set2iset[type_][set_name] = iset
 
             return set2iset
@@ -490,24 +464,37 @@ class System(object):
             Same as above, but by var_set name.
         """
         if not initial:
-            return (
-                self._ext_num_vars, self._ext_num_vars_byset,
-                self._ext_sizes, self._ext_sizes_byset)
+            return (self._ext_num_vars, self._ext_num_vars_byset,
+                    self._ext_sizes, self._ext_sizes_byset)
         else:
-            ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
-            ext_sizes = {'input': (0, 0), 'output': (0, 0)}
-            ext_num_vars_byset = {
-                'input': {set_name: (0, 0) for set_name in self._var_set2iset['input']},
-                'output': {set_name: (0, 0) for set_name in self._var_set2iset['output']}
-            }
-            ext_sizes_byset = {
-                'input': {set_name: (0, 0) for set_name in self._var_set2iset['input']},
-                'output': {set_name: (0, 0) for set_name in self._var_set2iset['output']}
-            }
+            ext_num_vars = {}
+            ext_sizes = {}
+            ext_num_vars_byset = {}
+            ext_sizes_byset = {}
+
+            for vec_name in self._lin_rel_vec_name_list:
+                ext_num_vars[vec_name] = {}
+                ext_num_vars_byset[vec_name] = {}
+                ext_sizes[vec_name] = {}
+                ext_sizes_byset[vec_name] = {}
+                for type_ in ['input', 'output']:
+                    ext_num_vars[vec_name][type_] = (0, 0)
+                    ext_sizes[vec_name][type_] = (0, 0)
+                    ext_num_vars_byset[vec_name][type_] = {
+                        set_name: (0, 0) for set_name in self._var_set2iset[type_]
+                    }
+                    ext_sizes_byset[vec_name][type_] = {
+                        set_name: (0, 0) for set_name in self._var_set2iset[type_]
+                    }
+
+            ext_num_vars['nonlinear'] = ext_num_vars['linear']
+            ext_num_vars_byset['nonlinear'] = ext_num_vars_byset['linear']
+            ext_sizes['nonlinear'] = ext_sizes['linear']
+            ext_sizes_byset['nonlinear'] = ext_sizes_byset['linear']
+
             return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
-    def _get_root_vectors(self, vector_class, initial, force_alloc_complex=False, mode=None,
-                          multi_vector_class=None):
+    def _get_root_vectors(self, vector_class, initial, force_alloc_complex=False):
         """
         Get the root vectors for the nonlinear and linear vectors for the model.
 
@@ -521,47 +508,24 @@ class System(object):
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
             after a reconfiguration) you may need to set this to True.
-        mode : str or None
-            Direction of derivatives.  If None, we are reconfiguring.
-        multi_vector_class : type
-            reference to an actual <Vector> class; not an instance. This specifies
-            the class to use to perform matrix-matrix derivative operations.  If None,
-            matrix-matrix will not be used.
 
         Returns
         -------
         dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
-        dict of set
-            Dictionary of sets of excluded output variable absolute names, keyed by vec_name.
-        dict of set
-            Dictionary of sets of excluded input variable absolute names, keyed by vec_name.
         """
-        root_vectors = {'input': OrderedDict(),
-                        'output': OrderedDict(),
-                        'residual': OrderedDict()}
+        # save root vecs as an attribute so that we can reuse the nonlinear scaling vecs in the
+        # linear root vec
+        self._root_vecs = root_vectors = {'input': OrderedDict(),
+                                          'output': OrderedDict(),
+                                          'residual': OrderedDict()}
 
         if initial:
-            # get all vec_names.  If we know the  mode, only get vec_names for
-            # one direction.
-            # TODO: during reconfig we currently don't know the mode, so we end
-            # up allocating unnecessary arrays when using parallel derivatives
-            vois = {}
-            if mode is None or mode == 'fwd':
-                desvars = self.get_design_vars(recurse=True)
-                in_vec_names = _get_vec_names(desvars)
-                vois.update(desvars)
-            else:
-                in_vec_names = set()
-
-            if mode is None or mode == 'rev':
-                responses = self.get_responses(recurse=True)
-                out_vec_names = _get_vec_names(responses)
-                vois.update(responses)
-            else:
-                out_vec_names = set()
-            vec_names = ['nonlinear', 'linear']
-            vec_names.extend(sorted(in_vec_names | out_vec_names))
+            relevant = self._relevant
+            vec_names = self._rel_vec_name_list
+            vois = self._vois
+            iproc = self.comm.rank
+            abs2idx = self._var_allprocs_abs2idx
 
             # Check for complex step to set vectors up appropriately.
             # If any subsystem needs complex step, then we need to allocate it everywhere.
@@ -571,45 +535,42 @@ class System(object):
                 if nl_alloc_complex:
                     break
 
-            if multi_vector_class is None:
-                multi_vector_class = vector_class
+            if self._has_input_scaling or self._has_output_scaling or self._has_resid_scaling:
+                self._scale_factors = self._compute_root_scale_factors()
+            else:
+                self._scale_factors = {}
 
             for vec_name in vec_names:
+                sizes = self._var_sizes[vec_name]['output']
                 ncol = 1
+                rel = None
                 if vec_name == 'nonlinear':
                     alloc_complex = nl_alloc_complex
-                    vec_class = vector_class
                 else:
                     alloc_complex = force_alloc_complex
 
-                    if vec_name == 'linear':
-                        vec_class = vector_class
-                    else:
-                        vec_class = multi_vector_class
-                        idxs = vois[vec_name]['indices']
-                        if idxs is None:
-                            if vec_class in (DefaultMultiVector, PETScMultiVector):
-                                ncol = vois[vec_name]['size']
-                        else:
-                            ncol = len(idxs)
+                    if vec_name != 'linear':
+                        voi = vois[vec_name]
+                        if voi['vectorize_derivs']:
+                            if 'size' in voi:
+                                ncol = voi['size']
+                            else:
+                                owner = self._owning_rank['output'][vec_name]
+                                ncol = sizes[owner, abs2idx[vec_name]['output'][vec_name]]
+                        rdct, _ = relevant[vec_name]['@all']
+                        rel = rdct['output']
+
                 for key in ['input', 'output', 'residual']:
-                    root_vectors[key][vec_name] = vec_class(vec_name, _type_map[key], self,
-                                                            alloc_complex=alloc_complex,
-                                                            ncol=ncol)
-
-            excl_out = {vec_name: set() for vec_name in root_vectors['output']}
-            excl_in = {vec_name: set() for vec_name in root_vectors['output']}
-
+                    root_vectors[key][vec_name] = vector_class(vec_name, key, self,
+                                                               alloc_complex=alloc_complex,
+                                                               ncol=ncol, relevant=rel)
         else:
 
             for key, vardict in iteritems(self._vectors):
                 for vec_name, vec in iteritems(vardict):
                     root_vectors[key][vec_name] = vec._root_vector
 
-            excl_out = self._excluded_vars_out
-            excl_in = self._excluded_vars_in
-
-        return root_vectors, excl_out, excl_in
+        return root_vectors
 
     def _get_bounds_root_vectors(self, vector_class, initial):
         """
@@ -633,49 +594,10 @@ class System(object):
             lower = self._lower_bounds._root_vector
             upper = self._upper_bounds._root_vector
         else:
-            lower = vector_class('lower', 'output', self)
-            upper = vector_class('upper', 'output', self)
+            lower = vector_class('nonlinear', 'output', self)
+            upper = vector_class('nonlinear', 'output', self)
 
         return lower, upper
-
-    def _get_scaling_root_vectors(self, vector_class, initial):
-        """
-        Get the root vectors for the scaling vectors.
-
-        Parameters
-        ----------
-        vector_class : Vector
-            The Vector class used to instantiate the root vectors.
-        initial : bool
-            Whether we are reconfiguring - i.e., whether the model has been previously setup.
-
-        Returns
-        -------
-        dict of dict of Vector
-            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
-        """
-        root_vectors = OrderedDict([
-            (('input', 'phys0'), OrderedDict()), (('input', 'phys1'), OrderedDict()),
-            (('input', 'norm0'), OrderedDict()), (('input', 'norm1'), OrderedDict()),
-            (('output', 'phys0'), OrderedDict()), (('output', 'phys1'), OrderedDict()),
-            (('output', 'norm0'), OrderedDict()), (('output', 'norm1'), OrderedDict()),
-            (('residual', 'phys0'), OrderedDict()), (('residual', 'phys1'), OrderedDict()),
-            (('residual', 'norm0'), OrderedDict()), (('residual', 'norm1'), OrderedDict()),
-        ])
-
-        for key in root_vectors:
-            vec_key, coeff_key = key
-
-            for vec_name in self._vectors['output']:
-                if initial:
-                    root_vectors[key][vec_name] = vector_class(vec_name, _type_map[vec_key], self)
-
-                    if coeff_key[-1] != '0':
-                        root_vectors[key][vec_name].set_const(1.0)
-                else:
-                    root_vectors[key][vec_name] = self._scaling_vecs[key][vec_name]._root_vector
-
-        return root_vectors
 
     def resetup(self, setup_mode='full'):
         """
@@ -686,10 +608,10 @@ class System(object):
         setup_mode : str
             Must be one of 'full', 'reconf', or 'update'.
         """
-        self._setup(self.comm, setup_mode=setup_mode)
+        self._setup(self.comm, setup_mode=setup_mode, mode=self._mode)
         self._final_setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
 
-    def _setup(self, comm, setup_mode):
+    def _setup(self, comm, setup_mode, mode):
         """
         Perform setup for this system and its descendant systems.
 
@@ -704,12 +626,18 @@ class System(object):
             The global communicator.
         setup_mode : str
             Must be one of 'full', 'reconf', or 'update'.
+        mode : str or None
+            Derivative direction, either 'fwd', or 'rev', or None
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
             initial = True
             recurse = True
             resize = False
+
+            self.pathname = ''
+            self.comm = comm
+            self._relevant = None
         # 2. Partial setup called in the system initiating the reconfiguration.
         elif setup_mode == 'reconf':
             initial = False
@@ -721,11 +649,12 @@ class System(object):
             recurse = False
             resize = False
 
+        self._mode = mode
+
         # If we're only updating and not recursing, processors don't need to be redistributed
         if recurse:
-            pathname, comm = self._get_initial_procs(comm, initial)
             # Besides setting up the processors, this method also builds the model hierarchy.
-            self._setup_procs(pathname, comm)
+            self._setup_procs(self.pathname, comm)
 
         # Recurse model from the bottom to the top for configuring.
         self._configure()
@@ -733,16 +662,17 @@ class System(object):
         # For updating variable and connection data, setup needs to be performed only
         # in the current system, by gathering data from immediate subsystems,
         # and no recursion is necessary.
+        self._setup_var_data(recurse=recurse)
+        self._setup_vec_names(mode, self._vec_names, self._vois)
+        self._setup_global_connections(recurse=recurse)
+        self._setup_relevance(mode, self._relevant)
         self._setup_vars(recurse=recurse)
         self._setup_var_index_ranges(self._get_initial_var_indices(initial), recurse=recurse)
-        self._setup_var_data(recurse=recurse)
         self._setup_var_index_maps(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
-        self._setup_global_connections(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
-    def _final_setup(self, comm, vector_class, setup_mode, force_alloc_complex=False,
-                     mode=None, multi_vector_class=None):
+    def _final_setup(self, comm, vector_class, setup_mode, force_alloc_complex=False):
         """
         Perform final setup for this system and its descendant systems.
 
@@ -765,12 +695,6 @@ class System(object):
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
             after a reconfiguration) you may need to set this to True.
-        mode : str or None
-            Derivative direction, either 'fwd', or 'rev', or None
-        multi_vector_class : type
-            reference to an actual <Vector> class; not an instance. This specifies
-            the class to use to perform matrix-matrix derivative operations.  If None,
-            matrix-matrix will not be used.
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
@@ -793,13 +717,10 @@ class System(object):
         ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset = \
             self._get_initial_global(initial)
         self._setup_global(ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset)
-        root_vectors, excl_out, excl_in = \
-            self._get_root_vectors(vector_class, initial,
-                                   force_alloc_complex=force_alloc_complex,
-                                   mode=mode, multi_vector_class=multi_vector_class)
-        self._setup_vectors(root_vectors, excl_out, excl_in, resize=resize)
+        root_vectors = self._get_root_vectors(vector_class, initial,
+                                              force_alloc_complex=force_alloc_complex)
+        self._setup_vectors(root_vectors, resize=resize)
         self._setup_bounds(*self._get_bounds_root_vectors(vector_class, initial), resize=resize)
-        self._setup_scaling(self._get_scaling_root_vectors(vector_class, initial), resize=resize)
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
         self._setup_transfers(recurse=recurse)
@@ -839,8 +760,8 @@ class System(object):
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2data_io = {}
-        self._design_vars = {}
-        self._responses = {}
+        self._design_vars = OrderedDict()
+        self._responses = OrderedDict()
 
         self._static_mode = False
         self._var_rel2data_io.update(self._static_var_rel2data_io)
@@ -851,11 +772,6 @@ class System(object):
         self.setup()
         self._static_mode = True
 
-        minp, maxp = self.get_req_procs()
-        if MPI and comm is not None and comm != MPI.COMM_NULL and comm.size < minp:
-            raise RuntimeError("%s needs %d MPI processes, but was given only %d." %
-                               (self.pathname, minp, comm.size))
-
     def _setup_vars(self, recurse=True):
         """
         Call setup in components and count variables, total and by var_set.
@@ -865,8 +781,8 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._num_var = {'input': 0, 'output': 0}
-        self._num_var_byset = {'input': {}, 'output': {}}
+        self._num_var = {}
+        self._num_var_byset = {}
 
     def _setup_var_index_ranges(self, set2iset, recurse=True):
         """
@@ -880,14 +796,6 @@ class System(object):
             Whether to call this method in subsystems.
         """
         self._var_set2iset = set2iset
-        self._subsystems_var_range = {'input': [], 'output': []}
-        self._subsystems_var_range_byset = {'input': [], 'output': []}
-
-        num_var_byset = self._num_var_byset
-        for type_ in ['input', 'output']:
-            for set_name in self._var_set2iset[type_]:
-                if set_name not in num_var_byset[type_]:
-                    num_var_byset[type_][set_name] = 0
 
     def _setup_var_data(self, recurse=True):
         """
@@ -914,21 +822,26 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._var_allprocs_abs2idx = allprocs_abs2idx = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2idx_byset = allprocs_abs2idx_byset = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2idx = abs2idx = {}
+        self._var_allprocs_abs2idx_byset = abs2idx_byset = {}
 
-        for type_ in ['input', 'output']:
-            allprocs_abs2meta_t = self._var_allprocs_abs2meta[type_]
-            allprocs_abs2idx_t = allprocs_abs2idx[type_]
-            allprocs_abs2idx_byset_t = allprocs_abs2idx_byset[type_]
+        for vec_name in self._lin_rel_vec_name_list:
+            abs2idx[vec_name] = {'input': {}, 'output': {}}
+            abs2idx_byset[vec_name] = {'input': {}, 'output': {}}
+            for type_ in ['input', 'output']:
+                counter = defaultdict(int)
+                abs2idx_t = abs2idx[vec_name][type_]
+                abs2idx_byset_t = abs2idx_byset[vec_name][type_]
+                abs2meta_t = self._var_allprocs_abs2meta[type_]
 
-            counter = {set_name: 0 for set_name in self._var_set2iset[type_]}
-            for idx, abs_name in enumerate(self._var_allprocs_abs_names[type_]):
-                allprocs_abs2idx_t[abs_name] = idx
+                for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
+                    abs2idx_t[abs_name] = i
+                    set_name = abs2meta_t[abs_name]['var_set']
+                    abs2idx_byset_t[abs_name] = counter[set_name]
+                    counter[set_name] += 1
 
-                set_name = allprocs_abs2meta_t[abs_name]['var_set']
-                allprocs_abs2idx_byset_t[abs_name] = counter[set_name]
-                counter[set_name] += 1
+        abs2idx['nonlinear'] = abs2idx['linear']
+        abs2idx_byset['nonlinear'] = abs2idx_byset['linear']
 
         # Recursion
         if recurse:
@@ -944,8 +857,9 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._var_sizes = {'input': None, 'output': None}
-        self._var_sizes_byset = {'input': {}, 'output': {}}
+        self._var_sizes = {}
+        self._var_sizes_byset = {}
+        self._owning_rank = {'input': defaultdict(int), 'output': defaultdict(int)}
 
     def _setup_global_shapes(self):
         """
@@ -954,13 +868,13 @@ class System(object):
         meta = self._var_allprocs_abs2meta['output']
 
         # now set global sizes and shapes into metadata for distributed outputs
-        sizes = self._var_sizes['output']
+        sizes = self._var_sizes['nonlinear']['output']
         for idx, abs_name in enumerate(self._var_allprocs_abs_names['output']):
             mymeta = meta[abs_name]
             local_shape = mymeta['shape']
             if not mymeta['distributed']:
                 # not distributed, just use local shape and size
-                mymeta['global_size'] = np.prod(local_shape)
+                mymeta['global_size'] = mymeta['size']
                 mymeta['global_shape'] = local_shape
                 continue
 
@@ -1002,6 +916,105 @@ class System(object):
         """
         self._conn_global_abs_in2out = {}
 
+    def _setup_vec_names(self, mode, vec_names=None, vois=None):
+        """
+        Return the list of vec_names and the vois dict.
+
+        Parameters
+        ----------
+        mode : str
+            Derivative direction, either 'fwd' or 'rev'.
+        vec_names : list of str or None
+            The list of names of vectors. Depends on the value of mode.
+        vois : dict
+            Dictionary of either design vars or responses, depending on the value
+            of mode.
+
+        """
+        def _filter_names(voi_dict):
+            return set(voi for voi, data in iteritems(voi_dict)
+                       if data['parallel_deriv_color'] is not None
+                       or data['vectorize_derivs'])
+
+        self._mode = mode
+        self._vois = vois
+        if vec_names is None:  # should only occur at top level on full setup
+            vec_names = ['nonlinear', 'linear']
+            if mode == 'fwd':
+                desvars = self.get_design_vars(recurse=True, get_sizes=False)
+                vec_names.extend(sorted(_filter_names(desvars)))
+                self._vois = vois = desvars
+            else:  # rev
+                responses = self.get_responses(recurse=True, get_sizes=False)
+                vec_names.extend(sorted(_filter_names(responses)))
+                self._vois = vois = responses
+
+        self._vec_names = vec_names
+        self._lin_vec_names = vec_names[1:]  # only linear vec names
+
+        for s in self.system_iter():
+            s._vec_names = vec_names
+            s._lin_vec_names = self._lin_vec_names
+
+    def _init_relevance(self, mode):
+        """
+        Create the relevance dictionary.
+
+        Parameters
+        ----------
+        mode : str
+            Derivative direction, either 'fwd' or 'rev'.
+
+        Returns
+        -------
+        dict
+            The relevance dictionary.
+        """
+        self._relevant = relevant = {}
+        relevant['nonlinear'] = {'@all': ({'input': ContainsAll(),
+                                           'output': ContainsAll()},
+                                          ContainsAll())}
+        relevant['linear'] = relevant['nonlinear']
+        return relevant
+
+    def _setup_relevance(self, mode, relevant=None):
+        """
+        Set up the relevance dictionary.
+
+        Parameters
+        ----------
+        mode : str
+            Derivative direction, either 'fwd' or 'rev'.
+        relevant : dict or None
+            Dictionary mapping VOI name to all variables necessary for computing
+            derivatives between the VOI and all other VOIs.
+
+        """
+        if relevant is None:  # should only occur at top level on full setup
+            self._relevant = relevant = self._init_relevance(mode)
+        else:
+            self._relevant = relevant
+
+        self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
+        self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
+
+        self._rel_vec_name_list = []
+        for vec_name in self._vec_names:
+            rel, relsys = relevant[vec_name]['@all']
+            if self.pathname in relsys:
+                self._rel_vec_name_list.append(vec_name)
+            for type_ in ('input', 'output'):
+                self._var_allprocs_relevant_names[vec_name][type_].extend(
+                    v for v in self._var_allprocs_abs_names[type_] if v in rel[type_])
+                self._var_relevant_names[vec_name][type_].extend(
+                    v for v in self._var_abs_names[type_] if v in rel[type_])
+
+        self._rel_vec_names = set(self._rel_vec_name_list)
+        self._lin_rel_vec_name_list = self._rel_vec_name_list[1:]
+
+        for s in self._subsystems_myproc:
+            s._setup_relevance(mode, relevant)
+
     def _setup_connections(self, recurse=True):
         """
         Compute dict of all implicit and explicit connections owned by this system.
@@ -1033,7 +1046,7 @@ class System(object):
         self._ext_sizes = ext_sizes
         self._ext_sizes_byset = ext_sizes_byset
 
-    def _setup_vectors(self, root_vectors, excl_out, excl_in, resize=False, alloc_complex=False):
+    def _setup_vectors(self, root_vectors, resize=False, alloc_complex=False):
         """
         Compute all vectors for all vec names and assign excluded variables lists.
 
@@ -1041,10 +1054,6 @@ class System(object):
         ----------
         root_vectors : dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
-        excl_out : dict of set
-            Dictionary of sets of excluded output variable absolute names, keyed by vec_name.
-        excl_in : dict of set
-            Dictionary of sets of excluded input variable absolute names, keyed by vec_name.
         resize : bool
             Whether to resize the root vectors - i.e, because this system is initiating a reconf.
         alloc_complex : bool
@@ -1053,8 +1062,6 @@ class System(object):
         self._vectors = vectors = {'input': OrderedDict(),
                                    'output': OrderedDict(),
                                    'residual': OrderedDict()}
-        self._excluded_vars_out = excl_out
-        self._excluded_vars_in = excl_in
 
         # Allocate complex if root vector was allocated complex.
         alloc_complex = root_vectors['output']['nonlinear']._alloc_complex
@@ -1066,13 +1073,13 @@ class System(object):
                 '"force_alloc_complex" to True during setup.'
             raise RuntimeError(msg)
 
-        for vec_name in root_vectors['output']:
+        for vec_name in self._rel_vec_name_list:
             vector_class = root_vectors['output'][vec_name].__class__
 
-            for key in ['input', 'output', 'residual']:
-                rootvec = root_vectors[key][vec_name]
-                vectors[key][vec_name] = vector_class(
-                    vec_name, _type_map[key], self, rootvec, resize=resize,
+            for kind in ['input', 'output', 'residual']:
+                rootvec = root_vectors[kind][vec_name]
+                vectors[kind][vec_name] = vector_class(
+                    vec_name, kind, self, rootvec, resize=resize,
                     alloc_complex=alloc_complex and vec_name == 'nonlinear', ncol=rootvec._ncol)
 
         self._inputs = vectors['input']['nonlinear']
@@ -1080,7 +1087,8 @@ class System(object):
         self._residuals = vectors['residual']['nonlinear']
 
         for subsys in self._subsystems_myproc:
-            subsys._setup_vectors(root_vectors, excl_out, excl_in, alloc_complex=alloc_complex)
+            subsys._scale_factors = self._scale_factors
+            subsys._setup_vectors(root_vectors, alloc_complex=alloc_complex)
 
     def _setup_bounds(self, root_lower, root_upper, resize=False):
         """
@@ -1097,9 +1105,9 @@ class System(object):
         """
         vector_class = root_lower.__class__
         self._lower_bounds = lower = vector_class(
-            'lower', 'output', self, root_lower, resize=resize)
+            'nonlinear', 'output', self, root_lower, resize=resize)
         self._upper_bounds = upper = vector_class(
-            'upper', 'output', self, root_upper, resize=resize)
+            'nonlinear', 'output', self, root_upper, resize=resize)
 
         for abs_name, meta in iteritems(self._var_abs2meta['output']):
             shape = meta['shape']
@@ -1126,82 +1134,45 @@ class System(object):
         for subsys in self._subsystems_myproc:
             subsys._setup_bounds(root_lower, root_upper)
 
-    def _setup_scaling(self, root_vectors, resize=False):
+    def _compute_root_scale_factors(self):
         """
-        Compute all scaling vectors for all vec names.
+        Compute scale factors for all variables.
 
-        Parameters
-        ----------
-        root_vectors : dict of dict of Vector
-            Root vectors: first key is scaling direction; second key is vec_name.
-        resize : bool
-            Whether to resize the root vectors - i.e, because this system is initiating a reconf.
+        Returns
+        -------
+        dict
+            Mapping of each absoute var name to its corresponding scaling factor tuple.
         """
-        self._scaling_vecs = vecs = OrderedDict([
-            (('input', 'phys0'), OrderedDict()), (('input', 'phys1'), OrderedDict()),
-            (('input', 'norm0'), OrderedDict()), (('input', 'norm1'), OrderedDict()),
-            (('output', 'phys0'), OrderedDict()), (('output', 'phys1'), OrderedDict()),
-            (('output', 'norm0'), OrderedDict()), (('output', 'norm1'), OrderedDict()),
-            (('residual', 'phys0'), OrderedDict()), (('residual', 'phys1'), OrderedDict()),
-            (('residual', 'norm0'), OrderedDict()), (('residual', 'norm1'), OrderedDict()),
-        ])
+        # make this a defaultdict to handle the case of access using unconnected inputs
+        scale_factors = defaultdict(lambda: {
+            ('input', 'phys'): (0.0, 1.0),
+            ('input', 'norm'): (0.0, 1.0)
+        })
 
-        allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
         abs2meta_in = self._var_abs2meta['input']
+        allprocs_meta_out = self._var_allprocs_abs2meta['output']
 
-        for vec_name in self._vectors['output']:
-            vector_class = root_vectors['residual', 'phys0'][vec_name].__class__
+        for abs_name in self._var_allprocs_abs_names['output']:
+            meta = allprocs_meta_out[abs_name]
+            ref0 = meta['ref0']
+            res_ref = meta['res_ref']
+            a0 = ref0
+            a1 = meta['ref'] - ref0
+            scale_factors[abs_name] = {
+                ('output', 'phys'): (a0, a1),
+                ('output', 'norm'): (-a0 / a1, 1.0 / a1),
+                ('residual', 'phys'): (0.0, res_ref),
+                ('residual', 'norm'): (0.0, 1.0 / res_ref),
+            }
 
-            for key in vecs:
-                vecs[key][vec_name] = vector_class(
-                    vec_name, _type_map[key[0]], self, root_vectors[key][vec_name],
-                    resize=resize)
-
-                # This is necessary because scaling will not be set for inputs
-                # whose source is outside of this system. The units and scaling
-                # for those sources are not available, so those components of the
-                # scaling vectors will just be 0. That will zero out input values
-                # during transfers, so the multiplier must be 1 by default.
-                if resize:
-                    if '1' in key[1]:
-                        vecs[key][vec_name].set_const(1.)
-
-            for abs_name, meta in iteritems(self._var_abs2meta['output']):
-                shape = meta['shape']
-                ref = meta['ref']
-                ref0 = meta['ref0']
-                res_ref = meta['res_ref']
-                if not np.isscalar(ref):
-                    ref = ref.reshape(shape)
-                if not np.isscalar(ref0):
-                    ref0 = ref0.reshape(shape)
-                if not np.isscalar(res_ref):
-                    res_ref = res_ref.reshape(shape)
-
-                a0 = ref0
-                a1 = ref - ref0
-                vecs['output', 'phys0'][vec_name]._views[abs_name][:] = a0
-                vecs['output', 'phys1'][vec_name]._views[abs_name][:] = a1
-                vecs['output', 'norm0'][vec_name]._views[abs_name][:] = -a0 / a1
-                vecs['output', 'norm1'][vec_name]._views[abs_name][:] = 1.0 / a1
-
-                vecs['residual', 'phys0'][vec_name]._views[abs_name][:] = 0.0
-                vecs['residual', 'phys1'][vec_name]._views[abs_name][:] = res_ref
-                vecs['residual', 'norm0'][vec_name]._views[abs_name][:] = 0.0
-                vecs['residual', 'norm1'][vec_name]._views[abs_name][:] = 1.0 / res_ref
-
-            for abs_in, abs_out in iteritems(self._conn_abs_in2out):
+        if self._has_input_scaling:
+            for abs_in, abs_out in iteritems(self._conn_global_abs_in2out):
+                meta_out = allprocs_meta_out[abs_out]
                 if abs_in not in abs2meta_in:
+                    # we only perform scaling on local arrays, so skip
                     continue
 
-                meta_out = allprocs_abs2meta_out[abs_out]
                 meta_in = abs2meta_in[abs_in]
-
-                shape_out = meta_out['shape']
-                units_out = meta_out['units']
-                distrib_out = meta_out['distributed']
-                shape_in = meta_in['shape']
-                units_in = meta_in['units']
 
                 ref = meta_out['ref']
                 ref0 = meta_out['ref0']
@@ -1212,7 +1183,8 @@ class System(object):
                     if not (np.isscalar(ref) and np.isscalar(ref0)):
                         global_shape_out = meta_out['global_shape']
                         if src_indices.ndim != 1:
-                            if len(shape_out) == 1:
+                            shape_in = meta_in['shape']
+                            if len(meta_out['shape']) == 1 or shape_in == src_indices.shape:
                                 src_indices = src_indices.flatten()
                                 src_indices = convert_neg(src_indices, src_indices.size)
                             else:
@@ -1225,19 +1197,12 @@ class System(object):
                         # TODO: if either ref or ref0 are not scalar and the output is
                         # distributed, we need to do a scatter
                         # to obtain the values needed due to global src_indices
-                        if distrib_out:
+                        if meta_out['distributed']:
                             raise RuntimeError("vector scalers with distrib vars "
                                                "not supported yet.")
 
-                        if not np.isscalar(ref):
-                            ref = ref[src_indices]
-                        if not np.isscalar(ref0):
-                            ref0 = ref0[src_indices]
-                else:
-                    if not np.isscalar(ref):
-                        ref = ref.reshape(shape_out)
-                    if not np.isscalar(ref0):
-                        ref0 = ref0.reshape(shape_out)
+                        ref = ref[src_indices]
+                        ref0 = ref0[src_indices]
 
                 # Compute scaling arrays for inputs using a0 and a1
                 # Example:
@@ -1252,16 +1217,23 @@ class System(object):
                 #   b1 = d0 + d1 a1 - d0
                 #   b1 = g(a1) - g(0)
 
-                a0 = convert_units(ref0, units_out, units_in)
-                a1 = convert_units(ref - ref0, units_out, units_in) \
-                    - convert_units(0., units_out, units_in)
-                vecs['input', 'phys0'][vec_name]._views[abs_in][:] = a0
-                vecs['input', 'phys1'][vec_name]._views[abs_in][:] = a1
-                vecs['input', 'norm0'][vec_name]._views[abs_in][:] = -a0 / a1
-                vecs['input', 'norm1'][vec_name]._views[abs_in][:] = 1.0 / a1
+                units_in = meta_in['units']
+                units_out = meta_out['units']
 
-        for subsys in self._subsystems_myproc:
-            subsys._setup_scaling(root_vectors)
+                if units_in is None or units_out is None or units_in == units_out:
+                    a0 = ref0
+                    a1 = ref - ref0
+                else:
+                    factor, offset = get_conversion(units_out, units_in)
+                    a0 = (ref0 + offset) * factor
+                    a1 = (ref - ref0) * factor
+
+                scale_factors[abs_in] = {
+                    ('input', 'phys'): (a0, a1),
+                    ('input', 'norm'): (-a0 / a1, 1.0 / a1)
+                }
+
+        return scale_factors
 
     def _setup_transfers(self, recurse=True):
         """
@@ -1383,14 +1355,6 @@ class System(object):
         for abs_name, meta in iteritems(self._var_abs2meta['output']):
             self._outputs._views[abs_name][:] = meta['value']
 
-    def _scale_vec(self, vec, key, scale_to):
-        scal_vecs = self._scaling_vecs
-        vec_name = vec._name
-
-        vec.elem_mult(scal_vecs[key, scale_to + '1'][vec_name])
-        if vec_name == 'nonlinear':
-            vec += scal_vecs[key, scale_to + '0'][vec_name]
-
     def _transfer(self, vec_name, mode, isub=None):
         """
         Perform a vector transfer.
@@ -1406,33 +1370,29 @@ class System(object):
             If int, perform a partial transfer for linear Gauss--Seidel.
         """
         vec_inputs = self._vectors['input'][vec_name]
-        vec_outputs = self._vectors['output'][vec_name]
 
         if mode == 'fwd':
-            direction = ('norm', 'phys')
-        elif mode == 'rev':
-            direction = ('phys', 'norm')
-
-        self._scale_vec(vec_inputs, 'input', direction[0])
-        self._transfers[vec_name][mode, isub](vec_inputs, vec_outputs, mode)
-        self._scale_vec(vec_inputs, 'input', direction[1])
-
-    def get_req_procs(self):
-        """
-        Return the min and max MPI processes usable by this System.
-
-        This should be overridden by Components that require more than
-        1 process.
-
-        Returns
-        -------
-        tuple : (int, int or None)
-            A tuple of the form (min_procs, max_procs), indicating the min
-            and max processors usable by this `System`.  max_procs can be None,
-            indicating all available procs can be used.
-        """
-        # by default, systems only require 1 proc
-        return (1, 1)
+            if self._has_input_scaling:
+                vec_inputs.scale('norm')
+                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
+                                                               self._vectors['output'][vec_name],
+                                                               mode)
+                vec_inputs.scale('phys')
+            else:
+                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
+                                                               self._vectors['output'][vec_name],
+                                                               mode)
+        else:  # rev
+            if self._has_input_scaling:
+                vec_inputs.scale('phys')
+                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
+                                                               self._vectors['output'][vec_name],
+                                                               mode)
+                vec_inputs.scale('norm')
+            else:
+                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
+                                                               self._vectors['output'][vec_name],
+                                                               mode)
 
     def _get_maps(self, prom_names):
         """
@@ -1532,28 +1492,32 @@ class System(object):
         return maps
 
     def _get_scope(self, excl_sub=None):
+        if excl_sub in self._scope_cache:
+            return self._scope_cache[excl_sub]
+
         if excl_sub is None:
             # All myproc outputs
             scope_out = set(self._var_abs_names['output'])
 
             # All myproc inputs connected to an output in this system
-            scope_in = set(self._conn_global_abs_in2out) \
-                & set(self._var_abs_names['input'])
+            scope_in = set(self._conn_global_abs_in2out).intersection(
+                self._var_abs_names['input'])
+
         else:
             # All myproc outputs not in excl_sub
             scope_out = set(self._var_abs_names['output']).difference(
                 excl_sub._var_abs_names['output'])
 
             # All myproc inputs connected to an output in this system but not in excl_sub
-            scope_in = []
+            scope_in = set()
             for abs_in in self._var_abs_names['input']:
                 if abs_in in self._conn_global_abs_in2out:
                     abs_out = self._conn_global_abs_in2out[abs_in]
 
-                    if abs_out not in excl_sub._var_allprocs_abs2idx['output']:
-                        scope_in.append(abs_in)
-            scope_in = set(scope_in)
+                    if abs_out not in excl_sub._var_allprocs_abs2idx['linear']['output']:
+                        scope_in.add(abs_in)
 
+        self._scope_cache[excl_sub] = (scope_out, scope_in)
         return scope_out, scope_in
 
     @property
@@ -1588,10 +1552,12 @@ class System(object):
         residuals : list of residual <Vector> objects
             List of residual vectors to apply the unit and scaling conversions.
         """
-        for vec in outputs:
-            self._scale_vec(vec, 'output', 'phys')
-        for vec in residuals:
-            self._scale_vec(vec, 'residual', 'phys')
+        if self._has_output_scaling:
+            for vec in outputs:
+                vec.scale('phys')
+        if self._has_resid_scaling:
+            for vec in residuals:
+                vec.scale('phys')
 
         yield
 
@@ -1601,7 +1567,8 @@ class System(object):
             if vec._vector_info._under_complex_step:
                 vec._remove_complex_views()
 
-            self._scale_vec(vec, 'output', 'norm')
+            if self._has_output_scaling:
+                vec.scale('norm')
 
         for vec in residuals:
 
@@ -1609,35 +1576,50 @@ class System(object):
             if vec._vector_info._under_complex_step:
                 vec._remove_complex_views()
 
-            self._scale_vec(vec, 'residual', 'norm')
+            if self._has_resid_scaling:
+                vec.scale('norm')
 
     @contextmanager
     def _unscaled_context_all(self):
         """
         Context manager that temporarily puts all vectors and Jacobians in an unscaled state.
         """
-        for vec_type in ['output', 'residual']:
-            for vec in self._vectors[vec_type].values():
-                self._scale_vec(vec, vec_type, 'phys')
+        if self._has_output_scaling:
+            for vec in self._vectors['output'].values():
+                vec.scale('phys')
+        if self._has_resid_scaling:
+            for vec in self._vectors['residual'].values():
+                vec.scale('phys')
+
         yield
-        for vec_type in ['output', 'residual']:
-            for vec in self._vectors[vec_type].values():
-                self._scale_vec(vec, vec_type, 'norm')
+
+        if self._has_output_scaling:
+            for vec in self._vectors['output'].values():
+                vec.scale('norm')
+        if self._has_resid_scaling:
+            for vec in self._vectors['residual'].values():
+                vec.scale('norm')
 
     @contextmanager
     def _scaled_context_all(self):
         """
         Context manager that temporarily puts all vectors and Jacobians in a scaled state.
         """
-        for vec_type in ['output', 'residual']:
-            for vec in self._vectors[vec_type].values():
-                self._scale_vec(vec, vec_type, 'norm')
+        if self._has_output_scaling:
+            for vec in self._vectors['output'].values():
+                vec.scale('norm')
+        if self._has_resid_scaling:
+            for vec in self._vectors['residual'].values():
+                vec.scale('norm')
 
         yield
 
-        for vec_type in ['output', 'residual']:
-            for vec in self._vectors[vec_type].values():
-                self._scale_vec(vec, vec_type, 'phys')
+        if self._has_output_scaling:
+            for vec in self._vectors['output'].values():
+                vec.scale('phys')
+        if self._has_resid_scaling:
+            for vec in self._vectors['residual'].values():
+                vec.scale('phys')
 
     @contextmanager
     def _matvec_context(self, vec_name, scope_out, scope_in, mode, clear=True):
@@ -1679,31 +1661,23 @@ class System(object):
         if clear:
             if mode == 'fwd':
                 d_residuals.set_const(0.0)
-            elif mode == 'rev':
+            else:  # rev
                 d_inputs.set_const(0.0)
                 d_outputs.set_const(0.0)
 
-        excl_out = self._excluded_vars_out[vec_name]
-        excl_in = self._excluded_vars_in[vec_name]
+        if scope_out is None and scope_in is None:
+            yield d_inputs, d_outputs, d_residuals
+        else:
+            if scope_out is not None:
+                d_outputs._names = scope_out.intersection(d_outputs._views)
+            if scope_in is not None:
+                d_inputs._names = scope_in.intersection(d_inputs._views)
 
-        res_names = set(self._var_abs_names['output']) - excl_out
-        out_names = set(self._var_abs_names['output']) - excl_out
-        in_names = set(self._var_abs_names['input']) - excl_in
-        if scope_out is not None:
-            out_names = out_names & scope_out
-        if scope_in is not None:
-            in_names = in_names & scope_in
+            yield d_inputs, d_outputs, d_residuals
 
-        d_inputs._names = in_names
-        d_outputs._names = out_names
-        d_residuals._names = res_names
-
-        yield d_inputs, d_outputs, d_residuals
-
-        # reset _names so users will see full vector contents
-        d_inputs._names = d_inputs._views
-        d_outputs._names = d_outputs._views
-        d_residuals._names = d_residuals._views
+            # reset _names so users will see full vector contents
+            d_inputs._names = d_inputs._views
+            d_outputs._names = d_outputs._views
 
     def get_nonlinear_vectors(self):
         """
@@ -1860,20 +1834,6 @@ class System(object):
             if subsys.nonlinear_solver is not None and type_ != 'LN':
                 subsys.nonlinear_solver._set_solver_print(level=level, type_=type_)
 
-    @property
-    def proc_allocator(self):
-        """
-        Get the current system's processor allocator object.
-        """
-        return self._mpi_proc_allocator
-
-    @proc_allocator.setter
-    def proc_allocator(self, value):
-        """
-        Set the processor allocator object.
-        """
-        self._mpi_proc_allocator = value
-
     def _set_partials_meta(self):
         """
         Set subjacobian info into our jacobian.
@@ -1916,7 +1876,7 @@ class System(object):
 
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
-                       rhs_group=None):
+                       parallel_deriv_color=None, vectorize_derivs=False):
         r"""
         Add a design variable to this system.
 
@@ -1942,9 +1902,11 @@ class System(object):
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-        rhs_group : string
+        parallel_deriv_color : string
             If specified, this design var will be grouped for parallel derivative
-            calculations with other variables sharing the same rhs_group.
+            calculations with other variables sharing the same parallel_deriv_color.
+        vectorize_derivs : bool
+            If True, vectorize derivative calculations.
 
         Notes
         -----
@@ -1994,7 +1956,7 @@ class System(object):
         dvs['scaler'] = scaler
 
         if isinstance(adder, np.ndarray):
-            if np.all(adder == 0.0):
+            if not np.any(adder):
                 adder = None
         elif adder == 0.0:
             adder = None
@@ -2006,14 +1968,20 @@ class System(object):
         dvs['ref'] = ref
         dvs['ref0'] = ref0
         if indices is not None:
-            dvs['size'] = len(indices)
             indices = np.atleast_1d(indices)
+            dvs['size'] = len(indices)
         dvs['indices'] = indices
-        dvs['rhs_group'] = rhs_group
+        dvs['parallel_deriv_color'] = parallel_deriv_color
+        dvs['vectorize_derivs'] = vectorize_derivs
+        # TODO: figure out why grouping the matmat variables this way
+        #       makes the flat_earth test run faster on one proc.
+        if vectorize_derivs and parallel_deriv_color is None:
+            dvs['parallel_deriv_color'] = '@matmat'
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None,
-                     adder=None, scaler=None, linear=False, rhs_group=None):
+                     adder=None, scaler=None, linear=False, parallel_deriv_color=None,
+                     vectorize_derivs=False):
         r"""
         Add a response variable to this system.
 
@@ -2047,9 +2015,11 @@ class System(object):
             is second in precedence.
         linear : bool
             Set to True if constraint is linear. Default is False.
-        rhs_group : string
+        parallel_deriv_color : string
             If specified, this design var will be grouped for parallel derivative
-            calculations with other variables sharing the same rhs_group.
+            calculations with other variables sharing the same parallel_deriv_color.
+        vectorize_derivs : bool
+            If True, vectorize derivative calculations.
 
         Notes
         -----
@@ -2072,7 +2042,7 @@ class System(object):
 
         if name in self._responses or name in self._static_responses:
             typemap = {'con': 'Constraint', 'obj': 'Objective'}
-            msg = '{0} \'{1}\' already exists.'.format(typemap[type], name)
+            msg = '{0} \'{1}\' already exists.'.format(typemap[type_], name)
             raise RuntimeError(msg.format(name))
 
         # Convert ref/ref0 to ndarray/float as necessary
@@ -2102,55 +2072,36 @@ class System(object):
             msg = "If specified, indices must be a sequence of integers."
             raise ValueError(msg)
 
-        # Convert lower to ndarray/float as necessary
-        lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.max,
-                                         flatten=True)
-
-        # Convert upper to ndarray/float as necessary
-        upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max,
-                                         flatten=True)
-
-        # Convert equals to ndarray/float as necessary
-        if equals is not None:
-            equals = format_as_float_or_array('equals', equals, flatten=True)
-
-        # Scale the bounds
-        if lower is not None:
-            lower = (lower + adder) * scaler
-
-        if upper is not None:
-            upper = (upper + adder) * scaler
-
-        if equals is not None:
-            equals = (equals + adder) * scaler
-
         if self._static_mode:
             responses = self._static_responses
         else:
             responses = self._responses
 
-        responses[name] = resp = OrderedDict()
-
-        if isinstance(scaler, np.ndarray):
-            if np.all(scaler == 1.0):
-                scaler = None
-        elif scaler == 1.0:
-            scaler = None
-        resp['scaler'] = scaler
-
-        if isinstance(adder, np.ndarray):
-            if np.all(adder == 0.0):
-                adder = None
-        elif adder == 0.0:
-            adder = None
-        resp['adder'] = adder
-
-        resp['name'] = name
-        resp['ref'] = ref
-        resp['ref0'] = ref0
-        resp['type'] = type_
+        resp = OrderedDict()
 
         if type_ == 'con':
+            # Convert lower to ndarray/float as necessary
+            lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.max,
+                                             flatten=True)
+
+            # Convert upper to ndarray/float as necessary
+            upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max,
+                                             flatten=True)
+
+            # Convert equals to ndarray/float as necessary
+            if equals is not None:
+                equals = format_as_float_or_array('equals', equals, flatten=True)
+
+            # Scale the bounds
+            if lower is not None:
+                lower = (lower + adder) * scaler
+
+            if upper is not None:
+                upper = (upper + adder) * scaler
+
+            if equals is not None:
+                equals = (equals + adder) * scaler
+
             resp['lower'] = lower
             resp['upper'] = upper
             resp['equals'] = equals
@@ -2164,11 +2115,37 @@ class System(object):
                 resp['size'] = 1
                 index = np.array([index], dtype=int)
             resp['indices'] = index
-        resp['rhs_group'] = rhs_group
+
+        if isinstance(scaler, np.ndarray):
+            if np.all(scaler == 1.0):
+                scaler = None
+        elif scaler == 1.0:
+            scaler = None
+        resp['scaler'] = scaler
+
+        if isinstance(adder, np.ndarray):
+            if not np.any(adder):
+                adder = None
+        elif adder == 0.0:
+            adder = None
+        resp['adder'] = adder
+
+        resp['name'] = name
+        resp['ref'] = ref
+        resp['ref0'] = ref0
+        resp['type'] = type_
+
+        resp['parallel_deriv_color'] = parallel_deriv_color
+        resp['vectorize_derivs'] = vectorize_derivs
+        if vectorize_derivs and parallel_deriv_color is None:
+            resp['parallel_deriv_color'] = '@matmat'
+
+        responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
-                       indices=None, linear=False, rhs_group=None):
+                       indices=None, linear=False, parallel_deriv_color=None,
+                       vectorize_derivs=False):
         r"""
         Add a constraint variable to this system.
 
@@ -2198,9 +2175,11 @@ class System(object):
             negative integers.
         linear : bool
             Set to True if constraint is linear. Default is False.
-        rhs_group : string
+        parallel_deriv_color : string
             If specified, this design var will be grouped for parallel derivative
-            calculations with other variables sharing the same rhs_group.
+            calculations with other variables sharing the same parallel_deriv_color.
+        vectorize_derivs : bool
+            If True, vectorize derivative calculations.
 
         Notes
         -----
@@ -2211,10 +2190,12 @@ class System(object):
         self.add_response(name=name, type_='con', lower=lower, upper=upper,
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
                           ref0=ref0, indices=indices, linear=linear,
-                          rhs_group=rhs_group)
+                          parallel_deriv_color=parallel_deriv_color,
+                          vectorize_derivs=vectorize_derivs)
 
     def add_objective(self, name, ref=None, ref0=None, index=None,
-                      adder=None, scaler=None, rhs_group=None):
+                      adder=None, scaler=None, parallel_deriv_color=None,
+                      vectorize_derivs=False):
         r"""
         Add a response variable to this system.
 
@@ -2236,9 +2217,11 @@ class System(object):
         scaler : float or ndarray, optional
             value to multiply the model value to get the scaled value. Scaler
             is second in precedence.
-        rhs_group : string
+        parallel_deriv_color : string
             If specified, this design var will be grouped for parallel derivative
-            calculations with other variables sharing the same rhs_group.
+            calculations with other variables sharing the same parallel_deriv_color.
+        vectorize_derivs : bool
+            If True, vectorize derivative calculations.
 
         Notes
         -----
@@ -2268,9 +2251,11 @@ class System(object):
         if index is not None and not isinstance(index, int):
             raise TypeError('If specified, index must be an int.')
         self.add_response(name, type_='obj', scaler=scaler, adder=adder,
-                          ref=ref, ref0=ref0, index=index, rhs_group=rhs_group)
+                          ref=ref, ref0=ref0, index=index,
+                          parallel_deriv_color=parallel_deriv_color,
+                          vectorize_derivs=vectorize_derivs)
 
-    def get_design_vars(self, recurse=True):
+    def get_design_vars(self, recurse=True, get_sizes=True):
         """
         Get the DesignVariable settings from this system.
 
@@ -2282,6 +2267,8 @@ class System(object):
         recurse : bool
             If True, recurse through the subsystems and return the path of
             all design vars relative to the this system.
+        get_sizes : bool, optional
+            If True, compute the size of each response.
 
         Returns
         -------
@@ -2294,31 +2281,33 @@ class System(object):
 
         # Human readable error message during Driver setup.
         try:
-            out = {pro2abs[name][0]: data for name, data in iteritems(self._design_vars)}
+            out = OrderedDict((pro2abs[name][0], data) for name, data in
+                              iteritems(self._design_vars))
         except KeyError as err:
             msg = "Output not found for design variable {0} in system '{1}'."
             raise RuntimeError(msg.format(str(err), self.pathname))
 
-        # Size them all
-        iproc = self.comm.rank
-        for name, data in iteritems(out):
-            if 'size' not in data:
-                data['size'] = \
-                    self._var_sizes['output'][iproc,
-                                              self._var_allprocs_abs2idx['output'][name]]
+        if get_sizes:
+            # Size them all
+            sizes = self._var_sizes['nonlinear']['output']
+            abs2idx = self._var_allprocs_abs2idx['nonlinear']['output']
+            for name in out:
+                if 'size' not in out[name]:
+                    out[name]['size'] = sizes[self._owning_rank['output'][name], abs2idx[name]]
 
         if recurse:
             for subsys in self._subsystems_myproc:
-                out.update(subsys.get_design_vars(recurse=recurse))
+                out.update(subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes))
 
             if self.comm.size > 1 and self._subsystems_allprocs:
-                for rank, all_out in enumerate(self.comm.allgather(out)):
-                    if rank != iproc:
-                        out.update(all_out)
+                allouts = self.comm.allgather(out)
+                out = OrderedDict()
+                for rank, all_out in enumerate(allouts):
+                    out.update(all_out)
 
         return out
 
-    def get_responses(self, recurse=True):
+    def get_responses(self, recurse=True, get_sizes=True):
         """
         Get the response variable settings from this system.
 
@@ -2330,6 +2319,8 @@ class System(object):
         recurse : bool, optional
             If True, recurse through the subsystems and return the path of
             all responses relative to the this system.
+        get_sizes : bool, optional
+            If True, compute the size of each response.
 
         Returns
         -------
@@ -2342,27 +2333,29 @@ class System(object):
 
         # Human readable error message during Driver setup.
         try:
-            out = {prom2abs[name][0]: data for name, data in iteritems(self._responses)}
+            out = OrderedDict((prom2abs[name][0], data) for name, data in
+                              iteritems(self._responses))
         except KeyError as err:
             msg = "Output not found for response {0} in system '{1}'."
             raise RuntimeError(msg.format(str(err), self.pathname))
 
-        # Size them all
-        iproc = self.comm.rank
-        for name in out:
-            if 'size' not in out[name]:
-                out[name]['size'] = \
-                    self._var_sizes['output'][iproc,
-                                              self._var_allprocs_abs2idx['output'][name]]
+        if get_sizes:
+            # Size them all
+            sizes = self._var_sizes['nonlinear']['output']
+            abs2idx = self._var_allprocs_abs2idx['nonlinear']['output']
+            for name in out:
+                if 'size' not in out[name]:
+                    out[name]['size'] = sizes[self._owning_rank['output'][name], abs2idx[name]]
 
         if recurse:
             for subsys in self._subsystems_myproc:
-                out.update(subsys.get_responses(recurse=recurse))
+                out.update(subsys.get_responses(recurse=recurse, get_sizes=get_sizes))
 
             if self.comm.size > 1 and self._subsystems_allprocs:
-                for rank, all_out in enumerate(self.comm.allgather(out)):
-                    if rank != iproc:
-                        out.update(all_out)
+                all_outs = self.comm.allgather(out)
+                out = OrderedDict()
+                for rank, all_out in enumerate(all_outs):
+                    out.update(all_out)
 
         return out
 
@@ -2654,7 +2647,7 @@ class System(object):
             If None, all are in the scope.
         """
         with self._scaled_context_all():
-            self._apply_linear(vec_names, mode, scope_out, scope_in)
+            self._apply_linear(vec_names, ContainsAll(), mode, scope_out, scope_in)
 
     def run_solve_linear(self, vec_names, mode):
         """
@@ -2679,7 +2672,7 @@ class System(object):
             absolute error.
         """
         with self._scaled_context_all():
-            result = self._solve_linear(vec_names, mode)
+            result = self._solve_linear(vec_names, mode, ContainsAll())
 
         return result
 
@@ -2735,7 +2728,7 @@ class System(object):
         """
         pass
 
-    def _apply_linear(self, vec_names, mode, var_inds=None):
+    def _apply_linear(self, vec_names, rel_systems, mode, var_inds=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -2743,15 +2736,17 @@ class System(object):
         ----------
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
         mode : str
             'fwd' or 'rev'.
         var_inds : [int, int, int, int] or None
             ranges of variable IDs involved in this matrix-vector product.
             The ordering is [lb1, ub1, lb2, ub2].
         """
-        pass
+        raise NotImplementedError("_apply_linear has not been overridden")
 
-    def _solve_linear(self, vec_names, mode):
+    def _solve_linear(self, vec_names, mode, rel_systems):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -2761,6 +2756,8 @@ class System(object):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
 
         Returns
         -------
@@ -2783,43 +2780,6 @@ class System(object):
             Flag indicating if the nonlinear solver should be linearized.
         do_ln : boolean
             Flag indicating if the linear solver should be linearized.
-        """
-        pass
-
-    def initialize_processors(self):
-        """
-        Run after repartitioning/rebalancing. (Optional user-defined method).
-
-        Available attributes:
-            name
-            pathname
-            comm
-            metadata (local and global)
-        """
-        pass
-
-    def initialize_variables(self):
-        """
-        Declare inputs and outputs. (Required method for components).
-
-        Available attributes:
-            name
-            pathname
-            comm
-            metadata (local and global)
-        """
-        pass
-
-    def initialize_partials(self):
-        """
-        Declare Jacobian structure/approximations. (Optional method for components).
-
-        Available attributes:
-            name
-            pathname
-            comm
-            metadata (local and global)
-            variable names
         """
         pass
 
@@ -2849,6 +2809,9 @@ class System(object):
         recurse : boolean
             Flag indicating if the recorder should be added to all the subsystems.
         """
+        if MPI:
+            raise RuntimeError(
+                "Recording of Systems when running parallel code is not supported yet")
         for s in self.system_iter(include_self=True, recurse=recurse):
             s._rec_mgr.append(recorder)
 
@@ -2860,7 +2823,21 @@ class System(object):
         self._rec_mgr.record_iteration(self, metadata)
         self.iter_count += 1
 
+    def is_active(self):
+        """
+        Determine if the system is active on this rank.
 
-def _get_vec_names(voi_dict):
-    return set(voi for voi, data in iteritems(voi_dict)
-               if data['rhs_group'] is not None)
+        Returns
+        -------
+        bool
+            If running under MPI, returns True if this `System` has a valid
+            communicator. Always returns True if not running under MPI.
+        """
+        return MPI is None or not (self.comm is None or
+                                   self.comm == MPI.COMM_NULL)
+
+    def _clear_iprint(self):
+        """
+        Clear out the iprint stack from the solvers.
+        """
+        self.nonlinear_solver._solver_info.clear()

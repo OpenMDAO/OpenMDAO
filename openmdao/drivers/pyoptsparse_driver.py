@@ -11,6 +11,9 @@ from collections import OrderedDict
 import traceback
 
 from six import iteritems
+
+import numpy as np
+
 from pyoptsparse import Optimization
 
 from openmdao.core.analysis_error import AnalysisError
@@ -182,9 +185,11 @@ class pyOptSparseDriver(Driver):
             Failure flag; True if failed to converge, False is successful.
         """
         problem = self._problem
-        model = self._problem.model
+        model = problem.model
+        relevant = model._relevant
         self.pyopt_solution = None
         self.iter_count = 0
+        fwd = problem._mode == 'fwd'
 
         # Metadata Setup
         self.metadata = create_local_meta(self.options['optimizer'])
@@ -220,8 +225,7 @@ class pyOptSparseDriver(Driver):
         con_meta = self._cons
         lcons = [key for (key, con) in iteritems(con_meta) if con['linear'] is True]
         if len(lcons) > 0:
-            _lin_jacs = problem._compute_total_derivs(of=lcons, wrt=indep_list,
-                                                      return_format='dict')
+            _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list, return_format='dict')
 
         # Add all equality constraints
         self.active_tols = {}
@@ -230,13 +234,18 @@ class pyOptSparseDriver(Driver):
         for name, meta in iteritems(eqcons):
             size = meta['size']
             lower = upper = meta['equals']
+            if fwd:
+                wrt = [v for v in indep_list if name in relevant[v]]
+            else:
+                rels = relevant[name]
+                wrt = [v for v in indep_list if v in rels]
 
             if meta['linear']:
                 opt_prob.addConGroup(name, size, lower=lower, upper=upper,
-                                     linear=True,
+                                     linear=True, wrt=wrt,
                                      jac=_lin_jacs[name])
             else:
-                opt_prob.addConGroup(name, size, lower=lower, upper=upper)
+                opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrt)
                 self._quantities.append(name)
 
         # Add all inequality constraints
@@ -249,12 +258,18 @@ class pyOptSparseDriver(Driver):
             lower = meta['lower']
             upper = meta['upper']
 
+            if fwd:
+                wrt = [v for v in indep_list if name in relevant[v]]
+            else:
+                rels = relevant[name]
+                wrt = [v for v in indep_list if v in rels]
+
             if meta['linear']:
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower,
-                                     linear=True,
+                                     linear=True, wrt=wrt,
                                      jac=_lin_jacs[name])
             else:
-                opt_prob.addConGroup(name, size, upper=upper, lower=lower)
+                opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt)
                 self._quantities.append(name)
 
         # Instantiate the requested optimizer
@@ -375,6 +390,7 @@ class pyOptSparseDriver(Driver):
 
                 # Let the optimizer try to handle the error
                 except AnalysisError:
+                    model._clear_iprint()
                     fail = 1
 
                 func_dict = self.get_objective_values()
@@ -430,12 +446,13 @@ class pyOptSparseDriver(Driver):
         try:
 
             try:
-                sens_dict = self._compute_total_derivs(of=self._quantities,
-                                                       wrt=self._indep_list,
-                                                       return_format='dict')
+                sens_dict = self._compute_totals(of=self._quantities,
+                                                 wrt=self._indep_list,
+                                                 return_format='dict')
 
             # Let the optimizer try to handle the error
             except AnalysisError:
+                self._problem.model._clear_iprint()
                 fail = 1
 
                 # We need to cobble together a sens_dict of the correct size.

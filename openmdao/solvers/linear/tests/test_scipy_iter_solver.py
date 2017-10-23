@@ -113,7 +113,7 @@ class TestScipyIterativeSolver(LinearSolverTests.LinearSolverTestCase):
 
         d_residuals.set_const(1.0)
         d_outputs.set_const(0.0)
-        g1._solve_linear(['linear'], 'fwd')
+        g1.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
         # The empty first entry in _data is due to the dummy
@@ -127,7 +127,7 @@ class TestScipyIterativeSolver(LinearSolverTests.LinearSolverTestCase):
         d_outputs.set_const(1.0)
         d_residuals.set_const(0.0)
         g1.linear_solver._linearize()
-        g1._solve_linear(['linear'], 'rev')
+        g1.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
         assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
@@ -162,6 +162,9 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
     def test_feature_simple(self):
         """Tests feature for adding a Scipy GMRES solver and calculating the
         derivatives."""
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver
+        from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
+
         # Tests derivatives on a simple comp that defines compute_jacvec.
         prob = Problem()
         model = prob.model = Group()
@@ -180,10 +183,17 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
         of = ['area']
         wrt = ['length']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['area', 'length'][0][0], 2.0, 1e-6)
 
     def test_specify_solver(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, \
+             NonlinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -210,11 +220,16 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
     def test_feature_maxiter(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, NonlinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -242,11 +257,16 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 0.0, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 0.0, .00001)
 
     def test_feature_atol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, NonlinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -274,11 +294,17 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001055699, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448533563, .00001)
 
     def test_specify_precon(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, NewtonSolver, \
+             LinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()

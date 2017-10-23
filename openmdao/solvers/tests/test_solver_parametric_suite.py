@@ -33,6 +33,7 @@ class ImplComp4Test(ImplicitComponent):
 
         #self.declare_partials('y', 'x', val=-np.eye(2))
         #self.declare_partials('y', 'y', val=self.mtx)
+        self.declare_partials('*', '*')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         residuals['y'] = self.mtx.dot(outputs['y']) - inputs['x']

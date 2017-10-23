@@ -47,15 +47,8 @@ class TestGetSetVariables(unittest.TestCase):
         outputs['c.y'] = 5.0
         self.assertEqual(outputs['c.y'], 5.0)
 
-        with g.jacobian_context() as jac:
-
-            # d(output)/d(input)
-            jac['c.y', 'c.x'] = 5.0
-            self.assertEqual(jac['c.y', 'c.x'], 5.0)
-
-            # d(output)/d(output)
-            jac['c.y', 'c.y'] = 5.0
-            self.assertEqual(jac['c.y', 'c.y'], 5.0)
+        # Removed part of test where we set values into the jacobian willy-nilly. You can only set
+        # declared values now.
 
     def test_with_promotion(self):
         """
@@ -103,17 +96,8 @@ class TestGetSetVariables(unittest.TestCase):
         outputs['y'] = 5.0
         self.assertEqual(outputs['y'], 5.0)
 
-        with g.jacobian_context() as jac:
-
-            # d(outputs)/d(inputs)
-            jac['c2.y', 'c2.x'] = 5.0
-            self.assertEqual(jac['c2.y', 'c2.x'], 5.0)
-
-            # d(outputs)/d(outputs)
-            jac['c2.y', 'c2.y'] = 5.0
-            self.assertEqual(jac['c2.y', 'c2.y'], 5.0)
-            jac['y', 'y'] = 5.0
-            self.assertEqual(jac['y', 'y'], 5.0)
+        # Removed part of test where we set values into the jacobian willy-nilly. You can only set
+        # declared values now.
 
     def test_no_promotion_errors(self):
         """

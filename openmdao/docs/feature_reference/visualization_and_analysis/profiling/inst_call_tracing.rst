@@ -4,70 +4,63 @@ Instance-based Call Tracing
 
 The `icalltrace` command can be used to print a trace of each instance method call.  For example:
 
-.. code::
+.. code-block:: none
 
    icalltrace <your_python_script_here>
 
 
 Whenever a method is called that matches the search criteria, the pathname of the object instance, if
 available, and its class and an instance ID, along with the method name, will be written to the
-console, indented based on its location in the call stack.  The current call count for the method
-is also displayed.   For example:
+console, indented based on its location in the call stack. For example:
 
 
-::
+.. code-block:: none
 
-   Group#1.Group.__init__ (1)
-      Group#1.System.__init__ (1)
-         DictionaryJacobian#1.Jacobian.__init__ (1)
-         Group#1().System.initialize (1)
-      NonLinearRunOnce#1.Solver.__init__ (1)
-         NonLinearRunOnce#1.Solver._declare_options (1)
-      LinearRunOnce#1.Solver.__init__ (1)
-         LinearRunOnce#1.Solver._declare_options (1)
-   Problem#1.Problem.__init__ (1)
-      Driver#1.Driver.__init__ (1)
-   IndepVarComp#1.IndepVarComp.__init__ (1)
-      IndepVarComp#1.ExplicitComponent.__init__ (1)
-         IndepVarComp#1.Component.__init__ (1)
-            IndepVarComp#1.System.__init__ (1)
-               DictionaryJacobian#2.Jacobian.__init__ (1)
-               IndepVarComp#1().System.initialize (1)
-   ExecComp#1.ExecComp.__init__ (1)
-      ExecComp#1.ExplicitComponent.__init__ (1)
-         ExecComp#1.Component.__init__ (1)
-            ExecComp#1.System.__init__ (1)
-               DictionaryJacobian#3.Jacobian.__init__ (1)
-               ExecComp#1().System.initialize (1)
-   Problem#1.Problem.setup (1)
-      Group#1().System._setup (1)
-         Group#1().System._get_initial_procs (1)
-         Group#1().Group._setup_procs (1)
-            IndepVarComp#1().System.get_req_procs (1)
-            ExecComp#1().System.get_req_procs (1)
-            IndepVarComp#1().System._setup_procs (1)
-               IndepVarComp#1(indep).System.get_req_procs (1)
-            ExecComp#1().System._setup_procs (1)
-               ExecComp#1(comp1).System.get_req_procs (1)
-         Group#1().Group._setup_vars (1)
-            Group#1().System._setup_vars (1)
-            IndepVarComp#1(indep).Component._setup_vars (1)
-               IndepVarComp#1(indep).System._setup_vars (1)
-            ExecComp#1(comp1).Component._setup_vars (1)
-               ExecComp#1(comp1).System._setup_vars (1)
-         Group#1().System._get_initial_var_indices (1)
-         Group#1().Group._setup_var_index_ranges (1)
-            Group#1().System._setup_var_index_ranges (1)
-            IndepVarComp#1(indep).System._setup_var_index_ranges (1)
-            ExecComp#1(comp1).System._setup_var_index_ranges (1)
-         Group#1().Group._setup_var_data (1)
-            Group#1().System._setup_var_data (1)
-            IndepVarComp#1(indep).Component._setup_var_data (1)
-               IndepVarComp#1(indep).System._setup_var_data (1)
-            ExecComp#1(comp1).Component._setup_var_data (1)
-               ExecComp#1(comp1).System._setup_var_data (1)
-            IndepVarComp#1(indep).System._get_maps (1)
-            ExecComp#1(comp1).System._get_maps (1)
+    Problem#1.Problem.__init__
+        Group#1.Group.__init__
+            Group#1.System.__init__
+                DictionaryJacobian#1.Jacobian.__init__
+                Group#1().System.initialize
+            NonLinearRunOnce#1.Solver.__init__
+                NonLinearRunOnce#1.Solver._declare_options
+            LinearRunOnce#1.LinearSolver.__init__
+                LinearRunOnce#1.Solver.__init__
+                    LinearRunOnce#1.Solver._declare_options
+        Driver#1.Driver.__init__
+    IndepVarComp#1.IndepVarComp.__init__
+        IndepVarComp#1.ExplicitComponent.__init__
+            IndepVarComp#1.Component.__init__
+                IndepVarComp#1.System.__init__
+                    DictionaryJacobian#2.Jacobian.__init__
+                    IndepVarComp#1().System.initialize
+    Propulsor#1.Group.__init__
+        Propulsor#1.System.__init__
+            DictionaryJacobian#3.Jacobian.__init__
+            Propulsor#1().System.initialize
+        NonLinearRunOnce#2.Solver.__init__
+            NonLinearRunOnce#2.Solver._declare_options
+        LinearRunOnce#2.LinearSolver.__init__
+            LinearRunOnce#2.Solver.__init__
+                LinearRunOnce#2.Solver._declare_options
+    Problem#1.Problem.set_solver_print
+        Group#1().System._set_solver_print
+            LinearRunOnce#2.Solver._set_solver_print
+            NonLinearRunOnce#2.Solver._set_solver_print
+    Problem#1.Problem.setup
+        Group#1().System._setup
+            Group#1().System._get_initial_procs
+            Group#1().Group._setup_procs
+                IndepVarComp#1().System._setup_procs
+                Propulsor#1().Group._setup_procs
+                    FlightConditions#1.Group.__init__
+                        FlightConditions#1.System.__init__
+                            DictionaryJacobian#4.Jacobian.__init__
+                            FlightConditions#1().FlightConditions.initialize
+                        NonLinearRunOnce#3.Solver.__init__
+                            NonLinearRunOnce#3.Solver._declare_options
+                        LinearRunOnce#3.LinearSolver.__init__
+                            LinearRunOnce#3.Solver.__init__
+                                LinearRunOnce#3.Solver._declare_options
 
    ...
 
@@ -76,3 +69,64 @@ Note that we must always include the class name and instance ID, even when the i
 attribute, because there are times early in execution where either the pathname attriubute doesn't exist
 yet, as in the beginning of `__init__` method, or pathname exists but still has the default value of ""
 instead of its eventual value, as in the `_setup_procs` method.
+
+For more verbose output, which includes values of function locals and return values, as well as
+the number of times a function has been called, use the `-v` arg. For example:
+
+.. code-block:: none
+
+   icalltrace -v <your_python_script_here>
+
+
+Which will result in output that looks like this:
+
+.. code-block:: none
+
+    Problem#1.Problem.__init__ (1)
+      comm=None
+      model=None
+      root=None
+      self=<openmdao.core.problem.Problem object>
+      use_ref_vector=True
+        Group#1.Group.__init__ (1)
+          kwargs={}
+          self=<openmdao.core.group.Group object>
+            Group#1.System.__init__ (1)
+              kwargs={}
+              self=<openmdao.core.group.Group object>
+                DictionaryJacobian#1.Jacobian.__init__ (1)
+                  kwargs={}
+                  self=<openmdao.jacobians.dictionary_jacobian.DictionaryJacobian object>
+                <-- DictionaryJacobian#1.Jacobian.__init__
+                Group#1().System.initialize (1)
+                  self=<openmdao.core.group.Group object>
+                <-- Group#1().System.initialize
+            <-- Group#1().System.__init__
+            NonLinearRunOnce#1.Solver.__init__ (1)
+              kwargs={}
+              self=NL: RUNONCE
+                NonLinearRunOnce#1.Solver._declare_options (1)
+                  self=NL: RUNONCE
+                <-- NonLinearRunOnce#1.Solver._declare_options
+            <-- NonLinearRunOnce#1.Solver.__init__
+            LinearRunOnce#1.LinearSolver.__init__ (1)
+              kwargs={}
+              self=LN: RUNONCE
+                LinearRunOnce#1.Solver.__init__ (1)
+                  kwargs={}
+                  self=LN: RUNONCE
+                    LinearRunOnce#1.Solver._declare_options (1)
+                      self=LN: RUNONCE
+                    <-- LinearRunOnce#1.Solver._declare_options
+                <-- LinearRunOnce#1.Solver.__init__
+            <-- LinearRunOnce#1.LinearSolver.__init__
+        <-- Group#1().Group.__init__
+        Driver#1.Driver.__init__ (1)
+          self=<openmdao.core.driver.Driver object>
+        <-- Driver#1.Driver.__init__
+    <-- Problem#1.Problem.__init__
+
+    ...
+
+
+The `-h` command line option will display all of the available command line options.

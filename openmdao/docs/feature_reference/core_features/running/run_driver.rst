@@ -1,4 +1,4 @@
-. _setup-and-run:
+.. _setup-and-run:
 
 ************
 Run a Driver

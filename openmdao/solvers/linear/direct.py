@@ -30,10 +30,10 @@ class DirectSolver(LinearSolver):
         system = self._system
 
         if system._owns_assembled_jac or system._views_assembled_jac:
-            ranges = system._jacobian._view_ranges[system.pathname]
             mtx = system._jacobian._int_mtx
             # Perform dense or sparse lu factorization
             if isinstance(mtx, DenseMatrix):
+                ranges = system._jacobian._view_ranges[system.pathname]
                 matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
                 np.set_printoptions(precision=3)
                 self._lup = scipy.linalg.lu_factor(matrix)
@@ -80,9 +80,8 @@ class DirectSolver(LinearSolver):
         """
         vec_name = 'linear'
         system = self._system
-        mode = self._mode
 
-        # assign x and b vectors based on fwd mode
+        # assign x and b vectors based on mode
         x_vec = system._vectors['output'][vec_name]
         b_vec = system._vectors['residual'][vec_name]
 
@@ -91,12 +90,12 @@ class DirectSolver(LinearSolver):
 
         # apply linear
         scope_out, scope_in = system._get_scope()
-        system._apply_linear([vec_name], self._mode, scope_out, scope_in)
+        system._apply_linear([vec_name], self._rel_systems, 'fwd', scope_out, scope_in)
 
         # put new value in out_vec
         b_vec.get_data(out_vec)
 
-    def solve(self, vec_names, mode):
+    def solve(self, vec_names, mode, rel_systems=None):
         """
         Run the solver.
 
@@ -116,24 +115,28 @@ class DirectSolver(LinearSolver):
         float
             relative error.
         """
+        if len(vec_names) > 1:
+            raise RuntimeError("DirectSolvers with multiple right-hand-sides are not supported.")
+
         self._vec_names = vec_names
-        self._mode = mode
 
         system = self._system
 
         with Recording('DirectSolver', 0, self) as rec:
-            for vec_name in self._vec_names:
+            for vec_name in vec_names:
+                if vec_name not in system._rel_vec_names:
+                    continue
                 self._vec_name = vec_name
                 d_residuals = system._vectors['residual'][vec_name]
                 d_outputs = system._vectors['output'][vec_name]
 
                 # assign x and b vectors based on mode
-                if self._mode == 'fwd':
+                if mode == 'fwd':
                     x_vec = d_outputs
                     b_vec = d_residuals
                     trans_lu = 0
                     trans_splu = 'N'
-                elif self._mode == 'rev':
+                else:  # rev
                     x_vec = d_residuals
                     b_vec = d_outputs
                     trans_lu = 1

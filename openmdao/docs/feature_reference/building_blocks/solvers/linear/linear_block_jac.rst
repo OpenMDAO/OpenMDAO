@@ -16,10 +16,18 @@ Here, we calculate the total derivatives across the Sellar system.
 .. embed-test::
     openmdao.solvers.linear.tests.test_linear_block_jac.TestBJacSolverFeature.test_specify_solver
 
-Options
--------
+LinearBlockJac Options
+----------------------
 
--  maxiter
+.. embed-options::
+    openmdao.solvers.linear.linear_block_jac
+    LinearBlockJac
+    options
+
+LinearBlockJac Option Examples
+------------------------------
+
+**maxiter**
 
   This lets you specify the maximum number of Gauss Seidel iterations to apply. In this example, we
   cut it back from the default (10) to 5 so that it terminates a few iterations earlier and doesn't
@@ -29,7 +37,7 @@ Options
   .. embed-test::
       openmdao.solvers.linear.tests.test_linear_block_jac.TestBJacSolverFeature.test_feature_maxiter
 
-- atol
+**atol**
 
   Here, we set the absolute tolerance to a looser value that will trigger an earlier termination. After
   each iteration, the norm of the linear residuals is calculated by calling `apply_linear`. If this norm value is lower than the absolute
@@ -38,7 +46,7 @@ Options
   .. embed-test::
       openmdao.solvers.linear.tests.test_linear_block_jac.TestBJacSolverFeature.test_feature_atol
 
-- rtol
+**rtol**
 
   Here, we set the relative tolerance to a looser value that will trigger an earlier termination. After
   each iteration, the norm of the linear residuals is calculated by calling `apply_linear`. If the ratio of the currently calculated norm to the

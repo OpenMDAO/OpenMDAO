@@ -20,6 +20,7 @@ from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, N
 from openmdao.core.problem import Problem
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.utils.record_util import format_iteration_coordinate
+from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.web_recorder import format_version
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
@@ -51,7 +52,7 @@ def run_driver(problem):
 class TestServerRecorder(unittest.TestCase):
     _endpoint_base = 'http://www.openmdao.org/visualization/case'
     _default_case_id = '123456'
-    _accepted_token = 'DU89SZPIIZ'
+    _accepted_token = 'test'
     recorded_metadata = False
     recorded_driver_iteration = False
     recorded_global_iteration = False
@@ -66,8 +67,9 @@ class TestServerRecorder(unittest.TestCase):
     system_iterations = None
     solver_metadata = None
     solver_iterations = None
-
+    update_header = False
     def setUp(self):
+        recording_iteration.stack = []  # reset to avoid problems with earlier tests
         super(TestServerRecorder, self).setUp()
 
     def assert_array_close(self, test_val, comp_set):
@@ -76,7 +78,7 @@ class TestServerRecorder(unittest.TestCase):
             self.assertTrue(False, 'Expected to find a value with a unique name in the comp_set,\
              but found 0 or more than 1 instead')
             return
-        np.testing.assert_almost_equal(test_val['values'], values_arr[0]['values'], decimal=5)
+        np.testing.assert_almost_equal(test_val['values'], values_arr[0]['values'], decimal=3)
 
     def setup_sellar_model(self):
         self.prob = Problem()
@@ -93,12 +95,13 @@ class TestServerRecorder(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
         self.prob.model.nonlinear_solver = NonlinearBlockGS()
+        self.prob.model.linear_solver = LinearBlockGS()
 
-        self.prob.model.add_design_var('x', lower=-100, upper=100)
-        self.prob.model.add_design_var('z', lower=-100, upper=100)
+        self.prob.model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        self.prob.model.add_design_var('x', lower=0.0, upper=10.0)
         self.prob.model.add_objective('obj')
-        self.prob.model.add_constraint('con1')
-        self.prob.model.add_constraint('con2')
+        self.prob.model.add_constraint('con1', upper=0.0)
+        self.prob.model.add_constraint('con2', upper=0.0)
 
     def setup_sellar_grouped_model(self):
         self.prob = Problem()
@@ -146,6 +149,8 @@ class TestServerRecorder(unittest.TestCase):
                json=self.check_solver_metadata)
         m.post(self._endpoint_base + '/' + self._default_case_id + '/solver_iterations',
                json=self.check_solver_iterations)
+        m.post(self._endpoint_base + '/' + '54321' + '/driver_metadata',
+               json = self.check_driver)
 
     def check_header(self, request, context):
         if request.headers['token'] == self._accepted_token:
@@ -163,6 +168,7 @@ class TestServerRecorder(unittest.TestCase):
     def check_driver(self, request, context):
         self.recorded_metadata = True
         self.driver_data = request.body
+        self.update_header = request.headers['update']
         return {'status': 'Success'}
 
     def check_driver_iteration(self, request, context):
@@ -227,6 +233,46 @@ class TestServerRecorder(unittest.TestCase):
         connections = model_data['connections_list']
         self.assertEqual(driv_id, 'Driver')
         self.assertEqual(len(connections), 11)
+
+    def test_header_with_case_id(self, m):
+        self.setup_endpoints(m)
+        recorder = WebRecorder(self._accepted_token, case_id="54321", suppress_output=True)
+
+        self.setup_sellar_model()
+
+        recorder.options['includes'] = ["p1.x"]
+        recorder.options['record_metadata'] = True
+        self.prob.driver.add_recorder(recorder)
+        self.prob.setup(check=False)
+
+        # Need this since we aren't running the model.
+        self.prob.final_setup()
+
+        self.prob.cleanup()
+        self.assertTrue(self.recorded_metadata)
+        self.recorded_metadata = False
+
+        self.assertEqual(self.update_header, 'True')
+
+    def test_header_without_case_id(self, m):
+        self.setup_endpoints(m)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
+
+        self.setup_sellar_model()
+
+        recorder.options['includes'] = ["p1.x"]
+        recorder.options['record_metadata'] = True
+        self.prob.driver.add_recorder(recorder)
+        self.prob.setup(check=False)
+
+        # Need this since we aren't running the model.
+        self.prob.final_setup()
+
+        self.prob.cleanup()
+        self.assertTrue(self.recorded_metadata)
+        self.recorded_metadata = False
+
+        self.assertEqual(self.update_header, 'False')
 
     def test_driver_doesnt_record_metadata(self, m):
         self.setup_endpoints(m)
@@ -405,15 +451,11 @@ class TestServerRecorder(unittest.TestCase):
         for r in residuals:
             self.assert_array_close(r, system_iterations['residuals'])
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_simple_driver_recording(self, m):
         self.setup_endpoints(m)
         recorder = WebRecorder(self._accepted_token, suppress_output=True)
-
-        if OPT is None:
-            raise unittest.SkipTest("pyoptsparse is not installed")
-
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
 
         prob = Problem()
         model = prob.model = Group()
@@ -674,8 +716,8 @@ class TestServerRecorder(unittest.TestCase):
 
         solver_iteration = json.loads(self.solver_iterations)
 
-        expected_abs_error = 5.041402548755789e-06
-        expected_rel_error = 1.3876088080160474e-07
+        expected_abs_error = 2.1677810075550974e-10
+        expected_rel_error = 5.966657077752565e-12
         self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
         self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
         self.assertEqual(solver_iteration['solver_residuals'], [])
@@ -906,16 +948,13 @@ class TestServerRecorder(unittest.TestCase):
         for o in expected_solver_output:
             self.assert_array_close(o, solver_iteration['solver_output'])
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_record_driver_system_solver(self, m):
         # Test what happens when all three types are recorded:
         #    Driver, System, and Solver
         self.setup_endpoints(m)
         recorder = WebRecorder(self._accepted_token, suppress_output=True)
-        if OPT is None:
-            raise unittest.SkipTest("pyoptsparse is not installed")
-
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
 
         self.setup_sellar_grouped_model()
 
@@ -986,7 +1025,7 @@ class TestServerRecorder(unittest.TestCase):
 
         # System recording test
         expected_inputs = []
-        expected_outputs = [{'name': 'pz.z', 'values': [1.97764, -1.13287e-15]}]
+        expected_outputs = [{'name': 'pz.z', 'values': [1.978467, -1.6464114e-13]}]
         expected_residuals = [{'name': 'pz.z', 'values': [0.0, 0.0]}]
 
         system_iteration = json.loads(self.system_iterations)
@@ -1001,10 +1040,10 @@ class TestServerRecorder(unittest.TestCase):
 
         # Solver recording test
         expected_abs_error = 3.90598e-11
-        expected_rel_error = 1.037105199e-6
+        expected_rel_error = 2.0701941e-06
 
         expected_solver_output = [
-            {'name': 'mda.d2.y2', 'values': [3.75527777]},
+            {'name': 'mda.d2.y2', 'values': [3.75610598]},
             {'name': 'mda.d1.y1', 'values': [3.16]}
         ]
 
@@ -1015,8 +1054,8 @@ class TestServerRecorder(unittest.TestCase):
 
         solver_iteration = json.loads(self.solver_iterations)
 
-        self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
-        self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
+        np.testing.assert_almost_equal(expected_abs_error, solver_iteration['abs_err'], decimal=5)
+        np.testing.assert_almost_equal(expected_rel_error, solver_iteration['rel_err'], decimal=5)
 
         for o in expected_solver_output:
             self.assert_array_close(o, solver_iteration['solver_output'])
