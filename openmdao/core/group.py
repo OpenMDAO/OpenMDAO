@@ -3,6 +3,7 @@ from __future__ import division
 
 from collections import Iterable, Counter, OrderedDict, defaultdict
 from itertools import product, chain
+from numbers import Number
 import warnings
 
 from six import iteritems, string_types, itervalues
@@ -1190,6 +1191,16 @@ class Group(System):
             subsystems_allprocs = self._subsystems_allprocs
 
         subsystems_allprocs.append(subsys)
+
+        if not isinstance(min_procs, int) or min_procs < 1:
+            raise TypeError("%s: min_procs must be an int > 0 but (%s) was given." %
+                            (self.name, min_procs))
+        if max_procs is not None and (not isinstance(max_procs, int) or max_procs < min_procs):
+            raise TypeError("%s: max_procs must be None or an int >= min_procs but (%s) was given."
+                            % (self.name, max_procs))
+        if isinstance(proc_weight, Number) and proc_weight < 0:
+            raise TypeError("%s: proc_weight must be a float > 0. but (%s) was given." %
+                            (self.name, proc_weight))
 
         self._proc_info[name] = (min_procs, max_procs, proc_weight)
 

@@ -36,6 +36,8 @@ class ProcAllocator(object):
         ----------
         proc_info : list of (min_procs, max_procs, weight)
             Information used to determine MPI process allocation to subsystems.
+        nsubs : int
+            Number of subsystems.
         comm : MPI.Comm or <FakeComm>
             communicator of the owning system.
 
