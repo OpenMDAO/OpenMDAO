@@ -1,5 +1,5 @@
-.. _advanced_guide_partial_derivs_implicit:
+.. _advanced_guide_derivs_coupled_systems:
 
 ****************************************************
-Defining Partial Derivatives on Implicit Components
+Computing Total Derivatives of Coupled Models
 ****************************************************

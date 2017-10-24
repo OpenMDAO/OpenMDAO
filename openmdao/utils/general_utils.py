@@ -248,7 +248,6 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
     """
     # Convert adder to ndarray/float as necessary
     if isinstance(values, np.ndarray):
-        values = values
         if flatten:
             values = values.flatten()
     elif not isinstance(values, string_types) \

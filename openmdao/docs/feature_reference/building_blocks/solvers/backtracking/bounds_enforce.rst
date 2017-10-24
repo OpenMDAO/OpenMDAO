@@ -1,3 +1,4 @@
+.. _feature_bounds_enforce:
 
 **************
 Bounds Enforce

@@ -392,8 +392,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                 sorted(['root', 'mda.d1', 'pz'])
         )
         assert_rel_error(
-                        self, cr.system_metadata['root'][('output', 'phys')]['nonlinear'][1]._views_flat['pz.z'],
-                        [2.0, 2.0], 1.0e-3)
+            self, cr.system_metadata['pz']['output']['nonlinear']['phys'][0][1], [2.0, 2.0], 1.0e-3)
 
     def test_reading_solver_metadata(self):
         self.setup_sellar_model()

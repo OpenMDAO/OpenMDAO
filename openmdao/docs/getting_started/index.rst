@@ -8,11 +8,11 @@ Installation Instructions:
 
 Use :code:`git` to clone the repository:
 
-:code:`git clone http://github.com/OpenMDAO/blue`
+:code:`git clone http://github.com/OpenMDAO/OpenMDAO`
 
 Use :code:`pip` to install openmdao locally:
 
-:code:`cd blue`
+:code:`cd OpenMDAO`
 
 :code:`pip install .`
 

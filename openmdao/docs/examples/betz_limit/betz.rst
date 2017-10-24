@@ -15,4 +15,5 @@ a simple actuator disk model for a wind-turbine.
 
 .. embed-test::
     openmdao.test_suite.test_examples.test_betz_limit.TestBetzLimit.test_betz
+    :no-split:
 

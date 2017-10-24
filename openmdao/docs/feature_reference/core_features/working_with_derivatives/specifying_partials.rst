@@ -1,3 +1,5 @@
+.. _feature_specify_partials:
+
 ******************************
 Specifying Partial Derivatives
 ******************************

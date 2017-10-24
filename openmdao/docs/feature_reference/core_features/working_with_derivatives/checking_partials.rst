@@ -1,3 +1,5 @@
+.. _feature_check_partials:
+
 ****************************
 Checking Partial Derivatives
 ****************************

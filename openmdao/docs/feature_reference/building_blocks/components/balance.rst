@@ -1,5 +1,7 @@
 .. index:: BalanceComp Example
 
+.. _balancecomp_feature:
+
 *****************
 Balance Component
 *****************

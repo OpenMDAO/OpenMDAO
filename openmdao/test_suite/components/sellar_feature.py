@@ -221,3 +221,5 @@ class DoubleSellar(Group):
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
         self.nonlinear_solver = NewtonSolver()
         self.linear_solver = DirectSolver()
+
+
