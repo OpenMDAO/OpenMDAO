@@ -16,7 +16,7 @@ from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
 from openmdao.core.component import Component
-from openmdao.proc_allocators.default_allocator import DefaultAllocator
+from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
@@ -149,8 +149,17 @@ class Group(System):
         proc_info = [self._proc_info[s.name] for s in self._subsystems_allprocs]
 
         # Call the load balancing algorithm
-        sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(
-            proc_info, len(self._subsystems_allprocs), comm)
+        try:
+            sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(
+                proc_info, len(self._subsystems_allprocs), comm)
+        except ProcAllocationError as err:
+            subs = self._subsystems_allprocs
+            if err.sub_inds is None:
+                raise RuntimeError("%s: %s" % (self.pathname, err.msg))
+            else:
+                raise RuntimeError("%s: MPI process allocation failed: %s for the following "
+                                   "subsystems: %s" % (self.pathname, err.msg,
+                                                       [subs[i].name for i in err.sub_inds]))
 
         # Define local subsystems
         self._subsystems_myproc = [self._subsystems_allprocs[ind]
