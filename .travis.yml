@@ -69,13 +69,13 @@ install:
 - pip install git+https://github.com/OpenMDAO/testflo.git
 - pip install coverage
 - pip install coveralls
-- pip install -e .
+- pip install .
 
 script:
 # make docs first
 - cd openmdao/docs;
 - make all
-- cd ../..
+# - cd ../.. # run the docs from down here to see if it can work without being at top level
 # run all openmdao tests
 - testflo -n 1 -m "ptest*"
 - testflo -n 1 --coverage --coverpkg openmdao
@@ -96,7 +96,7 @@ deploy:
   script:
   - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
       if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
-        cd openmdao/docs;
+        # cd openmdao/docs;
         rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/bluedocs;
       fi
     fi
