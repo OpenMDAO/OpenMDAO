@@ -43,7 +43,7 @@ class EmbedOptionsDirective(Directive):
         options = getattr(obj, attribute_name)
 
         outputs = []
-        for option_name, option_data in iteritems(options._dict):
+        for option_name, option_data in sorted(iteritems(options._dict)):
             name = option_name
             default = option_data['value']
             values = option_data['values']
