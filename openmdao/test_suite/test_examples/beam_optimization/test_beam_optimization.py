@@ -32,7 +32,6 @@ class TestCase(unittest.TestCase):
 
         prob.setup()
 
-        prob.run_model()
         prob.run_driver()
 
         print(prob['inputs_comp.h'])
