@@ -31,6 +31,10 @@ The displacements vector :math:`d` is given by
 where :math:`K` is the stiffness matrix. However, in practice, we augment the linear system with Lagrange multipliers to apply the boundary constraints at the first node.
 
 Since our model contains a system of equations, we use the adjoint method to compute the gradient of the objective with respect to the beam height vector.
+The model is shown below.
+
+.. raw:: html
+    :file: n2.html
 
 Implementation: group
 ---------------------
@@ -77,6 +81,14 @@ There are 7 components that compute:
 Implementation: optimization script
 -----------------------------------
 
+Here is the optimization script:
+
 .. embed-test::
     openmdao.test_suite.test_examples.beam_optimization.test_beam_optimization.TestCase.test
     :no-split:
+
+The optimized thickness distribution looks like this:
+
+.. figure:: optimized.png
+   :align: center
+   :width: 500 px

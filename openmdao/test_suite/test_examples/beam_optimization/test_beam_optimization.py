@@ -4,8 +4,6 @@ import unittest
 
 from openmdao.devtools.testutil import assert_rel_error
 
-from openmdao.api import Problem, ScipyOptimizer, IndepVarComp, ExplicitComponent
-
 
 class TestCase(unittest.TestCase):
 
