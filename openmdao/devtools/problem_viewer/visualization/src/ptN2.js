@@ -1680,5 +1680,6 @@ var mouseOutN2;
 var mouseClickN2;
 var hasInputConn;
 var treeData, connectionList;
+modelData.tree.name = 'model'; //Change 'root' to 'model'
 var app = PtN2Diagram(document.getElementById("ptN2ContentDivId"), modelData['tree'], modelData['connections_list']);
 
