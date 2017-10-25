@@ -10,7 +10,6 @@ We use Euler--Bernoulli beam theory and assume a rectangular section.
 Background
 ----------
 
-The minimize compliance subject to a constraint on the beam volume.
 The optimization problem is
 
 .. math ::
