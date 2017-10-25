@@ -38,5 +38,4 @@ class LocalStiffnessMatrixComp(ExplicitComponent):
         
         outputs['K_local'] = 0
         for ind in range(num_elements):
-            outputs['K_local'][ind, :, :] = \
-                self.mtx[ind, :, :, ind] * inputs['I'][ind]
+            outputs['K_local'][ind, :, :] = self.mtx[ind, :, :, ind] * inputs['I'][ind]
