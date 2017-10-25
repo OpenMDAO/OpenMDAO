@@ -2,36 +2,63 @@ from __future__ import print_function
 
 import unittest
 
+from openmdao.api import Problem, Group, ExecComp
+from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, DefaultVector, \
+    ExecComp, ExplicitComponent, PETScVector, ScipyIterativeSolver, NonlinearBlockGS
 from openmdao.utils.mpi import MPI
-from openmdao.core.default_allocator import DefaultAllocator
+
+if MPI:
+    from openmdao.api import PETScVector
+    vector_class = PETScVector
+else:
+    vector_class = DefaultVector
 
 
-@unittest.skipIf(not MPI)
+def _build_model(nsubs, min_procs=None, max_procs=None, weights=None):
+    p = Problem(model=ParallelGroup())
+    if min_procs is None:
+        min_procs = [1]*nsubs
+    if max_procs is None:
+        max_procs = [MPI.COMM_WORLD.size]*nsubs
+    if weights is None:
+        weights = [1.0]*nsubs
+
+    model = p.model
+    for i in range(nsubs):
+        model.add_subsystem("C%d" % i, ExecComp("y=2.0*x"),
+                            min_procs=min_procs[i], max_procs=max_procs[i], proc_weight=weights[i])
+
+    p.setup(vector_class=vector_class, check=False)
+    p.final_setup()
+
+    return p
+
+def _get_which_procs(group):
+    sub_inds = [i for i, s in enumerate(group._subsystems_allprocs)
+                if s in group._subsystems_myproc]
+    return MPI.COMM_WORLD.allgather(sub_inds)
+
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
 class ProcTestCase1(unittest.TestCase):
 
     N_PROCS = 1
 
     def test_proc(self):
-        allocator = DefaultAllocator(parallel=True)
+        p = _build_model(nsubs=4)
+        all_inds = _get_which_procs(p.model)
+        self.assertEqual(all_inds, [[0,1,2,3]])
 
-        proc_info = [
-            (1, None, 4.5),
-            (1, None, 1.0),
-            (1, None, 2.0),
-            (1, None, 4.0),
-        ]
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
+class ProcTestCase2(unittest.TestCase):
 
-        weights = [w for _, _, w in proc_info]
+    N_PROCS = 2
 
-        # normalize so that smallest weight is 1
-        norm = weights / np.sum(weights)
+    def test_proc(self):
+        p = _build_model(nsubs=4)
+        all_inds = _get_which_procs(p.model)
+        self.assertEqual(all_inds, [[0,1],[2,3]])
 
-        comm = MPI.COMM_WORLD
 
-        if comm.rank == 0:
-            print("size:", comm.size)
-        try:
-            isubs, sub_comm, sub_proc_range = allocator._divide_procs(proc_info, MPI.COMM_WORLD)
-        except Exception as err:
-            traceback.print_exc()
-        print("  %d: %s %s" % (comm.rank, isubs, sub_proc_range))
+if __name__ == "__main__":
+    from openmdao.utils.mpi import mpirun_tests
+    mpirun_tests()
