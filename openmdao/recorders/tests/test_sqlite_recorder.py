@@ -2,12 +2,11 @@
 import errno
 import os
 import sqlite3
-import time
 import unittest
 import numpy as np
 
 from shutil import rmtree
-from six import iteritems, PY2, PY3
+from six import PY2, PY3
 from tempfile import mkdtemp
 
 from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, NonlinearBlockJac,\
@@ -16,16 +15,14 @@ from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, N
             LinearBlockJac
 
 from openmdao.core.problem import Problem
-from openmdao.devtools.testutil import assert_rel_error
-from openmdao.utils.record_util import format_iteration_coordinate
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.recorders.sqlite_recorder import format_version, blob_to_array
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
     SellarDis2withDerivatives
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.recorders.tests.sqlite_recorder_test_utils import _assertDriverIterationDataRecorded, \
-    _assertSystemIterationDataRecorded, _assertSolverIterationDataRecorded
+from openmdao.recorders.tests.sqlite_recorder_test_utils import assertDriverIterationDataRecorded, \
+    assertSystemIterationDataRecorded, assertSolverIterationDataRecorded, assertMetadataRecorded, \
+    assertDriverMetadataRecorded
 from openmdao.recorders.tests.recorder_test_utils import run_driver
 
 try:
@@ -43,55 +40,6 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-
-def _assertMetadataRecorded(test, db_cur):
-
-    db_cur.execute("SELECT format_version FROM metadata")
-    row = db_cur.fetchone()
-
-    format_version_actual = row[0]
-    format_version_expected = format_version
-
-    # this always gets recorded
-    test.assertEqual(format_version_actual, format_version_expected)
-
-    return
-
-
-def _assertDriverMetadataRecorded(test, db_cur, expected):
-
-    db_cur.execute("SELECT model_viewer_data FROM driver_metadata")
-    row = db_cur.fetchone()
-
-    if expected is None:
-        test.assertEqual(None, row)
-        return
-
-    if PY2:
-        model_viewer_data = pickle.loads(str(row[0]))
-    if PY3:
-        model_viewer_data = pickle.loads(row[0])
-
-    test.assertTrue(isinstance(model_viewer_data, dict))
-
-    test.assertEqual(2, len(model_viewer_data))
-
-    test.assertTrue(isinstance(model_viewer_data['connections_list'], list))
-
-    test.assertEqual(expected['connections_list_length'],
-                     len(model_viewer_data['connections_list']))
-
-    test.assertEqual(expected['tree_length'], len(model_viewer_data['tree']))
-
-    tr = model_viewer_data['tree']
-    test.assertEqual(set(['name', 'type', 'subsystem_type', 'children']), set(tr.keys()))
-    test.assertEqual(expected['tree_children_length'], len(model_viewer_data['tree']['children']))
-
-    cl = model_viewer_data['connections_list']
-    for c in cl:
-        test.assertTrue(set(c.keys()).issubset(set(['src', 'tgt', 'cycle_arrows'])))
-
-    return
 
 
 class TestSqliteRecorder(unittest.TestCase):
@@ -121,13 +69,13 @@ class TestSqliteRecorder(unittest.TestCase):
     def assertDriverIterationDataRecorded(self, expected, tolerance):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
-        _assertDriverIterationDataRecorded(self, cur, expected, tolerance)
+        assertDriverIterationDataRecorded(self, cur, expected, tolerance)
         con.close()
 
     def assertSystemIterationDataRecorded(self, expected, tolerance):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
-        _assertSystemIterationDataRecorded(self, cur, expected, tolerance)
+        assertSystemIterationDataRecorded(self, cur, expected, tolerance)
         con.close()
 
     def assertSystemIterationCoordinatesRecorded(self, iteration_coordinates):
@@ -145,19 +93,19 @@ class TestSqliteRecorder(unittest.TestCase):
     def assertSolverIterationDataRecorded(self, expected, tolerance):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
-        _assertSolverIterationDataRecorded(self, cur, expected, tolerance)
+        assertSolverIterationDataRecorded(self, cur, expected, tolerance)
         con.close()
 
     def assertMetadataRecorded(self):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
-        _assertMetadataRecorded(self, cur)
+        assertMetadataRecorded(self, cur)
         con.close()
 
     def assertDriverMetadataRecorded(self, expected_driver_metadata):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
-        _assertDriverMetadataRecorded(self, cur, expected_driver_metadata)
+        assertDriverMetadataRecorded(self, cur, expected_driver_metadata)
         con.close()
 
     def assertSystemMetadataIdsRecorded(self, ids):

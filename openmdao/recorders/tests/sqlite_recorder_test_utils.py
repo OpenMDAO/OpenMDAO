@@ -1,12 +1,17 @@
-from six import iteritems
+from six import iteritems, PY2, PY3
+
+if PY2:
+    import cPickle as pickle
+if PY3:
+    import pickle
 
 import numpy as np
 
 from openmdao.utils.record_util import format_iteration_coordinate
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.recorders.sqlite_recorder import blob_to_array
+from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
 
-def _assertDriverIterationDataRecorded(test, db_cur, expected, tolerance):
+def assertDriverIterationDataRecorded(test, db_cur, expected, tolerance):
     """
         Expected can be from multiple cases.
     """
@@ -62,7 +67,7 @@ def _assertDriverIterationDataRecorded(test, db_cur, expected, tolerance):
                     assert_rel_error(test, actual[0][key], expected[key], tolerance)
         return
 
-def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
+def assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
     """
         Expected can be from multiple cases.
     """
@@ -112,7 +117,7 @@ def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
         return
 
 
-def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
+def assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
     """
         Expected can be from multiple cases.
     """
@@ -164,3 +169,51 @@ def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
                     # Check to see if the values in actual and expected match
                     assert_rel_error(test, actual[0][key], expected[key], tolerance)
         return
+
+def assertMetadataRecorded(test, db_cur):
+
+    db_cur.execute("SELECT format_version FROM metadata")
+    row = db_cur.fetchone()
+
+    format_version_actual = row[0]
+    format_version_expected = format_version
+
+    # this always gets recorded
+    test.assertEqual(format_version_actual, format_version_expected)
+
+    return
+
+def assertDriverMetadataRecorded(test, db_cur, expected):
+
+    db_cur.execute("SELECT model_viewer_data FROM driver_metadata")
+    row = db_cur.fetchone()
+
+    if expected is None:
+        test.assertEqual(None, row)
+        return
+
+    if PY2:
+        model_viewer_data = pickle.loads(str(row[0]))
+    if PY3:
+        model_viewer_data = pickle.loads(row[0])
+
+    test.assertTrue(isinstance(model_viewer_data, dict))
+
+    test.assertEqual(2, len(model_viewer_data))
+
+    test.assertTrue(isinstance(model_viewer_data['connections_list'], list))
+
+    test.assertEqual(expected['connections_list_length'],
+                     len(model_viewer_data['connections_list']))
+
+    test.assertEqual(expected['tree_length'], len(model_viewer_data['tree']))
+
+    tr = model_viewer_data['tree']
+    test.assertEqual(set(['name', 'type', 'subsystem_type', 'children']), set(tr.keys()))
+    test.assertEqual(expected['tree_children_length'], len(model_viewer_data['tree']['children']))
+
+    cl = model_viewer_data['connections_list']
+    for c in cl:
+        test.assertTrue(set(c.keys()).issubset(set(['src', 'tgt', 'cycle_arrows'])))
+
+    return

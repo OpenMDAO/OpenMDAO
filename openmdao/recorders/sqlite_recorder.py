@@ -16,7 +16,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.record_util import values_to_array
 
 
-def _array_to_blob(array):
+def array_to_blob(array):
     """
     Make numpy array in to BLOB type.
 
@@ -31,7 +31,7 @@ def _array_to_blob(array):
     return sqlite3.Binary(out.read())
 
 
-def _blob_to_array(blob):
+def blob_to_array(blob):
     """
     Convert sqlite BLOB to numpy array.
 
@@ -151,11 +151,11 @@ class SqliteRecorder(BaseRecorder):
             constraints_array = values_to_array(constraints)
             sysvars_array = values_to_array(sysvars)
 
-            desvars_blob = _array_to_blob(desvars_array)
-            responses_blob = _array_to_blob(responses_array)
-            objectives_blob = _array_to_blob(objectives_array)
-            constraints_blob = _array_to_blob(constraints_array)
-            sysvars_blob = _array_to_blob(sysvars_array)
+            desvars_blob = array_to_blob(desvars_array)
+            responses_blob = array_to_blob(responses_array)
+            objectives_blob = array_to_blob(objectives_array)
+            constraints_blob = array_to_blob(constraints_array)
+            sysvars_blob = array_to_blob(sysvars_array)
 
             with self.con:
                 self.cursor.execute("INSERT INTO driver_iterations(counter, iteration_coordinate, "
@@ -190,9 +190,9 @@ class SqliteRecorder(BaseRecorder):
         outputs_array = values_to_array(outputs)
         residuals_array = values_to_array(residuals)
 
-        inputs_blob = _array_to_blob(inputs_array)
-        outputs_blob = _array_to_blob(outputs_array)
-        residuals_blob = _array_to_blob(residuals_array)
+        inputs_blob = array_to_blob(inputs_array)
+        outputs_blob = array_to_blob(outputs_array)
+        residuals_blob = array_to_blob(residuals_array)
 
         with self.con:
             self.cursor.execute("INSERT INTO system_iterations(counter, iteration_coordinate, "
@@ -226,8 +226,8 @@ class SqliteRecorder(BaseRecorder):
         outputs_array = values_to_array(outputs)
         residuals_array = values_to_array(residuals)
 
-        outputs_blob = _array_to_blob(outputs_array)
-        residuals_blob = _array_to_blob(residuals_array)
+        outputs_blob = array_to_blob(outputs_array)
+        residuals_blob = array_to_blob(residuals_array)
 
         with self.con:
             self.cursor.execute("INSERT INTO solver_iterations(counter, iteration_coordinate, "

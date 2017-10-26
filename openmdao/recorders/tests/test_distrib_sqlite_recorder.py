@@ -25,8 +25,8 @@ if OPTIMIZER:
 from openmdao.api import ExecComp, ExplicitComponent, Problem, \
     Group, ParallelGroup, IndepVarComp, SqliteRecorder
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from sqlite_recorder_test_utils import _assertDriverIterationDataRecorded
-from recorder_test_utils import run_driver
+from openmdao.recorders.tests.sqlite_recorder_test_utils import assertDriverIterationDataRecorded
+from openmdao.recorders.tests.recorder_test_utils import run_driver
 
 class DistributedAdder(ExplicitComponent):
     """
@@ -124,7 +124,7 @@ class DistributedRecorderTest(unittest.TestCase):
     def assertDriverIterationDataRecorded(self, expected, tolerance):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
-        _assertDriverIterationDataRecorded(self, cur, expected, tolerance)
+        assertDriverIterationDataRecorded(self, cur, expected, tolerance)
         con.close()
 
     def test_distrib_record_system(self):
