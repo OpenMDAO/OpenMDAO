@@ -1,12 +1,26 @@
 ---------------------------------------------------------------------------------------------------
+Release Notes for OpenMDAO 2.0.2
+October 19, 2017
+
+* Fixing further packaging errors by updating packaging information.
+* Adding tutorials for derivatives of explicit and implicit components.
+
+---------------------------------------------------------------------------------------------------
+Release Notes for OpenMDAO 2.0.1
+October 19, 2017
+
+* Attempting to fix test errors that were happening by updating the packaging information.
+
+
+---------------------------------------------------------------------------------------------------
 Release Notes for OpenMDAO 2.0.0
 October 19, 2017
-----------------------------------
+
 First public release of 2.0.0.
 
 
 New Features:
--------------------------------
+--------------
 (first release... so EVERYTHING!)
 - Drivers:
     - ScipyOptimizer
