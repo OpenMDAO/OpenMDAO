@@ -40,18 +40,20 @@ class DefaultAllocator(ProcAllocator):
 
         nsubs = len(proc_info)
         min_procs, max_procs, proc_weights = self._split_proc_info(proc_info, comm)
+        min_sum = np.sum(min_procs)
 
         if np.sum(max_procs) < nproc:
             raise ProcAllocationError("too many MPI procs allocated. Comm is size %d but "
                                       "can only use %d" % (nproc, np.sum(max_procs)))
-        if np.any(min_procs > nproc):
-            raise ProcAllocationError("can't meet min_procs required",
-                                      np.array(list(range(nsubs)))[min_procs > nproc])
+        if min_sum > nproc and np.any(min_procs > 1):
+            raise ProcAllocationError("can't meet min_procs required because the sum of the "
+                                      "min procs required exceeds the procs allocated and the "
+                                      "min procs required is > 1",
+                                      np.array(list(range(nsubs)))[min_procs > 1])
 
         # Define the normalized weights for all subsystems
         proc_weights /= np.sum(proc_weights)
 
-        min_sum = np.sum(min_procs)
         if min_sum > nproc:
             isubs_list = [[] for ind in range(nproc)]
             proc_load = np.zeros(nproc)
