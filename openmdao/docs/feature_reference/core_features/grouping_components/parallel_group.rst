@@ -44,7 +44,7 @@ starts, assuming that the number of processes is greater or equal to the number 
 by assigning the *min_procs* for each subsystem.  It then adds any remaining processes to subsystems
 based on their weights, being careful not to exceed their specified *max_procs*, if any.
 
-If the  number of processes is less than the number of subsystems, or is less than the sum of the
-*min_procs* for all of the subsystems, then each subsystem, one at a time starting with the one with
-the highest *min_procs* or highest *proc_weight*, is allocated to the least
-loaded process.
+If the  number of processes is less than the number of subsystems then each subsystem, one at a
+time starting with the one with the highest *proc_weight*, is allocated to the least
+loaded process.  An exception will be raised if any of the subsystems in this case have a
+*min_procs* value greater than 1.
