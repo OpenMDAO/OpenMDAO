@@ -132,7 +132,7 @@ class Driver(object):
         self.metadata = None
         self._model_viewer_data = None
 
-        # TODO, support these in Openmdao blue
+        # TODO, support these in OpenMDAO
         self.supports.declare('integer_design_vars', type_=bool, default=False)
 
         self.fail = False

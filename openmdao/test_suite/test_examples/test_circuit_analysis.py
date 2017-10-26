@@ -230,6 +230,68 @@ class TestCircuit(unittest.TestCase):
         # 'Sanity check: shoudl sum to .1 Amps
         assert_rel_error(self, p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
+    def test_circuit_voltage_source(self):
+        from openmdao.api import ArmijoGoldsteinLS, Problem, IndepVarComp, BalanceComp, ExecComp
+        from openmdao.api import NewtonSolver, DirectSolver, NonLinearRunOnce, LinearRunOnce
+
+        from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
+
+        p = Problem()
+        model = p.model
+
+        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
+
+        # replacing the fixed current source with a BalanceComp to represent a fixed Voltage source
+        # model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('batt', IndepVarComp('V', 1.5, units='V'))
+        bal = model.add_subsystem('batt_balance', BalanceComp())
+        bal.add_balance('I', units='A', eq_units='V')
+
+        model.add_subsystem('circuit', Circuit())
+        model.add_subsystem('batt_deltaV', ExecComp('dV = V1 - V2', V1={'units':'V'}, V2={'units':'V'}, dV={'units':'V'}))
+
+        # current into the circuit is now the output state from the batt_balance comp
+        model.connect('batt_balance.I', 'circuit.I_in')
+        model.connect('ground.V', ['circuit.Vg','batt_deltaV.V2'])
+        model.connect('circuit.n1.V', 'batt_deltaV.V1')
+
+        # set the lhs and rhs for the battery residual
+        model.connect('batt.V', 'batt_balance.rhs:I')
+        model.connect('batt_deltaV.dV', 'batt_balance.lhs:I')
+
+        p.setup()
+
+        ###################
+        # Solver Setup
+        ###################
+
+        # change the circuit solver to RunOnce because we're
+        # going to converge at the top level of the model with newton instead
+        p.model.circuit.nonlinear_solver = NonLinearRunOnce()
+        p.model.circuit.linear_solver = LinearRunOnce()
+
+        # Put Newton at the top so it can also converge the new BalanceComp residual
+        newton = p.model.nonlinear_solver = NewtonSolver()
+        p.model.linear_solver = DirectSolver()
+        newton.options['iprint'] = 2
+        newton.options['maxiter'] = 20
+        newton.options['solve_subsystems'] = True
+        newton.linesearch = ArmijoGoldsteinLS()
+        newton.linesearch.options['maxiter'] = 10
+        newton.linesearch.options['iprint'] = 2
+
+        # set initial guesses from the current source problem
+        p['circuit.n1.V'] = 9.8
+        p['circuit.n2.V'] = .7
+
+        p.run_model()
+
+        assert_rel_error(self, p['circuit.n1.V'], 1.5, 1e-5)
+        assert_rel_error(self, p['circuit.n2.V'], 0.676232, 1e-5)
+        assert_rel_error(self, p['circuit.R1.I'], 0.015, 1e-5)
+        assert_rel_error(self, p['circuit.R2.I'], 8.23767999e-05, 1e-5)
+        assert_rel_error(self, p['circuit.D1.I'], 8.23767999e-05, 1e-5)
+
 
 if __name__ == "__main__":
     unittest.main()

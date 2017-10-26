@@ -110,7 +110,12 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
 
             text += "<br />self.connect(\"" + unknownName + "\", \"" + paramName + "\")";
         }
-        parentDiv.querySelector("#connectionId").innerHTML = text;
+        if({{draw_potential_connections}}) {
+             parentDiv.querySelector("#connectionId").innerHTML = text;
+        }
+        else {
+            parentDiv.querySelector("#connectionId").innerHTML = "";
+        }
     }
     var n2BackgroundRect = n2Group.append("rect")
         .attr("class", "background")
@@ -173,7 +178,7 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
             var param = d3RightTextNodesArrayZoomed[c],
                 unknown = d3RightTextNodesArrayZoomed[r];
             if (param.type !== "param" && unknown.type !== "unknown") return;
-            if (r > c) { //bottom left
+            if (r > c && {{draw_potential_connections}}) { //bottom left
                 DrawPathTwoLines(
                     n2Dx * r, //x1
                     n2Dy * r + n2Dy * .5, //y1
@@ -183,7 +188,7 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
                     n2Dy * c + n2Dy - 1e-2, //up y3
                     "blue", lineWidth, true);
             }
-            else if (r < c) { //top right
+            else if (r < c && {{draw_potential_connections}}) { //top right
                 DrawPathTwoLines(
                     n2Dx * r + n2Dx, //x1
                     n2Dy * r + n2Dy * .5, //y1
@@ -208,7 +213,9 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
                     "<b>" + zoomedElement.promotions[unknown.absPathName] + "</b>" :
                     ((zoomedElement === root) ? unknown.absPathName : unknown.absPathName.slice(zoomedElement.absPathName.length + 1));
 
-                parentDiv.querySelector("#connectionId").innerHTML += "<br /><i style=\"color:red;\">self.connect(\"" + unknownName + "\", \"" + paramName + "\")</i>";
+                if({{draw_potential_connections}}) {
+                    parentDiv.querySelector("#connectionId").innerHTML += "<br /><i style=\"color:red;\">self.connect(\"" + unknownName + "\", \"" + paramName + "\")</i>";
+                }
             }
         });
 
@@ -1673,5 +1680,6 @@ var mouseOutN2;
 var mouseClickN2;
 var hasInputConn;
 var treeData, connectionList;
+modelData.tree.name = 'model'; //Change 'root' to 'model'
 var app = PtN2Diagram(document.getElementById("ptN2ContentDivId"), modelData['tree'], modelData['connections_list']);
 

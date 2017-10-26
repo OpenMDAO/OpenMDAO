@@ -16,7 +16,7 @@ from openmdao.test_suite.components.exec_comp_for_test import ExecComp4Test
 from openmdao.utils.mpi import MPI
 
 if MPI:
-    from openmdao.vectors.petsc_vector import PetscVector
+    from openmdao.vectors.petsc_vector import PETScVector
 
 
 class DynComp(ExplicitComponent):
@@ -51,6 +51,7 @@ class DynComp(ExplicitComponent):
         """
         time.sleep(self.ln_sleep)
 
+
 def make_subtree(parent, nsubgroups, levels,
                  ncomps, ninputs, noutputs, nconns, var_factory=float):
     """Construct a system subtree under the given parent group."""
@@ -67,6 +68,7 @@ def make_subtree(parent, nsubgroups, levels,
             make_subtree(g, nsubgroups, levels-1,
                          ncomps, ninputs, noutputs, nconns,
                          var_factory=var_factory)
+
 
 def create_dyncomps(parent, ncomps, ninputs, noutputs, nconns,
                     var_factory=float):
@@ -95,14 +97,14 @@ if __name__ == '__main__':
     class SubGroup(Group):
         def setup(self):
             create_dyncomps(self, num_comps, 2, 2, 2,
-                                var_factory=lambda: numpy.zeros(vec_size))
+                            var_factory=lambda: numpy.zeros(vec_size))
             cname = "C%d"%(num_comps-1)
             self.add_objective("%s.o0" % cname)
             self.add_constraint("%s.o1" % cname, lower=0.0)
 
 
     if 'petsc' in sys.argv:
-        vec_class = PetscVector
+        vec_class = PETScVector
     else:
         vec_class = DefaultVector
 

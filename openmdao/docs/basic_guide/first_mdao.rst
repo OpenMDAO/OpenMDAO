@@ -9,7 +9,7 @@ Here is the mathematical problem formulation for the Sellar optimziation problem
 .. math::
 
     \begin{align}
-    \text{min}: & \ \ \ & x_1^2 + z_2 + y_1 + e^-{y_2} \\
+    \text{min}: & \ \ \ & x_1^2 + z_2 + y_1 + e^{-y_2} \\
     \text{w.r.t.}: & \ \ \ &  x_1, z_1, z_2 \\
     \text{subject to}: & \ \ \ & \\
     & \ \ \ & 3.16 - y_1 <=0 \\
