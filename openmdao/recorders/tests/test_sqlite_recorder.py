@@ -24,8 +24,9 @@ from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
     SellarDis2withDerivatives
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from sqlite_recorder_test_utils import _assertDriverIterationDataRecorded
-from recorder_test_utils import run_driver
+from openmdao.recorders.tests.sqlite_recorder_test_utils import _assertDriverIterationDataRecorded, \
+    _assertSystemIterationDataRecorded, _assertSolverIterationDataRecorded
+from openmdao.recorders.tests.recorder_test_utils import run_driver
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -42,117 +43,6 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-
-def run_driver(problem):
-    t0 = time.time()
-    problem.run_driver()
-    t1 = time.time()
-
-    return t0, t1
-
-def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
-    """
-        Expected can be from multiple cases.
-    """
-
-    # iterate through the cases
-    for coord, (t0, t1), inputs_expected, outputs_expected, residuals_expected in expected:
-        iter_coord = format_iteration_coordinate(coord)
-
-        # from the database, get the actual data recorded
-        db_cur.execute("SELECT * FROM system_iterations WHERE "
-                       "iteration_coordinate=:iteration_coordinate",
-                       {"iteration_coordinate": iter_coord})
-        row_actual = db_cur.fetchone()
-        test.assertTrue(row_actual, 'System iterations table does not contain the requested iteration coordinate: "{}"'.format(iter_coord))
-
-        counter, global_counter, iteration_coordinate, timestamp, success, msg, inputs_blob, \
-            outputs_blob, residuals_blob = row_actual
-
-        inputs_actual = blob_to_array(inputs_blob)
-        outputs_actual = blob_to_array(outputs_blob)
-        residuals_actual = blob_to_array(residuals_blob)
-
-        # Does the timestamp make sense?
-        test.assertTrue(t0 <= timestamp and timestamp <= t1)
-
-        test.assertEqual(success, 1)
-        test.assertEqual(msg, '')
-
-        for vartype, actual, expected in (
-            ('inputs', inputs_actual, inputs_expected),
-            ('outputs', outputs_actual, outputs_expected),
-            ('residuals', residuals_actual, residuals_expected),
-        ):
-
-            if expected is None:
-                test.assertEqual(actual, np.array(None, dtype=object))
-            else:
-                # Check to see if the number of values in actual and expected match
-                test.assertEqual(len(actual[0]), len(expected))
-                for key, value in iteritems(expected):
-                    # Check to see if the keys in the actual and expected match
-                    test.assertTrue(key in actual[0].dtype.names,
-                                    '{} variable not found in actual data '
-                                    'from recorder'.format(key))
-                    # Check to see if the values in actual and expected match
-                    assert_rel_error(test, actual[0][key], expected[key], tolerance)
-        return
-
-
-def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
-    """
-        Expected can be from multiple cases.
-    """
-
-    # iterate through the cases
-    for coord, (t0, t1), expected_abs_error, expected_rel_error, expected_output, \
-            expected_solver_residuals in expected:
-
-        iter_coord = format_iteration_coordinate(coord)
-
-        # from the database, get the actual data recorded
-        db_cur.execute("SELECT * FROM solver_iterations WHERE iteration_coordinate=:iteration_coordinate",
-                       {"iteration_coordinate": iter_coord})
-        row_actual = db_cur.fetchone()
-        test.assertTrue(row_actual, 'Solver iterations table does not contain the requested iteration coordinate: "{}"'.format(iter_coord))
-
-        counter, global_counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
-            output_blob, residuals_blob = row_actual
-
-        output_actual = blob_to_array(output_blob)
-        residuals_actual = blob_to_array(residuals_blob)
-        # Does the timestamp make sense?
-        test.assertTrue(t0 <= timestamp and timestamp <= t1, 'timestamp should be between when the model '
-                                                             'started and stopped')
-
-        test.assertEqual(success, 1)
-        test.assertEqual(msg, '')
-        if expected_abs_error:
-            test.assertTrue(abs_err, 'Expected absolute error but none recorded')
-            assert_rel_error(test, abs_err, expected_abs_error, tolerance)
-        if expected_rel_error:
-            test.assertTrue(rel_err, 'Expected relative error but none recorded')
-            assert_rel_error(test, rel_err, expected_rel_error, tolerance)
-
-        for vartype, actual, expected in (
-                ('outputs', output_actual, expected_output),
-                ('residuals', residuals_actual, expected_solver_residuals),
-        ):
-
-            if expected is None:
-                test.assertEqual(actual, np.array(None, dtype=object))
-            else:
-                # Check to see if the number of values in actual and expected match
-                test.assertEqual(len(actual[0]), len(expected))
-                for key, value in iteritems(expected):
-                    # Check to see if the keys in the actual and expected match
-                    test.assertTrue(key in actual[0].dtype.names, '{} variable not found in actual '
-                                                                  'data from recorder'.format(key))
-                    # Check to see if the values in actual and expected match
-                    assert_rel_error(test, actual[0][key], expected[key], tolerance)
-        return
-
 
 def _assertMetadataRecorded(test, db_cur):
 
@@ -363,10 +253,10 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.setup_sellar_model()
 
-        self.recorder.options['record_desvars'] = True
-        self.recorder.options['record_responses'] = False
-        self.recorder.options['record_objectives'] = False
-        self.recorder.options['record_constraints'] = False
+        self.prob.driver.options['record_desvars'] = True
+        self.prob.driver.options['record_responses'] = False
+        self.prob.driver.options['record_objectives'] = False
+        self.prob.driver.options['record_constraints'] = False
 
         self.prob.setup(check=False)
 
@@ -390,10 +280,10 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.setup_sellar_model()
 
-        self.recorder.options['record_desvars'] = False
-        self.recorder.options['record_responses'] = False
-        self.recorder.options['record_objectives'] = True
-        self.recorder.options['record_constraints'] = False
+        self.prob.driver.options['record_desvars'] = False
+        self.prob.driver.options['record_responses'] = False
+        self.prob.driver.options['record_objectives'] = True
+        self.prob.driver.options['record_constraints'] = False
         self.prob.driver.add_recorder(self.recorder)
         self.prob.setup(check=False)
 
@@ -412,10 +302,10 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.setup_sellar_model()
 
-        self.recorder.options['record_desvars'] = False
-        self.recorder.options['record_responses'] = False
-        self.recorder.options['record_objectives'] = False
-        self.recorder.options['record_constraints'] = True
+        self.prob.driver.options['record_desvars'] = False
+        self.prob.driver.options['record_responses'] = False
+        self.prob.driver.options['record_objectives'] = False
+        self.prob.driver.options['record_constraints'] = True
         self.prob.driver.add_recorder(self.recorder)
         self.prob.setup(check=False)
 
@@ -450,10 +340,10 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.driver = pyOptSparseDriver()
 
         prob.driver.add_recorder(self.recorder)
-        self.recorder.options['record_desvars'] = True
-        self.recorder.options['record_responses'] = True
-        self.recorder.options['record_objectives'] = True
-        self.recorder.options['record_constraints'] = True
+        prob.driver.options['record_desvars'] = True
+        prob.driver.options['record_responses'] = True
+        prob.driver.options['record_objectives'] = True
+        prob.driver.options['record_constraints'] = True
 
         prob.driver.options['optimizer'] = OPTIMIZER
         if OPTIMIZER == 'SLSQP':
@@ -486,8 +376,8 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_driver_records_metadata(self):
         self.setup_sellar_model()
 
-        self.recorder.options['includes'] = ["p1.x"]
-        self.recorder.options['record_metadata'] = True
+        self.prob.driver.options['includes'] = ["p1.x"]
+        self.prob.driver.options['record_metadata'] = True
         self.prob.driver.add_recorder(self.recorder)
         self.prob.setup(check=False)
 
@@ -508,7 +398,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.setup_sellar_model()
 
-        self.recorder.options['record_metadata'] = False
+        self.prob.driver.options['record_metadata'] = False
         self.prob.driver.add_recorder(self.recorder)
         self.prob.setup(check=False)
 
@@ -524,17 +414,24 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_record_system(self):
         self.setup_sellar_model()
 
-        self.recorder.options['record_inputs'] = True
-        self.recorder.options['record_outputs'] = True
-        self.recorder.options['record_residuals'] = True
-        self.recorder.options['record_metadata'] = True
-
+        self.prob.model.options['record_inputs'] = True
+        self.prob.model.options['record_outputs'] = True
+        self.prob.model.options['record_residuals'] = True
+        self.prob.model.options['record_metadata'] = True
         self.prob.model.add_recorder(self.recorder)
 
         d1 = self.prob.model.get_subsystem('d1')  # instance of SellarDis1withDerivatives, a Group
+        d1.options['record_inputs'] = True
+        d1.options['record_outputs'] = True
+        d1.options['record_residuals'] = True
+        d1.options['record_metadata'] = True
         d1.add_recorder(self.recorder)
 
         obj_cmp = self.prob.model.get_subsystem('obj_cmp')  # an ExecComp
+        obj_cmp.options['record_inputs'] = True
+        obj_cmp.options['record_outputs'] = True
+        obj_cmp.options['record_residuals'] = True
+        obj_cmp.options['record_metadata'] = True
         obj_cmp.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
@@ -585,12 +482,12 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.driver = pyOptSparseDriver()
 
         prob.driver.add_recorder(self.recorder)
-        self.recorder.options['record_desvars'] = True
-        self.recorder.options['record_responses'] = True
-        self.recorder.options['record_objectives'] = True
-        self.recorder.options['record_constraints'] = True
-        self.recorder.options['includes'] = ['*']
-        self.recorder.options['excludes'] = ['p2*']
+        prob.driver.options['record_desvars'] = True
+        prob.driver.options['record_responses'] = True
+        prob.driver.options['record_objectives'] = True
+        prob.driver.options['record_constraints'] = True
+        prob.driver.options['includes'] = ['*']
+        prob.driver.options['excludes'] = ['p2*']
 
         prob.driver.options['optimizer'] = OPTIMIZER
         prob.driver.opt_settings['ACC'] = 1e-9
@@ -644,12 +541,12 @@ class TestSqliteRecorder(unittest.TestCase):
 
         # Set up recorder after intitial setup.
         prob.driver.add_recorder(self.recorder)
-        self.recorder.options['record_desvars'] = True
-        self.recorder.options['record_responses'] = True
-        self.recorder.options['record_objectives'] = True
-        self.recorder.options['record_constraints'] = True
-        self.recorder.options['includes'] = ['*']
-        self.recorder.options['excludes'] = ['p2*']
+        prob.driver.options['record_desvars'] = True
+        prob.driver.options['record_responses'] = True
+        prob.driver.options['record_objectives'] = True
+        prob.driver.options['record_constraints'] = True
+        prob.driver.options['includes'] = ['*']
+        prob.driver.options['excludes'] = ['p2*']
 
         t0, t1 = run_driver(prob)
 
@@ -676,18 +573,26 @@ class TestSqliteRecorder(unittest.TestCase):
         if OPTIMIZER == 'SLSQP':
             self.prob.driver.opt_settings['ACC'] = 1e-9
 
-        self.recorder.options['record_inputs'] = True
-        self.recorder.options['record_outputs'] = True
-        self.recorder.options['record_residuals'] = True
-        self.recorder.options['record_metadata'] = True
+        self.prob.model.options['record_inputs'] = True
+        self.prob.model.options['record_outputs'] = True
+        self.prob.model.options['record_residuals'] = True
+        self.prob.model.options['record_metadata'] = True
 
         self.prob.model.add_recorder(self.recorder)
 
         pz = self.prob.model.get_subsystem('pz')  # IndepVarComp which is an ExplicitComponent
+        pz.options['record_inputs'] = True
+        pz.options['record_outputs'] = True
+        pz.options['record_residuals'] = True
+        pz.options['record_metadata'] = True
         pz.add_recorder(self.recorder)
 
         mda = self.prob.model.get_subsystem('mda')  # Group
         d1 = mda.get_subsystem('d1')
+        d1.options['record_inputs'] = True
+        d1.options['record_outputs'] = True
+        d1.options['record_residuals'] = True
+        d1.options['record_metadata'] = True
         d1.add_recorder(self.recorder)
 
         self.prob.setup(check=False, mode='rev')
@@ -723,11 +628,12 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_record_solver(self):
         self.setup_sellar_model()
 
-        self.recorder.options['record_abs_error'] = True
-        self.recorder.options['record_rel_error'] = True
-        self.recorder.options['record_solver_output'] = True
-        self.recorder.options['record_solver_residuals'] = True
-        self.prob.model._nonlinear_solver.add_recorder(self.recorder)
+        solver = self.prob.model._nonlinear_solver
+        solver.options['record_abs_error'] = True
+        solver.options['record_rel_error'] = True
+        solver.options['record_solver_output'] = True
+        solver.options['record_solver_residuals'] = True
+        solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
 
@@ -829,10 +735,11 @@ class TestSqliteRecorder(unittest.TestCase):
         self.setup_sellar_model()
 
         self.prob.model.nonlinear_solver = NonlinearBlockGS()
-        self.prob.model.nonlinear_solver.add_recorder(self.recorder)
+        nonlinear_solver = self.prob.model.nonlinear_solver
+        nonlinear_solver.add_recorder(self.recorder)
 
-        self.recorder.options['record_solver_output'] = True
-        self.recorder.options['record_solver_residuals'] = True
+        nonlinear_solver.options['record_solver_output'] = True
+        nonlinear_solver.options['record_solver_residuals'] = True
 
         self.prob.setup(check=False)
 
@@ -942,14 +849,15 @@ class TestSqliteRecorder(unittest.TestCase):
         self.setup_sellar_model()
 
         self.prob.model.nonlinear_solver = NewtonSolver()
+        nonlinear_solver = self.prob.model.nonlinear_solver
         # used for analytic derivatives
-        self.prob.model.nonlinear_solver.linear_solver = DirectSolver()
+        nonlinear_solver.linear_solver = DirectSolver()
 
-        self.recorder.options['record_abs_error'] = True
-        self.recorder.options['record_rel_error'] = True
-        self.recorder.options['record_solver_output'] = True
-        self.recorder.options['record_solver_residuals'] = True
-        self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
+        nonlinear_solver.linear_solver.options['record_abs_error'] = True
+        nonlinear_solver.linear_solver.options['record_rel_error'] = True
+        nonlinear_solver.linear_solver.options['record_solver_output'] = True
+        nonlinear_solver.linear_solver.options['record_solver_residuals'] = True
+        nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
@@ -988,14 +896,15 @@ class TestSqliteRecorder(unittest.TestCase):
         self.setup_sellar_model()
 
         self.prob.model.nonlinear_solver = NewtonSolver()
+        nonlinear_solver = self.prob.model.nonlinear_solver
         # used for analytic derivatives
-        self.prob.model.nonlinear_solver.linear_solver = ScipyIterativeSolver()
+        nonlinear_solver.linear_solver = ScipyIterativeSolver()
 
-        self.recorder.options['record_abs_error'] = True
-        self.recorder.options['record_rel_error'] = True
-        self.recorder.options['record_solver_output'] = True
-        self.recorder.options['record_solver_residuals'] = True
-        self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
+        nonlinear_solver.linear_solver.options['record_abs_error'] = True
+        nonlinear_solver.linear_solver.options['record_rel_error'] = True
+        nonlinear_solver.linear_solver.options['record_solver_output'] = True
+        nonlinear_solver.linear_solver.options['record_solver_residuals'] = True
+        nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
@@ -1035,14 +944,15 @@ class TestSqliteRecorder(unittest.TestCase):
         self.setup_sellar_model()
 
         self.prob.model.nonlinear_solver = NewtonSolver()
+        nonlinear_solver = self.prob.model.nonlinear_solver
         # used for analytic derivatives
-        self.prob.model.nonlinear_solver.linear_solver = PetscKSP()
+        nonlinear_solver.linear_solver = PetscKSP()
 
-        self.recorder.options['record_abs_error'] = True
-        self.recorder.options['record_rel_error'] = True
-        self.recorder.options['record_solver_output'] = True
-        self.recorder.options['record_solver_residuals'] = True
-        self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
+        nonlinear_solver.linear_solver.options['record_abs_error'] = True
+        nonlinear_solver.linear_solver.options['record_rel_error'] = True
+        nonlinear_solver.linear_solver.options['record_solver_output'] = True
+        nonlinear_solver.linear_solver.options['record_solver_residuals'] = True
+        nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
@@ -1080,14 +990,15 @@ class TestSqliteRecorder(unittest.TestCase):
         self.setup_sellar_model()
 
         self.prob.model.nonlinear_solver = NewtonSolver()
+        nonlinear_solver = self.prob.model.nonlinear_solver
         # used for analytic derivatives
-        self.prob.model.nonlinear_solver.linear_solver = LinearBlockGS()
+        nonlinear_solver.linear_solver = LinearBlockGS()
 
-        self.recorder.options['record_abs_error'] = True
-        self.recorder.options['record_rel_error'] = True
-        self.recorder.options['record_solver_output'] = True
-        self.recorder.options['record_solver_residuals'] = True
-        self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
+        nonlinear_solver.linear_solver.options['record_abs_error'] = True
+        nonlinear_solver.linear_solver.options['record_rel_error'] = True
+        nonlinear_solver.linear_solver.options['record_solver_output'] = True
+        nonlinear_solver.linear_solver.options['record_solver_residuals'] = True
+        nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
@@ -1126,14 +1037,15 @@ class TestSqliteRecorder(unittest.TestCase):
         self.setup_sellar_model()
 
         self.prob.model.nonlinear_solver = NewtonSolver()
+        nonlinear_solver = self.prob.model.nonlinear_solver
         # used for analytic derivatives
-        self.prob.model.nonlinear_solver.linear_solver = LinearRunOnce()
+        nonlinear_solver.linear_solver = LinearRunOnce()
 
-        self.recorder.options['record_abs_error'] = True
-        self.recorder.options['record_rel_error'] = True
-        self.recorder.options['record_solver_output'] = True
-        self.recorder.options['record_solver_residuals'] = True
-        self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
+        nonlinear_solver.linear_solver.options['record_abs_error'] = True
+        nonlinear_solver.linear_solver.options['record_rel_error'] = True
+        nonlinear_solver.linear_solver.options['record_solver_output'] = True
+        nonlinear_solver.linear_solver.options['record_solver_residuals'] = True
+        nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
@@ -1171,14 +1083,15 @@ class TestSqliteRecorder(unittest.TestCase):
         self.setup_sellar_model()
 
         self.prob.model.nonlinear_solver = NewtonSolver()
+        nonlinear_solver = self.prob.model.nonlinear_solver
         # used for analytic derivatives
-        self.prob.model.nonlinear_solver.linear_solver = LinearBlockJac()
+        nonlinear_solver.linear_solver = LinearBlockJac()
 
-        self.recorder.options['record_abs_error'] = True
-        self.recorder.options['record_rel_error'] = True
-        self.recorder.options['record_solver_output'] = True
-        self.recorder.options['record_solver_residuals'] = True
-        self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
+        nonlinear_solver.linear_solver.options['record_abs_error'] = True
+        nonlinear_solver.linear_solver.options['record_rel_error'] = True
+        nonlinear_solver.linear_solver.options['record_solver_output'] = True
+        nonlinear_solver.linear_solver.options['record_solver_residuals'] = True
+        nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
@@ -1224,34 +1137,29 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.options['optimizer'] = OPTIMIZER
         self.prob.driver.opt_settings['ACC'] = 1e-9
 
-        self.recorder.options['record_metadata'] = True
-
         # Add recorders
         # Driver
+        self.prob.driver.options['record_metadata'] = True
+        self.prob.driver.options['record_desvars'] = True
+        self.prob.driver.options['record_responses'] = True
+        self.prob.driver.options['record_objectives'] = True
+        self.prob.driver.options['record_constraints'] = True
         self.prob.driver.add_recorder(self.recorder)
         # System
         pz = self.prob.model.get_subsystem('pz')  # IndepVarComp which is an ExplicitComponent
+        pz.options['record_metadata'] = True
+        pz.options['record_inputs'] = True
+        pz.options['record_outputs'] = True
+        pz.options['record_residuals'] = True
         pz.add_recorder(self.recorder)
         # Solver
         mda = self.prob.model.get_subsystem('mda')
+        mda.nonlinear_solver.options['record_metadata'] = True
+        mda.nonlinear_solver.options['record_abs_error'] = True
+        mda.nonlinear_solver.options['record_rel_error'] = True
+        mda.nonlinear_solver.options['record_solver_output'] = True
+        mda.nonlinear_solver.options['record_solver_residuals'] = True
         mda.nonlinear_solver.add_recorder(self.recorder)
-
-        # Driver
-        self.recorder.options['record_desvars'] = True
-        self.recorder.options['record_responses'] = True
-        self.recorder.options['record_objectives'] = True
-        self.recorder.options['record_constraints'] = True
-
-        # System
-        self.recorder.options['record_inputs'] = True
-        self.recorder.options['record_outputs'] = True
-        self.recorder.options['record_residuals'] = True
-
-        # Solver
-        self.recorder.options['record_abs_error'] = True
-        self.recorder.options['record_rel_error'] = True
-        self.recorder.options['record_solver_output'] = True
-        self.recorder.options['record_solver_residuals'] = True
 
         self.prob.setup(check=False, mode='rev')
         t0, t1 = run_driver(self.prob)
@@ -1321,14 +1229,11 @@ class TestSqliteRecorder(unittest.TestCase):
             self.prob.driver.opt_settings['ACC'] = 1e-2  # to speed the test up
             self.prob.driver.opt_settings['ACC'] = 1e-9
 
-        self.recorder.options['record_inputs'] = True
-        self.recorder.options['record_outputs'] = True
-        self.recorder.options['record_residuals'] = True
-        self.recorder.options['record_metadata'] = True
-
         # Add recorders for Driver, System, Solver
         self.prob.driver.add_recorder(self.recorder)
+
         self.prob.model.add_recorder(self.recorder)
+
         mda = self.prob.model.get_subsystem('mda')
         mda.nonlinear_solver.add_recorder(self.recorder)
 
@@ -1379,7 +1284,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         comp2 = prob.model.get_subsystem('comp2')  # ImplicitComponent
 
-        self.recorder.options['record_metadata'] = False
+        comp2.options['record_metadata'] = False
 
         comp2.add_recorder(self.recorder)
 
@@ -1409,10 +1314,10 @@ class TestSqliteRecorder(unittest.TestCase):
         prob['widths'] = 2.
 
         comp.add_recorder(self.recorder)
-        self.recorder.options['record_inputs'] = True
-        self.recorder.options['record_outputs'] = True
-        self.recorder.options['record_residuals'] = True
-        self.recorder.options['record_metadata'] = False
+        comp.options['record_inputs'] = True
+        comp.options['record_outputs'] = True
+        comp.options['record_residuals'] = True
+        comp.options['record_metadata'] = False
 
         t0, t1 = run_driver(prob)
 
@@ -1451,12 +1356,12 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.options['optimizer'] = OPTIMIZER
         self.prob.driver.opt_settings['ACC'] = 1e-9
 
-        self.recorder.options['record_metadata'] = True
-
-        # Add recorder to model and all subsystems
-        self.recorder.options['record_inputs'] = True
-        self.recorder.options['record_outputs'] = True
-        self.recorder.options['record_residuals'] = True
+        # self.recorder.options['record_metadata'] = True
+        #
+        # # Add recorder to model and all subsystems
+        # self.recorder.options['record_inputs'] = True
+        # self.recorder.options['record_outputs'] = True
+        # self.recorder.options['record_residuals'] = True
 
         self.prob.setup(check=False, mode='rev')
 
@@ -1508,15 +1413,15 @@ class TestSqliteRecorder(unittest.TestCase):
             self.prob.driver.opt_settings['ACC'] = 1e-9
 
         self.prob.driver.add_recorder(self.recorder)
-        self.recorder.options['record_desvars'] = True
-        self.recorder.options['record_responses'] = True
-        self.recorder.options['record_objectives'] = True
-        self.recorder.options['record_constraints'] = True
-        self.recorder.options['system_includes'] = ['mda.d2.y2',]
+        self.prob.driver.options['record_desvars'] = True
+        self.prob.driver.options['record_responses'] = True
+        self.prob.driver.options['record_objectives'] = True
+        self.prob.driver.options['record_constraints'] = True
+        self.prob.driver.options['system_includes'] = ['mda.d2.y2',]
 
-        self.prob.driver.options['optimizer'] = OPTIMIZER
-        if OPTIMIZER == 'SLSQP':
-            self.prob.driver.opt_settings['ACC'] = 1e-9
+        # self.prob.driver.options['optimizer'] = OPTIMIZER
+        # if OPTIMIZER == 'SLSQP':
+        #     self.prob.driver.opt_settings['ACC'] = 1e-9
 
         self.prob.setup(check=False)
 
@@ -1550,11 +1455,11 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.setup_sellar_model()
 
-        self.recorder.options['record_metadata'] = True
-        self.recorder.options['record_desvars'] = True
-        self.recorder.options['record_responses'] = False
-        self.recorder.options['record_objectives'] = False
-        self.recorder.options['record_constraints'] = False
+        self.prob.driver.options['record_metadata'] = True
+        self.prob.driver.options['record_desvars'] = True
+        self.prob.driver.options['record_responses'] = False
+        self.prob.driver.options['record_objectives'] = False
+        self.prob.driver.options['record_constraints'] = False
         self.prob.driver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
@@ -1564,11 +1469,11 @@ class TestSqliteRecorder(unittest.TestCase):
         # Open up a new instance of the recorder but with the same filename
         self.setup_sellar_model()
         recorder = SqliteRecorder(self.filename)
-        recorder.options['record_metadata'] = True
-        recorder.options['record_desvars'] = True
-        recorder.options['record_responses'] = False
-        recorder.options['record_objectives'] = False
-        recorder.options['record_constraints'] = False
+        # recorder.options['record_metadata'] = True
+        # recorder.options['record_desvars'] = True
+        # recorder.options['record_responses'] = False
+        # recorder.options['record_objectives'] = False
+        # recorder.options['record_constraints'] = False
         self.prob.driver.add_recorder(recorder)
 
         self.prob.setup(check=False)

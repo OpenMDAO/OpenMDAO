@@ -86,7 +86,6 @@ class Recording(object):
         self.object_requesting_recording = object_requesting_recording
         self.abs = 0
         self.rel = 0
-        self.method = ''
 
         from openmdao.solvers.solver import Solver
         self._is_solver = isinstance(self.object_requesting_recording, Solver)
@@ -113,6 +112,7 @@ class Recording(object):
         if do_recording:
             if self._is_solver:
                 self.object_requesting_recording.record_iteration(abs=self.abs, rel=self.rel)
+                # self.object_requesting_recording.record_iteration()
             else:
                 self.object_requesting_recording.record_iteration()
 

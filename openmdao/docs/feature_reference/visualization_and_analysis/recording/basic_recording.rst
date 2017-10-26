@@ -19,14 +19,14 @@ SqliteRecorder exists), and name the output file that you would like to write to
 Setting Recording Options
 +++++++++++++++++++++++++
 
-Once you have instantiated a recorder or recorders, there are many options that can be set in recorders, which will
-change the amount of information retained by the recorders.
+There are many recorder options that can be set. This affects the amount of information retained by the recorders.
+These options are associated with the System, Driver or Solver that is being recorded.
 
 A basic example of how to set an option:
 
 .. code-block:: console
 
-    self.my_recorder.options['record_desvars'] = True
+    prob.driver.options['record_desvars'] = True
 
 
 General Recording Options
@@ -59,6 +59,8 @@ Driver Recording Options
         Tells recorder whether to record the objectives of a Driver.
     options['record_constraints'] :  bool(False)
         Tells recorder whether to record the constraints of a Driver.
+    options['system_includes'] :  list([])
+        List of specific System variables to record in addition to Driver variables.
 
 Solver Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -94,12 +96,9 @@ A More Comprehensive Example
 
 .. code-block:: console
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_simple_driver_recording(self):
-        if OPT is None:
-            raise unittest.SkipTest("pyoptsparse is not installed")
-
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
 
         prob = Problem()
         model = prob.model = Group()
@@ -114,10 +113,10 @@ A More Comprehensive Example
         prob.driver = pyOptSparseDriver()
 
         prob.driver.add_recorder(self.recorder)
-        self.recorder.options['record_desvars'] = True
-        self.recorder.options['record_responses'] = True
-        self.recorder.options['record_objectives'] = True
-        self.recorder.options['record_constraints'] = True
+        prob.driver.options['record_desvars'] = True
+        prob.driver.options['record_responses'] = True
+        prob.driver.options['record_objectives'] = True
+        prob.driver.options['record_constraints'] = True
 
         prob.driver.options['optimizer'] = OPTIMIZER
         if OPTIMIZER == 'SLSQP':
@@ -129,7 +128,7 @@ A More Comprehensive Example
         model.add_constraint('c', upper=-15.0)
         prob.setup(check=False)
 
-        prob.run_driver()
+        t0, t1 = run_driver(prob)
 
         prob.cleanup()
 
@@ -145,7 +144,7 @@ A More Comprehensive Example
         expected_constraints = {"con.c": [-15.0, ], }
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
-                                           expected_objectives, expected_constraints),), self.eps)
+                                           expected_objectives, expected_constraints, None),), self.eps)
 
 Reading Recorded Data
 +++++++++++++++++++++

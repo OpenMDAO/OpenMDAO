@@ -89,7 +89,6 @@ class Summer(ExplicitComponent):
         outputs['sum'] = np.sum(inputs['y'])
 
 
-
 class Mygroup(Group):
 
     def setup(self):
@@ -99,12 +98,6 @@ class Mygroup(Group):
 
         self.add_design_var('x')
         self.add_constraint('c', lower=-3.)
-
-
-
-
-
-
 
 
 @unittest.skipIf(PETScVector is None or os.environ.get("TRAVIS"),
@@ -164,10 +157,10 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
         prob.model.add_subsystem('plus', DistributedAdder(size), promotes=['x', 'y'])
         prob.model.add_subsystem('summer', Summer(size), promotes=['y', 'sum'])
-        self.recorder.options['record_desvars'] = True
-        self.recorder.options['record_responses'] = True
-        self.recorder.options['record_objectives'] = True
-        self.recorder.options['record_constraints'] = True
+        prob.driver.options['record_desvars'] = True
+        prob.driver.options['record_responses'] = True
+        prob.driver.options['record_objectives'] = True
+        prob.driver.options['record_constraints'] = True
         prob.driver.add_recorder(self.recorder)
 
         prob.model.add_design_var('x')
@@ -197,7 +190,6 @@ class DistributedRecorderTest(unittest.TestCase):
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_recording_remote_voi(self):
-
         prob = Problem()
 
         prob.model.add_subsystem('par', ParallelGroup())
@@ -215,11 +207,11 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
-        self.recorder.options['record_desvars'] = True
-        self.recorder.options['record_responses'] = True
-        self.recorder.options['record_objectives'] = True
-        self.recorder.options['record_constraints'] = True
-        self.recorder.options['system_includes'] = ['par.G1.Cy.y','par.G2.Cy.y']
+        prob.driver.options['record_desvars'] = True
+        prob.driver.options['record_responses'] = True
+        prob.driver.options['record_objectives'] = True
+        prob.driver.options['record_constraints'] = True
+        prob.driver.options['system_includes'] = ['par.G1.Cy.y','par.G2.Cy.y']
 
         prob.driver.add_recorder(self.recorder)
 
@@ -240,7 +232,7 @@ class DistributedRecorderTest(unittest.TestCase):
         rrank = prob.comm.rank  # root ( aka model ) rank.
         rowned = prob.model._owning_rank['output']
         # names of sysincl vars on this rank
-        local_sysinclnames = [n for n in self.recorder.options['system_includes'] if rrank == rowned[n]]
+        local_sysinclnames = [n for n in prob.driver.options['system_includes'] if rrank == rowned[n]]
         # Get values for vars on this rank
         inputs, outputs, residuals = prob.model.get_nonlinear_vectors()
         #   Potential local sysvars are in this

@@ -13,7 +13,7 @@ from openmdao.recorders.recording_iteration_stack import Recording, recording_it
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.record_util import create_local_meta
+from openmdao.utils.record_util import create_local_meta, check_path
 
 
 class SolverInfo(object):
@@ -127,6 +127,10 @@ class Solver(object):
     supports : <OptionsDictionary>
         Options dictionary describing what features are supported by this
         solver.
+    _filtered_vars_to_record: Dict
+        Dict of list of var names to record
+    _norm0: float
+        Normalization factor
     """
 
     SOLVER = 'base_solver'
@@ -158,6 +162,24 @@ class Solver(object):
                              desc='whether to print output')
         self.options.declare('err_on_maxiter', type_=bool, default=False,
                              desc="When True, AnlysisError will be raised if we don't convege.")
+        # Case recording options
+        self.options.declare('record_abs_error', type_=bool, default=True,
+                             desc='Set to True to record absolute error at the solver level')
+        self.options.declare('record_rel_error', type_=bool, default=True,
+                             desc='Set to True to record relative error at the solver level')
+        self.options.declare('record_solver_output', type_=bool, default=False,
+                             desc='Set to True to record output at the solver level')
+        self.options.declare('record_solver_residuals', type_=bool, default=False,
+                             desc='Set to True to record residuals at the solver level')
+        self.options.declare('record_metadata', type_=bool, desc='Record metadata', default=True)
+        self.options.declare('includes', type_=list, default=['*'],
+                             desc='Patterns for variables to include in recording')
+        self.options.declare('excludes', type_=list, default=[],
+                             desc='Patterns for vars to exclude in recording '
+                                  '(processed post-includes)')
+        # Case recording related
+        self._filtered_vars_to_record = {}
+        self._norm0 = 0.0
 
         # What the solver supports.
         self.supports = OptionsDictionary()
@@ -206,6 +228,33 @@ class Solver(object):
         self._depth = depth
         self._rec_mgr.startup(self)
         self._rec_mgr.record_metadata(self)
+
+        myoutputs = myresiduals = set()
+        incl = self.options['includes']
+        excl = self.options['excludes']
+
+        if self.options['record_solver_residuals']:
+            if isinstance(self, NonlinearSolver):
+                residuals = self._system._residuals
+            else:  # it's a LinearSolver
+                residuals = self._system._vectors['residual']['linear']
+
+            myresiduals = {n for n in residuals._names
+                           if check_path(n, incl, excl)}
+
+        if self.options['record_solver_output']:
+            if isinstance(self, NonlinearSolver):
+                outputs = self._system._outputs
+            else:  # it's a LinearSolver
+                outputs = self._system._vectors['output']['linear']
+            # myoutputs = {n for n in outputs
+            myoutputs = {n for n in outputs._names
+                         if check_path(n, incl, excl)}
+
+        self._filtered_vars_to_record = {
+            'out': myoutputs,
+            'res': myresiduals
+        }
 
     def _set_solver_print(self, level=2, type_='all'):
         """
@@ -275,6 +324,9 @@ class Solver(object):
 
         self._iter_count = 0
         norm0, norm = self._iter_initialize()
+
+        self._norm0 = norm0
+
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
         while self._iter_count < maxiter and \
@@ -404,8 +456,63 @@ class Solver(object):
         **kwargs : dict
             Keyword arguments (used for abs and rel error).
         """
+        if not self._rec_mgr.has_recorders():
+            return
+
         metadata = create_local_meta(self.SOLVER)
-        self._rec_mgr.record_iteration(self, metadata, **kwargs)
+
+        # Get the data
+        data = {}
+        # if self.options['record_abs_error'] or self.options['record_rel_error']:
+        #     norm = self._iter_get_norm()
+
+        if self.options['record_abs_error']:
+            # data['abs'] = norm
+            data['abs'] = kwargs.get('abs')
+        else:
+            data['abs'] = None
+
+        if self.options['record_rel_error']:
+            # data['rel'] = norm / self._norm0
+            data['rel'] = kwargs.get('rel')
+        else:
+            data['rel'] = None
+
+        if self.options['record_solver_output']:
+
+            if isinstance(self, NonlinearSolver):
+                outputs = self._system._outputs
+            else:  # it's a LinearSolver
+                outputs = self._system._vectors['output']['linear']
+
+            data['o'] = {}
+            if 'out' in self._filtered_vars_to_record:
+                for out in self._filtered_vars_to_record['out']:
+                    if out in outputs._names:
+                        data['o'][out] = outputs._names[out]
+            else:
+                data['o'] = outputs
+        else:
+            data['o'] = None
+
+        if self.options['record_solver_residuals']:
+
+            if isinstance(self, NonlinearSolver):
+                residuals = self._system._residuals
+            else:  # it's a LinearSolver
+                residuals = self._system._vectors['residual']['linear']
+
+            data['r'] = {}
+            if 'res' in self._filtered_vars_to_record:
+                for res in self._filtered_vars_to_record['res']:
+                    if res in residuals._names:
+                        data['r'][res] = residuals._names[res]
+            else:
+                data['r'] = residuals
+        else:
+            data['r'] = None
+
+        self._rec_mgr.record_iteration(self, data, metadata)
 
 
 class NonlinearSolver(Solver):

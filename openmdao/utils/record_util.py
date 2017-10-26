@@ -3,7 +3,10 @@ Utility functions related to recording or execution metadata.
 """
 from fnmatch import fnmatchcase
 from six.moves import map, zip
+from six import iteritems
 import os
+
+import numpy as np
 
 
 def create_local_meta(name):
@@ -114,3 +117,33 @@ def check_path(path, includes, excludes):
 
     # Did not match anything in includes.
     return False
+
+
+def values_to_array(values):
+    """
+    Convert a dict of variable names and values into a numpy named array.
+
+    Parameters
+    ----------
+    values : dict
+        dict of variable names and values
+
+    Returns
+    -------
+    array: numpy named array
+        named array containing the same names and values as the input values dict.
+    """
+    if values:
+        dtype_tuples = []
+        for name, value in iteritems(values):
+            tple = (name, '{}f8'.format(value.shape))
+            dtype_tuples.append(tple)
+
+        array = np.zeros((1,), dtype=dtype_tuples)
+
+        for name, value in iteritems(values):
+            array[name] = value
+    else:
+        array = None
+
+    return array

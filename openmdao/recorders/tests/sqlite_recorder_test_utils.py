@@ -61,3 +61,106 @@ def _assertDriverIterationDataRecorded(test, db_cur, expected, tolerance):
                     # Check to see if the values in actual and expected match
                     assert_rel_error(test, actual[0][key], expected[key], tolerance)
         return
+
+def _assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
+    """
+        Expected can be from multiple cases.
+    """
+
+    # iterate through the cases
+    for coord, (t0, t1), inputs_expected, outputs_expected, residuals_expected in expected:
+        iter_coord = format_iteration_coordinate(coord)
+
+        # from the database, get the actual data recorded
+        db_cur.execute("SELECT * FROM system_iterations WHERE "
+                       "iteration_coordinate=:iteration_coordinate",
+                       {"iteration_coordinate": iter_coord})
+        row_actual = db_cur.fetchone()
+        test.assertTrue(row_actual, 'System iterations table does not contain the requested iteration coordinate: "{}"'.format(iter_coord))
+
+        counter, global_counter, iteration_coordinate, timestamp, success, msg, inputs_blob, \
+            outputs_blob, residuals_blob = row_actual
+
+        inputs_actual = blob_to_array(inputs_blob)
+        outputs_actual = blob_to_array(outputs_blob)
+        residuals_actual = blob_to_array(residuals_blob)
+
+        # Does the timestamp make sense?
+        test.assertTrue(t0 <= timestamp and timestamp <= t1)
+
+        test.assertEqual(success, 1)
+        test.assertEqual(msg, '')
+
+        for vartype, actual, expected in (
+            ('inputs', inputs_actual, inputs_expected),
+            ('outputs', outputs_actual, outputs_expected),
+            ('residuals', residuals_actual, residuals_expected),
+        ):
+
+            if expected is None:
+                test.assertEqual(actual, np.array(None, dtype=object))
+            else:
+                # Check to see if the number of values in actual and expected match
+                test.assertEqual(len(actual[0]), len(expected))
+                for key, value in iteritems(expected):
+                    # Check to see if the keys in the actual and expected match
+                    test.assertTrue(key in actual[0].dtype.names,
+                                    '{} variable not found in actual data '
+                                    'from recorder'.format(key))
+                    # Check to see if the values in actual and expected match
+                    assert_rel_error(test, actual[0][key], expected[key], tolerance)
+        return
+
+
+def _assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
+    """
+        Expected can be from multiple cases.
+    """
+
+    # iterate through the cases
+    for coord, (t0, t1), expected_abs_error, expected_rel_error, expected_output, \
+            expected_solver_residuals in expected:
+
+        iter_coord = format_iteration_coordinate(coord)
+
+        # from the database, get the actual data recorded
+        db_cur.execute("SELECT * FROM solver_iterations WHERE iteration_coordinate=:iteration_coordinate",
+                       {"iteration_coordinate": iter_coord})
+        row_actual = db_cur.fetchone()
+        test.assertTrue(row_actual, 'Solver iterations table does not contain the requested iteration coordinate: "{}"'.format(iter_coord))
+
+        counter, global_counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
+            output_blob, residuals_blob = row_actual
+
+        output_actual = blob_to_array(output_blob)
+        residuals_actual = blob_to_array(residuals_blob)
+        # Does the timestamp make sense?
+        test.assertTrue(t0 <= timestamp and timestamp <= t1, 'timestamp should be between when the model '
+                                                             'started and stopped')
+
+        test.assertEqual(success, 1)
+        test.assertEqual(msg, '')
+        if expected_abs_error:
+            test.assertTrue(abs_err, 'Expected absolute error but none recorded')
+            assert_rel_error(test, abs_err, expected_abs_error, tolerance)
+        if expected_rel_error:
+            test.assertTrue(rel_err, 'Expected relative error but none recorded')
+            assert_rel_error(test, rel_err, expected_rel_error, tolerance)
+
+        for vartype, actual, expected in (
+                ('outputs', output_actual, expected_output),
+                ('residuals', residuals_actual, expected_solver_residuals),
+        ):
+
+            if expected is None:
+                test.assertEqual(actual, np.array(None, dtype=object))
+            else:
+                # Check to see if the number of values in actual and expected match
+                test.assertEqual(len(actual[0]), len(expected))
+                for key, value in iteritems(expected):
+                    # Check to see if the keys in the actual and expected match
+                    test.assertTrue(key in actual[0].dtype.names, '{} variable not found in actual '
+                                                                  'data from recorder'.format(key))
+                    # Check to see if the values in actual and expected match
+                    assert_rel_error(test, actual[0][key], expected[key], tolerance)
+        return
