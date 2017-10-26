@@ -271,7 +271,12 @@ class ScipyOptimizer(Driver):
         self.result = result
         self.fail = False if self.result.success else True
 
-        if self.options['disp']:
+        if self.fail:
+            print('Optimization FAILED.')
+            print(result.message)
+            print('-' * 35)
+
+        elif self.options['disp']:
             print('Optimization Complete')
             print('-' * 35)
 
