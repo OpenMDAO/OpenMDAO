@@ -44,7 +44,7 @@ class DefaultAllocator(ProcAllocator):
 
         if np.sum(max_procs) < nproc:
             raise ProcAllocationError("too many MPI procs allocated. Comm is size %d but "
-                                      "can only use %d" % (nproc, np.sum(max_procs)))
+                                      "can only use %d." % (nproc, np.sum(max_procs)))
         if min_sum > nproc and np.any(min_procs > 1):
             raise ProcAllocationError("can't meet min_procs required because the sum of the "
                                       "min procs required exceeds the procs allocated and the "
@@ -58,13 +58,8 @@ class DefaultAllocator(ProcAllocator):
             isubs_list = [[] for ind in range(nproc)]
             proc_load = np.zeros(nproc)
 
-            # allocate procs based on min procs if any min procs are > 1, else just use weights
-            if any(min_procs > 1):
-                sub_sort_idxs = np.flip(np.argsort(min_procs), 0)
-                vals = min_procs
-            else:
-                sub_sort_idxs = np.flip(np.argsort(proc_weights), 0)
-                vals = proc_weights
+            sub_sort_idxs = np.flip(np.argsort(proc_weights), 0)
+            vals = proc_weights
 
             # Assign the slowest subsystem to the most free processor
             for isub in sub_sort_idxs:
@@ -100,45 +95,44 @@ class DefaultAllocator(ProcAllocator):
         expected_total = np.sum(num_procs)
         extras = nproc - expected_total
 
-        if extras >= 0:
-            if extras > 0:  # we have some extra procs lying around.
-                # give remaining procs such that after each addition we are closest to
-                # desired weights
-                newsum = expected_total
-                eye = np.eye(weighted.size)
-                weighted[:] = proc_weights
-                for i in range(extras):
-                    mask = max_procs <= num_procs
-                    weighted[mask] = 0.0
-                    weighted *= (1. / np.sum(weighted))
-                    newsum += 1
-                    mat = eye + num_procs
-                    mat *= (1. / newsum)
-                    mat -= weighted
-                    # prevent rows associated with the maxed out subsystems from having the
-                    # smallest norm.
-                    mat[mask] = 1e99
-                    # zero out columns for maxed out subsystems
-                    mat[:, mask] = 0.0
-                    norm = np.linalg.norm(mat, axis=1)
-                    # add a proc to a subsystem based on matching closest to desired weights for
-                    # the remaining 'active' subsystems.
-                    num_procs[np.argmin(norm)] += 1
+        if extras > 0:  # we have some extra procs lying around.
+            # give remaining procs such that after each addition we are closest to
+            # desired weights
+            newsum = expected_total
+            eye = np.eye(weighted.size)
+            weighted[:] = proc_weights
+            for i in range(extras):
+                mask = max_procs <= num_procs
+                weighted[mask] = 0.0
+                weighted *= (1. / np.sum(weighted))
+                newsum += 1
+                mat = eye + num_procs
+                mat *= (1. / newsum)
+                mat -= weighted
+                # prevent rows associated with the maxed out subsystems from having the
+                # smallest norm.
+                mat[mask] = 1e99
+                # zero out columns for maxed out subsystems
+                mat[:, mask] = 0.0
+                norm = np.linalg.norm(mat, axis=1)
+                # add a proc to a subsystem based on matching closest to desired weights for
+                # the remaining 'active' subsystems.
+                num_procs[np.argmin(norm)] += 1
 
-            # Compute the coloring
-            color = np.zeros(nproc, int)
-            start, end = 0, 0
-            for isub in range(nsubs):
-                end += num_procs[isub]
-                color[start:end] = isub
-                start += num_procs[isub]
+        # Compute the coloring
+        color = np.zeros(nproc, int)
+        start, end = 0, 0
+        for isub in range(nsubs):
+            end += num_procs[isub]
+            color[start:end] = isub
+            start += num_procs[isub]
 
-            isub = color[iproc]
+        isub = color[iproc]
 
-            # Result
-            isubs = [isub]
-            sub_comm = comm.Split(isub)
-            start = list(color).index(isub)  # find lowest matching color
-            sub_proc_range = [start, start + sub_comm.size]
+        # Result
+        isubs = [isub]
+        sub_comm = comm.Split(isub)
+        start = list(color).index(isub)  # find lowest matching color
+        sub_proc_range = [start, start + sub_comm.size]
 
         return isubs, sub_comm, sub_proc_range
