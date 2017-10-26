@@ -239,7 +239,6 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
         option.innerHTML = "" + i + "";
         var f = function (idx) {
             return function () {
-                toggleMenuOff();
                 CollapseToDepthSelectChange(idx);
             };
         }(i);
@@ -319,13 +318,6 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
             })
             .on("click", function (d) { LeftClick(d, this); })
             .on("contextmenu", function (d) { RightClick(d, this); });
-
-        var collapseButton = document.getElementById("collapseButton");
-        var texButton = document.getElementById("texButton");
-        collapseButton.addEventListener("click", collapse);
-        texButton.addEventListener("click", addTex);
-
-        document.addEventListener("click", function () { toggleMenuOff(); });
 
         nodeEnter.append("svg:rect")
             .attr("width", function (d) {
@@ -745,81 +737,15 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
         lastRightClickedObj = d;
         lastRightClickedEle = ele;
         e.preventDefault();
-        toggleMenuOn();
-        positionMenu(e);
+        collapse();
     }
 
     var menu = document.querySelector('#context-menu');
     var menuState = 0;
     var contextMenuActive = "context-menu--active";
 
-    function toggleMenuOn() {
-        if (menuState !== 1) {
-            menuState = 1;
-            menu.classList.add(contextMenuActive);
-        }
-    }
-
-    function toggleMenuOff() {
-        if (menuState !== 0) {
-            menuState = 0;
-            menu.classList.remove(contextMenuActive);
-        }
-    }
-
-    window.onkeyup = function (e) {
-        if (e.keyCode === 27) {
-            toggleMenuOff();
-        }
-    }
-
-    function getPosition(e) {
-        var posx = 0;
-        var posy = 0;
-
-        if (!e) var e = window.event;
-
-        if (e.pageX || e.pageY) {
-            posx = e.pageX;
-            posy = e.pageY;
-        } else if (e.clientX || e.clientY) {
-            posx = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
-            posy = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
-        }
-
-        return {
-            x: posx,
-            y: posy
-        }
-    }
-
-    function positionMenu(e) {
-        clickCoords = getPosition(e);
-        clickCoordsX = clickCoords.x;
-        clickCoordsY = clickCoords.y;
-
-        menuWidth = menu.offsetWidth + 4;
-        menuHeight = menu.offsetHeight + 4;
-
-        windowWidth = window.innerWidth;
-        windowHeight = window.innerHeight;
-
-        if ((windowWidth - clickCoordsX) < menuWidth) {
-            menu.style.left = windowWidth - menuWidth + "px";
-        } else {
-            menu.style.left = clickCoordsX + "px";
-        }
-
-        if ((windowHeight - clickCoordsY) < menuHeight) {
-            menu.style.top = windowHeight - menuHeight + "px";
-        } else {
-            menu.style.top = clickCoordsY + "px";
-        }
-    }
-
     function collapse() {
         var d = lastLeftClickedEle;
-        toggleMenuOff();
         if (!d.children) return;
         if (d.depth > zoomedElement.depth) { //dont allow minimizing on root node
             lastRightClickedElement = d;
@@ -829,34 +755,6 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
             Toggle(d);
             Update(d);
         }
-    }
-
-    function addTex() {
-        toggleMenuOff();
-
-        //Open up the input
-        katexInputDivElement.style.display = "inline";
-        katexInputElement.focus();
-        katexInputElement.addEventListener("keyup", katexEnterInput);
-
-        //Replace the rcEle innerHTML with stuff from KaTeX
-    }
-
-    function katexEnterInput(e) {
-        e.which = e.which || e.keyCode;
-        if (e.which == 13) {
-            setTex(katexInputElement.value);
-            katexInputDivElement.event
-            katexInputElement.removeEventListener("keyup", katexEnterInput);
-            katexInputDivElement.style.display = "none";
-            katexInputElement.value = '';
-        }
-    }
-
-    function setTex(input) {
-        console.log("setting name to: " + input);
-        lastRightClickedObj.name = input;
-        DrawMatrix();
     }
 
     function SetupLeftClick(d) {
@@ -875,7 +773,6 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
 
     //left click => navigate
     function LeftClick(d, ele) {
-        toggleMenuOff();
         if (!d.children) return;
         if (d3.event.button != 0) return;
         backButtonHistory.push({ "el": zoomedElement });
@@ -1486,7 +1383,6 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
     }
 
     function MouseClickN2(d) {
-        toggleMenuOff();
         var newClassName = "n2_hover_elements_" + d.r + "_" + d.c;
         var selection = n2Group.selectAll("." + newClassName);
         if (selection.size() > 0) {
