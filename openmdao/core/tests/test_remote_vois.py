@@ -41,13 +41,6 @@ class RemoteVOITestCase(unittest.TestCase):
 
     def test_remote_voi(self):
 
-        # import pydevd
-        # from openmdao.utils.mpi import MPI
-        # if MPI.COMM_WORLD.rank == 0:
-        #     pydevd.settrace('localhost', port=9876, stdoutToServer=True, stderrToServer=True)
-        # else:
-        #     pydevd.settrace('localhost', port=9877, stdoutToServer=True, stderrToServer=True)
-
         prob = Problem()
 
         prob.model.add_subsystem('par', ParallelGroup())
