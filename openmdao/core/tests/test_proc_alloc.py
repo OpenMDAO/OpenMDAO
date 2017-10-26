@@ -65,6 +65,12 @@ class ProcTestCase1(unittest.TestCase):
         all_inds = _get_which_procs(p.model.par)
         self.assertEqual(all_inds, [[0,1,2,3]])
 
+        p.run_model()
+        assert_rel_error(self, p['objective.y'], 8.0)
+
+        J = p.compute_totals(['objective.y'], ['indep.x'], return_format='dict')
+        assert_rel_error(self, J['objective.y']['indep.x'][0][0], 8.0, 1e-6)
+
 
 @unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
 class ProcTestCase2(unittest.TestCase):
@@ -72,9 +78,15 @@ class ProcTestCase2(unittest.TestCase):
     N_PROCS = 2
 
     def test_4_subs(self):
-        p = _build_model(nsubs=4)
+        p = _build_model(nsubs=4, mode='rev')
         all_inds = _get_which_procs(p.model.par)
         self.assertEqual(all_inds, [[0,1],[2,3]])
+
+        p.run_model()
+        assert_rel_error(self, p['objective.y'], 8.0)
+
+        J = p.compute_totals(['objective.y'], ['indep.x'], return_format='dict')
+        assert_rel_error(self, J['objective.y']['indep.x'][0][0], 8.0, 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
@@ -174,6 +186,12 @@ class ProcTestCase5(unittest.TestCase):
         p = _build_model(nsubs=4, max_procs=[2,2,2,2])
         all_inds = _get_which_procs(p.model.par)
         self.assertEqual(all_inds, [[0], [0], [1], [2], [3]])
+
+        p.run_model()
+        assert_rel_error(self, p['objective.y'], 8.0)
+
+        J = p.compute_totals(['objective.y'], ['indep.x'], return_format='dict')
+        assert_rel_error(self, J['objective.y']['indep.x'][0][0], 8.0, 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
