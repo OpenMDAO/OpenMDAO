@@ -116,7 +116,6 @@ class RecordingManager(object):
         if metadata is not None:
             metadata['timestamp'] = time.time()
 
-        # from openmdao.core.driver import Driver
         for recorder in self._recorders:
             if recorder._parallel or MPI is None or self.rank == 0:
                 recorder.record_iteration(object_requesting_recording, data, metadata)

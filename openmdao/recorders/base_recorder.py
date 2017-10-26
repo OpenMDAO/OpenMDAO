@@ -211,7 +211,7 @@ class BaseRecorder(object):
 
         Parameters
         ----------
-        object_requesting_recording : object
+        object_requesting_recording : <Driver>
             Driver in need of recording.
         data : dict
             Dictionary containing desvars, objectives, constraints, responses, and System vars.
@@ -226,7 +226,7 @@ class BaseRecorder(object):
 
         Parameters
         ----------
-        object_requesting_recording : object
+        object_requesting_recording : <System>
             System in need of recording.
         data : dict
             Dictionary containing inputs, outputs, and residuals.
@@ -241,7 +241,7 @@ class BaseRecorder(object):
 
         Parameters
         ----------
-        object_requesting_recording : object
+        object_requesting_recording : <Solver>
             Solver in need of recording.
         data : dict
             Dictionary containing outputs, residuals, and errors.

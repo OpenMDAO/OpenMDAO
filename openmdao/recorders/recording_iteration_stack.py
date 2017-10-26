@@ -112,7 +112,6 @@ class Recording(object):
         if do_recording:
             if self._is_solver:
                 self.object_requesting_recording.record_iteration(abs=self.abs, rel=self.rel)
-                # self.object_requesting_recording.record_iteration()
             else:
                 self.object_requesting_recording.record_iteration()
 

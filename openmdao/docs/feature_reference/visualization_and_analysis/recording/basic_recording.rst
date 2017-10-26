@@ -128,7 +128,7 @@ A More Comprehensive Example
         model.add_constraint('c', upper=-15.0)
         prob.setup(check=False)
 
-        t0, t1 = run_driver(prob)
+        prob.run_driver()
 
         prob.cleanup()
 
