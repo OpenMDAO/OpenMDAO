@@ -229,8 +229,6 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
     #grab the src
     with open(os.path.join(src_dir, "constants.js"), "r") as f:
         constants = f.read()
-    with open(os.path.join(src_dir, "context-menu.js"), "r") as f:
-        context_menu = f.read()
     with open(os.path.join(src_dir, "draw.js"), "r") as f:
         draw = f.read()
     with open(os.path.join(src_dir, "legend.js"), "r") as f:
@@ -277,7 +275,6 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
     index = index.replace('{{search_lib}}', search)
     index = index.replace('{{legend_lib}}', legend)
     index = index.replace('{{draw_lib}}', draw)
-    index = index.replace('{{context_menu_lib}}', context_menu)
     index = index.replace('{{ptn2_lib}}', pt_n2)
     if draw_potential_connections:
         index = index.replace('{{draw_potential_connections}}', 'true')
