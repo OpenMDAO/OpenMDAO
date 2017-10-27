@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizer
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizer, ExplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -643,6 +643,54 @@ class TestScipyOptimizer(unittest.TestCase):
 
         max_defect = np.max(np.abs(p['defect.defect']))
         assert_rel_error(self, max_defect, 0.0, 1e-10)
+
+    def test_reraise_exception_from_callbacks(self):
+        class ReducedActuatorDisc(ExplicitComponent):
+
+            def setup(self):
+
+                # Inputs
+                self.add_input('a', 0.5, desc="Induced Velocity Factor")
+                self.add_input('Vu', 10.0, units="m/s", desc="Freestream air velocity, upstream of rotor")
+
+                # Outputs
+                self.add_output('Vd', 0.0, units="m/s",
+                                desc="Slipstream air velocity, downstream of rotor")
+
+            def compute(self, inputs, outputs):
+                a = inputs['a']
+                Vu = inputs['Vu']
+
+                outputs['Vd'] = Vu * (1 - 2 * a)
+
+            def compute_partials(self, inputs, J):
+                Vu = inputs['Vu']
+
+                J['Vd', 'a'] = -2.0 * Vu
+
+        prob = Problem()
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('a', .5)
+        indeps.add_output('Vu', 10.0, units='m/s')
+
+        prob.model.add_subsystem('a_disk', ReducedActuatorDisc(),
+                                 promotes_inputs=['a', 'Vu'])
+
+        # setup the optimization
+        prob.driver = ScipyOptimizer()
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+        prob.model.add_design_var('a', lower=0., upper=1.)
+        # negative one so we maximize the objective
+        prob.model.add_objective('a_disk.Vd', scaler=-1)
+
+        prob.setup()
+
+        with self.assertRaises(KeyError) as context:
+            prob.run_driver()
+
+        msg = 'Variable name pair ("Vd", "a") must first be declared.'
+        self.assertTrue(msg in str(context.exception))
 
 
 class TestScipyOptimizerFeatures(unittest.TestCase):

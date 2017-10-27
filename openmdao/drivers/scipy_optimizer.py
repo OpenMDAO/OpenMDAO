@@ -253,17 +253,26 @@ class ScipyOptimizer(Driver):
             jac = None
 
         # optimize
-        result = minimize(self._objfunc, x_init,
-                          # args=(),
-                          method=opt,
-                          jac=jac,
-                          # hess=None,
-                          # hessp=None,
-                          bounds=bounds,
-                          constraints=constraints,
-                          tol=self.options['tol'],
-                          # callback=None,
-                          options=self.opt_settings)
+        try:
+            result = minimize(self._objfunc, x_init,
+                              # args=(),
+                              method=opt,
+                              jac=jac,
+                              # hess=None,
+                              # hessp=None,
+                              bounds=bounds,
+                              constraints=constraints,
+                              tol=self.options['tol'],
+                              # callback=None,
+                              options=self.opt_settings)
+
+        # If an exception was swallowed in one of our callbacks, we want to raise it
+        # rather than the cryptic message from scipy.
+        except Exception as msg:
+            if self._exc_info is not None:
+                self._reraise()
+            else:
+                raise
 
         if self._exc_info is not None:
             self._reraise()
@@ -271,7 +280,12 @@ class ScipyOptimizer(Driver):
         self.result = result
         self.fail = False if self.result.success else True
 
-        if self.options['disp']:
+        if self.fail:
+            print('Optimization FAILED.')
+            print(result.message)
+            print('-' * 35)
+
+        elif self.options['disp']:
             print('Optimization Complete')
             print('-' * 35)
 
