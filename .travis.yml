@@ -114,7 +114,7 @@ deploy:
   script:
   - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
       if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
-        rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/twodocversions/test;
+        rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/twodocversions/latest;
       fi
     fi
   on:
