@@ -99,7 +99,7 @@ deploy:
   #    if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
         # cd openmdao/docs;
         # rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/bluedocs;
-        rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/twodocversions/test;
+   rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/twodocversions/test;
 
   #    fi
   #  fi
