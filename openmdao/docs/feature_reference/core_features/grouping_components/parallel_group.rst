@@ -38,11 +38,12 @@ a ParallelGroup.
     :noindex:
 
 
-In general you should avoid mixing *min_procs/max_procs* with *proc_weights*, but if you do use them
-both, OpenMDAO will attempt to perform the allocation as directed.  The algorithm used for the allocation
-starts, assuming that the number of processes is greater or equal to the number of subsystems,
-by assigning the *min_procs* for each subsystem.  It then adds any remaining processes to subsystems
-based on their weights, being careful not to exceed their specified *max_procs*, if any.
+If you use both *min_procs/max_procs* and *proc_weights*, it can become less obvious what the
+resulting process allocation will be, so you may want to stick to just using one or the other.
+The algorithm used for the allocation starts, assuming that the number of processes is greater or
+equal to the number of subsystems, by assigning the *min_procs* for each subsystem.  It then adds
+any remaining processes to subsystems based on their weights, being careful not to exceed their
+specified *max_procs*, if any.
 
 If the  number of processes is less than the number of subsystems then each subsystem, one at a
 time starting with the one with the highest *proc_weight*, is allocated to the least
