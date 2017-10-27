@@ -393,10 +393,10 @@ class TestServerRecorder(unittest.TestCase):
 
         self.prob.model.add_recorder(recorder)
 
-        d1 = self.prob.model.get_subsystem('d1')  # instance of SellarDis1withDerivatives, a Group
+        d1 = self.prob.model.d1  # instance of SellarDis1withDerivatives, a Group
         d1.add_recorder(recorder)
 
-        obj_cmp = self.prob.model.get_subsystem('obj_cmp')  # an ExecComp
+        obj_cmp = self.prob.model.obj_cmp  # an ExecComp
         obj_cmp.add_recorder(recorder)
 
         self.prob.setup(check=False)
@@ -968,10 +968,10 @@ class TestServerRecorder(unittest.TestCase):
         # Driver
         self.prob.driver.add_recorder(recorder)
         # System
-        pz = self.prob.model.get_subsystem('pz')  # IndepVarComp which is an ExplicitComponent
+        pz = self.prob.model.pz  # IndepVarComp which is an ExplicitComponent
         pz.add_recorder(recorder)
         # Solver
-        mda = self.prob.model.get_subsystem('mda')
+        mda = self.prob.model.mda
         mda.nonlinear_solver.add_recorder(recorder)
 
         # Driver
@@ -1085,7 +1085,7 @@ class TestServerRecorder(unittest.TestCase):
         prob['comp1.b'] = -4.
         prob['comp1.c'] = 3.
 
-        comp2 = prob.model.get_subsystem('comp2')  # ImplicitComponent
+        comp2 = prob.model.comp2  # ImplicitComponent
         comp2.add_recorder(recorder)
 
         t0, t1 = run_driver(prob)

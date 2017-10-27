@@ -347,7 +347,7 @@ class TestJacobian(unittest.TestCase):
         model.nonlinear_solver = NewtonSolver()
         model.linear_solver = ScipyIterativeSolver()
 
-        d1 = prob.model.get_subsystem('d1')
+        d1 = prob.model.d1
 
         d1.jacobian = DenseJacobian()
         prob.set_solver_print(level=0)
@@ -535,7 +535,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup(check=False)
         prob.final_setup()
 
-        d1 = prob.model.get_subsystem('d1')
+        d1 = prob.model.d1
         d1.jacobian = DenseJacobian()
 
         msg = "d1: jacobian has changed and setup was not called."

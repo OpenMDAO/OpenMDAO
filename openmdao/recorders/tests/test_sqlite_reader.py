@@ -248,10 +248,10 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.prob.model.add_recorder(self.recorder)
 
-        d1 = self.prob.model.get_subsystem('d1')  # instance of SellarDis1withDerivatives, a Group
+        d1 = self.prob.model.d1  # instance of SellarDis1withDerivatives, a Group
         d1.add_recorder(self.recorder)
 
-        obj_cmp = self.prob.model.get_subsystem('obj_cmp')  # an ExecComp
+        obj_cmp = self.prob.model.obj_cmp  # an ExecComp
         obj_cmp.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
@@ -372,11 +372,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.prob.model.add_recorder(self.recorder)
 
-        pz = self.prob.model.get_subsystem('pz')  # IndepVarComp which is an ExplicitComponent
+        pz = self.prob.model.pz # IndepVarComp which is an ExplicitComponent
         pz.add_recorder(self.recorder)
 
-        mda = self.prob.model.get_subsystem('mda')  # Group
-        d1 = mda.get_subsystem('d1')
+        mda = self.prob.model.mda  # Group
+        d1 = mda.d1
         d1.add_recorder(self.recorder)
 
         self.prob.setup(check=False, mode='rev')
@@ -404,7 +404,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.prob.model.nonlinear_solver.add_recorder(self.recorder)
         self.prob.model.linear_solver.add_recorder(self.recorder)
 
-        d1 = self.prob.model.get_subsystem('d1')  # instance of SellarDis1withDerivatives, a Group
+        d1 = self.prob.model.d1  # instance of SellarDis1withDerivatives, a Group
         d1.nonlinear_solver = NonlinearBlockGS()
         d1.nonlinear_solver.options['maxiter'] = 5
         d1.nonlinear_solver.add_recorder(self.recorder)
