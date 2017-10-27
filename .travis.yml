@@ -34,10 +34,10 @@ notifications:
     secure: Dd+tpZkz48Q47Y+PtdL4b+KAs55PsvWjt9ybhip6xljhA5kVsba9oZS+KsAC8RLWSzVJLOSjz3Cu3MsRym4sTd/g4Pbqyh0ldK2Xnl+n2JOgpPFSXtFuH4Ln3uWB6kYtUK6+aGIC8qhbvEt8tukTBT0RduEmdRyVIZ3oN7YjETPSZXvujeiUFLssfpZW2mqoA/tIgJHFSlySAp6J5694t2Z/p8sHOrK8G/Nm+qlk4xqXHvJ3xablcSBG4BZCrpqmMMdTLXBt2E2K9Rc1P2ZBIrSHVWfSLx+4n79U2385+og7miN1Zuf3gY3YuGKIwnBTtEzTu20905idkr4QdKELCBEcU4azdznwjvUkXWkiFAJII9UELTluSQmZX602zWk4AgJNeHxhN3EbBSMezfYVZjprhlAlwnZZv6t4qAkvuzb7KOA4s679xWzWOBOn1wkynfIF8A66APqssveyz/PvZHSjnHQoLgMU+kwzoX759o0Z/HuRlhCcjv0W9DWxU2bFNi/zVh9YyvR8fG15biGthzOyuf+CHjxohw+J6M+YdR1RIf1g/60nGUPHx4j4SN3kEFPmEDxzZT/f349gvaZGOmKXBi0wH8iY/i9RinM9LJB4t6chj2MkKwUA26bYaVaIO6FYPfE7r+tTG6OXdck4voCs/s4aa9VKEX97yhh0i9g=
 
 before_install:
-- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-    openssl aes-256-cbc -K $encrypted_74d70a284b7d_key -iv $encrypted_74d70a284b7d_iv -in travis_deploy_rsa.enc -out /tmp/travis_deploy_rsa -d;
-    #openssl aes-256-cbc -K $encrypted_67e08862e114_key -iv $encrypted_67e08862e114_iv -in deploy.rsa.enc -out /tmp/deploy.rsa -d;
-  fi
+#- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+- openssl aes-256-cbc -K $encrypted_74d70a284b7d_key -iv $encrypted_74d70a284b7d_iv -in travis_deploy_rsa.enc -out /tmp/travis_deploy_rsa -d;
+#openssl aes-256-cbc -K $encrypted_67e08862e114_key -iv $encrypted_67e08862e114_iv -in deploy.rsa.enc -out /tmp/deploy.rsa -d;
+#  fi
 - OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux"; fi)
 - if [ "$OS" = "MacOSX" ] && [ "$MPI" ]; then
     brew install openmpi;
@@ -50,20 +50,20 @@ before_install:
   else echo "/home/travis/miniconda/bin"; fi)
 - export PATH=$PATHPREFIX:$PATH
 - export OPENMDAO_TEST_DOCS=1
-- if [[ "$TRAVIS_PULL_REQUEST" = "false" ]]; then
-    echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
-  fi
+#- if [[ "$TRAVIS_PULL_REQUEST" = "false" ]]; then
+- echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
+#  fi
 
 install:
-- conda install --yes python=$PY numpy==1.11.2 scipy nose sphinx mock swig
-- if [ "$OS" = "Linux" ]; then
-    if [ "$PY" = "2.7" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp27-none-linux_x86_64.whl;
-    elif [ "$PY" = "3.4" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py3-none-linux_x86_64.whl;
-    fi
-  fi
-- if [ "$OS" = "MacOSX" ]; then if [ "$PY" = "2.7" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py2-none-macosx_10_5_x86_64.whl;
-  elif [ "$PY" = "3.4" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp34-none-macosx_10_5_x86_64.whl;
-  fi fi
+- conda install --yes python=$PY numpy==1.12.1 scipy nose sphinx mock swig
+#- if [ "$OS" = "Linux" ]; then
+#    if [ "$PY" = "2.7" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp27-none-linux_x86_64.whl;
+#    elif [ "$PY" = "3.4" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py3-none-linux_x86_64.whl;
+#    fi
+#  fi
+#- if [ "$OS" = "MacOSX" ]; then if [ "$PY" = "2.7" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py2-none-macosx_10_5_x86_64.whl;
+#  elif [ "$PY" = "3.4" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp34-none-macosx_10_5_x86_64.whl;
+#  fi fi
 - if [ "$MPI" ]; then pip install mpi4py; pip install git+https://bitbucket.org/petsc/petsc4py@3.7.0;
   fi
 - pip install redbaron
@@ -99,7 +99,7 @@ deploy:
   #    if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
         # cd openmdao/docs;
         # rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/bluedocs;
-   rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/twodocversions/test;
+    rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/twodocversions/test;
 
   #    fi
   #  fi
