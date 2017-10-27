@@ -115,73 +115,73 @@ class BaseRecorder(object):
         # unnecessary gathering.
         self._parallel = False
 
-    def startup(self, object_requesting_recording):
+    def startup(self, recording_requester):
         """
         Prepare for a new run and calculate inclusion lists.
 
         Parameters
         ----------
-        object_requesting_recording :
+        recording_requester :
             Object to which this recorder is attached.
         """
         self._counter = 0
 
-    def record_metadata(self, object_requesting_recording):
+    def record_metadata(self, recording_requester):
         """
         Route the record_metadata call to the proper method.
 
         Parameters
         ----------
-        object_requesting_recording: <object>
+        recording_requester: <object>
             The object that would like to record its metadata.
         """
-        if isinstance(object_requesting_recording, Driver):
-            self.record_metadata_driver(object_requesting_recording)
-        elif isinstance(object_requesting_recording, System):
-            self.record_metadata_system(object_requesting_recording)
-        elif isinstance(object_requesting_recording, Solver):
-            self.record_metadata_solver(object_requesting_recording)
+        if isinstance(recording_requester, Driver):
+            self.record_metadata_driver(recording_requester)
+        elif isinstance(recording_requester, System):
+            self.record_metadata_system(recording_requester)
+        elif isinstance(recording_requester, Solver):
+            self.record_metadata_solver(recording_requester)
 
-    def record_metadata_driver(self, object_requesting_recording):
+    def record_metadata_driver(self, recording_requester):
         """
         Record driver metadata.
 
         Parameters
         ----------
-        object_requesting_recording: <Driver>
+        recording_requester: <Driver>
             The Driver that would like to record its metadata.
         """
         raise NotImplementedError()
 
-    def record_metadata_system(self, object_requesting_recording):
+    def record_metadata_system(self, recording_requester):
         """
         Record system metadata.
 
         Parameters
         ----------
-        object_requesting_recording: <System>
+        recording_requester: <System>
             The System that would like to record its metadata.
         """
         raise NotImplementedError()
 
-    def record_metadata_solver(self, object_requesting_recording):
+    def record_metadata_solver(self, recording_requester):
         """
         Record solver metadata.
 
         Parameters
         ----------
-        object_requesting_recording: <Solver>
+        recording_requester: <Solver>
             The Solver that would like to record its metadata.
         """
         raise NotImplementedError()
 
-    def record_iteration(self, object_requesting_recording, data, metadata, **kwargs):
+    def record_iteration(self, recording_requester, data, metadata, **kwargs):
         """
         Route the record_iteration call to the proper method.
 
         Parameters
         ----------
-        object_requesting_recording : object
+        recording_requester : object
             System, Solver, Driver in need of recording.
         metadata : dict, optional
             Dictionary containing execution metadata.
@@ -196,22 +196,22 @@ class BaseRecorder(object):
 
         self._iteration_coordinate = get_formatted_iteration_coordinate()
 
-        if isinstance(object_requesting_recording, Driver):
-            self.record_iteration_driver(object_requesting_recording, data, metadata)
-        elif isinstance(object_requesting_recording, System):
-            self.record_iteration_system(object_requesting_recording, data, metadata)
-        elif isinstance(object_requesting_recording, Solver):
-            self.record_iteration_solver(object_requesting_recording, data, metadata)
+        if isinstance(recording_requester, Driver):
+            self.record_iteration_driver(recording_requester, data, metadata)
+        elif isinstance(recording_requester, System):
+            self.record_iteration_system(recording_requester, data, metadata)
+        elif isinstance(recording_requester, Solver):
+            self.record_iteration_solver(recording_requester, data, metadata)
         else:
             raise ValueError("Recorders must be attached to Drivers, Systems, or Solvers.")
 
-    def record_iteration_driver(self, object_requesting_recording, data, metadata):
+    def record_iteration_driver(self, recording_requester, data, metadata):
         """
         Record data and metadata from a Driver.
 
         Parameters
         ----------
-        object_requesting_recording : <Driver>
+        recording_requester : <Driver>
             Driver in need of recording.
         data : dict
             Dictionary containing desvars, objectives, constraints, responses, and System vars.
@@ -220,13 +220,13 @@ class BaseRecorder(object):
         """
         raise NotImplementedError("record_iteration_driver has not been overridden")
 
-    def record_iteration_system(self, object_requesting_recording, data, metadata):
+    def record_iteration_system(self, recording_requester, data, metadata):
         """
         Record data and metadata from a System.
 
         Parameters
         ----------
-        object_requesting_recording : <System>
+        recording_requester : <System>
             System in need of recording.
         data : dict
             Dictionary containing inputs, outputs, and residuals.
@@ -235,13 +235,13 @@ class BaseRecorder(object):
         """
         raise NotImplementedError("record_iteration_system has not been overridden")
 
-    def record_iteration_solver(self, object_requesting_recording, data, metadata):
+    def record_iteration_solver(self, recording_requester, data, metadata):
         """
         Record data and metadata from a Solver.
 
         Parameters
         ----------
-        object_requesting_recording : <Solver>
+        recording_requester : <Solver>
             Solver in need of recording.
         data : dict
             Dictionary containing outputs, residuals, and errors.

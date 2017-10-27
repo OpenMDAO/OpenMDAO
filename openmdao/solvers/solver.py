@@ -456,7 +456,7 @@ class Solver(object):
         **kwargs : dict
             Keyword arguments (used for abs and rel error).
         """
-        if not self._rec_mgr.has_recorders():
+        if not self._rec_mgr._recorders:
             return
 
         metadata = create_local_meta(self.SOLVER)

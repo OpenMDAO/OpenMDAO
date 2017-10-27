@@ -286,7 +286,7 @@ class Driver(object):
         }
 
         self._rec_mgr.startup(self)
-        if (self._rec_mgr._recorders):
+        if self._rec_mgr._recorders:
             from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
             self._model_viewer_data = _get_viewer_data(problem)
         if self.options['record_metadata']:
@@ -614,7 +614,7 @@ class Driver(object):
         """
         Record an iteration of the current Driver.
         """
-        if not self._rec_mgr.has_recorders():
+        if not self._rec_mgr._recorders:
             return
 
         metadata = create_local_meta(self._get_name())
@@ -652,7 +652,8 @@ class Driver(object):
 
         if self.options['system_includes']:
             root = self._problem.model
-            inputs, outputs, residuals = root.get_nonlinear_vectors()
+            outputs = root._outputs
+            # outputsinputs, outputs, residuals = root.get_nonlinear_vectors()
             sysvars = {}
             for name, value in iteritems(outputs._names):
                 if name in self._filtered_vars_to_record['sys']:

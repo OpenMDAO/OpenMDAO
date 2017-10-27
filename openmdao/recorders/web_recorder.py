@@ -87,13 +87,13 @@ class WebRecorder(BaseRecorder):
             self._case_id = str(case_id)
             self._headers['update'] = "True"
 
-    def record_iteration_driver(self, object_requesting_recording, data, metadata):
+    def record_iteration_driver(self, recording_requester, data, metadata):
         """
         Record data and metadata from a Driver.
 
         Parameters
         ----------
-        object_requesting_recording : object
+        recording_requester : object
             Driver in need of recording.
         data : dict
             Dictionary containing desvars, objectives, constraints, responses, and System vars.
@@ -170,13 +170,13 @@ class WebRecorder(BaseRecorder):
         requests.post(self._endpoint + '/' + self._case_id + '/global_iterations',
                       data=global_iteration, headers=self._headers)
 
-    def record_iteration_system(self, object_requesting_recording, data, metadata):
+    def record_iteration_system(self, recording_requester, data, metadata):
         """
         Record data and metadata from a System.
 
         Parameters
         ----------
-        object_requesting_recording : object
+        recording_requester : object
             Driver in need of recording.
         data : dict
             Dictionary containing inputs, outputs, and residuals.
@@ -219,13 +219,13 @@ class WebRecorder(BaseRecorder):
                                       metadata['msg'], inputs_array, outputs_array,
                                       residuals_array)
 
-    def record_iteration_solver(self, object_requesting_recording, data, metadata):
+    def record_iteration_solver(self, recording_requester, data, metadata):
         """
         Record data and metadata from a Solver.
 
         Parameters
         ----------
-        object_requesting_recording : object
+        recording_requester : object
             Solver in need of recording.
         data : dict
             Dictionary containing outputs, residuals, and errors.
@@ -398,17 +398,17 @@ class WebRecorder(BaseRecorder):
         requests.post(self._endpoint + '/' + self._case_id + '/global_iterations',
                       data=global_iteration, headers=self._headers)
 
-    def record_metadata_driver(self, object_requesting_recording):
+    def record_metadata_driver(self, recording_requester):
         """
         Record driver metadata.
 
         Parameters
         ----------
-        object_requesting_recording: <Driver>
+        recording_requester: <Driver>
             The Driver that would like to record its metadata.
         """
-        driver_class = type(object_requesting_recording).__name__
-        model_viewer_data = json.dumps(object_requesting_recording._model_viewer_data)
+        driver_class = type(recording_requester).__name__
+        model_viewer_data = json.dumps(recording_requester._model_viewer_data)
         self._record_driver_metadata(driver_class, model_viewer_data)
 
     def _record_driver_metadata(self, driver_class, model_viewer_data):
@@ -431,29 +431,29 @@ class WebRecorder(BaseRecorder):
         requests.post(self._endpoint + '/' + self._case_id + '/driver_metadata',
                       data=driver_metadata, headers=self._headers)
 
-    def record_metadata_system(self, object_requesting_recording):
+    def record_metadata_system(self, recording_requester):
         """
         Record system metadata.
 
         Parameters
         ----------
-        object_requesting_recording: <System>
+        recording_requester: <System>
             The System that would like to record its metadata.
         """
         pass
 
-    def record_metadata_solver(self, object_requesting_recording):
+    def record_metadata_solver(self, recording_requester):
         """
         Record solver metadata.
 
         Parameters
         ----------
-        object_requesting_recording: <Solver>
+        recording_requester: <Solver>
             The Solver that would like to record its metadata.
         """
-        solver_class = type(object_requesting_recording).__name__
-        path = object_requesting_recording._system.pathname
-        self._record_solver_metadata(object_requesting_recording.options, solver_class, path)
+        solver_class = type(recording_requester).__name__
+        path = recording_requester._system.pathname
+        self._record_solver_metadata(recording_requester.options, solver_class, path)
 
     def _record_solver_metadata(self, opts, solver_class, path):
         """

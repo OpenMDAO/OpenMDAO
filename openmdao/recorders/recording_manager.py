@@ -61,19 +61,19 @@ class RecordingManager(object):
         """
         self._recorders.append(recorder)
 
-    def startup(self, object_requesting_recording):
+    def startup(self, recording_requester):
         """
         Run startup on each recorder in the manager.
         """
         # Will only add parallel code for Drivers. Use the old method for System and Solver
         from openmdao.core.driver import Driver
-        if not isinstance(object_requesting_recording, Driver):
+        if not isinstance(recording_requester, Driver):
             for recorder in self._recorders:
-                recorder.startup(object_requesting_recording)
+                recorder.startup(recording_requester)
             return
 
         # The remaining code only works for recording of Drivers
-        model = object_requesting_recording._problem.model
+        model = recording_requester._problem.model
         if MPI:
             # TODO Eventually, we think we can get rid of this next check. But to be safe,
             #       we are leaving it in there.
@@ -85,7 +85,7 @@ class RecordingManager(object):
         for recorder in self._recorders:
             # Each of the recorders determines its self._filtered_* list of vars
             #   to record
-            recorder.startup(object_requesting_recording)
+            recorder.startup(recording_requester)
 
             if not recorder._parallel:
                 self._has_serial_recorders = True
@@ -97,13 +97,13 @@ class RecordingManager(object):
         for recorder in self._recorders:
             recorder.close()
 
-    def record_iteration(self, object_requesting_recording, data, metadata):
+    def record_iteration(self, recording_requester, data, metadata):
         """
         Call record_iteration on all recorders.
 
         Parameters
         ----------
-        object_requesting_recording : <object>
+        recording_requester : <object>
             The object that needs an iteration of itself recorded.
         metadata : dict
             Metadata for iteration coordinate
@@ -118,15 +118,15 @@ class RecordingManager(object):
 
         for recorder in self._recorders:
             if recorder._parallel or MPI is None or self.rank == 0:
-                recorder.record_iteration(object_requesting_recording, data, metadata)
+                recorder.record_iteration(recording_requester, data, metadata)
 
-    def record_metadata(self, object_requesting_recording):
+    def record_metadata(self, recording_requester):
         """
         Call record_metadata for all recorders.
 
         Parameters
         ----------
-        object_requesting_recording : <object>
+        recording_requester : <object>
             The object that needs its metadata recorded.
 
         """
@@ -134,7 +134,7 @@ class RecordingManager(object):
             # If the recorder does not support parallel recording
             # we need to make sure we only record on rank 0.
             if recorder._parallel or self.rank == 0:
-                recorder.record_metadata(object_requesting_recording)
+                recorder.record_metadata(recording_requester)
 
     def has_recorders(self):
         """

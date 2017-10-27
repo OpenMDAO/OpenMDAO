@@ -117,13 +117,13 @@ class SqliteRecorder(BaseRecorder):
                 self.cursor.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
                                     "solver_options BLOB, solver_class TEXT)")
 
-    def record_iteration_driver(self, object_requesting_recording, data, metadata):
+    def record_iteration_driver(self, recording_requester, data, metadata):
         """
         Record data and metadata from a Driver.
 
         Parameters
         ----------
-        object_requesting_recording : object
+        recording_requester : object
             Driver in need of recording.
         data : dict
             Dictionary containing desvars, objectives, constraints, responses, and System vars.
@@ -169,13 +169,13 @@ class SqliteRecorder(BaseRecorder):
                 self.con.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
                                  ('driver', self.cursor.lastrowid))
 
-    def record_iteration_system(self, object_requesting_recording, data, metadata):
+    def record_iteration_system(self, recording_requester, data, metadata):
         """
         Record data and metadata from a System.
 
         Parameters
         ----------
-        object_requesting_recording : object
+        recording_requester : object
             Driver in need of recording.
         data : dict
             Dictionary containing inputs, outputs, and residuals.
@@ -205,13 +205,13 @@ class SqliteRecorder(BaseRecorder):
             self.cursor.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
                                 ('system', self.cursor.lastrowid))
 
-    def record_iteration_solver(self, object_requesting_recording, data, metadata):
+    def record_iteration_solver(self, recording_requester, data, metadata):
         """
         Record data and metadata from a Solver.
 
         Parameters
         ----------
-        object_requesting_recording : object
+        recording_requester : object
             Solver in need of recording.
         data : dict
             Dictionary containing outputs, residuals, and errors.
@@ -242,69 +242,69 @@ class SqliteRecorder(BaseRecorder):
             self.cursor.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
                                 ('solver', self.cursor.lastrowid))
 
-    def record_metadata_driver(self, object_requesting_recording):
+    def record_metadata_driver(self, recording_requester):
         """
         Record driver metadata.
 
         Parameters
         ----------
-        object_requesting_recording: <Driver>
+        recording_requester: <Driver>
             The Driver that would like to record its metadata.
         """
-        driver_class = type(object_requesting_recording).__name__
-        model_viewer_data = pickle.dumps(object_requesting_recording._model_viewer_data,
+        driver_class = type(recording_requester).__name__
+        model_viewer_data = pickle.dumps(recording_requester._model_viewer_data,
                                          pickle.HIGHEST_PROTOCOL)
 
         with self.con:
             self.con.execute("INSERT INTO driver_metadata(id, model_viewer_data) "
                              "VALUES(?,?)", (driver_class, sqlite3.Binary(model_viewer_data)))
 
-    def record_metadata_system(self, object_requesting_recording):
+    def record_metadata_system(self, recording_requester):
         """
         Record system metadata.
 
         Parameters
         ----------
-        object_requesting_recording: <System>
+        recording_requester: <System>
             The System that would like to record its metadata.
         """
         # Cannot handle PETScVector yet
         from openmdao.api import PETScVector
-        if PETScVector and isinstance(object_requesting_recording._outputs, PETScVector):
+        if PETScVector and isinstance(recording_requester._outputs, PETScVector):
             return  # Cannot handle PETScVector yet
 
         # collect scaling arrays
         scaling_vecs = {}
-        for kind, odict in iteritems(object_requesting_recording._vectors):
+        for kind, odict in iteritems(recording_requester._vectors):
             scaling_vecs[kind] = scaling = {}
             for vecname, vec in iteritems(odict):
                 scaling[vecname] = vec._scaling
         scaling_factors = pickle.dumps(scaling_vecs,
                                        pickle.HIGHEST_PROTOCOL)
 
-        path = object_requesting_recording.pathname
+        path = recording_requester.pathname
         if not path:
             path = 'root'
         with self.con:
             self.con.execute("INSERT INTO system_metadata(id, scaling_factors) VALUES(?,?)",
                              (path, sqlite3.Binary(scaling_factors)))
 
-    def record_metadata_solver(self, object_requesting_recording):
+    def record_metadata_solver(self, recording_requester):
         """
         Record solver metadata.
 
         Parameters
         ----------
-        object_requesting_recording: <Solver>
+        recording_requester: <Solver>
             The Solver that would like to record its metadata.
         """
-        path = object_requesting_recording._system.pathname
-        solver_class = type(object_requesting_recording).__name__
+        path = recording_requester._system.pathname
+        solver_class = type(recording_requester).__name__
         if not path:
             path = 'root'
         id = "{}.{}".format(path, solver_class)
 
-        solver_options = pickle.dumps(object_requesting_recording.options,
+        solver_options = pickle.dumps(recording_requester.options,
                                       pickle.HIGHEST_PROTOCOL)
         with self.con:
             self.con.execute(

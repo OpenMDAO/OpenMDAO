@@ -2879,7 +2879,7 @@ class System(object):
         """
         Record an iteration of the current System.
         """
-        if self._rec_mgr.has_recorders():
+        if self._rec_mgr._recorders:
             metadata = create_local_meta(self.pathname)
 
             # Get the data to record
