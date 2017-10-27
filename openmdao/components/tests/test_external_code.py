@@ -192,6 +192,16 @@ class ParaboloidExternalCode(ExternalCode):
 
 class TestExternalCodeFeature(unittest.TestCase):
 
+    def tearDown(self):
+        try:
+            os.remove('paraboloid_input.dat')
+        except OSError:
+            pass
+        try:
+            os.remove('paraboloid_output.dat')
+        except OSError:
+            pass
+
     def test_main(self):
         from openmdao.api import Problem, Group, IndepVarComp
         from openmdao.components.tests.test_external_code import ParaboloidExternalCode
