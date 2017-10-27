@@ -58,7 +58,7 @@ class DefaultAllocator(ProcAllocator):
             isubs_list = [[] for ind in range(nproc)]
             proc_load = np.zeros(nproc)
 
-            sub_sort_idxs = np.flip(np.argsort(proc_weights), 0)
+            sub_sort_idxs = np.flipud(np.argsort(proc_weights))
             vals = proc_weights
 
             # Assign the slowest subsystem to the most free processor
