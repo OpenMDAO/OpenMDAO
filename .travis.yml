@@ -10,10 +10,10 @@ os:
 language: generic
 
 env:
-- PY=2.7 MPI=1
-- PY=3.4 MPI=1
-- PY=2.7 MPI=
-- PY=3.4 MPI=
+#- PY=2.7 MPI=1
+#- PY=3.4 MPI=1
+#- PY=2.7 MPI=
+#- PY=3.4 MPI=
 - PY=3.6 MPI=
 
 addons:
@@ -77,30 +77,30 @@ script:
 - make all
 # - cd ../.. # run the docs from down here to see if it can work without being at top level
 # run all openmdao tests
-- testflo -n 1 -m "ptest*"
-- testflo -n 1 --coverage --coverpkg openmdao
+#- testflo -n 1 -m "ptest*"
+#- testflo -n 1 --coverage --coverpkg openmdao
 
 after_success:
-- coverallspwd
+#- coveralls
 
 before_deploy:
-- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+#- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
     eval "$(ssh-agent -s)";
     chmod 600 /tmp/deploy.rsa;
     ssh-add /tmp/deploy.rsa;
-  fi
+#  fi
 
 deploy:
   provider: script
   skip_cleanup: true
   script:
-  - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-      if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
+  #- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+  #    if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
         # cd openmdao/docs;
         # rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/bluedocs;
-        rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/twodocversions/latest;
+        rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/twodocversions/test;
 
-      fi
-    fi
+  #    fi
+  #  fi
   on:
     branch: master
