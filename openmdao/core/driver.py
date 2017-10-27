@@ -679,6 +679,18 @@ class Driver(object):
     def _gather_vars(self, root, local_vars):
         """
         Gather and return only variables listed in `local_vars` from the `root` System.
+
+        Parameters
+        ----------
+        root : <System>
+            the root System for the Problem
+        local_vars : dict
+            local variable names and values
+
+        Returns
+        -------
+        dct : dict
+            variable names and values.
         """
         # if trace:
         #     debug("gathering vars for recording in %s" % root.pathname)
@@ -686,11 +698,8 @@ class Driver(object):
         # if trace:
         #     debug("DONE gathering rec vars for %s" % root.pathname)
 
-        print('root.comm.rank', root.comm.rank, 'local_vars', local_vars, 'all_vars', all_vars)
-
         if root.comm.rank == 0:
             dct = all_vars[-1]
-            print('dct', dct)
             for d in all_vars[:-1]:
                 dct.update(d)
             return dct
