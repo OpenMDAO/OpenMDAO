@@ -3,6 +3,7 @@ from __future__ import division
 
 from collections import Iterable, Counter, OrderedDict, defaultdict
 from itertools import product, chain
+from numbers import Number
 import warnings
 
 from six import iteritems, string_types, itervalues
@@ -15,7 +16,7 @@ from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
 from openmdao.core.component import Component
-from openmdao.proc_allocators.default_allocator import DefaultAllocator
+from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
@@ -23,6 +24,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ancestors
 from openmdao.utils.units import is_compatible
+from openmdao.utils.mpi import MPI
 from openmdao.utils.graph_utils import all_connected_edges
 
 # regex to check for valid names.
@@ -38,8 +40,8 @@ class Group(System):
     ----------
     _mpi_proc_allocator : ProcAllocator
         Object used to allocate MPI processes to subsystems.
-    proc_weights : list of float
-        Weights used to determine MPI process allocation to subsystems.
+    _proc_info : dict of subsys_name: (min_procs, max_procs, weight)
+        Information used to determine MPI process allocation to subsystems.
     """
 
     def __init__(self, **kwargs):
@@ -62,7 +64,7 @@ class Group(System):
         if not self._linear_solver:
             self._linear_solver = LinearRunOnce()
         self._mpi_proc_allocator = DefaultAllocator()
-        self.proc_weights = None
+        self._proc_info = {}
 
     def setup(self):
         """
@@ -130,7 +132,6 @@ class Group(System):
         """
         self.pathname = pathname
         self.comm = comm
-        self._subsystems_proc_range = subsystems_proc_range = []
 
         self._subsystems_allprocs = []
         self._manual_connections = {}
@@ -145,29 +146,59 @@ class Group(System):
         self.setup()
         self._static_mode = True
 
-        # Call the load balancing algorithm
-        sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(
-            self.proc_weights,
-            len(self._subsystems_allprocs),
-            comm)
+        if MPI:
+            proc_info = [self._proc_info[s.name] for s in self._subsystems_allprocs]
 
-        # Define local subsystems
-        self._subsystems_myproc = [self._subsystems_allprocs[ind]
-                                   for ind in sub_inds]
-        self._subsystems_myproc_inds = sub_inds
+            # Call the load balancing algorithm
+            try:
+                sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(
+                    proc_info, len(self._subsystems_allprocs), comm)
+            except ProcAllocationError as err:
+                subs = self._subsystems_allprocs
+                if err.sub_inds is None:
+                    raise RuntimeError("%s: %s" % (self.pathname, err.msg))
+                else:
+                    raise RuntimeError("%s: MPI process allocation failed: %s for the following "
+                                       "subsystems: %s" % (self.pathname, err.msg,
+                                                           [subs[i].name for i in err.sub_inds]))
+
+            self._subsystems_myproc = [self._subsystems_allprocs[ind] for ind in sub_inds]
+
+            # Define local subsystems
+            if np.sum([minp for minp, _, _ in proc_info]) <= comm.size:
+                self._subsystems_myproc_inds = sub_inds
+            else:
+                # reorder the subsystems_allprocs based on which procs they live on. If we don't
+                # do this, we can get ordering mismatches in some of our data structures.
+                new_allsubs = []
+                seen = set()
+                gathered = self.comm.allgather(sub_inds)
+                for rank, inds in enumerate(gathered):
+                    for ind in inds:
+                        if ind not in seen:
+                            new_allsubs.append(self._subsystems_allprocs[ind])
+                            seen.add(ind)
+                self._subsystems_allprocs = new_allsubs
+                sub_idxs = {s.name: i for i, s in enumerate(self._subsystems_allprocs)}
+
+                # since the subsystems_allprocs order changed, we also have to update
+                # subsystems_myproc_inds
+                self._subsystems_myproc_inds = [sub_idxs[s.name] for s in self._subsystems_myproc]
+        else:
+            sub_comm = comm
+            self._subsystems_myproc = self._subsystems_allprocs
+            self._subsystems_myproc_inds = list(range(len(self._subsystems_myproc)))
+            sub_proc_range = (0, 1)
 
         # Compute _subsystems_proc_range
-        for subsys in self._subsystems_myproc:
-            subsystems_proc_range.append(sub_proc_range)
+        self._subsystems_proc_range = [sub_proc_range] * len(self._subsystems_myproc)
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
             if self.pathname:
-                sub_pathname = '.'.join((self.pathname, subsys.name))
+                subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm)
             else:
-                sub_pathname = subsys.name
-
-            subsys._setup_procs(sub_pathname, sub_comm)
+                subsys._setup_procs(subsys.name, sub_comm)
 
     def _setup_vars(self, recurse=True):
         """
@@ -1112,7 +1143,8 @@ class Group(System):
         return self.add_subsystem(name, subsys, promotes=promotes)
 
     def add_subsystem(self, name, subsys, promotes=None,
-                      promotes_inputs=None, promotes_outputs=None):
+                      promotes_inputs=None, promotes_outputs=None,
+                      min_procs=1, max_procs=None, proc_weight=1.0):
         """
         Add a subsystem.
 
@@ -1137,6 +1169,14 @@ class Group(System):
             variables to 'promote' up to this group. If an entry is a tuple of
             the form (old_name, new_name), this will rename the variable in
             the parent group.
+        min_procs : int
+            Minimum number of MPI processes usable by the subsystem. Defaults to 1.
+        max_procs : int or None
+            Maximum number of MPI processes usable by the subsystem.  A value
+            of None (the default) indicates there is no maximum limit.
+        proc_weight : float
+            Weight given to the subsystem when allocating available MPI processes
+            to all subsystems.  Default is 1.0.
 
         Returns
         -------
@@ -1181,6 +1221,18 @@ class Group(System):
             subsystems_allprocs = self._subsystems_allprocs
 
         subsystems_allprocs.append(subsys)
+
+        if not isinstance(min_procs, int) or min_procs < 1:
+            raise TypeError("%s: min_procs must be an int > 0 but (%s) was given." %
+                            (self.name, min_procs))
+        if max_procs is not None and (not isinstance(max_procs, int) or max_procs < min_procs):
+            raise TypeError("%s: max_procs must be None or an int >= min_procs but (%s) was given."
+                            % (self.name, max_procs))
+        if isinstance(proc_weight, Number) and proc_weight < 0:
+            raise TypeError("%s: proc_weight must be a float > 0. but (%s) was given." %
+                            (self.name, proc_weight))
+
+        self._proc_info[name] = (min_procs, max_procs, proc_weight)
 
         setattr(self, name, subsys)
 
