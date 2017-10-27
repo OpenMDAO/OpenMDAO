@@ -714,11 +714,11 @@ class TestProblem(unittest.TestCase):
             def setup(self):
                 self.add_subsystem('comp', ImplSimple())
 
-                # This will not solve it
+                # This solver will get over-ridden below
                 self.nonlinear_solver = NonlinearBlockGS()
 
             def configure(self):
-                # This will not solve it either.
+                # This solver will get over-ridden below
                 self.nonlinear_solver = NonlinearBlockGS()
 
 
@@ -733,7 +733,7 @@ class TestProblem(unittest.TestCase):
 
         top.setup(check=False)
 
-        # This will solve it.
+        # These solvers override the ones set in the setup method of the 'sub' groups
         top.model.sub.nonlinear_solver = NewtonSolver()
         top.model.sub.linear_solver = ScipyIterativeSolver()
 
