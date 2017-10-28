@@ -1,8 +1,8 @@
 .. _feature_adding_subsystem_to_a_group:
 
-****************************
-Adding Subsystems to a Group
-****************************
+******************************************************
+Adding Subsystems to a Group and Promoting Variables
+******************************************************
 
 To add a Component or another Group to a Group, use the add_subsystem method.
 
