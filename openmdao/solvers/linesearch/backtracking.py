@@ -113,7 +113,7 @@ class BoundsEnforceLS(NonlinearSolver):
         norm0 = self._iter_get_norm()
         if norm0 == 0.0:
             norm0 = 1.0
-
+        self._norm0 = norm0
         u += du
 
         if self.options['print_bound_enforce']:
@@ -317,6 +317,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
 
         self._iter_count = 0
         norm0, norm = self._iter_initialize()
+        self._norm0 = norm0
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
         # Further backtracking if needed.

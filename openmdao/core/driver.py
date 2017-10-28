@@ -8,13 +8,33 @@ import numpy as np
 
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.utils.record_util import create_local_meta
+from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 
 
 class Driver(object):
     """
     Top-level container for the systems and drivers.
+
+    Options
+    -------
+    options['record_metadata'] :  bool(True)
+        Tells recorder whether to record variable attribute metadata.
+    options['record_desvars'] :  bool(True)
+        Tells recorder whether to record the desvars of the Driver.
+    options['record_responses'] :  bool(False)
+        Tells recorder whether to record the responses of the Driver.
+    options['record_objectives'] :  bool(False)
+        Tells recorder whether to record the objectives of the Driver.
+    options['record_constraints'] :  bool(False)
+        Tells recorder whether to record the constraints of the Driver.
+    options['system_includes'] :  list([])
+        List of specific System variables to record in addition to Driver variables.
+    options['includes'] :  list of strings("*")
+        Patterns for variables to include in recording.
+    options['excludes'] :  list of strings('')
+        Patterns for variables to exclude in recording (processed after includes).
 
     Attributes
     ----------
@@ -40,6 +60,8 @@ class Driver(object):
         Contains all response info.
     _rec_mgr : <RecordingManager>
         Object that manages all recorders added to this driver.
+    _vars_to_record: dict
+        Dict of lists of var names indicating what to record
     _model_viewer_data : dict
         Structure of model, used to make n2 diagram.
     _remote_dvs : dict
@@ -60,6 +82,13 @@ class Driver(object):
         Initialize the driver.
         """
         self._rec_mgr = RecordingManager()
+        self._vars_to_record = {
+            'desvarnames': set(),
+            'responsenames': set(),
+            'objectivenames': set(),
+            'constraintnames': set(),
+            'sysinclnames': set(),
+        }
 
         self._problem = None
         self._designvars = None
@@ -67,6 +96,26 @@ class Driver(object):
         self._objs = None
         self._responses = None
         self.options = OptionsDictionary()
+
+        ###########################
+        self.options.declare('record_metadata', type_=bool, desc='Record metadata', default=True)
+        self.options.declare('record_desvars', type_=bool, default=True,
+                             desc='Set to True to record design variables at the driver level')
+        self.options.declare('record_responses', type_=bool, default=False,
+                             desc='Set to True to record responses at the driver level')
+        self.options.declare('record_objectives', type_=bool, default=False,
+                             desc='Set to True to record objectives at the driver level')
+        self.options.declare('record_constraints', type_=bool, default=False,
+                             desc='Set to True to record constraints at the driver level')
+        self.options.declare('system_includes', type_=list, default=[],
+                             desc='Patterns for System outputs to include in '
+                             'recording of Driver iterations')
+        self.options.declare('includes', type_=list, default=['*'],
+                             desc='Patterns for variables to include in recording')
+        self.options.declare('excludes', type_=list, default=[],
+                             desc='Patterns for vars to exclude in recording '
+                                  '(processed post-includes)')
+        ###########################
 
         # What the driver supports.
         self.supports = OptionsDictionary()
@@ -167,11 +216,81 @@ class Driver(object):
         self._remote_responses = self._remote_cons.copy()
         self._remote_responses.update(self._remote_objs)
 
+        # Case recording setup
+        mydesvars = myobjectives = myconstraints = myresponses = set()
+        mysystem_outputs = set()
+        incl = self.options['includes']
+        excl = self.options['excludes']
+        sys_incl = self.options['system_includes']
+
+        if self.options['record_desvars']:
+            mydesvars = {n for n in self._designvars
+                         if check_path(n, incl, excl)}
+
+        if self.options['record_objectives']:
+            myobjectives = {n for n in self._objs
+                            if check_path(n, incl, excl)}
+
+        if self.options['record_constraints']:
+            myconstraints = {n for n in self._cons
+                             if check_path(n, incl, excl)}
+
+        if self.options['record_responses']:
+            myresponses = {n for n in self._responses
+                           if check_path(n, incl, excl)}
+
+        # get the system_includes that were requested for this Driver recording
+        if sys_incl:
+            prob = self._problem
+            root = prob.model
+            # The my* variables are sets
+            # sys_incl is not subject to the checking with incl and excl
+            #   sys_incl IS the incl
+
+            # First gather all of the desired outputs
+            # The following might only be the local vars if MPI
+            # mysystem_outputs = {n for n in root._outputs}
+            mysystem_outputs = {n for n in root._outputs
+                                if check_path(n, sys_incl, [])}
+
+            # If MPI, and on rank 0, need to gather up all the variables
+            #    even those not local to rank 0
+            if MPI:
+                all_vars = root.comm.gather(mysystem_outputs, root=0)
+                if MPI.COMM_WORLD.rank == 0:
+                    mysystem_outputs = all_vars[-1]
+                    for d in all_vars[:-1]:
+                        mysystem_outputs.update(d)
+
+        if MPI:  # filter based on who owns the variables
+            # TODO Eventually, we think we can get rid of this next check. But to be safe,
+            #       we are leaving it in there.
+            if not model.is_active():
+                raise RuntimeError(
+                    "RecordingManager.startup should never be called when "
+                    "running in parallel on an inactive System")
+            rrank = self._problem.comm.rank  # root ( aka model ) rank.
+            rowned = model._owning_rank['output']
+            mydesvars = [n for n in mydesvars if rrank == rowned[n]]
+            myresponses = [n for n in myresponses if rrank == rowned[n]]
+            myobjectives = [n for n in myobjectives if rrank == rowned[n]]
+            myconstraints = [n for n in myconstraints if rrank == rowned[n]]
+            mysystem_outputs = [n for n in mysystem_outputs if rrank == rowned[n]]
+
+        self._filtered_vars_to_record = {
+            'des': mydesvars,
+            'obj': myobjectives,
+            'con': myconstraints,
+            'res': myresponses,
+            'sys': mysystem_outputs,
+        }
+
         self._rec_mgr.startup(self)
-        if (self._rec_mgr._recorders):
+        if self._rec_mgr._recorders:
             from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
             self._model_viewer_data = _get_viewer_data(problem)
-        self._rec_mgr.record_metadata(self)
+        if self.options['record_metadata']:
+            self._rec_mgr.record_metadata(self)
 
     def _get_voi_val(self, name, meta, remote_vois):
         """
@@ -495,8 +614,96 @@ class Driver(object):
         """
         Record an iteration of the current Driver.
         """
+        if not self._rec_mgr._recorders:
+            return
+
         metadata = create_local_meta(self._get_name())
-        self._rec_mgr.record_iteration(self, metadata)
+
+        # Get the data to record
+        data = {}
+        if self.options['record_desvars']:
+            # collective call that gets across all ranks
+            desvars = self.get_design_var_values()
+        else:
+            desvars = {}
+        # return
+
+        if self.options['record_responses']:
+            # responses = self.get_response_values() # not really working yet
+            responses = {}
+        else:
+            responses = {}
+
+        if self.options['record_objectives']:
+            objectives = self.get_objective_values()
+        else:
+            objectives = {}
+
+        if self.options['record_constraints']:
+            constraints = self.get_constraint_values()
+        else:
+            constraints = {}
+
+        desvars = {name: desvars[name] for name in self._filtered_vars_to_record['des']}
+        # responses not working yet
+        # responses = {name: responses[name] for name in self._filtered_vars_to_record['res']}
+        objectives = {name: objectives[name] for name in self._filtered_vars_to_record['obj']}
+        constraints = {name: constraints[name] for name in self._filtered_vars_to_record['con']}
+
+        if self.options['system_includes']:
+            root = self._problem.model
+            outputs = root._outputs
+            # outputsinputs, outputs, residuals = root.get_nonlinear_vectors()
+            sysvars = {}
+            for name, value in iteritems(outputs._names):
+                if name in self._filtered_vars_to_record['sys']:
+                    sysvars[name] = value
+        else:
+            sysvars = {}
+
+        if MPI:
+            root = self._problem.model
+            desvars = self._gather_vars(root, desvars)
+            responses = self._gather_vars(root, responses)
+            objectives = self._gather_vars(root, objectives)
+            constraints = self._gather_vars(root, constraints)
+            sysvars = self._gather_vars(root, sysvars)
+
+        data['des'] = desvars
+        data['res'] = responses
+        data['obj'] = objectives
+        data['con'] = constraints
+        data['sys'] = sysvars
+
+        self._rec_mgr.record_iteration(self, data, metadata)
+
+    def _gather_vars(self, root, local_vars):
+        """
+        Gather and return only variables listed in `local_vars` from the `root` System.
+
+        Parameters
+        ----------
+        root : <System>
+            the root System for the Problem
+        local_vars : dict
+            local variable names and values
+
+        Returns
+        -------
+        dct : dict
+            variable names and values.
+        """
+        # if trace:
+        #     debug("gathering vars for recording in %s" % root.pathname)
+        all_vars = root.comm.gather(local_vars, root=0)
+        # if trace:
+        #     debug("DONE gathering rec vars for %s" % root.pathname)
+
+        if root.comm.rank == 0:
+            dct = all_vars[-1]
+            for d in all_vars[:-1]:
+                dct.update(d)
+            return dct
 
     def _get_name(self):
         """

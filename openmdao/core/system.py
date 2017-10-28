@@ -17,11 +17,13 @@ from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobi
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
 from openmdao.recorders.recording_manager import RecordingManager
+from openmdao.recorders.recording_iteration_stack import recording_iteration, \
+    get_formatted_iteration_coordinate
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import get_conversion
 from openmdao.utils.array_utils import convert_neg
-from openmdao.utils.record_util import create_local_meta
+from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.logger_utils import get_logger
 
 
@@ -241,6 +243,13 @@ class System(object):
     #
     _owning_rank : {'input': {}, 'output': {}}
         Dict mapping var name to the lowest rank where that variable is local.
+    #
+    options: OptionsDictionary
+        Recording options
+    _filtered_vars_to_record: Dict
+        Dict of list of var names to record
+    _norm0: float
+        Normalization factor
     """
 
     def __init__(self, **kwargs):
@@ -257,6 +266,24 @@ class System(object):
         self.comm = None
         self.metadata = OptionsDictionary()
 
+        # System options
+        self.options = OptionsDictionary()
+        self.options.declare('record_inputs', type_=bool, default=True,
+                             desc='Set to True to record inputs at the system level')
+        self.options.declare('record_outputs', type_=bool, default=True,
+                             desc='Set to True to record outputs at the system level')
+        self.options.declare('record_residuals', type_=bool, default=True,
+                             desc='Set to True to record residuals at the system level')
+        self.options.declare('record_derivatives', type_=bool, default=False,
+                             desc='Set to True to record derivatives at the system level')
+        self.options.declare('record_metadata', type_=bool, desc='Record metadata', default=True)
+        self.options.declare('includes', type_=list, default=['*'],
+                             desc='Patterns for variables to include in recording')
+        self.options.declare('excludes', type_=list, default=[],
+                             desc='Patterns for vars to exclude in recording '
+                                  '(processed post-includes)')
+
+        # Case recording related
         self.iter_count = 0
 
         self._subsystems_allprocs = []
@@ -672,6 +699,37 @@ class System(object):
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
+    def _setup_case_recording(self, recurse=True):
+        myinputs = myoutputs = myresiduals = set()
+        incl = self.options['includes']
+        excl = self.options['excludes']
+
+        if self.options['record_inputs']:
+            if self._inputs:
+                myinputs = {n for n in self._inputs._names
+                            if check_path(n, incl, excl)}
+        if self.options['record_outputs']:
+            if self._outputs:
+                myoutputs = {n for n in self._outputs._names
+                             if check_path(n, incl, excl)}
+            if self.options['record_residuals']:
+                myresiduals = myoutputs  # outputs and residuals have same names
+        elif self.options['record_residuals']:
+            if self._residuals:
+                myresiduals = {n for n in self._residuals._names
+                               if check_path(n, incl, excl)}
+
+        self._filtered_vars_to_record = {
+            'i': myinputs,
+            'o': myoutputs,
+            'r': myresiduals
+        }
+
+        # Recursion
+        if recurse:
+            for subsys in self._subsystems_myproc:
+                subsys._setup_case_recording(recurse)
+
     def _final_setup(self, comm, vector_class, setup_mode, force_alloc_complex=False):
         """
         Perform final setup for this system and its descendant systems.
@@ -730,6 +788,8 @@ class System(object):
         self._setup_solvers(recurse=recurse)
         self._setup_partials(recurse=recurse)
         self._setup_jacobians(recurse=recurse)
+
+        self._setup_case_recording(recurse=recurse)
 
         # If full or reconf setup, reset this system's variables to initial values.
         if setup_mode in ('full', 'reconf'):
@@ -2819,8 +2879,67 @@ class System(object):
         """
         Record an iteration of the current System.
         """
-        metadata = create_local_meta(self.pathname)
-        self._rec_mgr.record_iteration(self, metadata)
+        if self._rec_mgr._recorders:
+            metadata = create_local_meta(self.pathname)
+
+            # Get the data to record
+            stack_top = recording_iteration.stack[-1][0]
+            method = stack_top.split('.')[-1]
+
+            if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear',
+                              '_solve_nonlinear']:
+                raise ValueError("method must be one of: '_apply_linear, "
+                                 "_apply_nonlinear, _solve_linear, _solve_nonlinear'")
+
+            if 'nonlinear' in method:
+                inputs, outputs, residuals = self.get_nonlinear_vectors()
+            else:
+                inputs, outputs, residuals = self.get_linear_vectors()
+
+            data = {}
+            if self.options['record_inputs'] and inputs._names:
+                data['i'] = {}
+                if 'i' in self._filtered_vars_to_record:
+                    # use filtered inputs
+                    for inp in self._filtered_vars_to_record['i']:
+                        if inp in inputs._names:
+                            data['i'][inp] = inputs._names[inp]
+                else:
+                    # use all the inputs
+                    data['i'] = inputs._names
+            else:
+                data['i'] = None
+
+            if self.options['record_outputs'] and outputs._names:
+                data['o'] = {}
+
+                if 'o' in self._filtered_vars_to_record:
+                    # use outputs from filtered list.
+                    for out in self._filtered_vars_to_record['o']:
+                        if out in outputs._names:
+                            data['o'][out] = outputs._names[out]
+                else:
+                    # use all the outputs
+                    data['o'] = outputs._names
+            else:
+                data['o'] = None
+
+            if self.options['record_residuals'] and residuals._names:
+                data['r'] = {}
+
+                if 'r' in self._filtered_vars_to_record:
+                    # use filtered residuals
+                    for res in self._filtered_vars_to_record['r']:
+                        if res in residuals._names:
+                            data['r'][res] = residuals._names[res]
+                else:
+                    # use all the residuals
+                    data['r'] = residuals._names
+            else:
+                data['r'] = None
+
+            self._rec_mgr.record_iteration(self, data, metadata)
+
         self.iter_count += 1
 
     def is_active(self):
