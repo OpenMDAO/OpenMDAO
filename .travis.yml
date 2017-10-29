@@ -88,7 +88,7 @@ install:
 - pip install git+https://github.com/OpenMDAO/testflo.git
 - pip install coverage
 - pip install coveralls
-- pip install -e .  # Not using -e on purpose here, to catch pkging errors
+- pip install .  # Not using -e on purpose here, to catch pkging errors
 
 script:
 # make docs first
@@ -118,4 +118,5 @@ deploy:
     branch: master
 
 after_success:
+- cd ../..
 - coveralls
