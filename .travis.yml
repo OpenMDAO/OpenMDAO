@@ -95,6 +95,7 @@ script:
 - cd openmdao/docs;
 - make all
 # run the tests from down here to see if it can work without being at top level
+- cd ../..
 - testflo -n 1 -m "ptest*"
 - testflo -n 1 --coverage --coverpkg openmdao
 
@@ -109,6 +110,7 @@ deploy:
   provider: script
   skip_cleanup: true
   script:
+  - cd openmdao/docs
   - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
       if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
         rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/twodocversions/latest;
@@ -118,5 +120,4 @@ deploy:
     branch: master
 
 after_success:
-- cd ../..
 - coveralls
