@@ -98,9 +98,6 @@ script:
 - testflo -n 1 -m "ptest*"
 - testflo -n 1 --coverage --coverpkg openmdao
 
-after_success:
-- coveralls
-
 before_deploy:
 - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
     eval "$(ssh-agent -s)";
@@ -119,3 +116,6 @@ deploy:
     fi
   on:
     branch: master
+
+after_success:
+- coveralls
