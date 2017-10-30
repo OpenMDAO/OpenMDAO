@@ -339,6 +339,31 @@ class TestServerRecorder(unittest.TestCase):
         self.assertEqual(driver_iteration_data['desvars'], [])
         self.assertEqual(driver_iteration_data['responses'], [])
         self.assertEqual(driver_iteration_data['constraints'], [])
+    
+    def test_only_sysincludes_recorded(self, m):
+        self.setup_endpoints(m)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
+
+        self.setup_sellar_model()
+
+        recorder.options['record_desvars'] = False
+        recorder.options['record_responses'] = False
+        recorder.options['record_objectives'] = False
+        recorder.options['record_constraints'] = False
+        recorder.options['system_includes'] = ['*']
+        self.prob.driver.add_recorder(recorder)
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+
+        driver_iteration_data = json.loads(self.driver_iteration_data)
+        self.assertEqual(len(driver_iteration_data['sysincludes']), 7)
+        self.assertEqual(driver_iteration_data['objectives'], [])
+        self.assertEqual(driver_iteration_data['desvars'], [])
+        self.assertEqual(driver_iteration_data['responses'], [])
+        self.assertEqual(driver_iteration_data['constraints'], [])
 
     def test_only_constraints_recorded(self, m):
         self.setup_endpoints(m)

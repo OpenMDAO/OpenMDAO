@@ -125,7 +125,7 @@ class WebRecorder(BaseRecorder):
                 for name, value in iteritems(self._desvars_values):
                     desvars_array.append({
                         'name': name,
-                        'values': list(value)
+                        'values': self.convert_to_list(value)
                     })
 
         if self.options['record_responses']:
@@ -134,7 +134,7 @@ class WebRecorder(BaseRecorder):
                 for name, value in iteritems(self._responses_values):
                     responses_array.append({
                         'name': name,
-                        'values': list(value)
+                        'values': self.convert_to_list(value)
                     })
 
         if self.options['record_objectives']:
@@ -143,7 +143,7 @@ class WebRecorder(BaseRecorder):
                 for name, value in iteritems(self._objectives_values):
                     objectives_array.append({
                         'name': name,
-                        'values': list(value)
+                        'values': self.convert_to_list(value)
                     })
 
         if self.options['record_constraints']:
@@ -152,7 +152,7 @@ class WebRecorder(BaseRecorder):
                 for name, value in iteritems(self._constraints_values):
                     constraints_array.append({
                         'name': name,
-                        'values': list(value)
+                        'values': self.convert_to_list(value)
                     })
 
         if self.options['system_includes']:
@@ -161,32 +161,13 @@ class WebRecorder(BaseRecorder):
                 for name, value in iteritems(self._sysincludes_values):
                     sysincludes_array.append({
                         'name': name,
-                        'values': list(value)
+                        'values': self.convert_to_list(value)
                     })
 
-        driver_iteration_dict = {
-            "counter": self._counter,
-            "iteration_coordinate": self._iteration_coordinate,
-            "success": metadata['success'],
-            "msg": metadata['msg'],
-            "desvars": self.convert_to_list(desvars_array),
-            "responses": self.convert_to_list(responses_array),
-            "objectives": self.convert_to_list(objectives_array),
-            "constraints": self.convert_to_list(constraints_array),
-            "sysincludes": self.convert_to_list(sysincludes_array),
-        }
-
-        global_iteration_dict = {
-            'record_type': 'driver',
-            'counter': self._counter
-        }
-
-        driver_iteration = json.dumps(driver_iteration_dict)
-        global_iteration = json.dumps(global_iteration_dict)
-        requests.post(self._endpoint + '/' + self._case_id + '/driver_iterations',
-                      data=driver_iteration, headers=self._headers)
-        requests.post(self._endpoint + '/' + self._case_id + '/global_iterations',
-                      data=global_iteration, headers=self._headers)
+        iteration_coordinate = get_formatted_iteration_coordinate()
+        self._record_driver_iteration(self._counter, iteration_coordinate, metadata['success'],
+                                      metadata['msg'], desvars_array, responses_array,
+                                      objectives_array, constraints_array, sysincludes_array)
 
     def record_iteration_driver(self, object_requesting_recording, metadata):
         """
@@ -271,10 +252,10 @@ class WebRecorder(BaseRecorder):
         iteration_coordinate = get_formatted_iteration_coordinate()
         self._record_driver_iteration(self._counter, iteration_coordinate, metadata['success'],
                                       metadata['msg'], desvars_array, responses_array,
-                                      objectives_array, constraints_array)
+                                      objectives_array, constraints_array, None)
 
     def _record_driver_iteration(self, counter, iteration_coordinate, success, msg,
-                                 desvars, responses, objectives, constraints):
+                                 desvars, responses, objectives, constraints, sysincludes):
         """
         Record a driver iteration.
 
@@ -305,7 +286,8 @@ class WebRecorder(BaseRecorder):
             "desvars": [] if desvars is None else desvars,
             "responses": [] if responses is None else responses,
             "objectives": [] if objectives is None else objectives,
-            "constraints": [] if constraints is None else constraints
+            "constraints": [] if constraints is None else constraints,
+            "sysincludes": [] if sysincludes is None else sysincludes
         }
 
         global_iteration_dict = {
