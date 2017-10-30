@@ -379,11 +379,11 @@ Specify Scipy GMRES as a Linear Solver in a Group
 .. content-container ::
 
   .. embed-compare::
-      openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyGMRESFeature.test_specify_solver
-      ScipyGMRES
-      ScipyGMRES
+      openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyKrylovFeature.test_specify_solver
+      ScipyKrylov
+      ScipyKrylov
 
-    model.ln_solver = ScipyGMRES()
+    model.ln_solver = ScipyKrylov()
 
 
 Specify Linear Block Gauss Seidel as a Linear Solver in a Group

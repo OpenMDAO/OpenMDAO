@@ -2,7 +2,7 @@
 
 import unittest
 
-from openmdao.api import Problem, ScipyGMRES, IndepVarComp, Group
+from openmdao.api import Problem, ScipyKrylov, IndepVarComp, Group
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -15,7 +15,7 @@ class TestNonLinearRunOnceSolver(unittest.TestCase):
         # Test derivatives for converge-diverge-groups topology.
         prob = Problem()
         prob.model = ConvergeDivergeGroups()
-        prob.model.linear_solver = ScipyGMRES()
+        prob.model.linear_solver = ScipyKrylov()
         prob.set_solver_print(level=0)
 
         prob.model.nonlinear_solver = NonLinearRunOnce()

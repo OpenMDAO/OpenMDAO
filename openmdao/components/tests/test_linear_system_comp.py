@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Group, Problem, IndepVarComp
-from openmdao.api import LinearSystemComp, ScipyGMRES, DirectSolver
+from openmdao.api import LinearSystemComp, ScipyKrylov, DirectSolver
 from openmdao.devtools.testutil import assert_rel_error
 
 
@@ -34,7 +34,7 @@ class TestLinearSystem(unittest.TestCase):
         prob.setup()
 
         lingrp = prob.model.get_subsystem('lingrp')
-        lingrp.linear_solver = ScipyGMRES()
+        lingrp.linear_solver = ScipyKrylov()
 
         prob.set_solver_print(level=0)
         prob.run_model()

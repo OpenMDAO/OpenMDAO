@@ -11,7 +11,7 @@ From Sellar's analytic problem.
 import numpy as np
 
 from openmdao.api import Group, ExplicitComponent, ExecComp, IndepVarComp, \
-                         NonlinearBlockGS, ScipyGMRES
+                         NonlinearBlockGS, ScipyKrylov
 
 
 class SellarDis1(ExplicitComponent):
@@ -205,7 +205,7 @@ class SellarNoDerivativesCS(Group):
         self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         self.nonlinear_solver = NonlinearBlockGS()
-        self.linear_solver = ScipyGMRES()
+        self.linear_solver = ScipyKrylov()
 
 
 class DoubleSellar(Group):

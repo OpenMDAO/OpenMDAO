@@ -5,7 +5,7 @@ import warnings
 import numpy as np
 
 from openmdao.api import Group, Problem, IndepVarComp, LinearBlockGS, \
-    NewtonSolver, ExecComp, ScipyGMRES, ImplicitComponent, \
+    NewtonSolver, ExecComp, ScipyKrylov, ImplicitComponent, \
     DirectSolver, DenseJacobian, AnalysisError
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.double_sellar import DoubleSellar, DoubleSellarImplicit, \
@@ -93,7 +93,7 @@ class TestNewton(unittest.TestCase):
 
         top.model.nonlinear_solver = NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyGMRES()
+        top.model.linear_solver = ScipyKrylov()
 
         msg = "The 'line_search' attribute provides backwards compatibility with OpenMDAO 1.x ; use 'linesearch' instead."
         with warnings.catch_warnings(record=True) as w:
@@ -213,7 +213,7 @@ class TestNewton(unittest.TestCase):
 
         subgrp = sub.add_subsystem('state_eq_group', Group(),
                                    promotes=['state_eq.y2_actual', 'state_eq.y2_command'])
-        subgrp.linear_solver = ScipyGMRES()
+        subgrp.linear_solver = ScipyKrylov()
         subgrp.add_subsystem('state_eq', StateConnection())
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1'])
@@ -236,11 +236,11 @@ class TestNewton(unittest.TestCase):
         # Use bad settings for this one so that problem doesn't converge.
         # That way, we test that we are really using Newton's Lin Solver
         # instead.
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
         model.linear_solver.options['maxiter'] = 1
 
         # The good solver
-        model.nonlinear_solver.linear_solver = ScipyGMRES()
+        model.nonlinear_solver.linear_solver = ScipyKrylov()
 
         prob.set_solver_print(level=0)
         prob.setup(check=False)
@@ -267,7 +267,7 @@ class TestNewton(unittest.TestCase):
 
         subgrp = sub.add_subsystem('state_eq_group', Group(),
                                    promotes=['state_eq.y2_actual', 'state_eq.y2_command'])
-        subgrp.linear_solver = ScipyGMRES()
+        subgrp.linear_solver = ScipyKrylov()
         subgrp.add_subsystem('state_eq', StateConnection())
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1'])
@@ -290,7 +290,7 @@ class TestNewton(unittest.TestCase):
         # Use bad settings for this one so that problem doesn't converge.
         # That way, we test that we are really using Newton's Lin Solver
         # instead.
-        sub.linear_solver = ScipyGMRES()
+        sub.linear_solver = ScipyKrylov()
         model.linear_solver.options['maxiter'] = 1
 
         # The good solver
@@ -322,7 +322,7 @@ class TestNewton(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
 
         model.nonlinear_solver.options['solve_subsystems'] = True
 
@@ -350,7 +350,7 @@ class TestNewton(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
 
         model.nonlinear_solver.options['solve_subsystems'] = True
 
@@ -378,7 +378,7 @@ class TestNewton(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
 
         model.nonlinear_solver.options['solve_subsystems'] = True
 
@@ -406,7 +406,7 @@ class TestNewton(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
 
         model.nonlinear_solver.options['solve_subsystems'] = True
 
@@ -426,12 +426,12 @@ class TestNewton(unittest.TestCase):
         g1 = model.get_subsystem('g1')
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
-        g1.linear_solver = ScipyGMRES()
+        g1.linear_solver = ScipyKrylov()
 
         g2 = model.get_subsystem('g2')
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
-        g2.linear_solver = ScipyGMRES()
+        g2.linear_solver = ScipyKrylov()
 
         model.nonlinear_solver = NewtonSolver()
         model.linear_solver = DirectSolver()
@@ -461,7 +461,7 @@ class TestNewton(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
         model.nonlinear_solver.options['solve_subsystems'] = True
 
         prob.setup()
@@ -488,7 +488,7 @@ class TestNewton(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
         model.nonlinear_solver.options['solve_subsystems'] = True
 
         prob.setup()
@@ -515,7 +515,7 @@ class TestNewton(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
         model.nonlinear_solver.options['solve_subsystems'] = True
 
         prob.setup()
@@ -542,7 +542,7 @@ class TestNewton(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
 
         prob.setup()
         prob.run_model()
@@ -594,7 +594,7 @@ class TestNewton(unittest.TestCase):
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
 
         # Enfore behavior: max_sub_solves = 0 means we run once during init
 
@@ -627,7 +627,7 @@ class TestNewton(unittest.TestCase):
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
 
         # Enforce Behavior: baseline
 
@@ -660,7 +660,7 @@ class TestNewton(unittest.TestCase):
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
 
         # Enfore behavior: max_sub_solves = 1 means we run during init and first iteration of iter_execute
 
@@ -772,7 +772,7 @@ class TestNewton(unittest.TestCase):
         model.add_objective('ecomp.y')
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
 
         prob.setup(check=False)
 
@@ -959,7 +959,7 @@ class TestNewtonFeatures(unittest.TestCase):
     def test_feature_max_sub_solves(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp, DirectSolver, ScipyGMRES
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp, DirectSolver, ScipyKrylov
         from openmdao.test_suite.components.double_sellar import SubSellar
 
         prob = Problem()
@@ -986,7 +986,7 @@ class TestNewtonFeatures(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
 
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 0
@@ -1030,7 +1030,7 @@ class TestNewtonFeatures(unittest.TestCase):
             pass
 
     def test_solve_subsystems_basic(self):
-        from openmdao.api import Problem, NewtonSolver, DirectSolver, ScipyGMRES
+        from openmdao.api import Problem, NewtonSolver, DirectSolver, ScipyKrylov
         from openmdao.test_suite.components.double_sellar import DoubleSellar
 
         prob = Problem()
@@ -1047,7 +1047,7 @@ class TestNewtonFeatures(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
 
         model.nonlinear_solver.options['solve_subsystems'] = True
 

@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, NonlinearBlockGS, Group, ScipyGMRES, IndepVarComp, \
+from openmdao.api import Problem, NonlinearBlockGS, Group, ScipyKrylov, IndepVarComp, \
      ExecComp, AnalysisError
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -265,7 +265,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
                 self.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
                 self.nonlinear_solver = NonlinearBlockGS()
-                self.linear_solver = ScipyGMRES()
+                self.linear_solver = ScipyKrylov()
 
         prob = Problem()
         root = prob.model = Group()

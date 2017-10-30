@@ -11,7 +11,7 @@ effectively. It also solves all subsystems below it in the hierarchy, so assigni
 subsystems will have no effect on the solution at this level.
 
 This solver works under MPI, so it is a good alternative to
-:ref:`ScipyGMRES <openmdao.solvers.linear.scipy_iter_solver.py>`.
+:ref:`ScipyKrylov <openmdao.solvers.linear.scipy_iter_solver.py>`.
 This solver is also re-entrant, so there are no problems if it is nested during preconditioning.
 
 Here, we calculate the total derivatives across the Sellar system.

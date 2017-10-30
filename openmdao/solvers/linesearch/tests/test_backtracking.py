@@ -13,7 +13,7 @@ from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, AnalysisErr
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.linesearch.backtracking import ArmijoGoldsteinLS, BoundsEnforceLS
 from openmdao.solvers.nonlinear.newton import NewtonSolver
-from openmdao.solvers.linear.scipy_iter_solver import ScipyGMRES
+from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.implicit_newton_linesearch \
     import ImplCompTwoStates, ImplCompTwoStatesArrays
@@ -30,7 +30,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
 
         top.model.nonlinear_solver = NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyGMRES()
+        top.model.linear_solver = ScipyKrylov()
 
         top.setup(check=False)
 
@@ -173,7 +173,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
 
         top.model.nonlinear_solver = NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 1
-        top.model.linear_solver = ScipyGMRES()
+        top.model.linear_solver = ScipyKrylov()
 
         ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
         ls.options['maxiter'] = 10
@@ -202,7 +202,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
 
         top.model.nonlinear_solver = NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 1
-        top.model.linear_solver = ScipyGMRES()
+        top.model.linear_solver = ScipyKrylov()
 
         ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
         ls.options['maxiter'] = 10
@@ -280,11 +280,11 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
         top.model.nonlinear_solver = NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 2
         top.model.nonlinear_solver.options['solve_subsystems'] = True
-        top.model.linear_solver = ScipyGMRES()
+        top.model.linear_solver = ScipyKrylov()
 
         sub.nonlinear_solver = NewtonSolver()
         sub.nonlinear_solver.options['maxiter'] = 2
-        sub.linear_solver = ScipyGMRES()
+        sub.linear_solver = ScipyKrylov()
 
         ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='wall')
         ls.options['maxiter'] = 5
@@ -319,7 +319,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
 
         top.model.nonlinear_solver = NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyGMRES()
+        top.model.linear_solver = ScipyKrylov()
 
         top.set_solver_print(level=0)
         top.setup(check=False)
@@ -425,7 +425,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
 
         top.model.nonlinear_solver = NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyGMRES()
+        top.model.linear_solver = ScipyKrylov()
 
         top.set_solver_print(level=0)
         top.setup(check=False)
@@ -521,7 +521,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
 
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 4
@@ -544,7 +544,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
 class TestFeatureLineSearch(unittest.TestCase):
 
     def test_feature_specification(self):
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyGMRES, ArmijoGoldsteinLS
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, ArmijoGoldsteinLS
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 
         top = Problem()
@@ -555,7 +555,7 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         top.model.nonlinear_solver = NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyGMRES()
+        top.model.linear_solver = ScipyKrylov()
 
         ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS()
         ls.options['maxiter'] = 10
@@ -571,7 +571,7 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_boundscheck_basic(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyGMRES, BoundsEnforceLS
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, BoundsEnforceLS
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = Problem()
@@ -582,7 +582,7 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         top.model.nonlinear_solver = NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyGMRES()
+        top.model.linear_solver = ScipyKrylov()
 
         top.model.nonlinear_solver.linesearch = BoundsEnforceLS()
 
@@ -601,7 +601,7 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_boundscheck_vector(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyGMRES, BoundsEnforceLS
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, BoundsEnforceLS
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = Problem()
@@ -612,7 +612,7 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         top.model.nonlinear_solver = NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyGMRES()
+        top.model.linear_solver = ScipyKrylov()
 
         ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS()
         ls.options['bound_enforcement'] = 'vector'
@@ -632,7 +632,7 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_boundscheck_wall(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyGMRES, BoundsEnforceLS
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, BoundsEnforceLS
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = Problem()
@@ -643,7 +643,7 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         top.model.nonlinear_solver = NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyGMRES()
+        top.model.linear_solver = ScipyKrylov()
 
         ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS()
         ls.options['bound_enforcement'] = 'wall'
@@ -663,7 +663,7 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_boundscheck_scalar(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyGMRES, BoundsEnforceLS
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, BoundsEnforceLS
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = Problem()
@@ -674,7 +674,7 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         top.model.nonlinear_solver = NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyGMRES()
+        top.model.linear_solver = ScipyKrylov()
 
         ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS()
         ls.options['bound_enforcement'] = 'scalar'
@@ -695,7 +695,7 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_print_bound_enforce(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyGMRES, BoundsEnforceLS
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, BoundsEnforceLS
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = Problem()
@@ -706,7 +706,7 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         newt = top.model.nonlinear_solver = NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 2
-        top.model.linear_solver = ScipyGMRES()
+        top.model.linear_solver = ScipyKrylov()
 
         ls = newt.linesearch = BoundsEnforceLS(bound_enforcement='vector')
         ls.options['print_bound_enforce'] = True

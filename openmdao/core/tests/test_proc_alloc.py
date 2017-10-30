@@ -4,7 +4,7 @@ import unittest
 
 from openmdao.api import Problem, Group, ExecComp
 from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, DefaultVector, \
-    ExecComp, ExplicitComponent, PETScVector, ScipyGMRES, NonlinearBlockGS
+    ExecComp, ExplicitComponent, PETScVector, ScipyKrylov, NonlinearBlockGS
 from openmdao.utils.mpi import MPI
 from openmdao.devtools.testutil import assert_rel_error
 

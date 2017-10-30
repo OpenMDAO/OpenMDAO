@@ -1,4 +1,4 @@
-"""Test the ScipyGMRES linear solver class."""
+"""Test the ScipyKrylov linear solver class."""
 
 from __future__ import division, print_function
 
@@ -10,7 +10,7 @@ import numpy as np
 from openmdao.api import Group, IndepVarComp, Problem, ExecComp, NonlinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
-from openmdao.solvers.linear.scipy_iter_solver import ScipyGMRES, gmres
+from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov, gmres
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
@@ -18,22 +18,22 @@ from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, Sel
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 
 
-class TestScipyGMRES(LinearSolverTests.LinearSolverTestCase):
+class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
 
-    linear_solver_class = ScipyGMRES
+    linear_solver_class = ScipyKrylov
 
     def test_options(self):
         """Verify that the SciPy solver specific options are declared."""
 
         group = Group()
-        group.linear_solver = ScipyGMRES()
+        group.linear_solver = ScipyKrylov()
 
         assert(group.linear_solver.options['solver'] == gmres)
 
     def test_solve_linear_scipy(self):
-        """Solve implicit system with ScipyGMRES."""
+        """Solve implicit system with ScipyKrylov."""
 
-        group = TestImplicitGroup(lnSolverClass=ScipyGMRES)
+        group = TestImplicitGroup(lnSolverClass=ScipyKrylov)
 
         p = Problem(group)
         p.setup(check=False)
@@ -61,9 +61,9 @@ class TestScipyGMRES(LinearSolverTests.LinearSolverTestCase):
         assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
 
     def test_solve_linear_scipy_maxiter(self):
-        """Verify that ScipyGMRES abides by the 'maxiter' option."""
+        """Verify that ScipyKrylov abides by the 'maxiter' option."""
 
-        group = TestImplicitGroup(lnSolverClass=ScipyGMRES)
+        group = TestImplicitGroup(lnSolverClass=ScipyKrylov)
         group.linear_solver.options['maxiter'] = 2
 
         p = Problem(group)
@@ -98,7 +98,7 @@ class TestScipyGMRES(LinearSolverTests.LinearSolverTestCase):
         # just need a dummy variable so the sizes don't match between root and g1
         dv.add_output('dummy', val=1.0, shape=10)
 
-        g1 = model.add_subsystem('g1', TestImplicitGroup(lnSolverClass=ScipyGMRES))
+        g1 = model.add_subsystem('g1', TestImplicitGroup(lnSolverClass=ScipyKrylov))
 
         p.model.linear_solver.options['maxiter'] = 1
         p.setup(check=False)
@@ -135,7 +135,7 @@ class TestScipyGMRES(LinearSolverTests.LinearSolverTestCase):
 
     def test_preconditioner_deprecation(self):
 
-        group = TestImplicitGroup(lnSolverClass=ScipyGMRES)
+        group = TestImplicitGroup(lnSolverClass=ScipyKrylov)
 
         msg = "The 'preconditioner' property provides backwards compatibility " \
             + "with OpenMDAO <= 1.x ; use 'precon' instead."
@@ -157,12 +157,12 @@ class TestScipyGMRES(LinearSolverTests.LinearSolverTestCase):
         self.assertEqual(str(w[0].message), msg)
 
 
-class TestScipyGMRESFeature(unittest.TestCase):
+class TestScipyKrylovFeature(unittest.TestCase):
 
     def test_feature_simple(self):
         """Tests feature for adding a Scipy GMRES solver and calculating the
         derivatives."""
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyGMRES
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov
         from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 
         # Tests derivatives on a simple comp that defines compute_jacvec.
@@ -173,7 +173,7 @@ class TestScipyGMRESFeature(unittest.TestCase):
         model.add_subsystem('mycomp', TestExplCompSimpleDense(),
                             promotes=['length', 'width', 'area'])
 
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
@@ -189,7 +189,7 @@ class TestScipyGMRESFeature(unittest.TestCase):
     def test_specify_solver(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyGMRES, \
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, \
              NonlinearBlockGS, ExecComp
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
              SellarDis2withDerivatives
@@ -212,7 +212,7 @@ class TestScipyGMRESFeature(unittest.TestCase):
 
         model.nonlinear_solver = NonlinearBlockGS()
 
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
 
         prob.setup()
         prob.run_model()
@@ -227,7 +227,7 @@ class TestScipyGMRESFeature(unittest.TestCase):
     def test_feature_maxiter(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyGMRES, NonlinearBlockGS, ExecComp
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, NonlinearBlockGS, ExecComp
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
@@ -248,7 +248,7 @@ class TestScipyGMRESFeature(unittest.TestCase):
 
         model.nonlinear_solver = NonlinearBlockGS()
 
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
         model.linear_solver.options['maxiter'] = 3
 
         prob.setup()
@@ -264,7 +264,7 @@ class TestScipyGMRESFeature(unittest.TestCase):
     def test_feature_atol(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyGMRES, NonlinearBlockGS, ExecComp
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, NonlinearBlockGS, ExecComp
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
@@ -285,7 +285,7 @@ class TestScipyGMRESFeature(unittest.TestCase):
 
         model.nonlinear_solver = NonlinearBlockGS()
 
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
         model.linear_solver.options['atol'] = 1.0e-20
 
         prob.setup()
@@ -301,7 +301,7 @@ class TestScipyGMRESFeature(unittest.TestCase):
     def test_specify_precon(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyGMRES, NewtonSolver, \
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, NewtonSolver, \
              LinearBlockGS, ExecComp
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
              SellarDis2withDerivatives
@@ -323,7 +323,7 @@ class TestScipyGMRESFeature(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.linear_solver = ScipyGMRES()
+        prob.model.linear_solver = ScipyKrylov()
 
         prob.model.linear_solver.precon = LinearBlockGS()
         prob.model.linear_solver.precon.options['maxiter'] = 2

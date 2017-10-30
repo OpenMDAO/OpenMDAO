@@ -122,7 +122,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(len(w), 1)
         self.assertTrue(issubclass(w[0].category, DeprecationWarning))
         self.assertEqual(str(w[0].message),
-                         "ScipyIterativeSolver is deprecated.  Use ScipyGMRES instead.")
+                         "ScipyIterativeSolver is deprecated.  Use ScipyKrylov instead.")
 
     def test_group_simple_promoted(self):
         from openmdao.api import ExecComp, Problem, IndepVarComp

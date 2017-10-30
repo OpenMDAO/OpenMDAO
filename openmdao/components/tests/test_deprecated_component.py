@@ -9,7 +9,7 @@ from six.moves import cStringIO
 import numpy as np
 
 from openmdao.api import Problem, IndepVarComp, Component, Group, NewtonSolver, NonLinearRunOnce
-from openmdao.api import ScipyGMRES as ScipyGMRES
+from openmdao.api import ScipyKrylov as ScipyKrylov
 from openmdao.devtools.testutil import assert_rel_error, TestLogger
 
 
@@ -207,7 +207,7 @@ class DepCompTestCase(unittest.TestCase):
 
         prob.model.connect('px.x', 'comp.x')
         prob.model.connect('py.y', 'comp.y')
-        prob.model.linear_solver = ScipyGMRES()
+        prob.model.linear_solver = ScipyKrylov()
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
@@ -249,7 +249,7 @@ class DepCompTestCase(unittest.TestCase):
 
         prob.model.connect('px.x', 'comp.x')
         prob.model.connect('py.y', 'comp.y')
-        prob.model.linear_solver = ScipyGMRES()
+        prob.model.linear_solver = ScipyKrylov()
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
@@ -287,7 +287,7 @@ class DepCompTestCase(unittest.TestCase):
         prob.model.add_subsystem('p1', IndepVarComp('x', 0.5))
         prob.model.add_subsystem('comp', SimpleImplicitComp())
 
-        prob.model.linear_solver = ScipyGMRES()
+        prob.model.linear_solver = ScipyKrylov()
         prob.model.nonlinear_solver = NewtonSolver()
         prob.set_solver_print(level=0)
 
@@ -364,7 +364,7 @@ class DepCompTestCase(unittest.TestCase):
         comp = prob.model.add_subsystem('comp', SimpleImplicitComp())
         comp.self_solve = True
 
-        prob.model.linear_solver = ScipyGMRES()
+        prob.model.linear_solver = ScipyKrylov()
         prob.model.nonlinear_solver = NonLinearRunOnce()
         prob.set_solver_print(level=0)
 
@@ -411,7 +411,7 @@ class DepCompTestCase(unittest.TestCase):
         prob.model.add_subsystem('p1', IndepVarComp('x', 0.5))
         prob.model.add_subsystem('comp', SimpleImplicitComp(resid_scaler=0.001))
 
-        prob.model.linear_solver = ScipyGMRES()
+        prob.model.linear_solver = ScipyKrylov()
         prob.model.nonlinear_solver = NewtonSolver()
         prob.set_solver_print(level=0)
 
@@ -457,7 +457,7 @@ class DepCompTestCase(unittest.TestCase):
         prob.model.add_subsystem('p1', IndepVarComp('x', 0.5))
         prob.model.add_subsystem('comp', SimpleImplicitCompApply())
 
-        prob.model.linear_solver = ScipyGMRES()
+        prob.model.linear_solver = ScipyKrylov()
         prob.model.nonlinear_solver = NewtonSolver()
         prob.set_solver_print(level=0)
 

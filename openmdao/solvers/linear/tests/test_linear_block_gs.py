@@ -8,7 +8,7 @@ import numpy as np
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.api import LinearBlockGS, Problem, Group, ImplicitComponent, IndepVarComp, \
-    DirectSolver, NewtonSolver, ScipyGMRES, AssembledJacobian, ExecComp, NonlinearBlockGS
+    DirectSolver, NewtonSolver, ScipyKrylov, AssembledJacobian, ExecComp, NonlinearBlockGS
 from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2, \
     SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
@@ -114,7 +114,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
 
         model.nonlinear_solver = NewtonSolver()
         model.nonlinear_solver.options['maxiter'] = 5
-        model.linear_solver = ScipyGMRES()
+        model.linear_solver = ScipyKrylov()
         model.linear_solver.precon = self.linear_solver_class()
 
         prob.setup(check=False)
