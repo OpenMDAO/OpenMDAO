@@ -3,21 +3,18 @@
 from __future__ import division, print_function
 
 import numpy as np
-from scipy.sparse.linalg import LinearOperator, gmres, bicg, bigcstab, cg, cgs, lgmres
+from scipy.sparse.linalg import LinearOperator, gmres, bicg, bicgstab, cg, cgs
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.recorders.recording_iteration_stack import Recording
 
-_common_args = {'A', 'b', 'x0', 'tol', 'maxiter', 'M'}
-
 _SOLVER_TYPES = {
-    'bicg': (bicg, _common_args),
-    'bigcstab': (bigcstab, _common_args),
-    'cg': (cg, _common_args),
-    'cgs': (cgs, _common_args),
-    'gmres': (gmres, _common_args.union({'restart'})),
-    'lgmres': (lgmres, _common_args.union({'inner_m', 'outer_k', 'outer_v', 'store_outer_Av'})),
+    'bicg': bicg,
+    'bicgstab': bicgstab,
+    'cg': cg,
+    'cgs': cgs,
+    'gmres': gmres,
 }
 
 
@@ -56,7 +53,8 @@ class ScipyKrylov(LinearSolver):
 
         self.options.declare('restart', default=20, type_=int,
                              desc='Number of iterations between restarts. Larger values increase '
-                                  'iteration cost, but may be necessary for convergence')
+                                  'iteration cost, but may be necessary for convergence. This '
+                                  'option applies only to gmres.')
 
         # changing the default maxiter from the base class
         self.options['maxiter'] = 1000
@@ -192,12 +190,14 @@ class ScipyKrylov(LinearSolver):
         self._mode = mode
 
         system = self._system
-        solver = _SOLVER_TYPES[self.options['solver']][0]
+        solver = _SOLVER_TYPES[self.options['solver']]
+        if solver is gmres:
+            restart = self.options['restart']
 
         maxiter = self.options['maxiter']
         atol = self.options['atol']
-        rtol = self.options['rtol']
-        restart = self.options['restart']
+
+        fail = False
 
         for vec_name in self._vec_names:
 
@@ -224,14 +224,21 @@ class ScipyKrylov(LinearSolver):
                 M = None
 
             self._iter_count = 0
-            x_vec.set_data(
-                solver(linop, b_vec.get_data(), M=M, restart=restart,
-                       x0=x_vec_combined, maxiter=maxiter, tol=atol,
-                       callback=self._monitor)[0])
+            if solver is gmres:
+                x, info = solver(linop, b_vec.get_data(), M=M, restart=restart,
+                                 x0=x_vec_combined, maxiter=maxiter, tol=atol,
+                                 callback=self._monitor)
+            else:
+                x, info = solver(linop, b_vec.get_data(), M=M,
+                                 x0=x_vec_combined, maxiter=maxiter, tol=atol,
+                                 callback=self._monitor)
+
+            fail |= (info != 0)
+            x_vec.set_data(x)
 
         # TODO: implement this properly
 
-        return False, 0., 0.
+        return fail, 0., 0.
 
     def _apply_precon(self, in_vec):
         """

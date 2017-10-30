@@ -18,23 +18,29 @@ from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, Sel
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 
 
+def krylov_factory(solver):
+    def factory(junk=None):
+        return ScipyKrylov(solver=solver)
+    return factory
+
+
 class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
 
-    linear_solver_class = ScipyKrylov
+    linear_solver_name = 'gmres'
+    linear_solver_class = krylov_factory('gmres')
 
     def test_options(self):
         """Verify that the SciPy solver specific options are declared."""
 
         group = Group()
-        group.linear_solver = ScipyKrylov()
+        group.linear_solver = self.linear_solver_class()
 
-        assert(group.linear_solver.options['solver'] == gmres)
+        self.assertEqual(group.linear_solver.options['solver'], self.linear_solver_name)
 
     def test_solve_linear_scipy(self):
         """Solve implicit system with ScipyKrylov."""
 
-        group = TestImplicitGroup(lnSolverClass=ScipyKrylov)
-
+        group = TestImplicitGroup(lnSolverClass=self.linear_solver_class)
         p = Problem(group)
         p.setup(check=False)
         p.set_solver_print(level=0)
@@ -63,7 +69,7 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
     def test_solve_linear_scipy_maxiter(self):
         """Verify that ScipyKrylov abides by the 'maxiter' option."""
 
-        group = TestImplicitGroup(lnSolverClass=ScipyKrylov)
+        group = TestImplicitGroup(lnSolverClass=self.linear_solver_class)
         group.linear_solver.options['maxiter'] = 2
 
         p = Problem(group)
@@ -98,7 +104,8 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         # just need a dummy variable so the sizes don't match between root and g1
         dv.add_output('dummy', val=1.0, shape=10)
 
-        g1 = model.add_subsystem('g1', TestImplicitGroup(lnSolverClass=ScipyKrylov))
+        grp = TestImplicitGroup(lnSolverClass=self.linear_solver_class)
+        g1 = model.add_subsystem('g1', grp)
 
         p.model.linear_solver.options['maxiter'] = 1
         p.setup(check=False)
@@ -135,7 +142,7 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
 
     def test_preconditioner_deprecation(self):
 
-        group = TestImplicitGroup(lnSolverClass=ScipyKrylov)
+        group = TestImplicitGroup(lnSolverClass=self.linear_solver_class)
 
         msg = "The 'preconditioner' property provides backwards compatibility " \
             + "with OpenMDAO <= 1.x ; use 'precon' instead."
@@ -155,6 +162,18 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         self.assertEqual(len(w), 1)
         self.assertTrue(issubclass(w[0].category, DeprecationWarning))
         self.assertEqual(str(w[0].message), msg)
+
+
+class TestScipyKrylovBICG(TestScipyKrylov):
+
+    linear_solver_name = 'bicg'
+    linear_solver_class = krylov_factory('bicg')
+
+
+class TestScipyKrylovBICGSTAB(TestScipyKrylov):
+
+    linear_solver_name = 'bicgstab'
+    linear_solver_class = krylov_factory('bicgstab')
 
 
 class TestScipyKrylovFeature(unittest.TestCase):
