@@ -10,7 +10,7 @@ import json
 from six import PY2, PY3
 
 from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, NonlinearBlockJac,\
-            NewtonSolver, NonLinearRunOnce, WebRecorder, Group, IndepVarComp, ExecComp, \
+            NewtonSolver, NonlinearRunOnce, WebRecorder, Group, IndepVarComp, ExecComp, \
             DirectSolver, ScipyIterativeSolver, PetscKSP, LinearBlockGS, LinearRunOnce, \
             LinearBlockJac
 
@@ -717,7 +717,7 @@ class TestServerRecorder(unittest.TestCase):
         recorder = WebRecorder(self._accepted_token, suppress_output=True)
         self.setup_sellar_model()
 
-        self.prob.model.nonlinear_solver = NonLinearRunOnce()
+        self.prob.model.nonlinear_solver = NonlinearRunOnce()
         self.prob.model.nonlinear_solver.add_recorder(recorder)
 
         self.prob.setup(check=False)

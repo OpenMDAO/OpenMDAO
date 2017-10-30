@@ -98,9 +98,9 @@ runtime and total number of calls for each profiled function.  For example:
         1    0.000000   0.00 <Solver#25._declare_options>
         1    0.000000   0.00 design.fc.ambient.readAtmTable.<System.initialize>
       ...
-        5    1.690505   8.06 <NonLinearRunOnce#5.solve>
+        5    1.690505   8.06 <NonlinearRunOnce#5.solve>
         5    1.694799   8.08 design.fc.conv.fs.exit_static.<Group._solve_nonlinear>
-        5    1.885014   8.99 <NonLinearRunOnce#6.solve>
+        5    1.885014   8.99 <NonlinearRunOnce#6.solve>
         5    1.892510   9.02 design.fc.conv.fs.<Group._solve_nonlinear>
         1    1.934901   9.23 .<System._setup_scaling>
         1    2.053042   9.79 design.fan.<Group._setup_vars>
@@ -108,14 +108,14 @@ runtime and total number of calls for each profiled function.  For example:
         2    2.609760  12.44 <Solver#22._run_iterator>
         2    2.609783  12.44 <NonlinearSolver#2.solve>
         2    2.613209  12.46 design.fc.conv.<Group._solve_nonlinear>
-        2    2.615414  12.47 <NonLinearRunOnce#7.solve>
+        2    2.615414  12.47 <NonlinearRunOnce#7.solve>
         2    2.619340  12.49 design.fc.<Group._solve_nonlinear>
         1    3.133403  14.94 design.nozz.<Group._setup_vars>
         2    7.319256  34.90 <NewtonSolver#1._iter_execute>
         1    7.608798  36.28 <Solver#13._run_iterator>
         1    7.608808  36.28 <NonlinearSolver#1.solve>
         1    7.617416  36.32 design.<Group._solve_nonlinear>
-        1    7.617761  36.32 <NonLinearRunOnce#32.solve>
+        1    7.617761  36.32 <NonlinearRunOnce#32.solve>
         1    7.627209  36.37 .<Group._solve_nonlinear>
         1    7.627431  36.37 .<System.run_solve_nonlinear>
         1    7.627438  36.37 <Problem#1.run_model>

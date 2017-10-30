@@ -30,7 +30,7 @@ from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
 from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 from openmdao.solvers.nonlinear.nonlinear_block_jac import NonlinearBlockJac
 from openmdao.solvers.nonlinear.newton import NewtonSolver
-from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
+from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce, NonLinearRunOnce
 
 # Surrogate Models
 from openmdao.surrogate_models.kriging import KrigingSurrogate, FloatKrigingSurrogate

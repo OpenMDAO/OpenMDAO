@@ -11,9 +11,11 @@ import warnings
 import numpy as np
 from parameterized import parameterized
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, NonLinearRunOnce
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, \
+    NonlinearRunOnce, NonLinearRunOnce
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
+
 try:
     from openmdao.parallel_api import PETScVector
 except ImportError:
@@ -84,6 +86,19 @@ class TestGroup(unittest.TestCase):
             self.assertEqual(str(err), "Subsystem name 'comp2' is already used.")
         else:
             self.fail('Exception expected.')
+
+    def test_deprecated_runonce(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', 5.0))
+        p.model.add_subsystem('comp', ExecComp('b=2*a'))
+        with warnings.catch_warnings(record=True) as w:
+            p.model.nonlinear_solver = NonLinearRunOnce()
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message),
+                         "NonLinearRunOnce is deprecated.  Use NonlinearRunOnce instead.")
+
 
     def test_group_simple(self):
         from openmdao.api import ExecComp, Problem
@@ -784,14 +799,14 @@ class TestGroup(unittest.TestCase):
         assert_rel_error(self, p['C1.y'], 21.)
 
     def test_set_order_feature(self):
-        from openmdao.api import Problem, IndepVarComp, NonLinearRunOnce
+        from openmdao.api import Problem, IndepVarComp, NonlinearRunOnce
         from openmdao.core.tests.test_group import ReportOrderComp
 
         # this list will record the execution order of our C1, C2, and C3 components
         order_list = []
         prob = Problem()
         model = prob.model
-        model.nonlinear_solver = NonLinearRunOnce()
+        model.nonlinear_solver = NonlinearRunOnce()
         model.add_subsystem('indeps', IndepVarComp('x', 1.))
         model.add_subsystem('C1', ReportOrderComp(order_list))
         model.add_subsystem('C2', ReportOrderComp(order_list))
@@ -823,7 +838,7 @@ class TestGroup(unittest.TestCase):
         order_list = []
         prob = Problem()
         model = prob.model
-        model.nonlinear_solver = NonLinearRunOnce()
+        model.nonlinear_solver = NonlinearRunOnce()
         model.add_subsystem('indeps', IndepVarComp('x', 1.))
         model.add_subsystem('C1', ReportOrderComp(order_list))
         model.add_subsystem('C2', ReportOrderComp(order_list))

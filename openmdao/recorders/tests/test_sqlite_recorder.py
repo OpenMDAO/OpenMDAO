@@ -10,7 +10,7 @@ from six import PY2, PY3
 from tempfile import mkdtemp
 
 from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, NonlinearBlockJac,\
-            NewtonSolver, NonLinearRunOnce, SqliteRecorder, Group, IndepVarComp, ExecComp, \
+            NewtonSolver, NonlinearRunOnce, SqliteRecorder, Group, IndepVarComp, ExecComp, \
             DirectSolver, ScipyIterativeSolver, PetscKSP, LinearBlockGS, LinearRunOnce, \
             LinearBlockJac
 
@@ -772,7 +772,7 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_record_solver_nonlinear_nonlinear_run_once(self):
         self.setup_sellar_model()
 
-        self.prob.model.nonlinear_solver = NonLinearRunOnce()
+        self.prob.model.nonlinear_solver = NonlinearRunOnce()
         self.prob.model.nonlinear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
