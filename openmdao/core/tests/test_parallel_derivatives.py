@@ -8,7 +8,7 @@ import time
 import random
 
 from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, DefaultVector, \
-    ExecComp, ExplicitComponent, PETScVector, ScipyIterativeSolver, NonlinearBlockGS
+    ExecComp, ExplicitComponent, PETScVector, ScipyGMRES, NonlinearBlockGS
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped

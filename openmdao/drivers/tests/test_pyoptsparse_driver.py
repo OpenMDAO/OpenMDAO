@@ -8,7 +8,7 @@ from six.moves import cStringIO as StringIO
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, AnalysisError, ExplicitComponent, \
-     ScipyIterativeSolver, NonlinearBlockGS, LinearBlockGS
+     ScipyGMRES, NonlinearBlockGS, LinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
@@ -1086,7 +1086,7 @@ class TestPyoptSparse(unittest.TestCase):
                                          promotes_outputs=['y2'])
 
                 self.linear_solver = LinearBlockGS()
-                cycle.linear_solver = ScipyIterativeSolver()
+                cycle.linear_solver = ScipyGMRES()
                 cycle.nonlinear_solver = NonlinearBlockGS()
 
                 self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',

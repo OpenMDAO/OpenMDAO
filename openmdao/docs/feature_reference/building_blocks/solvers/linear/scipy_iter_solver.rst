@@ -1,10 +1,10 @@
 .. _scipyiterativesolver:
 
 ********************
-ScipyIterativeSolver
+ScipyGMRES
 ********************
 
-The ScipyIterativeSolver is an iterative linear solver that wraps the methods found in `scipy.sparse.linalg`.
+The ScipyGMRES is an iterative linear solver that wraps the methods found in `scipy.sparse.linalg`.
 The default method is "GMRES", or the Generalized Minimal RESidual method, though you can give it other
 methods that satisfy the same interface. This linear solver is capable of handling any system topology very
 effectively. It also solves all subsystems below it in the hierarchy, so assigning different solvers to
@@ -16,17 +16,17 @@ instead.
 Here, we calculate the total derivatives across the Sellar system.
 
 .. embed-test::
-    openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyIterativeSolverFeature.test_specify_solver
+    openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyGMRESFeature.test_specify_solver
 
-ScipyIterativeSolver Options
+ScipyGMRES Options
 ----------------------------
 
 .. embed-options::
     openmdao.solvers.linear.scipy_iter_solver
-    ScipyIterativeSolver
+    ScipyGMRES
     options
 
-ScipyIterativeSolver Option Examples
+ScipyGMRES Option Examples
 ------------------------------------
 
 **maxiter**
@@ -42,7 +42,7 @@ ScipyIterativeSolver Option Examples
   soon.)
 
   .. embed-test::
-      openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyIterativeSolverFeature.test_feature_maxiter
+      openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyGMRESFeature.test_feature_maxiter
 
 **atol**
 
@@ -55,7 +55,7 @@ ScipyIterativeSolver Option Examples
   You may need to adjust this setting if you have abnormally large or small values in your global Jacobean.
 
   .. embed-test::
-      openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyIterativeSolverFeature.test_feature_atol
+      openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyGMRESFeature.test_feature_atol
 
 **rtol**
 
@@ -73,9 +73,9 @@ Here, we add a Gauss Seidel preconditioner to the simple Sellar solution with Ne
 GMRES iterations is lower when using the preconditioner.
 
 .. embed-test::
-    openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyIterativeSolverFeature.test_specify_precon
+    openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyGMRESFeature.test_specify_precon
 
-**A note on nesting ScipyIterativeSolver under a preconditoner:** The underlying GMRES module is not
+**A note on nesting ScipyGMRES under a preconditoner:** The underlying GMRES module is not
 re-entrant, so it cannot be called as a new instance while it is running. If you need to use gmres under
 gmres in a preconditioner stack, you should use :ref:`PetscKSP <openmdao.solvers.linear.petsc_ksp.py>` at
 one (ore more) of the levels.

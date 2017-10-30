@@ -9,7 +9,7 @@ from six.moves import cStringIO
 import numpy as np
 
 from openmdao.api import Problem, IndepVarComp, Component, Group, NewtonSolver, NonLinearRunOnce
-from openmdao.api import ScipyIterativeSolver as ScipyGMRES
+from openmdao.api import ScipyGMRES as ScipyGMRES
 from openmdao.devtools.testutil import assert_rel_error, TestLogger
 
 

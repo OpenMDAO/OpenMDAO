@@ -15,7 +15,7 @@ from tempfile import mkdtemp
 
 from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, NonlinearBlockJac,\
             NewtonSolver, NonLinearRunOnce, Group, IndepVarComp, ExecComp, \
-            DirectSolver, ScipyIterativeSolver, LinearBlockGS, LinearRunOnce, \
+            DirectSolver, ScipyGMRES, LinearBlockGS, LinearRunOnce, \
             LinearBlockJac, SqliteRecorder, upload
 
 from openmdao.core.problem import Problem
@@ -123,7 +123,7 @@ class TestDataUploader(unittest.TestCase):
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         mda = model.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
-        mda.linear_solver = ScipyIterativeSolver()
+        mda.linear_solver = ScipyGMRES()
         mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -136,7 +136,7 @@ class TestDataUploader(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         mda.nonlinear_solver = NonlinearBlockGS()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyGMRES()
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
         model.add_design_var('x', lower=0.0, upper=10.0)
@@ -575,7 +575,7 @@ class TestDataUploader(unittest.TestCase):
 
         model = self.prob.model
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyGMRES()
 
         model._nonlinear_solver.options['solve_subsystems'] = True
         model._nonlinear_solver.options['max_sub_solves'] = 4
@@ -608,7 +608,7 @@ class TestDataUploader(unittest.TestCase):
 
         model = self.prob.model
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyGMRES()
 
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 4
@@ -812,7 +812,7 @@ class TestDataUploader(unittest.TestCase):
 
         self.prob.model.nonlinear_solver = NewtonSolver()
         # used for analytic derivatives
-        self.prob.model.nonlinear_solver.linear_solver = ScipyIterativeSolver()
+        self.prob.model.nonlinear_solver.linear_solver = ScipyGMRES()
 
         self.prob.model.nonlinear_solver.linear_solver.options['record_abs_error'] = True
         self.prob.model.nonlinear_solver.linear_solver.options['record_rel_error'] = True

@@ -12,7 +12,7 @@ from scipy.sparse import coo_matrix, csr_matrix
 
 from openmdao.api import IndepVarComp, Group, Problem, \
                          ExplicitComponent, ImplicitComponent, ExecComp, \
-                         NewtonSolver, ScipyIterativeSolver, \
+                         NewtonSolver, ScipyGMRES, \
                          DenseJacobian, CSRJacobian, CSCJacobian, COOJacobian, \
                          LinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
@@ -239,8 +239,8 @@ class TestJacobian(unittest.TestCase):
 
         top.jacobian = jac_class()
         top.nonlinear_solver = NewtonSolver()
-        top.nonlinear_solver.linear_solver = ScipyIterativeSolver(maxiter=100)
-        top.linear_solver = ScipyIterativeSolver(
+        top.nonlinear_solver.linear_solver = ScipyGMRES(maxiter=100)
+        top.linear_solver = ScipyGMRES(
             maxiter=200, atol=1e-10, rtol=1e-10)
         prob.set_solver_print(level=0)
 
@@ -345,7 +345,7 @@ class TestJacobian(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyGMRES()
 
         d1 = prob.model.get_subsystem('d1')
 
@@ -499,7 +499,7 @@ class TestJacobian(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyGMRES()
 
         prob.model.jacobian = DenseJacobian()
 
@@ -530,7 +530,7 @@ class TestJacobian(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyGMRES()
 
         prob.setup(check=False)
         prob.final_setup()

@@ -379,9 +379,9 @@ Specify Scipy GMRES as a Linear Solver in a Group
 .. content-container ::
 
   .. embed-compare::
-      openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyIterativeSolverFeature.test_specify_solver
-      ScipyIterativeSolver
-      ScipyIterativeSolver
+      openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyGMRESFeature.test_specify_solver
+      ScipyGMRES
+      ScipyGMRES
 
     model.ln_solver = ScipyGMRES()
 

@@ -10,7 +10,7 @@ from openmdao.utils.general_utils import warn_deprecation
 from openmdao.recorders.recording_iteration_stack import Recording
 
 
-class ScipyIterativeSolver(LinearSolver):
+class ScipyGMRES(LinearSolver):
     """
     The Krylov iterative solvers in scipy.sparse.linalg.
 
@@ -31,7 +31,7 @@ class ScipyIterativeSolver(LinearSolver):
         **kwargs : {}
             dictionary of options set by the instantiating class/script.
         """
-        super(ScipyIterativeSolver, self).__init__(**kwargs)
+        super(ScipyGMRES, self).__init__(**kwargs)
 
         # initialize preconditioner to None
         self.precon = None
@@ -62,7 +62,7 @@ class ScipyIterativeSolver(LinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(ScipyIterativeSolver, self)._setup_solvers(system, depth)
+        super(ScipyGMRES, self)._setup_solvers(system, depth)
 
         if self.precon is not None:
             self.precon._setup_solvers(self._system, self._depth + 1)
@@ -80,7 +80,7 @@ class ScipyIterativeSolver(LinearSolver):
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        super(ScipyIterativeSolver, self)._set_solver_print(level=level, type_=type_)
+        super(ScipyGMRES, self)._set_solver_print(level=level, type_=type_)
 
         if self.precon is not None and type_ != 'NL':
             self.precon._set_solver_print(level=level, type_=type_)
@@ -146,7 +146,7 @@ class ScipyIterativeSolver(LinearSolver):
             the current residual vector.
         """
         norm = np.linalg.norm(res)
-        with Recording('ScipyIterativeSolver', self._iter_count, self):
+        with Recording('ScipyGMRES', self._iter_count, self):
             if self._iter_count == 0:
                 if norm != 0.0:
                     self._norm0 = norm
