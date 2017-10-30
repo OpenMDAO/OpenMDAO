@@ -62,19 +62,18 @@ for row in cur:
     pprint.pprint(driver_metadata, indent=4)
 
 
-def print_scaling_factors(scaling_factors, in_out, norm_type, linear_type):
+def print_scaling_factors(scaling_factors, in_out, linear_type):
     """
     Print the names and values of all variables in this vector, one per line.
     """
-    vector = scaling_factors[(in_out,norm_type)][linear_type]
-    print(indent, in_out, norm_type, linear_type)
-    if vector._views:
+    vector = scaling_factors[in_out][linear_type]
+    print(indent, in_out, linear_type)
+    if vector:
         for abs_name, view in iteritems(vector._views):
             print(2 * indent, abs_name, view)
     else:
         print(2 * indent, 'None')
     print()
-
 
 print_header('System Metadata', '=')
 cur.execute("SELECT id, scaling_factors FROM system_metadata")
@@ -83,10 +82,9 @@ for row in cur:
     scaling_factors = pickle_load(row[1])
     print('id = ', id)
     print('scaling_factors')
-    for in_out in ['input', 'output']:
-        for norm_type in ['norm0', 'norm1', 'phys0', 'phys1']:
-            for linear_type in ['linear', 'nonlinear']:
-                print_scaling_factors(scaling_factors, in_out, norm_type, linear_type)
+    for in_out in ['input', 'output', 'residual']:
+        for linear_type in ['linear', 'nonlinear']:
+            print_scaling_factors(scaling_factors, in_out, linear_type)
 
 print_header('Solver Metadata', '=')
 cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")

@@ -194,10 +194,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         """ Tests that the reader returns params correctly. """
         self.setup_sellar_model_with_optimization()
 
-        self.recorder.options['record_desvars'] = True
-        self.recorder.options['record_responses'] = True
-        self.recorder.options['record_objectives'] = True
-        self.recorder.options['record_constraints'] = True
+        self.prob.driver.options['record_desvars'] = True
+        self.prob.driver.options['record_responses'] = True
+        self.prob.driver.options['record_objectives'] = True
+        self.prob.driver.options['record_constraints'] = True
         self.prob.driver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
@@ -241,10 +241,10 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.setup_sellar_model()
 
-        self.recorder.options['record_inputs'] = True
-        self.recorder.options['record_outputs'] = True
-        self.recorder.options['record_residuals'] = True
-        self.recorder.options['record_metadata'] = False
+        self.prob.model.options['record_inputs'] = True
+        self.prob.model.options['record_outputs'] = True
+        self.prob.model.options['record_residuals'] = True
+        self.prob.model.options['record_metadata'] = False
 
         self.prob.model.add_recorder(self.recorder)
 
@@ -292,10 +292,10 @@ class TestSqliteCaseReader(unittest.TestCase):
     def test_reading_solver_cases(self):
         self.setup_sellar_model()
 
-        self.recorder.options['record_abs_error'] = True
-        self.recorder.options['record_rel_error'] = True
-        self.recorder.options['record_solver_output'] = True
-        self.recorder.options['record_solver_residuals'] = True
+        self.prob.model._nonlinear_solver.options['record_abs_error'] = True
+        self.prob.model._nonlinear_solver.options['record_rel_error'] = True
+        self.prob.model._nonlinear_solver.options['record_solver_output'] = True
+        self.prob.model._nonlinear_solver.options['record_solver_residuals'] = True
         self.prob.model._nonlinear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
@@ -335,10 +335,10 @@ class TestSqliteCaseReader(unittest.TestCase):
     def test_reading_driver_metadata(self):
         self.setup_sellar_model_with_optimization()
 
-        self.recorder.options['record_desvars'] = True
-        self.recorder.options['record_responses'] = True
-        self.recorder.options['record_objectives'] = True
-        self.recorder.options['record_constraints'] = True
+        self.prob.driver.options['record_desvars'] = True
+        self.prob.driver.options['record_responses'] = True
+        self.prob.driver.options['record_objectives'] = True
+        self.prob.driver.options['record_constraints'] = True
         self.prob.driver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
@@ -365,10 +365,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         if OPTIMIZER == 'SLSQP':
             self.prob.driver.opt_settings['ACC'] = 1e-9
 
-        self.recorder.options['record_inputs'] = True
-        self.recorder.options['record_outputs'] = True
-        self.recorder.options['record_residuals'] = True
-        self.recorder.options['record_metadata'] = True
+        self.prob.model.options['record_inputs'] = True
+        self.prob.model.options['record_outputs'] = True
+        self.prob.model.options['record_residuals'] = True
+        self.prob.model.options['record_metadata'] = True
 
         self.prob.model.add_recorder(self.recorder)
 
@@ -397,12 +397,11 @@ class TestSqliteCaseReader(unittest.TestCase):
     def test_reading_solver_metadata(self):
         self.setup_sellar_model()
 
-        self.recorder.options['record_abs_error'] = True
-        self.recorder.options['record_rel_error'] = True
-        self.recorder.options['record_solver_output'] = True
-        self.recorder.options['record_solver_residuals'] = True
+        nonlinear_solver = self.prob.model.nonlinear_solver
         self.prob.model.nonlinear_solver.add_recorder(self.recorder)
-        self.prob.model.linear_solver.add_recorder(self.recorder)
+
+        linear_solver = self.prob.model.linear_solver
+        linear_solver.add_recorder(self.recorder)
 
         d1 = self.prob.model.d1  # instance of SellarDis1withDerivatives, a Group
         d1.nonlinear_solver = NonlinearBlockGS()
@@ -435,11 +434,12 @@ class TestSqliteCaseReader(unittest.TestCase):
             self.prob.driver.opt_settings['ACC'] = 1e-9
 
         self.prob.driver.add_recorder(self.recorder)
-        self.recorder.options['record_desvars'] = True
-        self.recorder.options['record_responses'] = True
-        self.recorder.options['record_objectives'] = True
-        self.recorder.options['record_constraints'] = True
-        self.recorder.options['system_includes'] = ['mda.d2.y2',]
+        driver = self.prob.driver
+        driver.options['record_desvars'] = True
+        driver.options['record_responses'] = True
+        driver.options['record_objectives'] = True
+        driver.options['record_constraints'] = True
+        driver.options['system_includes'] = ['mda.d2.y2',]
 
         self.prob.driver.options['optimizer'] = OPTIMIZER
         if OPTIMIZER == 'SLSQP':
