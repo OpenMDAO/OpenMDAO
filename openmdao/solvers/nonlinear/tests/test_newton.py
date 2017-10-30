@@ -311,12 +311,12 @@ class TestNewton(unittest.TestCase):
         prob = Problem()
         model = prob.model = DoubleSellar()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
@@ -339,12 +339,12 @@ class TestNewton(unittest.TestCase):
         model = prob.model = DoubleSellar()
         model.jacobian = DenseJacobian()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
@@ -367,12 +367,12 @@ class TestNewton(unittest.TestCase):
         model = prob.model = DoubleSellar(units=None, scaling=True)
         model.jacobian = DenseJacobian()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
@@ -395,12 +395,12 @@ class TestNewton(unittest.TestCase):
         model = prob.model = DoubleSellar(units=True, scaling=True)
         model.jacobian = DenseJacobian()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
@@ -423,12 +423,12 @@ class TestNewton(unittest.TestCase):
         model = prob.model = DoubleSellar()
         model.jacobian = DenseJacobian()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = ScipyIterativeSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = ScipyIterativeSolver()
@@ -450,12 +450,12 @@ class TestNewton(unittest.TestCase):
         model = prob.model = DoubleSellarImplicit()
         model.jacobian = DenseJacobian()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
@@ -477,12 +477,12 @@ class TestNewton(unittest.TestCase):
         model = prob.model = DoubleSellarImplicit(scaling=True)
         model.jacobian = DenseJacobian()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
@@ -504,12 +504,12 @@ class TestNewton(unittest.TestCase):
         model = prob.model = DoubleSellarImplicit(units=True, scaling=True)
         model.jacobian = DenseJacobian()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
@@ -530,13 +530,13 @@ class TestNewton(unittest.TestCase):
         prob = Problem()
         model = prob.model = DoubleSellar()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
         g1.jacobian = DenseJacobian()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
@@ -582,12 +582,12 @@ class TestNewton(unittest.TestCase):
         model = prob.model = DoubleSellar()
 
         # each SubSellar group converges itself
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = CountNewton()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = CountDS()  # used for derivatives
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = CountNewton()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
@@ -615,12 +615,12 @@ class TestNewton(unittest.TestCase):
         model = prob.model = DoubleSellar()
 
         # each SubSellar group converges itself
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = CountNewton()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = CountDS()  # used for derivatives
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = CountNewton()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
@@ -648,12 +648,12 @@ class TestNewton(unittest.TestCase):
         model = prob.model = DoubleSellar()
 
         # each SubSellar group converges itself
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = CountNewton()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = CountDS()  # used for derivatives
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = CountNewton()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
@@ -975,12 +975,12 @@ class TestNewtonFeatures(unittest.TestCase):
         model.nonlinear_solver = NewtonSolver()
         model.linear_solver = DirectSolver()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
@@ -1036,12 +1036,12 @@ class TestNewtonFeatures(unittest.TestCase):
         prob = Problem()
         model = prob.model = DoubleSellar()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()

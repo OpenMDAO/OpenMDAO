@@ -19,9 +19,9 @@ class TestLinearRunOnceSolver(unittest.TestCase):
         prob.model.linear_solver = LinearRunOnce()
         prob.set_solver_print(level=0)
 
-        g1 = prob.model.get_subsystem('g1')
-        g2 = g1.get_subsystem('g2')
-        g3 = prob.model.get_subsystem('g3')
+        g1 = prob.model.g1
+        g2 = g1.g2
+        g3 = prob.model.g3
         g1.linear_solver = LinearRunOnce()
         g2.linear_solver = LinearRunOnce()
         g3.linear_solver = LinearRunOnce()
