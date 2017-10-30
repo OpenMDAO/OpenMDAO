@@ -2,15 +2,8 @@
 from __future__ import division, print_function
 
 
-class Null(object):
-    """
-    Dummy class instantiated to check whether the default argument is given.
-    """
-
-    pass
-
-
-null_object = Null()
+# unique object to check if default is given
+_undefined = object()
 
 
 class OptionsDictionary(object):
@@ -92,7 +85,7 @@ class OptionsDictionary(object):
         if is_valid is not None and not is_valid(value):
             raise ValueError("Function is_valid returns False for {}.".format(name))
 
-    def declare(self, name, default=null_object, values=None, type_=None, desc='',
+    def declare(self, name, default=_undefined, values=None, type_=None, desc='',
                 upper=None, lower=None, is_valid=None):
         r"""
         Declare an option.
@@ -126,7 +119,7 @@ class OptionsDictionary(object):
         if type_ is not None and not isinstance(type_, (type, set, list, tuple)):
             raise TypeError("'type_' must be None, a type or a tuple  - not %s." % type_)
 
-        default_provided = default != null_object
+        default_provided = default is not _undefined
 
         self._dict[name] = {
             'value': default,
