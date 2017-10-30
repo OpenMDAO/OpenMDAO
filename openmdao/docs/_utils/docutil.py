@@ -666,9 +666,11 @@ def get_test_src(method_path):
             save_dir = os.getcwd()
             os.chdir('/'.join(test_module.__file__.split('/')[:-1]))
 
-            exec(code_to_run, {})
+            try:
+                exec(code_to_run, {})
+            finally:
+                os.chdir(save_dir)
 
-            os.chdir(save_dir)
             np.set_printoptions(precision=save_opts['precision'])
             run_outputs = strout.getvalue()
 
