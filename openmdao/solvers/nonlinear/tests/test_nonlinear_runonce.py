@@ -19,9 +19,9 @@ class TestNonLinearRunOnceSolver(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         prob.model.nonlinear_solver = NonLinearRunOnce()
-        g1 = prob.model.get_subsystem('g1')
-        g2 = g1.get_subsystem('g2')
-        g3 = prob.model.get_subsystem('g3')
+        g1 = prob.model.g1
+        g2 = g1.g2
+        g3 = prob.model.g3
         g1.nonlinear_solver = NonLinearRunOnce()
         g2.nonlinear_solver = NonLinearRunOnce()
         g3.nonlinear_solver = NonLinearRunOnce()
