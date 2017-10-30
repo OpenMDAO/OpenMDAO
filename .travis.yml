@@ -98,8 +98,9 @@ script:
 - cd openmdao/docs;
 - make all
 # run the tests from down here to see if it can work without being at top level
-- testflo -n 1 -m "ptest*"
+- testflo -n 1 openmdao  -m "ptest*"
 - testflo -n 1 openmdao  --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*
+- cp .coverage ../.. #copy coverage results up top
 
 before_deploy:
 - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
