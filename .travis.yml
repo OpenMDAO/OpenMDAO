@@ -88,7 +88,7 @@ install:
 - pip install git+https://github.com/OpenMDAO/testflo.git
 - pip install coverage
 - pip install coveralls
-- pip install .  # Not using -e on purpose here, to catch pkging errors
+- pip install -e .  # Not using -e on purpose here, to catch pkging errors
 
 script:
 # make docs first
@@ -116,6 +116,7 @@ deploy:
         rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/twodocversions/latest;
       fi
     fi
+  - cd ../..
   on:
     branch: master
 
