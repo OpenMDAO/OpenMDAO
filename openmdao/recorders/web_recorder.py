@@ -148,8 +148,8 @@ class WebRecorder(BaseRecorder):
 
         iteration_coordinate = get_formatted_iteration_coordinate()
         self._record_driver_iteration(self._counter, iteration_coordinate, metadata['success'],
-                                 metadata['msg'], desvars_array, responses_array,
-                                 objectives_array, constraints_array, sysincludes_array)
+                                      metadata['msg'], desvars_array, responses_array,
+                                      objectives_array, constraints_array, sysincludes_array)
 
     def record_iteration_system(self, recording_requester, data, metadata):
         """
