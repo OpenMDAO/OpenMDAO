@@ -91,16 +91,16 @@ install:
 - pip install git+https://github.com/OpenMDAO/testflo.git
 - pip install coverage
 - pip install coveralls
-- pip install  .  # Not using -e on purpose here, to catch pkging errors
+- pip install -e .  # Not using -e on purpose here, to catch pkging errors
 
 script:
 # make docs first
 - cd openmdao/docs;
 - make all
 # run the tests from down here to see if it can work without being at top level
+- cd ../..
 - testflo -n 1 -m "ptest*"
 - testflo -n 1 --coverage --coverpkg openmdao
-- cp .coverage ../../.coverage
 
 before_deploy:
 - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
@@ -113,11 +113,13 @@ deploy:
   provider: script
   skip_cleanup: true
   script:
+  - cd openmdao/docs
   - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
       if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
         rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/twodocversions/latest;
       fi
     fi
+  - cd ../..
   on:
     branch: master
 
