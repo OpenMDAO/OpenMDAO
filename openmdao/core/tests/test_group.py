@@ -11,7 +11,8 @@ import warnings
 import numpy as np
 from parameterized import parameterized
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, NonLinearRunOnce
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, \
+    NonLinearRunOnce, ScipyIterativeSolver
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
 try:
@@ -110,6 +111,18 @@ class TestGroup(unittest.TestCase):
                          "with OpenMDAO <= 1.x ; use 'add_subsystem' instead.")
 
         self.assertTrue(ecomp is comp1)
+
+    def test_deprecated_scipyiterativesolver(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', 5.0))
+        p.model.add_subsystem('comp', ExecComp('b=2*a'))
+        with warnings.catch_warnings(record=True) as w:
+            p.model.linear_solver = ScipyIterativeSolver()
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message),
+                         "ScipyIterativeSolver is deprecated.  Use ScipyGMRES instead.")
 
     def test_group_simple_promoted(self):
         from openmdao.api import ExecComp, Problem, IndepVarComp
