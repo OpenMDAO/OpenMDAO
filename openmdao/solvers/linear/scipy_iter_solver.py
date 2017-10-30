@@ -289,3 +289,23 @@ class ScipyGMRES(LinearSolver):
         warn_deprecation("The 'preconditioner' property provides backwards compatibility "
                          "with OpenMDAO <= 1.x ; use 'precon' instead.")
         self.precon = precon
+
+
+class ScipyIterativeSolver(ScipyGMRES):
+    """
+    Deprecated.  See ScipyGMRES.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Deprecated.
+
+        Parameters
+        ----------
+        *args : list of object
+            Positional args.
+        **kwargs : dict
+            Named args.
+        """
+        super(ScipyIterativeSolver, self).__init__(*args, **kwargs)
+        warn_deprecation('ScipyIterativeSolver is deprecated.  Use ScipyGMRES instead.')
