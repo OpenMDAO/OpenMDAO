@@ -21,8 +21,8 @@ console, indented based on its location in the call stack. For example:
             Group#1.System.__init__
                 DictionaryJacobian#1.Jacobian.__init__
                 Group#1().System.initialize
-            NonLinearRunOnce#1.Solver.__init__
-                NonLinearRunOnce#1.Solver._declare_options
+            NonlinearRunOnce#1.Solver.__init__
+                NonlinearRunOnce#1.Solver._declare_options
             LinearRunOnce#1.LinearSolver.__init__
                 LinearRunOnce#1.Solver.__init__
                     LinearRunOnce#1.Solver._declare_options
@@ -37,15 +37,15 @@ console, indented based on its location in the call stack. For example:
         Propulsor#1.System.__init__
             DictionaryJacobian#3.Jacobian.__init__
             Propulsor#1().System.initialize
-        NonLinearRunOnce#2.Solver.__init__
-            NonLinearRunOnce#2.Solver._declare_options
+        NonlinearRunOnce#2.Solver.__init__
+            NonlinearRunOnce#2.Solver._declare_options
         LinearRunOnce#2.LinearSolver.__init__
             LinearRunOnce#2.Solver.__init__
                 LinearRunOnce#2.Solver._declare_options
     Problem#1.Problem.set_solver_print
         Group#1().System._set_solver_print
             LinearRunOnce#2.Solver._set_solver_print
-            NonLinearRunOnce#2.Solver._set_solver_print
+            NonlinearRunOnce#2.Solver._set_solver_print
     Problem#1.Problem.setup
         Group#1().System._setup
             Group#1().System._get_initial_procs
@@ -56,8 +56,8 @@ console, indented based on its location in the call stack. For example:
                         FlightConditions#1.System.__init__
                             DictionaryJacobian#4.Jacobian.__init__
                             FlightConditions#1().FlightConditions.initialize
-                        NonLinearRunOnce#3.Solver.__init__
-                            NonLinearRunOnce#3.Solver._declare_options
+                        NonlinearRunOnce#3.Solver.__init__
+                            NonlinearRunOnce#3.Solver._declare_options
                         LinearRunOnce#3.LinearSolver.__init__
                             LinearRunOnce#3.Solver.__init__
                                 LinearRunOnce#3.Solver._declare_options
@@ -102,13 +102,13 @@ Which will result in output that looks like this:
                   self=<openmdao.core.group.Group object>
                 <-- Group#1().System.initialize
             <-- Group#1().System.__init__
-            NonLinearRunOnce#1.Solver.__init__ (1)
+            NonlinearRunOnce#1.Solver.__init__ (1)
               kwargs={}
               self=NL: RUNONCE
-                NonLinearRunOnce#1.Solver._declare_options (1)
+                NonlinearRunOnce#1.Solver._declare_options (1)
                   self=NL: RUNONCE
-                <-- NonLinearRunOnce#1.Solver._declare_options
-            <-- NonLinearRunOnce#1.Solver.__init__
+                <-- NonlinearRunOnce#1.Solver._declare_options
+            <-- NonlinearRunOnce#1.Solver.__init__
             LinearRunOnce#1.LinearSolver.__init__ (1)
               kwargs={}
               self=LN: RUNONCE
