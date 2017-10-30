@@ -27,6 +27,11 @@ class TestOptionsDict(unittest.TestCase):
         self.dict['flag'] = True
         self.assertEqual(self.dict['flag'], True)
 
+    def test_allow_none(self):
+        self.dict.declare('test', types=int, allow_none=True, desc='Test integer value')
+        self.dict['test'] = None
+        self.assertEqual(self.dict['test'], None)
+
     def test_type_and_values(self):
         # Test with only type_
         self.dict.declare('test1', types=int)
