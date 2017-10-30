@@ -214,7 +214,7 @@ def tree(top, show_solvers=True, show_colors=True, filter=None, max_depth=0, str
             if s.linear_solver is not None and lnsolver != "LinearRunOnce":
                 cprint("  LN: ")
                 cprint(lnsolver, color=Fore.MAGENTA + Style.BRIGHT)
-            if s.nonlinear_solver is not None and nlsolver != "NonLinearRunOnce":
+            if s.nonlinear_solver is not None and nlsolver != "NonlinearRunOnce":
                 cprint("  NL: ")
                 cprint(nlsolver, color=Fore.MAGENTA + Style.BRIGHT)
         print()

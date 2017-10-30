@@ -14,7 +14,7 @@ from six import PY2, PY3
 from tempfile import mkdtemp
 
 from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, NonlinearBlockJac,\
-            NewtonSolver, NonLinearRunOnce, Group, IndepVarComp, ExecComp, \
+            NewtonSolver, NonlinearRunOnce, Group, IndepVarComp, ExecComp, \
             DirectSolver, ScipyIterativeSolver, LinearBlockGS, LinearRunOnce, \
             LinearBlockJac, SqliteRecorder, upload
 
@@ -761,7 +761,7 @@ class TestDataUploader(unittest.TestCase):
         self.setup_endpoints(m)
         self.setup_sellar_model()
 
-        self.prob.model.nonlinear_solver = NonLinearRunOnce()
+        self.prob.model.nonlinear_solver = NonlinearRunOnce()
         self.prob.model.nonlinear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
