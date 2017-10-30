@@ -192,7 +192,11 @@ class ParaboloidExternalCode(ExternalCode):
 
 class TestExternalCodeFeature(unittest.TestCase):
 
+    def setUp(self):
+        os.chdir(DIRECTORY)
+
     def tearDown(self):
+        import os
         try:
             os.remove('paraboloid_input.dat')
         except OSError:

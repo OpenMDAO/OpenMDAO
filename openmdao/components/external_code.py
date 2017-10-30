@@ -54,7 +54,6 @@ class ExternalCode(ExplicitComponent):
         self.DEV_NULL = DEV_NULL
 
         # Input options for this Component
-        self.options = OptionsDictionary()
         self.options.declare('command', [], desc='command to be executed')
         self.options.declare('env_vars', {},
                              desc='Environment variables required by the command')
