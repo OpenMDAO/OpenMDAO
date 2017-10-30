@@ -1341,7 +1341,7 @@ class Group(System):
 
         subsystems[:] = [olddict[name] for name in new_order]
 
-    def get_subsystem(self, name):
+    def _get_subsystem(self, name):
         """
         Return the system called 'name' in the current namespace.
 
@@ -1612,7 +1612,7 @@ class Group(System):
                 # indepvarcomp.
                 else:
                     compname = src.rsplit('.', 1)[0]
-                    comp = self.get_subsystem(compname)
+                    comp = self._get_subsystem(compname)
                     if isinstance(comp, IndepVarComp):
                         wrt.add(src)
                         ivc.append(src)

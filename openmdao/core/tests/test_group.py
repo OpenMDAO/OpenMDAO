@@ -221,22 +221,11 @@ class TestGroup(unittest.TestCase):
         p = Problem(model=BranchGroup())
         p.setup()
 
-        c1 = p.model.get_subsystem('Branch1.G1.G2.comp1')
+        c1 = p.model.Branch1.G1.G2.comp1
         self.assertEqual(c1.pathname, 'Branch1.G1.G2.comp1')
 
-        c2 = p.model.get_subsystem('Branch2.G3.comp2')
+        c2 = p.model.Branch2.G3.comp2
         self.assertEqual(c2.pathname, 'Branch2.G3.comp2')
-
-    def test_group_getsystem_middle(self):
-        from openmdao.api import Problem
-        from openmdao.core.tests.test_group import BranchGroup
-
-        p = Problem(model=BranchGroup())
-        p.setup()
-
-        grp = p.model.get_subsystem('Branch1.G1')
-        c1 = grp.get_subsystem('G2.comp1')
-        self.assertEqual(c1.pathname, 'Branch1.G1.G2.comp1')
 
     def test_group_nested_promoted1(self):
         from openmdao.api import Problem, Group, ExecComp
@@ -419,25 +408,25 @@ class TestGroup(unittest.TestCase):
         p = Problem(model=model)
         p.setup()
 
-        c1_1 = p.model.get_subsystem('group1.comp1')
-        c1_2 = p.model.get_subsystem('group1.comp2')
-        c2_1 = p.model.get_subsystem('group2.comp1')
-        c2_2 = p.model.get_subsystem('group2.comp2')
+        c1_1 = p.model.group1.comp1
+        c1_2 = p.model.group1.comp2
+        c2_1 = p.model.group2.comp1
+        c2_2 = p.model.group2.comp2
         self.assertEqual(c1_1.name, 'comp1')
         self.assertEqual(c1_2.name, 'comp2')
         self.assertEqual(c2_1.name, 'comp1')
         self.assertEqual(c2_2.name, 'comp2')
 
-        c1_1 = p.model.get_subsystem('group1').get_subsystem('comp1')
-        c1_2 = p.model.get_subsystem('group1').get_subsystem('comp2')
-        c2_1 = p.model.get_subsystem('group2').get_subsystem('comp1')
-        c2_2 = p.model.get_subsystem('group2').get_subsystem('comp2')
+        c1_1 = p.model.group1.comp1
+        c1_2 = p.model.group1.comp2
+        c2_1 = p.model.group2.comp1
+        c2_2 = p.model.group2.comp2
         self.assertEqual(c1_1.name, 'comp1')
         self.assertEqual(c1_2.name, 'comp2')
         self.assertEqual(c2_1.name, 'comp1')
         self.assertEqual(c2_2.name, 'comp2')
 
-        s = p.model.get_subsystem('')
+        s = p.model._get_subsystem('')
         self.assertEqual(s, None)
 
         p.set_solver_print(level=0)
