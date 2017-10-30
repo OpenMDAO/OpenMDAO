@@ -15,6 +15,8 @@ from openmdao.recorders.base_recorder import BaseRecorder
 from openmdao.solvers.solver import Solver
 from openmdao.recorders.recording_iteration_stack import \
     get_formatted_iteration_coordinate
+from openmdao.utils.record_util import values_to_array
+
 
 format_version = 1
 
@@ -85,174 +87,157 @@ class WebRecorder(BaseRecorder):
             self._case_id = str(case_id)
             self._headers['update'] = "True"
 
-    def record_iteration_driver_passing_vars(self, object_requesting_recording, desvars,
-                                             responses, objectives, constraints, sysvars, metadata):
+    def record_iteration_driver(self, recording_requester, data, metadata):
         """
-        Record an iteration using the driver options.
+        Record data and metadata from a Driver.
 
         Parameters
         ----------
-        object_requesting_recording: <Driver>
-            The Driver object that wants to record an iteration.
+        recording_requester : object
+            Driver in need of recording.
+        data : dict
+            Dictionary containing desvars, objectives, constraints, responses, and System vars.
         metadata : dict
-            Dictionary containing execution metadata (e.g. iteration coordinate).
+            Dictionary containing execution metadata.
         """
-        # make a nested numpy named array using the example
-        #   http://stackoverflow.com/questions/19201868/how-to-set-dtype-for-nested-numpy-ndarray
-        # e.g.
-        # table = np.array(data, dtype=[('instrument', 'S32'),
-        #                        ('filter', 'S64'),
-        #                        ('response', [('linenumber', 'i'),
-        #                                      ('wavelength', 'f'),
-        #                                      ('throughput', 'f')], (2,))
-        #                       ])
-
-        super(WebRecorder, self).record_iteration_driver_passing_vars(object_requesting_recording,
-                                                                      desvars, responses,
-                                                                      objectives, constraints,
-                                                                      sysvars,
-                                                                      metadata)
-
         desvars_array = None
         responses_array = None
         objectives_array = None
         constraints_array = None
         sysincludes_array = None
 
-        if self.options['record_desvars']:
-            if self._desvars_values:
-                desvars_array = []
-                for name, value in iteritems(self._desvars_values):
-                    desvars_array.append({
-                        'name': name,
-                        'values': self.convert_to_list(value)
-                    })
+        if data['des']:
+            desvars_array = []
+            for name, value in iteritems(data['des']):
+                desvars_array.append({
+                    'name': name,
+                    'values': self.convert_to_list(value)
+                })
 
-        if self.options['record_responses']:
-            if self._responses_values:
-                responses_array = []
-                for name, value in iteritems(self._responses_values):
-                    responses_array.append({
-                        'name': name,
-                        'values': self.convert_to_list(value)
-                    })
+        if data['res']:
+            responses_array = []
+            for name, value in iteritems(data['res']):
+                responses_array.append({
+                    'name': name,
+                    'values': self.convert_to_list(value)
+                })
 
-        if self.options['record_objectives']:
-            if self._objectives_values:
-                objectives_array = []
-                for name, value in iteritems(self._objectives_values):
-                    objectives_array.append({
-                        'name': name,
-                        'values': self.convert_to_list(value)
-                    })
+        if data['obj']:
+            objectives_array = []
+            for name, value in iteritems(data['obj']):
+                objectives_array.append({
+                    'name': name,
+                    'values': self.convert_to_list(value)
+                })
 
-        if self.options['record_constraints']:
-            if self._constraints_values:
-                constraints_array = []
-                for name, value in iteritems(self._constraints_values):
-                    constraints_array.append({
-                        'name': name,
-                        'values': self.convert_to_list(value)
-                    })
+        if data['con']:
+            constraints_array = []
+            for name, value in iteritems(data['con']):
+                constraints_array.append({
+                    'name': name,
+                    'values': self.convert_to_list(value)
+                })
 
-        if self.options['system_includes']:
-            if self._sysincludes_values:
-                sysincludes_array = []
-                for name, value in iteritems(self._sysincludes_values):
-                    sysincludes_array.append({
-                        'name': name,
-                        'values': self.convert_to_list(value)
-                    })
+        if data['sys']:
+            sysincludes_array = []
+            for name, value in iteritems(data['sys']):
+                sysincludes_array.append({
+                    'name': name,
+                    'values': self.convert_to_list(value)
+                })
 
         iteration_coordinate = get_formatted_iteration_coordinate()
         self._record_driver_iteration(self._counter, iteration_coordinate, metadata['success'],
-                                      metadata['msg'], desvars_array, responses_array,
-                                      objectives_array, constraints_array, sysincludes_array)
+                                 metadata['msg'], desvars_array, responses_array,
+                                 objectives_array, constraints_array, sysincludes_array)
 
-    def record_iteration_driver(self, object_requesting_recording, metadata):
+    def record_iteration_system(self, recording_requester, data, metadata):
         """
-        Record an iteration using the driver options.
+        Record data and metadata from a System.
 
         Parameters
         ----------
-        object_requesting_recording: <Driver>
-            The Driver object that wants to record an iteration.
+        recording_requester : object
+            Driver in need of recording.
+        data : dict
+            Dictionary containing inputs, outputs, and residuals.
         metadata : dict
-            Dictionary containing execution metadata (e.g. iteration coordinate).
+            Dictionary containing execution metadata.
         """
-        desvars_array = None
-        responses_array = None
-        objectives_array = None
-        constraints_array = None
-        desvars_values = None
-        responses_values = None
-        objectives_values = None
-        constraints_values = None
+        inputs = data['i']
+        outputs = data['o']
+        residuals = data['r']
 
-        if self.options['record_desvars']:
-            if self._filtered_driver:
-                desvars_values = \
-                    object_requesting_recording.get_design_var_values(self._filtered_driver['des'])
-            else:
-                desvars_values = object_requesting_recording.get_design_var_values()
+        # Inputs
+        inputs_array = []
+        if inputs:
+            for name, value in iteritems(inputs):
+                inputs_array.append({
+                    'name': name,
+                    'values': self.convert_to_list(value)
+                })
 
-            if desvars_values:
-                desvars_array = []
-                for name, value in iteritems(desvars_values):
-                    desvars_array.append({
-                        'name': name,
-                        'values': self.convert_to_list(value)
-                    })
+        # Outputs
+        outputs_array = []
+        if outputs:
+            for name, value in iteritems(outputs):
+                outputs_array.append({
+                    'name': name,
+                    'values': self.convert_to_list(value)
+                })
 
-        if self.options['record_responses']:
-            if self._filtered_driver:
-                responses_values = \
-                    object_requesting_recording.get_response_values(self._filtered_driver['res'])
-            else:
-                responses_values = object_requesting_recording.get_response_values()
-
-            if responses_values:
-                responses_array = []
-                for name, value in iteritems(responses_values):
-                    responses_array.append({
-                        'name': name,
-                        'values': self.convert_to_list(value)
-                    })
-
-        if self.options['record_objectives']:
-            if self._filtered_driver:
-                objectives_values = \
-                    object_requesting_recording.get_objective_values(self._filtered_driver['obj'])
-            else:
-                objectives_values = object_requesting_recording.get_objective_values()
-
-            if objectives_values:
-                objectives_array = []
-                for name, value in iteritems(objectives_values):
-                    objectives_array.append({
-                        'name': name,
-                        'values': self.convert_to_list(value)
-                    })
-
-        if self.options['record_constraints']:
-            if self._filtered_driver:
-                constraints_values = \
-                    object_requesting_recording.get_constraint_values(self._filtered_driver['con'])
-            else:
-                constraints_values = object_requesting_recording.get_constraint_values()
-
-            if constraints_values:
-                constraints_array = []
-                for name, value in iteritems(constraints_values):
-                    constraints_array.append({
-                        'name': name,
-                        'values': self.convert_to_list(value)
-                    })
+        # Residuals
+        residuals_array = []
+        if residuals:
+            for name, value in iteritems(residuals):
+                residuals_array.append({
+                    'name': name,
+                    'values': self.convert_to_list(value)
+                })
 
         iteration_coordinate = get_formatted_iteration_coordinate()
-        self._record_driver_iteration(self._counter, iteration_coordinate, metadata['success'],
-                                      metadata['msg'], desvars_array, responses_array,
-                                      objectives_array, constraints_array, None)
+        self._record_system_iteration(self._counter, iteration_coordinate, metadata['success'],
+                                      metadata['msg'], inputs_array, outputs_array,
+                                      residuals_array)
+
+    def record_iteration_solver(self, recording_requester, data, metadata):
+        """
+        Record data and metadata from a Solver.
+
+        Parameters
+        ----------
+        recording_requester : object
+            Solver in need of recording.
+        data : dict
+            Dictionary containing outputs, residuals, and errors.
+        metadata : dict
+            Dictionary containing execution metadata.
+        """
+        abs = data['abs']
+        rel = data['rel']
+        outputs = data['o']
+        residuals = data['r']
+
+        outputs_array = []
+        if outputs:
+            for name, value in iteritems(outputs):
+                outputs_array.append({
+                    'name': name,
+                    'values': self.convert_to_list(value)
+                })
+
+        residuals_array = []
+        if residuals:
+            for name, value in iteritems(residuals):
+                residuals_array.append({
+                    'name': name,
+                    'values': self.convert_to_list(value)
+                })
+
+        iteration_coordinate = get_formatted_iteration_coordinate()
+        self._record_solver_iteration(self._counter, iteration_coordinate, metadata['success'],
+                                      metadata['msg'], abs, rel,
+                                      outputs_array, residuals_array)
 
     def _record_driver_iteration(self, counter, iteration_coordinate, success, msg,
                                  desvars, responses, objectives, constraints, sysincludes):
@@ -302,56 +287,6 @@ class WebRecorder(BaseRecorder):
         requests.post(self._endpoint + '/' + self._case_id + '/global_iterations',
                       data=global_iteration, headers=self._headers)
 
-    def record_iteration_system(self, object_requesting_recording, metadata):
-        """
-        Record an iteration using system options.
-
-        Parameters
-        ----------
-        object_requesting_recording: <System>
-            The System object that wants to record an iteration.
-        metadata : dict
-            Dictionary containing execution metadata (e.g. iteration coordinate).
-        method : str
-            The method that called record_iteration. One of '_apply_linear', '_solve_linear',
-            '_apply_nonlinear,' '_solve_nonlinear'. Behavior varies based on from which function
-            record_iteration was called.
-        """
-        super(WebRecorder, self).record_iteration_system(object_requesting_recording,
-                                                         metadata)
-
-        # Inputs
-        inputs_array = []
-        if self._inputs:
-            for name, value in iteritems(self._inputs):
-                inputs_array.append({
-                    'name': name,
-                    'values': self.convert_to_list(value)
-                })
-
-        # Outputs
-        outputs_array = []
-        if self._outputs:
-            for name, value in iteritems(self._outputs):
-                outputs_array.append({
-                    'name': name,
-                    'values': self.convert_to_list(value)
-                })
-
-        # Residuals
-        residuals_array = []
-        if self._resids:
-            for name, value in iteritems(self._resids):
-                residuals_array.append({
-                    'name': name,
-                    'values': self.convert_to_list(value)
-                })
-
-        iteration_coordinate = get_formatted_iteration_coordinate()
-        self._record_system_iteration(self._counter, iteration_coordinate, metadata['success'],
-                                      metadata['msg'], inputs_array, outputs_array,
-                                      residuals_array)
-
     def _record_system_iteration(self, counter, iteration_coordinate, success, msg,
                                  inputs, outputs, residuals):
         """
@@ -396,47 +331,6 @@ class WebRecorder(BaseRecorder):
                       data=system_iteration, headers=self._headers)
         requests.post(self._endpoint + '/' + self._case_id + '/global_iterations',
                       data=global_iteration, headers=self._headers)
-
-    def record_iteration_solver(self, object_requesting_recording, metadata, **kwargs):
-        """
-        Record an iteration using solver options.
-
-        Parameters
-        ----------
-        object_requesting_recording: <Solver>
-            The Solver object that wants to record an iteration.
-        metadata : dict
-            Dictionary containing execution metadata (e.g. iteration coordinate).
-        absolute : float
-            The absolute error of the Solver requesting recording. It is not cached in
-            the Solver object, so we pass it in here.
-        relative : float
-            The relative error of the Solver requesting recording. It is not cached in
-            the Solver object, so we pass it in here.
-        """
-        super(WebRecorder, self).record_iteration_solver(object_requesting_recording,
-                                                         metadata, **kwargs)
-
-        outputs_array = []
-        if self._outputs:
-            for name, value in iteritems(self._outputs):
-                outputs_array.append({
-                    'name': name,
-                    'values': self.convert_to_list(value)
-                })
-
-        residuals_array = []
-        if self._resids:
-            for name, value in iteritems(self._resids):
-                residuals_array.append({
-                    'name': name,
-                    'values': self.convert_to_list(value)
-                })
-
-        iteration_coordinate = get_formatted_iteration_coordinate()
-        self._record_solver_iteration(self._counter, iteration_coordinate, metadata['success'],
-                                      metadata['msg'], self._abs_error, self._rel_error,
-                                      outputs_array, residuals_array)
 
     def _record_solver_iteration(self, counter, iteration_coordinate, success, msg,
                                  abs_error, rel_error, outputs, residuals):
@@ -486,17 +380,17 @@ class WebRecorder(BaseRecorder):
         requests.post(self._endpoint + '/' + self._case_id + '/global_iterations',
                       data=global_iteration, headers=self._headers)
 
-    def record_metadata_driver(self, object_requesting_recording):
+    def record_metadata_driver(self, recording_requester):
         """
         Record driver metadata.
 
         Parameters
         ----------
-        object_requesting_recording: <Driver>
+        recording_requester: <Driver>
             The Driver that would like to record its metadata.
         """
-        driver_class = type(object_requesting_recording).__name__
-        model_viewer_data = json.dumps(object_requesting_recording._model_viewer_data)
+        driver_class = type(recording_requester).__name__
+        model_viewer_data = json.dumps(recording_requester._model_viewer_data)
         self._record_driver_metadata(driver_class, model_viewer_data)
 
     def _record_driver_metadata(self, driver_class, model_viewer_data):
@@ -519,29 +413,29 @@ class WebRecorder(BaseRecorder):
         requests.post(self._endpoint + '/' + self._case_id + '/driver_metadata',
                       data=driver_metadata, headers=self._headers)
 
-    def record_metadata_system(self, object_requesting_recording):
+    def record_metadata_system(self, recording_requester):
         """
         Record system metadata.
 
         Parameters
         ----------
-        object_requesting_recording: <System>
+        recording_requester: <System>
             The System that would like to record its metadata.
         """
         pass
 
-    def record_metadata_solver(self, object_requesting_recording):
+    def record_metadata_solver(self, recording_requester):
         """
         Record solver metadata.
 
         Parameters
         ----------
-        object_requesting_recording: <Solver>
+        recording_requester: <Solver>
             The Solver that would like to record its metadata.
         """
-        solver_class = type(object_requesting_recording).__name__
-        path = object_requesting_recording._system.pathname
-        self._record_solver_metadata(object_requesting_recording.options, solver_class, path)
+        solver_class = type(recording_requester).__name__
+        path = recording_requester._system.pathname
+        self._record_solver_metadata(recording_requester.options, solver_class, path)
 
     def _record_solver_metadata(self, opts, solver_class, path):
         """
