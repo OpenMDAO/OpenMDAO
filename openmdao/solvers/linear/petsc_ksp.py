@@ -207,7 +207,7 @@ class PetscKSP(LinearSolver):
         self.options.declare('ksp_type', default='fgmres', values=KSP_TYPES,
                              desc="KSP algorithm to use. Default is 'fgmres'.")
 
-        self.options.declare('restart', default=1000, type_=int,
+        self.options.declare('restart', default=1000, types=int,
                              desc='Number of iterations between restarts. Larger values increase '
                              'iteration cost, but may be necessary for convergence')
 

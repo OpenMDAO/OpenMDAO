@@ -130,7 +130,7 @@ class ScalingTestComp(ImplicitComponent):
     def initialize(self):
         self.metadata.declare('row', values=[1, 2])
         self.metadata.declare('coeffs')
-        self.metadata.declare('use_scal', type_=bool)
+        self.metadata.declare('use_scal', types=bool)
 
     def setup(self):
 
