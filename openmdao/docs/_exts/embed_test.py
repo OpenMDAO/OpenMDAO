@@ -123,6 +123,7 @@ class EmbedTestDirective(Directive):
             doc_nodes.append(output_node)
 
         else:
+            output_blocks = [cgiesc.escape(ob) for ob in output_blocks]
             if 'no-split' in self.options:
                 input_block = '\n'.join(input_blocks)
                 output_block = '\n'.join(output_blocks)
