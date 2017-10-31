@@ -6,23 +6,13 @@ exclude_lines =
     raise NotImplementedError
     if __name__ == .__main__.:
 
-omit =
-    */python?.?/*
-    */site-packages/nose/*
-    */test/*
-    */tests/*
-    openmdao/code_review/*
-    openmdao/devtools/*
-    openmdao/docs/*
-    openmdao/test_suite/*
+include =
+    */openmdao/*
 
-[run]
 omit =
-    */python?.?/*
-    */site-packages/nose/*
     */test/*
     */tests/*
-    openmdao/code_review/*
-    openmdao/devtools/*
-    openmdao/docs/*
-    openmdao/test_suite/*
+    */test_suite/*
+    */code_review/*
+    */devtools/*
+    */docs/*
