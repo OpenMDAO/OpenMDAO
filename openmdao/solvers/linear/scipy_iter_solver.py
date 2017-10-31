@@ -10,10 +10,10 @@ from openmdao.utils.general_utils import warn_deprecation
 from openmdao.recorders.recording_iteration_stack import Recording
 
 _SOLVER_TYPES = {
-    'bicg': bicg,
-    'bicgstab': bicgstab,
-    'cg': cg,
-    'cgs': cgs,
+    # 'bicg': bicg,
+    # 'bicgstab': bicgstab,
+    # 'cg': cg,
+    # 'cgs': cgs,
     'gmres': gmres,
 }
 
@@ -48,7 +48,7 @@ class ScipyKrylov(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('solver', type_=object, default='gmres', values=_SOLVER_TYPES.keys(),
+        self.options.declare('solver', default='gmres', values=_SOLVER_TYPES.keys(),
                              desc='function handle for actual solver')
 
         self.options.declare('restart', default=20, type_=int,

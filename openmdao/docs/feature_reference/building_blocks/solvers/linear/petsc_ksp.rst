@@ -4,7 +4,7 @@
 PetscKSP
 ********
 
-The PetscKSP is an iterative linear solver that wraps the linear solution methods found in PETSc via Petsc4py.
+The PetscKSP is an iterative linear solver that wraps the linear solution methods found in PETSc via petsc4py.
 The default method is "fgmres", or the Flexible Generalized Minimal RESidual method, though you choose any of
 the other methods in PETSc. This linear solver is capable of handling any system topology very
 effectively. It also solves all subsystems below it in the hierarchy, so assigning different solvers to
