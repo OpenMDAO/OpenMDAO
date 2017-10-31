@@ -334,7 +334,7 @@ Add a Design Variable with Scale and Offset that Maps [3, 5] to [0, 1]
 Set Solvers
 -----------
 
-Setup a Problem Using the PetscVector
+Setup a Problem Using the PETScVector
 =====================================
 
 .. content-container ::

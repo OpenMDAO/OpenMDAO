@@ -11,7 +11,7 @@ from six import PY2, PY3
 
 from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, NonlinearBlockJac,\
             NewtonSolver, NonLinearRunOnce, WebRecorder, Group, IndepVarComp, ExecComp, \
-            DirectSolver, ScipyKrylov, PetscKSP, LinearBlockGS, LinearRunOnce, \
+            DirectSolver, ScipyKrylov, PETScKrylov, LinearBlockGS, LinearRunOnce, \
             LinearBlockJac
 
 from openmdao.core.problem import Problem

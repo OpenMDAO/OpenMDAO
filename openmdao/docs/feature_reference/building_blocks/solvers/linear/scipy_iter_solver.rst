@@ -10,7 +10,7 @@ methods that satisfy the same interface. This linear solver is capable of handli
 effectively. It also solves all subsystems below it in the hierarchy, so assigning different solvers to
 subsystems will have no effect on the solution at this level.
 
-This is a serial solver, so it should never be used under MPI; use :ref:`PetscKSP <openmdao.solvers.linear.petsc_ksp.py>`
+This is a serial solver, so it should never be used under MPI; use :ref:`PETScKrylov <openmdao.solvers.linear.petsc_ksp.py>`
 instead.
 
 Here, we calculate the total derivatives across the Sellar system.
@@ -77,7 +77,7 @@ GMRES iterations is lower when using the preconditioner.
 
 **A note on nesting ScipyKrylov under a preconditoner:** The underlying GMRES module is not
 re-entrant, so it cannot be called as a new instance while it is running. If you need to use gmres under
-gmres in a preconditioner stack, you should use :ref:`PetscKSP <openmdao.solvers.linear.petsc_ksp.py>` at
+gmres in a preconditioner stack, you should use :ref:`PETScKrylov <openmdao.solvers.linear.petsc_ksp.py>` at
 one (ore more) of the levels.
 
 .. tags:: Solver, LinearSolver

@@ -129,7 +129,7 @@ class TestNumpyVec(unittest.TestCase):
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
-class TestPetscVec(TestNumpyVec):
+class TestPETScVec(TestNumpyVec):
 
     def setUp(self):
         group = GroupG()

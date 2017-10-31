@@ -11,7 +11,7 @@ from tempfile import mkdtemp
 
 from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, NonlinearBlockJac,\
             NewtonSolver, NonLinearRunOnce, SqliteRecorder, Group, IndepVarComp, ExecComp, \
-            DirectSolver, ScipyKrylov, PetscKSP, LinearBlockGS, LinearRunOnce, \
+            DirectSolver, ScipyKrylov, PETScKrylov, LinearBlockGS, LinearRunOnce, \
             LinearBlockJac
 
 from openmdao.core.problem import Problem
@@ -894,7 +894,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.model.nonlinear_solver = NewtonSolver()
         nonlinear_solver = self.prob.model.nonlinear_solver
         # used for analytic derivatives
-        nonlinear_solver.linear_solver = PetscKSP()
+        nonlinear_solver.linear_solver = PETScKrylov()
 
         nonlinear_solver.linear_solver.options['record_abs_error'] = True
         nonlinear_solver.linear_solver.options['record_rel_error'] = True
@@ -905,7 +905,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)
 
-        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'PetscKSP', (3,)]
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'PETScKrylov', (3,)]
         expected_abs_error = 0.0
         expected_rel_error = 0.0
 

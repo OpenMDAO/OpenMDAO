@@ -18,6 +18,7 @@ from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, Sel
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 
 
+# use this to fake out the TestImplicitGroup so it'll use the solver we want.
 def krylov_factory(solver):
     def factory(junk=None):
         return ScipyKrylov(solver=solver)
@@ -164,16 +165,18 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         self.assertEqual(str(w[0].message), msg)
 
 
-class TestScipyKrylovBICG(TestScipyKrylov):
-
-    linear_solver_name = 'bicg'
-    linear_solver_class = krylov_factory('bicg')
-
-
-class TestScipyKrylovBICGSTAB(TestScipyKrylov):
-
-    linear_solver_name = 'bicgstab'
-    linear_solver_class = krylov_factory('bicgstab')
+# class TestScipyKrylovBICG(TestScipyKrylov):
+#     # This will run all of the gmres tests with the bicg solver.
+#
+#     linear_solver_name = 'bicg'
+#     linear_solver_class = krylov_factory('bicg')
+#
+#
+# class TestScipyKrylovBICGSTAB(TestScipyKrylov):
+#     # This will run all of the gmres tests with the bicgstab solver.
+#
+#     linear_solver_name = 'bicgstab'
+#     linear_solver_class = krylov_factory('bicgstab')
 
 
 class TestScipyKrylovFeature(unittest.TestCase):
