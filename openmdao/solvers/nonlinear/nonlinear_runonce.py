@@ -1,13 +1,14 @@
 """
-Define the NonLinearRunOnce class.
+Define the NonlinearRunOnce class.
 
 This is a simple nonlinear solver that just runs the system once.
 """
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.utils.general_utils import warn_deprecation
 
 
-class NonLinearRunOnce(NonlinearSolver):
+class NonlinearRunOnce(NonlinearSolver):
     """
     Simple solver that runs the containing system once.
 
@@ -48,3 +49,23 @@ class NonLinearRunOnce(NonlinearSolver):
             rec.rel = 0.0
 
         return False, 0.0, 0.0
+
+
+class NonLinearRunOnce(NonlinearRunOnce):
+    """
+    Deprecated.  See NonlinearRunOnce.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Deprecated.
+
+        Parameters
+        ----------
+        *args : list of object
+            Positional args.
+        **kwargs : dict
+            Named args.
+        """
+        super(NonLinearRunOnce, self).__init__(*args, **kwargs)
+        warn_deprecation('NonLinearRunOnce is deprecated.  Use NonlinearRunOnce instead.')
