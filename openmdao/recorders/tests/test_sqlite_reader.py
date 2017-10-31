@@ -194,10 +194,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         """ Tests that the reader returns params correctly. """
         self.setup_sellar_model_with_optimization()
 
-        self.prob.driver.options['record_desvars'] = True
-        self.prob.driver.options['record_responses'] = True
-        self.prob.driver.options['record_objectives'] = True
-        self.prob.driver.options['record_constraints'] = True
+        self.prob.driver.recording_options['record_desvars'] = True
+        self.prob.driver.recording_options['record_responses'] = True
+        self.prob.driver.recording_options['record_objectives'] = True
+        self.prob.driver.recording_options['record_constraints'] = True
         self.prob.driver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
@@ -241,10 +241,10 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.setup_sellar_model()
 
-        self.prob.model.options['record_inputs'] = True
-        self.prob.model.options['record_outputs'] = True
-        self.prob.model.options['record_residuals'] = True
-        self.prob.model.options['record_metadata'] = False
+        self.prob.model.recording_options['record_inputs'] = True
+        self.prob.model.recording_options['record_outputs'] = True
+        self.prob.model.recording_options['record_residuals'] = True
+        self.prob.model.recording_options['record_metadata'] = False
 
         self.prob.model.add_recorder(self.recorder)
 
@@ -292,10 +292,10 @@ class TestSqliteCaseReader(unittest.TestCase):
     def test_reading_solver_cases(self):
         self.setup_sellar_model()
 
-        self.prob.model._nonlinear_solver.options['record_abs_error'] = True
-        self.prob.model._nonlinear_solver.options['record_rel_error'] = True
-        self.prob.model._nonlinear_solver.options['record_solver_output'] = True
-        self.prob.model._nonlinear_solver.options['record_solver_residuals'] = True
+        self.prob.model._nonlinear_solver.recording_options['record_abs_error'] = True
+        self.prob.model._nonlinear_solver.recording_options['record_rel_error'] = True
+        self.prob.model._nonlinear_solver.recording_options['record_solver_output'] = True
+        self.prob.model._nonlinear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model._nonlinear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
@@ -335,10 +335,10 @@ class TestSqliteCaseReader(unittest.TestCase):
     def test_reading_driver_metadata(self):
         self.setup_sellar_model_with_optimization()
 
-        self.prob.driver.options['record_desvars'] = True
-        self.prob.driver.options['record_responses'] = True
-        self.prob.driver.options['record_objectives'] = True
-        self.prob.driver.options['record_constraints'] = True
+        self.prob.driver.recording_options['record_desvars'] = True
+        self.prob.driver.recording_options['record_responses'] = True
+        self.prob.driver.recording_options['record_objectives'] = True
+        self.prob.driver.recording_options['record_constraints'] = True
         self.prob.driver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
@@ -365,10 +365,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         if OPTIMIZER == 'SLSQP':
             self.prob.driver.opt_settings['ACC'] = 1e-9
 
-        self.prob.model.options['record_inputs'] = True
-        self.prob.model.options['record_outputs'] = True
-        self.prob.model.options['record_residuals'] = True
-        self.prob.model.options['record_metadata'] = True
+        self.prob.model.recording_options['record_inputs'] = True
+        self.prob.model.recording_options['record_outputs'] = True
+        self.prob.model.recording_options['record_residuals'] = True
+        self.prob.model.recording_options['record_metadata'] = True
 
         self.prob.model.add_recorder(self.recorder)
 
@@ -435,11 +435,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.prob.driver.add_recorder(self.recorder)
         driver = self.prob.driver
-        driver.options['record_desvars'] = True
-        driver.options['record_responses'] = True
-        driver.options['record_objectives'] = True
-        driver.options['record_constraints'] = True
-        driver.options['system_includes'] = ['mda.d2.y2',]
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_responses'] = True
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+        driver.recording_options['system_includes'] = ['mda.d2.y2',]
 
         self.prob.driver.options['optimizer'] = OPTIMIZER
         if OPTIMIZER == 'SLSQP':

@@ -18,37 +18,37 @@ class BaseRecorder(object):
 
     Options
     -------
-    options['record_metadata'] :  bool(True)
+    recording_options['record_metadata'] :  bool(True)
         Tells recorder whether to record variable attribute metadata.
-    options['record_outputs'] :  bool(True)
+    recording_options['record_outputs'] :  bool(True)
         Tells recorder whether to record the outputs of a System.
-    options['record_inputs'] :  bool(False)
+    recording_options['record_inputs'] :  bool(False)
         Tells recorder whether to record the inputs of a System.
-    options['record_residuals'] :  bool(False)
+    recording_options['record_residuals'] :  bool(False)
         Tells recorder whether to record the residuals of a System.
-    options['record_derivatives'] :  bool(False)
+    recording_options['record_derivatives'] :  bool(False)
         Tells recorder whether to record the derivatives of a System.
-    options['record_desvars'] :  bool(True)
+    recording_options['record_desvars'] :  bool(True)
         Tells recorder whether to record the desvars of a Driver.
-    options['record_responses'] :  bool(False)
+    recording_options['record_responses'] :  bool(False)
         Tells recorder whether to record the responses of a Driver.
-    options['record_objectives'] :  bool(False)
+    recording_options['record_objectives'] :  bool(False)
         Tells recorder whether to record the objectives of a Driver.
-    options['record_constraints'] :  bool(False)
+    recording_options['record_constraints'] :  bool(False)
         Tells recorder whether to record the constraints of a Driver.
-    options['record_abs_error'] :  bool(True)
+    recording_options['record_abs_error'] :  bool(True)
         Tells recorder whether to record the absolute error of a Solver.
-    options['record_rel_error'] :  bool(True)
+    recording_options['record_rel_error'] :  bool(True)
         Tells recorder whether to record the relative error of a Solver.
-    options['record_solver_output'] :  bool(False)
+    recording_options['record_solver_output'] :  bool(False)
         Tells recorder whether to record the output of a Solver.
-    options['record_solver_derivatives'] :  bool(False)
+    recording_options['record_solver_derivatives'] :  bool(False)
         Tells recorder whether to record the derivatives of a Solver.
-    options['includes'] :  list of strings("*")
+    recording_options['includes'] :  list of strings("*")
         Patterns for variables to include in recording.
-    options['excludes'] :  list of strings([])
+    recording_options['excludes'] :  list of strings([])
         Patterns for variables to exclude in recording (processed after includes).
-    options['system_includes'] :  list of strings([])
+    recording_options['system_includes'] :  list of strings([])
         Patterns for System outputs to include in recording of Driver iterations.
 
     Attributes

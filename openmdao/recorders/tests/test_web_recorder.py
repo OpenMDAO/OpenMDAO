@@ -201,8 +201,8 @@ class TestServerRecorder(unittest.TestCase):
 
         self.setup_sellar_model()
 
-        self.prob.driver.options['includes'] = ["p1.x"]
-        self.prob.driver.options['record_metadata'] = True
+        self.prob.driver.recording_options['includes'] = ["p1.x"]
+        self.prob.driver.recording_options['record_metadata'] = True
         self.prob.driver.add_recorder(recorder)
         self.prob.setup(check=False)
 
@@ -228,8 +228,8 @@ class TestServerRecorder(unittest.TestCase):
 
         self.setup_sellar_model()
 
-        self.prob.driver.options['includes'] = ["p1.x"]
-        self.prob.driver.options['record_metadata'] = True
+        self.prob.driver.recording_options['includes'] = ["p1.x"]
+        self.prob.driver.recording_options['record_metadata'] = True
         self.prob.driver.add_recorder(recorder)
         self.prob.setup(check=False)
 
@@ -248,8 +248,8 @@ class TestServerRecorder(unittest.TestCase):
 
         self.setup_sellar_model()
 
-        self.prob.driver.options['includes'] = ["p1.x"]
-        self.prob.driver.options['record_metadata'] = True
+        self.prob.driver.recording_options['includes'] = ["p1.x"]
+        self.prob.driver.recording_options['record_metadata'] = True
         self.prob.driver.add_recorder(recorder)
         self.prob.setup(check=False)
 
@@ -268,7 +268,7 @@ class TestServerRecorder(unittest.TestCase):
         self.setup_sellar_model()
 
         recorder = WebRecorder(self._accepted_token, suppress_output=True)
-        self.prob.driver.options['record_metadata'] = False
+        self.prob.driver.recording_options['record_metadata'] = False
         self.prob.driver.add_recorder(recorder)
         self.prob.setup(check=False)
 
@@ -284,10 +284,10 @@ class TestServerRecorder(unittest.TestCase):
 
         self.setup_sellar_model()
 
-        self.prob.driver.options['record_desvars'] = True
-        self.prob.driver.options['record_responses'] = False
-        self.prob.driver.options['record_objectives'] = False
-        self.prob.driver.options['record_constraints'] = False
+        self.prob.driver.recording_options['record_desvars'] = True
+        self.prob.driver.recording_options['record_responses'] = False
+        self.prob.driver.recording_options['record_objectives'] = False
+        self.prob.driver.recording_options['record_constraints'] = False
         self.prob.driver.add_recorder(recorder)
 
         self.prob.setup(check=False)
@@ -310,10 +310,10 @@ class TestServerRecorder(unittest.TestCase):
 
         self.setup_sellar_model()
 
-        self.prob.driver.options['record_desvars'] = False
-        self.prob.driver.options['record_responses'] = False
-        self.prob.driver.options['record_objectives'] = True
-        self.prob.driver.options['record_constraints'] = False
+        self.prob.driver.recording_options['record_desvars'] = False
+        self.prob.driver.recording_options['record_responses'] = False
+        self.prob.driver.recording_options['record_objectives'] = True
+        self.prob.driver.recording_options['record_constraints'] = False
         self.prob.driver.add_recorder(recorder)
         self.prob.setup(check=False)
 
@@ -334,11 +334,11 @@ class TestServerRecorder(unittest.TestCase):
 
         self.setup_sellar_model()
 
-        self.prob.driver.options['record_desvars'] = False
-        self.prob.driver.options['record_responses'] = False
-        self.prob.driver.options['record_objectives'] = False
-        self.prob.driver.options['record_constraints'] = False
-        self.prob.driver.options['system_includes'] = ['*']
+        self.prob.driver.recording_options['record_desvars'] = False
+        self.prob.driver.recording_options['record_responses'] = False
+        self.prob.driver.recording_options['record_objectives'] = False
+        self.prob.driver.recording_options['record_constraints'] = False
+        self.prob.driver.recording_options['system_includes'] = ['*']
         self.prob.driver.add_recorder(recorder)
         self.prob.setup(check=False)
 
@@ -359,10 +359,10 @@ class TestServerRecorder(unittest.TestCase):
 
         self.setup_sellar_model()
 
-        self.prob.driver.options['record_desvars'] = False
-        self.prob.driver.options['record_responses'] = False
-        self.prob.driver.options['record_objectives'] = False
-        self.prob.driver.options['record_constraints'] = True
+        self.prob.driver.recording_options['record_desvars'] = False
+        self.prob.driver.recording_options['record_responses'] = False
+        self.prob.driver.recording_options['record_objectives'] = False
+        self.prob.driver.recording_options['record_constraints'] = True
         self.prob.driver.add_recorder(recorder)
         self.prob.setup(check=False)
 
@@ -399,10 +399,10 @@ class TestServerRecorder(unittest.TestCase):
 
         self.setup_sellar_model()
 
-        self.prob.model.options['record_inputs'] = True
-        self.prob.model.options['record_outputs'] = True
-        self.prob.model.options['record_residuals'] = True
-        self.prob.model.options['record_metadata'] = True
+        self.prob.model.recording_options['record_inputs'] = True
+        self.prob.model.recording_options['record_outputs'] = True
+        self.prob.model.recording_options['record_residuals'] = True
+        self.prob.model.recording_options['record_metadata'] = True
 
         self.prob.model.add_recorder(recorder)
 
@@ -483,10 +483,10 @@ class TestServerRecorder(unittest.TestCase):
         prob.driver = pyOptSparseDriver()
 
         prob.driver.add_recorder(recorder)
-        prob.driver.options['record_desvars'] = True
-        prob.driver.options['record_responses'] = True
-        prob.driver.options['record_objectives'] = True
-        prob.driver.options['record_constraints'] = True
+        prob.driver.recording_options['record_desvars'] = True
+        prob.driver.recording_options['record_responses'] = True
+        prob.driver.recording_options['record_objectives'] = True
+        prob.driver.recording_options['record_constraints'] = True
 
         prob.driver.options['optimizer'] = OPTIMIZER
         if OPTIMIZER == 'SLSQP':
@@ -533,10 +533,10 @@ class TestServerRecorder(unittest.TestCase):
         self.setup_sellar_model()
 
         nonlinear_solver = self.prob.model._nonlinear_solver
-        nonlinear_solver.options['record_abs_error'] = True
-        nonlinear_solver.options['record_rel_error'] = True
-        nonlinear_solver.options['record_solver_output'] = True
-        nonlinear_solver.options['record_solver_residuals'] = True
+        nonlinear_solver.recording_options['record_abs_error'] = True
+        nonlinear_solver.recording_options['record_rel_error'] = True
+        nonlinear_solver.recording_options['record_solver_output'] = True
+        nonlinear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model._nonlinear_solver.add_recorder(recorder)
 
         self.prob.setup(check=False)
@@ -647,8 +647,8 @@ class TestServerRecorder(unittest.TestCase):
         self.prob.model.nonlinear_solver = NonlinearBlockGS()
         self.prob.model.nonlinear_solver.add_recorder(recorder)
         nonlinear_solver = self.prob.model.nonlinear_solver
-        nonlinear_solver.options['record_solver_output'] = True
-        nonlinear_solver.options['record_solver_residuals'] = True
+        nonlinear_solver.recording_options['record_solver_output'] = True
+        nonlinear_solver.recording_options['record_solver_residuals'] = True
 
         self.prob.setup(check=False)
 
@@ -774,10 +774,10 @@ class TestServerRecorder(unittest.TestCase):
         self.prob.model.nonlinear_solver.linear_solver = DirectSolver()
 
         linear_solver = self.prob.model.nonlinear_solver.linear_solver
-        linear_solver.options['record_abs_error'] = True
-        linear_solver.options['record_rel_error'] = True
-        linear_solver.options['record_solver_output'] = True
-        linear_solver.options['record_solver_residuals'] = True
+        linear_solver.recording_options['record_abs_error'] = True
+        linear_solver.recording_options['record_rel_error'] = True
+        linear_solver.recording_options['record_solver_output'] = True
+        linear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model.nonlinear_solver.linear_solver.add_recorder(recorder)
 
         self.prob.setup(check=False)
@@ -824,10 +824,10 @@ class TestServerRecorder(unittest.TestCase):
         self.prob.model.nonlinear_solver.linear_solver = ScipyIterativeSolver()
 
         linear_solver = self.prob.model.nonlinear_solver.linear_solver
-        linear_solver.options['record_abs_error'] = True
-        linear_solver.options['record_rel_error'] = True
-        linear_solver.options['record_solver_output'] = True
-        linear_solver.options['record_solver_residuals'] = True
+        linear_solver.recording_options['record_abs_error'] = True
+        linear_solver.recording_options['record_rel_error'] = True
+        linear_solver.recording_options['record_solver_output'] = True
+        linear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model.nonlinear_solver.linear_solver.add_recorder(recorder)
 
         self.prob.setup(check=False)
@@ -859,10 +859,10 @@ class TestServerRecorder(unittest.TestCase):
         self.prob.model.nonlinear_solver.linear_solver = LinearBlockGS()
 
         linear_solver = self.prob.model.nonlinear_solver.linear_solver
-        linear_solver.options['record_abs_error'] = True
-        linear_solver.options['record_rel_error'] = True
-        linear_solver.options['record_solver_output'] = True
-        linear_solver.options['record_solver_residuals'] = True
+        linear_solver.recording_options['record_abs_error'] = True
+        linear_solver.recording_options['record_rel_error'] = True
+        linear_solver.recording_options['record_solver_output'] = True
+        linear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model.nonlinear_solver.linear_solver.add_recorder(recorder)
 
         self.prob.setup(check=False)
@@ -899,10 +899,10 @@ class TestServerRecorder(unittest.TestCase):
         self.prob.model.nonlinear_solver.linear_solver = LinearRunOnce()
 
         linear_solver = self.prob.model.nonlinear_solver.linear_solver
-        linear_solver.options['record_abs_error'] = True
-        linear_solver.options['record_rel_error'] = True
-        linear_solver.options['record_solver_output'] = True
-        linear_solver.options['record_solver_residuals'] = True
+        linear_solver.recording_options['record_abs_error'] = True
+        linear_solver.recording_options['record_rel_error'] = True
+        linear_solver.recording_options['record_solver_output'] = True
+        linear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model.nonlinear_solver.linear_solver.add_recorder(recorder)
 
         self.prob.setup(check=False)
@@ -938,10 +938,10 @@ class TestServerRecorder(unittest.TestCase):
         self.prob.model.nonlinear_solver.linear_solver = LinearBlockJac()
 
         linear_solver = self.prob.model.nonlinear_solver.linear_solver
-        linear_solver.options['record_abs_error'] = True
-        linear_solver.options['record_rel_error'] = True
-        linear_solver.options['record_solver_output'] = True
-        linear_solver.options['record_solver_residuals'] = True
+        linear_solver.recording_options['record_abs_error'] = True
+        linear_solver.recording_options['record_rel_error'] = True
+        linear_solver.recording_options['record_solver_output'] = True
+        linear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model.nonlinear_solver.linear_solver.add_recorder(recorder)
 
         self.prob.setup(check=False)
@@ -983,26 +983,26 @@ class TestServerRecorder(unittest.TestCase):
 
         # Add recorders
         # Driver
-        self.prob.driver.options['record_metadata'] = True
-        self.prob.driver.options['record_desvars'] = True
-        self.prob.driver.options['record_responses'] = True
-        self.prob.driver.options['record_objectives'] = True
-        self.prob.driver.options['record_constraints'] = True
+        self.prob.driver.recording_options['record_metadata'] = True
+        self.prob.driver.recording_options['record_desvars'] = True
+        self.prob.driver.recording_options['record_responses'] = True
+        self.prob.driver.recording_options['record_objectives'] = True
+        self.prob.driver.recording_options['record_constraints'] = True
         self.prob.driver.add_recorder(recorder)
         # System
         pz = self.prob.model.pz  # IndepVarComp which is an ExplicitComponent
-        pz.options['record_metadata'] = True
-        pz.options['record_inputs'] = True
-        pz.options['record_outputs'] = True
-        pz.options['record_residuals'] = True
+        pz.recording_options['record_metadata'] = True
+        pz.recording_options['record_inputs'] = True
+        pz.recording_options['record_outputs'] = True
+        pz.recording_options['record_residuals'] = True
         pz.add_recorder(recorder)
         # Solver
         mda = self.prob.model.mda
-        mda.nonlinear_solver.options['record_metadata'] = True
-        mda.nonlinear_solver.options['record_abs_error'] = True
-        mda.nonlinear_solver.options['record_rel_error'] = True
-        mda.nonlinear_solver.options['record_solver_output'] = True
-        mda.nonlinear_solver.options['record_solver_residuals'] = True
+        mda.nonlinear_solver.recording_options['record_metadata'] = True
+        mda.nonlinear_solver.recording_options['record_abs_error'] = True
+        mda.nonlinear_solver.recording_options['record_rel_error'] = True
+        mda.nonlinear_solver.recording_options['record_solver_output'] = True
+        mda.nonlinear_solver.recording_options['record_solver_residuals'] = True
         mda.nonlinear_solver.add_recorder(recorder)
 
         self.prob.setup(check=False, mode='rev')

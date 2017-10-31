@@ -244,8 +244,10 @@ class System(object):
     _owning_rank : {'input': {}, 'output': {}}
         Dict mapping var name to the lowest rank where that variable is local.
     #
-    options: OptionsDictionary
-        Recording options
+    options : OptionsDictionary
+        options dictionary
+    recording_options : OptionsDictionary
+        Recording options dictionary
     _filtered_vars_to_record: Dict
         Dict of list of var names to record
     _norm0: float
@@ -268,20 +270,22 @@ class System(object):
 
         # System options
         self.options = OptionsDictionary()
-        self.options.declare('record_inputs', type_=bool, default=True,
-                             desc='Set to True to record inputs at the system level')
-        self.options.declare('record_outputs', type_=bool, default=True,
-                             desc='Set to True to record outputs at the system level')
-        self.options.declare('record_residuals', type_=bool, default=True,
-                             desc='Set to True to record residuals at the system level')
-        self.options.declare('record_derivatives', type_=bool, default=False,
-                             desc='Set to True to record derivatives at the system level')
-        self.options.declare('record_metadata', type_=bool, desc='Record metadata', default=True)
-        self.options.declare('includes', type_=list, default=['*'],
-                             desc='Patterns for variables to include in recording')
-        self.options.declare('excludes', type_=list, default=[],
-                             desc='Patterns for vars to exclude in recording '
-                                  '(processed post-includes)')
+        self.recording_options = OptionsDictionary()
+        self.recording_options.declare('record_inputs', type_=bool, default=True,
+                                       desc='Set to True to record inputs at the system level')
+        self.recording_options.declare('record_outputs', type_=bool, default=True,
+                                       desc='Set to True to record outputs at the system level')
+        self.recording_options.declare('record_residuals', type_=bool, default=True,
+                                       desc='Set to True to record residuals at the system level')
+        self.recording_options.declare('record_derivatives', type_=bool, default=False,
+                                       desc='Set to True to record derivatives at the system level')
+        self.recording_options.declare('record_metadata', type_=bool, desc='Record metadata',
+                                       default=True)
+        self.recording_options.declare('includes', type_=list, default=['*'],
+                                       desc='Patterns for variables to include in recording')
+        self.recording_options.declare('excludes', type_=list, default=[],
+                                       desc='Patterns for vars to exclude in recording '
+                                       '(processed post-includes)')
 
         # Case recording related
         self.iter_count = 0
@@ -701,20 +705,20 @@ class System(object):
 
     def _setup_case_recording(self, recurse=True):
         myinputs = myoutputs = myresiduals = set()
-        incl = self.options['includes']
-        excl = self.options['excludes']
+        incl = self.recording_options['includes']
+        excl = self.recording_options['excludes']
 
-        if self.options['record_inputs']:
+        if self.recording_options['record_inputs']:
             if self._inputs:
                 myinputs = {n for n in self._inputs._names
                             if check_path(n, incl, excl)}
-        if self.options['record_outputs']:
+        if self.recording_options['record_outputs']:
             if self._outputs:
                 myoutputs = {n for n in self._outputs._names
                              if check_path(n, incl, excl)}
-            if self.options['record_residuals']:
+            if self.recording_options['record_residuals']:
                 myresiduals = myoutputs  # outputs and residuals have same names
-        elif self.options['record_residuals']:
+        elif self.recording_options['record_residuals']:
             if self._residuals:
                 myresiduals = {n for n in self._residuals._names
                                if check_path(n, incl, excl)}
@@ -2897,7 +2901,7 @@ class System(object):
                 inputs, outputs, residuals = self.get_linear_vectors()
 
             data = {}
-            if self.options['record_inputs'] and inputs._names:
+            if self.recording_options['record_inputs'] and inputs._names:
                 data['i'] = {}
                 if 'i' in self._filtered_vars_to_record:
                     # use filtered inputs
@@ -2910,7 +2914,7 @@ class System(object):
             else:
                 data['i'] = None
 
-            if self.options['record_outputs'] and outputs._names:
+            if self.recording_options['record_outputs'] and outputs._names:
                 data['o'] = {}
 
                 if 'o' in self._filtered_vars_to_record:
@@ -2924,7 +2928,7 @@ class System(object):
             else:
                 data['o'] = None
 
-            if self.options['record_residuals'] and residuals._names:
+            if self.recording_options['record_residuals'] and residuals._names:
                 data['r'] = {}
 
                 if 'r' in self._filtered_vars_to_record:
