@@ -103,7 +103,7 @@ script:
 - cp .coverage ../.. #copy coverage results up top
 
 after_success:
-- coveralls debug --rcfile=../../.coveragerc
+- coveralls --rcfile=../../.coveragerc
 
 before_deploy:
 - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
