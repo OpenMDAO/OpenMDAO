@@ -21,12 +21,11 @@ from openmdao.test_suite.components.implicit_newton_linesearch \
 class TestNewton(unittest.TestCase):
 
     def test_specify_newton_linear_solver_in_system(self):
-        prob = Problem()
 
         my_newton = NewtonSolver()
         my_newton.linear_solver = DirectSolver()
 
-        model = prob.model = SellarDerivatives(nonlinear_solver=my_newton)
+        prob = Problem(model=SellarDerivatives(nonlinear_solver=my_newton))
 
         prob.setup()
 
@@ -44,8 +43,7 @@ class TestNewton(unittest.TestCase):
         from openmdao.api import Problem, NewtonSolver
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem()
-        prob.model = SellarDerivatives(nonlinear_solver=NewtonSolver())
+        prob = Problem(model=SellarDerivatives(nonlinear_solver=NewtonSolver()))
 
         prob.setup(check=False)
         prob.run_model()
@@ -56,8 +54,7 @@ class TestNewton(unittest.TestCase):
     def test_sellar_grouped(self):
         # Tests basic Newton solution on Sellar in a subgroup
 
-        prob = Problem()
-        prob.model = SellarDerivativesGrouped(nonlinear_solver=NewtonSolver())
+        prob = Problem(model=SellarDerivativesGrouped(nonlinear_solver=NewtonSolver()))
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -72,8 +69,7 @@ class TestNewton(unittest.TestCase):
     def test_sellar(self):
         # Just tests Newton on Sellar with FD derivs.
 
-        prob = Problem()
-        prob.model = SellarNoDerivatives(nonlinear_solver=NewtonSolver())
+        prob = Problem(model=SellarNoDerivatives(nonlinear_solver=NewtonSolver()))
 
         prob.setup(check=False)
         prob.run_model()
@@ -86,7 +82,6 @@ class TestNewton(unittest.TestCase):
 
     def test_line_search_deprecated(self):
         top = Problem()
-        top.model = Group()
         top.model.add_subsystem('px', IndepVarComp('x', 1.0))
         top.model.add_subsystem('comp', ImplCompTwoStates())
         top.model.connect('px.x', 'comp.x')
@@ -153,8 +148,7 @@ class TestNewton(unittest.TestCase):
 
     def test_sellar_derivs_with_Lin_GS(self):
 
-        prob = Problem()
-        prob.model = SellarDerivatives(nonlinear_solver=NewtonSolver())
+        prob = Problem(model=SellarDerivatives(nonlinear_solver=NewtonSolver()))
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -169,8 +163,7 @@ class TestNewton(unittest.TestCase):
     def test_sellar_state_connection(self):
         # Sellar model closes loop with state connection instead of a cycle.
 
-        prob = Problem()
-        prob.model = SellarStateConnection(nonlinear_solver=NewtonSolver())
+        prob = Problem(model=SellarStateConnection(nonlinear_solver=NewtonSolver()))
 
         prob.set_solver_print(level=0)
         prob.setup(check=False)
@@ -185,8 +178,7 @@ class TestNewton(unittest.TestCase):
     def test_sellar_state_connection_fd_system(self):
         # Sellar model closes loop with state connection instead of a cycle.
         # This test is just fd.
-        prob = Problem()
-        prob.model = SellarStateConnection(nonlinear_solver=NewtonSolver())
+        prob = Problem(model=SellarStateConnection(nonlinear_solver=NewtonSolver()))
 
         prob.model.approx_totals(method='fd')
 
@@ -203,7 +195,7 @@ class TestNewton(unittest.TestCase):
     def test_sellar_specify_linear_solver(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -257,7 +249,7 @@ class TestNewton(unittest.TestCase):
     def test_sellar_specify_linear_direct_solver(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -308,8 +300,8 @@ class TestNewton(unittest.TestCase):
         self.assertEqual(model.linear_solver._iter_count, 0)
 
     def test_solve_subsystems_basic(self):
-        prob = Problem()
-        model = prob.model = DoubleSellar()
+        prob = Problem(model=DoubleSellar())
+        model = prob.model
 
         g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
@@ -335,8 +327,8 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_basic_dense_jac(self):
-        prob = Problem()
-        model = prob.model = DoubleSellar()
+        prob = Problem(model=DoubleSellar())
+        model = prob.model
         model.jacobian = DenseJacobian()
 
         g1 = model.g1
@@ -363,8 +355,8 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_basic_dense_jac_scaling(self):
-        prob = Problem()
-        model = prob.model = DoubleSellar(units=None, scaling=True)
+        prob = Problem(model=DoubleSellar(units=None, scaling=True))
+        model = prob.model
         model.jacobian = DenseJacobian()
 
         g1 = model.g1
@@ -391,8 +383,8 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_basic_dense_jac_units_scaling(self):
-        prob = Problem()
-        model = prob.model = DoubleSellar(units=True, scaling=True)
+        prob = Problem(model=DoubleSellar(units=True, scaling=True))
+        model = prob.model
         model.jacobian = DenseJacobian()
 
         g1 = model.g1
@@ -419,8 +411,8 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_assembled_jac_top(self):
-        prob = Problem()
-        model = prob.model = DoubleSellar()
+        prob = Problem(model=DoubleSellar())
+        model = prob.model
         model.jacobian = DenseJacobian()
 
         g1 = model.g1
@@ -446,8 +438,8 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_assembled_jac_top_implicit(self):
-        prob = Problem()
-        model = prob.model = DoubleSellarImplicit()
+        prob = Problem(model=DoubleSellarImplicit())
+        model = prob.model
         model.jacobian = DenseJacobian()
 
         g1 = model.g1
@@ -473,8 +465,8 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_assembled_jac_top_implicit_scaling(self):
-        prob = Problem()
-        model = prob.model = DoubleSellarImplicit(scaling=True)
+        prob = Problem(model=DoubleSellarImplicit(scaling=True))
+        model = prob.model
         model.jacobian = DenseJacobian()
 
         g1 = model.g1
@@ -500,8 +492,8 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_assembled_jac_top_implicit_scaling_units(self):
-        prob = Problem()
-        model = prob.model = DoubleSellarImplicit(units=True, scaling=True)
+        prob = Problem(model=DoubleSellarImplicit(units=True, scaling=True))
+        model = prob.model
         model.jacobian = DenseJacobian()
 
         g1 = model.g1
@@ -527,8 +519,8 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_assembled_jac_subgroup(self):
-        prob = Problem()
-        model = prob.model = DoubleSellar()
+        prob = Problem(model=DoubleSellar())
+        model = prob.model
 
         g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
@@ -578,8 +570,8 @@ class TestNewton(unittest.TestCase):
                 super(CountDS, self)._linearize()
                 self.lin_count += 1
 
-        prob = Problem()
-        model = prob.model = DoubleSellar()
+        prob = Problem(model=DoubleSellar())
+        model = prob.model
 
         # each SubSellar group converges itself
         g1 = model.g1
@@ -611,8 +603,8 @@ class TestNewton(unittest.TestCase):
         self.assertEqual(g2.nonlinear_solver.total_count, 2)
         self.assertEqual(g1.linear_solver.lin_count, 2)
 
-        prob = Problem()
-        model = prob.model = DoubleSellar()
+        prob = Problem(model=DoubleSellar())
+        model = prob.model
 
         # each SubSellar group converges itself
         g1 = model.g1
@@ -644,8 +636,8 @@ class TestNewton(unittest.TestCase):
         self.assertEqual(g2.nonlinear_solver.total_count, 5)
         self.assertEqual(g1.linear_solver.lin_count, 5)
 
-        prob = Problem()
-        model = prob.model = DoubleSellar()
+        prob = Problem(model=DoubleSellar())
+        model = prob.model
 
         # each SubSellar group converges itself
         g1 = model.g1
@@ -707,7 +699,7 @@ class TestNewton(unittest.TestCase):
                     raise RuntimeError("Bug! Linearize called before Apply!")
 
         prob = Problem()
-        root = prob.model = Group()
+        root = prob.model
         root.add_subsystem('p1', IndepVarComp('a', 1.0))
         root.add_subsystem('comp', ImpComp())
         root.connect('p1.a', 'comp.a')
@@ -759,7 +751,7 @@ class TestNewton(unittest.TestCase):
 
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 3.0))
         model.add_subsystem('icomp', TestImplCompSimple())
@@ -787,11 +779,11 @@ class TestNewtonFeatures(unittest.TestCase):
     def test_feature_basic(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
+        from openmdao.api import Problem, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -824,7 +816,7 @@ class TestNewtonFeatures(unittest.TestCase):
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -858,7 +850,7 @@ class TestNewtonFeatures(unittest.TestCase):
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -892,7 +884,7 @@ class TestNewtonFeatures(unittest.TestCase):
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -928,7 +920,7 @@ class TestNewtonFeatures(unittest.TestCase):
              SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -963,7 +955,7 @@ class TestNewtonFeatures(unittest.TestCase):
         from openmdao.test_suite.components.double_sellar import SubSellar
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('g1', SubSellar())
         model.add_subsystem('g2', SubSellar())
@@ -1001,7 +993,7 @@ class TestNewtonFeatures(unittest.TestCase):
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -1033,8 +1025,8 @@ class TestNewtonFeatures(unittest.TestCase):
         from openmdao.api import Problem, NewtonSolver, DirectSolver, ScipyKrylov
         from openmdao.test_suite.components.double_sellar import DoubleSellar
 
-        prob = Problem()
-        model = prob.model = DoubleSellar()
+        prob = Problem(model=DoubleSellar())
+        model = prob.model
 
         g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()

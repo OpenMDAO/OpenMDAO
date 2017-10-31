@@ -4,11 +4,11 @@
 ScipyKrylov
 ********************
 
-The ScipyKrylov is an iterative linear solver that wraps the methods found in `scipy.sparse.linalg`.
-The default method is "GMRES", or the Generalized Minimal RESidual method, though you can give it other
-methods that satisfy the same interface. This linear solver is capable of handling any system topology very
-effectively. It also solves all subsystems below it in the hierarchy, so assigning different solvers to
-subsystems will have no effect on the solution at this level.
+ScipyKrylov is an iterative linear solver that wraps the methods found in `scipy.sparse.linalg`.
+The default method is "gmres", or the Generalized Minimal RESidual method. Support for other
+`scipy.sparse.linalg` solvers will be added over time. This linear solver is capable of handling any
+system topology very effectively. It also solves all subsystems below it in the hierarchy, so
+assigning different solvers to subsystems will have no effect on the solution at this level.
 
 This is a serial solver, so it should never be used under MPI; use :ref:`PETScKrylov <openmdao.solvers.linear.petsc_ksp.py>`
 instead.

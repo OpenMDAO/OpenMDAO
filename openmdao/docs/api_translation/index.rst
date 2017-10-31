@@ -354,8 +354,8 @@ Specify Newton as a Nonlinear Solver in a Group
 
   .. embed-compare::
       openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_basic
-      NewtonSolver
-      NewtonSolver
+      NewtonSolver()
+      NewtonSolver()
 
     model.nl_solver = Newton()
 
@@ -367,8 +367,8 @@ Specify Block Gauss Seidel as a Nonlinear Solver in a Group
 
   .. embed-compare::
       openmdao.solvers.nonlinear.tests.test_nonlinear_block_gs.TestNLBGaussSeidel.test_feature_basic
-      NonlinearBlockGS
-      NonlinearBlockGS
+      NonlinearBlockGS()
+      NonlinearBlockGS()
 
     model.nl_solver = NLGaussSeidel()
 
@@ -380,8 +380,8 @@ Specify Scipy GMRES as a Linear Solver in a Group
 
   .. embed-compare::
       openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyKrylovFeature.test_specify_solver
-      ScipyKrylov
-      ScipyKrylov
+      ScipyKrylov()
+      ScipyKrylov()
 
     model.ln_solver = ScipyGMRES()
 
@@ -393,7 +393,7 @@ Specify Linear Block Gauss Seidel as a Linear Solver in a Group
 
   .. embed-compare::
       openmdao.solvers.linear.tests.test_linear_block_gs.TestBGSSolverFeature.test_specify_solver
-      LinearBlockGS
-      LinearBlockGS
+      LinearBlockGS()
+      LinearBlockGS()
 
     model.ln_solver = LinearGaussSeidel()

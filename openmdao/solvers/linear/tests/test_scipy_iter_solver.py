@@ -197,7 +197,7 @@ class TestScipyKrylovFeature(unittest.TestCase):
 
         # Tests derivatives on a simple comp that defines compute_jacvec.
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('x_param', IndepVarComp('length', 3.0),
                             promotes=['length'])
         model.add_subsystem('mycomp', TestExplCompSimpleDense(),
@@ -225,7 +225,7 @@ class TestScipyKrylovFeature(unittest.TestCase):
              SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -261,7 +261,7 @@ class TestScipyKrylovFeature(unittest.TestCase):
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -298,7 +298,7 @@ class TestScipyKrylovFeature(unittest.TestCase):
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -337,7 +337,7 @@ class TestScipyKrylovFeature(unittest.TestCase):
              SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -352,11 +352,11 @@ class TestScipyKrylovFeature(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.linear_solver = ScipyKrylov()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyKrylov()
 
-        prob.model.linear_solver.precon = LinearBlockGS()
-        prob.model.linear_solver.precon.options['maxiter'] = 2
+        model.linear_solver.precon = LinearBlockGS()
+        model.linear_solver.precon.options['maxiter'] = 2
 
         prob.setup()
         prob.run_model()
