@@ -8,7 +8,7 @@ import warnings
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, PETScKrylov, LinearBlockGS, DirectSolver, \
-     ExecComp, NewtonSolver, NonlinearBlockGS
+     ExecComp, NewtonSolver, NonlinearBlockGS, PetscKSP
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
@@ -282,6 +282,14 @@ class TestPETScKrylov(unittest.TestCase):
         self.assertEqual(len(w), 1)
         self.assertTrue(issubclass(w[0].category, DeprecationWarning))
         self.assertEqual(str(w[0].message), msg)
+
+    def test_kspname_deprecation(self):
+        with warnings.catch_warnings(record=True) as w:
+            solver = PetscKSP()
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), "PetscKSP is deprecated.  Use PETScKrylov instead.")
 
     def test_solve_on_subsystem(self):
         """solve an implicit system with KSP attached anywhere but the root"""

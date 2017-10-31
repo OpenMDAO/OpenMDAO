@@ -21,7 +21,7 @@ from openmdao.components.multifi_meta_model import MultiFiMetaModel
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 from openmdao.solvers.linear.linear_block_jac import LinearBlockJac
 from openmdao.solvers.linear.direct import DirectSolver
-from openmdao.solvers.linear.petsc_ksp import PETScKrylov
+from openmdao.solvers.linear.petsc_ksp import PETScKrylov, PetscKSP
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov, ScipyIterativeSolver
 from openmdao.solvers.linear.user_defined import LinearUserDefined
