@@ -74,7 +74,6 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.y'], [[-8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        sub = model.get_subsystem('sub')
         self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 2)
 
     def test_paraboloid_subbed_in_setup(self):
@@ -109,7 +108,6 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.y'], [[-8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        sub = model.get_subsystem('sub')
         self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 2)
 
     def test_paraboloid_subbed_with_connections(self):
@@ -146,7 +144,6 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.by.yin'], [[-8.0]], 1e-6)
 
         # 3 outputs x 2 inputs
-        sub = model.get_subsystem('sub')
         self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 6)
 
     def test_arrray_comp(self):
@@ -388,7 +385,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         prob.model = model = Group()
         model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
                             promotes=['x1'])
-        model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
+        mycomp = model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
 
         model.add_design_var('x1', indices=[1, 3])
         model.add_constraint('y1')
@@ -399,7 +396,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
-        Jbase = model.get_subsystem('mycomp').JJ
+        Jbase = mycomp.JJ
         of = ['y1']
         wrt = ['x1']
 
@@ -447,7 +444,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         prob.model = model = Group()
         model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
                             promotes=['x1'])
-        model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
+        mycomp = model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
 
         model.add_design_var('x1', indices=[1, 3])
         model.add_constraint('y1', indices=[0, 2])
@@ -458,7 +455,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
-        Jbase = model.get_subsystem('mycomp').JJ
+        Jbase = mycomp.JJ
         of = ['y1']
         wrt = ['x1']
 
@@ -634,7 +631,6 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.y'], [[-8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        sub = model.get_subsystem('sub')
         self.assertEqual(len(sub._approx_schemes['cs']._exec_list), 2)
 
     @parameterized.expand(itertools.product(
@@ -679,7 +675,6 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.by.yin'], [[-8.0]], 1e-6)
 
         # 3 outputs x 2 inputs
-        sub = model.get_subsystem('sub')
         self.assertEqual(len(sub._approx_schemes['cs']._exec_list), 6)
 
     @parameterized.expand(itertools.product(
@@ -856,7 +851,7 @@ class TestGroupComplexStep(unittest.TestCase):
         prob.model = model = Group()
         model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
                             promotes=['x1'])
-        model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
+        mycomp = model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
 
         model.add_design_var('x1', indices=[1, 3])
         model.add_constraint('y1', indices=[0, 2])
@@ -867,7 +862,7 @@ class TestGroupComplexStep(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
-        Jbase = model.get_subsystem('mycomp').JJ
+        Jbase = mycomp.JJ
         of = ['y1']
         wrt = ['x1']
 
@@ -916,7 +911,7 @@ class TestGroupComplexStep(unittest.TestCase):
         prob.model = model = Group()
         model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
                             promotes=['x1'])
-        model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
+        mycomp = model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
 
         model.add_design_var('x1', indices=[1, 3])
         model.add_constraint('y1')
@@ -927,7 +922,7 @@ class TestGroupComplexStep(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
-        Jbase = model.get_subsystem('mycomp').JJ
+        Jbase = mycomp.JJ
         of = ['y1']
         wrt = ['x1']
 

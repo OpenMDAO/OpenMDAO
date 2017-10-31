@@ -5,7 +5,7 @@ from six import iteritems
 
 import numpy as np
 
-from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NonLinearRunOnce, \
+from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NonlinearRunOnce, \
                          ImplicitComponent, NonlinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error, TestLogger
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
@@ -306,7 +306,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         units = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
 
-        model.nonlinear_solver = NonLinearRunOnce()
+        model.nonlinear_solver = NonlinearRunOnce()
 
         p.setup()
         data = p.check_partials(suppress_output=True)
@@ -322,8 +322,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         # The count is 5 because in check_partials, there are two calls to apply_nonlinear
         # when compute the fwd and rev analytic derivatives, then one call to apply_nonlinear
         # to compute the reference point for FD, then two additional calls for the two inputs.
-        comp = model.get_subsystem('units')
-        self.assertEqual(comp.run_count, 5)
+        self.assertEqual(units.run_count, 5)
 
     def test_scalar_val(self):
         class PassThrough(ExplicitComponent):
@@ -1283,7 +1282,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.model = model = Group()
         model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
                             promotes=['x1'])
-        model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
+        mycomp = model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
 
         model.add_design_var('x1', indices=[1, 3])
         model.add_constraint('y1', indices=[0, 2])
@@ -1293,7 +1292,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
-        Jbase = model.get_subsystem('mycomp').JJ
+        Jbase = mycomp.JJ
         of = ['y1']
         wrt = ['x1']
 
@@ -1316,7 +1315,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.model = model = Group()
         model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
                             promotes=['x1'])
-        model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
+        mycomp = model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
 
         model.add_design_var('x1', indices=[1, 3])
         model.add_objective('y1', index=1)
@@ -1326,7 +1325,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
-        Jbase = model.get_subsystem('mycomp').JJ
+        Jbase = mycomp.JJ
         of = ['y1']
         wrt = ['x1']
 

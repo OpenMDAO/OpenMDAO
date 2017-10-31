@@ -123,10 +123,9 @@ class TestExplicitComponent(unittest.TestCase):
 
         prob = Problem()
         model = prob.model = Group()
-        model.add_subsystem('comp', MyComp())
+        comp = model.add_subsystem('comp', MyComp())
 
         prob.setup(check=False)
-        comp = model.get_subsystem('comp')
         self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
         self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
 

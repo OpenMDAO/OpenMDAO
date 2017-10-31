@@ -8,8 +8,8 @@ from six.moves import cStringIO
 
 import numpy as np
 
-from openmdao.api import Problem, IndepVarComp, Component, Group, NewtonSolver, NonLinearRunOnce
-from openmdao.api import ScipyKrylov as ScipyKrylov
+from openmdao.api import Problem, IndepVarComp, Component, Group, NewtonSolver, NonlinearRunOnce
+from openmdao.api import ScipyKrylov
 from openmdao.devtools.testutil import assert_rel_error, TestLogger
 
 
@@ -365,7 +365,8 @@ class DepCompTestCase(unittest.TestCase):
         comp.self_solve = True
 
         prob.model.linear_solver = ScipyKrylov()
-        prob.model.nonlinear_solver = NonLinearRunOnce()
+        prob.model.nonlinear_solver = NonlinearRunOnce()
+
         prob.set_solver_print(level=0)
 
         prob.model.connect('p1.x', 'comp.x')

@@ -510,12 +510,12 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         prob = Problem()
         model = prob.model = DoubleSellar()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()

@@ -232,7 +232,7 @@ class TestCircuit(unittest.TestCase):
 
     def test_circuit_voltage_source(self):
         from openmdao.api import ArmijoGoldsteinLS, Problem, IndepVarComp, BalanceComp, ExecComp
-        from openmdao.api import NewtonSolver, DirectSolver, NonLinearRunOnce, LinearRunOnce
+        from openmdao.api import NewtonSolver, DirectSolver, NonlinearRunOnce, LinearRunOnce
 
         from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
 
@@ -267,7 +267,7 @@ class TestCircuit(unittest.TestCase):
 
         # change the circuit solver to RunOnce because we're
         # going to converge at the top level of the model with newton instead
-        p.model.circuit.nonlinear_solver = NonLinearRunOnce()
+        p.model.circuit.nonlinear_solver = NonlinearRunOnce()
         p.model.circuit.linear_solver = LinearRunOnce()
 
         # Put Newton at the top so it can also converge the new BalanceComp residual

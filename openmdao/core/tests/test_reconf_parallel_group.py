@@ -65,7 +65,7 @@ class Test(unittest.TestCase):
             print(prob['C2.z'])
 
         # Now, reconfigure so ReconfGroup is not parallel, and x0, x1 should be preserved
-        prob.model.get_subsystem('g').resetup('reconf')
+        prob.model.g.resetup('reconf')
         prob.model.resetup('update')
         prob.run_model()
         assert_rel_error(self, prob['C1.z'], 8.0, 1e-8)

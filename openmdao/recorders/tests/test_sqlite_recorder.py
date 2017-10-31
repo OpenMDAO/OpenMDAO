@@ -10,7 +10,7 @@ from six import PY2, PY3
 from tempfile import mkdtemp
 
 from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, NonlinearBlockJac,\
-            NewtonSolver, NonLinearRunOnce, SqliteRecorder, Group, IndepVarComp, ExecComp, \
+            NewtonSolver, NonlinearRunOnce, SqliteRecorder, Group, IndepVarComp, ExecComp, \
             DirectSolver, ScipyKrylov, PETScKrylov, LinearBlockGS, LinearRunOnce, \
             LinearBlockJac
 
@@ -368,14 +368,14 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.model.options['record_metadata'] = True
         self.prob.model.add_recorder(self.recorder)
 
-        d1 = self.prob.model.get_subsystem('d1')  # instance of SellarDis1withDerivatives, a Group
+        d1 = self.prob.model.d1  # instance of SellarDis1withDerivatives, a Group
         d1.options['record_inputs'] = True
         d1.options['record_outputs'] = True
         d1.options['record_residuals'] = True
         d1.options['record_metadata'] = True
         d1.add_recorder(self.recorder)
 
-        obj_cmp = self.prob.model.get_subsystem('obj_cmp')  # an ExecComp
+        obj_cmp = self.prob.model.obj_cmp  # an ExecComp
         obj_cmp.options['record_inputs'] = True
         obj_cmp.options['record_outputs'] = True
         obj_cmp.options['record_residuals'] = True
@@ -528,15 +528,15 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.model.add_recorder(self.recorder)
 
-        pz = self.prob.model.get_subsystem('pz')  # IndepVarComp which is an ExplicitComponent
+        pz = self.prob.model.pz  # IndepVarComp which is an ExplicitComponent
         pz.options['record_inputs'] = True
         pz.options['record_outputs'] = True
         pz.options['record_residuals'] = True
         pz.options['record_metadata'] = True
         pz.add_recorder(self.recorder)
 
-        mda = self.prob.model.get_subsystem('mda')  # Group
-        d1 = mda.get_subsystem('d1')
+        mda = self.prob.model.mda  # Group
+        d1 = mda.d1
         d1.options['record_inputs'] = True
         d1.options['record_outputs'] = True
         d1.options['record_residuals'] = True
@@ -772,7 +772,7 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_record_solver_nonlinear_nonlinear_run_once(self):
         self.setup_sellar_model()
 
-        self.prob.model.nonlinear_solver = NonLinearRunOnce()
+        self.prob.model.nonlinear_solver = NonlinearRunOnce()
         self.prob.model.nonlinear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
@@ -1094,14 +1094,14 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.options['record_constraints'] = True
         self.prob.driver.add_recorder(self.recorder)
         # System
-        pz = self.prob.model.get_subsystem('pz')  # IndepVarComp which is an ExplicitComponent
+        pz = self.prob.model.pz  # IndepVarComp which is an ExplicitComponent
         pz.options['record_metadata'] = True
         pz.options['record_inputs'] = True
         pz.options['record_outputs'] = True
         pz.options['record_residuals'] = True
         pz.add_recorder(self.recorder)
         # Solver
-        mda = self.prob.model.get_subsystem('mda')
+        mda = self.prob.model.mda
         mda.nonlinear_solver.options['record_metadata'] = True
         mda.nonlinear_solver.options['record_abs_error'] = True
         mda.nonlinear_solver.options['record_rel_error'] = True
@@ -1182,7 +1182,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.model.add_recorder(self.recorder)
 
-        mda = self.prob.model.get_subsystem('mda')
+        mda = self.prob.model.mda
         mda.nonlinear_solver.add_recorder(self.recorder)
 
         self.prob.setup(check=False, mode='rev')
@@ -1230,7 +1230,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob['comp1.b'] = -4.
         prob['comp1.c'] = 3.
 
-        comp2 = prob.model.get_subsystem('comp2')  # ImplicitComponent
+        comp2 = prob.model.comp2  # ImplicitComponent
 
         comp2.options['record_metadata'] = False
 
