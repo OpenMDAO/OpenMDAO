@@ -36,7 +36,14 @@ class TestPETScKrylov(unittest.TestCase):
     def test_solve_linear_ksp_default(self):
         """Solve implicit system with PETScKrylov using default method."""
 
-        group = TestImplicitGroup(lnSolverClass=PETScKrylov)
+        # use PetscKSP here to check for deprecation warning and verify that the deprecated
+        # class still gets the right answer without duplicating this test.
+        with warnings.catch_warnings(record=True) as w:
+            group = TestImplicitGroup(lnSolverClass=PetscKSP)
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), "PetscKSP is deprecated.  Use PETScKrylov instead.")
 
         p = Problem(group)
         p.setup(vector_class=PETScVector, check=False)
@@ -282,14 +289,6 @@ class TestPETScKrylov(unittest.TestCase):
         self.assertEqual(len(w), 1)
         self.assertTrue(issubclass(w[0].category, DeprecationWarning))
         self.assertEqual(str(w[0].message), msg)
-
-    def test_kspname_deprecation(self):
-        with warnings.catch_warnings(record=True) as w:
-            solver = PetscKSP()
-
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), "PetscKSP is deprecated.  Use PETScKrylov instead.")
 
     def test_solve_on_subsystem(self):
         """solve an implicit system with KSP attached anywhere but the root"""

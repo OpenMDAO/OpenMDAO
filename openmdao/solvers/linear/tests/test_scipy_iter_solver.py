@@ -10,7 +10,7 @@ import numpy as np
 from openmdao.api import Group, IndepVarComp, Problem, ExecComp, NonlinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
-from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov, gmres
+from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov, ScipyIterativeSolver
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
@@ -20,9 +20,9 @@ from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 
 # use this to fake out the TestImplicitGroup so it'll use the solver we want.
 def krylov_factory(solver):
-    def factory(junk=None):
+    def f(junk=None):
         return ScipyKrylov(solver=solver)
-    return factory
+    return f
 
 
 class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
@@ -41,7 +41,15 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
     def test_solve_linear_scipy(self):
         """Solve implicit system with ScipyKrylov."""
 
-        group = TestImplicitGroup(lnSolverClass=self.linear_solver_class)
+        # use ScipyIterativeSolver here to check for deprecation warning and verify that the deprecated
+        # class still gets the right answer without duplicating this test.
+        with warnings.catch_warnings(record=True) as w:
+            group = TestImplicitGroup(lnSolverClass=lambda : ScipyIterativeSolver(solver=self.linear_solver_name))
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), "ScipyIterativeSolver is deprecated.  Use ScipyKrylov instead.")
+
         p = Problem(group)
         p.setup(check=False)
         p.set_solver_print(level=0)
