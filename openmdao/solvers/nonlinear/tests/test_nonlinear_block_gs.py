@@ -118,7 +118,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         from openmdao.api import Problem, IndepVarComp, ExecComp, NonlinearBlockGS
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives, SellarDerivatives
 
-        prob = Problem(model=SellarDerivatives())
+        prob = Problem()
         model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])

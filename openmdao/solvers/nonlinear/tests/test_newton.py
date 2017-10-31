@@ -29,7 +29,7 @@ class TestNewton(unittest.TestCase):
 
         prob.setup()
 
-        self.assertIsInstance(model.nonlinear_solver.linear_solver, DirectSolver)
+        self.assertIsInstance(prob.model.nonlinear_solver.linear_solver, DirectSolver)
 
         prob.run_model()
 
