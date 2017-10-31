@@ -1,0 +1,28 @@
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+
+omit =
+    */python?.?/*
+    */site-packages/nose/*
+    */test/*
+    */tests/*
+    */code_review/*
+    */devtools/*
+    */docs/*
+    */test_suite/*
+
+[run]
+omit =
+    */python?.?/*
+    */site-packages/nose/*
+    */test/*
+    */tests/*
+    */code_review/*
+    *//devtools/*
+    */docs/*
+    */test_suite/*
