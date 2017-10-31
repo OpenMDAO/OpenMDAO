@@ -1,8 +1,8 @@
 .. _petscKSP:
 
-********
+***********
 PETScKrylov
-********
+***********
 
 The PETScKrylov is an iterative linear solver that wraps the linear solution methods found in PETSc via petsc4py.
 The default method is "fgmres", or the Flexible Generalized Minimal RESidual method, though you choose any of
@@ -20,7 +20,7 @@ Here, we calculate the total derivatives across the Sellar system.
     openmdao.solvers.linear.tests.test_petsc_ksp.TestPETScKrylovSolverFeature.test_specify_solver
 
 PETScKrylov Options
-----------------
+-------------------
 
 .. embed-options::
     openmdao.solvers.linear.petsc_ksp
@@ -28,7 +28,7 @@ PETScKrylov Options
     options
 
 PETScKrylov Option Examples
-------------------------
+---------------------------
 
 **maxiter**
 

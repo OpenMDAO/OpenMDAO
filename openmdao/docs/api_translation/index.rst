@@ -383,7 +383,7 @@ Specify Scipy GMRES as a Linear Solver in a Group
       ScipyKrylov
       ScipyKrylov
 
-    model.ln_solver = ScipyKrylov()
+    model.ln_solver = ScipyGMRES()
 
 
 Specify Linear Block Gauss Seidel as a Linear Solver in a Group
