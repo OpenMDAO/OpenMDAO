@@ -19,7 +19,7 @@ from openmdao.core.component import Component
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
+from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ancestors
@@ -60,7 +60,7 @@ class Group(System):
         # because our lint check thinks that we are defining new attributes
         # called nonlinear_solver and linear_solver without documenting them.
         if not self._nonlinear_solver:
-            self._nonlinear_solver = NonLinearRunOnce()
+            self._nonlinear_solver = NonlinearRunOnce()
         if not self._linear_solver:
             self._linear_solver = LinearRunOnce()
         self._mpi_proc_allocator = DefaultAllocator()
@@ -1341,7 +1341,7 @@ class Group(System):
 
         subsystems[:] = [olddict[name] for name in new_order]
 
-    def get_subsystem(self, name):
+    def _get_subsystem(self, name):
         """
         Return the system called 'name' in the current namespace.
 
@@ -1612,7 +1612,7 @@ class Group(System):
                 # indepvarcomp.
                 else:
                     compname = src.rsplit('.', 1)[0]
-                    comp = self.get_subsystem(compname)
+                    comp = self._get_subsystem(compname)
                     if isinstance(comp, IndepVarComp):
                         wrt.add(src)
                         ivc.append(src)

@@ -502,7 +502,7 @@ class Problem(object):
             if extra:
                 msg = 'The following are not valid comp names: {}'.format(sorted(list(extra)))
                 raise ValueError(msg)
-            comps = [model.get_subsystem(c_name) for c_name in comps]
+            comps = [model._get_subsystem(c_name) for c_name in comps]
 
         current_mode = self._mode
         self.set_solver_print(level=0)
