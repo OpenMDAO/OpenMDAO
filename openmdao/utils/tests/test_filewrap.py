@@ -556,7 +556,7 @@ class TestCase(unittest.TestCase):
         op = FileParser()
         op.set_file(self.filename)
 
-        olddelims = op.delimiter
+        olddelims = op._delimiter
         op.set_delimiters(' \t,=')
 
         op.mark_anchor('anchor')
