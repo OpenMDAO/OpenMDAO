@@ -380,6 +380,33 @@ class TestDataUploader(unittest.TestCase):
         self.assertEqual(driver_iteration_data['objectives'], [])
         self.assertEqual(driver_iteration_data['responses'], [])
 
+    def test_only_sysincludes_recorded(self, m):
+        self.setup_endpoints(m)
+
+        self.setup_sellar_model()
+
+        self.prob.driver.options['record_desvars'] = False
+        self.prob.driver.options['record_responses'] = False
+        self.prob.driver.options['record_objectives'] = False
+        self.prob.driver.options['record_constraints'] = False
+        self.prob.driver.options['system_includes'] = ['*']
+        self.prob.driver.add_recorder(self.recorder)
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+        upload(self.filename, self._accepted_token)
+
+        driver_iteration_data = json.loads(self.driver_iteration_data)
+        sysincludes = driver_iteration_data['sysincludes']
+
+        self.assertEqual(len(sysincludes), 7)
+        self.assertEqual(driver_iteration_data['desvars'], [])
+        self.assertEqual(driver_iteration_data['objectives'], [])
+        self.assertEqual(driver_iteration_data['responses'], [])
+        self.assertEqual(driver_iteration_data['constraints'], [])
+
     @unittest.skipIf(PETScVector is None or os.environ.get("TRAVIS"),
                      "PETSc is required." if PETScVector is None
                      else "Unreliable on Travis CI.")
