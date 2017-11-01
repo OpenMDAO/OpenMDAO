@@ -2,7 +2,7 @@
 import unittest
 
 from openmdao.core.problem import Problem
-from openmdao.solvers.linear.scipy_iter_solver import ScipyIterativeSolver
+from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
 from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
@@ -12,7 +12,7 @@ from openmdao.devtools.testutil import assert_rel_error
 
 class TestVarSets(unittest.TestCase):
     def setUp(self):
-        group = TestImplicitGroup(lnSolverClass=ScipyIterativeSolver,
+        group = TestImplicitGroup(lnSolverClass=ScipyKrylov,
                                   nlSolverClass=NonlinearBlockGS,
                                   use_varsets=True)
 
@@ -23,7 +23,7 @@ class TestVarSets(unittest.TestCase):
         self.p = p
 
         # now create the same problem with no varsets
-        group = TestImplicitGroup(lnSolverClass=ScipyIterativeSolver,
+        group = TestImplicitGroup(lnSolverClass=ScipyKrylov,
                                   nlSolverClass=NonlinearBlockGS,
                                   use_varsets=False)
 

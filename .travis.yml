@@ -1,6 +1,6 @@
-# branches:
-#   only:
-#   - master
+branches:
+  only:
+  - master
 
 sudo: false
 
@@ -102,9 +102,9 @@ script:
 - testflo -n 1 openmdao  --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*
 
 after_success:
-- if [ "$PY" = "2.7" ] || [ "$PY" = "3.4" ]; then
-    coveralls --rcfile=../../.coveragerc
-  fi
+- cp .coverage .coverage.orig
+- sed 's/\/home\/travis\/miniconda\/lib\/python'"$PY"'\/site-packages\///g' < .coverage.orig > .coverage
+- coveralls -v --rcfile=../../.coveragerc
 
 before_deploy:
 - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
