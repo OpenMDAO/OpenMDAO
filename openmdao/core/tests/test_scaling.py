@@ -7,7 +7,7 @@ from six import assertRaisesRegex
 import numpy as np
 
 from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, IndepVarComp
-from openmdao.api import NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS, DirectSolver
+from openmdao.api import NewtonSolver, ScipyKrylov, NonlinearBlockGS, DirectSolver
 from openmdao.api import AssembledJacobian
 
 from openmdao.devtools.testutil import assert_rel_error
@@ -276,7 +276,7 @@ class TestScaling(unittest.TestCase):
             prob.model.connect('row1.y', 'row2.x')
             prob.model.connect('row2.y', 'row1.x')
             prob.model.nonlinear_solver = NewtonSolver(maxiter=2, atol=1e-5, rtol=0)
-            prob.model.nonlinear_solver.linear_solver = ScipyIterativeSolver(maxiter=1)
+            prob.model.nonlinear_solver.linear_solver = ScipyKrylov(maxiter=1)
 
             prob.set_solver_print(level=0)
 
