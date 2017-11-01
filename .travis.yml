@@ -102,7 +102,10 @@ script:
 - testflo -n 1 openmdao  --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*
 
 after_success:
-- coveralls --rcfile=../../.coveragerc
+
+- sed 's\/home\/travis\/miniconda\/lib\/python$(PY)\/site-packages\///g' .coverage
+#- sed 's/\/Users\/kmarstel\/Work\/OpenMDAO\///g' .coverage
+- coveralls -v --rcfile=../../.coveragerc
 
 before_deploy:
 - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
