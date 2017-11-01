@@ -103,7 +103,7 @@ script:
 
 after_success:
 
-- sed 's\/home\/travis\/miniconda\/lib\/python$(PY)\/site-packages\///g' .coverage
+- sed 's/\/home\/travis\/miniconda\/lib\/python$(PY)\/site-packages\///g' .coverage
 #- sed 's/\/Users\/kmarstel\/Work\/OpenMDAO\///g' .coverage
 - coveralls -v --rcfile=../../.coveragerc
 
