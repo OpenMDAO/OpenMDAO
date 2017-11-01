@@ -1,5 +1,6 @@
 from openmdao.api import OptionsDictionary
 import unittest
+import warnings
 from six import PY3, assertRegex
 
 
@@ -51,6 +52,23 @@ class TestOptionsDict(unittest.TestCase):
 
     def test_isvalid(self):
         self.dict.declare('even_test', types=int, is_valid=lambda x: x%2 == 0)
+        self.dict['even_test'] = 2
+        self.dict['even_test'] = 4
+
+        with self.assertRaises(ValueError) as context:
+            self.dict['even_test'] = 3
+
+        expected_msg = "Function is_valid returns False for {}.".format('even_test')
+        self.assertEqual(expected_msg, str(context.exception))
+
+    def test_isvalid_deprecated_type(self):
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            self.dict.declare('even_test', type_=int, is_valid=lambda x: x%2 == 0)
+            self.assertEqual(len(w), 1)
+            self.assertEqual(str(w[-1].message), "In declaration of option 'even_test' the '_type' arg is deprecated.  Use 'types' instead.")
+
         self.dict['even_test'] = 2
         self.dict['even_test'] = 4
 

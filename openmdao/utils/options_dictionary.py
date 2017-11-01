@@ -1,6 +1,7 @@
 """Define the OptionsDictionary class."""
 from __future__ import division, print_function
 
+from openmdao.utils.general_utils import warn_deprecation
 
 # unique object to check if default is given
 _undefined = object()
@@ -81,7 +82,7 @@ class OptionsDictionary(object):
         if is_valid is not None and not is_valid(value):
             raise ValueError("Function is_valid returns False for {}.".format(name))
 
-    def declare(self, name, default=_undefined, values=None, types=None, desc='',
+    def declare(self, name, default=_undefined, values=None, types=None, type_=None, desc='',
                 upper=None, lower=None, is_valid=None, allow_none=False):
         r"""
         Declare an option.
@@ -112,6 +113,12 @@ class OptionsDictionary(object):
         allow_none : bool
             If True, allow None as a value regardless of values or types.
         """
+        if type_ is not None:
+            warn_deprecation("In declaration of option '%s' the '_type' arg is deprecated.  "
+                             "Use 'types' instead." % name)
+        if types is None:
+            types = type_
+
         if values is not None and not isinstance(values, (set, list, tuple)):
             raise TypeError("'values' must be of type None, list, or tuple - not %s." % values)
         if types is not None and not isinstance(types, (type, set, list, tuple)):
