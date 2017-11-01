@@ -12,7 +12,7 @@ import numpy as np
 from parameterized import parameterized
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, \
-    NonlinearRunOnce, NonLinearRunOnce
+    NonlinearRunOnce, NonLinearRunOnce, ScipyIterativeSolver
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
 

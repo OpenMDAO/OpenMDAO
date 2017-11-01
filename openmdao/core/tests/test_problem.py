@@ -8,7 +8,7 @@ import numpy as np
 
 from openmdao.core.group import get_relevant_vars
 from openmdao.api import Problem, Group, IndepVarComp, PETScVector, NonlinearBlockGS, ScipyOptimizer, \
-     ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyIterativeSolver
+     ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov
 from openmdao.devtools.testutil import assert_rel_error
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -679,7 +679,7 @@ class TestProblem(unittest.TestCase):
             def configure(self):
                 # This will solve it.
                 self.sub.nonlinear_solver = NewtonSolver()
-                self.sub.linear_solver = ScipyIterativeSolver()
+                self.sub.linear_solver = ScipyKrylov()
 
 
         top = Problem()
@@ -688,7 +688,7 @@ class TestProblem(unittest.TestCase):
         top.setup(check=False)
 
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
-        self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
+        self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyKrylov))
 
     def test_post_setup_solver_configure(self):
         # Test that we can change solver settings after we have instantiated our model.
@@ -735,13 +735,13 @@ class TestProblem(unittest.TestCase):
 
         # These solvers override the ones set in the setup method of the 'sub' groups
         top.model.sub.nonlinear_solver = NewtonSolver()
-        top.model.sub.linear_solver = ScipyIterativeSolver()
+        top.model.sub.linear_solver = ScipyKrylov()
 
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
-        self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
+        self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyKrylov))
 
     def test_feature_system_configure(self):
-        from openmdao.api import Problem, Group, ImplicitComponent, NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS
+        from openmdao.api import Problem, Group, ImplicitComponent, NewtonSolver, ScipyKrylov, NonlinearBlockGS
 
         class ImplSimple(ImplicitComponent):
 
@@ -776,7 +776,7 @@ class TestProblem(unittest.TestCase):
             def configure(self):
                 # This will solve it.
                 self.sub.nonlinear_solver = NewtonSolver()
-                self.sub.linear_solver = ScipyIterativeSolver()
+                self.sub.linear_solver = ScipyKrylov()
 
 
         top = Problem()
@@ -785,10 +785,10 @@ class TestProblem(unittest.TestCase):
         top.setup(check=False)
 
         print(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
-        print(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
+        print(isinstance(top.model.sub.linear_solver, ScipyKrylov))
 
     def test_feature_post_setup_solver_configure(self):
-        from openmdao.api import Problem, Group, ImplicitComponent, NewtonSolver, ScipyIterativeSolver, NonlinearBlockGS
+        from openmdao.api import Problem, Group, ImplicitComponent, NewtonSolver, ScipyKrylov, NonlinearBlockGS
 
         class ImplSimple(ImplicitComponent):
 
@@ -832,10 +832,10 @@ class TestProblem(unittest.TestCase):
 
         # This will solve it.
         top.model.sub.nonlinear_solver = NewtonSolver()
-        top.model.sub.linear_solver = ScipyIterativeSolver()
+        top.model.sub.linear_solver = ScipyKrylov()
 
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
-        self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyIterativeSolver))
+        self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyKrylov))
 
 if __name__ == "__main__":
     unittest.main()
