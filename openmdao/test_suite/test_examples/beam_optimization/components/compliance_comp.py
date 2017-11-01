@@ -6,8 +6,8 @@ from openmdao.api import ExplicitComponent
 class ComplianceComp(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare('num_elements', type_=int)
-        self.metadata.declare('force_vector', type_=np.ndarray)
+        self.metadata.declare('num_elements', types=int)
+        self.metadata.declare('force_vector', types=np.ndarray)
 
     def setup(self):
         num_elements = self.metadata['num_elements']

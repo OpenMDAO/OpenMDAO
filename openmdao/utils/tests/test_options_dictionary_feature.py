@@ -35,33 +35,6 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
         prob.run_model()
         self.assertEqual(prob['main_comp.y'], 7.)
 
-    def test_values_and_types(self):
-        from openmdao.api import Problem, IndepVarComp
-        from openmdao.test_suite.components.metadata_feature_function import UnitaryFunctionComp
-
-        prob = Problem()
-        prob.model.add_subsystem('input_comp', IndepVarComp('x'))
-        prob.model.add_subsystem('main_comp', UnitaryFunctionComp(func='cos'))
-        prob.model.connect('input_comp.x', 'main_comp.x')
-        prob.setup()
-
-        prob['input_comp.x'] = 0.
-        prob.run_model()
-        self.assertEqual(prob['main_comp.y'], 1.)
-
-        def myfunc(x):
-            return x ** 2 + 2
-
-        prob = Problem()
-        prob.model.add_subsystem('input_comp', IndepVarComp('x'))
-        prob.model.add_subsystem('main_comp', UnitaryFunctionComp(func=myfunc))
-        prob.model.connect('input_comp.x', 'main_comp.x')
-        prob.setup()
-
-        prob['input_comp.x'] = 2.
-        prob.run_model()
-        self.assertEqual(prob['main_comp.y'], 6.)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -26,7 +26,7 @@ class LinearSystemComp(ImplicitComponent):
         """
         Declare metadata.
         """
-        self.metadata.declare('size', default=1, type_=int, desc='the size of the linear system')
+        self.metadata.declare('size', default=1, types=int, desc='the size of the linear system')
         self.metadata.declare('partial_type', default='dense',
                               values=['dense', 'sparse', 'matrix_free'],
                               desc='the way the derivatives are defined')

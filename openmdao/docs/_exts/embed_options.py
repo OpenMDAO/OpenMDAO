@@ -47,7 +47,7 @@ class EmbedOptionsDirective(Directive):
             name = option_name
             default = option_data['value']
             values = option_data['values']
-            types = option_data['type_']
+            types = option_data['types']
             desc = option_data['desc']
 
             if types is None:
