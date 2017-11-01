@@ -151,6 +151,7 @@ def _upload_driver_iterations(new_list, recorder):
         responses = []
         objectives = []
         constraints = []
+        sysincludes = []
         if data.desvars is not None:
             for n in data.desvars.dtype.names:
                 desvars.append({
@@ -176,13 +177,21 @@ def _upload_driver_iterations(new_list, recorder):
                     'values': recorder.convert_to_list(data.constraints[n])
                 })
 
+        if data.sysincludes is not None:
+            for n in data.sysincludes.dtype.names:
+                sysincludes.append({
+                    'name': n,
+                    'values': recorder.convert_to_list(data.sysincludes[n])
+                })
+
         data.desvars = desvars
         data.responses = responses
         data.objectives = objectives
         data.constraints = constraints
+        data.sysincludes = sysincludes
         recorder._record_driver_iteration(data.counter, data.iteration_coordinate,
                                           data.success, data.msg, data.desvars, data.responses,
-                                          data.objectives, data.constraints)
+                                          data.objectives, data.constraints, data.sysincludes)
 
 
 if __name__ == "__main__":
