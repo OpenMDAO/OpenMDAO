@@ -67,11 +67,12 @@ before_install:
 install:
 - conda install --yes python=$PY numpy==1.11.2 scipy nose sphinx mock swig
 - if [ "$OS" = "Linux" ]; then
-    if [ "$PY" = "2.7" ]; then
-      pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp27-none-linux_x86_64.whl;
-    elif [ "$PY" = "3.4" ]; then
-      pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py3-none-linux_x86_64.whl;
-    fi
+    pip install hg+https://bitbucket.org/mdolab/pyoptsparse
+#    if [ "$PY" = "2.7" ]; then
+#      pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp27-none-linux_x86_64.whl;
+#    elif [ "$PY" = "3.4" ]; then
+#      pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py3-none-linux_x86_64.whl;
+#    fi
   fi
 
 - if [ "$OS" = "MacOSX" ]; then
