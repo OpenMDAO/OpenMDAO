@@ -110,7 +110,7 @@ class OptionsDictionary(object):
         is_valid : function or None
             General check function that returns True if valid.
         allow_none : bool
-            If True, allow None as a value regardless of the value of 'values' or 'types'.
+            If True, allow None as a value regardless of values or types.
         """
         if values is not None and not isinstance(values, (set, list, tuple)):
             raise TypeError("'values' must be of type None, list, or tuple - not %s." % values)
