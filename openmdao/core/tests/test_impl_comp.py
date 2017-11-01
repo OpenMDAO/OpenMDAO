@@ -7,7 +7,7 @@ from six.moves import cStringIO
 import numpy as np
 
 from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, NewtonSolver, \
-                         ScipyIterativeSolver
+                         ScipyKrylov
 from openmdao.devtools.testutil import assert_rel_error
 
 
@@ -274,7 +274,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         group.nonlinear_solver = NewtonSolver()
         group.nonlinear_solver.options['solve_subsystems'] = True
         group.nonlinear_solver.options['max_sub_solves'] = 1
-        group.linear_solver = ScipyIterativeSolver()
+        group.linear_solver = ScipyKrylov()
 
         prob.setup(check=False)
 
@@ -417,7 +417,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['sub.comp2.y'], 77., 1e-5)
 
     def test_guess_nonlinear_feature(self):
-        from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, NewtonSolver, ScipyIterativeSolver
+        from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, NewtonSolver, ScipyKrylov
 
         class ImpWithInitial(ImplicitComponent):
 
@@ -479,7 +479,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         model.nonlinear_solver = NewtonSolver()
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 1
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
         prob.setup(check=False)
 

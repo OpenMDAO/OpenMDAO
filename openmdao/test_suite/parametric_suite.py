@@ -11,7 +11,7 @@ from unittest import SkipTest
 from openmdao.core.problem import Problem
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, \
                                                   CSRJacobian, CSCJacobian
-from openmdao.solvers.linear.scipy_iter_solver import ScipyIterativeSolver
+from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.test_suite.groups.cycle_group import CycleGroup
 from openmdao.vectors.default_vector import DefaultVector
@@ -160,7 +160,7 @@ class ParameterizedInstance(object):
             'maxiter': 100
         }
 
-        self.linear_solver_class = ScipyIterativeSolver
+        self.linear_solver_class = ScipyKrylov
         self.linear_solver_options = {'maxiter': 200,
                                       'atol': 1e-10,
                                       'rtol': 1e-10,
