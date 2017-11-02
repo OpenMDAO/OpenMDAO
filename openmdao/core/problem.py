@@ -1066,7 +1066,7 @@ class Problem(object):
         iproc = model.comm.rank
 
         for vois in itervalues(voi_lists):
-            for input_name, old_input_name in vois:
+            for input_name, old_input_name, _, _ in vois:
                 vecname = inp2rhs_name[input_name]
                 if vecname not in input_vec:
                     continue
@@ -1089,7 +1089,10 @@ class Problem(object):
                         in_idxs = in_voi_meta['indices']
 
                 if in_idxs is not None:
+                    neg = in_idxs[in_idxs < 0]
                     irange = in_idxs
+                    if neg:
+                        irange[neg] += end
                     max_i = np.max(in_idxs)
                     min_i = np.min(in_idxs)
                     loc_size = len(in_idxs)
@@ -1123,139 +1126,6 @@ class Problem(object):
                                         loc_size, start, end, dup, store)
 
         return voi_info
-
-    def _compute_totals_multi(self, totals, vois, voi_info, lin_vec_names, mode,
-                              output_list, old_output_list, output_vois,
-                              use_rel_reduction, rel_systems, return_format):
-        fwd = mode == 'fwd'
-        if fwd:
-            remote_outputs = self.driver._remote_responses
-        else:
-            remote_outputs = self.driver._remote_dvs
-
-        model = self.model
-        nproc = model.comm.size
-        iproc = model.comm.rank
-        sizes = model._var_sizes['nonlinear']['output']
-        owning_ranks = model._owning_rank['output']
-
-        # this sets dinputs for the current parallel_deriv_color to 0
-        voi_info[vois[0][0]][0].set_const(0.0)
-        if use_rel_reduction:
-            if fwd:
-                model._vectors['output']['linear'].set_const(0.0)
-            else:
-                model._vectors['input']['linear'].set_const(0.0)
-
-        for input_name, old_input_name in vois:
-            dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
-                dup, store = voi_info[input_name]
-            if input_name in dinputs:
-                vec = dinputs._views_flat[input_name]
-                for i, idx in enumerate(idxs):
-                    if idx < 0:
-                        idx += end
-
-                    if start <= idx < end:
-                        # not all vars will be matrix-matrix, so we have to check here
-                        if len(vec.shape) > 1:
-                            dinputs._views_flat[input_name][idx - start, i] = 1.0
-                        else:
-                            dinputs._views_flat[input_name][idx - start] = 1.0
-
-        model._solve_linear(lin_vec_names, mode, rel_systems)
-
-        for input_name, old_input_name in vois:
-            dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
-                dup, store = voi_info[input_name]
-            ncol = dinputs._ncol
-
-            # Pull out the answers and pack into our data structure.
-            for ocount, output_name in enumerate(output_list):
-                out_idxs = None
-                if output_name in output_vois:
-                    out_voi_meta = output_vois[output_name]
-                    out_idxs = out_voi_meta['indices']
-
-                if use_rel_reduction and output_name not in model._relevant[input_name]:
-                    # irrelevant output, just give zeros
-                    if out_idxs is None:
-                        out_var_idx = \
-                            model._var_allprocs_abs2idx['nonlinear']['output'][output_name]
-                        if output_name in remote_outputs:
-                            _, sz = remote_outputs[output_name]
-                        else:
-                            sz = sizes[iproc, out_var_idx]
-                        if ncol > 1:
-                            deriv_val = np.zeros((sz, ncol))
-                        else:
-                            deriv_val = np.zeros(sz)
-                    elif ncol > 1:
-                        deriv_val = np.zeros((len(out_idxs), ncol))
-                    else:
-                        deriv_val = np.zeros(len(out_idxs))
-                else:  # relevant output
-                    if output_name in doutputs._views_flat:
-                        deriv_val = doutputs._views_flat[output_name]
-                        size = deriv_val.size
-                    else:
-                        deriv_val = None
-
-                    if out_idxs is not None:
-                        size = out_idxs.size
-                        if deriv_val is not None:
-                            deriv_val = deriv_val[out_idxs]
-
-                    if dup and nproc > 1:
-                        out_var_idx = \
-                            model._var_allprocs_abs2idx['nonlinear']['output'][output_name]
-                        root = owning_ranks[output_name]
-                        if deriv_val is None:
-                            if out_idxs is not None:
-                                sz = size
-                            else:
-                                sz = sizes[root, out_var_idx]
-                            deriv_val = np.empty((sz, ncol))
-                        self.comm.Bcast(deriv_val, root=root)
-
-                len_val = len(deriv_val)
-
-                if store and ncol > 1 and len(deriv_val.shape) == 1:
-                    deriv_val = np.atleast_2d(deriv_val).T
-
-                if return_format == 'flat_dict':
-                    if fwd:
-                        key = (old_output_list[ocount], old_input_name)
-
-                        if totals[key] is None:
-                            totals[key] = np.zeros((len_val, loc_size))
-                        if store:
-                            totals[key][:, loc_idxs] = deriv_val
-                    else:
-                        key = (old_input_name, old_output_list[ocount])
-
-                        if totals[key] is None:
-                            totals[key] = np.zeros((loc_size, len_val))
-                        if store:
-                            totals[key][loc_idxs, :] = deriv_val.T
-
-                elif return_format == 'dict':
-                    if fwd:
-                        okey = old_output_list[ocount]
-
-                        if totals[okey][old_input_name] is None:
-                            totals[okey][old_input_name] = np.zeros((len_val, loc_size))
-                        if store:
-                            totals[okey][old_input_name][:, loc_idxs] = deriv_val
-                    else:
-                        ikey = old_output_list[ocount]
-
-                        if totals[old_input_name][ikey] is None:
-                            totals[old_input_name][ikey] = np.zeros((loc_size, len_val))
-                        if store:
-                            totals[old_input_name][ikey][loc_idxs, :] = deriv_val.T
-                else:
-                    raise RuntimeError("unsupported return format")
 
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
@@ -1312,9 +1182,6 @@ class Problem(object):
         # vectors.
         matmat = False
         for vec_name in model._lin_vec_names:
-
-            # TODO: Do all three deriv vectors have the same keys?
-
             vec_dinput[vec_name].set_const(0.0)
             vec_doutput[vec_name].set_const(0.0)
             vec_dresid[vec_name].set_const(0.0)
@@ -1386,13 +1253,12 @@ class Problem(object):
         # in the model)
         use_rel_reduction = True
 
-        matmat = False
         for i, name in enumerate(input_list):
-            varmatmat = False
+            matmat = False
             if name in input_vois:
                 meta = input_vois[name]
                 parallel_deriv_color = meta['parallel_deriv_color']
-                varmatmat |= (meta['vectorize_derivs'] and meta['size'] > 1)
+                matmat = (meta['vectorize_derivs'] and meta['size'] > 1)
             else:
                 parallel_deriv_color = None
                 use_rel_reduction = False
@@ -1405,50 +1271,44 @@ class Problem(object):
                     # store the absolute name along with the original name, which
                     # can be either promoted or absolute depending on the value
                     # of the 'global_names' flag.
-                    voi_lists[name] = [(name, old_input_list[i])]
-                    inp2rhs_name[name] = name if varmatmat else 'linear'
+                    voi_lists[name] = [(name, old_input_list[i], parallel_deriv_color, matmat)]
+                    inp2rhs_name[name] = name if matmat else 'linear'
             else:
                 if parallel_deriv_color not in voi_lists:
                     voi_lists[parallel_deriv_color] = []
-                voi_lists[parallel_deriv_color].append((name, old_input_list[i]))
+                voi_lists[parallel_deriv_color].append((name, old_input_list[i],
+                                                        parallel_deriv_color, matmat))
                 inp2rhs_name[name] = name
-
-            matmat |= varmatmat
 
         lin_vec_names = sorted(set(inp2rhs_name.values()))
 
         voi_info = self._get_voi_info(voi_lists, inp2rhs_name, input_vec, output_vec, input_vois)
 
-        if matmat:
-            for vois in itervalues(voi_lists):
-                if use_rel_reduction:
-                    rel_systems = set()
-                    for voi, _ in vois:
-                        rel_systems.update(relevant[voi]['@all'][1])
-                else:
-                    rel_systems = _contains_all
-                self._compute_totals_multi(totals, vois, voi_info, lin_vec_names, mode,
-                                           output_list, old_output_list,
-                                           output_vois, use_rel_reduction, rel_systems,
-                                           return_format)
-            recording_iteration.stack.pop()
-            return totals
-
         for vois in itervalues(voi_lists):
             # If Forward mode, solve linear system for each 'wrt'
             # If Adjoint mode, solve linear system for each 'of'
 
+            matmats = [m for _, _, _, m in vois]
+            matmat = matmats[0]
+            if any(matmats) and not all(matmats):
+                raise RuntimeError("Mixing of vectorized and non-vectorized derivs in the same "
+                                   "parallel color group (%s) is not supported." %
+                                   [name for _, name, _, _ in vois])
             if use_rel_reduction:
                 rel_systems = set()
-                for voi, _ in vois:
+                for voi, _, _, _ in vois:
                     rel_systems.update(relevant[voi]['@all'][1])
             else:
                 rel_systems = _contains_all
 
-            loc_idxs = defaultdict(lambda: -1)
+            if matmat:
+                idx_iter = range(1)
+            else:
+                loc_idx_dict = defaultdict(lambda: -1)
+                max_len = max(len(voi_info[name][2]) for name, _, _, _ in vois)
+                idx_iter = range(max_len)
 
-            max_len = max(len(voi_info[name][2]) for name, _ in vois)
-            for i in range(max_len):
+            for i in idx_iter:
                 # this sets dinputs for the current parallel_deriv_color to 0
                 # dinputs is dresids in fwd, doutouts in rev
                 if fwd:
@@ -1460,50 +1320,59 @@ class Problem(object):
                     if use_rel_reduction:
                         vec_dinput['linear'].set_const(0.0)
 
-                for input_name, old_input_name in vois:
+                for input_name, old_input_name, pd_color, matmat in vois:
                     dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
                         voi_info[input_name]
-                    if i >= len(idxs):
-                        # reuse the last index if loop iter is larger than current var size
-                        idx = idxs[-1]
-                    else:
-                        idx = idxs[i]
 
-                    if idx < 0:
-                        idx += end
-                    if start <= idx < end and input_name in dinputs._views_flat:
-                        # Dictionary access returns a scaler for 1d input, and we
-                        # need a vector for clean code, so use _views_flat.
-                        dinputs._views_flat[input_name][idx - start] = 1.0
+                    if matmat:
+                        if input_name in dinputs:
+                            vec = dinputs._views_flat[input_name]
+                            for ii, idx in enumerate(idxs):
+                                if start <= idx < end:
+                                    dinputs._views_flat[input_name][idx - start, ii] = 1.0
+                    else:
+                        if i >= len(idxs):
+                            # reuse the last index if loop iter is larger than current var size
+                            idx = idxs[-1]
+                        else:
+                            idx = idxs[i]
+
+                        if start <= idx < end and input_name in dinputs._views_flat:
+                            # Dictionary access returns a scaler for 1d input, and we
+                            # need a vector for clean code, so use _views_flat.
+                            dinputs._views_flat[input_name][idx - start] = 1.0
 
                 model._solve_linear(lin_vec_names, mode, rel_systems)
 
-                for input_name, old_input_name in vois:
-                    dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
-                        voi_info[input_name]
+                for input_name, old_input_name, _, matmat in vois:
+                    dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
+                        dup, store = voi_info[input_name]
                     ncol = dinputs._ncol
-                    if i >= len(idxs):
-                        idx = idxs[-1]  # reuse the last index
-                        delta_loc_idx = 0  # don't increment local_idx
-                    else:
-                        idx = idxs[i]
-                        delta_loc_idx = 1
 
-                    # totals to zeros instead of None in those cases when none
-                    # of the specified indices are within the range of interest
-                    # for this proc.
-                    store = True if start <= idx < end else dup
-                    if store:
-                        loc_idxs[input_name] += delta_loc_idx
-                    loc_idx = loc_idxs[input_name]
+                    if matmat:
+                        loc_idx = loc_idxs
+                    else:
+                        if i >= len(idxs):
+                            idx = idxs[-1]  # reuse the last index
+                            delta_loc_idx = 0  # don't increment local_idx
+                        else:
+                            idx = idxs[i]
+                            delta_loc_idx = 1
+
+                        # totals to zeros instead of None in those cases when none
+                        # of the specified indices are within the range of interest
+                        # for this proc.
+                        store = True if start <= idx < end else dup
+                        if store:
+                            loc_idx_dict[input_name] += delta_loc_idx
+                        loc_idx = loc_idx_dict[input_name]
 
                     # Pull out the answers and pack into our data structure.
                     for ocount, output_name in enumerate(output_list):
                         out_idxs = None
                         if output_name in output_vois:
                             out_voi_meta = output_vois[output_name]
-                            if 'indices' in out_voi_meta:
-                                out_idxs = out_voi_meta['indices']
+                            out_idxs = out_voi_meta['indices']
 
                         if use_rel_reduction and output_name not in relevant[input_name]:
                             # irrelevant output, just give zeros
@@ -1885,3 +1754,18 @@ def _format_error(error, tol):
     if np.isnan(error) or error < tol:
         return '{:.6e}'.format(error)
     return '{:.6e} *'.format(error)
+
+
+def range_list_iter(num):
+    """
+    A generator of single element lists over a given range from 0 to num.
+
+    Parameters
+    ----------
+    num : int
+        Max number in the range.
+    """
+    lst = [0]
+    for i in range(num):
+        lst[0] = i
+        yield lst
