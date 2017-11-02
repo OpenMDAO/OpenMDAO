@@ -57,25 +57,14 @@ making it optional to pass the value in during component instantiation.
 
 In this example, both 'a' and 'b' are optional, so it is valid to pass in 'a', but not 'b'.
 
-Specifying values and types
+Specifying values or types
 ---------------------------
 
-Another commonly-used metadata feature is specifying acceptable values and types.
+Another commonly-used metadata feature is specifying acceptable values or types.
 If only the list of acceptable values is specified,
-the default value and the value passed in must be one of these values.
+the default value and the value passed in must be one of these values, or None if allow_none is True.
 If only the list of acceptable types is specified,
-the default value and the value passed in must be an instance one of these types.
-If both the lists of acceptable values and types are specified,
-the default value and the value passed in must be one of the values OR an instance one of the types.
-This is illustrated in the following example.
-
-.. embed-code::
-    openmdao.test_suite.components.metadata_feature_function
-
-.. embed-test::
-    openmdao.utils.tests.test_options_dictionary_feature.TestOptionsDictionaryFeature.test_values_and_types
-
-In this example, it is convenient to specify a list of acceptable values of the 'func' metadata,
-but also to provide a valid type if it is not one of these acceptable values.
+the default value and the value passed in must be an instance one of these types, or None if allow_none is True.
+It is an error to attempt to specify both a list of acceptable values and a list of acceptable types.
 
 .. tags:: Metadata

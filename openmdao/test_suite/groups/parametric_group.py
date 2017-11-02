@@ -39,13 +39,11 @@ class ParametericTestGroup(Group):
 
         self.metadata.declare('vector_class', default='default',
                               values=['default', 'petsc'],
-                              type_=str,
                               desc='Which vector implementation to use.')
         self.metadata.declare('assembled_jac', default=True,
-                              type_=bool,
+                              types=bool,
                               desc='If an assemebled Jacobian should be used.')
         self.metadata.declare('jacobian_type', default='matvec',
-                              type_=str,
                               values=['dense', 'matvec', 'sparse-coo', 'sparse-csr', 'sparse-csc'],
                               desc='Controls the type of the assembled jacobian.')
 

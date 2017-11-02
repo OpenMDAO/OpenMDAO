@@ -51,7 +51,7 @@ class ScipyKrylov(LinearSolver):
         self.options.declare('solver', default='gmres', values=tuple(_SOLVER_TYPES.keys()),
                              desc='function handle for actual solver')
 
-        self.options.declare('restart', default=20, type_=int,
+        self.options.declare('restart', default=20, types=int,
                              desc='Number of iterations between restarts. Larger values increase '
                                   'iteration cost, but may be necessary for convergence. This '
                                   'option applies only to gmres.')

@@ -9,7 +9,7 @@ from openmdao.api import ExplicitComponent
 class VectorDoublingComp(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare('size', type_=int)
+        self.metadata.declare('size', types=int)
 
     def setup(self):
         size = self.metadata['size']
