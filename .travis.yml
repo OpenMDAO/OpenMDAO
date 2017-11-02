@@ -83,11 +83,22 @@ install:
 #  fi
 
 #trying a manual install of pyoptsparse
-- pip install mercurial
-- hg clone https://bitbucket.org/mdolab/pyoptsparse
-- cd pyoptsparse
-- python setup.py install
-- cd ..
+if [ "$PY" = "2.7" ]; then
+  pip install --upgrade pip;
+  pip install mercurial;
+  hg clone https://bitbucket.org/mdolab/pyoptsparse;
+  cd pyoptsparse;
+  python setup.py install;
+  cd ..;
+fi
+
+if [ "$PY" = "3.4" or "$PY" = "3.6"]; then
+  wget https://bitbucket.org/mdolab/pyoptsparse/get/9af3264429b9.zip;
+  tar -xvf 99af3264429b9.zip;
+  cd 99af3264429b9.zip;
+  python setup.py install;
+  cd ..;
+fi
 
 - if [ "$MPI" ]; then
     pip install mpi4py;
