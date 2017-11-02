@@ -48,8 +48,6 @@ class BaseRecorder(object):
         Patterns for variables to include in recording.
     recording_options['excludes'] :  list of strings([])
         Patterns for variables to exclude in recording (processed after includes).
-    recording_options['system_includes'] :  list of strings([])
-        Patterns for System outputs to include in recording of Driver iterations.
 
     Attributes
     ----------

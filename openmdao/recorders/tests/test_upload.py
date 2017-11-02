@@ -389,7 +389,7 @@ class TestDataUploader(unittest.TestCase):
         self.prob.driver.recording_options['record_responses'] = False
         self.prob.driver.recording_options['record_objectives'] = False
         self.prob.driver.recording_options['record_constraints'] = False
-        self.prob.driver.recording_options['system_includes'] = ['*']
+        self.prob.driver.recording_options['includes'] = ['*']
         self.prob.driver.add_recorder(self.recorder)
         self.prob.setup(check=False)
 
@@ -401,11 +401,11 @@ class TestDataUploader(unittest.TestCase):
         driver_iteration_data = json.loads(self.driver_iteration_data)
         sysincludes = driver_iteration_data['sysincludes']
 
-        self.assertEqual(len(sysincludes), 7)
-        self.assertEqual(driver_iteration_data['desvars'], [])
-        self.assertEqual(driver_iteration_data['objectives'], [])
+        self.assertEqual(len(driver_iteration_data['sysincludes']), 2)
+        self.assertEqual(len(driver_iteration_data['objectives']), 1)
+        self.assertEqual(len(driver_iteration_data['desvars']), 2)
+        self.assertEqual(len(driver_iteration_data['constraints']), 2)
         self.assertEqual(driver_iteration_data['responses'], [])
-        self.assertEqual(driver_iteration_data['constraints'], [])
 
     @unittest.skipIf(PETScVector is None or os.environ.get("TRAVIS"),
                      "PETSc is required." if PETScVector is None

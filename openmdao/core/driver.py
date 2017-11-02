@@ -29,8 +29,6 @@ class Driver(object):
         Tells recorder whether to record the objectives of the Driver.
     recording_options['record_constraints'] :  bool(False)
         Tells recorder whether to record the constraints of the Driver.
-    recording_options['system_includes'] :  list([])
-        List of specific System variables to record in addition to Driver variables.
     recording_options['includes'] :  list of strings("*")
         Patterns for variables to include in recording.
     recording_options['excludes'] :  list of strings('')
@@ -112,10 +110,7 @@ class Driver(object):
                                        desc='Set to True to record objectives at the driver level')
         self.recording_options.declare('record_constraints', type_=bool, default=False,
                                        desc='Set to True to record constraints at the driver level')
-        self.recording_options.declare('system_includes', type_=list, default=[],
-                                       desc='Patterns for System outputs to include in '
-                                       'recording of Driver iterations')
-        self.recording_options.declare('includes', type_=list, default=['*'],
+        self.recording_options.declare('includes', type_=list, default=[],
                                        desc='Patterns for variables to include in recording')
         self.recording_options.declare('excludes', type_=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
@@ -230,37 +225,37 @@ class Driver(object):
         mysystem_outputs = set()
         incl = self.recording_options['includes']
         excl = self.recording_options['excludes']
-        sys_incl = self.recording_options['system_includes']
+        rec_desvars = self.recording_options['record_desvars']
+        rec_objectives = self.recording_options['record_objectives']
+        rec_constraints = self.recording_options['record_constraints']
+        rec_responses = self.recording_options['record_responses']
 
-        if self.recording_options['record_desvars']:
+        if rec_desvars or incl:
             mydesvars = {n for n in self._designvars
-                         if check_path(n, incl, excl)}
+                         if check_path(n, incl, excl, rec_desvars)}
 
-        if self.recording_options['record_objectives']:
+        if rec_objectives or incl:
             myobjectives = {n for n in self._objs
-                            if check_path(n, incl, excl)}
+                            if check_path(n, incl, excl, rec_objectives)}
 
-        if self.recording_options['record_constraints']:
+        if rec_constraints or incl:
             myconstraints = {n for n in self._cons
-                             if check_path(n, incl, excl)}
+                             if check_path(n, incl, excl, rec_constraints)}
 
-        if self.recording_options['record_responses']:
+        if rec_responses or incl:
             myresponses = {n for n in self._responses
-                           if check_path(n, incl, excl)}
+                           if check_path(n, incl, excl, rec_responses)}
 
         # get the system_includes that were requested for this Driver recording
-        if sys_incl:
+        if self.recording_options['includes']:
             prob = self._problem
             root = prob.model
             # The my* variables are sets
-            # sys_incl is not subject to the checking with incl and excl
-            #   sys_incl IS the incl
 
             # First gather all of the desired outputs
             # The following might only be the local vars if MPI
-            # mysystem_outputs = {n for n in root._outputs}
             mysystem_outputs = {n for n in root._outputs
-                                if check_path(n, sys_incl, [])}
+                                if check_path(n, incl, excl)}
 
             # If MPI, and on rank 0, need to gather up all the variables
             #    even those not local to rank 0
@@ -270,6 +265,15 @@ class Driver(object):
                     mysystem_outputs = all_vars[-1]
                     for d in all_vars[:-1]:
                         mysystem_outputs.update(d)
+
+            # de-deplicate sets by removing from mysystem_outputs
+            #   if it's already in another set
+            # clone mysystem_outputs so we can remove from the set while iterating
+            #   over its values
+            temp_outputs = mysystem_outputs.copy()
+            for n in temp_outputs:
+                if n in mydesvars or n in myobjectives or n in myconstraints:
+                    mysystem_outputs.remove(n)
 
         if MPI:  # filter based on who owns the variables
             # TODO Eventually, we think we can get rid of this next check. But to be safe,
@@ -284,8 +288,7 @@ class Driver(object):
             myresponses = [n for n in myresponses if rrank == rowned[n]]
             myobjectives = [n for n in myobjectives if rrank == rowned[n]]
             myconstraints = [n for n in myconstraints if rrank == rowned[n]]
-            mysystem_outputs = [
-                n for n in mysystem_outputs if rrank == rowned[n]]
+            mysystem_outputs = [n for n in mysystem_outputs if rrank == rowned[n]]
 
         self._filtered_vars_to_record = {
             'des': mydesvars,
@@ -631,25 +634,25 @@ class Driver(object):
 
         # Get the data to record
         data = {}
-        if self.recording_options['record_desvars']:
+        if self.recording_options['record_desvars'] or self.recording_options['includes']:
             # collective call that gets across all ranks
             desvars = self.get_design_var_values()
         else:
             desvars = {}
         # return
 
-        if self.recording_options['record_responses']:
+        if self.recording_options['record_responses'] or self.recording_options['includes']:
             # responses = self.get_response_values() # not really working yet
             responses = {}
         else:
             responses = {}
 
-        if self.recording_options['record_objectives']:
+        if self.recording_options['record_objectives'] or self.recording_options['includes']:
             objectives = self.get_objective_values()
         else:
             objectives = {}
 
-        if self.recording_options['record_constraints']:
+        if self.recording_options['record_constraints'] or self.recording_options['includes']:
             constraints = self.get_constraint_values()
         else:
             constraints = {}
@@ -663,7 +666,7 @@ class Driver(object):
         constraints = {name: constraints[name]
                        for name in self._filtered_vars_to_record['con']}
 
-        if self.recording_options['system_includes']:
+        if self.recording_options['includes']:
             root = self._problem.model
             outputs = root._outputs
             # outputsinputs, outputs, residuals = root.get_nonlinear_vectors()

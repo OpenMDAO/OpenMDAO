@@ -59,8 +59,6 @@ Driver Recording Options
         Tells recorder whether to record the objectives of a Driver.
     recording_options['record_constraints'] :  bool(False)
         Tells recorder whether to record the constraints of a Driver.
-    recording_options['system_includes'] :  list([])
-        List of specific System variables to record in addition to Driver variables.
 
 Solver Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^

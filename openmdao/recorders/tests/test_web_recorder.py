@@ -328,7 +328,7 @@ class TestServerRecorder(unittest.TestCase):
         self.assertEqual(driver_iteration_data['responses'], [])
         self.assertEqual(driver_iteration_data['constraints'], [])
     
-    def test_only_sysincludes_recorded(self, m):
+    def test_sysincludes_recorded(self, m):
         self.setup_endpoints(m)
         recorder = WebRecorder(self._accepted_token, suppress_output=True)
 
@@ -338,7 +338,7 @@ class TestServerRecorder(unittest.TestCase):
         self.prob.driver.recording_options['record_responses'] = False
         self.prob.driver.recording_options['record_objectives'] = False
         self.prob.driver.recording_options['record_constraints'] = False
-        self.prob.driver.recording_options['system_includes'] = ['*']
+        self.prob.driver.recording_options['includes'] = ['*']
         self.prob.driver.add_recorder(recorder)
         self.prob.setup(check=False)
 
@@ -347,11 +347,37 @@ class TestServerRecorder(unittest.TestCase):
         self.prob.cleanup()
 
         driver_iteration_data = json.loads(self.driver_iteration_data)
-        self.assertEqual(len(driver_iteration_data['sysincludes']), 7)
-        self.assertEqual(driver_iteration_data['objectives'], [])
-        self.assertEqual(driver_iteration_data['desvars'], [])
+        self.assertEqual(len(driver_iteration_data['sysincludes']), 2)
+        self.assertEqual(len(driver_iteration_data['objectives']), 1)
+        self.assertEqual(len(driver_iteration_data['desvars']), 2)
+        self.assertEqual(len(driver_iteration_data['constraints']), 2)
         self.assertEqual(driver_iteration_data['responses'], [])
-        self.assertEqual(driver_iteration_data['constraints'], [])
+
+    def test_sysincludes_recorded_with_excludes(self, m):
+        self.setup_endpoints(m)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
+
+        self.setup_sellar_model()
+
+        self.prob.driver.recording_options['record_desvars'] = False
+        self.prob.driver.recording_options['record_responses'] = False
+        self.prob.driver.recording_options['record_objectives'] = False
+        self.prob.driver.recording_options['record_constraints'] = False
+        self.prob.driver.recording_options['includes'] = ['*']
+        self.prob.driver.recording_options['excludes'] = ['obj_cmp.obj']
+        self.prob.driver.add_recorder(recorder)
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+
+        driver_iteration_data = json.loads(self.driver_iteration_data)
+        self.assertEqual(len(driver_iteration_data['sysincludes']), 2)
+        self.assertEqual(len(driver_iteration_data['objectives']), 0)
+        self.assertEqual(len(driver_iteration_data['desvars']), 2)
+        self.assertEqual(len(driver_iteration_data['constraints']), 2)
+        self.assertEqual(driver_iteration_data['responses'], [])
 
     def test_only_constraints_recorded(self, m):
         self.setup_endpoints(m)

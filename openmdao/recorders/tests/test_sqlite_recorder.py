@@ -1365,7 +1365,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.recording_options['record_responses'] = True
         self.prob.driver.recording_options['record_objectives'] = True
         self.prob.driver.recording_options['record_constraints'] = True
-        self.prob.driver.recording_options['system_includes'] = ['mda.d2.y2',]
+        self.prob.driver.recording_options['includes'] = ['mda.d2.y2',]
 
         # self.prob.driver.options['optimizer'] = OPTIMIZER
         # if OPTIMIZER == 'SLSQP':
