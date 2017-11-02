@@ -154,43 +154,38 @@ class Solver(object):
         self._iter_count = 0
 
         self.options = OptionsDictionary()
-        self.recording_options = OptionsDictionary()
-        self.options.declare('maxiter', type_=int, default=10,
-                                       desc='maximum number of iterations')
+        self.options.declare('maxiter', types=int, default=10,
+                             desc='maximum number of iterations')
         self.options.declare('atol', default=1e-10,
                                        desc='absolute error tolerance')
         self.options.declare('rtol', default=1e-10,
-                                       desc='relative error tolerance')
-        self.options.declare('iprint', type_=int, default=1,
-                                       desc='whether to print output')
-        self.options.declare('err_on_maxiter', type_=bool, default=False,
-                                       desc="When True, AnlysisError will be raised if we \
-                                       don't convege.")
+                             desc='relative error tolerance')
+        self.options.declare('iprint', types=int, default=1,
+                             desc='whether to print output')
+        self.options.declare('err_on_maxiter', types=bool, default=False,
+                             desc="When True, AnlysisError will be raised if we don't convege.")
         # Case recording options
-        self.recording_options.declare('record_abs_error', type_=bool, default=True,
-                                       desc='Set to True to record absolute error at the \
-                                       solver level')
-        self.recording_options.declare('record_rel_error', type_=bool, default=True,
-                                       desc='Set to True to record relative error at the \
-                                       solver level')
-        self.recording_options.declare('record_solver_output', type_=bool, default=False,
-                                       desc='Set to True to record output at the solver level')
-        self.recording_options.declare('record_solver_residuals', type_=bool, default=False,
-                                       desc='Set to True to record residuals at the solver level')
-        self.recording_options.declare('record_metadata', type_=bool, desc='Record metadata',
-                                       default=True)
-        self.recording_options.declare('includes', type_=list, default=['*'],
-                                       desc='Patterns for variables to include in recording')
-        self.recording_options.declare('excludes', type_=list, default=[],
-                                       desc='Patterns for vars to exclude in recording '
-                                       '(processed post-includes)')
+        self.options.declare('record_abs_error', types=bool, default=True,
+                             desc='Set to True to record absolute error at the solver level')
+        self.options.declare('record_rel_error', types=bool, default=True,
+                             desc='Set to True to record relative error at the solver level')
+        self.options.declare('record_solver_output', types=bool, default=False,
+                             desc='Set to True to record output at the solver level')
+        self.options.declare('record_solver_residuals', types=bool, default=False,
+                             desc='Set to True to record residuals at the solver level')
+        self.options.declare('record_metadata', types=bool, desc='Record metadata', default=True)
+        self.options.declare('includes', types=list, default=['*'],
+                             desc='Patterns for variables to include in recording')
+        self.options.declare('excludes', types=list, default=[],
+                             desc='Patterns for vars to exclude in recording '
+                                  '(processed post-includes)')
         # Case recording related
         self._filtered_vars_to_record = {}
         self._norm0 = 0.0
 
         # What the solver supports.
         self.supports = OptionsDictionary()
-        self.supports.declare('gradients', type_=bool, default=False)
+        self.supports.declare('gradients', types=bool, default=False)
 
         self._declare_options()
         self.options.update(kwargs)

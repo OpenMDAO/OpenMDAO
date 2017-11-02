@@ -6,7 +6,7 @@ from openmdao.api import ExplicitComponent
 class DisplacementsComp(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare('num_elements', type_=int)
+        self.metadata.declare('num_elements', types=int)
 
     def setup(self):
         num_elements = self.metadata['num_elements']

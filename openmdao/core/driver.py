@@ -99,44 +99,46 @@ class Driver(object):
         self.recording_options = OptionsDictionary()
 
         ###########################
-        self.recording_options.declare(
-            'record_metadata', type_=bool, desc='Record metadata', default=True)
-        self.recording_options.declare('record_desvars', type_=bool, default=True,
-                                       desc='Set to True to record design variables \
-                                       at the driver level')
-        self.recording_options.declare('record_responses', type_=bool, default=False,
+        self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
+                                       default=True)
+        self.recording_options.declare('record_desvars', types=bool, default=True,
+                                       desc='Set to True to record design variables at the \
+                                       driver level')
+        self.recording_options.declare('record_responses', types=bool, default=False,
                                        desc='Set to True to record responses at the driver level')
-        self.recording_options.declare('record_objectives', type_=bool, default=False,
-                                       desc='Set to True to record objectives at the driver level')
-        self.recording_options.declare('record_constraints', type_=bool, default=False,
-                                       desc='Set to True to record constraints at the driver level')
-        self.recording_options.declare('includes', type_=list, default=[],
+        self.recording_options.declare('record_objectives', types=bool, default=False,
+                                       desc='Set to True to record objectives at the \
+                                       driver level')
+        self.recording_options.declare('record_constraints', types=bool, default=False,
+                                       desc='Set to True to record constraints at the \
+                                       driver level')
+        self.recording_options.declare('system_includes', types=list, default=[],
+                                       desc='Patterns for System outputs to include in '
+                                       'recording of Driver iterations')
+        self.recording_options.declare('includes', types=list, default=[],
                                        desc='Patterns for variables to include in recording')
-        self.recording_options.declare('excludes', type_=list, default=[],
+        self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
                                        '(processed post-includes)')
         ###########################
 
         # What the driver supports.
         self.supports = OptionsDictionary()
-        self.supports.declare('inequality_constraints',
-                              type_=bool, default=False)
-        self.supports.declare('equality_constraints',
-                              type_=bool, default=False)
-        self.supports.declare('linear_constraints', type_=bool, default=False)
-        self.supports.declare('two_sided_constraints',
-                              type_=bool, default=False)
-        self.supports.declare('multiple_objectives', type_=bool, default=False)
-        self.supports.declare('integer_design_vars', type_=bool, default=False)
-        self.supports.declare('gradients', type_=bool, default=False)
-        self.supports.declare('active_set', type_=bool, default=False)
+        self.supports.declare('inequality_constraints', types=bool, default=False)
+        self.supports.declare('equality_constraints', types=bool, default=False)
+        self.supports.declare('linear_constraints', types=bool, default=False)
+        self.supports.declare('two_sided_constraints', types=bool, default=False)
+        self.supports.declare('multiple_objectives', types=bool, default=False)
+        self.supports.declare('integer_design_vars', types=bool, default=False)
+        self.supports.declare('gradients', types=bool, default=False)
+        self.supports.declare('active_set', types=bool, default=False)
 
         self.iter_count = 0
         self.metadata = None
         self._model_viewer_data = None
 
         # TODO, support these in OpenMDAO
-        self.supports.declare('integer_design_vars', type_=bool, default=False)
+        self.supports.declare('integer_design_vars', types=bool, default=False)
 
         self.fail = False
 

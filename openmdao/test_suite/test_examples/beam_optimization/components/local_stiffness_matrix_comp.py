@@ -6,7 +6,7 @@ from openmdao.api import ExplicitComponent
 class LocalStiffnessMatrixComp(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare('num_elements', type_=int)
+        self.metadata.declare('num_elements', types=int)
         self.metadata.declare('E')
         self.metadata.declare('L')
 
@@ -35,7 +35,7 @@ class LocalStiffnessMatrixComp(ExplicitComponent):
 
     def compute(self, inputs, outputs):
         num_elements = self.metadata['num_elements']
-        
+
         outputs['K_local'] = 0
         for ind in range(num_elements):
             outputs['K_local'][ind, :, :] = self.mtx[ind, :, :, ind] * inputs['I'][ind]

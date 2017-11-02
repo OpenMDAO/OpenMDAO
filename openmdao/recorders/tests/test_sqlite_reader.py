@@ -10,7 +10,7 @@ from tempfile import mkdtemp, mkstemp
 import numpy as np
 
 from openmdao.test_suite.components.sellar import SellarDerivatives
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS, ScipyIterativeSolver, LinearBlockGS
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS, ScipyKrylov, LinearBlockGS
 from openmdao.recorders.sqlite_recorder import SqliteRecorder, format_version
 from openmdao.recorders.case_reader import CaseReader
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
@@ -90,7 +90,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         mda = model.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
-        mda.linear_solver = ScipyIterativeSolver()
+        mda.linear_solver = ScipyKrylov()
         mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -119,7 +119,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0]), ref=2.0), promotes=['z'])
 
         mda = model.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
-        mda.linear_solver = ScipyIterativeSolver()
+        mda.linear_solver = ScipyKrylov()
         mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
