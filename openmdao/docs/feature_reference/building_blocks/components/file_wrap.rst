@@ -1,6 +1,6 @@
-.. index:: ExternalCode Example
+.. index:: File Wrapping Tools
 
-.. _externalcode_feature:
+.. _filewrap_feature:
 
 *************
 File Wrapping
@@ -11,84 +11,14 @@ Communicating with External Codes in OpenMDAO
 =============================================
 
 
-In the :ref:`ExternalCode Example <_externalcode_feature>` you saw how to
-define a component that calls an external program to perform it's computation.
+In the :ref:`ExternalCode Example <externalcode_feature>` you saw how to
+define a component that calls an external program to perform it's computation,
+passing input and output values via files.
 
-For many legacy codes, the only viable way to include them in an MDAO process
-is through file wrapping. In a file-wrapped component, the inputs are passed
-and the outputs are extracted via input and output files. To
-facilitate this process, OpenMDAO includes several utilities that will be
-described in this section.
-
-The execution of a file-wrapped component consists of the following three phases:
-
-- Generating an input file that contains OpenMDAO param values
-- Executing the external code
-- Parsing the output file and extracting values to place into OpenMDAO unkonwns
-
-A file-wrapped component must perform all three of these tasks in its ``solve_nonlinear``
-method.
-
-Presently, to create a file-wrapped component you must write some
-Python code, so you need a basic knowledge of Python to proceed.
-
-
-.. _`A-Note-on-Precision`:
-
-A Note on Precision
----------------------
-
-In a file-wrapped component, all key inputs for the external code come from an intermediate file
-that must be written. When generating the input file, it is important to prevent the loss of
-precision. Consider a variable with 15 digits of precision.
-
-::
-
-    >>> # Python 3 compatibility
-    >>> from __future__ import print_function
-    >>> val = 3.1415926535897932
-    >>>
-    >>> val
-    3.141592653589793...
-    >>>
-    >>> print(val)
-    3.14159265359
-    >>>
-    >>> print("%s" % str(val))
-    3.14159265359
-    >>>
-    >>> print("%f" % val)
-    3.141593
-    >>>
-    >>> print("%.16f" % val)
-    3.141592653589793...
-
-If the variable's value in the input file is created using the ``print``
-statement, only 11 digits of precision are in the generated output. The same
-is true if you convert the value to a string and use string output formatting.
-Printing the variable as a floating point number with no format string gives
-even less precision. To output the full precision of a variable, you must specify
-decimal precision using formatted output (i.e., ``"%.16f"``).
-
-Quibbling over the 11th--15th decimal place may sound unnecessary,
-but some applications are sensitive to changes of this magnitude. Moreover, it
-is important to consider how your component may be used during optimization. A
-gradient optimizer will often use a finite-difference scheme to calculate the
-gradients for a model, and this means that some component params might be
-subjected to small increments and decrements. A loss of precision here can
-completely change the calculated gradient and prevent the optimizer from
-reaching a correct minimum value.
-
-The file-wrapping utilities in OpenMDAO use ``"%.16g"``. If you write your own
-custom input-file generator for a new component, you should use this format
-for the floating point variables.
-
-Precision is also important when parsing the output, although the file-parsing
-utilities always grab the entire number. However, some codes limit the number of
-digits of precision in their output files for human readability. In such a case,
-you should check your external application's manual to see if there is a flag for
-telling the code to output the full precision.
-
+In that example, the input and output files were very simple, containing only
+the values of interest.  In the general case however, you may need to generate
+an input file with a specific format of rows and or columns and parse a similarly
+formatted output file for the values of teh outputs.
 
 .. _`Running-the-External-Code`:
 
@@ -965,6 +895,63 @@ delimiters back to the default:
 .. testcode:: Parse_Output
 
     parser.set_delimiters(" \t")
+
+
+.. _`A-Note-on-Precision`:
+
+A Note on Precision
+---------------------
+
+In a file-wrapped component, all key inputs for the external code come from an intermediate file
+that must be written. When generating the input file, it is important to prevent the loss of
+precision. Consider a variable with 15 digits of precision.
+
+::
+
+    >>> # Python 3 compatibility
+    >>> from __future__ import print_function
+    >>> val = 3.1415926535897932
+    >>>
+    >>> val
+    3.141592653589793...
+    >>>
+    >>> print(val)
+    3.14159265359
+    >>>
+    >>> print("%s" % str(val))
+    3.14159265359
+    >>>
+    >>> print("%f" % val)
+    3.141593
+    >>>
+    >>> print("%.16f" % val)
+    3.141592653589793...
+
+If the variable's value in the input file is created using the ``print``
+statement, only 11 digits of precision are in the generated output. The same
+is true if you convert the value to a string and use string output formatting.
+Printing the variable as a floating point number with no format string gives
+even less precision. To output the full precision of a variable, you must specify
+decimal precision using formatted output (i.e., ``"%.16f"``).
+
+Quibbling over the 11th--15th decimal place may sound unnecessary,
+but some applications are sensitive to changes of this magnitude. Moreover, it
+is important to consider how your component may be used during optimization. A
+gradient optimizer will often use a finite-difference scheme to calculate the
+gradients for a model, and this means that some component params might be
+subjected to small increments and decrements. A loss of precision here can
+completely change the calculated gradient and prevent the optimizer from
+reaching a correct minimum value.
+
+The file-wrapping utilities in OpenMDAO use ``"%.16g"``. If you write your own
+custom input-file generator for a new component, you should use this format
+for the floating point variables.
+
+Precision is also important when parsing the output, although the file-parsing
+utilities always grab the entire number. However, some codes limit the number of
+digits of precision in their output files for human readability. In such a case,
+you should check your external application's manual to see if there is a flag for
+telling the code to output the full precision.
 
 
 .. tags:: Tutorials, External Code, Wrapping
