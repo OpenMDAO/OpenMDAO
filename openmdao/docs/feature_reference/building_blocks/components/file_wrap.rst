@@ -15,16 +15,6 @@ In the :ref:`ExternalCode Example <externalcode_feature>` you saw how to
 define a component that calls an external program to perform it's computation,
 passing input and output values via files.
 
-In that example, the input and output files were very simple, containing only
-the values of interest.  In the general case however, you may need to generate
-an input file with a specific format of rows and or columns and parse a similarly
-formatted output file for the values of teh outputs.
-
-.. _`Running-the-External-Code`:
-
-Running the External Code
--------------------------
-
 The ExternalCode component takes care of the mundane tasks associated with
 executing the external application. These include:
 
@@ -36,7 +26,15 @@ executing the external application. These include:
 - Running the code on a remote server if required
 
 So we recommend that you always derive your file-wrapped component from the
-ExternalCode base class. This is explained in detail in :ref:`External-Code-Tutorial`.
+ExternalCode base class.
+
+In that basic example the input and output files were very simple, containing only
+the values of interest.  In the general case however, you may need to generate
+an input file with a specific format of rows and columns and parse a similarly
+formatted output file for the values of the outputs. To facilitate working with
+these more complex input and output files, OpenMDAO provides a couple of utility
+classes:  `InputFileGenerator` and `FileParser`.
+
 
 
 Generating the Input File - Templated File I/O

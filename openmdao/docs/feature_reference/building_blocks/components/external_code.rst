@@ -21,8 +21,8 @@ ExternalCode Options
     options
 
 
-ExternalCode Examples
----------------------
+ExternalCode Example
+--------------------
 
 In this example we will give an example based on a common scenario of a code that takes
 its inputs from an input file, performs some computations, and then writes the results

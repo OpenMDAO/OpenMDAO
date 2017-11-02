@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# usage: extcode_paraboloid input_filename output_filename
+# usage: extcode_paraboloid.py input_filename output_filename
 #
 # Read the values of `x` and `y` from input file
 # and write the value of `f_xy` to output file.
