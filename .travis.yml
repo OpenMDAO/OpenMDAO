@@ -85,7 +85,7 @@ install:
 #trying a manual install of pyoptsparse
 - pip install mercurial
 - hg clone https://bitbucket.org/mdolab/pyoptsparse
-- cd pyoptspare
+- cd pyoptsparse
 - python setup.py install
 - cd ..
 
