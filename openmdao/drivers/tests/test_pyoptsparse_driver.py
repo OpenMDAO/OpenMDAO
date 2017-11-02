@@ -987,7 +987,7 @@ class TestPyoptSparse(unittest.TestCase):
         if OPTIMIZER == 'SNOPT':
             prob.driver.opt_settings['Verify level'] = 3
         elif OPTIMIZER == 'SLSQP':
-            self.prob.driver.opt_settings['ACC'] = 1e-9
+            prob.driver.opt_settings['ACC'] = 1e-9
         prob.driver.options['print_results'] = False
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
