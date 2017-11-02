@@ -154,6 +154,7 @@ class Solver(object):
         self._iter_count = 0
 
         self.options = OptionsDictionary()
+        self.recording_options = OptionsDictionary()
         self.options.declare('maxiter', types=int, default=10,
                              desc='maximum number of iterations')
         self.options.declare('atol', default=1e-10,
@@ -165,20 +166,23 @@ class Solver(object):
         self.options.declare('err_on_maxiter', types=bool, default=False,
                              desc="When True, AnlysisError will be raised if we don't convege.")
         # Case recording options
-        self.options.declare('record_abs_error', types=bool, default=True,
-                             desc='Set to True to record absolute error at the solver level')
-        self.options.declare('record_rel_error', types=bool, default=True,
-                             desc='Set to True to record relative error at the solver level')
-        self.options.declare('record_solver_output', types=bool, default=False,
-                             desc='Set to True to record output at the solver level')
-        self.options.declare('record_solver_residuals', types=bool, default=False,
-                             desc='Set to True to record residuals at the solver level')
-        self.options.declare('record_metadata', types=bool, desc='Record metadata', default=True)
-        self.options.declare('includes', types=list, default=['*'],
-                             desc='Patterns for variables to include in recording')
-        self.options.declare('excludes', types=list, default=[],
-                             desc='Patterns for vars to exclude in recording '
-                                  '(processed post-includes)')
+        self.recording_options.declare('record_abs_error', types=bool, default=True,
+                                       desc='Set to True to record absolute error at the \
+                                       solver level')
+        self.recording_options.declare('record_rel_error', types=bool, default=True,
+                                       desc='Set to True to record relative error at the \
+                                       solver level')
+        self.recording_options.declare('record_solver_output', types=bool, default=False,
+                                       desc='Set to True to record output at the solver level')
+        self.recording_options.declare('record_solver_residuals', types=bool, default=False,
+                                       desc='Set to True to record residuals at the solver level')
+        self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
+                                       default=True)
+        self.recording_options.declare('includes', types=list, default=['*'],
+                                       desc='Patterns for variables to include in recording')
+        self.recording_options.declare('excludes', types=list, default=[],
+                                       desc='Patterns for vars to exclude in recording '
+                                       '(processed post-includes)')
         # Case recording related
         self._filtered_vars_to_record = {}
         self._norm0 = 0.0
