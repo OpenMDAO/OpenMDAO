@@ -112,8 +112,8 @@ if __name__ == '__main__':
     g = p.model
 
     if 'gmres' in sys.argv:
-        from openmdao.solvers.linear.scipy_iter_solver import ScipyIterativeSolver
-        p.root.linear_solver = ScipyIterativeSolver()
+        from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
+        p.root.linear_solver = ScipyKrylov()
 
     g.add_subsystem("P", IndepVarComp('x', numpy.ones(vec_size)))
 

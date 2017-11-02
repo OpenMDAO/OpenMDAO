@@ -1,34 +1,34 @@
 .. _petscKSP:
 
-********
-PetscKSP
-********
+***********
+PETScKrylov
+***********
 
-The PetscKSP is an iterative linear solver that wraps the linear solution methods found in PETSc via Petsc4py.
+The PETScKrylov is an iterative linear solver that wraps the linear solution methods found in PETSc via petsc4py.
 The default method is "fgmres", or the Flexible Generalized Minimal RESidual method, though you choose any of
 the other methods in PETSc. This linear solver is capable of handling any system topology very
 effectively. It also solves all subsystems below it in the hierarchy, so assigning different solvers to
 subsystems will have no effect on the solution at this level.
 
 This solver works under MPI, so it is a good alternative to
-:ref:`ScipyIterativeSolver <openmdao.solvers.linear.scipy_iter_solver.py>`.
+:ref:`ScipyKrylov <openmdao.solvers.linear.scipy_iter_solver.py>`.
 This solver is also re-entrant, so there are no problems if it is nested during preconditioning.
 
 Here, we calculate the total derivatives across the Sellar system.
 
 .. embed-test::
-    openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_specify_solver
+    openmdao.solvers.linear.tests.test_petsc_ksp.TestPETScKrylovSolverFeature.test_specify_solver
 
-PetscKSP Options
-----------------
+PETScKrylov Options
+-------------------
 
 .. embed-options::
     openmdao.solvers.linear.petsc_ksp
-    PetscKSP
+    PETScKrylov
     options
 
-PetscKSP Option Examples
-------------------------
+PETScKrylov Option Examples
+---------------------------
 
 **maxiter**
 
@@ -43,7 +43,7 @@ PetscKSP Option Examples
   soon.)
 
   .. embed-test::
-      openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_feature_maxiter
+      openmdao.solvers.linear.tests.test_petsc_ksp.TestPETScKrylovSolverFeature.test_feature_maxiter
 
 
 
@@ -58,7 +58,7 @@ PetscKSP Option Examples
   You may need to adjust this setting if you have abnormally large or small values in your global Jacobean.
 
   .. embed-test::
-      openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_feature_atol
+      openmdao.solvers.linear.tests.test_petsc_ksp.TestPETScKrylovSolverFeature.test_feature_atol
 
 **rtol**
 
@@ -71,7 +71,7 @@ PetscKSP Option Examples
   You may need to adjust this setting if you have abnormally large or small values in your global Jacobean.
 
   .. embed-test::
-      openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_feature_rtol
+      openmdao.solvers.linear.tests.test_petsc_ksp.TestPETScKrylovSolverFeature.test_feature_rtol
 
 **ksp_type**
 
@@ -79,7 +79,7 @@ PetscKSP Option Examples
   dictionary.  Here, we use 'gmres' instead.
 
   .. embed-test::
-      openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_specify_ksp_type
+      openmdao.solvers.linear.tests.test_petsc_ksp.TestPETScKrylovSolverFeature.test_specify_ksp_type
 
 Specifying a Preconditioner
 ---------------------------
@@ -93,13 +93,13 @@ Here, we add a Gauss Seidel preconditioner to the simple Sellar solution with Ne
 GMRES iterations is lower when using the preconditioner.
 
 .. embed-test::
-    openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_specify_precon
+    openmdao.solvers.linear.tests.test_petsc_ksp.TestPETScKrylovSolverFeature.test_specify_precon
 
 While the default preconditioning "side" is right-preconditioning, you can also use left-preconditioning provided that you choose
 a "ksp_type" that supports it. Here we solve the same problem with left-preconditioning using the Richardson method and a `DirectSolver`.
 
 .. embed-test::
-    openmdao.solvers.linear.tests.test_petsc_ksp.TestPetscKSPSolverFeature.test_specify_precon_left
+    openmdao.solvers.linear.tests.test_petsc_ksp.TestPETScKrylovSolverFeature.test_specify_precon_left
 
 
 .. tags:: Solver, LinearSolver

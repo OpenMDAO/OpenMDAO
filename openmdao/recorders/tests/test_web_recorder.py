@@ -10,8 +10,8 @@ import json
 from six import PY2, PY3
 
 from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, NonlinearBlockJac,\
-            NewtonSolver, NonLinearRunOnce, WebRecorder, Group, IndepVarComp, ExecComp, \
-            DirectSolver, ScipyIterativeSolver, PetscKSP, LinearBlockGS, LinearRunOnce, \
+            NewtonSolver, NonlinearRunOnce, WebRecorder, Group, IndepVarComp, ExecComp, \
+            DirectSolver, ScipyKrylov, PETScKrylov, LinearBlockGS, LinearRunOnce, \
             LinearBlockJac
 
 from openmdao.core.problem import Problem
@@ -100,7 +100,7 @@ class TestServerRecorder(unittest.TestCase):
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         mda = model.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
-        mda.linear_solver = ScipyIterativeSolver()
+        mda.linear_solver = ScipyKrylov()
         mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -113,7 +113,7 @@ class TestServerRecorder(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         mda.nonlinear_solver = NonlinearBlockGS()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
         model.add_design_var('x', lower=0.0, upper=10.0)
@@ -327,6 +327,31 @@ class TestServerRecorder(unittest.TestCase):
         self.assertEqual(driver_iteration_data['desvars'], [])
         self.assertEqual(driver_iteration_data['responses'], [])
         self.assertEqual(driver_iteration_data['constraints'], [])
+    
+    def test_only_sysincludes_recorded(self, m):
+        self.setup_endpoints(m)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
+
+        self.setup_sellar_model()
+
+        self.prob.driver.options['record_desvars'] = False
+        self.prob.driver.options['record_responses'] = False
+        self.prob.driver.options['record_objectives'] = False
+        self.prob.driver.options['record_constraints'] = False
+        self.prob.driver.options['system_includes'] = ['*']
+        self.prob.driver.add_recorder(recorder)
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+
+        driver_iteration_data = json.loads(self.driver_iteration_data)
+        self.assertEqual(len(driver_iteration_data['sysincludes']), 7)
+        self.assertEqual(driver_iteration_data['objectives'], [])
+        self.assertEqual(driver_iteration_data['desvars'], [])
+        self.assertEqual(driver_iteration_data['responses'], [])
+        self.assertEqual(driver_iteration_data['constraints'], [])
 
     def test_only_constraints_recorded(self, m):
         self.setup_endpoints(m)
@@ -381,10 +406,10 @@ class TestServerRecorder(unittest.TestCase):
 
         self.prob.model.add_recorder(recorder)
 
-        d1 = self.prob.model.get_subsystem('d1')  # instance of SellarDis1withDerivatives, a Group
+        d1 = self.prob.model.d1  # instance of SellarDis1withDerivatives, a Group
         d1.add_recorder(recorder)
 
-        obj_cmp = self.prob.model.get_subsystem('obj_cmp')  # an ExecComp
+        obj_cmp = self.prob.model.obj_cmp  # an ExecComp
         obj_cmp.add_recorder(recorder)
 
         self.prob.setup(check=False)
@@ -558,7 +583,7 @@ class TestServerRecorder(unittest.TestCase):
 
         model = self.prob.model
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
         model._nonlinear_solver.options['solve_subsystems'] = True
         model._nonlinear_solver.options['max_sub_solves'] = 4
@@ -591,7 +616,7 @@ class TestServerRecorder(unittest.TestCase):
 
         model = self.prob.model
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 4
@@ -717,7 +742,7 @@ class TestServerRecorder(unittest.TestCase):
         recorder = WebRecorder(self._accepted_token, suppress_output=True)
         self.setup_sellar_model()
 
-        self.prob.model.nonlinear_solver = NonLinearRunOnce()
+        self.prob.model.nonlinear_solver = NonlinearRunOnce()
         self.prob.model.nonlinear_solver.add_recorder(recorder)
 
         self.prob.setup(check=False)
@@ -796,7 +821,7 @@ class TestServerRecorder(unittest.TestCase):
 
         self.prob.model.nonlinear_solver = NewtonSolver()
         # used for analytic derivatives
-        self.prob.model.nonlinear_solver.linear_solver = ScipyIterativeSolver()
+        self.prob.model.nonlinear_solver.linear_solver = ScipyKrylov()
 
         linear_solver = self.prob.model.nonlinear_solver.linear_solver
         linear_solver.options['record_abs_error'] = True
@@ -965,14 +990,14 @@ class TestServerRecorder(unittest.TestCase):
         self.prob.driver.options['record_constraints'] = True
         self.prob.driver.add_recorder(recorder)
         # System
-        pz = self.prob.model.get_subsystem('pz')  # IndepVarComp which is an ExplicitComponent
+        pz = self.prob.model.pz  # IndepVarComp which is an ExplicitComponent
         pz.options['record_metadata'] = True
         pz.options['record_inputs'] = True
         pz.options['record_outputs'] = True
         pz.options['record_residuals'] = True
         pz.add_recorder(recorder)
         # Solver
-        mda = self.prob.model.get_subsystem('mda')
+        mda = self.prob.model.mda
         mda.nonlinear_solver.options['record_metadata'] = True
         mda.nonlinear_solver.options['record_abs_error'] = True
         mda.nonlinear_solver.options['record_rel_error'] = True
@@ -1074,7 +1099,7 @@ class TestServerRecorder(unittest.TestCase):
         prob['comp1.b'] = -4.
         prob['comp1.c'] = 3.
 
-        comp2 = prob.model.get_subsystem('comp2')  # ImplicitComponent
+        comp2 = prob.model.comp2  # ImplicitComponent
         comp2.add_recorder(recorder)
 
         t0, t1 = run_driver(prob)

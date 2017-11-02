@@ -8,7 +8,7 @@ import time
 import random
 
 from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, DefaultVector, \
-    ExecComp, ExplicitComponent, PETScVector, ScipyIterativeSolver, NonlinearBlockGS
+    ExecComp, ExplicitComponent, PETScVector, ScipyKrylov, NonlinearBlockGS
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped
@@ -31,7 +31,7 @@ class ParDerivTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = FanInGrouped()
         prob.model.linear_solver = LinearBlockGS()
-        prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x1')
         prob.model.add_design_var('iv.x2')
@@ -52,7 +52,7 @@ class ParDerivTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = FanInGrouped()
         prob.model.linear_solver = LinearBlockGS()
-        prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x1')
         prob.model.add_design_var('iv.x2')
@@ -73,7 +73,7 @@ class ParDerivTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = FanOutGrouped()
         prob.model.linear_solver = LinearBlockGS()
-        prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x')
         prob.model.add_constraint('c2.y', upper=0.0)
@@ -94,7 +94,7 @@ class ParDerivTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = FanOutGrouped()
         prob.model.linear_solver = LinearBlockGS()
-        prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x')
         prob.model.add_constraint('c2.y', upper=0.0)
@@ -115,7 +115,7 @@ class ParDerivTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = FanInGrouped()
         prob.model.linear_solver = LinearBlockGS()
-        prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x1', parallel_deriv_color='par_dv')
         prob.model.add_design_var('iv.x2', parallel_deriv_color='par_dv')
@@ -137,7 +137,7 @@ class ParDerivTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = FanOutGrouped()
         prob.model.linear_solver = LinearBlockGS()
-        prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x')
         prob.model.add_constraint('c2.y', upper=0.0, parallel_deriv_color='par_resp')

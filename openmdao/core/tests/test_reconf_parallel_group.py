@@ -3,7 +3,7 @@ import numpy as np
 import unittest
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, DefaultVector, ExecComp
-from openmdao.api import NewtonSolver, PetscKSP, NonlinearBlockGS, LinearBlockGS
+from openmdao.api import NewtonSolver, PETScKrylov, NonlinearBlockGS, LinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
 
 try:
@@ -23,7 +23,7 @@ class ReconfGroup(Group):
         self._mpi_proc_allocator.parallel = self.parallel
         if self.parallel:
             self.nonlinear_solver = NewtonSolver()
-            self.linear_solver = PetscKSP()
+            self.linear_solver = PETScKrylov()
         else:
             self.nonlinear_solver = NonlinearBlockGS()
             self.linear_solver = LinearBlockGS()
@@ -65,7 +65,7 @@ class Test(unittest.TestCase):
             print(prob['C2.z'])
 
         # Now, reconfigure so ReconfGroup is not parallel, and x0, x1 should be preserved
-        prob.model.get_subsystem('g').resetup('reconf')
+        prob.model.g.resetup('reconf')
         prob.model.resetup('update')
         prob.run_model()
         assert_rel_error(self, prob['C1.z'], 8.0, 1e-8)

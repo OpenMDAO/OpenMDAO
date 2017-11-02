@@ -6,7 +6,7 @@ from openmdao.api import ExplicitComponent
 class MomentOfInertiaComp(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare('num_elements', type_=int)
+        self.metadata.declare('num_elements', types=int)
         self.metadata.declare('b')
 
     def setup(self):
