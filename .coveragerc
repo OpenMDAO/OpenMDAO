@@ -7,12 +7,13 @@ exclude_lines =
     if __name__ == .__main__.:
 
 [run]
+include =
+    */openmdao/*
+
 omit =
-    */python?.?/*
-    */site-packages/nose/*
     */test/*
     */tests/*
-    openmdao/code_review/*
-    openmdao/devtools/*
-    openmdao/docs/*
-    openmdao/test_suite/*
+    */test_suite/*
+    */code_review/*
+    */devtools/*
+    */docs/*

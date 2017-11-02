@@ -83,10 +83,10 @@ class TestNumpyVec(unittest.TestCase):
         root = self.p.model
 
         if root.comm.size == 1:
-            comp1 = root.get_subsystem('C1')
-            comp2 = root.get_subsystem('C2')
-            comp3 = root.get_subsystem('C3')
-            comp4 = root.get_subsystem('C4')
+            comp1 = root.C1
+            comp2 = root.C2
+            comp3 = root.C3
+            comp4 = root.C4
 
             comp1._outputs['v1'] = 2.0
             comp2._outputs['v2'] = 4.0
@@ -129,7 +129,7 @@ class TestNumpyVec(unittest.TestCase):
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
-class TestPetscVec(TestNumpyVec):
+class TestPETScVec(TestNumpyVec):
 
     def setUp(self):
         group = GroupG()

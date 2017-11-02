@@ -129,7 +129,7 @@ class pyOptSparseDriver(Driver):
                              desc='Name of optimizers to use')
         self.options.declare('title', default='Optimization using pyOpt_sparse',
                              desc='Title of this optimization run')
-        self.options.declare('print_results', type_=bool, default=True,
+        self.options.declare('print_results', types=bool, default=True,
                              desc='Print pyOpt results if True')
         self.options.declare('gradient method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},

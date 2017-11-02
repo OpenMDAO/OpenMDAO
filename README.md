@@ -25,11 +25,13 @@ To use the OpenMDAO v0.x legacy version
 https://github.com/OpenMDAO/OpenMDAO-Framework
 
 
-# OpenMDAO 2.0
-This is an ALPHA version of OpenMDAO 2.0
+OpenMDAO 2.0.x
+--------------
 
-Our latest docs are available at [http://openmdao.org/twodocs](http://openmdao.org/twodocs)
-Our archived docs are available at [http://openmdao.org/twodocs/versions](http://openmdao.org/twodocs/versions)
+This is an ALPHA version of OpenMDAO 2.0.x
+
+Our latest docs are available at [http://openmdao.org/twodocs/versions/latest](http://openmdao.org/twodocs/versions/latest)
+Our archived 2.0.x docs are available at [http://openmdao.org/twodocs](http://openmdao.org/twodocs)
 
 
 

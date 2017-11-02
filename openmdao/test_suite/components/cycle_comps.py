@@ -84,19 +84,19 @@ class ExplicitCycleComp(ExplicitComponent):
         self.metadata.declare('partial_type', default='array',
                               values=['array', 'sparse', 'aij'],
                               desc='type of partial derivatives')
-        self.metadata.declare('num_var', type_=int, default=1,
+        self.metadata.declare('num_var', types=int, default=1,
                               desc='Number of variables per component')
-        self.metadata.declare('var_shape', type_=tuple, default=(3,),
+        self.metadata.declare('var_shape', types=tuple, default=(3,),
                               desc='Shape of each variable')
-        self.metadata.declare('index', type_=int,
+        self.metadata.declare('index', types=int,
                               desc='Index of the component. Used for testing implicit connections')
-        self.metadata.declare('connection_type', type_=str, default='explicit',
+        self.metadata.declare('connection_type', default='explicit',
                               values=['explicit', 'implicit'],
                               desc='How to connect variables.')
         self.metadata.declare('finite_difference', default=False,
-                              type_=bool,
+                              types=bool,
                               desc='If the derivatives should be finite differenced.')
-        self.metadata.declare('num_comp', type_=int, default=2,
+        self.metadata.declare('num_comp', types=int, default=2,
                               desc='Total number of components')
 
         self.angle_param = 'theta'

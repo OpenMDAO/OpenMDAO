@@ -4,6 +4,9 @@ import unittest
 
 from openmdao.devtools.testutil import assert_rel_error
 
+from openmdao.api import Problem, ScipyOptimizer
+from openmdao.test_suite.test_examples.beam_optimization.beam_group import BeamGroup
+
 
 class TestCase(unittest.TestCase):
 
@@ -33,3 +36,7 @@ class TestCase(unittest.TestCase):
         prob.run_driver()
 
         print(prob['inputs_comp.h'])
+
+
+if __name__ == "__main__":
+    unittest.main()

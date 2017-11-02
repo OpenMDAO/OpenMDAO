@@ -268,18 +268,18 @@ class System(object):
 
         # System options
         self.options = OptionsDictionary()
-        self.options.declare('record_inputs', type_=bool, default=True,
+        self.options.declare('record_inputs', types=bool, default=True,
                              desc='Set to True to record inputs at the system level')
-        self.options.declare('record_outputs', type_=bool, default=True,
+        self.options.declare('record_outputs', types=bool, default=True,
                              desc='Set to True to record outputs at the system level')
-        self.options.declare('record_residuals', type_=bool, default=True,
+        self.options.declare('record_residuals', types=bool, default=True,
                              desc='Set to True to record residuals at the system level')
-        self.options.declare('record_derivatives', type_=bool, default=False,
+        self.options.declare('record_derivatives', types=bool, default=False,
                              desc='Set to True to record derivatives at the system level')
-        self.options.declare('record_metadata', type_=bool, desc='Record metadata', default=True)
-        self.options.declare('includes', type_=list, default=['*'],
+        self.options.declare('record_metadata', types=bool, desc='Record metadata', default=True)
+        self.options.declare('includes', types=list, default=['*'],
                              desc='Patterns for variables to include in recording')
-        self.options.declare('excludes', type_=list, default=[],
+        self.options.declare('excludes', types=list, default=[],
                              desc='Patterns for vars to exclude in recording '
                                   '(processed post-includes)')
 

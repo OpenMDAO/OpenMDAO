@@ -4,7 +4,7 @@ import unittest
 import numpy
 
 from openmdao.api import ParallelGroup, Group, Problem, IndepVarComp, \
-    ExecComp, LinearBlockGS, ExplicitComponent, ImplicitComponent, PetscKSP
+    ExecComp, LinearBlockGS, ExplicitComponent, ImplicitComponent, PETScKrylov
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.devtools.testutil import assert_rel_error
@@ -316,7 +316,7 @@ class DistribStateImplicit(ImplicitComponent):
 
         self.local_size = sizes[rank]
 
-        self.linear_solver = PetscKSP()
+        self.linear_solver = PETScKrylov()
 
     def solve_nonlinear(self, i, o):
         o['states'] = i['a']

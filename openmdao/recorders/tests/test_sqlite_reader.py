@@ -10,7 +10,7 @@ from tempfile import mkdtemp, mkstemp
 import numpy as np
 
 from openmdao.test_suite.components.sellar import SellarDerivatives
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS, ScipyIterativeSolver, LinearBlockGS
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS, ScipyKrylov, LinearBlockGS
 from openmdao.recorders.sqlite_recorder import SqliteRecorder, format_version
 from openmdao.recorders.case_reader import CaseReader
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
@@ -90,7 +90,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         mda = model.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
-        mda.linear_solver = ScipyIterativeSolver()
+        mda.linear_solver = ScipyKrylov()
         mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -119,7 +119,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0]), ref=2.0), promotes=['z'])
 
         mda = model.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
-        mda.linear_solver = ScipyIterativeSolver()
+        mda.linear_solver = ScipyKrylov()
         mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -248,10 +248,10 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.prob.model.add_recorder(self.recorder)
 
-        d1 = self.prob.model.get_subsystem('d1')  # instance of SellarDis1withDerivatives, a Group
+        d1 = self.prob.model.d1  # instance of SellarDis1withDerivatives, a Group
         d1.add_recorder(self.recorder)
 
-        obj_cmp = self.prob.model.get_subsystem('obj_cmp')  # an ExecComp
+        obj_cmp = self.prob.model.obj_cmp  # an ExecComp
         obj_cmp.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
@@ -372,11 +372,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.prob.model.add_recorder(self.recorder)
 
-        pz = self.prob.model.get_subsystem('pz')  # IndepVarComp which is an ExplicitComponent
+        pz = self.prob.model.pz # IndepVarComp which is an ExplicitComponent
         pz.add_recorder(self.recorder)
 
-        mda = self.prob.model.get_subsystem('mda')  # Group
-        d1 = mda.get_subsystem('d1')
+        mda = self.prob.model.mda  # Group
+        d1 = mda.d1
         d1.add_recorder(self.recorder)
 
         self.prob.setup(check=False, mode='rev')
@@ -403,7 +403,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         linear_solver = self.prob.model.linear_solver
         linear_solver.add_recorder(self.recorder)
 
-        d1 = self.prob.model.get_subsystem('d1')  # instance of SellarDis1withDerivatives, a Group
+        d1 = self.prob.model.d1  # instance of SellarDis1withDerivatives, a Group
         d1.nonlinear_solver = NonlinearBlockGS()
         d1.nonlinear_solver.options['maxiter'] = 5
         d1.nonlinear_solver.add_recorder(self.recorder)

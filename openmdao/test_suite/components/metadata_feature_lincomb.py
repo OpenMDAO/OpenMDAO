@@ -9,8 +9,8 @@ from openmdao.api import ExplicitComponent
 class LinearCombinationComp(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare('a', default=1., type_=np.ScalarType)
-        self.metadata.declare('b', default=1., type_=np.ScalarType)
+        self.metadata.declare('a', default=1., types=np.ScalarType)
+        self.metadata.declare('b', default=1., types=np.ScalarType)
 
     def setup(self):
         self.add_input('x')
