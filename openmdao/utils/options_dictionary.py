@@ -89,7 +89,7 @@ class OptionsDictionary(object):
 
         The value of the option must satisfy the following:
         1. If values only was given when declaring, value must be in values.
-        2. If types only was given when declaring, value must satisfy isinstance(value, types)
+        2. If types only was given when declaring, value must satisfy isinstance(value, types).
         3. It is an error if both values and types are given.
 
         Parameters
