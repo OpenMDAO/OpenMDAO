@@ -1190,11 +1190,10 @@ class Problem(object):
                             deriv_val = np.zeros((sz, ncol))
                         else:
                             deriv_val = np.zeros(sz)
+                    elif ncol > 1:
+                        deriv_val = np.zeros((len(out_idxs), ncol))
                     else:
-                        if ncol > 1:
-                            deriv_val = np.zeros((len(out_idxs), ncol))
-                        else:
-                            deriv_val = np.zeros(len(out_idxs))
+                        deriv_val = np.zeros(len(out_idxs))
                 else:  # relevant output
                     if output_name in doutputs._views_flat:
                         deriv_val = doutputs._views_flat[output_name]
@@ -1216,15 +1215,12 @@ class Problem(object):
                                 sz = size
                             else:
                                 sz = sizes[root, out_var_idx]
-                            if ncol > 1:
-                                deriv_val = np.empty((sz, ncol))
-                            else:
-                                deriv_val = np.empty(sz, dtype=float)
+                            deriv_val = np.empty((sz, ncol))
                         self.comm.Bcast(deriv_val, root=root)
 
                 len_val = len(deriv_val)
 
-                if store and len(deriv_val.shape) == 1:
+                if store and ncol > 1 and len(deriv_val.shape) == 1:
                     deriv_val = np.atleast_2d(deriv_val).T
 
                 if return_format == 'flat_dict':
@@ -1485,6 +1481,7 @@ class Problem(object):
                 for input_name, old_input_name in vois:
                     dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
                         voi_info[input_name]
+                    ncol = dinputs._ncol
                     if i >= len(idxs):
                         idx = idxs[-1]  # reuse the last index
                         delta_loc_idx = 0  # don't increment local_idx
@@ -1514,9 +1511,14 @@ class Problem(object):
                                 out_var_idx = abs2idx_out[output_name]
                                 if output_name in remote_outputs:
                                     _, sz = remote_outputs[output_name]
-                                    deriv_val = np.zeros(sz)
                                 else:
-                                    deriv_val = np.zeros(sizes[iproc, out_var_idx])
+                                    sz = sizes[iproc, out_var_idx]
+                                if ncol > 1:
+                                    deriv_val = np.zeros((sz, ncol))
+                                else:
+                                    deriv_val = np.zeros(sz)
+                            elif ncol > 1:
+                                deriv_val = np.zeros((len(out_idxs), ncol))
                             else:
                                 deriv_val = np.zeros(len(out_idxs))
                         else:  # relevant output
@@ -1539,10 +1541,16 @@ class Problem(object):
                                         sz = size
                                     else:
                                         sz = sizes[root, out_var_idx]
-                                    deriv_val = np.empty(sz, dtype=float)
+                                    if ncol > 1:
+                                        deriv_val = np.empty((sz, ncol))
+                                    else:
+                                        deriv_val = np.empty(sz)
                                 self.comm.Bcast(deriv_val, root=root)
 
                         len_val = len(deriv_val)
+
+                        if store and ncol > 1 and len(deriv_val.shape) == 1:
+                            deriv_val = np.atleast_2d(deriv_val).T
 
                         if return_format == 'flat_dict':
                             if fwd:
@@ -1558,7 +1566,7 @@ class Problem(object):
                                 if totals[key] is None:
                                     totals[key] = np.zeros((loc_size, len_val))
                                 if store:
-                                    totals[key][loc_idx, :] = deriv_val
+                                    totals[key][loc_idx, :] = deriv_val.T
 
                         elif return_format == 'dict':
                             if fwd:
@@ -1574,7 +1582,7 @@ class Problem(object):
                                 if totals[old_input_name][ikey] is None:
                                     totals[old_input_name][ikey] = np.zeros((loc_size, len_val))
                                 if store:
-                                    totals[old_input_name][ikey][loc_idx, :] = deriv_val
+                                    totals[old_input_name][ikey][loc_idx, :] = deriv_val.T
                         else:
                             raise RuntimeError("unsupported return format")
 
