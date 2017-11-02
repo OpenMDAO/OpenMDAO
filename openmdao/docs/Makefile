@@ -57,9 +57,6 @@ all: mock redbaron
 	# Running things before docbuild
 	python _utils/preprocess_tags.py
 
-	# Doing the first command in the background does two builds in parallel
-	#       dev docs get built into tmp/moved into _build later
-	#       to avoid race to create dirs.
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 
 	@echo
