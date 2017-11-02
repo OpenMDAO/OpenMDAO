@@ -94,7 +94,7 @@ install:
 
 - if [ "$PY" = "3.4" ]; then
     wget https://bitbucket.org/mdolab/pyoptsparse/get/9af3264429b9.zip;
-    tar -xvf 99af3264429b9.zip;
+    unzip 99af3264429b9.zip;
     cd 99af3264429b9;
     python setup.py install;
     cd ..;
