@@ -88,9 +88,9 @@ class OptionsDictionary(object):
         Declare an option.
 
         The value of the option must satisfy the following:
-        1. If values and not types was given when declaring, value must be in values.
-        2. If types and not values was given when declaring, value must be an instance of a
-           type in types.
+        1. If values only was given when declaring, value must be in values.
+        2. If types only was given when declaring, value must satisfy isinstance(value, types).
+        3. It is an error if both values and types are given.
 
         Parameters
         ----------
