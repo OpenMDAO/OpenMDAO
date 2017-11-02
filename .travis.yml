@@ -78,11 +78,10 @@ install:
     cd ..;
   fi
 
-# if tip breaks, we once worked on commit 9af3264429b9
 - if [ "$PY" = "3.6" ]; then
-    wget https://bitbucket.org/mdolab/pyoptsparse/get/tip.zip;
-    unzip tip.zip;
-    cd mdolab-pyoptsparse-tip;
+    wget https://bitbucket.org/mdolab/pyoptsparse/get/9af3264429b9.zip;
+    unzip tip.9af3264429b9;
+    cd mdolab-pyoptsparse-9af3264429b9;
     python setup.py install;
     cd ..;
   fi
