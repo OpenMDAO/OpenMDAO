@@ -987,7 +987,7 @@ class TestPyoptSparse(unittest.TestCase):
         if OPTIMIZER == 'SNOPT':
             prob.driver.opt_settings['Verify level'] = 3
         elif OPTIMIZER == 'SLSQP':
-            prob.driver.opt_settings['ACC'] = 1e-9
+            prob.driver.opt_settings['ACC'] = 1e-3
         prob.driver.options['print_results'] = False
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
@@ -1001,7 +1001,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
-        assert_rel_error(self, prob['x'], 0.0, 1e-3)
+        assert_rel_error(self, prob['x'], 0.0, 4e-3)
 
     def test_sellar_analysis_error(self):
         # One discipline of Sellar will something raise analysis error. This is to test that
