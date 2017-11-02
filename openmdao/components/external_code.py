@@ -78,7 +78,7 @@ class ExternalCode(ExplicitComponent):
         self.return_code = 0  # Return code from the command
         self.stdin = self.DEV_NULL
         self.stdout = None
-        self.stderr = "error.out"
+        self.stderr = "external_code_error.out"
 
     def check_config(self, logger):
         """
@@ -101,11 +101,12 @@ class ExternalCode(ExplicitComponent):
                 logger.error("The command to be executed, '%s', "
                              "cannot be found" % program_to_execute)
 
-        # Check for missing input files
+        # Check for missing input files. This just generates a warning during
+        # setup, since these files may be generated during execution.
         missing = self._check_for_files(self.options['external_input_files'])
         if missing:
-            logger.error("The following input files are missing at setup "
-                         " time: %s" % missing)
+            logger.warning("The following input files are missing at setup "
+                           "time: %s" % missing)
 
     def compute(self, inputs, outputs):
         """

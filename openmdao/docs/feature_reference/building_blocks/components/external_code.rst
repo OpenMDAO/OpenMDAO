@@ -43,7 +43,7 @@ does the same computation as the :ref:`Paraboloid Tutorial <paraboloid_tutorial>
 
 
 .. embed-code::
-    openmdao.components.tests.external_code_feature_sample
+    openmdao.components.tests.extcode_paraboloid
 
 
 Next we need to build the OpenMDAO component that makes use of this external code.
@@ -69,10 +69,10 @@ Next we will go through each section and explain how this code works.
 
 OpenMDAO provides a base class, `ExternalCode`, which you should inherit from to
 build your wrapper components. Just like any other component, you will define the
-necessary inputs and outputs. If you
-want the component to check to make sure any files exist before/after you run
-then set the `external_input_files` and `external_output_files` respectively. You'll
-also define the command that should be called by the external code.
+necessary inputs and outputs in the `setup` method.
+If you want the component to check to make sure any files exist before/after you run
+then you can set the `external_input_files` and `external_output_files` respectively.
+You'll also define the command that should be called by the external code.
 
 .. embed-code::
     openmdao.components.tests.test_external_code.ParaboloidExternalCode.setup
@@ -88,8 +88,7 @@ code needed to do all that file writing, reading, and parsing.
     openmdao.components.tests.test_external_code.ParaboloidExternalCode.compute
 
 
-`ParaboloidExternalCode` is now complete. All that is left is to actually run
-it!
+`ParaboloidExternalCode` is now complete. All that is left is to actually run it!
 
 Setting up and running the model
 --------------------------------

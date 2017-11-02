@@ -10,6 +10,10 @@ File Wrapping
 Communicating with External Codes in OpenMDAO
 =============================================
 
+
+In the :ref:`ExternalCode Example <_externalcode_feature>` you saw how to
+define a component that calls an external program to perform it's computation.
+
 For many legacy codes, the only viable way to include them in an MDAO process
 is through file wrapping. In a file-wrapped component, the inputs are passed
 and the outputs are extracted via input and output files. To
@@ -962,4 +966,5 @@ delimiters back to the default:
 
     parser.set_delimiters(" \t")
 
-.. tags:: Tutorials
+
+.. tags:: Tutorials, External Code, Wrapping
