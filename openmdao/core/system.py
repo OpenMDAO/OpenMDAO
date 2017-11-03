@@ -1936,7 +1936,8 @@ class System(object):
 
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
-                       parallel_deriv_color=None, vectorize_derivs=False):
+                       parallel_deriv_color=None, vectorize_derivs=False,
+                       simul_coloring=None):
         r"""
         Add a design variable to this system.
 
@@ -1967,6 +1968,9 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
+        simul_coloring : ndarray or list of int
+            An array or list of integer color values.  Must match the size of the
+            design variable.
 
         Notes
         -----
@@ -2037,11 +2041,12 @@ class System(object):
         #       makes the flat_earth test run faster on one proc.
         if vectorize_derivs and parallel_deriv_color is None:
             dvs['parallel_deriv_color'] = '@matmat'
+        dvs['simul_coloring'] = simul_coloring
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None,
                      adder=None, scaler=None, linear=False, parallel_deriv_color=None,
-                     vectorize_derivs=False):
+                     vectorize_derivs=False, simul_coloring=None):
         r"""
         Add a response variable to this system.
 
@@ -2080,6 +2085,9 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
+        simul_coloring : ndarray or list of int
+            An array or list of integer color values.  Must match the size of the
+            response variable.
 
         Notes
         -----
@@ -2199,13 +2207,14 @@ class System(object):
         resp['vectorize_derivs'] = vectorize_derivs
         if vectorize_derivs and parallel_deriv_color is None:
             resp['parallel_deriv_color'] = '@matmat'
+        resp['simul_coloring'] = simul_coloring
 
         responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
                        indices=None, linear=False, parallel_deriv_color=None,
-                       vectorize_derivs=False):
+                       vectorize_derivs=False, simul_color=None):
         r"""
         Add a constraint variable to this system.
 
@@ -2240,6 +2249,9 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
+        simul_coloring : ndarray or list of int
+            An array or list of integer color values.  Must match the size of the
+            constraint variable.
 
         Notes
         -----
@@ -2255,7 +2267,7 @@ class System(object):
 
     def add_objective(self, name, ref=None, ref0=None, index=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
-                      vectorize_derivs=False):
+                      vectorize_derivs=False, simul_coloring=None):
         r"""
         Add a response variable to this system.
 
@@ -2282,6 +2294,9 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
+        simul_coloring : ndarray or list of int
+            An array or list of integer color values.  Must match the size of the
+            objective variable.
 
         Notes
         -----

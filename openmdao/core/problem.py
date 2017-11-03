@@ -1066,7 +1066,7 @@ class Problem(object):
         iproc = model.comm.rank
 
         for vois in itervalues(voi_lists):
-            for input_name, old_input_name, _, _ in vois:
+            for input_name, old_input_name, _, _, _ in vois:
                 vecname = inp2rhs_name[input_name]
                 if vecname not in input_vec:
                     continue
@@ -1258,10 +1258,19 @@ class Problem(object):
             if name in input_vois:
                 meta = input_vois[name]
                 parallel_deriv_color = meta['parallel_deriv_color']
+                simul_coloring = meta['simul_coloring']
                 matmat = (meta['vectorize_derivs'] and meta['size'] > 1)
             else:
-                parallel_deriv_color = None
+                parallel_deriv_color = simul_coloring = None
                 use_rel_reduction = False
+
+            if simul_coloring:
+                if parallel_deriv_color:
+                    raise RuntimeError("Using both simul_coloring and parallel_deriv_color with "
+                                       "variable '%s' is not supported." % name)
+                if matmat:
+                    raise RuntimeError("Using both simul_coloring and vectorize_derivs with "
+                                       "variable '%s' is not supported." % name)
 
             if parallel_deriv_color is None:  # variable is not in an parallel_deriv_color
                 if name in voi_lists:
@@ -1271,13 +1280,15 @@ class Problem(object):
                     # store the absolute name along with the original name, which
                     # can be either promoted or absolute depending on the value
                     # of the 'global_names' flag.
-                    voi_lists[name] = [(name, old_input_list[i], parallel_deriv_color, matmat)]
+                    voi_lists[name] = [(name, old_input_list[i], parallel_deriv_color, matmat,
+                                        simul_coloring)]
                     inp2rhs_name[name] = name if matmat else 'linear'
             else:
                 if parallel_deriv_color not in voi_lists:
                     voi_lists[parallel_deriv_color] = []
                 voi_lists[parallel_deriv_color].append((name, old_input_list[i],
-                                                        parallel_deriv_color, matmat))
+                                                        parallel_deriv_color, matmat,
+                                                        simul_coloring))
                 inp2rhs_name[name] = name
 
         lin_vec_names = sorted(set(inp2rhs_name.values()))
@@ -1288,24 +1299,35 @@ class Problem(object):
             # If Forward mode, solve linear system for each 'wrt'
             # If Adjoint mode, solve linear system for each 'of'
 
-            matmats = [m for _, _, _, m in vois]
+            matmats = [m for _, _, _, m, _ in vois]
             matmat = matmats[0]
             if any(matmats) and not all(matmats):
                 raise RuntimeError("Mixing of vectorized and non-vectorized derivs in the same "
                                    "parallel color group (%s) is not supported." %
-                                   [name for _, name, _, _ in vois])
+                                   [name for _, name, _, _, _ in vois])
+            simul_coloring = vois[0][4]
+
             if use_rel_reduction:
                 rel_systems = set()
-                for voi, _, _, _ in vois:
+                for voi, _, _, _, _ in vois:
                     rel_systems.update(relevant[voi]['@all'][1])
             else:
                 rel_systems = _contains_all
 
             if matmat:
                 idx_iter = range(1)
+            elif simul_coloring:
+                # here we're guaranteed that there is only one voi
+                input_name = vois[0][0]
+                info = voi_info(input_name)
+                dinputs = info[0]
+                colors = set(simul_coloring)
+                def idx_iter():
+                    for c in colors:
+                        yield np.nonzero(dinputs._views_flat[input_name][simul_coloring == c])
             else:
                 loc_idx_dict = defaultdict(lambda: -1)
-                max_len = max(len(voi_info[name][2]) for name, _, _, _ in vois)
+                max_len = max(len(voi_info[name][2]) for name, _, _, _, _ in vois)
                 idx_iter = range(max_len)
 
             for i in idx_iter:
@@ -1320,7 +1342,7 @@ class Problem(object):
                     if use_rel_reduction:
                         vec_dinput['linear'].set_const(0.0)
 
-                for input_name, old_input_name, pd_color, matmat in vois:
+                for input_name, old_input_name, pd_color, matmat, simul in vois:
                     dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
                         voi_info[input_name]
 
@@ -1330,6 +1352,9 @@ class Problem(object):
                             for ii, idx in enumerate(idxs):
                                 if start <= idx < end:
                                     dinputs._views_flat[input_name][idx - start, ii] = 1.0
+                    elif simul_coloring:
+                        final_idxs = np.logical_and(i >= start, i < end)
+                        dinputs._views_flat[input_name][i - start] = 1.0
                     else:
                         if i >= len(idxs):
                             # reuse the last index if loop iter is larger than current var size
@@ -1344,13 +1369,15 @@ class Problem(object):
 
                 model._solve_linear(lin_vec_names, mode, rel_systems)
 
-                for input_name, old_input_name, _, matmat in vois:
+                for input_name, old_input_name, _, matmat, simul in vois:
                     dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
                         dup, store = voi_info[input_name]
                     ncol = dinputs._ncol
 
                     if matmat:
                         loc_idx = loc_idxs
+                    elif simul:
+                        loc_idx = loc_idxs[i - start]
                     else:
                         if i >= len(idxs):
                             idx = idxs[-1]  # reuse the last index
