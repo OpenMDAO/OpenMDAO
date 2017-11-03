@@ -9,8 +9,16 @@ ExternalCode Component
 ExternalCode is a component that runs an external program in a subprocess on your operating system.
 
 If external programs do not have Python APIs, it is necessary to "file wrap" them.
-The `ExternalCode` is a utility component that makes file wrapping easier.
+The `ExternalCode` is a utility component that makes file wrapping easier by
+taking care of the mundane tasks associated with executing the external application.
+These include:
 
+- Making the system call using the Subprocess module
+- Redirecting `stdin, stdout,` and `stderr` to the user's specification
+- Capturing error codes
+- Defining environment variables
+- Handling timeout and polling
+- Running the code on a remote server if required
 
 ExternalCode Options
 --------------------
@@ -88,7 +96,7 @@ code needed to do all that file writing, reading, and parsing.
     openmdao.components.tests.test_external_code.ParaboloidExternalCode.compute
 
 
-`ParaboloidExternalCode` is now complete. All that is left is to actually run it!
+`ParaboloidExternalCode` is now complete. All that is left is to actually run it.
 
 Setting up and running the model
 --------------------------------
@@ -115,4 +123,4 @@ Setting up and running the model
         # Print the output
         print(top['p.f_xy'],)
 
-.. tags:: ExternalCode, FileWrap
+.. tags:: ExternalCode, File_Wrappping

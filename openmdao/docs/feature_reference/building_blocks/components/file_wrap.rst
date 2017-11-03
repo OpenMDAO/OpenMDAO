@@ -15,16 +15,6 @@ The :ref:`ExternalCode Example <externalcode_feature>` describes how to
 define a component that calls an external program to perform it's computation,
 passing input and output values via files.
 
-The ExternalCode component takes care of the mundane tasks associated with
-executing the external application. These include:
-
-- Making the system call using the Subprocess module
-- Redirecting `stdin, stdout,` and `stderr` to the user's specification
-- Capturing error codes
-- Defining environment variables
-- Handling timeout and polling
-- Running the code on a remote server if required
-
 The input and output files were very simple in that basic example, containing only
 the values of interest.  In the general case however, you will probably need to
 generate an input file with a specific format of rows and fields and to parse a
