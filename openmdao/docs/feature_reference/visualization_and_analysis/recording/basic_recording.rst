@@ -29,47 +29,27 @@ A basic example of how to set an option:
     prob.driver.recording_options['record_desvars'] = True
 
 
-General Recording Options
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-    recording_options['record_metadata'] :  bool(True)
-        Tells recorder whether to record variable attribute metadata.
-    recording_options['includes'] :  list of strings("*")
-        Patterns for variables to include in recording across all objects.
-    recording_options['excludes'] :  list of strings('')
-        Patterns for variables to exclude in recording across all objects (processed after includes).
-
 System Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-    recording_options['record_outputs'] \:  bool(True)
-        Tells recorder whether to record the outputs of a System.
-    recording_options['record_inputs'] :  bool(False)
-        Tells recorder whether to record the inputs of a System.
-    recording_options['record_residuals'] :  bool(False)
-        Tells recorder whether to record the residuals of a System.
+.. embed-options::
+    openmdao.core.system
+    System
+    recording_options
 
 Driver Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^
-    recording_options['record_desvars'] :  bool(True)
-        Tells recorder whether to record the desvars of a Driver.
-    recording_options['record_responses'] :  bool(False)
-        Tells recorder whether to record the responses of a Driver.
-    recording_options['record_objectives'] :  bool(False)
-        Tells recorder whether to record the objectives of a Driver.
-    recording_options['record_constraints'] :  bool(False)
-        Tells recorder whether to record the constraints of a Driver.
+.. embed-options::
+    openmdao.core.driver
+    Driver
+    recording_options
 
 Solver Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^
-    recording_options['record_abs_error'] :  bool(True)
-        Tells recorder whether to record the absolute error of a Solver.
-    recording_options['record_rel_error'] :  bool(True)
-        Tells recorder whether to record the relative error of a Solver.
-    recording_options['record_solver_output'] :  bool(False)
-        Tells recorder whether to record the output of a Solver.
-    recording_options['record_solver_residuals'] :  bool(False)
-        Tells recorder whether to record the derivatives of a Solver.
+.. embed-options::
+    openmdao.solvers.solver
+    Solver
+    recording_options
 
 
 How To Attach a Recorder to an Object

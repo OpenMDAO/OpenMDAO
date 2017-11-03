@@ -112,9 +112,6 @@ class Driver(object):
         self.recording_options.declare('record_constraints', types=bool, default=False,
                                        desc='Set to True to record constraints at the \
                                        driver level')
-        self.recording_options.declare('system_includes', types=list, default=[],
-                                       desc='Patterns for System outputs to include in '
-                                       'recording of Driver iterations')
         self.recording_options.declare('includes', types=list, default=[],
                                        desc='Patterns for variables to include in recording')
         self.recording_options.declare('excludes', types=list, default=[],
