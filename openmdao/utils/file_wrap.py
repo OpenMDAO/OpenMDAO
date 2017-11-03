@@ -136,7 +136,7 @@ class _SubHelper(object):
 
     def replace_array(self, text):
         """
-        Replace array of text in file.
+        Replace array of text values in file.
 
         This function should be passed to re.sub.
 

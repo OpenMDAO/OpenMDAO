@@ -11,7 +11,7 @@ Communicating with External Codes in OpenMDAO
 =============================================
 
 
-In the :ref:`ExternalCode Example <externalcode_feature>` you saw how to
+The :ref:`ExternalCode Example <externalcode_feature>` describes how to
 define a component that calls an external program to perform it's computation,
 passing input and output values via files.
 
@@ -25,36 +25,30 @@ executing the external application. These include:
 - Handling timeout and polling
 - Running the code on a remote server if required
 
-So we recommend that you always derive your file-wrapped component from the
-ExternalCode base class.
-
-In that basic example the input and output files were very simple, containing only
-the values of interest.  In the general case however, you may need to generate
-an input file with a specific format of rows and columns and parse a similarly
-formatted output file for the values of the outputs. To facilitate working with
-these more complex input and output files, OpenMDAO provides a couple of utility
-classes:  `InputFileGenerator` and `FileParser`.
+The input and output files were very simple in that basic example, containing only
+the values of interest.  In the general case however, you will probably need to
+generate an input file with a specific format of rows and fields and to parse a
+similarly formatted output file to get the output values. To facilitate working
+with these more complex input and output files, OpenMDAO provides a couple of utility
+classes: `InputFileGenerator` and `FileParser`.
 
 
+Generating the Input File
+-------------------------
 
-Generating the Input File - Templated File I/O
-----------------------------------------------
-
-You can generate an input file for an external application two different ways. The
-first way is to write the file completely from scratch using the new values that are
+You can generate an input file for an external application in a few different ways.
+One way is to write the file completely from scratch using the new values that are
 contained in the component's variables. Not much can be done to aid with this task, as
 it requires knowledge of the file format and can be completed using Python's standard
-formatted output. One exception to this is the Fortran namelist, which is more of a
-standard output format. The next section mentions some tools to help create namelist
-input files.
+formatted output.
 
-The second way to generate an input file is by templating. A *template* file is
+A second way to generate an input file is by templating. A *template* file is
 a sample input file which can be processed by a templating engine to insert
 new values in the appropriate locations. Often the template file is a valid
 input file before being processed, although other times it contains directives
 or conditional logic to guide the generation. Obviously this method works well
 for cases where only a small number of the possible variables and settings are
-being manipulated by outside components.
+being manipulated.
 
 OpenMDAO includes a basic templating capability that allows a template file to
 be read, fields to be replaced with new values, and an input file to be
@@ -74,11 +68,10 @@ template file. The templating object is called `InputFileGenerator`, and it
 includes methods that can replace specific fields as measured by their row
 and field numbers.
 
-To use the InputFileGenerator object, first instantiate it and give it the name of
+To use the InputFileGenerator, first instantiate it and give it the name of
 the template file and the name of the output file that you want to produce. (Note
-that this code must be placed in the ``execute`` method of your component
-*before* the external code is run. See :ref:`Running-the-External-Code`.) The
-code will generally look like this:
+that this code must be placed in the ``compute`` method of your component *before*
+the external code is run.) The code will generally look like this:
 
 ::
 
@@ -113,8 +106,8 @@ input file.
     parser.data.append("10.1 20.2 30.3")
     parser.data.append("A B C")
 
-Let's say you want to grab and replace the second integer with a 7. The code
-would look like this.
+Let's say you want to replace the second integer in the input file above
+with a 7. The code would look like this.
 
 .. testcode:: Parse_Input
 
@@ -139,10 +132,11 @@ would look like this.
 .. index:: mark_anchor
 
 The method ``mark_anchor`` is used to define an anchor, which becomes the
-starting point for the ``transfer_var`` method. Here you find the second field in
-the first line down from the anchor and replace it with the new value.
+starting point for the ``transfer_var`` method. Here you find the first line
+down from the anchor, then the second field on that line and replace it with
+the new value.
 
-Now, what if you want to replace the third value of the floating point numbers
+Now, if you want to replace the third value of the floating point numbers
 after the second ``INPUT`` statement. An additional argument can be passed to the
 ``mark_anchor`` method to tell it to start at the second instance of the text
 fragment ``"INPUT"``.
@@ -270,8 +264,7 @@ array in a template to add more terms.
     A B C
 
 The named argument ``sep`` defines which separator to include between the
-additional terms of the array. Future revisions of InputFileGenerator will
-hopefully be able to detect this automatically.
+additional terms of the array.
 
 The input file templating capability that comes with OpenMDAO is basic but quite
 functional. If you need a more powerful templating engine, particularly one that
@@ -285,143 +278,13 @@ one of the community-developed engines, such as mako_ or django_.
 .. todo:: Include some examples with one of the templating engines.
 
 
-.. index:: Fortran namelists
-
-Generating the Input File - Fortran Namelists
----------------------------------------------
-
-Since legacy Fortran codes are expected to be frequent candidates for
-file wrapping, OpenMDAO includes a library for reading and generating Fortran
-namelist. The syntax for a namelist varies somewhat depending on the
-Fortran implementation, but the format generally looks like this:
-
-::
-
-   NAMEIn
-   ! Comment string
-   &GROUP1
-    XREAL =  1.0e33,
-    XINT = 2,
-    XCHAR = 'namelist',
-    XBOOL = T/
-   &GROUP2
-    AREAL =  1.  1.  2.  3.,
-    AINT = 2 2 3 4,
-    ACHAR = 'aaa' 'bbb' 'ccc' ' ddd',
-    ABOOL = T T F F/
-
-The namelist utility includes methods to generate a valid namelist file from a
-component's set of input variables. Other methods can parse a
-namelist file and load the variable data back into an OpenMDAO component's
-variables (which can be useful for populating a component with new values).
-
-For example, consider a component whose parmeters include five variables of
-various types. A component that writes out an input file as a single
-namelist called `MAIN` would look like this:
-
-.. testcode:: Namelist
-
-    from numpy import array
-
-    from openmdao.api import ExternalCode
-    from openmdao.util.namelist_util import Namelist
-
-    class WrappedComp(ExternalCode):
-        """A simple file wrapper."""
-
-        def __init__(self):
-            super(VarComponent, self).__init__()
-
-            self.add_param('xreal', 35.6, desc='A floating point input')
-            self.add_param('xint', 88, pass_by_obj=True, desc='An integer input')
-            self.add_param('xchar', "Hello", pass_by_obj=True, desc='A string input')
-            self.add_param('xbool', True, pass_by_obj=True, desc='A boolean input')
-            self.add_param('areal', array([1.0, 1.0, 2.0, 3.0]), pass_by_obj=True, desc='An array input')
-
-        def solve_nonlinear(self, params, unknowns, resids):
-            """ Executes our file-wrapped component. """
-
-            self.stdin = "FileWrapTemplate.txt"
-            sb = Namelist(self)
-            sb.set_filename(self.stdin)
-
-            # Add a Title Card
-            sb.set_title("My Title")
-
-            # Add a group. Subsequent variables are in this group
-            sb.add_group('main')
-
-            # Toss in a comment
-            sb.add_comment(' ! Comment goes here')
-
-            # Add all the variables
-            sb.add_var("xreal")
-            sb.add_var("xint")
-            sb.add_var("xchar")
-            sb.add_var("xbool")
-            sb.add_var("areal")
-
-            # Add an internal variable
-            sb.add_newvar("Py", 3.14)
-
-            # Generate the input file
-            sb.generate()
-
-Note that this component is derived from ``ExternalCode`` and uses a few of its
-features, so it is important to read :ref:`Running-the-External-Code` before
-proceeding.
-
-In the ``solve_nonlinear`` method, a Namelist object is instantiated. This
-object allows you to sequentially build up a namelist input file. The only
-argument is `self`, which is passed because the Namelist object needs to
-access your component's OpenMDAO param vectors to access the data. The
-``set_filename`` method is used to set the name of the input file that will
-be written. Here, you just pass it the variable ``self.stdin``, which is part
-of the ExternalCode API.
-
-The first card you create for the ``Namelist`` is the title card, which is
-optionally assigned with the ``set_title`` method. After this, the first
-namelist group is declared with the ``add_group`` method. Subsequent variables
-are added to this namelist grouping. If ``add_group`` is called again, the
-current group is closed, and any further variables are added to the new one.
-
-The ``add_var`` method is used to add a variable to the ``Namelist``. The only
-needed argument is the variable's name in the component. The variable's type
-is used to determine what kind of namelist variable to output. If you need to
-add something to the namelist that isn't contained in one of the component's
-variables, then use the ``add_newvar`` method, giving it a name and a value as
-arguments. This method is what you will use if your variable has a different
-name in your component than in the namelist file (i.e., you may have decided
-to use a more descriptive name in Openmdao instead of the original cryptic
-6-character Fortran name.)
-
-Another method, ``add_comment``, lets you add a comment to the
-namelist. Of course, this isn't an essential function, but there are times you
-may want to add comments to enhance readability. The comment text should
-include the comment character. Note that the namelist format doesn't require a
-comment character, but it's still a good practice.
-
-Finally, once every variable, group, and comment have been assigned, use the
-``generate`` method to create the input file. If a variable was entered
-incorrectly, or if you have given it a variable type that it doesn't know how
-to handle (e.g., an Instance or a custom variable), an exception will be
-raised. Otherwise, the input file is created, and your ``execute`` method can
-move on to running your code.
-
-*Parsing a Namelist File*
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The Namelist object also includes some functions for parsing a namelist file
-and loading the variable values into a component's unknowns. Doing this can
-be useful for loading in models that were developed when your code was
-executed standalone.
-
 Parsing the Output File
 -----------------------
 
 When an external code is executed, it typically outputs the results into a
-file. OpenMDAO includes a few things to ease the task of extracting the
-important information from a file.
+file. OpenMDAO includes a utility called `FileParser`, which contains functions
+for parsing a file, extracting the fields you specify, and converting them to the
+appropriate data type.
 
 *Basic Extraction*
 ~~~~~~~~~~~~~~~~~~~
@@ -438,10 +301,8 @@ text-file output:
     STRESS 11 22 33 44 55 66
     DISPLACEMENT 1.0 2.0 3.0 4.0 5.0
 
-As part of the file wrap, you need to reach into this file and grab the information
-that is needed by downstream components in the model. OpenMDAO includes an
-object called `FileParser`, which contains functions for parsing a file, grabbing
-the fields you specify, and applying them to the appropriate data type. For this to
+As part of the file wrap, you need to reach into this file and extract the information
+that is needed by downstream components in the model. For this to
 work, the file must have some general format that would allow you to locate the
 piece of data you need relative to some constant feature in the file. In other
 words, the main capability of the FileParser is to locate and extract a set of
@@ -457,8 +318,7 @@ characters that is some number of lines and some number of fields away from an
 
 To use the FileParser object, first instantiate it and give it the name of the
 output file. (Note that this code must be placed in your component's
-``execute`` function *after* the external code has been run. See
-:ref:`Running-the-External-Code`.)
+``compute`` function *after* the external code has been run.
 
 .. testcode:: Parse_Output
     :hide:
@@ -479,7 +339,7 @@ output file. (Note that this code must be placed in your component's
     parser.data.append("STRESS 11 22 33 44 55 66")
     parser.data.append("DISPLACEMENT 1.0 2.0 3.0 4.0 5.0")
 
-Say you want to grab the first ``STRESS`` value from each load case in the file
+Say you want to extract the first ``STRESS`` value from each load case in the file
 snippet shown above. The code would look like this. (Note: in this example the print
 statement is there only for display.)
 
@@ -496,12 +356,12 @@ statement is there only for display.)
     1.3334e+07 is a <... 'float'>
 
 The method ``mark_anchor`` is used to define an anchor, which becomes the
-starting point for the ``transfer_var`` method. Here, you grab the value from the
+starting point for the ``transfer_var`` method. Here, you extract the value from the
 second field in the first line down from the anchor. The parser is smart enough to
 recognize the number as floating point and to create a Python float variable.
 The final statement assigns this value to the component variable `xreal`.
 
-The third value of ``STRESS`` is `NaN`. If you want to grab that element, you can type
+The third value of ``STRESS`` is `NaN`. If you want to extract that element, you can type
 this:
 
 ::
@@ -531,7 +391,7 @@ underflows, etc., and take action. NumPy includes the functions ``isnan`` and ``
 
     True
 
-When the data is not a number, it is recognized as a string. Grab the
+When the data is not a number, it is recognized as a string. extract the
 word ``DISPLACEMENT``.
 
 .. testcode:: Parse_Output
@@ -546,7 +406,7 @@ word ``DISPLACEMENT``.
 
     DISPLACEMENT
 
-Now, what if you want to grab the value of stress from the second load case? An
+Now, what if you want to extract the value of stress from the second load case? An
 additional argument can be passed to the ``mark_anchor`` method telling it to
 start at the second instance of the text fragment ``"LOAD CASE"``.
 
@@ -600,7 +460,7 @@ There is a shortcut for extracting data that is stored as ``Key Value`` or
     2.1
 
 The method ``transfer_keyvar`` finds the first occurrence of the *key* string
-after the anchor (in this case, the word ``DISPLACEMENT``), and grabs the
+after the anchor (in this case, the word ``DISPLACEMENT``), and extracts the
 specified field value. This can be useful in cases where variables are found
 on lines that are uniquely named, particularly where you don't always know how
 many lines the key will occur past the anchor location. There are two optional
@@ -623,7 +483,7 @@ text-file output:
     STRESS 11 22 33 44 55 66
     DISPLACEMENT 1.0 2.0 3.0 4.0 5.0
 
-This time, grab all of the displacements in one read and store
+This time, extract all of the displacements in one read and store
 them as an array. You can do this with the ``transfer_array`` method.
 
 .. testcode:: Parse_Output
@@ -727,11 +587,11 @@ entered instead of the field number. Delimiters are discussed in the next sectio
 When the parser counts fields in a line of output, it determines the field
 boundaries by comparing against a set of delimiters. These delimiters can be
 changed using the ``set_delimiters`` method. By default, the delimiters are the
-general white space characters space (``" "``) and tab (``"\\t"``). The newline characters
-(``"\\n"`` and ``"\\r"``) are always removed regardless of the delimiter status.
+general white space characters space (``" "``) and tab (``"\t"``). The newline characters
+(``"\n"`` and ``"\r"``) are always removed regardless of the delimiter status.
 
-One common case that will require a change in the default delimiter is the comma
-separated file (i.e, csv). Here's an example of such an output file:
+One common case that will require a change in the default delimiter is comma
+separated values (i.e. `csv`). Here's an example of such an output file:
 
 ::
 
@@ -746,7 +606,7 @@ separated file (i.e, csv). Here's an example of such an output file:
     parser.data.append("3,7,2,4,5,6")
     parser.reset_anchor()
 
-Try grabbing the first element without changing the delimiters:
+Try extracting the first element without changing the delimiters:
 
 .. testcode:: Parse_Output
 
@@ -895,7 +755,22 @@ delimiters back to the default:
     parser.set_delimiters(" \t")
 
 
-.. _`A-Note-on-Precision`:
+.. index:: Fortran namelists
+
+A Special Case - Fortran Namelists
+----------------------------------
+
+Since legacy Fortran codes are expected to be frequent candidates for
+file wrapping, you may also consider using the f90nml_ package for reading
+and writing files to wrap those codes. This package enables the creation and
+manipulation of namelist files using the common Python dictionary interface.
+
+.. _f90nml: https://f90nml.readthedocs.io/en/latest/
+
+.. todo:: Include an example with f90nml.
+
+
+.. _A-Note-on-Precision:
 
 A Note on Precision
 ---------------------
@@ -946,10 +821,10 @@ custom input-file generator for a new component, you should use this format
 for the floating point variables.
 
 Precision is also important when parsing the output, although the file-parsing
-utilities always grab the entire number. However, some codes limit the number of
+utilities always extract the entire number. However, some codes limit the number of
 digits of precision in their output files for human readability. In such a case,
 you should check your external application's manual to see if there is a flag for
 telling the code to output the full precision.
 
 
-.. tags:: Tutorials, External Code, Wrapping
+.. tags:: ExternalCode, FileWrap

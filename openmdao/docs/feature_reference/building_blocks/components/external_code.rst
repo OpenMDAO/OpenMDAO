@@ -115,4 +115,4 @@ Setting up and running the model
         # Print the output
         print(top['p.f_xy'],)
 
-.. tags:: Tutorials, External Code, Wrapping
+.. tags:: ExternalCode, FileWrap

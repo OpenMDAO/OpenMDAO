@@ -103,7 +103,6 @@ class TestCase(unittest.TestCase):
         else:
             self.fail('RuntimeError expected')
 
-
     def test_templated_input_same_anchors(self):
 
         template = "CQUAD4 1 3.456\n" + \
@@ -348,7 +347,6 @@ class TestCase(unittest.TestCase):
         else:
             self.fail('ValueError expected')
 
-
     def test_output_parse_array(self):
 
         data = "Anchor\n" + \
@@ -397,7 +395,6 @@ class TestCase(unittest.TestCase):
             self.assertEqual(str(err), msg)
         else:
             self.fail('ValueError expected')
-
 
     def test_output_parse_2Darray(self):
 
@@ -593,10 +590,5 @@ class TestCase(unittest.TestCase):
         self.assertEqual(val, '#$%')
 
 
-
-if __name__ == '__main__':
-    import nose
-    import sys
-    sys.argv.append('--cover-package=openmdao')
-    sys.argv.append('--cover-erase')
-    nose.runmodule()
+if __name__ == "__main__":
+    unittest.main()
