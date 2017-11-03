@@ -193,16 +193,16 @@ class ParaboloidExternalCode(ExternalCode):
 class TestExternalCodeFeature(unittest.TestCase):
 
     def setUp(self):
-        os.chdir(DIRECTORY)
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix='test_extcode_feature-')
+        os.chdir(self.tempdir)
+        shutil.copy(os.path.join(DIRECTORY, 'external_code_feature_sample.py'),
+                    os.path.join(self.tempdir, 'external_code_feature_sample.py'))
 
     def tearDown(self):
-        import os
+        os.chdir(self.startdir)
         try:
-            os.remove('paraboloid_input.dat')
-        except OSError:
-            pass
-        try:
-            os.remove('paraboloid_output.dat')
+            shutil.rmtree(self.tempdir)
         except OSError:
             pass
 
