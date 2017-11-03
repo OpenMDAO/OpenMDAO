@@ -9,7 +9,7 @@ import numpy as np
 try:
     from openmdao.utils.mpi import MPI
 except ImportError:
-    MPI = False
+    MPI = None
 
 
 class RecordingManager(object):
