@@ -245,8 +245,8 @@ class Driver(object):
             myresponses = {n for n in self._responses
                            if check_path(n, incl, excl, rec_responses)}
 
-        # get the system_includes that were requested for this Driver recording
-        if self.recording_options['includes']:
+        # get the includes that were requested for this Driver recording
+        if incl:
             prob = self._problem
             root = prob.model
             # The my* variables are sets
@@ -633,28 +633,33 @@ class Driver(object):
 
         # Get the data to record
         data = {}
-        if self.recording_options['record_desvars'] or self.recording_options['includes']:
-            # collective call that gets across all ranks
+        if self.recording_options['includes']:
             desvars = self.get_design_var_values()
-        else:
-            desvars = {}
-        # return
-
-        if self.recording_options['record_responses'] or self.recording_options['includes']:
-            # responses = self.get_response_values() # not really working yet
-            responses = {}
-        else:
-            responses = {}
-
-        if self.recording_options['record_objectives'] or self.recording_options['includes']:
             objectives = self.get_objective_values()
-        else:
-            objectives = {}
-
-        if self.recording_options['record_constraints'] or self.recording_options['includes']:
             constraints = self.get_constraint_values()
-        else:
-            constraints = {}
+            responses = {}
+        else:    
+            if self.recording_options['record_desvars']:
+                # collective call that gets across all ranks
+                desvars = self.get_design_var_values()
+            else:
+                desvars = {}
+
+            if self.recording_options['record_responses']:
+                # responses = self.get_response_values() # not really working yet
+                responses = {}
+            else:
+                responses = {}
+
+            if self.recording_options['record_objectives']:
+                objectives = self.get_objective_values()
+            else:
+                objectives = {}
+
+            if self.recording_options['record_constraints']:
+                constraints = self.get_constraint_values()
+            else:
+                constraints = {}
 
         desvars = {name: desvars[name]
                    for name in self._filtered_vars_to_record['des']}

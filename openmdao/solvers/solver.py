@@ -158,7 +158,7 @@ class Solver(object):
         self.options.declare('maxiter', types=int, default=10,
                              desc='maximum number of iterations')
         self.options.declare('atol', default=1e-10,
-                                       desc='absolute error tolerance')
+                             desc='absolute error tolerance')
         self.options.declare('rtol', default=1e-10,
                              desc='relative error tolerance')
         self.options.declare('iprint', types=int, default=1,

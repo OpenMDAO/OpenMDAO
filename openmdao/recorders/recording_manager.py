@@ -11,6 +11,7 @@ try:
 except ImportError:
     MPI = False
 
+
 class RecordingManager(object):
     """
     Object that routes function calls to all attached recorders.
