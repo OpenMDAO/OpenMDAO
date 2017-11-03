@@ -11,9 +11,8 @@ language: generic
 
 env:
 - PY=2.7 MPI=1
-- PY=3.4 MPI=1
+- PY=3.6 MPI=1
 - PY=2.7 MPI=
-- PY=3.4 MPI=
 - PY=3.6 MPI=
 
 addons:
@@ -34,6 +33,8 @@ notifications:
     secure: Dd+tpZkz48Q47Y+PtdL4b+KAs55PsvWjt9ybhip6xljhA5kVsba9oZS+KsAC8RLWSzVJLOSjz3Cu3MsRym4sTd/g4Pbqyh0ldK2Xnl+n2JOgpPFSXtFuH4Ln3uWB6kYtUK6+aGIC8qhbvEt8tukTBT0RduEmdRyVIZ3oN7YjETPSZXvujeiUFLssfpZW2mqoA/tIgJHFSlySAp6J5694t2Z/p8sHOrK8G/Nm+qlk4xqXHvJ3xablcSBG4BZCrpqmMMdTLXBt2E2K9Rc1P2ZBIrSHVWfSLx+4n79U2385+og7miN1Zuf3gY3YuGKIwnBTtEzTu20905idkr4QdKELCBEcU4azdznwjvUkXWkiFAJII9UELTluSQmZX602zWk4AgJNeHxhN3EbBSMezfYVZjprhlAlwnZZv6t4qAkvuzb7KOA4s679xWzWOBOn1wkynfIF8A66APqssveyz/PvZHSjnHQoLgMU+kwzoX759o0Z/HuRlhCcjv0W9DWxU2bFNi/zVh9YyvR8fG15biGthzOyuf+CHjxohw+J6M+YdR1RIf1g/60nGUPHx4j4SN3kEFPmEDxzZT/f349gvaZGOmKXBi0wH8iY/i9RinM9LJB4t6chj2MkKwUA26bYaVaIO6FYPfE7r+tTG6OXdck4voCs/s4aa9VKEX97yhh0i9g=
 
 before_install:
+- pip install --upgrade pip;
+
 - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
     openssl aes-256-cbc -K $encrypted_74d70a284b7d_key -iv $encrypted_74d70a284b7d_iv -in travis_deploy_rsa.enc -out /tmp/travis_deploy_rsa -d;
   fi
@@ -65,22 +66,15 @@ before_install:
   fi
 
 install:
-- conda install --yes python=$PY numpy==1.11.2 scipy nose sphinx mock swig
-- if [ "$OS" = "Linux" ]; then
-    if [ "$PY" = "2.7" ]; then
-      pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp27-none-linux_x86_64.whl;
-    elif [ "$PY" = "3.4" ]; then
-      pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py3-none-linux_x86_64.whl;
-    fi
-  fi
+# keeping numpy pinned at 1.12 because pySNOPT dies with 1.13 because numpy broke callback
+- conda install --yes python=$PY numpy==1.12 scipy nose sphinx mock swig
 
-- if [ "$OS" = "MacOSX" ]; then
-    if [ "$PY" = "2.7" ]; then
-      pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py2-none-macosx_10_5_x86_64.whl;
-    elif [ "$PY" = "3.4" ]; then
-      pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp34-none-macosx_10_5_x86_64.whl;
-    fi
-  fi
+# trying a manual install of pyoptsparse
+- wget https://bitbucket.org/mdolab/pyoptsparse/get/tip.zip;
+- unzip tip.zip;
+- cd mdolab-pyoptsparse*;
+- python setup.py install;
+- cd ..;
 
 - if [ "$MPI" ]; then
     pip install mpi4py;
