@@ -66,25 +66,15 @@ before_install:
   fi
 
 install:
-# keeping numpy pinned at 1.12 because snopt dies with 1.13 because numpy broke callback
+# keeping numpy pinned at 1.12 because pySNOPT dies with 1.13 because numpy broke callback
 - conda install --yes python=$PY numpy==1.12 scipy nose sphinx mock swig
 
 # trying a manual install of pyoptsparse
-- if [ "$PY" = "2.7" ]; then
-    pip install mercurial;
-    hg clone https://bitbucket.org/mdolab/pyoptsparse;
-    cd pyoptsparse;
-    python setup.py install;
-    cd ..;
-  fi
-
-- if [ "$PY" = "3.6" ]; then
-    wget https://bitbucket.org/mdolab/pyoptsparse/get/9af3264429b9.zip;
-    unzip 9af3264429b9.zip;
-    cd mdolab-pyoptsparse-9af3264429b9;
-    python setup.py install;
-    cd ..;
-  fi
+- wget https://bitbucket.org/mdolab/pyoptsparse/get/tip.zip;
+- unzip tip.zip;
+- cd mdolab-pyoptsparse*;
+- python setup.py install;
+- cd ..;
 
 - if [ "$MPI" ]; then
     pip install mpi4py;
