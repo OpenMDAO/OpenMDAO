@@ -123,4 +123,4 @@ Setting up and running the model
         # Print the output
         print(top['p.f_xy'],)
 
-.. tags:: ExternalCode, File_Wrappping
+.. tags:: External Code, File Wrapping

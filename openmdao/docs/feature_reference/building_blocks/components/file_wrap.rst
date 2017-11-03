@@ -488,8 +488,8 @@ them as an array. You can do this with the ``transfer_array`` method.
 
     [ 2.1      4.6      3.1      2.22234]
 
-The ``transfer_array`` method takes four arguments: *starting row, starting field,
-ending row,* and *ending field.* The parser extracts all values from the starting
+The ``transfer_array`` method takes four arguments: *starting row*, *starting field*,
+*ending row*, and *ending field*. The parser extracts all values from the starting
 row and field and continues until it hits the ending field in the ending row.
 These values are all placed in a 1D array. When extracting multiple lines, if
 a line break is hit, the parser continues reading from the next line until the
@@ -561,10 +561,10 @@ method.
      [ 42.8  47.6  49.1  48.9  47.4  44.8  41.2  36.7  31.3  25. ]
      [ 48.4  53.1  54.7  54.5  53.   50.4  46.8  42.3  36.9  30.6]]
 
-The arguments to ``transfer_2Darray`` are the starting row number, the starting field
-number, the ending row number, and the ending field number. If the end field is
-omitted, then all values to the end of the line are extracted. In that case, care
-must be taken to make sure that all lines have the same number of values.
+The arguments to ``transfer_2Darray`` are the *starting row*, *starting field*,
+*ending row*, and *ending field*. If the ending field is omitted, then all values
+to the end of the line are extracted. In that case, care must be taken to make
+sure that all lines have the same number of values.
 
 Note that if the delimiter is set to ``'columns'``, then the column number should be
 entered instead of the field number. Delimiters are discussed in the next section.
@@ -729,8 +729,8 @@ inside of the box are parsed assuming standard separator characters (``" \t"``).
 
     print(var)
 
-So here we've called ``transfer_array`` with four arguments: `starting row,
-starting column, ending row, ending column`. This results in the following
+So here we've called ``transfer_array`` with four arguments: *starting row*,
+*starting column*, *ending row*, and *ending column*. This results in the following
 value for var:
 
 .. testoutput:: Parse_Output
@@ -817,4 +817,4 @@ you should check your external application's manual to see if there is a flag fo
 telling the code to output the full precision.
 
 
-.. tags:: ExternalCode, FileWrap
+.. tags:: External Code, File Wrapping

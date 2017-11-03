@@ -52,7 +52,6 @@ class TestExternalCode(unittest.TestCase):
         self.top.run_model()
 
     def test_timeout_raise(self):
-
         self.extcode.options['command'] = [
             'python', 'extcode_example.py', 'extcode.out', '--delay', '3'
         ]
@@ -70,7 +69,6 @@ class TestExternalCode(unittest.TestCase):
             self.fail('Expected AnalysisError')
 
     def test_error_code_raise(self):
-
         self.extcode.options['command'] = [
             'python', 'extcode_example.py', 'extcode.out', '--delay', '-3'
         ]
@@ -90,7 +88,6 @@ class TestExternalCode(unittest.TestCase):
             self.fail('Expected RuntimeError')
 
     def test_error_code_soft(self):
-
         self.extcode.options['command'] = [
             'python', 'extcode_example.py', 'extcode.out', '--delay', '-3'
         ]
@@ -112,7 +109,6 @@ class TestExternalCode(unittest.TestCase):
             self.fail("AnalysisError expected")
 
     def test_badcmd(self):
-
         # Set command to nonexistant path.
         self.extcode.options['command'] = ['no-such-command', ]
 
@@ -127,7 +123,6 @@ class TestExternalCode(unittest.TestCase):
             self.fail('Expected ValueError')
 
     def test_nullcmd(self):
-
         self.extcode.stdout = 'nullcmd.out'
         self.extcode.stderr = STDOUT
 
@@ -143,9 +138,10 @@ class TestExternalCode(unittest.TestCase):
                 os.remove(self.extcode.stdout)
 
     def test_env_vars(self):
-
         self.extcode.options['env_vars'] = {'TEST_ENV_VAR': 'SOME_ENV_VAR_VALUE'}
-        self.extcode.options['command'] = ['python', 'extcode_example.py', 'extcode.out', '--write_test_env_var']
+        self.extcode.options['command'] = [
+            'python', 'extcode_example.py', 'extcode.out', '--write_test_env_var'
+        ]
 
         dev_null = open(os.devnull, 'w')
         self.top.setup(check=True)
@@ -160,7 +156,6 @@ class TestExternalCode(unittest.TestCase):
 
 class ParaboloidExternalCode(ExternalCode):
     def setup(self):
-
         self.add_input('x', val=0.0)
         self.add_input('y', val=0.0)
 

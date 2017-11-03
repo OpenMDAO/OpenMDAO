@@ -102,7 +102,7 @@ class ExternalCode(ExplicitComponent):
                              "cannot be found" % program_to_execute)
 
         # Check for missing input files. This just generates a warning during
-        # setup, since these files may be generated during execution.
+        # setup, since these files may be generated later during execution.
         missing = self._check_for_files(self.options['external_input_files'])
         if missing:
             logger.warning("The following input files are missing at setup "

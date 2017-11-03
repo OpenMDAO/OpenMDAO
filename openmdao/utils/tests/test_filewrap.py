@@ -32,7 +32,6 @@ class TestCase(unittest.TestCase):
                 pass
 
     def test_templated_input(self):
-
         template = "Junk\n" + \
                    "Anchor\n" + \
                    " A 1, 2 34, Test 1e65\n" + \
@@ -104,7 +103,6 @@ class TestCase(unittest.TestCase):
             self.fail('RuntimeError expected')
 
     def test_templated_input_same_anchors(self):
-
         template = "CQUAD4 1 3.456\n" + \
                    "CQUAD4 2 4.123\n" + \
                    "CQUAD4 3 7.222\n" + \
@@ -140,7 +138,6 @@ class TestCase(unittest.TestCase):
         self.assertEqual(answer, result)
 
     def test_templated_input_arrays(self):
-
         template = "Anchor\n" + \
                    "0 0 0 0 0\n"
 
@@ -167,7 +164,6 @@ class TestCase(unittest.TestCase):
         self.assertEqual(answer, result)
 
     def test_templated_input_2Darrays(self):
-
         template = "Anchor\n" + \
                    "0 0 0 0 0\n" + \
                    "0 0 0 0 0\n"
@@ -197,7 +193,6 @@ class TestCase(unittest.TestCase):
         self.assertEqual(answer, result)
 
     def test_output_parse(self):
-
         data = "Junk\n" + \
                "Anchor\n" + \
                " A 1, 2 34, Test 1e65\n" + \
@@ -268,7 +263,6 @@ class TestCase(unittest.TestCase):
             self.fail('RuntimeError expected')
 
     def test_output_parse_same_anchors(self):
-
         data = "CQUAD4 1 3.456\n" + \
                "CQUAD4 2 4.123\n" + \
                "CQUAD4 3 7.222\n" + \
@@ -309,7 +303,6 @@ class TestCase(unittest.TestCase):
         self.assertEqual(val, 4.123)
 
     def test_output_parse_keyvar(self):
-
         data = "Anchor\n" + \
                " Key1 1 2 3.7 Test 1e65\n" + \
                " Key1 3 4 3.2 ibg 0.0003\n" + \
@@ -348,7 +341,6 @@ class TestCase(unittest.TestCase):
             self.fail('ValueError expected')
 
     def test_output_parse_array(self):
-
         data = "Anchor\n" + \
                "10 20 30 40 50 60 70 80\n" + \
                "11 21 31 41 51 61 71 81\n" + \
@@ -397,7 +389,6 @@ class TestCase(unittest.TestCase):
             self.fail('ValueError expected')
 
     def test_output_parse_2Darray(self):
-
         data = '''
         Anchor
             FREQ  DELTA  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5
@@ -500,7 +491,6 @@ class TestCase(unittest.TestCase):
             self.fail('ValueError expected')
 
     def test_comment_char(self):
-
         # Check to see if the use of the comment
         #   characters works
         data = "Junk\n" + \
@@ -539,7 +529,6 @@ class TestCase(unittest.TestCase):
         self.assertEqual(val, 'A')
 
     def test_more_delims(self):
-
         data = "anchor,1.0,2.0\n" + \
                "abc=123.456\n" + \
                "c=1,2,Word,6\n" + \
