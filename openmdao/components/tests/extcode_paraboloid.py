@@ -4,7 +4,6 @@
 #
 # Read the values of `x` and `y` from input file
 # and write the value of `f_xy` to output file.
-#
 
 if __name__ == '__main__':
     import sys
