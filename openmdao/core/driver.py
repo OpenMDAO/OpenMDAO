@@ -265,14 +265,8 @@ class Driver(object):
                     for d in all_vars[:-1]:
                         mysystem_outputs.update(d)
 
-            # de-deplicate sets by removing from mysystem_outputs
-            #   if it's already in another set
-            # clone mysystem_outputs so we can remove from the set while iterating
-            #   over its values
-            temp_outputs = mysystem_outputs.copy()
-            for n in temp_outputs:
-                if n in mydesvars or n in myobjectives or n in myconstraints:
-                    mysystem_outputs.remove(n)
+            # de-duplicate mysystem_outputs
+            mysystem_outputs = mysystem_outputs.difference(mydesvars, myobjectives, myconstraints)
 
         if MPI:  # filter based on who owns the variables
             # TODO Eventually, we think we can get rid of this next check. But to be safe,
@@ -638,7 +632,7 @@ class Driver(object):
             objectives = self.get_objective_values()
             constraints = self.get_constraint_values()
             responses = {}
-        else:    
+        else:
             if self.recording_options['record_desvars']:
                 # collective call that gets across all ranks
                 desvars = self.get_design_var_values()
