@@ -3,7 +3,6 @@ from __future__ import print_function
 
 import os
 import shutil
-import sys
 import tempfile
 import unittest
 
@@ -193,18 +192,24 @@ class ParaboloidExternalCode(ExternalCode):
 class TestExternalCodeFeature(unittest.TestCase):
 
     def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='test_extcode_feature-')
-        os.chdir(self.tempdir)
-        shutil.copy(os.path.join(DIRECTORY, 'external_code_feature_sample.py'),
-                    os.path.join(self.tempdir, 'external_code_feature_sample.py'))
+        # if running in doc build, there will be no 'self'
+        if 'self' in locals():
+            self.startdir = os.getcwd()
+            self.tempdir = tempfile.mkdtemp(prefix='test_extcode_feature-')
+            os.chdir(self.tempdir)
+            shutil.copy(os.path.join(DIRECTORY, 'external_code_feature_sample.py'),
+                        os.path.join(self.tempdir, 'external_code_feature_sample.py'))
+        else:
+            os.chdir(DIRECTORY)
 
     def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
+        # if running in doc build, there will be no 'self'
+        if 'self' in locals():
+            os.chdir(self.startdir)
+            try:
+                shutil.rmtree(self.tempdir)
+            except OSError:
+                pass
 
     def test_main(self):
         from openmdao.api import Problem, Group, IndepVarComp
