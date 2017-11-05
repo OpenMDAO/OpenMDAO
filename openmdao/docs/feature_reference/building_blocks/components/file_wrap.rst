@@ -99,25 +99,10 @@ input file.
 Let's say you want to replace the second integer in the input file above
 with a 7. The code would look like this.
 
-.. testcode:: Parse_Input
 
-    parser.mark_anchor("INPUT")
-    parser.transfer_var(7, 1, 2)
+.. embed-test::
+    openmdao.utils.tests.test_file_wrap.FeatureTestCase.test_parse_input
 
-.. testcode:: Parse_Input
-    :hide:
-
-    from __future__ import print_function
-    for datum in parser.data:
-        print(datum)
-
-.. testoutput:: Parse_Input
-
-    INPUT
-    1 7 3
-    INPUT
-    10.1 20.2 30.3
-    A B C
 
 .. index:: mark_anchor
 
@@ -259,11 +244,9 @@ additional terms of the array.
 The input file templating capability that comes with OpenMDAO is basic but quite
 functional. If you need a more powerful templating engine, particularly one that
 allows the inclusion of logic in your template files, then you may want to consider
-one of the community-developed engines, such as mako_ or django_.
+one of the community-developed templating_ engines.
 
-.. _mako: http://www.makotemplates.org/
-
-.. _django: https://docs.djangoproject.com/en/dev/topics/templates/
+.. _templating: https://wiki.python.org/moin/Templating
 
 .. todo:: Include some examples with one of the templating engines.
 

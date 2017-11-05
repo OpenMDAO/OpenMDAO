@@ -14,9 +14,6 @@ from pyparsing import CaselessLiteral, Combine, OneOrMore, Optional, \
 
 import numpy as np
 
-# public symbols
-__all__ = ['InputFileGenerator', 'FileParser']
-
 
 def _getformat(val):
     """

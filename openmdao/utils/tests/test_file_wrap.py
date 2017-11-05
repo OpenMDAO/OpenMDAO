@@ -12,6 +12,8 @@ from numpy import array, isnan, isinf
 
 from openmdao.utils.file_wrap import InputFileGenerator, FileParser
 
+DIRECTORY = os.path.dirname((os.path.abspath(__file__)))
+
 
 class TestCase(unittest.TestCase):
     """ Test file wrapping functions. """
@@ -542,7 +544,6 @@ class TestCase(unittest.TestCase):
         op = FileParser()
         op.set_file(self.filename)
 
-        olddelims = op._delimiter
         op.set_delimiters(' \t,=')
 
         op.mark_anchor('anchor')
@@ -577,6 +578,55 @@ class TestCase(unittest.TestCase):
         self.assertEqual(isnan(val), True)
         val = op.transfer_var(4, 4)
         self.assertEqual(val, '#$%')
+
+
+class FeatureTestCase(unittest.TestCase):
+
+    def setUp(self):
+        # if running in doc build, there will be no 'self'
+        if 'self' in locals():
+            self.startdir = os.getcwd()
+            self.tempdir = tempfile.mkdtemp(prefix='test_filewarp_feature-')
+        else:
+            os.chdir(DIRECTORY)
+
+        # A way to "cheat" and do this without a file.
+        global parser
+        parser = InputFileGenerator()
+        parser.data = []
+        parser.data.append("INPUT")
+        parser.data.append("1 2 3")
+        parser.data.append("INPUT")
+        parser.data.append("10.1 20.2 30.3")
+        parser.data.append("A B C")
+
+    def show_data(self, data):
+        text = ''
+        for row in data:
+            text = text + row + '\n'
+        return text
+
+    def tearDown(self):
+        # if running in doc build, there will be no 'self'
+        if 'self' in locals():
+            os.chdir(self.startdir)
+            try:
+                shutil.rmtree(self.tempdir)
+            except OSError:
+                pass
+
+    def test_parse_input(self):
+        parser.mark_anchor("INPUT")
+        parser.transfer_var(7, 1, 2)
+        print(parser.data)
+
+        # self.assertEquals(parser.data, [
+        #     "INPUT",
+        #     "1 7 3",
+        #     "INPUT",
+        #     "10.1 20.2 30.3",
+        #     "A B C"
+        # ].join('\n'))
 
 
 if __name__ == "__main__":

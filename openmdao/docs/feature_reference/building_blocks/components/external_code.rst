@@ -46,7 +46,7 @@ for simplicity, this example only uses one of each.
   work here, not just python scripts!
 
 Here is the script for this external code. It simply reads its inputs, `x` and `y`, from an external file,
-does the same computation as the :ref:`Paraboloid Tutorial <paraboloid_tutorial>` and writes the output,
+does the same computation as the :ref:`Paraboloid Tutorial <tutorial_paraboloid_analysis>` and writes the output,
 `f_xy`, to an output file.
 
 
