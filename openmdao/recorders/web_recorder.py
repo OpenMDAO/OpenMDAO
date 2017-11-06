@@ -262,6 +262,9 @@ class WebRecorder(BaseRecorder):
             The array of json objects representing the objectives.
         constraints : [JSON]
             The array of json objects representing the constraints.
+        sysincludes : [JSON]
+            The array of json objects representing the system variables explicitly included
+            in the options.
         """
         driver_iteration_dict = {
             "counter": counter,

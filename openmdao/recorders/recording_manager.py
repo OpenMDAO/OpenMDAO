@@ -1,12 +1,15 @@
 """
 RecordingManager class definition.
 """
-from six import iteritems
 import time
+from six import iteritems
 
 import numpy as np
 
-from openmdao.utils.mpi import MPI
+try:
+    from openmdao.utils.mpi import MPI
+except ImportError:
+    MPI = None
 
 
 class RecordingManager(object):

@@ -122,6 +122,8 @@ class Solver(object):
         Object to store some formatting for iprint that is shared across all solvers.
     options : <OptionsDictionary>
         Options dictionary.
+    recording_options : <OptionsDictionary>
+        Recording options dictionary.
     metadata : dict
         Dictionary holding data about this solver.
     supports : <OptionsDictionary>
@@ -152,6 +154,7 @@ class Solver(object):
         self._iter_count = 0
 
         self.options = OptionsDictionary()
+        self.recording_options = OptionsDictionary()
         self.options.declare('maxiter', types=int, default=10,
                              desc='maximum number of iterations')
         self.options.declare('atol', default=1e-10,
@@ -163,20 +166,23 @@ class Solver(object):
         self.options.declare('err_on_maxiter', types=bool, default=False,
                              desc="When True, AnlysisError will be raised if we don't convege.")
         # Case recording options
-        self.options.declare('record_abs_error', types=bool, default=True,
-                             desc='Set to True to record absolute error at the solver level')
-        self.options.declare('record_rel_error', types=bool, default=True,
-                             desc='Set to True to record relative error at the solver level')
-        self.options.declare('record_solver_output', types=bool, default=False,
-                             desc='Set to True to record output at the solver level')
-        self.options.declare('record_solver_residuals', types=bool, default=False,
-                             desc='Set to True to record residuals at the solver level')
-        self.options.declare('record_metadata', types=bool, desc='Record metadata', default=True)
-        self.options.declare('includes', types=list, default=['*'],
-                             desc='Patterns for variables to include in recording')
-        self.options.declare('excludes', types=list, default=[],
-                             desc='Patterns for vars to exclude in recording '
-                                  '(processed post-includes)')
+        self.recording_options.declare('record_abs_error', types=bool, default=True,
+                                       desc='Set to True to record absolute error at the \
+                                       solver level')
+        self.recording_options.declare('record_rel_error', types=bool, default=True,
+                                       desc='Set to True to record relative error at the \
+                                       solver level')
+        self.recording_options.declare('record_solver_output', types=bool, default=False,
+                                       desc='Set to True to record output at the solver level')
+        self.recording_options.declare('record_solver_residuals', types=bool, default=False,
+                                       desc='Set to True to record residuals at the solver level')
+        self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
+                                       default=True)
+        self.recording_options.declare('includes', types=list, default=['*'],
+                                       desc='Patterns for variables to include in recording')
+        self.recording_options.declare('excludes', types=list, default=[],
+                                       desc='Patterns for vars to exclude in recording '
+                                       '(processed post-includes)')
         # Case recording related
         self._filtered_vars_to_record = {}
         self._norm0 = 0.0
@@ -230,10 +236,10 @@ class Solver(object):
         self._rec_mgr.record_metadata(self)
 
         myoutputs = myresiduals = set()
-        incl = self.options['includes']
-        excl = self.options['excludes']
+        incl = self.recording_options['includes']
+        excl = self.recording_options['excludes']
 
-        if self.options['record_solver_residuals']:
+        if self.recording_options['record_solver_residuals']:
             if isinstance(self, NonlinearSolver):
                 residuals = self._system._residuals
             else:  # it's a LinearSolver
@@ -242,7 +248,7 @@ class Solver(object):
             myresiduals = {n for n in residuals._names
                            if check_path(n, incl, excl)}
 
-        if self.options['record_solver_output']:
+        if self.recording_options['record_solver_output']:
             if isinstance(self, NonlinearSolver):
                 outputs = self._system._outputs
             else:  # it's a LinearSolver
@@ -466,19 +472,19 @@ class Solver(object):
         # if self.options['record_abs_error'] or self.options['record_rel_error']:
         #     norm = self._iter_get_norm()
 
-        if self.options['record_abs_error']:
+        if self.recording_options['record_abs_error']:
             # data['abs'] = norm
             data['abs'] = kwargs.get('abs')
         else:
             data['abs'] = None
 
-        if self.options['record_rel_error']:
+        if self.recording_options['record_rel_error']:
             # data['rel'] = norm / self._norm0
             data['rel'] = kwargs.get('rel')
         else:
             data['rel'] = None
 
-        if self.options['record_solver_output']:
+        if self.recording_options['record_solver_output']:
 
             if isinstance(self, NonlinearSolver):
                 outputs = self._system._outputs
@@ -495,7 +501,7 @@ class Solver(object):
         else:
             data['o'] = None
 
-        if self.options['record_solver_residuals']:
+        if self.recording_options['record_solver_residuals']:
 
             if isinstance(self, NonlinearSolver):
                 residuals = self._system._residuals

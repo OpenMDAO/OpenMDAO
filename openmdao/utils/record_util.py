@@ -88,7 +88,7 @@ def is_valid_sqlite3_db(filename):
     return header[:16] == b'SQLite format 3\x00'
 
 
-def check_path(path, includes, excludes):
+def check_path(path, includes, excludes, include_all_path=False):
     """
     Calculate whether `path` should be recorded.
 
@@ -100,6 +100,8 @@ def check_path(path, includes, excludes):
         list of things to be included in recording list.
     excludes : list
         list of things to be excluded from recording list.
+    include_all_path : bool
+        If set to True, will return True unless it is in excludes
 
     Returns
     -------
@@ -108,14 +110,20 @@ def check_path(path, includes, excludes):
     """
     # First see if it's included
     for pattern in includes:
-        if fnmatchcase(path, pattern):
+        if fnmatchcase(path, pattern) or include_all_path:
             # We found a match. Check to see if it is excluded.
             for ex_pattern in excludes:
                 if fnmatchcase(path, ex_pattern):
                     return False
             return True
 
-    # Did not match anything in includes.
+    # the case where includes is empty but include_all_path is True
+    if include_all_path:
+        for ex_pattern in excludes:
+            if fnmatchcase(path, ex_pattern):
+                return False
+        return True
+
     return False
 
 
