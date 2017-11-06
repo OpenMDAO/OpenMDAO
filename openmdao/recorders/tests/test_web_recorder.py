@@ -561,7 +561,6 @@ class TestServerRecorder(unittest.TestCase):
         nonlinear_solver = self.prob.model._nonlinear_solver
         nonlinear_solver.recording_options['record_abs_error'] = True
         nonlinear_solver.recording_options['record_rel_error'] = True
-        nonlinear_solver.recording_options['record_solver_output'] = True
         nonlinear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model._nonlinear_solver.add_recorder(recorder)
 
@@ -632,7 +631,7 @@ class TestServerRecorder(unittest.TestCase):
 
         self.assertAlmostEqual(solver_iteration['abs_err'], expected_abs_error)
         self.assertAlmostEqual(solver_iteration['rel_err'], expected_rel_error)
-        self.assertEqual(solver_iteration['solver_output'], [])
+        self.assertEqual(len(solver_iteration['solver_output']), 7)
         self.assertEqual(solver_iteration['solver_residuals'], [])
 
     def test_record_line_search_bounds_enforce(self, m):
@@ -662,7 +661,7 @@ class TestServerRecorder(unittest.TestCase):
         solver_iteration = json.loads(self.solver_iterations)
         self.assertAlmostEqual(solver_iteration['abs_err'], expected_abs_error)
         self.assertAlmostEqual(solver_iteration['rel_err'], expected_rel_error)
-        self.assertEqual(solver_iteration['solver_output'], [])
+        self.assertEqual(len(solver_iteration['solver_output']), 7)
         self.assertEqual(solver_iteration['solver_residuals'], [])
 
     def test_record_solver_nonlinear_block_gs(self, m):
@@ -673,7 +672,6 @@ class TestServerRecorder(unittest.TestCase):
         self.prob.model.nonlinear_solver = NonlinearBlockGS()
         self.prob.model.nonlinear_solver.add_recorder(recorder)
         nonlinear_solver = self.prob.model.nonlinear_solver
-        nonlinear_solver.recording_options['record_solver_output'] = True
         nonlinear_solver.recording_options['record_solver_residuals'] = True
 
         self.prob.setup(check=False)
@@ -738,7 +736,7 @@ class TestServerRecorder(unittest.TestCase):
         self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
         self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
         self.assertEqual(solver_iteration['solver_residuals'], [])
-        self.assertEqual(solver_iteration['solver_output'], [])
+        self.assertEqual(len(solver_iteration['solver_output']), 7)
 
     def test_record_solver_nonlinear_newton(self, m):
         self.setup_endpoints(m)
@@ -761,7 +759,7 @@ class TestServerRecorder(unittest.TestCase):
         self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
         self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
         self.assertEqual(solver_iteration['solver_residuals'], [])
-        self.assertEqual(solver_iteration['solver_output'], [])
+        self.assertEqual(len(solver_iteration['solver_output']), 7)
 
     def test_record_solver_nonlinear_nonlinear_run_once(self, m):
         self.setup_endpoints(m)
@@ -788,7 +786,7 @@ class TestServerRecorder(unittest.TestCase):
         self.assertEqual(expected_abs_error, solver_iteration['abs_err'])
         self.assertEqual(expected_rel_error, solver_iteration['rel_err'])
         self.assertEqual(solver_iteration['solver_residuals'], [])
-        self.assertEqual(solver_iteration['solver_output'], [])
+        self.assertEqual(len(solver_iteration['solver_output']), 7)
 
     def test_record_solver_linear_direct_solver(self, m):
         self.setup_endpoints(m)
@@ -802,7 +800,6 @@ class TestServerRecorder(unittest.TestCase):
         linear_solver = self.prob.model.nonlinear_solver.linear_solver
         linear_solver.recording_options['record_abs_error'] = True
         linear_solver.recording_options['record_rel_error'] = True
-        linear_solver.recording_options['record_solver_output'] = True
         linear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model.nonlinear_solver.linear_solver.add_recorder(recorder)
 
@@ -852,7 +849,6 @@ class TestServerRecorder(unittest.TestCase):
         linear_solver = self.prob.model.nonlinear_solver.linear_solver
         linear_solver.recording_options['record_abs_error'] = True
         linear_solver.recording_options['record_rel_error'] = True
-        linear_solver.recording_options['record_solver_output'] = True
         linear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model.nonlinear_solver.linear_solver.add_recorder(recorder)
 
@@ -887,7 +883,6 @@ class TestServerRecorder(unittest.TestCase):
         linear_solver = self.prob.model.nonlinear_solver.linear_solver
         linear_solver.recording_options['record_abs_error'] = True
         linear_solver.recording_options['record_rel_error'] = True
-        linear_solver.recording_options['record_solver_output'] = True
         linear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model.nonlinear_solver.linear_solver.add_recorder(recorder)
 
@@ -927,7 +922,6 @@ class TestServerRecorder(unittest.TestCase):
         linear_solver = self.prob.model.nonlinear_solver.linear_solver
         linear_solver.recording_options['record_abs_error'] = True
         linear_solver.recording_options['record_rel_error'] = True
-        linear_solver.recording_options['record_solver_output'] = True
         linear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model.nonlinear_solver.linear_solver.add_recorder(recorder)
 
@@ -966,7 +960,6 @@ class TestServerRecorder(unittest.TestCase):
         linear_solver = self.prob.model.nonlinear_solver.linear_solver
         linear_solver.recording_options['record_abs_error'] = True
         linear_solver.recording_options['record_rel_error'] = True
-        linear_solver.recording_options['record_solver_output'] = True
         linear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model.nonlinear_solver.linear_solver.add_recorder(recorder)
 
@@ -1027,7 +1020,6 @@ class TestServerRecorder(unittest.TestCase):
         mda.nonlinear_solver.recording_options['record_metadata'] = True
         mda.nonlinear_solver.recording_options['record_abs_error'] = True
         mda.nonlinear_solver.recording_options['record_rel_error'] = True
-        mda.nonlinear_solver.recording_options['record_solver_output'] = True
         mda.nonlinear_solver.recording_options['record_solver_residuals'] = True
         mda.nonlinear_solver.add_recorder(recorder)
 

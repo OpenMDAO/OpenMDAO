@@ -40,8 +40,6 @@ class BaseRecorder(object):
         Tells recorder whether to record the absolute error of a Solver.
     recording_options['record_rel_error'] :  bool(True)
         Tells recorder whether to record the relative error of a Solver.
-    recording_options['record_solver_output'] :  bool(False)
-        Tells recorder whether to record the output of a Solver.
     recording_options['record_solver_derivatives'] :  bool(False)
         Tells recorder whether to record the derivatives of a Solver.
     recording_options['includes'] :  list of strings("*")
