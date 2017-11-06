@@ -580,53 +580,103 @@ class TestCase(unittest.TestCase):
         self.assertEqual(val, '#$%')
 
 
+
+
 class FeatureTestCase(unittest.TestCase):
 
-    def setUp(self):
-        # if running in doc build, there will be no 'self'
-        if 'self' in locals():
-            self.startdir = os.getcwd()
-            self.tempdir = tempfile.mkdtemp(prefix='test_filewarp_feature-')
-        else:
-            os.chdir(DIRECTORY)
+    # output data for each test
+    output_data = {
+        "initial": [
+            "INPUT",
+            "1 2 3",
+            "INPUT",
+            "10.1 20.2 30.3",
+            "A B C"
+        ],
+        "test_parse_input": [
+            "INPUT",
+            "1 7 3",
+            "INPUT",
+            "10.1 20.2 30.3",
+            "A B C"
+        ],
+        "test_parse_input_2": [
+            "INPUT",
+            "1 7 3",
+            "INPUT",
+            "10.1 20.2 3.141592653589793",
+            "A B C"
+        ],
+        "test_parse_input_minus2": [
+            "INPUT",
+            "99999 7 3",
+            "INPUT",
+            "10.1 20.2 3.141592653589793",
+            "A B C"
+        ],
+        "test_parse_input_array": [
+            "INPUT",
+            "123 456 789",
+            "INPUT",
+            "10.1 20.2 3.141592653589793",
+            "A B C"
+        ]
+    }
 
-        # A way to "cheat" and do this without a file.
+    # the name of the preceding test in the feature doc
+    prev_test = {
+        "test_parse_input": "initial",
+        "test_parse_input_2": "test_parse_input",
+        "test_parse_input_minus2": "test_parse_input_2",
+        "test_parse_input_array": "test_parse_input_minus2"
+    }
+
+    def setUp(self):
+        import sys
+        from openmdao.utils.file_wrap import InputFileGenerator
+
+        # use a global parser object so we don't need `self.` in feature doc
         global parser
         parser = InputFileGenerator()
-        parser.data = []
-        parser.data.append("INPUT")
-        parser.data.append("1 2 3")
-        parser.data.append("INPUT")
-        parser.data.append("10.1 20.2 30.3")
-        parser.data.append("A B C")
 
-    def show_data(self, data):
-        text = ''
-        for row in data:
-            text = text + row + '\n'
-        return text
-
-    def tearDown(self):
-        # if running in doc build, there will be no 'self'
-        if 'self' in locals():
-            os.chdir(self.startdir)
-            try:
-                shutil.rmtree(self.tempdir)
-            except OSError:
-                pass
+        # the input data for each test is the output of the previous test
+        prev_test = self.prev_test[self._testMethodName]
+        parser._data = self.output_data[prev_test][:]
 
     def test_parse_input(self):
         parser.mark_anchor("INPUT")
         parser.transfer_var(7, 1, 2)
-        print(parser.data)
+        self.assertEqual(parser.generate(),
+                         '\n'.join(self.output_data[self._testMethodName]))
 
-        # self.assertEquals(parser.data, [
-        #     "INPUT",
-        #     "1 7 3",
-        #     "INPUT",
-        #     "10.1 20.2 30.3",
-        #     "A B C"
-        # ].join('\n'))
+    def test_parse_input_2(self):
+        parser.mark_anchor("INPUT", 2)
+
+        my_var = 3.1415926535897932
+        parser.transfer_var(my_var, 1, 3)
+
+        self.assertEqual(parser.generate(),
+                         '\n'.join(self.output_data[self._testMethodName]))
+
+    def test_parse_input_minus2(self):
+        parser.reset_anchor()
+        parser.mark_anchor("INPUT", -2)
+        parser.transfer_var("99999", 1, 1)
+
+        self.assertEqual(parser.generate(),
+                         '\n'.join(self.output_data[self._testMethodName]))
+
+    def test_parse_input_array(self):
+        from numpy import array
+
+        array_val = array([123, 456, 789])
+
+        parser.reset_anchor()
+        parser.mark_anchor("INPUT")
+        parser.transfer_array(array_val, 1, 1, 3)
+
+        self.assertEqual(parser.generate(),
+                         '\n'.join(self.output_data[self._testMethodName]))
 
 
 if __name__ == "__main__":

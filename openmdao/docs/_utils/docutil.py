@@ -603,9 +603,11 @@ def get_test_src(method_path):
 
     # Get all the pieces of code needed to run the unit test method
     global_imports = globals_for_imports(method_source)
+    setup_source_code = get_method_body(inspect.getsource(getattr(cls, 'setUp')))
     teardown_source_code = get_method_body(inspect.getsource(getattr(cls, 'tearDown')))
 
     code_to_run = '\n'.join([global_imports,
+                             setup_source_code,
                              source_with_output_start_stop_indicators,
                              teardown_source_code])
 

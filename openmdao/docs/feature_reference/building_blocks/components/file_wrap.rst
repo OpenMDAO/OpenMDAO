@@ -78,7 +78,9 @@ the external code is run.) The code will generally look like this:
 When the template file is set, it is read into memory so that all subsequent
 replacements are done without writing the intermediate file to the disk. Once
 all replacements have been made, the ``generate`` method is called to create the
-input file.
+input file.  If you have not provided the name of an output file, then the
+generated file data will be returned as a string.  We will use this feature in
+the following examples.
 
 .. testcode:: Parse_Input
     :hide:
@@ -116,28 +118,9 @@ after the second ``INPUT`` statement. An additional argument can be passed to th
 ``mark_anchor`` method to tell it to start at the second instance of the text
 fragment ``"INPUT"``.
 
-.. testcode:: Parse_Input
+.. embed-test::
+    openmdao.utils.tests.test_file_wrap.FeatureTestCase.test_parse_input_2
 
-    parser.reset_anchor()
-    parser.mark_anchor("INPUT", 2)
-
-    my_var = 3.1415926535897932
-    parser.transfer_var(my_var, 1, 3)
-
-.. testcode:: Parse_Input
-    :hide:
-
-    from __future__ import print_function
-    for datum in parser.data:
-        print(datum)
-
-.. testoutput:: Parse_Input
-
-    INPUT
-    1 7 3
-    INPUT
-    10.1 20.2 3.141592653589793
-    A B C
 
 Note that you are able to pass a floating point value to ``transfer_var`` and still
 keep 15 digits of precision. See :ref:`A-Note-on-Precision` for a discussion of
@@ -153,54 +136,17 @@ You can also count backwards from the bottom of the file by passing a negative
 number. Here, the second instance of ``"INPUT"`` from the bottom brings you
 back to the first one.
 
-.. testcode:: Parse_Input
+.. embed-test::
+    openmdao.utils.tests.test_file_wrap.FeatureTestCase.test_parse_input_minus2
 
-    parser.reset_anchor()
-    parser.mark_anchor("INPUT", -2)
-    parser.transfer_var("99999", 1, 1)
-
-.. testcode:: Parse_Input
-    :hide:
-
-    from __future__ import print_function
-    for datum in parser.data:
-        print(datum)
-
-.. testoutput:: Parse_Input
-
-    INPUT
-    99999 7 3
-    INPUT
-    10.1 20.2 3.141592653589793
-    A B C
 
 There is also a method for replacing an entire array of values. Try
 replacing the set of three integers as follows:
 
-.. testcode:: Parse_Input
 
-    from numpy import array
+.. embed-test::
+    openmdao.utils.tests.test_file_wrap.FeatureTestCase.test_parse_input_array
 
-    array_val = array([123, 456, 789])
-
-    parser.reset_anchor()
-    parser.mark_anchor("INPUT")
-    parser.transfer_array(array_val, 1, 1, 3)
-
-.. testcode:: Parse_Input
-    :hide:
-
-    from __future__ import print_function
-    for datum in parser.data:
-        print(datum.rstrip())
-
-.. testoutput:: Parse_Input
-
-    INPUT
-    123 456 789
-    INPUT
-    10.1 20.2 3.141592653589793
-    A B C
 
 .. index:: transfer_array
 

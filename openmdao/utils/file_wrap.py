@@ -276,9 +276,9 @@ class InputFileGenerator(object):
 
     Attributes
     ----------
-    _template_filename : string
+    _template_filename : string or None
         the name of the template file.
-    _output_filename : int
+    _output_filename : string or None
         the name of the output file.
     _delimiter : int
         delimiter.
@@ -296,8 +296,8 @@ class InputFileGenerator(object):
         """
         Initialize attributes.
         """
-        self._template_filename = []
-        self._output_filename = []
+        self._template_filename = None
+        self._output_filename = None
 
         self._delimiter = " "
         self._reg = re.compile('[^ \n]+')
@@ -504,8 +504,8 @@ class InputFileGenerator(object):
         if sub._counter < len(value):
             for val in value[sub._counter:]:
                 newline = newline.rstrip() + sep + str(val)
-
             self._data[j] = newline
+            self._data[j] += "\n"
 
         # Sometimes an array is too small for the template
         # This is resolved by removing fields
@@ -514,7 +514,6 @@ class InputFileGenerator(object):
             # Ideally, we'd remove the extra field placeholders
             raise ValueError("Array is too small for the template.")
 
-        self._data[j] += "\n"
 
     def transfer_2Darray(self, value, row_start, row_end, field_start, field_end):
         """
@@ -574,13 +573,31 @@ class InputFileGenerator(object):
         """
         self._data[self._current_row + row] = "\n"
 
-    def generate(self):
+    def generate(self, return_data=False):
         """
         Use the template file to generate the input file.
+
+        Parameters
+        ----------
+        return_data : bool
+            if True, generated file data will be returned as a string
+
+        Returns
+        -------
+        string
+            the generated file data if return_data is True or output filename
+            has not been provided, else None
         """
-        infile = open(self._output_filename, 'w')
-        infile.writelines(self._data)
-        infile.close()
+        if self._output_filename:
+            with open(self._output_filename, 'w') as f:
+                f.writelines(self._data)
+        else:
+            return_data = True
+
+        if return_data:
+            return '\n'.join(self._data)
+        else:
+            return None
 
 
 class FileParser(object):
