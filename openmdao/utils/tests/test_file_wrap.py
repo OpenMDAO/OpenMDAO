@@ -608,46 +608,46 @@ class TestCase(unittest.TestCase):
         self.assertEqual(val, '#$%')
 
 
-class FeatureTestCase(unittest.TestCase):
+class FileGenFeatureTestCase(unittest.TestCase):
 
     # output data for each test
     output_data = {
-        "initial": [
+        "": [
             "INPUT",
             "1 2 3",
             "INPUT",
             "10.1 20.2 30.3",
             "A B C"
         ],
-        "test_parse_input": [
+        "test_transfer": [
             "INPUT",
             "1 7 3",
             "INPUT",
             "10.1 20.2 30.3",
             "A B C"
         ],
-        "test_parse_input_2": [
+        "test_transfer_2": [
             "INPUT",
             "1 7 3",
             "INPUT",
             "10.1 20.2 3.141592653589793",
             "A B C"
         ],
-        "test_parse_input_minus2": [
+        "test_transfer_minus2": [
             "INPUT",
             "99999 7 3",
             "INPUT",
             "10.1 20.2 3.141592653589793",
             "A B C"
         ],
-        "test_parse_input_array": [
+        "test_transfer_array": [
             "INPUT",
             "123 456 789",
             "INPUT",
             "10.1 20.2 3.141592653589793",
             "A B C"
         ],
-        "test_parse_input_stretch": [
+        "test_transfer_stretch": [
             "INPUT",
             "11 22 33 44 55 66",
             "INPUT",
@@ -658,11 +658,11 @@ class FeatureTestCase(unittest.TestCase):
 
     # the name of the preceding test in the feature doc
     prev_test = {
-        "test_parse_input": "initial",
-        "test_parse_input_2": "test_parse_input",
-        "test_parse_input_minus2": "test_parse_input_2",
-        "test_parse_input_array": "test_parse_input_minus2",
-        "test_parse_input_stretch": "test_parse_input_array"
+        "test_transfer": "",
+        "test_transfer_2": "test_transfer",
+        "test_transfer_minus2": "test_transfer_2",
+        "test_transfer_array": "test_transfer_minus2",
+        "test_transfer_stretch": "test_transfer_array"
     }
 
     def setUp(self):
@@ -677,13 +677,13 @@ class FeatureTestCase(unittest.TestCase):
         prev_test = self.prev_test[self._testMethodName]
         parser._data = self.output_data[prev_test][:]
 
-    def test_parse_input(self):
+    def test_transfer(self):
         parser.mark_anchor("INPUT")
         parser.transfer_var(7, 1, 2)
         self.assertEqual(parser.generate(),
                          '\n'.join(self.output_data[self._testMethodName]))
 
-    def test_parse_input_2(self):
+    def test_transfer_2(self):
         parser.mark_anchor("INPUT", 2)
 
         my_var = 3.1415926535897932
@@ -692,7 +692,7 @@ class FeatureTestCase(unittest.TestCase):
         self.assertEqual(parser.generate(),
                          '\n'.join(self.output_data[self._testMethodName]))
 
-    def test_parse_input_minus2(self):
+    def test_transfer_minus2(self):
         parser.reset_anchor()
         parser.mark_anchor("INPUT", -2)
         parser.transfer_var("99999", 1, 1)
@@ -700,7 +700,7 @@ class FeatureTestCase(unittest.TestCase):
         self.assertEqual(parser.generate(),
                          '\n'.join(self.output_data[self._testMethodName]))
 
-    def test_parse_input_array(self):
+    def test_transfer_array(self):
         from numpy import array
 
         array_val = array([123, 456, 789])
@@ -712,7 +712,7 @@ class FeatureTestCase(unittest.TestCase):
         self.assertEqual(parser.generate(),
                          '\n'.join(self.output_data[self._testMethodName]))
 
-    def test_parse_input_stretch(self):
+    def test_transfer_stretch(self):
         from numpy import array
 
         array_val = array([11, 22, 33, 44, 55, 66])

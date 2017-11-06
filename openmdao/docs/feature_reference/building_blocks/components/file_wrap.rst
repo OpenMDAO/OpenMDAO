@@ -103,7 +103,7 @@ with a 7. The code would look like this.
 
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FeatureTestCase.test_parse_input
+    openmdao.utils.tests.test_file_wrap.FileGenFeatureTestCase.test_transfer
 
 
 .. index:: mark_anchor
@@ -119,7 +119,7 @@ after the second ``INPUT`` statement. An additional argument can be passed to th
 fragment ``"INPUT"``.
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FeatureTestCase.test_parse_input_2
+    openmdao.utils.tests.test_file_wrap.FileGenFeatureTestCase.test_transfer_2
 
 
 Note that you are able to pass a floating point value to ``transfer_var`` and still
@@ -137,7 +137,7 @@ number. Here, the second instance of ``"INPUT"`` from the bottom brings you
 back to the first one.
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FeatureTestCase.test_parse_input_minus2
+    openmdao.utils.tests.test_file_wrap.FileGenFeatureTestCase.test_transfer_minus2
 
 
 There is also a method for replacing an entire array of values. Try
@@ -145,7 +145,7 @@ replacing the set of three integers as follows:
 
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FeatureTestCase.test_parse_input_array
+    openmdao.utils.tests.test_file_wrap.FileGenFeatureTestCase.test_transfer_array
 
 
 .. index:: transfer_array
@@ -160,7 +160,7 @@ You can also use the ``transfer_array`` method to `stretch` an existing
 array in a template to add more terms.
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FeatureTestCase.test_parse_input_stretch
+    openmdao.utils.tests.test_file_wrap.FileGenFeatureTestCase.test_transfer_stretch
 
 
 The named argument ``sep`` defines which separator to include between the

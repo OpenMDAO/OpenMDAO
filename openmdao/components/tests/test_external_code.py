@@ -205,6 +205,16 @@ class TestExternalCodeFeature(unittest.TestCase):
             os.chdir(DIRECTORY)
 
     def tearDown(self):
+        try:
+            os.remove('paraboloid_input.dat')
+        except OSError:
+            pass
+
+        try:
+            os.remove('paraboloid_output.dat')
+        except OSError:
+            pass
+
         # if running in doc build, there will be no 'self'
         if 'self' in locals():
             os.chdir(self.startdir)
