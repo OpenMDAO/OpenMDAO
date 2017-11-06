@@ -493,6 +493,7 @@ class InputFileGenerator(object):
                 f_end = field_end
             else:
                 f_end = 99999
+
             sub.set_array(value, field_start, f_end)
             field_start = 0
 
@@ -505,7 +506,6 @@ class InputFileGenerator(object):
             for val in value[sub._counter:]:
                 newline = newline.rstrip() + sep + str(val)
             self._data[j] = newline
-            self._data[j] += "\n"
 
         # Sometimes an array is too small for the template
         # This is resolved by removing fields
@@ -513,7 +513,6 @@ class InputFileGenerator(object):
             # TODO - Figure out how to handle this.
             # Ideally, we'd remove the extra field placeholders
             raise ValueError("Array is too small for the template.")
-
 
     def transfer_2Darray(self, value, row_start, row_end, field_start, field_end):
         """

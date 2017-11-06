@@ -34,12 +34,14 @@ class TestCase(unittest.TestCase):
                 pass
 
     def test_templated_input(self):
-        template = "Junk\n" + \
-                   "Anchor\n" + \
-                   " A 1, 2 34, Test 1e65\n" + \
-                   " B 4 Stuff\n" + \
-                   "Anchor\n" + \
-                   " C 77 False Inf 333.444\n"
+        template = '\n'.join([
+            "Junk",
+            "Anchor",
+            " A 1, 2 34, Test 1e65",
+            " B 4 Stuff",
+            "Anchor",
+            " C 77 False Inf 333.444"
+        ])
 
         outfile = open(self.templatename, 'w')
         outfile.write(template)
@@ -70,12 +72,14 @@ class TestCase(unittest.TestCase):
         result = infile.read()
         infile.close()
 
-        answer = "\n" + \
-                 "Anchor\n" + \
-                 " A 1, 3.0 34, Test 1.3e-37\n" + \
-                 " B 55 Stuff\n" + \
-                 "Anchor\n" + \
-                 " C 77 False NaN 8.7\n"
+        answer = '\n'.join([
+            "",
+            "Anchor",
+            " A 1, 3.0 34, Test 1.3e-37",
+            " B 55 Stuff",
+            "Anchor",
+            " C 77 False NaN 8.7"
+        ])
 
         self.assertEqual(answer, result)
 
@@ -105,10 +109,12 @@ class TestCase(unittest.TestCase):
             self.fail('RuntimeError expected')
 
     def test_templated_input_same_anchors(self):
-        template = "CQUAD4 1 3.456\n" + \
-                   "CQUAD4 2 4.123\n" + \
-                   "CQUAD4 3 7.222\n" + \
-                   "CQUAD4 4\n"
+        template = '\n'.join([
+            "CQUAD4 1 3.456",
+            "CQUAD4 2 4.123",
+            "CQUAD4 3 7.222",
+            "CQUAD4 4"
+        ])
 
         outfile = open(self.templatename, 'w')
         outfile.write(template)
@@ -132,16 +138,20 @@ class TestCase(unittest.TestCase):
         result = infile.read()
         infile.close()
 
-        answer =   "CQUAD4 x 3.456\n" + \
-                   "CQUAD4 2 y\n" + \
-                   "CQUAD4 3 7.222\n" + \
-                   "CQUAD4 z\n"
+        answer = '\n'.join([
+            "CQUAD4 x 3.456",
+            "CQUAD4 2 y",
+            "CQUAD4 3 7.222",
+            "CQUAD4 z"
+        ])
 
         self.assertEqual(answer, result)
 
     def test_templated_input_arrays(self):
-        template = "Anchor\n" + \
-                   "0 0 0 0 0\n"
+        template = '\n'.join([
+            "Anchor",
+            "0 0 0 0 0"
+        ])
 
         outfile = open(self.templatename, 'w')
         outfile.write(template)
@@ -160,15 +170,19 @@ class TestCase(unittest.TestCase):
         result = infile.read()
         infile.close()
 
-        answer = "Anchor\n" + \
-                 "0 0 1.0 2.0 3.0 4.75 5.0\n"
+        answer = '\n'.join([
+            "Anchor",
+            "0 0 1.0 2.0 3.0 4.75 5.0"
+        ])
 
         self.assertEqual(answer, result)
 
     def test_templated_input_2Darrays(self):
-        template = "Anchor\n" + \
-                   "0 0 0 0 0\n" + \
-                   "0 0 0 0 0\n"
+        template = '\n'.join([
+            "Anchor",
+            "0 0 0 0 0",
+            "0 0 0 0 0"
+        ])
 
         outfile = open(self.templatename, 'w')
         outfile.write(template)
@@ -188,21 +202,25 @@ class TestCase(unittest.TestCase):
         result = infile.read()
         infile.close()
 
-        answer = "Anchor\n" + \
-                 "1 2 3 4 5\n" + \
-                 "6 7 8 9 10\n"
+        answer = '\n'.join([
+            "Anchor",
+            "1 2 3 4 5",
+            "6 7 8 9 10"
+        ])
 
         self.assertEqual(answer, result)
 
     def test_output_parse(self):
-        data = "Junk\n" + \
-               "Anchor\n" + \
-               " A 1, 2 34, Test 1e65\n" + \
-               " B 4 Stuff\n" + \
-               "Anchor\n" + \
-               " C 77 False NaN 333.444\n" + \
-               " 1,2,3,4,5\n" + \
-               " Inf 1.#QNAN -1.#IND\n"
+        data = '\n'.join([
+            "Junk",
+            "Anchor",
+            " A 1, 2 34, Test 1e65",
+            " B 4 Stuff",
+            "Anchor",
+            " C 77 False NaN 333.444",
+            " 1,2,3,4,5",
+            " Inf 1.#QNAN -1.#IND"
+        ])
 
         outfile = open(self.filename, 'w')
         outfile.write(data)
@@ -265,10 +283,12 @@ class TestCase(unittest.TestCase):
             self.fail('RuntimeError expected')
 
     def test_output_parse_same_anchors(self):
-        data = "CQUAD4 1 3.456\n" + \
-               "CQUAD4 2 4.123\n" + \
-               "CQUAD4 3 7.222\n" + \
-               "CQUAD4 4\n"
+        data = '\n'.join([
+            "CQUAD4 1 3.456",
+            "CQUAD4 2 4.123",
+            "CQUAD4 3 7.222",
+            "CQUAD4 4"
+        ])
 
         outfile = open(self.filename, 'w')
         outfile.write(data)
@@ -305,10 +325,12 @@ class TestCase(unittest.TestCase):
         self.assertEqual(val, 4.123)
 
     def test_output_parse_keyvar(self):
-        data = "Anchor\n" + \
-               " Key1 1 2 3.7 Test 1e65\n" + \
-               " Key1 3 4 3.2 ibg 0.0003\n" + \
-               " Key1 5 6 6.7 Tst xxx\n"
+        data = '\n'.join([
+            "Anchor",
+            " Key1 1 2 3.7 Test 1e65",
+            " Key1 3 4 3.2 ibg 0.0003",
+            " Key1 5 6 6.7 Tst xxx"
+        ])
 
         outfile = open(self.filename, 'w')
         outfile.write(data)
@@ -343,10 +365,12 @@ class TestCase(unittest.TestCase):
             self.fail('ValueError expected')
 
     def test_output_parse_array(self):
-        data = "Anchor\n" + \
-               "10 20 30 40 50 60 70 80\n" + \
-               "11 21 31 41 51 61 71 81\n" + \
-               "Key a b c d e\n"
+        data = '\n'.join([
+            "Anchor",
+            "10 20 30 40 50 60 70 80",
+            "11 21 31 41 51 61 71 81",
+            "Key a b c d e"
+        ])
 
         outfile = open(self.filename, 'w')
         outfile.write(data)
@@ -495,20 +519,22 @@ class TestCase(unittest.TestCase):
     def test_comment_char(self):
         # Check to see if the use of the comment
         #   characters works
-        data = "Junk\n" + \
-               "CAnchor\n" + \
-               " Z 11, 22 344, Test 1e65\n" + \
-               " B 4 Stuff\n" + \
-               "  $ Anchor\n" + \
-               " Q 1, 2 34, Test 1e65\n" + \
-               " B 4 Stuff\n" + \
-               "Anchor\n" + \
-               " A 1, 2 34, Test 1e65\n" + \
-               " B 4 Stuff\n" + \
-               "Anchor\n" + \
-               " C 77 False NaN 333.444\n" + \
-               " 1,2,3,4,5\n" + \
-               " Inf 1.#QNAN -1.#IND\n"
+        data = '\n'.join([
+            "Junk",
+            "CAnchor",
+            " Z 11, 22 344, Test 1e65",
+            " B 4 Stuff",
+            "  $ Anchor",
+            " Q 1, 2 34, Test 1e65",
+            " B 4 Stuff",
+            "Anchor",
+            " A 1, 2 34, Test 1e65",
+            " B 4 Stuff",
+            "Anchor",
+            " C 77 False NaN 333.444",
+            " 1,2,3,4,5",
+            " Inf 1.#QNAN -1.#IND"
+        ])
 
         outfile = open(self.filename, 'w')
         outfile.write(data)
@@ -531,11 +557,13 @@ class TestCase(unittest.TestCase):
         self.assertEqual(val, 'A')
 
     def test_more_delims(self):
-        data = "anchor,1.0,2.0\n" + \
-               "abc=123.456\n" + \
-               "c=1,2,Word,6\n" + \
-               "d=C:/abc/def,a+b*c^2,(%#%),!true\n" + \
-               "a^33 1.#QNAN^#$%^"
+        data = '\n'.join([
+            "anchor,1.0,2.0",
+            "abc=123.456",
+            "c=1,2,Word,6",
+            "d=C:/abc/def,a+b*c^2,(%#%),!true",
+            "a^33 1.#QNAN^#$%^"
+        ])
 
         outfile = open(self.filename, 'w')
         outfile.write(data)
@@ -580,8 +608,6 @@ class TestCase(unittest.TestCase):
         self.assertEqual(val, '#$%')
 
 
-
-
 class FeatureTestCase(unittest.TestCase):
 
     # output data for each test
@@ -620,6 +646,13 @@ class FeatureTestCase(unittest.TestCase):
             "INPUT",
             "10.1 20.2 3.141592653589793",
             "A B C"
+        ],
+        "test_parse_input_stretch": [
+            "INPUT",
+            "11 22 33 44 55 66",
+            "INPUT",
+            "10.1 20.2 3.141592653589793",
+            "A B C"
         ]
     }
 
@@ -628,7 +661,8 @@ class FeatureTestCase(unittest.TestCase):
         "test_parse_input": "initial",
         "test_parse_input_2": "test_parse_input",
         "test_parse_input_minus2": "test_parse_input_2",
-        "test_parse_input_array": "test_parse_input_minus2"
+        "test_parse_input_array": "test_parse_input_minus2",
+        "test_parse_input_stretch": "test_parse_input_array"
     }
 
     def setUp(self):
@@ -677,6 +711,19 @@ class FeatureTestCase(unittest.TestCase):
 
         self.assertEqual(parser.generate(),
                          '\n'.join(self.output_data[self._testMethodName]))
+
+    def test_parse_input_stretch(self):
+        from numpy import array
+
+        array_val = array([11, 22, 33, 44, 55, 66])
+
+        parser.reset_anchor()
+        parser.mark_anchor("INPUT")
+        parser.transfer_array(array_val, 1, 1, 3, sep=' ')
+
+        self.assertEqual(parser.generate(),
+                         '\n'.join(self.output_data[self._testMethodName]))
+
 
 
 if __name__ == "__main__":

@@ -159,30 +159,9 @@ block of fields spanned by the starting field and the ending field.
 You can also use the ``transfer_array`` method to `stretch` an existing
 array in a template to add more terms.
 
-.. testcode:: Parse_Input
+.. embed-test::
+    openmdao.utils.tests.test_file_wrap.FeatureTestCase.test_parse_input_stretch
 
-    from numpy import array
-
-    array_val = array([11, 22, 33, 44, 55, 66])
-
-    parser.reset_anchor()
-    parser.mark_anchor("INPUT")
-    parser.transfer_array(array_val, 1, 1, 3, sep=' ')
-
-.. testcode:: Parse_Input
-    :hide:
-
-    from __future__ import print_function
-    for datum in parser.data:
-        print(datum.rstrip())
-
-.. testoutput:: Parse_Input
-
-    INPUT
-    11 22 33 44 55 66
-    INPUT
-    10.1 20.2 3.141592653589793
-    A B C
 
 The named argument ``sep`` defines which separator to include between the
 additional terms of the array.
