@@ -112,7 +112,7 @@ deploy:
   skip_cleanup: true
   script:
   - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-      if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
+      if [ "$MPI" ] && [ "$PY" = "3.6" ]; then
         rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/twodocversions/latest;
       fi
     fi
