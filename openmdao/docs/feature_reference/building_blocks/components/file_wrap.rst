@@ -504,4 +504,4 @@ you should check your external application's manual to see if there is a flag fo
 telling the code to output the full precision.
 
 
-.. tags:: External Code, File Wrapping
+.. tags:: ExternalCode, FileWrapping
