@@ -89,7 +89,8 @@ Tags in OpenMDAO
 
 def tag():
     # Set the directories in which to find tags
-    docdirs = ['examples', 'getting_started', 'features', 'style_guide', 'theory_manual', 'user_guide']
+    # Let's make tags for dirs in this dr that don't start with an underscore.
+    docdirs = [x for x in os.listdir('.') if os.path.isdir(x) and not x.startswith('_')]
     tagdir = make_tagdir()
     make_tagfiles(docdirs, tagdir)
     make_tagindex(tagdir)

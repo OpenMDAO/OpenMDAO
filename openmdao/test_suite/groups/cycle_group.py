@@ -54,23 +54,23 @@ class CycleGroup(ParametericTestGroup):
             'var_shape': [(2, 3), (3,)],
         })
 
-        self.metadata.declare('num_comp', type_=int, default=2,
+        self.metadata.declare('num_comp', types=int, default=2,
                               desc='Total number of components')
-        self.metadata.declare('num_var', type_=int, default=1,
+        self.metadata.declare('num_var', types=int, default=1,
                               desc='Number of variables per component')
         self.metadata.declare('var_shape', default=(3,),
                               desc='Shape of each variable')
-        self.metadata.declare('connection_type', type_=str, default='explicit',
+        self.metadata.declare('connection_type', default='explicit',
                               values=['explicit', 'implicit'],
                               desc='How to connect variables.')
-        self.metadata.declare('component_class', type_=str, default='explicit',
+        self.metadata.declare('component_class', default='explicit',
                               values=['explicit', 'deprecated'],
                               desc='Component class to instantiate')
         self.metadata.declare('partial_type', default='array',
                               values=['array', 'sparse', 'aij'],
                               desc='type of partial derivatives')
         self.metadata.declare('finite_difference', default=False,
-                              type_=bool,
+                              types=bool,
                               desc='If the derivatives should be finite differenced.')
 
     def setup(self):

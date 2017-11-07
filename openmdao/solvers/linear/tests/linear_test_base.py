@@ -154,7 +154,7 @@ class LinearSolverTests(object):
                                 promotes=['x1'])
             group.add_subsystem('x_param2', IndepVarComp('x2', np.ones((2))),
                                 promotes=['x2'])
-            group.add_subsystem('mycomp', DoubleArrayComp(),
+            mycomp = group.add_subsystem('mycomp', DoubleArrayComp(),
                                 promotes=['x1', 'x2', 'y1', 'y2'])
 
             prob = Problem()
@@ -165,7 +165,7 @@ class LinearSolverTests(object):
             prob.setup(check=False, mode='fwd')
             prob.run_model()
 
-            Jbase = group.get_subsystem('mycomp').JJ
+            Jbase = mycomp.JJ
             of = ['y1', 'y2']
             wrt = ['x1', 'x2']
 
@@ -397,8 +397,6 @@ class LinearSolverTests(object):
             prob.model.linear_solver = self.linear_solver_class()
             prob.set_solver_print(level=0)
 
-            mda = prob.model.get_subsystem('mda')
-
             prob.setup(check=False, mode='fwd')
             prob.run_model()
 
@@ -521,4 +519,3 @@ class LinearSolverTests(object):
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             for key, val in iteritems(Jbase):
                 assert_rel_error(self, J[key], val, .00001)
-

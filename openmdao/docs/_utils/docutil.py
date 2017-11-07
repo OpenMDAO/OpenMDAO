@@ -662,7 +662,15 @@ def get_test_src(method_path):
             save_opts = np.get_printoptions()
             np.set_printoptions(precision=8)
 
-            exec(code_to_run, {})
+            # Move to the test directory in case there are files to read.
+            save_dir = os.getcwd()
+            os.chdir('/'.join(test_module.__file__.split('/')[:-1]))
+
+            try:
+                exec(code_to_run, {})
+            finally:
+                os.chdir(save_dir)
+
             np.set_printoptions(precision=save_opts['precision'])
             run_outputs = strout.getvalue()
 

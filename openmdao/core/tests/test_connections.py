@@ -556,7 +556,7 @@ class TestShapes(unittest.TestCase):
     #def test_ubcs(self):
         #p = Problem(model=Group())
         #root = p.model
-        #root._linear_solver = ScipyGMRES()
+        #root._linear_solver = ScipyKrylov()
 
         #self.P1 = root.add_subsystem("P1", IndepVarComp('x', 1.0))
         #self.C1 = root.add_subsystem("C1", ExecComp('y=x1*2.0+x2*3.0', x2=1.0))

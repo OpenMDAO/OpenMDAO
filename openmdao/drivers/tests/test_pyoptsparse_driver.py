@@ -8,7 +8,7 @@ from six.moves import cStringIO as StringIO
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, AnalysisError, ExplicitComponent, \
-     ScipyIterativeSolver, NonlinearBlockGS, LinearBlockGS
+     ScipyKrylov, NonlinearBlockGS, LinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
@@ -986,6 +986,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.driver.options['optimizer'] = OPTIMIZER
         if OPTIMIZER == 'SNOPT':
             prob.driver.opt_settings['Verify level'] = 3
+        elif OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-3
         prob.driver.options['print_results'] = False
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
@@ -999,7 +1001,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
-        assert_rel_error(self, prob['x'], 0.0, 1e-3)
+        assert_rel_error(self, prob['x'], 0.0, 4e-3)
 
     def test_sellar_analysis_error(self):
         # One discipline of Sellar will something raise analysis error. This is to test that
@@ -1086,7 +1088,7 @@ class TestPyoptSparse(unittest.TestCase):
                                          promotes_outputs=['y2'])
 
                 self.linear_solver = LinearBlockGS()
-                cycle.linear_solver = ScipyIterativeSolver()
+                cycle.linear_solver = ScipyKrylov()
                 cycle.nonlinear_solver = NonlinearBlockGS()
 
                 self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',

@@ -11,7 +11,7 @@ from openmdao.api import Problem, NonlinearBlockGS, Group, IndepVarComp
 from openmdao.devtools.testutil import assert_rel_error
 
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, \
-     SellarDis2withDerivatives, ExecComp, ScipyIterativeSolver
+     SellarDis2withDerivatives, ExecComp, ScipyKrylov
 
 
 class TestDesVarsResponses(unittest.TestCase):
@@ -186,21 +186,21 @@ class TestDesVarsResponses(unittest.TestCase):
         model.connect('d2.y2', ['d1.y2', 'obj_cmp.y2', 'con_cmp2.y2'])
 
         model.nonlinear_solver = NonlinearBlockGS()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
-        px = prob.model.get_subsystem('px')
+        px = prob.model.px
         px.add_design_var('x', lower=-100, upper=100)
 
-        pz = prob.model.get_subsystem('pz')
+        pz = prob.model.pz
         pz.add_design_var('z', lower=-100, upper=100)
 
-        obj = prob.model.get_subsystem('obj_cmp')
+        obj = prob.model.obj_cmp
         obj.add_objective('obj')
 
-        con_comp1 = prob.model.get_subsystem('con_cmp1')
+        con_comp1 = prob.model.con_cmp1
         con_comp1.add_constraint('con1')
 
-        con_comp2 = prob.model.get_subsystem('con_cmp2')
+        con_comp2 = prob.model.con_cmp2
         con_comp2.add_constraint('con2')
 
         prob.setup(check=False)

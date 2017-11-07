@@ -15,7 +15,7 @@ class EmbedOptionsDirective(Directive):
 
     .. embed-options::
         openmdao.solvers.linear.petsc_ksp
-        PetscKSP
+        PETScKrylov
         options
 
     The 3 arguments are the module path, the class name, and name of the options dictionary.
@@ -47,7 +47,7 @@ class EmbedOptionsDirective(Directive):
             name = option_name
             default = option_data['value']
             values = option_data['values']
-            types = option_data['type_']
+            types = option_data['types']
             desc = option_data['desc']
 
             if types is None:
