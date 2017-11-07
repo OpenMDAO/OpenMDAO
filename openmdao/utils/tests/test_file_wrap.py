@@ -611,7 +611,7 @@ class TestCase(unittest.TestCase):
         self.assertEqual(val, '#$%')
 
 
-class FileGenFeatureTestCase(unittest.TestCase):
+class FileGenFeature(unittest.TestCase):
 
     # output data for each test
     output_data = {
@@ -726,7 +726,7 @@ class FileGenFeatureTestCase(unittest.TestCase):
                          '\n'.join(self.output_data[self._testMethodName]))
 
 
-class FileParserFeatureTestCase(unittest.TestCase):
+class FileParserFeature(unittest.TestCase):
 
     def setUp(self):
         import numpy
@@ -807,7 +807,7 @@ class FileParserFeatureTestCase(unittest.TestCase):
         ]))
 
 
-class FileParser2dFeatureTestCase(unittest.TestCase):
+class FileParser2dFeature(unittest.TestCase):
 
     def setUp(self):
         import numpy
@@ -841,7 +841,7 @@ class FileParser2dFeatureTestCase(unittest.TestCase):
         ]))
 
 
-class FileParserDelimFeatureTestCase(unittest.TestCase):
+class FileParserDelimFeature(unittest.TestCase):
 
     def setUp(self):
         from openmdao.utils.file_wrap import FileParser
@@ -868,6 +868,60 @@ class FileParserDelimFeatureTestCase(unittest.TestCase):
         var = parser.transfer_var(1, 2)
 
         self.assertEqual((var, type(var)), (7, int))
+
+
+class FileParserColumnsFeature(unittest.TestCase):
+
+    def setUp(self):
+        from openmdao.utils.file_wrap import FileParser
+
+        global parser  # global so we don't need `self.` in feature doc
+        parser = FileParser()
+
+        parser._data = [
+            "CASE 1",
+            "12345678901234567890",
+            "TTF    3.7-9.4434967"
+        ]
+
+    def test_parse_columns(self):
+        parser.reset_anchor()
+        parser.mark_anchor("CASE")
+        parser.set_delimiters("columns")
+
+        var1 = parser.transfer_var(2, 3, 3)
+        var2 = parser.transfer_var(2, 4, 10)
+        var3 = parser.transfer_var(2, 11, 20)
+
+        self.assertEqual((var1, var2, var3), ('F', 3.7, -9.4434967))
+
+
+class FileParserArrayColumnsFeature(unittest.TestCase):
+
+    def setUp(self):
+        from openmdao.utils.file_wrap import FileParser
+
+        global parser  # global so we don't need `self.` in feature doc
+        parser = FileParser()
+
+        parser._data = [
+            "CASE 2",
+            "123456789012345678901234567890",
+            "NODE 11 22 33 COMMENT",
+            "NODE 44 55 66 STUFF"
+        ]
+
+    def test_parse_columns(self):
+        parser.reset_anchor()
+        parser.mark_anchor("CASE 2")
+
+        parser.set_delimiters("columns")
+        var = parser.transfer_array(2, 6, 3, 13)
+
+        parser.set_delimiters(" \t")
+
+        assert_rel_error(self, var,
+                         numpy.array([11., 22., 33., 44., 55., 66.]))
 
 
 if __name__ == "__main__":

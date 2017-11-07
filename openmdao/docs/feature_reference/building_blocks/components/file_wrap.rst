@@ -88,7 +88,7 @@ with a 7. The code would look like this.
 
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FileGenFeatureTestCase.test_transfer
+    openmdao.utils.tests.test_file_wrap.FileGenFeature.test_transfer
 
 
 .. index:: mark_anchor
@@ -104,7 +104,7 @@ after the second ``INPUT`` statement. An additional argument can be passed to th
 fragment ``"INPUT"``.
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FileGenFeatureTestCase.test_transfer_2
+    openmdao.utils.tests.test_file_wrap.FileGenFeature.test_transfer_2
 
 
 Note that you are able to pass a floating point value to ``transfer_var`` and still
@@ -122,7 +122,7 @@ number. Here, the second instance of ``"INPUT"`` from the bottom brings you
 back to the first one.
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FileGenFeatureTestCase.test_transfer_minus2
+    openmdao.utils.tests.test_file_wrap.FileGenFeature.test_transfer_minus2
 
 
 There is also a method for replacing an entire array of values. Try
@@ -130,7 +130,7 @@ replacing the set of three integers as follows:
 
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FileGenFeatureTestCase.test_transfer_array
+    openmdao.utils.tests.test_file_wrap.FileGenFeature.test_transfer_array
 
 
 .. index:: transfer_array
@@ -145,7 +145,7 @@ You can also use the ``transfer_array`` method to `stretch` an existing
 array in a template to add more terms.
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FileGenFeatureTestCase.test_transfer_stretch
+    openmdao.utils.tests.test_file_wrap.FileGenFeature.test_transfer_stretch
 
 
 The named argument ``sep`` defines which separator to include between the
@@ -207,7 +207,7 @@ Say you want to extract the first ``STRESS`` value from each load case in the fi
 snippet shown above. The code would look like this.
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FileParserFeatureTestCase.test_parse_output
+    openmdao.utils.tests.test_file_wrap.FileParserFeature.test_parse_output
 
 
 The method ``mark_anchor`` is used to define an anchor, which becomes the
@@ -223,14 +223,14 @@ underflows, etc., and take action. NumPy includes the functions ``isnan`` and
 we extract that `nan` value:
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FileParserFeatureTestCase.test_parse_nan
+    openmdao.utils.tests.test_file_wrap.FileParserFeature.test_parse_nan
 
 
 When the data is not a number, it is recognized as a string. For example, we can
 extract the word ``DISPLACEMENT``.
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FileParserFeatureTestCase.test_parse_string
+    openmdao.utils.tests.test_file_wrap.FileParserFeature.test_parse_string
 
 
 Now, what if you want to extract the value of stress from the second load case? An
@@ -238,7 +238,7 @@ additional argument can be passed to the ``mark_anchor`` method telling it to
 start at the second instance of the text fragment ``"LOAD CASE"``.
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FileParserFeatureTestCase.test_parse_output_2
+    openmdao.utils.tests.test_file_wrap.FileParserFeature.test_parse_output_2
 
 
 Note also that we used the method ``reset_anchor`` to return the anchor to the
@@ -252,7 +252,7 @@ number. Here, the second instance of ``"LOAD CASE"`` from the bottom brings us
 back to the first one.
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FileParserFeatureTestCase.test_parse_output_minus2
+    openmdao.utils.tests.test_file_wrap.FileParserFeature.test_parse_output_minus2
 
 
 There is a shortcut for extracting data that is stored as ``Key Value`` or
@@ -266,7 +266,7 @@ of the key, and the second lets you specify a number of lines to offset from
 the line where the key is found (negative numbers are allowed).
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FileParserFeatureTestCase.test_parse_keyvar
+    openmdao.utils.tests.test_file_wrap.FileParserFeature.test_parse_keyvar
 
 
 *Array Extraction*
@@ -288,7 +288,7 @@ This time, extract all of the displacements in one read and store
 them as an array. You can do this with the ``transfer_array`` method.
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FileParserFeatureTestCase.test_parse_array
+    openmdao.utils.tests.test_file_wrap.FileParserFeature.test_parse_array
 
 
 The ``transfer_array`` method takes four arguments: *starting row*, *starting field*,
@@ -299,7 +299,7 @@ a line break is hit, the parser continues reading from the next line until the
 last line is hit. The following extraction illustrates this:
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FileParserFeatureTestCase.test_parse_array_multiline
+    openmdao.utils.tests.test_file_wrap.FileParserFeature.test_parse_array_multiline
 
 
 With the inclusion of ``'DISPLACEMENT'``, this is returned as an array of strings,
@@ -324,7 +324,7 @@ labeled "50 Hz" through "100 Hz." We would like to save these values in a
 method.
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FileParser2dFeatureTestCase.test_parse_array_2d
+    openmdao.utils.tests.test_file_wrap.FileParser2dFeature.test_parse_array_2d
 
 
 The arguments to ``transfer_2Darray`` are the *starting row*, *starting field*,
@@ -350,7 +350,7 @@ One common case that will require a change in the default delimiter is comma
 separated values (i.e. `csv`). Here's an example of such an output file:
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FileParserDelimFeatureTestCase.test_parse_default_delim
+    openmdao.utils.tests.test_file_wrap.FileParserDelimFeature.test_parse_default_delim
 
 
 What happened here is slightly confusing, but the main point is that the parser
@@ -358,7 +358,7 @@ did not handle this as expected because commas were not in the set of
 delimiters. Now specify commas as your delimiter.
 
 .. embed-test::
-    openmdao.utils.tests.test_file_wrap.FileParserDelimFeatureTestCase.test_parse_comma_delim
+    openmdao.utils.tests.test_file_wrap.FileParserDelimFeature.test_parse_comma_delim
 
 
 With the correct delimiter set, you extract the second integer as expected.
@@ -383,15 +383,6 @@ output file:
     12345678901234567890
     TTF    3.7-9.4434967
 
-.. testcode:: Parse_Output
-    :hide:
-
-    parser.data = []
-    parser.data.append("CASE 1")
-    parser.data.append("12345678901234567890")
-    parser.data.append("TTF    3.7-9.4434967")
-    parser.reset_anchor()
-
 The second line is a comment that helps the reader identify the column
 number (particularly on a printout) and does not need to be parsed.
 
@@ -404,31 +395,15 @@ separator, but we can use the special separator ``'columns'``.
 
 Let's parse this file to extract the third boolean flag and the two numbers.
 
-.. testcode:: Parse_Output
-
-    parser.reset_anchor()
-    parser.mark_anchor("CASE")
-    parser.set_delimiters("columns")
-    var1 = parser.transfer_var(2, 3, 3)
-    var2 = parser.transfer_var(2, 4, 10)
-    var3 = parser.transfer_var(2, 11, 20)
-
-    print(var1)
-    print(var2)
-    print(var3)
-
 When the delimiters are in column mode, ``transfer_var`` takes the starting
 field and the ending field as its second and third arguments. Since we just
 want one column for the boolean flag, the starting field and ending field are
-the same. This gives us the output:
+the same. For the floating point values, we provide the appropriate column ranges:
 
-.. testoutput:: Parse_Output
+.. embed-test::
+    openmdao.utils.tests.test_file_wrap.FileParserColumnsFeature.test_parse_columns
 
-    F
-    3.7
-    -9.4434967
 
-which is what we wanted to extract.
 
 The ``transfer_array`` method can also be used with columns, but it is used
 differently than ``transfer_var``. Consider this output file:
@@ -440,44 +415,21 @@ differently than ``transfer_var``. Consider this output file:
     NODE 11 22 33 COMMENT
     NODE 44 55 66 STUFF
 
-.. testcode:: Parse_Output
-    :hide:
-
-    parser.data = []
-    parser.data.append("CASE 2")
-    parser.data.append("12345678901234567890")
-    parser.data.append("NODE 11 22 33 COMMENT")
-    parser.data.append("NODE 44 55 66 STUFF")
-    parser.reset_anchor()
-
 In this example, we want to extract the six numerical values and place them in
 an array. When the delimiter is set to columns, we can define a rectangular
 box from which all elements are parsed into an array. Note that the numbers
 inside of the box are parsed assuming standard separator characters (``" \t"``).
 
-.. testcode:: Parse_Output
+So here we call ``transfer_array`` with four arguments: *starting row*,
+*starting column*, *ending row*, and *ending column*:
 
-    parser.reset_anchor()
-    parser.mark_anchor("CASE 2")
-    parser.set_delimiters("columns")
-    var = parser.transfer_array(2, 6, 3, 13)
+.. embed-test::
+    openmdao.utils.tests.test_file_wrap.FileParserArrayColumnsFeature.test_parse_columns
 
-    print(var)
 
-So here we've called ``transfer_array`` with four arguments: *starting row*,
-*starting column*, *ending row*, and *ending column*. This results in the following
-value for var:
-
-.. testoutput:: Parse_Output
-
-    [ 11.  22.  33.  44.  55.  66.]
-
-You can always exit column mode and return to normal delimiter parsing by setting the
-delimiters back to the default:
-
-.. testcode:: Parse_Output
-
-    parser.set_delimiters(" \t")
+Note that, in this case, we exit column mode and return to normal delimiter
+parsing by setting the delimiters back to the default after extracting the
+desired values.
 
 
 .. index:: Fortran namelists
