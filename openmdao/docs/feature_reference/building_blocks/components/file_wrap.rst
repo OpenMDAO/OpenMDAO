@@ -173,7 +173,7 @@ appropriate data type.
 ~~~~~~~~~~~~~~~~~~~
 
 Consider an application that produces the following as part of its
-text-file output:
+text file output:
 
 ::
 
@@ -273,7 +273,7 @@ the line where the key is found (negative numbers are allowed).
 ~~~~~~~~~~~~~~~~~~
 
 Now consider the same application that produces the following as part of its
-text-file output:
+text file output:
 
 ::
 
@@ -287,17 +287,9 @@ text-file output:
 This time, extract all of the displacements in one read and store
 them as an array. You can do this with the ``transfer_array`` method.
 
-.. testcode:: Parse_Output
+.. embed-test::
+    openmdao.utils.tests.test_file_wrap.FileParserFeatureTestCase.test_parse_array
 
-    parser.reset_anchor()
-    parser.mark_anchor("LOAD CASE")
-    var = parser.transfer_array(2, 2, 2, 5)
-
-    print(var)
-
-.. testoutput:: Parse_Output
-
-    [ 2.1      4.6      3.1      2.22234]
 
 The ``transfer_array`` method takes four arguments: *starting row*, *starting field*,
 *ending row*, and *ending field*. The parser extracts all values from the starting
@@ -306,41 +298,15 @@ These values are all placed in a 1D array. When extracting multiple lines, if
 a line break is hit, the parser continues reading from the next line until the
 last line is hit. The following extraction illustrates this:
 
-.. testcode:: Parse_Output
+.. embed-test::
+    openmdao.utils.tests.test_file_wrap.FileParserFeatureTestCase.test_parse_array_multiline
 
-    parser.reset_anchor()
-    parser.mark_anchor("LOAD CASE")
-    var = parser.transfer_array(1, 3, 2, 4)
-
-    print(var)
-
-.. testoutput:: Parse_Output
-
-    ['39342000.0' 'nan' '265400.0' 'DISPLACEMENT' '2.1' '4.6' '3.1']
 
 With the inclusion of ``'DISPLACEMENT'``, this is returned as an array of strings,
 so you must be careful.
 
 There is also a method to extract a 2-dimensional array from tabulated data.
 Consider an output table that looks like this:
-
-.. testcode:: Parse_Output2D
-    :hide:
-
-    from openmdao.util.file_wrap import FileParser
-    parser = FileParser()
-    from openmdao.api import Component
-    self = Component()
-
-    # A way to "cheat" and do this without a file.
-    parser.data = []
-    parser.data.append('FREQ  DELTA  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5')
-    parser.data.append(' Hz')
-    parser.data.append(' 50.   1.0   30.0  34.8  36.3  36.1  34.6  32.0  28.4  23.9  18.5  12.2')
-    parser.data.append(' 63.   1.0   36.5  41.3  42.8  42.6  41.1  38.5  34.9  30.4  25.0  18.7')
-    parser.data.append(' 80.   1.0   42.8  47.6  49.1  48.9  47.4  44.8  41.2  36.7  31.3  25.0')
-    parser.data.append('100.   1.0   48.4  53.1  54.7  54.5  53.0  50.4  46.8  42.3  36.9  30.6')
-
 
 ::
 
@@ -354,23 +320,12 @@ Consider an output table that looks like this:
 We would like to extract the relevant numerical data from this table, which
 amounts to all values contained in columns labeled "A" through "J" and rows
 labeled "50 Hz" through "100 Hz." We would like to save these values in a
-two-dimensional numpy array. This can be accomplished using the ``transfer_2Darray``
+.. two-dimensional numpy array. This can be accomplished using the ``transfer_2Darray``
 method.
 
-.. testcode:: Parse_Output2D
+.. embed-test::
+    openmdao.utils.tests.test_file_wrap.FileParser2dFeatureTestCase.test_parse_array_2d
 
-    parser.reset_anchor()
-    parser.mark_anchor("Hz")
-    var = parser.transfer_2Darray(1, 3, 4, 12)
-
-    print(var)
-
-.. testoutput:: Parse_Output2D
-
-    [[ 30.   34.8  36.3  36.1  34.6  32.   28.4  23.9  18.5  12.2]
-     [ 36.5  41.3  42.8  42.6  41.1  38.5  34.9  30.4  25.   18.7]
-     [ 42.8  47.6  49.1  48.9  47.4  44.8  41.2  36.7  31.3  25. ]
-     [ 48.4  53.1  54.7  54.5  53.   50.4  46.8  42.3  36.9  30.6]]
 
 The arguments to ``transfer_2Darray`` are the *starting row*, *starting field*,
 *ending row*, and *ending field*. If the ending field is omitted, then all values
@@ -394,48 +349,17 @@ general white space characters space (``" "``) and tab (``"\t"``). The newline c
 One common case that will require a change in the default delimiter is comma
 separated values (i.e. `csv`). Here's an example of such an output file:
 
-::
+.. embed-test::
+    openmdao.utils.tests.test_file_wrap.FileParserDelimFeatureTestCase.test_parse_default_delim
 
-    CASE 1
-    3,7,2,4,5,6
-
-.. testcode:: Parse_Output
-    :hide:
-
-    parser.data = []
-    parser.data.append("CASE 1")
-    parser.data.append("3,7,2,4,5,6")
-    parser.reset_anchor()
-
-Try extracting the first element without changing the delimiters:
-
-.. testcode:: Parse_Output
-
-    parser.mark_anchor("CASE")
-    var = parser.transfer_var(1, 2)
-
-    print(var)
-
-.. testoutput:: Parse_Output
-
-    ,7,2,4,5,6
 
 What happened here is slightly confusing, but the main point is that the parser
 did not handle this as expected because commas were not in the set of
 delimiters. Now specify commas as your delimiter.
 
-.. testcode:: Parse_Output
+.. embed-test::
+    openmdao.utils.tests.test_file_wrap.FileParserDelimFeatureTestCase.test_parse_comma_delim
 
-    parser.reset_anchor()
-    parser.mark_anchor("CASE")
-    parser.set_delimiters(", ")
-    var = parser.transfer_var(1, 2)
-
-    print(var)
-
-.. testoutput:: Parse_Output
-
-    7
 
 With the correct delimiter set, you extract the second integer as expected.
 

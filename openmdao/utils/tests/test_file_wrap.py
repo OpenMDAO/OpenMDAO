@@ -8,6 +8,9 @@ import shutil
 
 import unittest
 
+from openmdao.devtools.testutil import assert_rel_error, assertEqualArrays
+
+import numpy
 from numpy import array, isnan, isinf
 
 from openmdao.utils.file_wrap import InputFileGenerator, FileParser
@@ -726,6 +729,7 @@ class FileGenFeatureTestCase(unittest.TestCase):
 class FileParserFeatureTestCase(unittest.TestCase):
 
     def setUp(self):
+        import numpy
         from openmdao.utils.file_wrap import FileParser
 
         global parser  # global so we don't need `self.` in feature doc
@@ -739,6 +743,9 @@ class FileParserFeatureTestCase(unittest.TestCase):
             "STRESS 11 22 33 44 55 66",
             "DISPLACEMENT 1.0 2.0 3.0 4.0 5.0"
         ]
+
+    def assertEqualArrays(self, a1, a2):
+        assertEqualArrays(a1, a2)
 
     def test_parse_output(self):
         parser.mark_anchor("LOAD CASE")
@@ -759,7 +766,7 @@ class FileParserFeatureTestCase(unittest.TestCase):
         parser.mark_anchor("LOAD CASE")
         var = parser.transfer_var(2, 1)
 
-        self.assertEqual(var, "DISPLACEMENT")
+        self.assertEqual((var, type(var)), ("DISPLACEMENT", str))
 
     def test_parse_output_2(self):
         parser.reset_anchor()
@@ -781,6 +788,86 @@ class FileParserFeatureTestCase(unittest.TestCase):
         var = parser.transfer_keyvar("DISPLACEMENT", 1)
 
         self.assertEqual(var, 2.1)
+
+    def test_parse_array(self):
+        parser.reset_anchor()
+        parser.mark_anchor("LOAD CASE")
+        var = parser.transfer_array(2, 2, 2, 5)
+
+        assert_rel_error(self, var, numpy.array([2.1, 4.6, 3.1, 2.22234]))
+
+    def test_parse_array_multiline(self):
+        parser.reset_anchor()
+        parser.mark_anchor("LOAD CASE")
+        var = parser.transfer_array(1, 3, 2, 4)
+
+        self.assertEqualArrays(var, numpy.array([
+            '39342000.0', 'nan', '265400.0',
+            'DISPLACEMENT', '2.1', '4.6', '3.1'
+        ]))
+
+
+class FileParser2dFeatureTestCase(unittest.TestCase):
+
+    def setUp(self):
+        import numpy
+        from openmdao.utils.file_wrap import FileParser
+
+        global parser  # global so we don't need `self.` in feature doc
+        parser = FileParser()
+
+        # A way to "cheat" and do this without a file.
+        parser._data = []
+        parser._data.append('FREQ  DELTA  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5  -8.5')
+        parser._data.append(' Hz')
+        parser._data.append(' 50.   1.0   30.0  34.8  36.3  36.1  34.6  32.0  28.4  23.9  18.5  12.2')
+        parser._data.append(' 63.   1.0   36.5  41.3  42.8  42.6  41.1  38.5  34.9  30.4  25.0  18.7')
+        parser._data.append(' 80.   1.0   42.8  47.6  49.1  48.9  47.4  44.8  41.2  36.7  31.3  25.0')
+        parser._data.append('100.   1.0   48.4  53.1  54.7  54.5  53.0  50.4  46.8  42.3  36.9  30.6')
+
+    def assertEqualArrays(self, a1, a2):
+        assertEqualArrays(a1, a2)
+
+    def test_parse_array_2d(self):
+        parser.reset_anchor()
+        parser.mark_anchor("Hz")
+        var = parser.transfer_2Darray(1, 3, 4, 12)
+
+        self.assertEqualArrays(var, numpy.array([
+            [30.0,  34.8,  36.3,  36.1,  34.6,  32.0,  28.4,  23.9,  18.5,  12.2],
+            [36.5,  41.3,  42.8,  42.6,  41.1,  38.5,  34.9,  30.4,  25.0,  18.7],
+            [42.8,  47.6,  49.1,  48.9,  47.4,  44.8,  41.2,  36.7,  31.3,  25.0],
+            [48.4,  53.1,  54.7,  54.5,  53.0,  50.4,  46.8,  42.3,  36.9,  30.6]
+        ]))
+
+
+class FileParserDelimFeatureTestCase(unittest.TestCase):
+
+    def setUp(self):
+        from openmdao.utils.file_wrap import FileParser
+
+        global parser  # global so we don't need `self.` in feature doc
+        parser = FileParser()
+
+        parser._data = [
+            "CASE 1",
+            "3,7,2,4,5,6"
+        ]
+
+    def test_parse_default_delim(self):
+        parser.reset_anchor()
+        parser.mark_anchor("CASE")
+        var = parser.transfer_var(1, 2)
+
+        self.assertEqual((var, type(var)), (",7,2,4,5,6", str))
+
+    def test_parse_comma_delim(self):
+        parser.reset_anchor()
+        parser.mark_anchor("CASE")
+        parser.set_delimiters(", ")
+        var = parser.transfer_var(1, 2)
+
+        self.assertEqual((var, type(var)), (7, int))
 
 
 if __name__ == "__main__":
