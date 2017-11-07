@@ -1,6 +1,6 @@
 """Define the Problem class and a FakeComm class for non-MPI users."""
 
-from __future__ import division
+from __future__ import division, print_function
 
 from collections import OrderedDict, defaultdict, namedtuple
 from itertools import product
@@ -1216,12 +1216,15 @@ class Problem(object):
         owning_ranks = self.model._owning_rank['output']
 
         if fwd:
-            input_list, output_list = wrt, of
+            oset = set(of)
+            input_list, output_list = wrt, [o for o in self.model._var_allprocs_abs_names['output'] if o in oset]
             old_input_list, old_output_list = oldwrt, oldof
             input_vec, output_vec = vec_dresid, vec_doutput
             input_vois = self.driver._designvars
             output_vois = self.driver._responses
             remote_outputs = self.driver._remote_responses
+
+
         else:  # rev
             input_list, output_list = of, wrt
             old_input_list, old_output_list = oldof, oldwrt
@@ -1264,7 +1267,7 @@ class Problem(object):
                 parallel_deriv_color = simul_coloring = None
                 use_rel_reduction = False
 
-            if simul_coloring:
+            if simul_coloring is not None:
                 if parallel_deriv_color:
                     raise RuntimeError("Using both simul_coloring and parallel_deriv_color with "
                                        "variable '%s' is not supported." % name)
@@ -1316,15 +1319,17 @@ class Problem(object):
 
             if matmat:
                 idx_iter = range(1)
-            elif simul_coloring:
+            elif simul_coloring is not None:
+                loc_idx_dict = defaultdict(lambda: -1)
                 # here we're guaranteed that there is only one voi
                 input_name = vois[0][0]
-                info = voi_info(input_name)
+                info = voi_info[input_name]
                 dinputs = info[0]
                 colors = set(simul_coloring)
                 def idx_iter():
                     for c in colors:
-                        yield np.nonzero(dinputs._views_flat[input_name][simul_coloring == c])
+                        yield np.nonzero(simul_coloring == c)[0]
+                idx_iter = idx_iter()
             else:
                 loc_idx_dict = defaultdict(lambda: -1)
                 max_len = max(len(voi_info[name][2]) for name, _, _, _, _ in vois)
@@ -1352,9 +1357,9 @@ class Problem(object):
                             for ii, idx in enumerate(idxs):
                                 if start <= idx < end:
                                     dinputs._views_flat[input_name][idx - start, ii] = 1.0
-                    elif simul_coloring:
-                        final_idxs = np.logical_and(i >= start, i < end)
-                        dinputs._views_flat[input_name][i - start] = 1.0
+                    elif simul_coloring is not None:
+                        final_idxs = i[np.logical_and(i >= start, i < end)]
+                        dinputs._views_flat[input_name][final_idxs - start] = 1.0
                     else:
                         if i >= len(idxs):
                             # reuse the last index if loop iter is larger than current var size
@@ -1366,6 +1371,7 @@ class Problem(object):
                             # Dictionary access returns a scaler for 1d input, and we
                             # need a vector for clean code, so use _views_flat.
                             dinputs._views_flat[input_name][idx - start] = 1.0
+                    #print(i, input_name, simul, dinputs._data[0])
 
                 model._solve_linear(lin_vec_names, mode, rel_systems)
 
@@ -1376,7 +1382,7 @@ class Problem(object):
 
                     if matmat:
                         loc_idx = loc_idxs
-                    elif simul:
+                    elif simul is not None:
                         loc_idx = loc_idxs[i - start]
                     else:
                         if i >= len(idxs):
@@ -1393,6 +1399,8 @@ class Problem(object):
                         if store:
                             loc_idx_dict[input_name] += delta_loc_idx
                         loc_idx = loc_idx_dict[input_name]
+
+                    orelcount = -1
 
                     # Pull out the answers and pack into our data structure.
                     for ocount, output_name in enumerate(output_list):
@@ -1418,6 +1426,7 @@ class Problem(object):
                             else:
                                 deriv_val = np.zeros(len(out_idxs))
                         else:  # relevant output
+                            orelcount += 1
                             if output_name in doutputs._views_flat:
                                 deriv_val = doutputs._views_flat[output_name]
                                 size = deriv_val.size
@@ -1471,7 +1480,10 @@ class Problem(object):
                                 if totals[okey][old_input_name] is None:
                                     totals[okey][old_input_name] = np.zeros((len_val, loc_size))
                                 if store:
-                                    totals[okey][old_input_name][:, loc_idx] = deriv_val
+                                    if simul is not None:
+                                        totals[okey][old_input_name][:, loc_idx[orelcount]] = deriv_val
+                                    else:
+                                        totals[okey][old_input_name][:, loc_idx] = deriv_val
                             else:
                                 ikey = old_output_list[ocount]
 
@@ -1483,6 +1495,7 @@ class Problem(object):
                             raise RuntimeError("unsupported return format")
 
         recording_iteration.stack.pop()
+        #print(totals)
         return totals
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):

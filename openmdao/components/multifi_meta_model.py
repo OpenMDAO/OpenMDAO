@@ -1,5 +1,7 @@
 """Define the MultiFiMetaModel class."""
 
+from six.moves import range
+
 import numpy as np
 
 from openmdao.components.meta_model import MetaModel

@@ -1,5 +1,7 @@
 """MetaModel provides basic meta modeling capability."""
 
+from six.moves import range
+
 import numpy as np
 from copy import deepcopy
 

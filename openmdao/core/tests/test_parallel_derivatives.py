@@ -13,6 +13,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped
 from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.array_utils import take_nth
 
 if MPI:
     from openmdao.api import PETScVector
@@ -703,6 +704,66 @@ class CleanupTestCase(unittest.TestCase):
         # test will fail if this fails to converge
         J = p.compute_totals(['con.y', 'obj.y'],
                              ['inputs.x'], return_format='dict')
+
+
+class Multiplier(ExplicitComponent):
+    def __init__(self, mult, size):
+        self.mult = mult
+        self.size = size
+        super(Multiplier, self).__init__()
+
+    def setup(self):
+        self.add_input('x', val=np.zeros(self.size))
+        self.add_output('y', val=np.zeros(self.size))
+
+        self.declare_partials(of='y', wrt='x')
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = inputs['x'] * inputs['x'] * self.mult
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        if mode == 'fwd':
+            if 'x' in d_inputs:
+                d_outputs['y'] += d_inputs['x'] * 2.0 * self.mult
+                print(self.pathname, d_outputs['y'])
+        else:
+            if 'x' in d_inputs:
+                d_inputs['x'] += d_inputs['x'] * 2.0 * self.mult
+
+
+class SimulDerivTestCase(unittest.TestCase):
+    def test_simul_fwd(self):
+        prob = Problem()
+        model = prob.model
+        total_size = 9
+        size = total_size // 3
+
+        model.add_subsystem('indep', IndepVarComp('x', np.ones(total_size)))
+        model.add_subsystem('C1', Multiplier(mult=2.0, size=size))
+        model.add_subsystem('C2', Multiplier(mult=3.0, size=size))
+        model.add_subsystem('C3', Multiplier(mult=5.0, size=size))
+
+        whole = list(range(total_size))
+
+        model.connect('indep.x', 'C1.x', src_indices=list(take_nth(0, size, whole)))
+        model.connect('indep.x', 'C2.x', src_indices=list(take_nth(1, size, whole)))
+        model.connect('indep.x', 'C3.x', src_indices=list(take_nth(2, size, whole)))
+
+        prob.model.add_design_var('indep.x', simul_coloring=np.array([1,1,1,2,2,2,3,3,3], dtype=int))
+        #prob.model.add_design_var('indep.x')
+        prob.model.add_constraint('C1.y', upper=0.0)
+        prob.model.add_constraint('C2.y', upper=0.0)
+        prob.model.add_constraint('C3.y', upper=0.0)
+
+        prob.setup(check=False, mode='fwd')
+        prob.run_driver()
+
+        J = prob.compute_totals(['C1.y', 'C2.y', 'C3.y'], ['indep.x'], return_format='dict')
+
+        assert_rel_error(self, J['C1.y']['indep.x'], np.eye(size)*4.0, 1e-6)
+        assert_rel_error(self, J['C2.y']['indep.x'], np.eye(size)*6.0, 1e-6)
+        assert_rel_error(self, J['C3.y']['indep.x'], np.eye(size)*10.0, 1e-6)
+
 
 
 if __name__ == "__main__":

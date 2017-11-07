@@ -15,7 +15,7 @@ import tempfile
 import numpy as np
 
 from six import StringIO, PY3
-from six.moves import cStringIO as cStringIO
+from six.moves import range, cStringIO as cStringIO
 
 from redbaron import RedBaron
 

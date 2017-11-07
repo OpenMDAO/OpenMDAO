@@ -3,6 +3,7 @@ from __future__ import division
 
 import numpy as np
 import scipy.sparse
+from six.moves import range
 
 from openmdao.jacobians.jacobian import Jacobian
 

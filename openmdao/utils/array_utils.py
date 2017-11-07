@@ -3,6 +3,8 @@ Utils for dealing with arrays.
 """
 
 import numpy as np
+import six
+from six.moves import range
 
 
 def evenly_distrib_idxs(num_divisions, arr_size):
@@ -38,6 +40,22 @@ def evenly_distrib_idxs(num_divisions, arr_size):
     offsets[1:] = np.cumsum(sizes)[:-1]
 
     return sizes, offsets
+
+
+def take_nth(rank, size, seq):
+    """Return an iterator over the sequence that returns every
+    nth element of seq based on the given rank within a group of
+    the given size.  For example, if size = 2, a rank of 0 returns
+    even indexed elements and a rank of 1 returns odd indexed elements.
+    """
+    assert(rank < size)
+    it = iter(seq)
+    while True:
+        for proc in range(size):
+            if rank == proc:
+                yield six.next(it)
+            else:
+                six.next(it)
 
 
 def convert_neg(arr, dim):

@@ -4,6 +4,7 @@ from __future__ import division
 
 import numpy as np
 from six import itervalues, iteritems
+from six.moves import range
 from itertools import product
 
 from openmdao.core.component import Component
