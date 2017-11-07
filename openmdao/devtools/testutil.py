@@ -103,11 +103,6 @@ def assertEqualArrays(a1, a2):
 
     a2 : array
         The second array to compare.
-
-    Returns
-    -------
-    bool
-        True is the arrays are equal, else False.
     """
     assert a1.shape == a2.shape
 
