@@ -93,7 +93,7 @@ script:
 - make all
 # run the tests from down here to see if it can work without being at top level
 - testflo -n 1 openmdao  -m "ptest*"
-- testflo -v -n 1 openmdao  --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*
+- testflo -n 1 openmdao  --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*
 
 after_success:
 - coveralls --rcfile=../../.coveragerc --output=coveralls.json

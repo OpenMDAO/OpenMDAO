@@ -82,21 +82,6 @@ input file.  If you have not provided the name of an output file, then the
 generated file data will be returned as a string.  We will use this feature in
 the following examples.
 
-.. testcode:: Parse_Input
-    :hide:
-
-    from openmdao.util.file_wrap import InputFileGenerator
-    parser = InputFileGenerator()
-    from openmdao.api import Component
-    self = Component()
-
-    # A way to "cheat" and do this without a file.
-    parser.data = []
-    parser.data.append("INPUT")
-    parser.data.append("1 2 3")
-    parser.data.append("INPUT")
-    parser.data.append("10.1 20.2 30.3")
-    parser.data.append("A B C")
 
 Let's say you want to replace the second integer in the input file above
 with a 7. The code would look like this.
@@ -199,7 +184,7 @@ text-file output:
     STRESS 11 22 33 44 55 66
     DISPLACEMENT 1.0 2.0 3.0 4.0 5.0
 
-As part of the file wrap, you need to reach into this file and extract the information
+As part of the file wrap, you need to extract the information from this file
 that is needed by downstream components in the model. For this to
 work, the file must have some general format that would allow you to locate the
 piece of data you need relative to some constant feature in the file. In other
@@ -212,113 +197,49 @@ characters that is some number of lines and some number of fields away from an
     from openmdao.util.file_wrap import FileParser
 
     parser = FileParser()
-    parser.set_file('myoutput.txt')
+    parser.set_file('output.txt')
 
 To use the FileParser object, first instantiate it and give it the name of the
 output file. (Note that this code must be placed in your component's
 ``compute`` function *after* the external code has been run.
 
-.. testcode:: Parse_Output
-    :hide:
-
-    from __future__ import print_function
-
-    from openmdao.util.file_wrap import FileParser
-    parser = FileParser()
-    from openmdao.api import Component
-    self = Component()
-
-    # A way to "cheat" and do this without a file.
-    parser.data = []
-    parser.data.append("LOAD CASE 1")
-    parser.data.append("STRESS 1.3334e7 3.9342e7 NaN 2.654e5")
-    parser.data.append("DISPLACEMENT 2.1 4.6 3.1 2.22234")
-    parser.data.append("LOAD CASE 2")
-    parser.data.append("STRESS 11 22 33 44 55 66")
-    parser.data.append("DISPLACEMENT 1.0 2.0 3.0 4.0 5.0")
-
 Say you want to extract the first ``STRESS`` value from each load case in the file
-snippet shown above. The code would look like this. (Note: in this example the print
-statement is there only for display.)
+snippet shown above. The code would look like this.
 
-.. testcode:: Parse_Output
+.. embed-test::
+    openmdao.utils.tests.test_file_wrap.FileParserFeatureTestCase.test_parse_output
 
-    parser.mark_anchor("LOAD CASE")
-    var = parser.transfer_var(1, 2)
-
-    print("%g is a %s" % (var, type(var)))
-    self.xreal = var
-
-.. testoutput:: Parse_Output
-
-    1.3334e+07 is a <... 'float'>
 
 The method ``mark_anchor`` is used to define an anchor, which becomes the
 starting point for the ``transfer_var`` method. Here, you extract the value from the
 second field in the first line down from the anchor. The parser is smart enough to
 recognize the number as floating point and to create a Python float variable.
-The final statement assigns this value to the component variable `xreal`.
 
-The third value of ``STRESS`` is `NaN`. If you want to extract that element, you can type
-this:
+The third value of ``STRESS`` is `NaN`. Python has built-in values for `nan`
+and `inf` that are valid for float variables. The parser recognizes them when it
+encounters them in a file. This allows you to catch numerical overflows,
+underflows, etc., and take action. NumPy includes the functions ``isnan`` and
+``isinf`` to test for `nan` and `inf` respectively.  In the following example,
+we extract that `nan` value:
 
-::
+.. embed-test::
+    openmdao.utils.tests.test_file_wrap.FileParserFeatureTestCase.test_parse_nan
 
-    parser.reset_anchor()
-    parser.mark_anchor("LOAD CASE")
-    var = parser.transfer_var(1, 4)
 
-    print("%g" % var)
+When the data is not a number, it is recognized as a string. For example, we can
+extract the word ``DISPLACEMENT``.
 
-::
+.. embed-test::
+    openmdao.utils.tests.test_file_wrap.FileParserFeatureTestCase.test_parse_string
 
-    nan
-
-Python also has built-in values for `nan` and `inf` that are valid for float variables. The parser
-recognizes them when it encounters them in a file. This allows you to catch numerical overflows,
-underflows, etc., and take action. NumPy includes the functions ``isnan`` and ``isinf`` to test for
-`nan` and `inf` respectively.
-
-::
-
-    from numpy import isnan, isinf
-
-    print(isnan(var))
-
-::
-
-    True
-
-When the data is not a number, it is recognized as a string. extract the
-word ``DISPLACEMENT``.
-
-.. testcode:: Parse_Output
-
-    parser.reset_anchor()
-    parser.mark_anchor("LOAD CASE")
-    var = parser.transfer_var(2, 1)
-
-    print(var)
-
-.. testoutput:: Parse_Output
-
-    DISPLACEMENT
 
 Now, what if you want to extract the value of stress from the second load case? An
 additional argument can be passed to the ``mark_anchor`` method telling it to
 start at the second instance of the text fragment ``"LOAD CASE"``.
 
-.. testcode:: Parse_Output
+.. embed-test::
+    openmdao.utils.tests.test_file_wrap.FileParserFeatureTestCase.test_parse_output_2
 
-    parser.reset_anchor()
-    parser.mark_anchor("LOAD CASE", 2)
-    var = parser.transfer_var(1, 2)
-
-    print(var)
-
-.. testoutput:: Parse_Output
-
-    11
 
 Note also that we used the method ``reset_anchor`` to return the anchor to the
 beginning of the file before marking our new anchor. Subsequent calls to
@@ -330,41 +251,23 @@ You can also count backwards from the bottom of the file by passing a negative
 number. Here, the second instance of ``"LOAD CASE"`` from the bottom brings us
 back to the first one.
 
-.. testcode:: Parse_Output
+.. embed-test::
+    openmdao.utils.tests.test_file_wrap.FileParserFeatureTestCase.test_parse_output_minus2
 
-    parser.reset_anchor()
-    parser.mark_anchor("LOAD CASE", -2)
-    var = parser.transfer_var(1, 2)
-
-    print("%g" % var)
-
-.. testoutput:: Parse_Output
-
-    1.3334e+07
 
 There is a shortcut for extracting data that is stored as ``Key Value`` or
-``"Key Value Value....``.
-
-.. testcode:: Parse_Output
-
-    parser.reset_anchor()
-    parser.mark_anchor("LOAD CASE 1")
-    var = parser.transfer_keyvar("DISPLACEMENT", 1)
-
-    print("%g" % var)
-
-.. testoutput:: Parse_Output
-
-    2.1
-
-The method ``transfer_keyvar`` finds the first occurrence of the *key* string
-after the anchor (in this case, the word ``DISPLACEMENT``), and extracts the
-specified field value. This can be useful in cases where variables are found
-on lines that are uniquely named, particularly where you don't always know how
+``"Key Value Value ..."``. The method ``transfer_keyvar`` finds the first occurrence
+of the *key* string after the anchor (in this case, the word ``DISPLACEMENT``), and
+extracts the specified field value. This can be useful in cases where variables are
+found on lines that are uniquely named, particularly where you don't always know how
 many lines the key will occur past the anchor location. There are two optional
 arguments to ``transfer_keyvar``. The first lets you specify the `nth` occurrence
 of the key, and the second lets you specify a number of lines to offset from
 the line where the key is found (negative numbers are allowed).
+
+.. embed-test::
+    openmdao.utils.tests.test_file_wrap.FileParserFeatureTestCase.test_parse_keyvar
+
 
 *Array Extraction*
 ~~~~~~~~~~~~~~~~~~

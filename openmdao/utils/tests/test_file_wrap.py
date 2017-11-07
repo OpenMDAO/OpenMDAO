@@ -666,11 +666,9 @@ class FileGenFeatureTestCase(unittest.TestCase):
     }
 
     def setUp(self):
-        import sys
         from openmdao.utils.file_wrap import InputFileGenerator
 
-        # use a global parser object so we don't need `self.` in feature doc
-        global parser
+        global parser  # global so we don't need `self.` in feature doc
         parser = InputFileGenerator()
 
         # the input data for each test is the output of the previous test
@@ -724,6 +722,65 @@ class FileGenFeatureTestCase(unittest.TestCase):
         self.assertEqual(parser.generate(),
                          '\n'.join(self.output_data[self._testMethodName]))
 
+
+class FileParserFeatureTestCase(unittest.TestCase):
+
+    def setUp(self):
+        from openmdao.utils.file_wrap import FileParser
+
+        global parser  # global so we don't need `self.` in feature doc
+        parser = FileParser()
+
+        parser._data = [
+            "LOAD CASE 1",
+            "STRESS 1.3334e7 3.9342e7 NaN 2.654e5",
+            "DISPLACEMENT 2.1 4.6 3.1 2.22234",
+            "LOAD CASE 2",
+            "STRESS 11 22 33 44 55 66",
+            "DISPLACEMENT 1.0 2.0 3.0 4.0 5.0"
+        ]
+
+    def test_parse_output(self):
+        parser.mark_anchor("LOAD CASE")
+        var = parser.transfer_var(1, 2)
+
+        self.assertEqual((var, type(var)), (1.3334e+07, float))
+
+    def test_parse_nan(self):
+        parser.reset_anchor()
+        parser.mark_anchor("LOAD CASE")
+        var = parser.transfer_var(1, 4)
+
+        from numpy import isnan, isinf
+        self.assertEqual(isnan(var), True)
+
+    def test_parse_string(self):
+        parser.reset_anchor()
+        parser.mark_anchor("LOAD CASE")
+        var = parser.transfer_var(2, 1)
+
+        self.assertEqual(var, "DISPLACEMENT")
+
+    def test_parse_output_2(self):
+        parser.reset_anchor()
+        parser.mark_anchor("LOAD CASE", 2)
+        var = parser.transfer_var(1, 2)
+
+        self.assertEqual((var, type(var)), (11, int))
+
+    def test_parse_output_minus2(self):
+        parser.reset_anchor()
+        parser.mark_anchor("LOAD CASE", -2)
+        var = parser.transfer_var(1, 2)
+
+        self.assertAlmostEqual(var, 1.3334e+07)
+
+    def test_parse_keyvar(self):
+        parser.reset_anchor()
+        parser.mark_anchor("LOAD CASE 1")
+        var = parser.transfer_keyvar("DISPLACEMENT", 1)
+
+        self.assertEqual(var, 2.1)
 
 
 if __name__ == "__main__":
