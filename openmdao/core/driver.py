@@ -1,8 +1,9 @@
 """Define a base class for all Drivers in OpenMDAO."""
 from __future__ import print_function
 from collections import OrderedDict
+import warnings
 
-from six import iteritems
+from six import iteritems, itervalues
 
 import numpy as np
 
@@ -173,14 +174,23 @@ class Driver(object):
         self._objs = objs = OrderedDict()
         self._cons = cons = OrderedDict()
         self._responses = model.get_responses(recurse=True)
+        response_size = 0
         for name, data in iteritems(self._responses):
             if data['type'] == 'con':
                 cons[name] = data
             else:
                 objs[name] = data
+            response_size += data['size']
 
         # Gather up the information for design vars.
         self._designvars = model.get_design_vars(recurse=True)
+        desvar_size = np.sum(data['size'] for data in itervalues(self._designvars))
+
+        if ((problem._mode == 'fwd' and desvar_size > response_size) or
+                (problem._mode == 'rev' and response_size > desvar_size)):
+            warnings.warn("Inefficient choice of derivative mode.  You chose '%s' for a "
+                          "design variable size of %d and a response size of %d." %
+                          (problem._mode, desvar_size, response_size), RuntimeWarning)
 
         con_set = set()
         obj_set = set()

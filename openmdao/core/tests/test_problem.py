@@ -493,10 +493,58 @@ class TestProblem(unittest.TestCase):
         try:
             prob.setup(mode='junk')
         except ValueError as err:
-            msg = "Unsupported mode: 'junk'"
+            msg = "Unsupported mode: 'junk'. Use either 'fwd' or 'rev'."
             self.assertEqual(str(err), msg)
         else:
             self.fail('Expecting ValueError')
+
+    def test_setup_bad_mode_direction_fwd(self):
+
+        prob = Problem()
+        prob.model.add_subsystem("indep", IndepVarComp("x", np.ones(99)))
+        prob.model.add_subsystem("C1", ExecComp("y=2.0*x", x=np.zeros(10), y=np.zeros(10)))
+
+        prob.model.connect("indep.x", "C1.x", src_indices=list(range(10)))
+
+        prob.model.add_design_var("indep.x")
+        prob.model.add_objective("C1.y")
+
+        prob.setup(mode='fwd')
+
+        with warnings.catch_warnings(record=True) as w:
+            prob.final_setup()
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, RuntimeWarning))
+        self.assertEqual(str(w[0].message),
+                         "Inefficient choice of derivative mode.  "
+                         "You chose 'fwd' for a design variable size of 99 and a "
+                         "response size of 10.")
+
+    def test_setup_bad_mode_direction_rev(self):
+
+        prob = Problem()
+        prob.model.add_subsystem("indep", IndepVarComp("x", np.ones(10)))
+        prob.model.add_subsystem("C1", ExecComp("y=2.0*x", x=np.zeros(10), y=np.zeros(10)))
+        prob.model.add_subsystem("C2", ExecComp("y=2.0*x", x=np.zeros(10), y=np.zeros(10)))
+
+        prob.model.connect("indep.x", ["C1.x", "C2.x"])
+
+        prob.model.add_design_var("indep.x")
+        prob.model.add_constraint("C1.y")
+        prob.model.add_constraint("C2.y")
+
+        prob.setup(mode='rev')
+
+        with warnings.catch_warnings(record=True) as w:
+            prob.final_setup()
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, RuntimeWarning))
+        self.assertEqual(str(w[0].message),
+                         "Inefficient choice of derivative mode.  "
+                         "You chose 'rev' for a design variable size of 10 and a "
+                         "response size of 20.")
 
     def test_run_before_setup(self):
         # Test error message when running before setup.
