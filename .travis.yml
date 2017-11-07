@@ -96,9 +96,9 @@ script:
 - testflo -n 1 openmdao  --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*
 
 after_success:
-- coveralls -v --rcfile=../../.coveragerc --output=coveralls.json
+- coveralls --rcfile=../../.coveragerc --output=coveralls.json
 - sed 's/\/home\/travis\/miniconda\/lib\/python'"$PY"'\/site-packages\///g' < coveralls.json > coveralls-upd.json
-- coveralls -v --upload=coveralls-upd.json
+- coveralls --upload=coveralls-upd.json
 
 before_deploy:
 - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
