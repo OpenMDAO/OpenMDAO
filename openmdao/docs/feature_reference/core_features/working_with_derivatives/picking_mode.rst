@@ -21,7 +21,7 @@ function as follows:
 
 Pass 'fwd' to indicate forward mode and 'rev' to indicate reverse mode.
 
-If you choose a mode that not optimal based on the sizes in your problem, you
+If you choose a mode that is not optimal based on the sizes in your problem, you
 will see a warning like this:
 
 
