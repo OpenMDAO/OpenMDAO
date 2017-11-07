@@ -194,34 +194,32 @@ class ParaboloidExternalCode(ExternalCode):
 class TestExternalCodeFeature(unittest.TestCase):
 
     def setUp(self):
-        # if running in doc build, there will be no 'self'
-        if 'self' in locals():
-            self.startdir = os.getcwd()
-            self.tempdir = tempfile.mkdtemp(prefix='test_extcode_feature-')
-            os.chdir(self.tempdir)
-            shutil.copy(os.path.join(DIRECTORY, 'extcode_paraboloid.py'),
-                        os.path.join(self.tempdir, 'extcode_paraboloid.py'))
-        else:
-            os.chdir(DIRECTORY)
+        import os
+        import shutil
+        import tempfile
+
+        # get the directory where the needed support files are located
+        import openmdao.components.tests.test_external_code as extcode_test
+        DIRECTORY = os.path.dirname((os.path.abspath(extcode_test.__file__)))
+
+        # change to temp dir
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix='test_extcode-')
+        os.chdir(self.tempdir)
+
+        # copy required files to temp dir
+        files = ['extcode_paraboloid.py']
+        for filename in files:
+            shutil.copy(os.path.join(DIRECTORY, filename),
+                        os.path.join(self.tempdir, filename))
 
     def tearDown(self):
+        # destroy the evidence
+        os.chdir(self.startdir)
         try:
-            os.remove('paraboloid_input.dat')
+            shutil.rmtree(self.tempdir)
         except OSError:
             pass
-
-        try:
-            os.remove('paraboloid_output.dat')
-        except OSError:
-            pass
-
-        # if running in doc build, there will be no 'self'
-        if 'self' in locals():
-            os.chdir(self.startdir)
-            try:
-                shutil.rmtree(self.tempdir)
-            except OSError:
-                pass
 
     def test_main(self):
         from openmdao.api import Problem, Group, IndepVarComp
