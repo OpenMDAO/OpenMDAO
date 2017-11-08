@@ -611,7 +611,7 @@ def get_test_src(method_path):
 
     global_imports = globals_for_imports(method_source)
 
-    # don't
+    # get setUp and tearDown but don't duplicate if it is the method being tested
     setup_source_code = '' if method_name == 'setUp' else \
         get_method_body(inspect.getsource(getattr(cls, 'setUp')))
 
