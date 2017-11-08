@@ -2,15 +2,23 @@ import os
 import time
 import argparse
 
+
 def main():
-    """ Just an external program for testing ExternalCode. """
+    """
+    A standalone program for testing ExternalCode.
+
+    Writes "test data" to the specified output file after an optional delay.
+    Optionally writes the value of the environment variable "TEST_ENV_VAR"
+    to the file.
+    """
 
     parser = argparse.ArgumentParser()
     parser.add_argument("output_filename")
-    parser.add_argument("-e", "--write_test_env_var", help="Write the value of TEST_ENV_VAR to the file",
-                    action="store_true", default=False)
+    parser.add_argument("-e", "--write_test_env_var",
+                        help="Write the value of TEST_ENV_VAR to the file",
+                        action="store_true", default=False)
     parser.add_argument("-d", "--delay", type=float,
-                    help="time in seconds to delay")
+                        help="time in seconds to delay")
 
     args = parser.parse_args()
 
@@ -26,6 +34,6 @@ def main():
 
     return 0
 
+
 if __name__ == '__main__':
     main()
-

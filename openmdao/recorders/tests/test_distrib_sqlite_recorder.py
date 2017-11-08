@@ -232,15 +232,15 @@ class DistributedRecorderTest(unittest.TestCase):
         rrank = prob.comm.rank  # root ( aka model ) rank.
         rowned = prob.model._owning_rank['output']
         # names of sysincl vars on this rank
-        local_sysinclnames = [n for n in prob.driver.recording_options['system_includes'] if rrank == rowned[n]]
+        local_inclnames = [n for n in prob.driver.recording_options['includes'] if rrank == rowned[n]]
         # Get values for vars on this rank
         inputs, outputs, residuals = prob.model.get_nonlinear_vectors()
         #   Potential local sysvars are in this
         sysvars = outputs._names
         # Just get the values for the sysincl vars on this rank
-        local_sysvars = {c: sysvars[c] for c in local_sysinclnames}
+        local_vars = {c: sysvars[c] for c in local_inclnames}
         # Gather up the values for all the sysincl vars on all ranks
-        all_vars = prob.model.comm.gather(local_sysvars, root=0)
+        all_vars = prob.model.comm.gather(local_vars, root=0)
 
         if prob.comm.rank == 0:
             # Only on rank 0 do we have all the values and only on rank 0
@@ -250,7 +250,7 @@ class DistributedRecorderTest(unittest.TestCase):
             for d in all_vars[:-1]:
                 dct.update(d)
 
-            expected_sysincludes = {
+            expected_includes = {
                 'par.G1.Cy.y': dct['par.G1.Cy.y'],
                 'par.G2.Cy.y': dct['par.G2.Cy.y'],
             }
@@ -260,7 +260,7 @@ class DistributedRecorderTest(unittest.TestCase):
             coordinate = [0, 'SLSQP', (49,)]
             self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
                                                      expected_objectives, expected_constraints,
-                                                     expected_sysincludes),), self.eps)
+                                                     expected_includes),), self.eps)
 
 
 if __name__ == "__main__":
