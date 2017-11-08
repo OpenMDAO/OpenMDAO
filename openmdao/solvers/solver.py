@@ -252,7 +252,7 @@ class Solver(object):
             outputs = self._system._vectors['output']['linear']
         # myoutputs = {n for n in outputs
         myoutputs = {n for n in outputs._names
-                        if check_path(n, incl, excl)}
+                     if check_path(n, incl, excl)}
 
         self._filtered_vars_to_record = {
             'out': myoutputs,
