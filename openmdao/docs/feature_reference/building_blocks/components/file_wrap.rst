@@ -320,8 +320,8 @@ Consider an output table that looks like this:
 We would like to extract the relevant numerical data from this table, which
 amounts to all values contained in columns labeled "A" through "J" and rows
 labeled "50 Hz" through "100 Hz." We would like to save these values in a
-.. two-dimensional numpy array. This can be accomplished using the ``transfer_2Darray``
-method.
+two-dimensional numpy array. This can be accomplished using the
+``transfer_2Darray`` method.
 
 .. embed-test::
     openmdao.utils.tests.test_file_wrap.FileParser2dFeature.test_parse_array_2d
