@@ -28,4 +28,4 @@ will see a warning like this:
 .. code-block:: none
 
     RuntimeWarning: Inefficient choice of derivative mode.  You chose 'rev' for a
-    design variable size of 100 and a response size of 200.
+    problem with 100 design variables and 200 response variables (objectives and constraints).

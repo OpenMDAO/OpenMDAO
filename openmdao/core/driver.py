@@ -189,7 +189,8 @@ class Driver(object):
         if ((problem._mode == 'fwd' and desvar_size > response_size) or
                 (problem._mode == 'rev' and response_size > desvar_size)):
             warnings.warn("Inefficient choice of derivative mode.  You chose '%s' for a "
-                          "design variable size of %d and a response size of %d." %
+                          "problem with %d design variables and %d response variables "
+                          "(objectives and constraints)." %
                           (problem._mode, desvar_size, response_size), RuntimeWarning)
 
         con_set = set()

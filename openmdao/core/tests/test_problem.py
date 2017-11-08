@@ -518,8 +518,8 @@ class TestProblem(unittest.TestCase):
         self.assertTrue(issubclass(w[0].category, RuntimeWarning))
         self.assertEqual(str(w[0].message),
                          "Inefficient choice of derivative mode.  "
-                         "You chose 'fwd' for a design variable size of 99 and a "
-                         "response size of 10.")
+                         "You chose 'fwd' for a problem with 99 design variables and 10 "
+                         "response variables (objectives and constraints).")
 
     def test_setup_bad_mode_direction_rev(self):
 
@@ -543,8 +543,8 @@ class TestProblem(unittest.TestCase):
         self.assertTrue(issubclass(w[0].category, RuntimeWarning))
         self.assertEqual(str(w[0].message),
                          "Inefficient choice of derivative mode.  "
-                         "You chose 'rev' for a design variable size of 10 and a "
-                         "response size of 20.")
+                         "You chose 'rev' for a problem with 10 design variables and 20 "
+                         "response variables (objectives and constraints).")
 
     def test_run_before_setup(self):
         # Test error message when running before setup.
