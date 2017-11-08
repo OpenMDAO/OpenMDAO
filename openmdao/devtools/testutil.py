@@ -112,8 +112,6 @@ def assertEqualArrays(a1, a2):
     for x, y in zip(flat1, flat2):
         assert x == y
 
-    assert True
-
 
 class TestLogger(object):
     """A logger replacement for testing that simplifies checking log output."""
