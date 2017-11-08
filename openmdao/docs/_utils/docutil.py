@@ -574,8 +574,7 @@ def get_test_src(method_path):
             newline = line[tab:]
 
         # exclude 'global' directives, not needed the way we are running things
-        # also exclude anything with the '# nodoc' tag at the end of the line
-        if not newline.startswith("global ") or newline.endswith("# nodoc"):
+        if not newline.startswith("global "):
             new_lines.append(newline)
 
     method_source = '\n'.join(new_lines[counter:])
