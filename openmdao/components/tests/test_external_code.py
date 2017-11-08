@@ -181,7 +181,7 @@ class ParaboloidExternalCode(ExternalCode):
         with open(self.input_file, 'w') as input_file:
             input_file.write('%f\n%f\n' % (x,y))
 
-        # the parent solve_nonlinear function actually runs the external code
+        # the parent compute function actually runs the external code
         super(ParaboloidExternalCode, self).compute(inputs, outputs)
 
         # parse the output file from the external code and set the value of f_xy
