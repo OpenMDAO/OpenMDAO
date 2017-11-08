@@ -1328,7 +1328,7 @@ class Problem(object):
                 colors = set(simul_coloring)
                 def idx_iter():
                     for c in colors:
-                        yield np.nonzero(simul_coloring == c)[0]
+                        yield (c, np.nonzero(simul_coloring == c)[0])
                 idx_iter = idx_iter()
             else:
                 loc_idx_dict = defaultdict(lambda: -1)
@@ -1336,6 +1336,10 @@ class Problem(object):
                 idx_iter = range(max_len)
 
             for i in idx_iter:
+                if simul_coloring is not None:
+                    color, i = i
+                    print('color', color)
+                    color_count = 0
                 # this sets dinputs for the current parallel_deriv_color to 0
                 # dinputs is dresids in fwd, doutouts in rev
                 if fwd:
@@ -1481,7 +1485,11 @@ class Problem(object):
                                     totals[okey][old_input_name] = np.zeros((len_val, loc_size))
                                 if store:
                                     if simul is not None:
-                                        totals[okey][old_input_name][:, loc_idx[orelcount]] = deriv_val
+                                        out_simul_idxs = output_vois[output_name]['simul_map'][input_name][color]
+                                        if out_simul_idxs:
+                                            for si in out_simul_idxs:
+                                                totals[okey][old_input_name][si, loc_idx[color_count]] = deriv_val[si]
+                                                color_count += 1
                                     else:
                                         totals[okey][old_input_name][:, loc_idx] = deriv_val
                             else:

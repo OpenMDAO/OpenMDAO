@@ -2046,7 +2046,8 @@ class System(object):
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None,
                      adder=None, scaler=None, linear=False, parallel_deriv_color=None,
-                     vectorize_derivs=False, simul_coloring=None):
+                     vectorize_derivs=False, simul_coloring=None,
+                     simul_map=None):
         r"""
         Add a response variable to this system.
 
@@ -2208,13 +2209,14 @@ class System(object):
         if vectorize_derivs and parallel_deriv_color is None:
             resp['parallel_deriv_color'] = '@matmat'
         resp['simul_coloring'] = simul_coloring
+        resp['simul_map'] = simul_map
 
         responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
                        indices=None, linear=False, parallel_deriv_color=None,
-                       vectorize_derivs=False, simul_color=None):
+                       vectorize_derivs=False, simul_coloring=None, simul_map=None):
         r"""
         Add a constraint variable to this system.
 
@@ -2263,11 +2265,12 @@ class System(object):
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
                           ref0=ref0, indices=indices, linear=linear,
                           parallel_deriv_color=parallel_deriv_color,
-                          vectorize_derivs=vectorize_derivs)
+                          vectorize_derivs=vectorize_derivs,
+                          simul_coloring=simul_coloring, simul_map=simul_map)
 
     def add_objective(self, name, ref=None, ref0=None, index=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
-                      vectorize_derivs=False, simul_coloring=None):
+                      vectorize_derivs=False, simul_coloring=None, simul_map=None):
         r"""
         Add a response variable to this system.
 
@@ -2328,7 +2331,8 @@ class System(object):
         self.add_response(name, type_='obj', scaler=scaler, adder=adder,
                           ref=ref, ref0=ref0, index=index,
                           parallel_deriv_color=parallel_deriv_color,
-                          vectorize_derivs=vectorize_derivs)
+                          vectorize_derivs=vectorize_derivs,
+                          simul_coloring=simul_coloring, simul_map=simul_map)
 
     def get_design_vars(self, recurse=True, get_sizes=True):
         """

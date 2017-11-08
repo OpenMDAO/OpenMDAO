@@ -732,7 +732,7 @@ class Multiplier(ExplicitComponent):
 
 
 class SimulDerivTestCase(unittest.TestCase):
-    def test_simul_fwd(self):
+    def test_simul_fwd_simple(self):
         prob = Problem()
         model = prob.model
         total_size = 9
@@ -760,10 +760,81 @@ class SimulDerivTestCase(unittest.TestCase):
 
         J = prob.compute_totals(['C1.y', 'C2.y', 'C3.y'], ['indep.x'], return_format='dict')
 
-        assert_rel_error(self, J['C1.y']['indep.x'], np.eye(size)*4.0, 1e-6)
-        assert_rel_error(self, J['C2.y']['indep.x'], np.eye(size)*6.0, 1e-6)
-        assert_rel_error(self, J['C3.y']['indep.x'], np.eye(size)*10.0, 1e-6)
+        c1mat = np.array([
+            [4.,0,0,0,0,0,0,0,0],
+            [0,0,0,4.,0,0,0,0,0],
+            [0,0,0,0,0,0,4.,0,0],
+        ])
+        c2mat = np.array([
+            [0,6.,0,0,0,0,0,0,0],
+            [0,0,0,0,6.,0,0,0,0],
+            [0,0,0,0,0,0,0,6.,0],
+        ])
+        c3mat = np.array([
+            [0,0,10.,0,0,0,0,0,0],
+            [0,0,0,0,0,10.,0,0,0],
+            [0,0,0,0,0,0,0,0,10.],
+        ])
 
+        assert_rel_error(self, J['C1.y']['indep.x'], c1mat, 1e-6)
+        assert_rel_error(self, J['C2.y']['indep.x'], c2mat, 1e-6)
+        assert_rel_error(self, J['C3.y']['indep.x'], c3mat, 1e-6)
+
+    def test_simul_fwd(self):
+        prob = Problem()
+        model = prob.model
+        total_size = 9
+        size = total_size // 3
+
+        model.add_subsystem('indep', IndepVarComp('x', np.ones(total_size)))
+        model.add_subsystem('C1', Multiplier(mult=np.array([2.,4.,6.,8.,10.]), size=5))
+        model.add_subsystem('C2', Multiplier(mult=np.array([3.,6.,9.,12.]), size=4))
+
+        model.connect('indep.x', 'C1.x', src_indices=list(range(5)))
+        model.connect('indep.x', 'C2.x', src_indices=list(range(5,9)))
+
+        prob.model.add_design_var('indep.x', simul_coloring=np.array([3,3,1,2,3,1,1,2,2], dtype=int))
+
+        # simul_map are the indices of the output that map (in order) to the corresponding indices
+        # from the input for each color.
+        prob.model.add_constraint('C1.y', upper=0.0,
+                                  simul_map={
+                                      'indep.x': {
+                                          1: [2],
+                                          2: [3],
+                                          3: [4,1,0]
+                                      }
+                                  })
+        prob.model.add_constraint('C2.y', upper=0.0,
+                                  simul_map={
+                                      'indep.x': {
+                                          1: [0,1],
+                                          2: [2,3],
+                                          3: []
+                                      }
+                                  })
+
+        prob.setup(check=False, mode='fwd')
+        prob.run_driver()
+
+        J = prob.compute_totals(['C1.y', 'C2.y'], ['indep.x'], return_format='dict')
+
+        c1mat = np.array([
+            [0,0,0,0,4.,0,0,0,0],
+            [0,8.,0,0,0,0,0,0,0],
+            [0,0,12.,0,0,0,0,0,0],
+            [0,0,0,16.,0,0,0,0,0],
+            [20.,0,0,0,0,0,0,0,0],
+        ])
+        c2mat = np.array([
+            [0,0,0,0,0,6.,0,0,0],
+            [0,0,0,0,0,0,12.,0,0],
+            [0,0,0,0,0,0,0,18.,0],
+            [0,0,0,0,0,0,0,0,24.],
+        ])
+
+        assert_rel_error(self, J['C1.y']['indep.x'], c1mat, 1e-6)
+        assert_rel_error(self, J['C2.y']['indep.x'], c2mat, 1e-6)
 
 
 if __name__ == "__main__":
