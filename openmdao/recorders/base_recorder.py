@@ -27,7 +27,7 @@ class BaseRecorder(object):
     recording_options['record_residuals'] :  bool(False)
         Tells recorder whether to record the residuals of a System.
     recording_options['record_derivatives'] :  bool(False)
-        Tells recorder whether to record the derivatives of a System.
+        Tells recorder whether to record the derivatives of a Driver.
     recording_options['record_desvars'] :  bool(True)
         Tells recorder whether to record the desvars of a Driver.
     recording_options['record_responses'] :  bool(False)
