@@ -1,4 +1,4 @@
-"""Various utilty functions for testing."""
+"""Various utility functions for testing."""
 
 import numpy as np
 from math import isnan
@@ -25,7 +25,6 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
     tolerance : float
         Maximum relative error ``(actual - desired) / desired``.
     """
-
     if isinstance(actual, dict) and isinstance(desired, dict):
 
         actual_keys = set(actual.keys())
@@ -87,6 +86,31 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
                                (error, tolerance))
 
     return error
+
+
+def assertEqualArrays(a1, a2):
+    """
+    Check that two arrays are equal.
+
+    This is a simplified method useful when the arrays to be compared may
+    not be numeric. It simply compares the shapes of the two arrays and then
+    does a value by value comparison.
+
+    Parameters
+    ----------
+    a1 : array
+        The first array to compare.
+
+    a2 : array
+        The second array to compare.
+    """
+    assert a1.shape == a2.shape
+
+    flat1 = a1.flatten()
+    flat2 = a2.flatten()
+
+    for x, y in zip(flat1, flat2):
+        assert x == y
 
 
 class TestLogger(object):

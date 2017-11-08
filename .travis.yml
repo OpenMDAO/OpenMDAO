@@ -69,7 +69,7 @@ install:
 # keeping numpy pinned at 1.12 because pySNOPT dies with 1.13 because numpy broke callback
 - conda install --yes python=$PY numpy==1.12 scipy nose sphinx mock swig
 
-# trying a manual install of pyoptsparse
+# install pyoptsparse
 - wget https://bitbucket.org/mdolab/pyoptsparse/get/tip.zip;
 - unzip tip.zip;
 - cd mdolab-pyoptsparse*;
@@ -112,7 +112,7 @@ deploy:
   skip_cleanup: true
   script:
   - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-      if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
+      if [ "$MPI" ] && [ "$PY" = "3.6" ]; then
         rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/twodocversions/latest;
       fi
     fi
