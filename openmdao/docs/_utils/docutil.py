@@ -337,7 +337,7 @@ def split_source_into_input_blocks(src):
             in_code_blocks.append(in_code_block)
             in_code_block = []
 
-    if in_code_block: # If anything left over
+    if in_code_block:  # If anything left over
         in_code_blocks.append(''.join(in_code_block))
 
     return in_code_blocks
@@ -358,49 +358,28 @@ def insert_output_start_stop_indicators(src):
         String with output demarked.
     """
 
-    new_src = ""
-    input_block_number = 0
+    rb = RedBaron(src)
 
-    for line in src.split('\n'):
-        new_src += line + '\n'
-        r = RedBaron(line)
-        r.help()
-        # r = rb[0]
+    src_with_out_start_stop_indicators = []
+    input_block_number = 0
+    for r in rb:
+        line = r.dumps()
+        # not sure why some lines from RedBaron do not have newlines
+        if not line.endswith('\n'):
+            line += '\n'
+        src_with_out_start_stop_indicators.append(line)
+
         if r.type == 'print':
-            new_src += 'print(">>>>>{}")\n'.format(input_block_number)
+            r.help()
+            src_with_out_start_stop_indicators.append('print(">>>>>{}")\n'.format(input_block_number))
         elif len(r.value) == 3 and \
             (r.type, r.value[0].type, r.value[1].type, r.value[2].type) == \
                 ('atomtrailers', 'name', 'name', 'call') and \
                 r.value[1].value in ['run_model', 'run_driver', 'setup']:
-            new_src += 'print(">>>>>{}")\n'.format(input_block_number)
+            src_with_out_start_stop_indicators.append('print(">>>>>{}")\n'.format(input_block_number))
 
         input_block_number += 1
-
-    return new_src
-
-    # rb = RedBaron(src)
-
-    # src_with_out_start_stop_indicators = []
-    # input_block_number = 0
-    # for r in rb:
-    #     line = r.dumps()
-    #     # not sure why some lines from RedBaron do not have newlines
-    #     if not line.endswith('\n'):
-    #         line += '\n'
-    #     if r.type == 'print':
-    #         # src_with_out_start_stop_indicators += 'print("<<<<<{}")'.format(input_block_number) + '\n'
-    #         src_with_out_start_stop_indicators.append(line)
-    #         src_with_out_start_stop_indicators.append('print(">>>>>{}")\n'.format(input_block_number))
-    #     elif len(r.value) == 3 and \
-    #         (r.type, r.value[0].type, r.value[1].type, r.value[2].type) == \
-    #             ('atomtrailers', 'name', 'name', 'call') and \
-    #             r.value[1].value in ['run_model', 'run_driver', 'setup']:
-    #         src_with_out_start_stop_indicators.append(line)
-    #         src_with_out_start_stop_indicators.append('print(">>>>>{}")\n'.format(input_block_number))
-    #     else:
-    #         src_with_out_start_stop_indicators.append(line)
-    #     input_block_number += 1
-    # return ''.join(src_with_out_start_stop_indicators)
+    return ''.join(src_with_out_start_stop_indicators)
 
 
 def clean_up_empty_output_blocks(input_blocks, output_blocks):
@@ -571,8 +550,8 @@ def get_test_src(method_path):
     else:
         N_PROCS = getattr(cls, 'N_PROCS', 1)
         use_mpi =  N_PROCS > 1
+
     meth = getattr(cls, method_name)
-    class_source_code = inspect.getsource(cls)
 
     # Directly manipulating function text to strip header and remove leading whitespace.
     # Should be faster than redbaron

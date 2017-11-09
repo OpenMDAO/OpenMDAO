@@ -4,11 +4,8 @@ import unittest
 import warnings
 
 from six import iteritems
-from six.moves import cStringIO, range
 
-import numpy as np
-
-from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, IndepVarComp, DenseJacobian, DirectSolver
+from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp, DenseJacobian, DirectSolver
 from openmdao.api import ExecComp
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.unit_conv import UnitConvGroup, SrcComp, TgtCompC, TgtCompF, \
@@ -163,7 +160,6 @@ class TestUnitConversion(unittest.TestCase):
                 else:
                     d_inputs['x1'] += d_outputs['x2']
 
-
         class TgtCompFa(ExplicitComponent):
             """Target expressed in degrees F."""
 
@@ -182,7 +178,6 @@ class TestUnitConversion(unittest.TestCase):
                     d_outputs['x3'] += d_inputs['x2']
                 else:
                     d_inputs['x2'] += d_outputs['x3']
-
 
         prob = Problem()
         model = prob.model = Group()
