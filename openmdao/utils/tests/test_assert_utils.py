@@ -48,7 +48,7 @@ class TestAssertUtils(unittest.TestCase):
         rtol = 1.e-6
         assert_check_partials(data, atol, rtol)
 
-        print("prob['y'] = {}".format(prob['y']))
+        print("prob['y'] =", prob['y'])
 
 
     def test_assert_check_partials_exception_expected(self):
