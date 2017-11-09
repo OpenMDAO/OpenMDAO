@@ -1804,16 +1804,15 @@ def _format_error(error, tol):
     return '{:.6e} *'.format(error)
 
 
-def range_list_iter(num):
+def find_disjoint(prob):
     """
-    A generator of single element lists over a given range from 0 to num.
+    Given a problem, find all sets of disjoint columns in the total jacobian and their
+    corresponding rows.
+    """
+    from openmdao.jacobians.assembled_jacobian import DenseJacobian
+    prob.model.jacobian = DenseJacobian()
+    prob.setup()
+    prob.final_setup()
 
-    Parameters
-    ----------
-    num : int
-        Max number in the range.
-    """
-    lst = [0]
-    for i in range(num):
-        lst[0] = i
-        yield lst
+    mat = prob.model.jacobian._int_mtx._matrix
+    
