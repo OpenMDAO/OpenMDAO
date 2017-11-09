@@ -51,7 +51,7 @@ residual values.
 *List Implicit or Explicit Outputs*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Note that explicit and implicit variables are listed separately.  If you are
+Note that explicit and implicit outputs are listed separately.  If you are
 only interested in seeing one or the other, you can exclude the ones you do
 not wish to see via the :code:`implicit` and :code:`explicit` arguments.
 
