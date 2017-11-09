@@ -1,3 +1,4 @@
+# using this file to build the docs allows you to attach the debugger to the process.
 if __name__ == '__main__':
     import sys
     import sphinx

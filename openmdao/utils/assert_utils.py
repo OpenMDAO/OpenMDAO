@@ -99,10 +99,9 @@ def assert_no_dict_jacobians(system, include_self=True, recurse=True):
     """
     groups_with_dict_jacobians = []
     msg = 'The following groups use dictionary jacobians:\n'
-    for s in system.system_iter(include_self=include_self, recurse=recurse):
-        if isinstance(s, Group):
-            if isinstance(s.jacobian, DictionaryJacobian):
-                groups_with_dict_jacobians.append(s.pathname)
+    for s in system.system_iter(include_self=include_self, recurse=recurse, typ=Group):
+        if isinstance(s.jacobian, DictionaryJacobian):
+            groups_with_dict_jacobians.append(s.pathname)
     msg = msg + '\n'.join(['    ' + s for s in groups_with_dict_jacobians])
     if groups_with_dict_jacobians:
         raise AssertionError(msg)

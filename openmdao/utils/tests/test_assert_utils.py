@@ -11,12 +11,6 @@ from openmdao.utils.assert_utils import assert_check_partials, assert_no_approx_
 
 
 class TestAssertUtils(unittest.TestCase):
-    # def setUp(self):
-    #     # need to reset logger between tests because of the way
-    #     # docutil runs the feature tests with redirected I/O
-    #     import sys
-    #     from openmdao.utils.logger_utils import get_logger
-    #     get_logger('check_partials', out_stream=sys.stdout)
 
     def test_assert_check_partials_no_exception_expected(self):
         import numpy as np
