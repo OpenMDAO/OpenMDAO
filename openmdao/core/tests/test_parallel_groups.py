@@ -10,7 +10,6 @@ from openmdao.api import Problem, Group, ParallelGroup, ExecComp, IndepVarComp, 
 
 from openmdao.utils.mpi import under_mpirun
 from openmdao.utils.mpi import MPI
-from openmdao.error_checking.check_config import check_config
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -289,7 +288,8 @@ class TestParallelGroups(unittest.TestCase):
         # check that we get setup messages only on proc 0
         msg = 'Only want to see this on rank 0'
         testlogger = TestLogger()
-        prob.setup(vector_class=PETScVector, check=True, mode='fwd')
+        prob.setup(vector_class=PETScVector, check=True, mode='fwd',
+                   logger=testlogger)
         prob.final_setup()
 
         if prob.comm.rank > 0:
@@ -297,7 +297,6 @@ class TestParallelGroups(unittest.TestCase):
             self.assertEqual(len(testlogger.get('warning')), 0)
             self.assertEqual(len(testlogger.get('info')), 0)
         else:
-            check_config(prob, logger=testlogger)
             self.assertEqual(len(testlogger.get('error')), 1)
             self.assertEqual(len(testlogger.get('warning')), 1)
             self.assertEqual(len(testlogger.get('info')), 1)

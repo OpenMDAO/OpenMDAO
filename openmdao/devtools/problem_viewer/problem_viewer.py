@@ -17,7 +17,7 @@ except ImportError:
 from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
-from openmdao.utils.general_utils import warn_deprecation, get_post_setup_func
+from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.record_util import is_valid_sqlite3_db
 
 
@@ -280,7 +280,7 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
         index = index.replace('{{draw_potential_connections}}', 'true')
     else:
         index = index.replace('{{draw_potential_connections}}', 'false')
-
+        
     with open(outfile, 'w') as f:
         f.write(index)
 
@@ -288,6 +288,3 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
     if show_browser:
         from openmdao.devtools.webview import webview
         webview(outfile)
-
-
-view_model_cmd = get_post_setup_func('openmdao.devtools.problem_viewer.problem_viewer:view_model')

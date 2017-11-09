@@ -23,6 +23,7 @@ from openmdao.core.driver import Driver
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
+from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll
 from openmdao.utils.logger_utils import get_logger
@@ -340,7 +341,7 @@ class Problem(object):
         """
         self.driver.cleanup()
 
-    def setup(self, vector_class=DefaultVector, check=True, mode='rev',
+    def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='rev',
               force_alloc_complex=False):
         """
         Set up the model hierarchy.
@@ -356,6 +357,8 @@ class Problem(object):
             reference to an actual <Vector> class; not an instance.
         check : boolean
             whether to run error check after setup is complete.
+        logger : object
+            Object for logging config checks if check is True.
         mode : string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
@@ -390,6 +393,7 @@ class Problem(object):
         # Cache all args for final setup.
         self._vector_class = vector_class
         self._check = check
+        self._logger = logger
         self._force_alloc_complex = force_alloc_complex
 
         self._setup_status = 1
@@ -407,6 +411,7 @@ class Problem(object):
         """
         vector_class = self._vector_class
         check = self._check
+        logger = self._logger
         force_alloc_complex = self._force_alloc_complex
 
         model = self.model
@@ -421,6 +426,9 @@ class Problem(object):
         # Now that setup has been called, we can set the iprints.
         for items in self._solver_print_cache:
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
+
+        if check and comm.rank == 0:
+            check_config(self, logger)
 
         if self._setup_status < 2:
             self._setup_status = 2

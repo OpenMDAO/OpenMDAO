@@ -5,7 +5,7 @@ from six.moves import range
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
 from openmdao.devtools.testutil import TestLogger
 from openmdao.utils.graph_utils import all_connected_edges
-from openmdao.error_checking.check_config import get_sccs_topo, check_config
+from openmdao.error_checking.check_config import get_sccs_topo
 
 
 class MyComp(ExecComp):
@@ -30,12 +30,10 @@ class TestCheckConfig(unittest.TestCase):
         C4 = G4.add_subsystem("C4", ExecComp('y=x*2.0+v'))
 
         testlogger = TestLogger()
-        p.setup()
+        p.setup(logger=testlogger)
 
         # Conclude setup but don't run model.
         p.final_setup()
-
-        check_config(p, logger=testlogger)
 
         self.assertEqual(len(testlogger.get('warning')), 1)
 
@@ -75,12 +73,10 @@ class TestCheckConfig(unittest.TestCase):
         root.connect("indep.x", "C4.b")
 
         testlogger = TestLogger()
-        p.setup()
+        p.setup(logger=testlogger)
 
         # Conclude setup but don't run model.
         p.final_setup()
-
-        check_config(p, logger=testlogger)
 
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 2)
@@ -115,12 +111,10 @@ class TestCheckConfig(unittest.TestCase):
         root.connect("indep.x", "C4.b")
 
         testlogger = TestLogger()
-        p.setup()
+        p.setup(logger=testlogger)
 
         # Conclude setup but don't run model.
         p.final_setup()
-
-        check_config(p, logger=testlogger)
 
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 3)
@@ -148,12 +142,10 @@ class TestCheckConfig(unittest.TestCase):
         p.model.connect("indep.x", "C2.a")
 
         testlogger = TestLogger()
-        p.setup()
+        p.setup(logger=testlogger)
 
         # Conclude setup but don't run model.
         p.final_setup()
-
-        check_config(p, logger=testlogger)
 
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 1)
@@ -198,12 +190,10 @@ class TestCheckConfig(unittest.TestCase):
         G1.connect("C11.z", "C3.b")
 
         testlogger = TestLogger()
-        p.setup()
+        p.setup(logger=testlogger)
 
         # Conclude setup but don't run model.
         p.final_setup()
-
-        check_config(p, logger=testlogger)
 
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 4)

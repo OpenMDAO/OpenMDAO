@@ -4,7 +4,7 @@ import unittest
 from openmdao.api import Group, Problem, MetaModel, IndepVarComp, ResponseSurface, \
     FloatKrigingSurrogate, KrigingSurrogate, MultiFiCoKrigingSurrogate
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.error_checking.check_config import check_config
+
 from openmdao.devtools.testutil import TestLogger
 
 
@@ -21,11 +21,10 @@ class MetaModelTestCase(unittest.TestCase):
 
         # check that missing surrogate is detected in check_config
         testlogger = TestLogger()
-        prob.setup()
+        prob.setup(logger=testlogger)
 
         # Conclude setup but don't run model.
         prob.final_setup()
-        check_config(prob, logger=testlogger)
 
         msg = ("No default surrogate model is defined and the "
                "following outputs do not have a surrogate model:\n"
@@ -75,12 +74,10 @@ class MetaModelTestCase(unittest.TestCase):
 
         # check that missing surrogate is detected in check_setup
         testlogger = TestLogger()
-        prob.setup()
+        prob.setup(logger=testlogger)
 
         # Conclude setup but don't run model.
         prob.final_setup()
-
-        check_config(prob, logger=testlogger)
 
         msg = ("No default surrogate model is defined and the "
                "following outputs do not have a surrogate model:\n"
