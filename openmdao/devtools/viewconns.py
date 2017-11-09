@@ -12,6 +12,8 @@ import numpy as np
 from openmdao.core.problem import Problem
 from openmdao.utils.units import convert_units
 from openmdao.devtools.webview import webview
+from openmdao.utils.general_utils import get_post_setup_func
+
 
 @contextlib.contextmanager
 def printoptions(*args, **kwargs):
@@ -158,3 +160,6 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     if show_browser:
         webview(outfile)
+
+
+view_connections_cmd = get_post_setup_func("openmdao.devtools.viewconns:view_connections")

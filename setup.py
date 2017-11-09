@@ -99,5 +99,11 @@ setup(
     iprofmem=openmdao.devtools.iprof_mem:_profile_py_file
     icalltrace=openmdao.devtools.itrace:_trace_py_file
     run_test=openmdao.devtools.run_test:run_test
+    check_config=openmdao.error_checking.check_config:check_config_cmd
+    prob_tree=openmdao.devtools.debug:tree_cmd
+    config_summary=openmdao.devtools.debug:config_summary_cmd
+    dump_dist_idxs=openmdao.devtools.debug:dump_dist_idxs_cmd
+    view_model=openmdao.devtools.problem_viewer.problem_viewer:view_model_cmd
+    view_connections=openmdao.devtools.viewconns:view_connections_cmd
     """
 )

@@ -8,6 +8,7 @@ import os
 from resource import getrusage, RUSAGE_SELF, RUSAGE_CHILDREN
 
 from six.moves import zip_longest
+from openmdao.utils.general_utils import get_post_setup_func
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group, System
 
@@ -86,6 +87,9 @@ def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma:
         stream.write("\n\n")
 
     _dump(problem.model, stream)
+
+
+dump_dist_idxs_cmd = get_post_setup_func('openmdao.devtools.debug:dump_dist_idxs')
 
 
 class _NoColor(object):
@@ -193,6 +197,9 @@ def tree(top, show_solvers=True, show_colors=True, filter=None, max_depth=0, str
             print("%s%s: %s" % (vindent, name, val))
 
 
+tree_cmd = get_post_setup_func("openmdao.devtools.debug:tree")
+
+
 def config_summary(problem, stream=sys.stdout):
     """
     Prints various high level statistics about the model structure.
@@ -246,6 +253,9 @@ def config_summary(problem, stream=sys.stdout):
               (noutputs, sum(d.size for d in problem.model._outputs._data.values())), file=stream)
     else:
         print("Output variables: %5d" % noutputs, file=stream)
+
+
+config_summary_cmd = get_post_setup_func('openmdao.devtools.debug:config_summary')
 
 
 def max_mem_usage():

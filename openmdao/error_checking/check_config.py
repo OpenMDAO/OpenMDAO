@@ -10,6 +10,7 @@ from openmdao.core.group import Group
 from openmdao.core.component import Component
 from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.logger_utils import get_logger
+from openmdao.utils.general_utils import get_post_setup_func
 
 
 def check_config(problem, logger=None):
@@ -141,3 +142,11 @@ def _check_hanging_inputs(problem, logger):
 
     if hanging:
         logger.warning("The following inputs are not connected: %s." % hanging)
+
+
+# this creates a function that, after we put a [console_scripts] entry in the setup.py file,
+# will be callable from the command line on any script that sets up an openmdao Problem.
+# The script will run through Problem.final_setup and then run check_config.  After that
+# it will exit.  This same thing can be done for any function that can be called with a
+# single argument that is a Problem instance.
+check_config_cmd = get_post_setup_func("openmdao.error_checking.check_config:check_config")
