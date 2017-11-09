@@ -357,29 +357,50 @@ def insert_output_start_stop_indicators(src):
     str
         String with output demarked.
     """
-    rb = RedBaron(src)
 
-    src_with_out_start_stop_indicators = []
+    new_src = ""
     input_block_number = 0
-    for r in rb:
-        line = r.dumps()
-        # not sure why some lines from RedBaron do not have newlines
-        if not line.endswith('\n'):
-            line += '\n'
+
+    for line in src.split('\n'):
+        new_src += line + '\n'
+        r = RedBaron(line)
+        r.help()
+        # r = rb[0]
         if r.type == 'print':
-            # src_with_out_start_stop_indicators += 'print("<<<<<{}")'.format(input_block_number) + '\n'
-            src_with_out_start_stop_indicators.append(line)
-            src_with_out_start_stop_indicators.append('print(">>>>>{}")\n'.format(input_block_number))
+            new_src += 'print(">>>>>{}")\n'.format(input_block_number)
         elif len(r.value) == 3 and \
             (r.type, r.value[0].type, r.value[1].type, r.value[2].type) == \
                 ('atomtrailers', 'name', 'name', 'call') and \
                 r.value[1].value in ['run_model', 'run_driver', 'setup']:
-            src_with_out_start_stop_indicators.append(line)
-            src_with_out_start_stop_indicators.append('print(">>>>>{}")\n'.format(input_block_number))
-        else:
-            src_with_out_start_stop_indicators.append(line)
+            new_src += 'print(">>>>>{}")\n'.format(input_block_number)
+
         input_block_number += 1
-    return ''.join(src_with_out_start_stop_indicators)
+
+    return new_src
+
+    # rb = RedBaron(src)
+
+    # src_with_out_start_stop_indicators = []
+    # input_block_number = 0
+    # for r in rb:
+    #     line = r.dumps()
+    #     # not sure why some lines from RedBaron do not have newlines
+    #     if not line.endswith('\n'):
+    #         line += '\n'
+    #     if r.type == 'print':
+    #         # src_with_out_start_stop_indicators += 'print("<<<<<{}")'.format(input_block_number) + '\n'
+    #         src_with_out_start_stop_indicators.append(line)
+    #         src_with_out_start_stop_indicators.append('print(">>>>>{}")\n'.format(input_block_number))
+    #     elif len(r.value) == 3 and \
+    #         (r.type, r.value[0].type, r.value[1].type, r.value[2].type) == \
+    #             ('atomtrailers', 'name', 'name', 'call') and \
+    #             r.value[1].value in ['run_model', 'run_driver', 'setup']:
+    #         src_with_out_start_stop_indicators.append(line)
+    #         src_with_out_start_stop_indicators.append('print(">>>>>{}")\n'.format(input_block_number))
+    #     else:
+    #         src_with_out_start_stop_indicators.append(line)
+    #     input_block_number += 1
+    # return ''.join(src_with_out_start_stop_indicators)
 
 
 def clean_up_empty_output_blocks(input_blocks, output_blocks):
@@ -390,6 +411,7 @@ def clean_up_empty_output_blocks(input_blocks, output_blocks):
     new_input_blocks = []
     new_output_blocks = []
     current_in_block = ''
+
     for in_block, out_block in zip(input_blocks, output_blocks):
         if current_in_block and not current_in_block.endswith('\n'):
             current_in_block += '\n'
@@ -422,19 +444,23 @@ def extract_output_blocks(run_output):
         List containing output text blocks.
     """
 
-    output_blocks = []
     # Look for start and end lines that look like this:
     #  <<<<<4
     #  >>>>>4
-    output_block = []
+
+    output_blocks = []
+    output_block = None
+
     for line in run_output.splitlines():
+        if output_block is None:
+            output_block = []
         if line.startswith('>>>>>'):
             output_blocks.append('\n'.join(output_block))
-            output_block = []
+            output_block = None
         else:
             output_block.append(line)
 
-    if output_block:
+    if output_block is not None:
         output_blocks.append('\n'.join(output_block))
     return output_blocks
 
@@ -580,6 +606,8 @@ def get_test_src(method_path):
 
     # Remove docstring from source code
     source_minus_docstrings = remove_docstrings(method_source)
+    # print('========== source_minus_docstrings ===================')
+    # print(source_minus_docstrings)
 
     #-----------------------------------------------------------------------------------
     # 2. Replace the asserts with prints -> source_minus_docstrings_with_prints_cleaned
@@ -588,20 +616,27 @@ def get_test_src(method_path):
     # Replace some of the asserts with prints of the actual values
     # This calls RedBaron
     source_minus_docstrings_with_prints = replace_asserts_with_prints(source_minus_docstrings)
+    # print('========== source_minus_docstrings_with_prints ===================')
+    # print(source_minus_docstrings_with_prints)
 
     # remove raise SkipTest lines
     # We decided to leave them in for now
     # source_minus_docstrings_with_prints = remove_raise_skip_tests(source_minus_docstrings_with_prints)
 
     # Remove the initial empty lines
-    source_minus_docstrings_with_prints_cleaned = remove_initial_empty_lines_from_source(
-        source_minus_docstrings_with_prints)
+    source_minus_docstrings_with_prints_cleaned = \
+        remove_initial_empty_lines_from_source(source_minus_docstrings_with_prints)
+    print('========== source_minus_docstrings_with_prints_cleaned ===================')
+    print(source_minus_docstrings_with_prints_cleaned)
 
     #-----------------------------------------------------------------------------------
     # 4. Insert extra print statements into source_minus_docstrings_with_prints_cleaned
     #        to indicate start and end of print Out blocks -> source_with_output_start_stop_indicators
     #-----------------------------------------------------------------------------------
-    source_with_output_start_stop_indicators = insert_output_start_stop_indicators(source_minus_docstrings_with_prints_cleaned)
+    source_with_output_start_stop_indicators = \
+        insert_output_start_stop_indicators(source_minus_docstrings_with_prints_cleaned)
+    print('========== source_with_output_start_stop_indicators ===================')
+    print(source_with_output_start_stop_indicators)
 
     #-----------------------------------------------------------------------------------
     # 5. Run the test using source_with_out_start_stop_indicators -> run_outputs
@@ -618,6 +653,8 @@ def get_test_src(method_path):
                              source_with_output_start_stop_indicators,
                              teardown_source_code])
 
+    print('========== code_to_run ===================')
+    print(code_to_run)
     skipped = False
     failed = False
     try:
@@ -724,6 +761,18 @@ def get_test_src(method_path):
         #####################
         if not use_mpi:
             output_blocks = extract_output_blocks(run_outputs)
+
+        if len(output_blocks) != len(input_blocks):
+            from pprint import pprint
+            print('input_blocks (%d):' % len(input_blocks))
+            pprint(input_blocks)
+            print('output_blocks (%d):' % len(output_blocks))
+            pprint(output_blocks)
+
+        # failsafe: make sure we have the same number of input and output blocks
+        assert len(output_blocks) == len(input_blocks), \
+            "Mismatch in input and output blocks processing %s.%s.%s" % \
+            (module_path, class_name, method_name)
 
         # Need to deal with the cases when there is no outputblock for a given input block
         # Merge an input block with the previous block and throw away the output block

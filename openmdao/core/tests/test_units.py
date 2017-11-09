@@ -12,7 +12,7 @@ from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, I
 from openmdao.api import ExecComp
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.unit_conv import UnitConvGroup, SrcComp, TgtCompC, TgtCompF, \
-     TgtCompK, SrcCompFD, TgtCompCFD, TgtCompFFD, TgtCompKFD, TgtCompFMulti
+    TgtCompK, SrcCompFD, TgtCompCFD, TgtCompFFD, TgtCompKFD, TgtCompFMulti
 
 
 class SpeedComp(ExplicitComponent):
@@ -422,7 +422,7 @@ class TestUnitConversion(unittest.TestCase):
 
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
         sub1 = prob.model.add_subsystem('sub1', Group(), promotes=['x2'])
-        sub1.add_subsystem('src', SrcComp(), promotes = ['x2'])
+        sub1.add_subsystem('src', SrcComp(), promotes=['x2'])
         root.add_subsystem('tgtF', TgtCompFMulti())
         root.add_subsystem('tgtC', TgtCompC())
         root.add_subsystem('tgtK', TgtCompK())
