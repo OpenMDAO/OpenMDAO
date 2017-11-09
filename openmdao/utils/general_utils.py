@@ -336,6 +336,8 @@ def get_post_setup_func(func_spec):
     """
     Return a function that executes a file after setting the post_setup hook to func_spec.
 
+    The returned function can then be tied to a console script and executed from the command line.
+
     Parameters
     ----------
     func_spec : str
