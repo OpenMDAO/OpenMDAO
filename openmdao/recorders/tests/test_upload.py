@@ -565,12 +565,12 @@ class TestDataUploader(unittest.TestCase):
         upload(self.filename, self._accepted_token)
 
         expected_solver_output = [
-            {'name': 'con_cmp1.con1', 'values': [-22.42830237000701]},
-            {'name': 'd1.y1', 'values': [25.58830237000701]},
-            {'name': 'con_cmp2.con2', 'values': [-11.941511849375644]},
+            {'name': 'con_cmp1.con1', 'values': [-22.42830237]},
+            {'name': 'd1.y1', 'values': [25.58830237]},
+            {'name': 'con_cmp2.con2', 'values': [-11.941511849]},
             {'name': 'pz.z', 'values': [5.0, 2.0]},
-            {'name': 'obj_cmp.obj', 'values': [28.588308165163074]},
-            {'name': 'd2.y2', 'values': [12.058488150624356]},
+            {'name': 'obj_cmp.obj', 'values': [28.588308165]},
+            {'name': 'd2.y2', 'values': [12.058488150]},
             {'name': 'px.x', 'values': [1.0]}
         ]
 
@@ -623,12 +623,12 @@ class TestDataUploader(unittest.TestCase):
 
         solver_iteration = json.loads(self.solver_iterations)
         expected_solver_output = [
-            {'name': 'con_cmp1.con1', 'values': [-22.42830237000701]},
-            {'name': 'd1.y1', 'values': [25.58830237000701]},
-            {'name': 'con_cmp2.con2', 'values': [-11.941511849375644]},
+            {'name': 'con_cmp1.con1', 'values': [-22.42830237]},
+            {'name': 'd1.y1', 'values': [25.58830237]},
+            {'name': 'con_cmp2.con2', 'values': [-11.941511849]},
             {'name': 'pz.z', 'values': [5.0, 2.0]},
-            {'name': 'obj_cmp.obj', 'values': [28.588308165163074]},
-            {'name': 'd2.y2', 'values': [12.058488150624356]},
+            {'name': 'obj_cmp.obj', 'values': [28.588308165]},
+            {'name': 'd2.y2', 'values': [12.058488150]},
             {'name': 'px.x', 'values': [1.0]}
         ]
 
@@ -662,12 +662,12 @@ class TestDataUploader(unittest.TestCase):
         expected_abs_error = 7.02783609310096e-10
         expected_rel_error = 8.078674883382422e-07
         expected_solver_output = [
-            {'name': 'con_cmp1.con1', 'values': [-22.42830237000701]},
-            {'name': 'd1.y1', 'values': [25.58830237000701]},
-            {'name': 'con_cmp2.con2', 'values': [-11.941511849375644]},
+            {'name': 'con_cmp1.con1', 'values': [-22.42830237]},
+            {'name': 'd1.y1', 'values': [25.58830237]},
+            {'name': 'con_cmp2.con2', 'values': [-11.941511849]},
             {'name': 'pz.z', 'values': [5.0, 2.0]},
-            {'name': 'obj_cmp.obj', 'values': [28.588308165163074]},
-            {'name': 'd2.y2', 'values': [12.058488150624356]},
+            {'name': 'obj_cmp.obj', 'values': [28.588308165]},
+            {'name': 'd2.y2', 'values': [12.058488150]},
             {'name': 'px.x', 'values': [1.0]}
         ]
 

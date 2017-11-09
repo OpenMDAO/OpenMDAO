@@ -590,17 +590,17 @@ class TestSqliteRecorder(unittest.TestCase):
 
         coordinate = [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ), 'NonlinearBlockGS', (6, )]
 
-        expected_abs_error = 1.31880284470753394998e-10
+        expected_abs_error = 1.318802844707e-10
 
-        expected_rel_error = 3.6299074030587596e-12
+        expected_rel_error = 3.62990740e-12
 
         expected_solver_output = {
-            "con_cmp1.con1": [-22.42830237000701],
-            "d1.y1": [25.58830237000701],
-            "con_cmp2.con2": [-11.941511849375644],
+            "con_cmp1.con1": [-22.42830237],
+            "d1.y1": [25.58830237],
+            "con_cmp2.con2": [-11.941511849],
             "pz.z": [5.0, 2.0],
-            "obj_cmp.obj": [28.588308165163074],
-            "d2.y2": [12.058488150624356],
+            "obj_cmp.obj": [28.588308165],
+            "d2.y2": [12.058488150],
             "px.x": [1.0]
         }
 
@@ -641,14 +641,14 @@ class TestSqliteRecorder(unittest.TestCase):
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'ArmijoGoldsteinLS', (4,)]
         expected_abs_error = 3.49773898733e-9
-        expected_rel_error = expected_abs_error / 2.9086436370499857e-08
+        expected_rel_error = expected_abs_error / 2.9086436370e-08
         expected_solver_output = {
-            "con_cmp1.con1": [-22.42830237000701],
-            "d1.y1": [25.58830237000701],
-            "con_cmp2.con2": [-11.941511849375644],
+            "con_cmp1.con1": [-22.42830237],
+            "d1.y1": [25.58830237],
+            "con_cmp2.con2": [-11.941511849],
             "pz.z": [5.0, 2.0],
-            "obj_cmp.obj": [28.588308165163074],
-            "d2.y2": [12.058488150624356],
+            "obj_cmp.obj": [28.58830816516],
+            "d2.y2": [12.058488150],
             "px.x": [1.0]
         }
         expected_solver_residuals = None
@@ -680,12 +680,12 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_abs_error = 7.02783609310096e-10
         expected_rel_error = 8.078674883382422e-07
         expected_solver_output = {
-            "con_cmp1.con1": [-22.42830237000701],
-            "d1.y1": [25.58830237000701],
-            "con_cmp2.con2": [-11.941511849375644],
+            "con_cmp1.con1": [-22.42830237],
+            "d1.y1": [25.58830237],
+            "con_cmp2.con2": [-11.941511849],
             "pz.z": [5.0, 2.0],
-            "obj_cmp.obj": [28.588308165163074],
-            "d2.y2": [12.058488150624356],
+            "obj_cmp.obj": [28.588308165],
+            "d2.y2": [12.058488150],
             "px.x": [1.0]
         }
         expected_solver_residuals = None
