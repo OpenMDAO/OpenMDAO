@@ -1,8 +1,8 @@
 .. _listing-variables:
 
-*****************
-Listing Variables
-*****************
+***************************************
+Printing the values of all Variables
+***************************************
 
 When working with a model, it may sometimes be helpful to examine the input and output variables.
 

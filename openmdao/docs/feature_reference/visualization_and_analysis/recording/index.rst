@@ -1,8 +1,9 @@
-*********
-Recording
-*********
+********************
+Recording Your Data
+********************
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 1
 
     basic_recording.rst
+    case_reading.rst
