@@ -338,7 +338,7 @@ class Problem(object):
         """
         self.driver.cleanup()
 
-    def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='auto',
+    def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='rev',
               force_alloc_complex=False):
         """
         Set up the model hierarchy.
@@ -358,8 +358,7 @@ class Problem(object):
             Object for logging config checks if check is True.
         mode : string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
-            reverse (adjoint). Default is 'auto', which lets OpenMDAO choose
-            the best mode for your problem.
+            reverse (adjoint). Default is 'rev'.
         force_alloc_complex : bool
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
@@ -380,13 +379,10 @@ class Problem(object):
                    % vector_class.__name__)
             raise ValueError(msg)
 
-        if mode not in ['fwd', 'rev', 'auto']:
-            msg = "Unsupported mode: '%s'" % mode
+        if mode not in ['fwd', 'rev']:
+            msg = "Unsupported mode: '%s'. Use either 'fwd' or 'rev'." % mode
             raise ValueError(msg)
 
-        # TODO: fix this so it computes the proper type based on sizes of VOIs
-        if mode == 'auto':
-            mode = 'rev'
         self._mode = mode
 
         model._setup(comm, 'full', mode)

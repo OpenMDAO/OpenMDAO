@@ -119,37 +119,6 @@ def _get_color_printer(stream=sys.stdout, colors=True):
     return color_print, Fore, Back, Style
 
 
-def _find_named_value(system, name):
-    """
-    Given a name, return the value of an attribute or vector variable.
-
-    Parameters
-    ----------
-    system : System
-        The System being searched for the value.
-    name : str
-        The name of the value.
-
-    Returns
-    -------
-    object
-        The value found, or _notfound.
-    """
-
-    # first, look for an attribute by that name
-    val = getattr(system, name, _notfound)
-    if val is not _notfound:
-        return val
-
-    # now look in the vectors
-    if name in system._outputs:
-        return system._outputs[name]
-    elif name in system._inputs:
-        return system._inputs[name]
-
-    return _notfound
-
-
 def tree(top, show_solvers=True, show_colors=True, filter=None, max_depth=0, stream=sys.stdout):
     """
     Dump the model tree structure to the given stream.

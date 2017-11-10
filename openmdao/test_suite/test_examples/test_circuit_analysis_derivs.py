@@ -66,8 +66,8 @@ class TestNonlinearCircuit(unittest.TestCase):
 
         class Node(ImplicitComponent):
             def initialize(self):
-                self.metadata.declare('n_in', default=1, type_=int, desc='number of connections with + assumed in')
-                self.metadata.declare('n_out', default=1, type_=int, desc='number of current connections + assumed out')
+                self.metadata.declare('n_in', default=1, types=int, desc='number of connections with + assumed in')
+                self.metadata.declare('n_out', default=1, types=int, desc='number of current connections + assumed out')
 
             def setup(self):
                 self.add_output('V', val=5., units='V')

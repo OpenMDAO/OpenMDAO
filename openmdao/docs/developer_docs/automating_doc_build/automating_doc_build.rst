@@ -65,10 +65,11 @@ The commands to do the above look something like this:
 
     ::
 
-        travis encrypt-file travis_deploy_rsa --add —debug
+        travis encrypt-file travis_deploy_rsa --add -—debug --org
 
-        —add adds the decryption command to the .travis.yml file automatically.
-        —debug shows all the available output of the command.
+        —-add adds the decryption command to the .travis.yml file automatically.
+        —-debug shows all the available output of the command.
+        --org creates a key for the org side, not the paid side
 
     So, what does this command do?
 

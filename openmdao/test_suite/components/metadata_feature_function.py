@@ -10,7 +10,7 @@ from openmdao.api import ExplicitComponent
 class UnitaryFunctionComp(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare('func', values=('exp', 'cos', 'sin'), type_=FunctionType)
+        self.metadata.declare('func', values=('exp', 'cos', 'sin'), types=FunctionType)
 
     def setup(self):
         self.add_input('x')
