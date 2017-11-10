@@ -1001,7 +1001,6 @@ class System(object):
                        if data['parallel_deriv_color'] is not None
                        or data['vectorize_derivs'])
 
-        self._mode = mode
         self._vois = vois
         if vec_names is None:  # should only occur at top level on full setup
             vec_names = ['nonlinear', 'linear']

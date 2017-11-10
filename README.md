@@ -8,13 +8,13 @@
 OpenMDAO Naming/Legacy OpenMDAO
 -------------------------------
 
-PLEASE NOTE: Until recently, this repository was named OpenMDAO/blue. If you had cloned that repository, please update 
+PLEASE NOTE: Until recently, this repository was named OpenMDAO/blue. If you had cloned that repository, please update
 your repository name and remotes to reflect these changes.
 
-The OpenMDAO 1.7.3 codebase repo has been renamed to OpenMDAO1, and it resides 
+The OpenMDAO 1.7.3 codebase repo has been renamed to OpenMDAO1, and it resides
 at https://github.com/OpenMDAO/OpenMDAO1
 
-The OpenMDAO 2.0.x code has taken the name OpenMDAO, 
+The OpenMDAO 2.0.x code has taken the name OpenMDAO,
 and it resides at https://github.com/OpenMDAO/OpenMDAO.
 
 Installation of 2.0.x code will now work with `pip install openmdao`.  
@@ -47,8 +47,8 @@ make sure you pull these updates often.
 Features of OpenMDAO 1.7.x Not Yet in 2.x
 -----------------------------------------
 
-Be aware that this is an Alpha. 
-Not all the features of 1.7.x exist in 2.x yet. 
+Be aware that this is an Alpha.
+Not all the features of 1.7.x exist in 2.x yet.
 
 Here is a list of things that have not yet been fully developed in 2.x:
 
@@ -61,6 +61,7 @@ Here is a list of things that have not yet been fully developed in 2.x:
 * Active-set constraint calculation disabling
 * Brent Solver
 * CaseRecording using CSV, HDF5, and dump recorders (SqliteRecorder and WebRecorder are currently supported)
+* 'auto' selection of mode based on sizes of design variables and responses
 
 Installation Instructions:
 --------------------------
@@ -86,4 +87,3 @@ Documentation Building Instructions:
 This will build the docs into `openmdao/docs/_build/html`.
 
 Then, just open  `openmdao/docs/_build/html/index.html` in a browser to begin.
-
