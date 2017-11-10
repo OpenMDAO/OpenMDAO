@@ -417,8 +417,12 @@ class Driver(object):
         dict
            Dictionary containing values of each response.
         """
-        # TODO: finish this method when we have a driver that requires it.
-        return {}
+        if filter:
+            resps = filter
+        else:
+            resps = self._responses
+
+        return {n: self._get_voi_val(n, self._responses[n], self._remote_objs) for n in resps}
 
     def get_objective_values(self, filter=None):
         """

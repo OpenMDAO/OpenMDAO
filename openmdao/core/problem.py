@@ -1815,4 +1815,7 @@ def find_disjoint(prob):
     prob.final_setup()
 
     mat = prob.model.jacobian._int_mtx._matrix
-    
+    desvars = prob.driver.get_design_var_values()
+    responses = prob.driver.get_response_values()
+
+    assert(all(prob.model.jacobian._ext_mtx._matrix == 0.0))
