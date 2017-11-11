@@ -2607,11 +2607,10 @@ class System(object):
         expl_resids = []
         impl_resids = []
         for name, val in iteritems(self._residuals._views):
-            if np.linalg.norm(val) > 1e-2:
-                if name in states:
-                    impl_resids.append((name, val)) if values else impl_resids.append(name)
-                else:
-                    expl_resids.append((name, val)) if values else expl_resids.append(name)
+            if name in states:
+                impl_resids.append((name, val)) if values else impl_resids.append(name)
+            else:
+                expl_resids.append((name, val)) if values else expl_resids.append(name)
 
         if out_stream:
             if explicit:
