@@ -27,8 +27,8 @@ However, in some cases it might be needed if a previous glob pattern matched a l
 .. embed-code::
     openmdao.jacobians.tests.test_jacobian_features.SimpleCompGlob.setup
 
-3. Using the :code:`val` argument to set a constant partial derivative. Note that this is indtended for cases when the derivative value is constant,
-and hence the derivatives do not ever need to be re computed in :code:`compute_partials`.
+3. Using the :code:`val` argument to set a constant partial derivative. Note that this is intended for cases when the derivative value is constant,
+and hence the derivatives do not ever need to be recomputed in :code:`compute_partials`.
 Here are several examples of how you can specify derivative values for different shaped partial derivative sub-Jacobians.
 
 * Scalar [see :math:`\displaystyle\frac{\partial f}{\partial x}`]

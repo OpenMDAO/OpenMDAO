@@ -6,5 +6,5 @@ Working With Your Models
     :maxdepth: 1
 
     recording/index.rst
-    output/index.rst
+    debugging/index.rst
     profiling/index.rst
