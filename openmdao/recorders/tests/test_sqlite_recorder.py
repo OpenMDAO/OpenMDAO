@@ -579,7 +579,6 @@ class TestSqliteRecorder(unittest.TestCase):
         solver = self.prob.model._nonlinear_solver
         solver.recording_options['record_abs_error'] = True
         solver.recording_options['record_rel_error'] = True
-        solver.recording_options['record_solver_output'] = True
         solver.recording_options['record_solver_residuals'] = True
         solver.add_recorder(self.recorder)
 
@@ -591,17 +590,17 @@ class TestSqliteRecorder(unittest.TestCase):
 
         coordinate = [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ), 'NonlinearBlockGS', (6, )]
 
-        expected_abs_error = 1.31880284470753394998e-10
+        expected_abs_error = 1.318802844707e-10
 
-        expected_rel_error = 3.6299074030587596e-12
+        expected_rel_error = 3.62990740e-12
 
         expected_solver_output = {
-            "con_cmp1.con1": [-22.42830237000701],
-            "d1.y1": [25.58830237000701],
-            "con_cmp2.con2": [-11.941511849375644],
+            "con_cmp1.con1": [-22.42830237],
+            "d1.y1": [25.58830237],
+            "con_cmp2.con2": [-11.941511849],
             "pz.z": [5.0, 2.0],
-            "obj_cmp.obj": [28.588308165163074],
-            "d2.y2": [12.058488150624356],
+            "obj_cmp.obj": [28.588308165],
+            "d2.y2": [12.058488150],
             "px.x": [1.0]
         }
 
@@ -642,8 +641,16 @@ class TestSqliteRecorder(unittest.TestCase):
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'ArmijoGoldsteinLS', (4,)]
         expected_abs_error = 3.49773898733e-9
-        expected_rel_error = expected_abs_error / 2.9086436370499857e-08
-        expected_solver_output = None
+        expected_rel_error = expected_abs_error / 2.9086436370e-08
+        expected_solver_output = {
+            "con_cmp1.con1": [-22.42830237],
+            "d1.y1": [25.58830237],
+            "con_cmp2.con2": [-11.941511849],
+            "pz.z": [5.0, 2.0],
+            "obj_cmp.obj": [28.58830816516],
+            "d2.y2": [12.058488150],
+            "px.x": [1.0]
+        }
         expected_solver_residuals = None
 
         self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
@@ -672,7 +679,15 @@ class TestSqliteRecorder(unittest.TestCase):
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (1,), 'BoundsEnforceLS', (0,)]
         expected_abs_error = 7.02783609310096e-10
         expected_rel_error = 8.078674883382422e-07
-        expected_solver_output = None
+        expected_solver_output = {
+            "con_cmp1.con1": [-22.42830237],
+            "d1.y1": [25.58830237],
+            "con_cmp2.con2": [-11.941511849],
+            "pz.z": [5.0, 2.0],
+            "obj_cmp.obj": [28.588308165],
+            "d2.y2": [12.058488150],
+            "px.x": [1.0]
+        }
         expected_solver_residuals = None
 
         self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
@@ -686,7 +701,6 @@ class TestSqliteRecorder(unittest.TestCase):
         nonlinear_solver = self.prob.model.nonlinear_solver
         nonlinear_solver.add_recorder(self.recorder)
 
-        nonlinear_solver.recording_options['record_solver_output'] = True
         nonlinear_solver.recording_options['record_solver_residuals'] = True
 
         self.prob.setup(check=False)
@@ -740,7 +754,15 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_abs_error = 7.234027587097439e-07
         expected_rel_error = 1.991112651729199e-08
         expected_solver_residuals = None
-        expected_solver_output = None
+        expected_solver_output = {
+            'px.x': [1.],
+            'pz.z': [5., 2.],
+            'd1.y1': [25.58830237],
+            'd2.y2': [12.05848815],
+            'obj_cmp.obj': [28.58830817],
+            'con_cmp1.con1': [-22.42830237],
+            'con_cmp2.con2': [-11.94151185]
+        }
 
         self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
                                                  expected_rel_error, expected_solver_output,
@@ -763,7 +785,15 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_abs_error = 2.1677810075550974e-10
         expected_rel_error = 5.966657077752565e-12
         expected_solver_residuals = None
-        expected_solver_output = None
+        expected_solver_output = {
+            'px.x': [1.],
+            'pz.z': [5., 2.],
+            'd1.y1': [25.58830237],
+            'd2.y2': [12.05848815],
+            'obj_cmp.obj': [28.58830817],
+            'con_cmp1.con1': [-22.42830237],
+            'con_cmp2.con2': [-11.94151185]
+        }
 
         self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
                                                  expected_rel_error, expected_solver_output,
@@ -786,7 +816,15 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_abs_error = None
         expected_rel_error = None
         expected_solver_residuals = None
-        expected_solver_output = None
+        expected_solver_output = {
+            'px.x': [1.],
+            'pz.z': [5., 2.],
+            'd1.y1': [27.8],
+            'd2.y2': [12.27257053],
+            'obj_cmp.obj': [30.80000468],
+            'con_cmp1.con1': [-24.64],
+            'con_cmp2.con2': [-11.72742947]
+        }
 
         self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
                                                  expected_rel_error, expected_solver_output,
@@ -803,7 +841,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         nonlinear_solver.linear_solver.recording_options['record_abs_error'] = True
         nonlinear_solver.linear_solver.recording_options['record_rel_error'] = True
-        nonlinear_solver.linear_solver.recording_options['record_solver_output'] = True
         nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
         nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
@@ -850,7 +887,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         nonlinear_solver.linear_solver.recording_options['record_abs_error'] = True
         nonlinear_solver.linear_solver.recording_options['record_rel_error'] = True
-        nonlinear_solver.linear_solver.recording_options['record_solver_output'] = True
         nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
         nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
@@ -898,7 +934,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         nonlinear_solver.linear_solver.recording_options['record_abs_error'] = True
         nonlinear_solver.linear_solver.recording_options['record_rel_error'] = True
-        nonlinear_solver.linear_solver.recording_options['record_solver_output'] = True
         nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
         nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
@@ -944,7 +979,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         nonlinear_solver.linear_solver.recording_options['record_abs_error'] = True
         nonlinear_solver.linear_solver.recording_options['record_rel_error'] = True
-        nonlinear_solver.linear_solver.recording_options['record_solver_output'] = True
         nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
         nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
@@ -991,7 +1025,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         nonlinear_solver.linear_solver.recording_options['record_abs_error'] = True
         nonlinear_solver.linear_solver.recording_options['record_rel_error'] = True
-        nonlinear_solver.linear_solver.recording_options['record_solver_output'] = True
         nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
         nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
@@ -1037,7 +1070,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         nonlinear_solver.linear_solver.recording_options['record_abs_error'] = True
         nonlinear_solver.linear_solver.recording_options['record_rel_error'] = True
-        nonlinear_solver.linear_solver.recording_options['record_solver_output'] = True
         nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
         nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
@@ -1105,7 +1137,6 @@ class TestSqliteRecorder(unittest.TestCase):
         mda.nonlinear_solver.recording_options['record_metadata'] = True
         mda.nonlinear_solver.recording_options['record_abs_error'] = True
         mda.nonlinear_solver.recording_options['record_rel_error'] = True
-        mda.nonlinear_solver.recording_options['record_solver_output'] = True
         mda.nonlinear_solver.recording_options['record_solver_residuals'] = True
         mda.nonlinear_solver.add_recorder(self.recorder)
 

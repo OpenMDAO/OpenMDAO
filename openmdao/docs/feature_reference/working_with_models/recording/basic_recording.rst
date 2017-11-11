@@ -31,7 +31,6 @@ A basic example of how to set an option:
 
 System Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^
-
 .. embed-options::
     openmdao.core.system
     System
