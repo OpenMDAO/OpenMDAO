@@ -57,7 +57,6 @@ class TagDirective(Directive):
         for tagg in taggs:
             # Create Sphinx doc refs of format :ref:`Tagname<Tagname>`
             link = ":ref:`" + tagg + "<" + tagg + ">`"
-            #link = "`" + tagg + " <http://openmdao.org/twodocs/versions/latest/tags/" + tagg + ".html>`_"
             links.append(link)
         # Put links back in a single comma-separated string together
         linkjoin = ", ".join(links)
