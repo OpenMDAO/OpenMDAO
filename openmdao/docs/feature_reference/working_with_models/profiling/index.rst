@@ -1,6 +1,6 @@
-*********
-Profiling
-*********
+***************************
+Profiling for Performance
+***************************
 
 .. toctree::
     :maxdepth: 1
