@@ -357,29 +357,46 @@ def insert_output_start_stop_indicators(src):
     str
         String with output demarked.
     """
-
     rb = RedBaron(src)
 
-    src_with_out_start_stop_indicators = []
+    # find lines with trailing comments so we can preserve them properly
+    lines_with_comments = {}
+    comments = rb.findAll('comment')
+    for c in comments:
+        if c.previous and c.previous.type != 'endl':
+            lines_with_comments[c.previous] = c
+
     input_block_number = 0
-    for r in rb:
-        line = r.dumps()
-        # not sure why some lines from RedBaron do not have newlines
-        if not line.endswith('\n'):
-            line += '\n'
-        src_with_out_start_stop_indicators.append(line)
 
+    # find all nodes that might produce output
+    nodes = rb.findAll(lambda identifier: identifier in ['print', 'atomtrailers'])
+    for r in nodes:
         if r.type == 'print':
-            r.help()
-            src_with_out_start_stop_indicators.append('print(">>>>>{}")\n'.format(input_block_number))
-        elif len(r.value) == 3 and \
-            (r.type, r.value[0].type, r.value[1].type, r.value[2].type) == \
-                ('atomtrailers', 'name', 'name', 'call') and \
-                r.value[1].value in ['run_model', 'run_driver', 'setup']:
-            src_with_out_start_stop_indicators.append('print(">>>>>{}")\n'.format(input_block_number))
+            # if line has trailing comment, insert print() after comment
+            if r in lines_with_comments:
+                r = lines_with_comments[r]
+                if r.previous.value == '\n':
+                    r.previous.value = ''
+            r.insert_after('print(">>>>>%d")\n' % input_block_number)
+            input_block_number += 1
 
-        input_block_number += 1
-    return ''.join(src_with_out_start_stop_indicators)
+        elif r.type == 'atomtrailers' and len(r.value) == 3:
+            sig = r.type, r.value[0].type, r.value[1].type, r.value[2].type
+            if (sig == ('atomtrailers', 'name', 'name', 'call') and
+               r.value[1].value in ['run_model', 'run_driver', 'setup']):
+                # if line has trailing comment, if found insert print() after comment
+                if r in lines_with_comments:
+                    r = lines_with_comments[r]
+                    if r.previous.value == '\n':
+                        r.previous.value = ''
+                r.insert_after('print(">>>>>%d")\n' % input_block_number)
+                input_block_number += 1
+
+    if comments:
+        print('------------------------------')
+        print(rb.dumps())
+        print('------------------------------')
+    return rb.dumps()
 
 
 def clean_up_empty_output_blocks(input_blocks, output_blocks):
@@ -539,6 +556,9 @@ def get_test_src(method_path):
     # make 'self' available to test code
     self_code = "from %s import %s; self = %s('%s')" % \
                 (module_path, class_name, class_name, method_name)
+    print('==========================================================================')
+    print('========== %s.%s.%s ' % (module_path, class_name, method_name))
+    print('==========================================================================')
 
     test_module = importlib.import_module(module_path)
     cls = getattr(test_module, class_name)
@@ -605,8 +625,8 @@ def get_test_src(method_path):
     # Remove the initial empty lines
     source_minus_docstrings_with_prints_cleaned = \
         remove_initial_empty_lines_from_source(source_minus_docstrings_with_prints)
-    print('========== source_minus_docstrings_with_prints_cleaned ===================')
-    print(source_minus_docstrings_with_prints_cleaned)
+    # print('========== source_minus_docstrings_with_prints_cleaned ===================')
+    # print(source_minus_docstrings_with_prints_cleaned)
 
     #-----------------------------------------------------------------------------------
     # 4. Insert extra print statements into source_minus_docstrings_with_prints_cleaned
@@ -614,8 +634,8 @@ def get_test_src(method_path):
     #-----------------------------------------------------------------------------------
     source_with_output_start_stop_indicators = \
         insert_output_start_stop_indicators(source_minus_docstrings_with_prints_cleaned)
-    print('========== source_with_output_start_stop_indicators ===================')
-    print(source_with_output_start_stop_indicators)
+    # print('========== source_with_output_start_stop_indicators ===================')
+    # print(source_with_output_start_stop_indicators)
 
     #-----------------------------------------------------------------------------------
     # 5. Run the test using source_with_out_start_stop_indicators -> run_outputs
@@ -640,6 +660,7 @@ def get_test_src(method_path):
 
         # Use Subprocess if we are under MPI.
         if use_mpi:
+            raise Exception("fuck MPI")
 
             # Write it to a file so we can run it.
             fd, code_to_run_path = tempfile.mkstemp()
@@ -721,7 +742,8 @@ def get_test_src(method_path):
 
     finally:
         if use_mpi:
-            os.remove(code_to_run_path)
+            # os.remove(code_to_run_path)
+            pass
         else:
             sys.stdout = stdout
             sys.stderr = stderr
