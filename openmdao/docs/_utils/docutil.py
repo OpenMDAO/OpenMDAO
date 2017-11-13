@@ -263,12 +263,12 @@ def get_test_source_code_for_feature(feature_name):
     return test_source_code_for_feature
 
 
-def remove_raise_skip_tests(source):
+def remove_raise_skip_tests(src):
     """
     Remove from the code any raise unittest.SkipTest lines since we don't want those in
     what the user sees.
     """
-    rb = RedBaron(source)
+    rb = RedBaron(src)
     raise_nodes = rb.findAll("RaiseNode")
     for rn in raise_nodes:
         # only the raise for SkipTest
@@ -318,14 +318,38 @@ def split_source_into_input_blocks(src):
         List of input code sections.
     """
     rb = RedBaron(src)
+
+    # find lines with trailing comments so we can preserve them properly
+    lines_with_comments = {}
+    comments = rb.findAll('comment')
+    for c in comments:
+        if c.previous and c.previous.type != 'endl':
+            lines_with_comments[c.previous] = c
+
+
     in_code_blocks = []
-    in_code_block = []
+    in_code_block = None
     # group code until the first print, then repeat
     for r in rb:
         line = r.dumps()
-        if not line.endswith('\n'):
+
+        # if this is a trailing comment for previous line, add and continue
+        if r in comments:
+            if in_code_block is None:
+                in_code_block[-1].append(line)
+            else:
+                in_code_block.append(line)
+            continue
+
+        if r not in lines_with_comments and not line.endswith('\n'):
             line += '\n'
-        in_code_block.append(line)
+
+        if in_code_block is None:
+            in_code_block = [line]
+        else:
+            in_code_block.append(line)
+        print("input line:", r.type, r)
+
         if r.type == 'print' or \
             (len(r.value) == 3 and
              (r.type, r.value[0].type, r.value[1].type, r.value[2].type) ==
@@ -335,9 +359,9 @@ def split_source_into_input_blocks(src):
             in_code_block = ''.join(in_code_block)
             in_code_block = remove_leading_trailing_whitespace_lines(in_code_block)
             in_code_blocks.append(in_code_block)
-            in_code_block = []
+            in_code_block = None
 
-    if in_code_block:  # If anything left over
+    if in_code_block is not None:  # If anything left over
         in_code_blocks.append(''.join(in_code_block))
 
     return in_code_blocks
@@ -374,9 +398,9 @@ def insert_output_start_stop_indicators(src):
         if r.type == 'print':
             # if line has trailing comment, insert print() after comment
             if r in lines_with_comments:
-                r = lines_with_comments[r]
+                r = lines_with_comments[r]  # r is now the comment
                 if r.previous.value == '\n':
-                    r.previous.value = ''
+                    r.previous.value = ''   # don't want endl before comment
             r.insert_after('print(">>>>>%d")\n' % input_block_number)
             input_block_number += 1
 
@@ -384,11 +408,11 @@ def insert_output_start_stop_indicators(src):
             sig = r.type, r.value[0].type, r.value[1].type, r.value[2].type
             if (sig == ('atomtrailers', 'name', 'name', 'call') and
                r.value[1].value in ['run_model', 'run_driver', 'setup']):
-                # if line has trailing comment, if found insert print() after comment
+                # if line has trailing comment, insert print() after comment
                 if r in lines_with_comments:
-                    r = lines_with_comments[r]
+                    r = lines_with_comments[r]  # r is now the comment
                     if r.previous.value == '\n':
-                        r.previous.value = ''
+                        r.previous.value = ''   # don't want endl before comment
                 r.insert_after('print(">>>>>%d")\n' % input_block_number)
                 input_block_number += 1
 
@@ -553,8 +577,8 @@ def get_test_src(method_path):
     class_name = method_path.split('.')[-2]
     method_name = method_path.split('.')[-1]
 
-    # make 'self' available to test code
-    self_code = "from %s import %s; self = %s('%s')" % \
+    # make 'self' available to test code (as an instance of the test case)
+    self_code = "from %s import %s\nself = %s('%s')\n" % \
                 (module_path, class_name, class_name, method_name)
     print('==========================================================================')
     print('========== %s.%s.%s ' % (module_path, class_name, method_name))
@@ -654,10 +678,10 @@ def get_test_src(method_path):
 
     print('========== code_to_run ===================')
     print(code_to_run)
+
     skipped = False
     failed = False
     try:
-
         # Use Subprocess if we are under MPI.
         if use_mpi:
             raise Exception("fuck MPI")
@@ -684,7 +708,6 @@ def get_test_src(method_path):
 
         # Just Exec the code for serial tests.
         else:
-
             stdout = sys.stdout
             stderr = sys.stderr
             strout = cStringIO()
@@ -765,10 +788,21 @@ def get_test_src(method_path):
 
         if len(output_blocks) != len(input_blocks):
             from pprint import pprint
+            print('===================')
             print('input_blocks (%d):' % len(input_blocks))
-            pprint(input_blocks)
+            counter = 0
+            for b in input_blocks:
+                print('-- %d --' % counter)
+                print(b)
+                counter += 1
+            print('----')
+            print('===================')
             print('output_blocks (%d):' % len(output_blocks))
-            pprint(output_blocks)
+            counter = 0
+            for b in output_blocks:
+                print('-- %d --' % counter)
+                print(b)
+                counter += 1
 
         # failsafe: make sure we have the same number of input and output blocks
         assert len(output_blocks) == len(input_blocks), \
