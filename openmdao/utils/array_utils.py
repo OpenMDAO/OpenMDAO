@@ -1,6 +1,7 @@
 """
 Utils for dealing with arrays.
 """
+from __future__ import print_function, division
 
 import numpy as np
 import six
@@ -76,3 +77,24 @@ def convert_neg(arr, dim):
     """
     arr[arr < 0] += dim
     return arr
+
+
+def array_viz(arr):
+    """
+    Display the structure of an array in a compact form.
+
+    Parameters
+    ----------
+    arr : ndarray
+        Array being visualized.
+    """
+    if len(arr.shape) != 2:
+        raise RuntimeError("array_viz only works for 2d arrays.")
+
+    for r in range(arr.shape[0]):
+        for c in range(arr.shape[1]):
+            if arr[r, c] == 0.0:
+                print('.', end='')
+            else:
+                print('x', end='')
+        print('')

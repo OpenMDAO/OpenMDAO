@@ -751,11 +751,74 @@ class SimulDerivTestCase(unittest.TestCase):
 
         prob.model.add_design_var('indep.x', simul_coloring=np.array([1,1,1,2,2,2,3,3,3], dtype=int))
         #prob.model.add_design_var('indep.x')
-        prob.model.add_constraint('C1.y', upper=0.0)
-        prob.model.add_constraint('C2.y', upper=0.0)
-        prob.model.add_constraint('C3.y', upper=0.0)
-
+        prob.model.add_constraint('C1.y', upper=0.0,
+                                  simul_map={
+                                      'indep.x': {
+                                          1: [0],
+                                          2: [3],
+                                          3: [6]
+                                      }
+                                  })
+        prob.model.add_constraint('C2.y', upper=0.0,
+                                  simul_map={
+                                      'indep.x': {
+                                          1: [1],
+                                          2: [4],
+                                          3: [7]
+                                      }
+                                  })
+        prob.model.add_constraint('C3.y', upper=0.0,
+                                  simul_map={
+                                      'indep.x': {
+                                          1: [2],
+                                          2: [5],
+                                          3: [8]
+                                      }
+                                  })
         prob.setup(check=False, mode='fwd')
+
+        #from openmdao.core.problem import find_disjoint
+        #from openmdao.utils.array_utils import array_viz
+
+        #p = prob
+        #p.run_model()
+        #J1 = p.driver._compute_totals(return_format='array')
+        #array_viz(J1)
+
+        #dv_idxs, res_idxs = find_disjoint(p)
+        #for dv in dv_idxs:
+            ## start with arange with all negative numbers so any idxs we don't color will have only a single idx for each color
+            #coloring = np.arange(-p.driver._designvars[dv]['size'], 0, dtype=int)
+            #for color in dv_idxs[dv]:
+                #coloring[np.array(dv_idxs[dv][color], dtype=int)] = color
+            #p.driver._designvars[dv]['simul_coloring'] = coloring
+            #print("coloring:", coloring)
+
+        #for res in res_idxs:
+            #simul_map = {}
+            #for dv in res_idxs[res]:
+                #simul_map[dv] = res_idxs[res][dv]
+            #print(res, simul_map)
+            #p.driver._responses[res]['simul_map'] = simul_map
+
+        #J2 = p.driver._compute_totals(return_format='array')
+        #print("\n\n\n")
+        #array_viz(J2)
+
+        #diff1 = J1[J1 != J2]
+        #diff2 = J2[J1 != J2]
+
+        #dmat = np.zeros(J1.shape)
+        #dmat[J1 != J2] = 1.0
+        #print("\n\n\n")
+        #array_viz(dmat)
+
+
+        #print(np.nonzero(J1 != J2))
+        #print(diff1.shape)
+
+        #print(diff2 - diff1)
+
         prob.run_driver()
 
         J = prob.compute_totals(['C1.y', 'C2.y', 'C3.y'], ['indep.x'], return_format='dict')
@@ -808,8 +871,8 @@ class SimulDerivTestCase(unittest.TestCase):
         prob.model.add_constraint('C2.y', upper=0.0,
                                   simul_map={
                                       'indep.x': {
-                                          1: [0,1],
-                                          2: [2,3],
+                                          1: [5, 6],
+                                          2: [7, 8],
                                           3: []
                                       }
                                   })

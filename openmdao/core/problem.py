@@ -1324,7 +1324,12 @@ class Problem(object):
                 colors = set(simul_coloring)
                 def idx_iter():
                     for c in colors:
-                        yield (c, np.nonzero(simul_coloring == c)[0])
+                        # iterate over negative colors individually
+                        if c < 0:
+                            for i in np.nonzero(simul_coloring == c)[0]:
+                                yield (c, i)
+                        else:
+                            yield (c, np.nonzero(simul_coloring == c)[0])
                 idx_iter = idx_iter()
             else:
                 loc_idx_dict = defaultdict(lambda: -1)
@@ -1332,10 +1337,12 @@ class Problem(object):
                 idx_iter = range(max_len)
 
             for i in idx_iter:
+                #color_count = 0
                 if simul_coloring is not None:
                     color, i = i
-                    print('color', color)
-                    color_count = 0
+                    #print('color', color)
+                    do_color_iter = i.size > 1
+
                 # this sets dinputs for the current parallel_deriv_color to 0
                 # dinputs is dresids in fwd, doutouts in rev
                 if fwd:
@@ -1357,7 +1364,7 @@ class Problem(object):
                             for ii, idx in enumerate(idxs):
                                 if start <= idx < end:
                                     dinputs._views_flat[input_name][idx - start, ii] = 1.0
-                    elif simul_coloring is not None:
+                    elif simul_coloring is not None and do_color_iter:
                         final_idxs = i[np.logical_and(i >= start, i < end)]
                         dinputs._views_flat[input_name][final_idxs - start] = 1.0
                     else:
@@ -1382,7 +1389,7 @@ class Problem(object):
 
                     if matmat:
                         loc_idx = loc_idxs
-                    elif simul is not None:
+                    elif simul is not None and do_color_iter:
                         loc_idx = loc_idxs[i - start]
                     else:
                         if i >= len(idxs):
@@ -1480,12 +1487,15 @@ class Problem(object):
                                 if totals[okey][old_input_name] is None:
                                     totals[okey][old_input_name] = np.zeros((len_val, loc_size))
                                 if store:
-                                    if simul is not None:
-                                        out_simul_idxs = output_vois[output_name]['simul_map'][input_name][color]
-                                        if out_simul_idxs:
-                                            for si in out_simul_idxs:
-                                                totals[okey][old_input_name][si, loc_idx[color_count]] = deriv_val[si]
-                                                color_count += 1
+                                    if simul is not None and do_color_iter:
+                                        smap = output_vois[output_name]['simul_map']
+                                        if smap is not None:
+                                            out_simul_idxs = np.array(smap[input_name][color], dtype=int)
+                                            if out_simul_idxs is not None and len(out_simul_idxs):
+                                                nzeros = np.nonzero(deriv_val)[0]
+                                                mat = totals[okey][old_input_name]
+                                                for idx, col in enumerate(out_simul_idxs):
+                                                    mat[nzeros[idx], col] = deriv_val[nzeros[idx]]
                                     else:
                                         totals[okey][old_input_name][:, loc_idx] = deriv_val
                             else:
@@ -1800,18 +1810,99 @@ def _format_error(error, tol):
     return '{:.6e} *'.format(error)
 
 
+def find_var_from_range(idx, ranges):
+    # TODO: use bisection
+    for start, end, name in ranges:
+        if start <= idx <= end:
+            return name, idx - start
+
+
 def find_disjoint(prob):
     """
     Given a problem, find all sets of disjoint columns in the total jacobian and their
     corresponding rows.
     """
+    # TODO: fix this to work in rev mode as well
+
+    from collections import defaultdict
+    from itertools import combinations, product
     from openmdao.jacobians.assembled_jacobian import DenseJacobian
-    prob.model.jacobian = DenseJacobian()
-    prob.setup()
-    prob.final_setup()
+    prob.run_model()
 
-    mat = prob.model.jacobian._int_mtx._matrix
-    desvars = prob.driver.get_design_var_values()
-    responses = prob.driver.get_response_values()
+    J = prob.driver._compute_totals(return_format='array')
+    J[J == -0.0] = 0.0
+    J[J != 0.0] = 1.
 
-    assert(all(prob.model.jacobian._ext_mtx._matrix == 0.0))
+    allcols = list(range(J.shape[1]))
+
+    disjoints = defaultdict(set)
+    rows = {}
+    for c1, c2 in combinations(allcols, 2):  # loop over column pairs
+        result = J[:, c1] + J[:, c2]
+        if np.all(result <= 1.0):
+            disjoints[c1].add(c2)
+            disjoints[c2].add(c1)
+            if c1 not in rows:
+                rows[c1] = set(np.nonzero(J[:, c1])[0])
+            if c2 not in rows:
+                rows[c2] = set(np.nonzero(J[:, c2])[0])
+
+    full_disjoint = {}
+    seen = set()
+    allrows = {}
+    discols = sorted(disjoints.items(), key=lambda x: len(x[1]), reverse=True)
+    for col, s in discols:
+        if col in seen or col in full_disjoint:
+            continue
+        seen.add(col)
+        allrows[col] = set(rows[col])
+        full_disjoint[col] = set([col])
+        for other_col in s:
+            if other_col not in seen and not allrows[col].intersection(rows[other_col]):
+                seen.add(other_col)
+                full_disjoint[col].add(other_col)
+                allrows[col].update(rows[other_col])
+
+    # find column and row ranges (inclusive) for dvs and responses respectively
+    dv_offsets = []
+    start = 0
+    end = -1
+    for name, data in iteritems(prob.driver._designvars):
+        end += data['size']
+        dv_offsets.append((start, end, name))
+        # print("dv range[%s] = %s" % (name, (start, end)))
+        start = end + 1
+
+    res_offsets = []
+    start = 0
+    end = -1
+    for name, data in iteritems(prob.driver._responses):
+        end += data['size']
+        res_offsets.append((start, end, name))
+        # print("res range[%s] = %s" % (name, (start, end)))
+        start = end + 1
+
+    print("")
+    # for col, s in full_disjoint.items():
+    #     print('cols:', sorted(s), 'rows:', sorted(allrows[col]))
+
+    total_dv_offsets = defaultdict(lambda: defaultdict(list))
+    total_res_offsets = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    for color, cols in enumerate(full_disjoint.values()):
+        print("\ncolor %d:" % color)
+        for c in sorted(cols):
+            dv, dvoffset = find_var_from_range(c, dv_offsets)
+            total_dv_offsets[dv][color].append(dvoffset)
+            print(dv, dvoffset, 'col', c)
+            for crow in sorted(rows[c]):
+                res, resoffset = find_var_from_range(crow, res_offsets)
+                total_res_offsets[res][dv][color].append(resoffset)
+                print("   ", res, resoffset, 'row', crow)
+
+    # print("\n")
+    # import pprint
+    # pprint.pprint(dict(total_dv_offsets))
+    # print("\n")
+    # pprint.pprint(dict(total_res_offsets))
+
+    return total_dv_offsets, total_res_offsets
