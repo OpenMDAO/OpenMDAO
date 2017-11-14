@@ -12,5 +12,5 @@ Anything documented here has been thoroughly tested, and should be considered fu
 
    core_features/index.rst
    building_blocks/index.rst
-   visualization_and_analysis/index.rst
+   working_with_models/index.rst
    units.rst

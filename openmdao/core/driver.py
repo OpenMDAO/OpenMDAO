@@ -118,6 +118,9 @@ class Driver(object):
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
                                        '(processed post-includes)')
+        self.recording_options.declare('record_derivatives', types=bool, default=False,
+                                       desc='Set to True to record derivatives at the driver \
+                                       level')
         ###########################
 
         # What the driver supports.

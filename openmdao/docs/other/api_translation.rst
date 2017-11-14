@@ -1,10 +1,11 @@
 .. _`api_translation`:
 
-******************
-Upgrading from 1.x
-******************
+**************************
+Upgrading from OpenMDAO 1
+**************************
 
-This guide takes how you did things in OpenMDAO Alpha and shows how to do them in the latest version of OpenMDAO.
+This guide takes how you did things in OpenMDAO 1 and shows how to do them OpenMDAO 2.
+It is not a comprehensive guide to using OpenMDAO 2, but focus only on the things that have changed in the API.
 
 
 Build a Model
@@ -103,6 +104,34 @@ Define an Implicit Component
             J[('y', 'y')] = y + 2.0 - 32.0*y*exp(-16.0*y*y) - 10.0*exp(-5.0*y)
 
             return J
+
+Input-Input connections
+============================
+
+See more details in the doc for :ref:`add_subsystem() <feature_adding_subsystem_to_a_group>`.
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_input_input
+      Problem
+      run_model
+
+    prob = Problem()
+    root = prob.root = Group()
+
+    root.add('p1', IndepVarComp('x', 3.0))
+
+    root.add('comp1', Paraboloid())
+    root.add('comp2', Paraboloid())
+
+    #input-input connection
+    root.connect('comp1.x', 'comp2.x')
+    #then connect the indep var to just one of the inputs
+    root.connect('p1.x', 'comp1.x')
+
+    prob.setup()
+    prob.run()
 
 
 Run a Model
@@ -264,8 +293,8 @@ Check Partial Derivatives with Complex Step
         prob.check_partials()
 
 
-Change Derivative Behavior
---------------------------
+Change Group Level Derivative Behavior
+---------------------------------------
 
 Force Group or Model to use Finite Difference
 =============================================
@@ -397,3 +426,40 @@ Specify Linear Block Gauss Seidel as a Linear Solver in a Group
       LinearBlockGS()
 
     model.ln_solver = LinearGaussSeidel()
+
+
+Total Derivatives
+----------------------------------
+
+
+Computing Total Derivatives
+================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_compute_totals
+      prob.compute_totals
+      prob.compute_totals
+
+    prob.calc_gradient(indep_list=['p1.x', 'p2.y'], unknown_list=['comp.f_xy'])
+
+Setting Derivative Computation Mode
+========================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_set_deriv_mode
+      prob.setup
+      prob.compute_totals
+
+    root.ln_solver.options['mode'] = 'rev'
+    # root.ln_solver.options['mode'] = 'fwd'
+    # root.ln_solver.options['mode'] = 'auto'
+    prob.setup()
+    prob.run()
+    prob.calc_gradient(indep_list=['p1.x', 'p2.y'], unknown_list=['comp.f_xy'])
+
+
+

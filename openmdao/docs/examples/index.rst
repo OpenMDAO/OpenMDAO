@@ -1,4 +1,4 @@
-.. _Examples:
+.. _OpenMDAO_Examples:
 
 ********
 Examples
