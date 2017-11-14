@@ -3,6 +3,7 @@ Utils for dealing with arrays.
 """
 from __future__ import print_function, division
 
+import sys
 import numpy as np
 import six
 from six.moves import range
@@ -94,7 +95,7 @@ def array_viz(arr):
     for r in range(arr.shape[0]):
         for c in range(arr.shape[1]):
             if arr[r, c] == 0.0:
-                print('.', end='')
+                sys.stdout.write('.')
             else:
-                print('x', end='')
-        print('')
+                sys.stdout.write('x')
+        sys.stdout.write('\n')

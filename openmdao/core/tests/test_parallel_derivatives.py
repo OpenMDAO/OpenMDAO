@@ -725,7 +725,7 @@ class Multiplier(ExplicitComponent):
         if mode == 'fwd':
             if 'x' in d_inputs:
                 d_outputs['y'] += d_inputs['x'] * 2.0 * self.mult
-                print(self.pathname, d_outputs['y'])
+                #print(self.pathname, d_outputs['y'])
         else:
             if 'x' in d_inputs:
                 d_inputs['x'] += d_inputs['x'] * 2.0 * self.mult
@@ -749,75 +749,35 @@ class SimulDerivTestCase(unittest.TestCase):
         model.connect('indep.x', 'C2.x', src_indices=list(take_nth(1, size, whole)))
         model.connect('indep.x', 'C3.x', src_indices=list(take_nth(2, size, whole)))
 
-        prob.model.add_design_var('indep.x', simul_coloring=np.array([1,1,1,2,2,2,3,3,3], dtype=int))
-        #prob.model.add_design_var('indep.x')
-        prob.model.add_constraint('C1.y', upper=0.0,
-                                  simul_map={
-                                      'indep.x': {
-                                          1: [0],
-                                          2: [3],
-                                          3: [6]
-                                      }
-                                  })
-        prob.model.add_constraint('C2.y', upper=0.0,
-                                  simul_map={
-                                      'indep.x': {
-                                          1: [1],
-                                          2: [4],
-                                          3: [7]
-                                      }
-                                  })
-        prob.model.add_constraint('C3.y', upper=0.0,
-                                  simul_map={
-                                      'indep.x': {
-                                          1: [2],
-                                          2: [5],
-                                          3: [8]
-                                      }
-                                  })
+        #prob.model.add_design_var('indep.x', simul_coloring=np.array([1,1,1,2,2,2,3,3,3], dtype=int))
+        prob.model.add_design_var('indep.x')
+        prob.model.add_constraint('C1.y', upper=0.0)#,
+                                  #simul_map={
+                                      #'indep.x': {
+                                          #1: [0],
+                                          #2: [3],
+                                          #3: [6]
+                                      #}
+                                  #})
+        prob.model.add_constraint('C2.y', upper=0.0)#,
+                                  #simul_map={
+                                      #'indep.x': {
+                                          #1: [1],
+                                          #2: [4],
+                                          #3: [7]
+                                      #}
+                                  #})
+        prob.model.add_constraint('C3.y', upper=0.0)#,
+                                  #simul_map={
+                                      #'indep.x': {
+                                          #1: [2],
+                                          #2: [5],
+                                          #3: [8]
+                                      #}
+                                  #})
         prob.setup(check=False, mode='fwd')
-
-        #from openmdao.core.problem import find_disjoint
-        #from openmdao.utils.array_utils import array_viz
-
-        #p = prob
-        #p.run_model()
-        #J1 = p.driver._compute_totals(return_format='array')
-        #array_viz(J1)
-
-        #dv_idxs, res_idxs = find_disjoint(p)
-        #for dv in dv_idxs:
-            ## start with arange with all negative numbers so any idxs we don't color will have only a single idx for each color
-            #coloring = np.arange(-p.driver._designvars[dv]['size'], 0, dtype=int)
-            #for color in dv_idxs[dv]:
-                #coloring[np.array(dv_idxs[dv][color], dtype=int)] = color
-            #p.driver._designvars[dv]['simul_coloring'] = coloring
-            #print("coloring:", coloring)
-
-        #for res in res_idxs:
-            #simul_map = {}
-            #for dv in res_idxs[res]:
-                #simul_map[dv] = res_idxs[res][dv]
-            #print(res, simul_map)
-            #p.driver._responses[res]['simul_map'] = simul_map
-
-        #J2 = p.driver._compute_totals(return_format='array')
-        #print("\n\n\n")
-        #array_viz(J2)
-
-        #diff1 = J1[J1 != J2]
-        #diff2 = J2[J1 != J2]
-
-        #dmat = np.zeros(J1.shape)
-        #dmat[J1 != J2] = 1.0
-        #print("\n\n\n")
-        #array_viz(dmat)
-
-
-        #print(np.nonzero(J1 != J2))
-        #print(diff1.shape)
-
-        #print(diff2 - diff1)
+        from openmdao.core.problem import set_simul_meta
+        set_simul_meta(prob)
 
         prob.run_driver()
 
@@ -853,31 +813,34 @@ class SimulDerivTestCase(unittest.TestCase):
         model.add_subsystem('C1', Multiplier(mult=np.array([2.,4.,6.,8.,10.]), size=5))
         model.add_subsystem('C2', Multiplier(mult=np.array([3.,6.,9.,12.]), size=4))
 
-        model.connect('indep.x', 'C1.x', src_indices=list(range(5)))
+        model.connect('indep.x', 'C1.x', src_indices=[4,1,2,3,0])
         model.connect('indep.x', 'C2.x', src_indices=list(range(5,9)))
 
-        prob.model.add_design_var('indep.x', simul_coloring=np.array([3,3,1,2,3,1,1,2,2], dtype=int))
+        prob.model.add_design_var('indep.x')#, simul_coloring=np.array([3,3,1,2,3,1,1,2,2], dtype=int))
 
-        # simul_map are the indices of the output that map (in order) to the corresponding indices
-        # from the input for each color.
-        prob.model.add_constraint('C1.y', upper=0.0,
-                                  simul_map={
-                                      'indep.x': {
-                                          1: [2],
-                                          2: [3],
-                                          3: [4,1,0]
-                                      }
-                                  })
-        prob.model.add_constraint('C2.y', upper=0.0,
-                                  simul_map={
-                                      'indep.x': {
-                                          1: [5, 6],
-                                          2: [7, 8],
-                                          3: []
-                                      }
-                                  })
+        ## simul_map are the indices of the output that map (in order) to the corresponding indices
+        ## from the input for each color.
+        prob.model.add_constraint('C1.y', upper=0.0)#,
+                                  #simul_map={
+                                      #'indep.x': {
+                                          #1: [2],
+                                          #2: [3],
+                                          #3: [4,1,0]
+                                      #}
+                                  #})
+        prob.model.add_constraint('C2.y', upper=0.0)#,
+                                  #simul_map={
+                                      #'indep.x': {
+                                          #1: [5, 6],
+                                          #2: [7, 8],
+                                          #3: []
+                                      #}
+                                  #})
 
         prob.setup(check=False, mode='fwd')
+        
+        from openmdao.core.problem import set_simul_meta
+        set_simul_meta(prob)
         prob.run_driver()
 
         J = prob.compute_totals(['C1.y', 'C2.y'], ['indep.x'], return_format='dict')

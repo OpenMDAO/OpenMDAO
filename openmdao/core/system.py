@@ -357,8 +357,8 @@ class System(object):
         self._static_mode = True
         self._static_subsystems_allprocs = []
         self._static_manual_connections = {}
-        self._static_design_vars = {}
-        self._static_responses = {}
+        self._static_design_vars = OrderedDict()
+        self._static_responses = OrderedDict()
 
         self._reconfigured = False
         self.supports_multivecs = False

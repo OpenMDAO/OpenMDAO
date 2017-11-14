@@ -135,8 +135,8 @@ class Group(System):
 
         self._subsystems_allprocs = []
         self._manual_connections = {}
-        self._design_vars = {}
-        self._responses = {}
+        self._design_vars = OrderedDict()
+        self._responses = OrderedDict()
 
         self._static_mode = False
         self._subsystems_allprocs.extend(self._static_subsystems_allprocs)

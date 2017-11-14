@@ -1894,11 +1894,16 @@ def find_disjoint(prob):
             dv, dvoffset = find_var_from_range(c, dv_offsets)
             total_dv_offsets[dv][color].append(dvoffset)
             print(dv, dvoffset, 'col', c)
-            for crow in sorted(rows[c]):
+            for crow in rows[c]:
                 res, resoffset = find_var_from_range(crow, res_offsets)
-                total_res_offsets[res][dv][color].append(resoffset)
                 print("   ", res, resoffset, 'row', crow)
+                total_res_offsets[res][dv][color].append((resoffset, dvoffset))
 
+    # sort dvoffsets by resoffsets so rows will be in right order
+    for res, resoffs in iteritems(total_res_offsets):
+        for dv, resoffs2 in iteritems(resoffs):
+            for color, lst in iteritems(resoffs2):
+                resoffs2[color] = [t[1] for t in sorted(lst, key=lambda x: x[0])]
     # print("\n")
     # import pprint
     # pprint.pprint(dict(total_dv_offsets))
@@ -1906,3 +1911,24 @@ def find_disjoint(prob):
     # pprint.pprint(dict(total_res_offsets))
 
     return total_dv_offsets, total_res_offsets
+
+
+def set_simul_meta(problem):
+    driver = problem.driver
+    dv_idxs, res_idxs = find_disjoint(problem)
+    for dv in dv_idxs:
+        # negative colors will be iterated over individually, so start by filling the coloring array
+        # with -1.  We then replace specific entries with positive colors which will be iterated over
+        # as a group.
+        coloring = np.full(driver._designvars[dv]['size'], -1)
+        for color in dv_idxs[dv]:
+            coloring[np.array(dv_idxs[dv][color], dtype=int)] = color
+        driver._designvars[dv]['simul_coloring'] = coloring
+        print("coloring:", coloring)
+
+    for res in res_idxs:
+        simul_map = {}
+        for dv in res_idxs[res]:
+            simul_map[dv] = res_idxs[res][dv]
+        print(res, simul_map)
+        driver._responses[res]['simul_map'] = simul_map
