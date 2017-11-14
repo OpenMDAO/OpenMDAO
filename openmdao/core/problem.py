@@ -456,19 +456,20 @@ class Problem(object):
             next to them in output, making them easy to search for. Note at times there may be a
             significant relative error due to a minor absolute error.  Default is 1.0E-6.
         method : str
-            Method, 'fd' for finite difference or 'cs' for complex step.
+            Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
         step : float
-            Step size for approximation.
+            Step size for approximation. Default is None.
         form : string
             Form for finite difference, can be 'forward', 'backward', or 'central'. The
-            default value is the value of DEFAULT_FD_OPTIONS['form']
+            default value is the value of DEFAULT_FD_OPTIONS['form']. Default is
+            the value of DEFAULT_FD_OPTIONS['form']
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
             relative. The default value is the value of DEFAULT_FD_OPTIONS['step_calc']
         force_dense : bool
-            If True, analytic derivatives will be coerced into arrays.
+            If True, analytic derivatives will be coerced into arrays. Default is True.
         suppress_output : bool
-            Set to True to suppress all output.
+            Set to True to suppress all output. Default is False.
 
         Returns
         -------
@@ -813,15 +814,17 @@ class Problem(object):
             next to them in output, making them easy to search for. Note at times there may be a
             significant relative error due to a minor absolute error.  Default is 1.0E-6.
         method : str
-            Method, 'fd' for finite difference or 'cs' for complex step.
+            Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'
         step : float
-            Step size for approximation.
+            Step size for approximation. Default is 1e-6.
         form : string
-            Form for finite difference, can be 'forward', 'backward', or 'central'.
+            Form for finite difference, can be 'forward', 'backward', or 'central'. Default
+            'forward'.
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
+            Default is 'abs'.
         suppress_output : bool
-            Set to True to suppress all output.
+            Set to True to suppress all output. Default is False.
 
         Returns
         -------
