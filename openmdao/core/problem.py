@@ -460,11 +460,11 @@ class Problem(object):
         step : float
             Step size for approximation.
         form : string
-            Form for finite difference, can be 'forward', 'backward', or 'central'. The default value is
-            the value of DEFAULT_FD_OPTIONS['form']
+            Form for finite difference, can be 'forward', 'backward', or 'central'. The
+            default value is the value of DEFAULT_FD_OPTIONS['form']
         step_calc : string
-            Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative. The default
-            value is the value of DEFAULT_FD_OPTIONS['step_calc']
+            Step type for finite difference, can be 'abs' for absolute', or 'rel' for
+            relative. The default value is the value of DEFAULT_FD_OPTIONS['step_calc']
         force_dense : bool
             If True, analytic derivatives will be coerced into arrays.
         suppress_output : bool
