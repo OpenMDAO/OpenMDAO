@@ -55,11 +55,8 @@ class TagDirective(Directive):
         links = []
 
         for tagg in taggs:
-            # Create rst hyperlinks of format `Python <http://www.python.org/>`_.
-            import os
-            cwd = os.getcwd()
-            html_dir = os.path.join(cwd, "_build", "html")
-            link = "`" + tagg + " <" + html_dir + os.sep + "tags" + os.sep + tagg + ".html>`_ "
+            # Create Sphinx doc refs of format :ref:`Tagname<Tagname>`
+            link = ":ref:`" + tagg + "<" + tagg + ">`"
             links.append(link)
         # Put links back in a single comma-separated string together
         linkjoin = ", ".join(links)
