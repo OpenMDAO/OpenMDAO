@@ -660,6 +660,7 @@ def get_test_src(method_path):
                 past_header = True
         else:
             newline = line[tab:]
+
         # exclude 'global' directives, not needed the way we are running things
         if not newline.startswith("global "):
             new_lines.append(newline)
@@ -668,18 +669,13 @@ def get_test_src(method_path):
 
     # Remove docstring from source code
     source_minus_docstrings = remove_docstrings(method_source)
-    # print('========== source_minus_docstrings ===================')
-    # print(source_minus_docstrings)
 
     #-----------------------------------------------------------------------------------
     # 2. Replace the asserts with prints -> source_minus_docstrings_with_prints_cleaned
     #-----------------------------------------------------------------------------------
 
-    # Replace some of the asserts with prints of the actual values
-    # This calls RedBaron
+    # Replace some of the asserts with prints of the actual values. This calls RedBaron
     source_minus_docstrings_with_prints = replace_asserts_with_prints(source_minus_docstrings)
-    # print('========== source_minus_docstrings_with_prints ===================')
-    # print(source_minus_docstrings_with_prints)
 
     # remove raise SkipTest lines
     # We decided to leave them in for now
@@ -688,8 +684,6 @@ def get_test_src(method_path):
     # Remove the initial empty lines
     source_minus_docstrings_with_prints_cleaned = \
         remove_initial_empty_lines_from_source(source_minus_docstrings_with_prints)
-    # print('========== source_minus_docstrings_with_prints_cleaned ===================')
-    # print(source_minus_docstrings_with_prints_cleaned)
 
     #-----------------------------------------------------------------------------------
     # 4. Insert extra print statements into source_minus_docstrings_with_prints_cleaned
@@ -697,17 +691,19 @@ def get_test_src(method_path):
     #-----------------------------------------------------------------------------------
     source_with_output_start_stop_indicators = \
         insert_output_start_stop_indicators(source_minus_docstrings_with_prints_cleaned)
-    # print('========== source_with_output_start_stop_indicators ===================')
-    # print(source_with_output_start_stop_indicators)
 
-    #-----------------------------------------------------------------------------------
-    # 5. Run the test using source_with_out_start_stop_indicators -> run_outputs
+    #----------------`-------------------------------------------------------------------
+    # 5. Get all the pieces of code needed to run the unit test method
     #-----------------------------------------------------------------------------------
 
-    # Get all the pieces of code needed to run the unit test method
     global_imports = globals_for_imports(method_source)
-    setup_source_code = get_method_body(inspect.getsource(getattr(cls, 'setUp')))
-    teardown_source_code = get_method_body(inspect.getsource(getattr(cls, 'tearDown')))
+
+    # get setUp and tearDown but don't duplicate if it is the method being tested
+    setup_source_code = '' if method_name == 'setUp' else \
+        get_method_body(inspect.getsource(getattr(cls, 'setUp')))
+
+    teardown_source_code = '' if method_name == 'tearDown' else \
+        get_method_body(inspect.getsource(getattr(cls, 'tearDown')))
 
     code_to_run = '\n'.join([global_imports,
                              self_code,
@@ -717,6 +713,10 @@ def get_test_src(method_path):
 
     print('========== code_to_run ===================')
     print(code_to_run)
+
+    #-----------------------------------------------------------------------------------
+    # 6. Run the test using source_with_out_start_stop_indicators -> run_outputs
+    #-----------------------------------------------------------------------------------
 
     skipped = False
     failed = False
@@ -753,18 +753,10 @@ def get_test_src(method_path):
             sys.stdout = strout
             sys.stderr = strout
 
-            # Hacking, but trying to make sure we capture the check config messages.
-            from openmdao.utils.logger_utils import _loggers, get_logger
-            if 'check_config' not in _loggers:
-                get_logger('check_config', use_format=True)
-            if 'check_partials' not in _loggers:
-                get_logger('check_partials')
-            if 'check_totals' not in _loggers:
-                get_logger('check_totals')
-
-            _loggers['check_config']['logger'].handlers[0].stream = strout
-            _loggers['check_partials']['logger'].handlers[0].stream = strout
-            _loggers['check_totals']['logger'].handlers[0].stream = strout
+            # reset all the loggers
+            from openmdao.utils.logger_utils import _loggers
+            for name in _loggers:
+                _loggers[name]['logger'].handlers[0].stream = strout
 
             # We need more precision from numpy
             save_opts = np.get_printoptions()

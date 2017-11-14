@@ -294,7 +294,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.prob.model._nonlinear_solver.recording_options['record_abs_error'] = True
         self.prob.model._nonlinear_solver.recording_options['record_rel_error'] = True
-        self.prob.model._nonlinear_solver.recording_options['record_solver_output'] = True
         self.prob.model._nonlinear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model._nonlinear_solver.add_recorder(self.recorder)
 

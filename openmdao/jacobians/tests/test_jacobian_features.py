@@ -103,6 +103,7 @@ class SimpleCompConst(ExplicitComponent):
         outputs['g'] = np.outer(inputs['y1'] + inputs['y3'], inputs['y2']) + inputs['x'] * np.eye(2)
 
     def compute_partials(self, inputs, partials):
+        # note: all the partial derivatives are constant, so no calculations happen here.
         pass
 
 

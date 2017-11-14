@@ -554,7 +554,6 @@ class TestDataUploader(unittest.TestCase):
 
         self.prob.model._nonlinear_solver.recording_options['record_abs_error'] = True
         self.prob.model._nonlinear_solver.recording_options['record_rel_error'] = True
-        self.prob.model._nonlinear_solver.recording_options['record_solver_output'] = True
         self.prob.model._nonlinear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model._nonlinear_solver.add_recorder(self.recorder)
 
@@ -566,12 +565,12 @@ class TestDataUploader(unittest.TestCase):
         upload(self.filename, self._accepted_token)
 
         expected_solver_output = [
-            {'name': 'con_cmp1.con1', 'values': [-22.42830237000701]},
-            {'name': 'd1.y1', 'values': [25.58830237000701]},
-            {'name': 'con_cmp2.con2', 'values': [-11.941511849375644]},
+            {'name': 'con_cmp1.con1', 'values': [-22.42830237]},
+            {'name': 'd1.y1', 'values': [25.58830237]},
+            {'name': 'con_cmp2.con2', 'values': [-11.941511849]},
             {'name': 'pz.z', 'values': [5.0, 2.0]},
-            {'name': 'obj_cmp.obj', 'values': [28.588308165163074]},
-            {'name': 'd2.y2', 'values': [12.058488150624356]},
+            {'name': 'obj_cmp.obj', 'values': [28.588308165]},
+            {'name': 'd2.y2', 'values': [12.058488150]},
             {'name': 'px.x', 'values': [1.0]}
         ]
 
@@ -623,11 +622,21 @@ class TestDataUploader(unittest.TestCase):
         expected_rel_error = expected_abs_error / 2.9086436370499857e-08
 
         solver_iteration = json.loads(self.solver_iterations)
+        expected_solver_output = [
+            {'name': 'con_cmp1.con1', 'values': [-22.42830237]},
+            {'name': 'd1.y1', 'values': [25.58830237]},
+            {'name': 'con_cmp2.con2', 'values': [-11.941511849]},
+            {'name': 'pz.z', 'values': [5.0, 2.0]},
+            {'name': 'obj_cmp.obj', 'values': [28.588308165]},
+            {'name': 'd2.y2', 'values': [12.058488150]},
+            {'name': 'px.x', 'values': [1.0]}
+        ]
 
         self.assertAlmostEqual(solver_iteration['abs_err'], expected_abs_error)
         self.assertAlmostEqual(solver_iteration['rel_err'], expected_rel_error)
-        self.assertEqual(solver_iteration['solver_output'], [])
         self.assertEqual(solver_iteration['solver_residuals'], [])
+        for o in expected_solver_output:
+            self.assert_array_close(o, solver_iteration['solver_output'])
 
     def test_record_line_search_bounds_enforce(self, m):
         self.setup_endpoints(m)
@@ -652,12 +661,22 @@ class TestDataUploader(unittest.TestCase):
 
         expected_abs_error = 7.02783609310096e-10
         expected_rel_error = 8.078674883382422e-07
+        expected_solver_output = [
+            {'name': 'con_cmp1.con1', 'values': [-22.42830237]},
+            {'name': 'd1.y1', 'values': [25.58830237]},
+            {'name': 'con_cmp2.con2', 'values': [-11.941511849]},
+            {'name': 'pz.z', 'values': [5.0, 2.0]},
+            {'name': 'obj_cmp.obj', 'values': [28.588308165]},
+            {'name': 'd2.y2', 'values': [12.058488150]},
+            {'name': 'px.x', 'values': [1.0]}
+        ]
 
         solver_iteration = json.loads(self.solver_iterations)
         self.assertAlmostEqual(solver_iteration['abs_err'], expected_abs_error)
         self.assertAlmostEqual(solver_iteration['rel_err'], expected_rel_error)
-        self.assertEqual(solver_iteration['solver_output'], [])
         self.assertEqual(solver_iteration['solver_residuals'], [])
+        for o in expected_solver_output:
+            self.assert_array_close(o, solver_iteration['solver_output'])
 
     def test_record_solver_nonlinear_block_gs(self, m):
         self.setup_endpoints(m)
@@ -666,7 +685,6 @@ class TestDataUploader(unittest.TestCase):
         self.prob.model.nonlinear_solver = NonlinearBlockGS()
         self.prob.model.nonlinear_solver.add_recorder(self.recorder)
 
-        self.prob.model.nonlinear_solver.recording_options['record_solver_output'] = True
         self.prob.model.nonlinear_solver.recording_options['record_solver_residuals'] = True
 
         self.prob.setup(check=False)
@@ -729,10 +747,21 @@ class TestDataUploader(unittest.TestCase):
 
         expected_abs_error = 7.234027587097439e-07
         expected_rel_error = 1.991112651729199e-08
+        expected_solver_output = [
+            {'name': 'px.x', 'values': [1.0]},
+            {'name': 'pz.z', 'values': [5., 2.]},
+            {'name': 'd1.y1', 'values': [25.58830237]},
+            {'name': 'd2.y2', 'values': [12.05848815]},
+            {'name': 'obj_cmp.obj', 'values': [28.58830817]},
+            {'name': 'con_cmp1.con1', 'values': [-22.42830237]},
+            {'name': 'con_cmp2.con2', 'values': [-11.94151185]}
+        ]
+
         self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
         self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
         self.assertEqual(solver_iteration['solver_residuals'], [])
-        self.assertEqual(solver_iteration['solver_output'], [])
+        for o in expected_solver_output:
+            self.assert_array_close(o, solver_iteration['solver_output'])
 
     def test_record_solver_nonlinear_newton(self, m):
         self.setup_endpoints(m)
@@ -749,13 +778,23 @@ class TestDataUploader(unittest.TestCase):
         upload(self.filename, self._accepted_token)
 
         solver_iteration = json.loads(self.solver_iterations)
+        expected_solver_output = [
+            {'name': 'px.x', 'values': [1.0]},
+            {'name': 'pz.z', 'values': [5., 2.]},
+            {'name': 'd1.y1', 'values': [25.58830237]},
+            {'name': 'd2.y2', 'values': [12.05848815]},
+            {'name': 'obj_cmp.obj', 'values': [28.58830817]},
+            {'name': 'con_cmp1.con1', 'values': [-22.42830237]},
+            {'name': 'con_cmp2.con2', 'values': [-11.94151185]}
+        ]
 
         expected_abs_error = 2.1677810075550974e-10
         expected_rel_error = 5.966657077752565e-12
         self.assertAlmostEqual(expected_abs_error, solver_iteration['abs_err'])
         self.assertAlmostEqual(expected_rel_error, solver_iteration['rel_err'])
         self.assertEqual(solver_iteration['solver_residuals'], [])
-        self.assertEqual(solver_iteration['solver_output'], [])
+        for o in expected_solver_output:
+            self.assert_array_close(o, solver_iteration['solver_output'])
 
     def test_record_solver_nonlinear_nonlinear_run_once(self, m):
         self.setup_endpoints(m)
@@ -775,14 +814,23 @@ class TestDataUploader(unittest.TestCase):
         expected_abs_error = 0.0
         expected_rel_error = 0.0
         expected_solver_residuals = None
-        expected_solver_output = None
+        expected_solver_output = [
+            {'name': 'px.x', 'values': [1.]},
+            {'name': 'pz.z', 'values': [5., 2.]},
+            {'name': 'd1.y1', 'values': [27.8]},
+            {'name': 'd2.y2', 'values': [12.27257053]},
+            {'name': 'obj_cmp.obj', 'values': [30.80000468]},
+            {'name': 'con_cmp1.con1', 'values': [-24.64]},
+            {'name': 'con_cmp2.con2', 'values': [-11.72742947]}
+        ]
 
         solver_iteration = json.loads(self.solver_iterations)
 
         self.assertEqual(expected_abs_error, solver_iteration['abs_err'])
         self.assertEqual(expected_rel_error, solver_iteration['rel_err'])
         self.assertEqual(solver_iteration['solver_residuals'], [])
-        self.assertEqual(solver_iteration['solver_output'], [])
+        for o in expected_solver_output:
+            self.assert_array_close(o, solver_iteration['solver_output'])
 
     def test_record_solver_linear_direct_solver(self, m):
         self.setup_endpoints(m)
@@ -794,7 +842,6 @@ class TestDataUploader(unittest.TestCase):
 
         self.prob.model.nonlinear_solver.linear_solver.recording_options['record_abs_error'] = True
         self.prob.model.nonlinear_solver.linear_solver.recording_options['record_rel_error'] = True
-        self.prob.model.nonlinear_solver.linear_solver.recording_options['record_solver_output'] = True
         self.prob.model.nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
@@ -843,7 +890,6 @@ class TestDataUploader(unittest.TestCase):
 
         self.prob.model.nonlinear_solver.linear_solver.recording_options['record_abs_error'] = True
         self.prob.model.nonlinear_solver.linear_solver.recording_options['record_rel_error'] = True
-        self.prob.model.nonlinear_solver.linear_solver.recording_options['record_solver_output'] = True
         self.prob.model.nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
@@ -877,7 +923,6 @@ class TestDataUploader(unittest.TestCase):
 
         self.prob.model.nonlinear_solver.linear_solver.recording_options['record_abs_error'] = True
         self.prob.model.nonlinear_solver.linear_solver.recording_options['record_rel_error'] = True
-        self.prob.model.nonlinear_solver.linear_solver.recording_options['record_solver_output'] = True
         self.prob.model.nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
@@ -916,7 +961,6 @@ class TestDataUploader(unittest.TestCase):
 
         self.prob.model.nonlinear_solver.linear_solver.recording_options['record_abs_error'] = True
         self.prob.model.nonlinear_solver.linear_solver.recording_options['record_rel_error'] = True
-        self.prob.model.nonlinear_solver.linear_solver.recording_options['record_solver_output'] = True
         self.prob.model.nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
@@ -954,7 +998,6 @@ class TestDataUploader(unittest.TestCase):
 
         self.prob.model.nonlinear_solver.linear_solver.recording_options['record_abs_error'] = True
         self.prob.model.nonlinear_solver.linear_solver.recording_options['record_rel_error'] = True
-        self.prob.model.nonlinear_solver.linear_solver.recording_options['record_solver_output'] = True
         self.prob.model.nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
         self.prob.model.nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
@@ -1018,7 +1061,6 @@ class TestDataUploader(unittest.TestCase):
         mda.nonlinear_solver.recording_options['record_metadata'] = True
         mda.nonlinear_solver.recording_options['record_abs_error'] = True
         mda.nonlinear_solver.recording_options['record_rel_error'] = True
-        mda.nonlinear_solver.recording_options['record_solver_output'] = True
         mda.nonlinear_solver.recording_options['record_solver_residuals'] = True
         mda.nonlinear_solver.add_recorder(self.recorder)
 
