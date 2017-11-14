@@ -323,38 +323,51 @@ def split_source_into_input_blocks(src):
     lines_with_comments = {}
     comments = rb.findAll('comment')
     for c in comments:
+        print('found comment:', c)
+        if c.previous:
+            print('after', c.previous.type, c.previous)
         if c.previous and c.previous.type != 'endl':
             lines_with_comments[c.previous] = c
-
+    print('========== lines_with_comments ===============')
+    from pprint import pprint
+    pprint(lines_with_comments)
+    trailing_comments = lines_with_comments.values()
 
     in_code_blocks = []
     in_code_block = None
+
     # group code until the first print, then repeat
     for r in rb:
         line = r.dumps()
 
-        # if this is a trailing comment for previous line, add and continue
-        if r in comments:
-            if in_code_block is None:
-                in_code_block[-1].append(line)
-            else:
-                in_code_block.append(line)
+        # if line is followed by a trailing comment, append teh comment
+        trailing_comment = lines_with_comments.get(r)
+        if trailing_comment:
+            print("appending comment", line, trailing_comment)
+            line += str(trailing_comment)
+        elif r in trailing_comments:
+            # we already handled it above
             continue
 
-        if r not in lines_with_comments and not line.endswith('\n'):
+        if in_code_block is None:
+            in_code_block = []
+
+        # ensure it ends with `\n`
+        if not line.endswith('\n'):
             line += '\n'
 
-        if in_code_block is None:
-            in_code_block = [line]
-        else:
-            in_code_block.append(line)
-        print("input line:", r.type, r)
+        in_code_block.append(line)
+        # print("input line:", r.type, line)
 
+        output_functions = [
+            'setup', 'run_model', 'run_driver',
+            'list_inputs', 'list_outputs', 'list_residuals'
+        ]
         if r.type == 'print' or \
             (len(r.value) == 3 and
              (r.type, r.value[0].type, r.value[1].type, r.value[2].type) ==
                 ('atomtrailers', 'name', 'name', 'call') and
-                r.value[1].value in ['run_model', 'run_driver', 'setup']):
+                r.value[1].value in output_functions):
             # stop and make an input code block
             in_code_block = ''.join(in_code_block)
             in_code_block = remove_leading_trailing_whitespace_lines(in_code_block)
@@ -387,10 +400,21 @@ def insert_output_start_stop_indicators(src):
     lines_with_comments = {}
     comments = rb.findAll('comment')
     for c in comments:
+        print('found comment:', c)
+        if c.previous:
+            print('after', c.previous.type, c.previous)
         if c.previous and c.previous.type != 'endl':
             lines_with_comments[c.previous] = c
+    print('========== lines_with_comments ===============')
+    from pprint import pprint
+    pprint(lines_with_comments)
 
     input_block_number = 0
+
+    output_functions = [
+        'setup', 'run_model', 'run_driver',
+        'list_inputs', 'list_outputs', 'list_residuals'
+    ]
 
     # find all nodes that might produce output
     nodes = rb.findAll(lambda identifier: identifier in ['print', 'atomtrailers'])
@@ -407,7 +431,7 @@ def insert_output_start_stop_indicators(src):
         elif r.type == 'atomtrailers' and len(r.value) == 3:
             sig = r.type, r.value[0].type, r.value[1].type, r.value[2].type
             if (sig == ('atomtrailers', 'name', 'name', 'call') and
-               r.value[1].value in ['run_model', 'run_driver', 'setup']):
+               r.value[1].value in output_functions):
                 # if line has trailing comment, insert print() after comment
                 if r in lines_with_comments:
                     r = lines_with_comments[r]  # r is now the comment
@@ -805,6 +829,7 @@ def get_test_src(method_path):
                 counter += 1
 
         # failsafe: make sure we have the same number of input and output blocks
+        # if this fails, then something in the docs is not being handled properly
         assert len(output_blocks) == len(input_blocks), \
             "Mismatch in input and output blocks processing %s.%s.%s" % \
             (module_path, class_name, method_name)
