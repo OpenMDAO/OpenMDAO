@@ -303,6 +303,45 @@ def remove_leading_trailing_whitespace_lines(src):
     return '\n'.join(lines[imin: imax+1])
 
 
+def is_output_node(node):
+    """
+    Determine whether a RedBaron node may be expected to generate output.
+
+    Parameters
+    ----------
+    node : <Node>
+        a RedBaron Node.
+
+    Returns
+    -------
+    bool
+        True if node may be expected to generate output, otherwise False.
+    """
+    if node.type == 'print':
+        return True
+
+    # lines with the following signatures and function names may generate output
+    output_signatures = [
+        ('name', 'name', 'call'),
+        ('name', 'name', 'name', 'call')
+    ]
+    output_functions = [
+        'setup', 'run_model', 'run_driver',
+        'list_inputs', 'list_outputs', 'list_residuals'
+    ]
+
+    if node.type == 'atomtrailers' and len(node.value) in (3, 4):
+        sig = []
+        for val in node.value:
+            sig.append(val.type)
+        func_name = node.value[-2].value
+        # print('sig:', tuple(sig), 'func:', func_name)
+        if tuple(sig) in output_signatures and func_name in output_functions:
+            return True
+
+    return False
+
+
 def split_source_into_input_blocks(src):
     """
     Split source into blocks; the splits occur at prints.
@@ -323,12 +362,10 @@ def split_source_into_input_blocks(src):
     lines_with_comments = {}
     comments = rb.findAll('comment')
     for c in comments:
-        print('found comment:', c)
-        if c.previous:
-            print('after', c.previous.type, c.previous)
         if c.previous and c.previous.type != 'endl':
             lines_with_comments[c.previous] = c
-    print('========== lines_with_comments ===============')
+
+    print('----- lines_with_comments -----')
     from pprint import pprint
     pprint(lines_with_comments)
     trailing_comments = lines_with_comments.values()
@@ -359,15 +396,7 @@ def split_source_into_input_blocks(src):
         in_code_block.append(line)
         # print("input line:", r.type, line)
 
-        output_functions = [
-            'setup', 'run_model', 'run_driver',
-            'list_inputs', 'list_outputs', 'list_residuals'
-        ]
-        if r.type == 'print' or \
-            (len(r.value) == 3 and
-             (r.type, r.value[0].type, r.value[1].type, r.value[2].type) ==
-                ('atomtrailers', 'name', 'name', 'call') and
-                r.value[1].value in output_functions):
+        if is_output_node(r):
             # stop and make an input code block
             in_code_block = ''.join(in_code_block)
             in_code_block = remove_leading_trailing_whitespace_lines(in_code_block)
@@ -400,45 +429,31 @@ def insert_output_start_stop_indicators(src):
     lines_with_comments = {}
     comments = rb.findAll('comment')
     for c in comments:
-        print('found comment:', c)
-        if c.previous:
-            print('after', c.previous.type, c.previous)
         if c.previous and c.previous.type != 'endl':
             lines_with_comments[c.previous] = c
-    print('========== lines_with_comments ===============')
+
+    print('----- lines_with_comments -----')
     from pprint import pprint
     pprint(lines_with_comments)
 
     input_block_number = 0
 
-    output_functions = [
-        'setup', 'run_model', 'run_driver',
-        'list_inputs', 'list_outputs', 'list_residuals'
-    ]
-
     # find all nodes that might produce output
     nodes = rb.findAll(lambda identifier: identifier in ['print', 'atomtrailers'])
     for r in nodes:
-        if r.type == 'print':
-            # if line has trailing comment, insert print() after comment
+        if is_output_node(r):
+            print('output node:', r)
             if r in lines_with_comments:
                 r = lines_with_comments[r]  # r is now the comment
+                print('trailing comment node:', r)
                 if r.previous.value == '\n':
                     r.previous.value = ''   # don't want endl before comment
-            r.insert_after('print(">>>>>%d")\n' % input_block_number)
-            input_block_number += 1
-
-        elif r.type == 'atomtrailers' and len(r.value) == 3:
-            sig = r.type, r.value[0].type, r.value[1].type, r.value[2].type
-            if (sig == ('atomtrailers', 'name', 'name', 'call') and
-               r.value[1].value in output_functions):
-                # if line has trailing comment, insert print() after comment
-                if r in lines_with_comments:
-                    r = lines_with_comments[r]  # r is now the comment
-                    if r.previous.value == '\n':
-                        r.previous.value = ''   # don't want endl before comment
+            try:
                 r.insert_after('print(">>>>>%d")\n' % input_block_number)
-                input_block_number += 1
+            except Exception as err:
+                print(err)
+                r.help()
+            input_block_number += 1
 
     if comments:
         print('------------------------------')
@@ -811,7 +826,6 @@ def get_test_src(method_path):
             output_blocks = extract_output_blocks(run_outputs)
 
         if len(output_blocks) != len(input_blocks):
-            from pprint import pprint
             print('===================')
             print('input_blocks (%d):' % len(input_blocks))
             counter = 0

@@ -6,8 +6,8 @@ import unittest
 from six.moves import cStringIO
 import numpy as np
 
-from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, NewtonSolver, \
-                         ScipyKrylov
+from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, \
+    NewtonSolver, ScipyKrylov
 from openmdao.devtools.testutil import assert_rel_error
 
 
@@ -259,7 +259,6 @@ class ImplicitCompTestCase(unittest.TestCase):
                 # we set it to a value that will take us to the x=3 solution.
                 outputs['x'] = 5.0
 
-
         group = Group()
 
         group.add_subsystem('pa', IndepVarComp('a', 1.0))
@@ -309,7 +308,6 @@ class ImplicitCompTestCase(unittest.TestCase):
                 # Passthrough
                 outputs['y'] = inputs['x']
 
-
         group = Group()
 
         group.add_subsystem('px', IndepVarComp('x', 77.0))
@@ -349,7 +347,6 @@ class ImplicitCompTestCase(unittest.TestCase):
             def guess_nonlinear(self, inputs, outputs, resids):
                 # Passthrough
                 outputs['y'] = inputs['x']
-
 
         group = Group()
         sub = Group()
@@ -393,7 +390,6 @@ class ImplicitCompTestCase(unittest.TestCase):
             def guess_nonlinear(self, inputs, outputs, resids):
                 # Passthrough
                 outputs['y'] = inputs['x']
-
 
         group = Group()
         sub = Group()
@@ -463,7 +459,6 @@ class ImplicitCompTestCase(unittest.TestCase):
                 # Solution at 1 and 3. Default value takes us to -1 solution. Here
                 # we set it to a value that will tke us to the 3 solution.
                 outputs['x'] = 5.0
-
 
         prob = Problem()
         model = prob.model = Group()
