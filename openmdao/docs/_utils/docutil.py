@@ -335,7 +335,6 @@ def is_output_node(node):
         for val in node.value:
             sig.append(val.type)
         func_name = node.value[-2].value
-        # print('sig:', tuple(sig), 'func:', func_name)
         if tuple(sig) in output_signatures and func_name in output_functions:
             return True
 
@@ -364,10 +363,6 @@ def split_source_into_input_blocks(src):
     for c in comments:
         if c.previous and c.previous.type != 'endl':
             lines_with_comments[c.previous] = c
-
-    print('----- lines_with_comments -----')
-    from pprint import pprint
-    pprint(lines_with_comments)
     trailing_comments = lines_with_comments.values()
 
     in_code_blocks = []
@@ -380,7 +375,6 @@ def split_source_into_input_blocks(src):
         # if line is followed by a trailing comment, append teh comment
         trailing_comment = lines_with_comments.get(r)
         if trailing_comment:
-            print("appending comment", line, trailing_comment)
             line += str(trailing_comment)
         elif r in trailing_comments:
             # we already handled it above
@@ -394,7 +388,6 @@ def split_source_into_input_blocks(src):
             line += '\n'
 
         in_code_block.append(line)
-        # print("input line:", r.type, line)
 
         if is_output_node(r):
             # stop and make an input code block
@@ -432,33 +425,29 @@ def insert_output_start_stop_indicators(src):
         if c.previous and c.previous.type != 'endl':
             lines_with_comments[c.previous] = c
 
-    print('----- lines_with_comments -----')
-    from pprint import pprint
-    pprint(lines_with_comments)
-
     input_block_number = 0
 
     # find all nodes that might produce output
     nodes = rb.findAll(lambda identifier: identifier in ['print', 'atomtrailers'])
     for r in nodes:
         if is_output_node(r):
-            print('output node:', r)
             if r in lines_with_comments:
                 r = lines_with_comments[r]  # r is now the comment
-                print('trailing comment node:', r)
                 if r.previous.value == '\n':
                     r.previous.value = ''   # don't want endl before comment
             try:
                 r.insert_after('print(">>>>>%d")\n' % input_block_number)
             except Exception as err:
+                print('------------ FIXME ------------------')
                 print(err)
                 r.help()
+                print('------------ FIXME ------------------')
             input_block_number += 1
 
-    if comments:
-        print('------------------------------')
+    if len(lines_with_comments.keys()) > 0:
+        print('------------check comments ------------------')
         print(rb.dumps())
-        print('------------------------------')
+        print('---------------------------------------------')
     return rb.dumps()
 
 
@@ -616,9 +605,6 @@ def get_test_src(method_path):
     class_name = method_path.split('.')[-2]
     method_name = method_path.split('.')[-1]
 
-    # make 'self' available to test code (as an instance of the test case)
-    self_code = "from %s import %s\nself = %s('%s')\n" % \
-                (module_path, class_name, class_name, method_name)
     print('==========================================================================')
     print('========== %s.%s.%s ' % (module_path, class_name, method_name))
     print('==========================================================================')
@@ -681,22 +667,28 @@ def get_test_src(method_path):
     # We decided to leave them in for now
     # source_minus_docstrings_with_prints = remove_raise_skip_tests(source_minus_docstrings_with_prints)
 
+    #-----------------------------------------------------------------------------------
     # Remove the initial empty lines
+    #-----------------------------------------------------------------------------------
     source_minus_docstrings_with_prints_cleaned = \
         remove_initial_empty_lines_from_source(source_minus_docstrings_with_prints)
 
     #-----------------------------------------------------------------------------------
     # 4. Insert extra print statements into source_minus_docstrings_with_prints_cleaned
-    #        to indicate start and end of print Out blocks -> source_with_output_start_stop_indicators
+    #    to indicate start and end of print Out blocks -> source_with_output_start_stop_indicators
     #-----------------------------------------------------------------------------------
     source_with_output_start_stop_indicators = \
         insert_output_start_stop_indicators(source_minus_docstrings_with_prints_cleaned)
 
     #----------------`-------------------------------------------------------------------
-    # 5. Get all the pieces of code needed to run the unit test method
+    # Get all the pieces of code needed to run the unit test method
     #-----------------------------------------------------------------------------------
 
     global_imports = globals_for_imports(method_source)
+
+    # make 'self' available to test code (as an instance of the test case)
+    self_code = "from %s import %s\nself = %s('%s')\n" % \
+                (module_path, class_name, class_name, method_name)
 
     # get setUp and tearDown but don't duplicate if it is the method being tested
     setup_source_code = '' if method_name == 'setUp' else \
@@ -711,11 +703,8 @@ def get_test_src(method_path):
                              source_with_output_start_stop_indicators,
                              teardown_source_code])
 
-    print('========== code_to_run ===================')
-    print(code_to_run)
-
     #-----------------------------------------------------------------------------------
-    # 6. Run the test using source_with_out_start_stop_indicators -> run_outputs
+    # 5. Run the test using source_with_out_start_stop_indicators -> run_outputs
     #-----------------------------------------------------------------------------------
 
     skipped = False
@@ -723,8 +712,6 @@ def get_test_src(method_path):
     try:
         # Use Subprocess if we are under MPI.
         if use_mpi:
-            raise Exception("fuck MPI")
-
             # Write it to a file so we can run it.
             fd, code_to_run_path = tempfile.mkstemp()
 
@@ -818,6 +805,11 @@ def get_test_src(method_path):
             output_blocks = extract_output_blocks(run_outputs)
 
         if len(output_blocks) != len(input_blocks):
+            print('==========================================================================')
+            print("Mismatch in input and output blocks processing %s.%s.%s" %
+                  (module_path, class_name, method_name))
+            print('========== code_to_run ===================')
+            print(code_to_run)
             print('===================')
             print('input_blocks (%d):' % len(input_blocks))
             counter = 0
@@ -836,9 +828,9 @@ def get_test_src(method_path):
 
         # failsafe: make sure we have the same number of input and output blocks
         # if this fails, then something in the docs is not being handled properly
-        assert len(output_blocks) == len(input_blocks), \
-            "Mismatch in input and output blocks processing %s.%s.%s" % \
-            (module_path, class_name, method_name)
+        # assert len(output_blocks) == len(input_blocks), \
+        #     "Mismatch in input and output blocks processing %s.%s.%s" % \
+        #     (module_path, class_name, method_name)
 
         # Need to deal with the cases when there is no outputblock for a given input block
         # Merge an input block with the previous block and throw away the output block
