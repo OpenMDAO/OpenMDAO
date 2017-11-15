@@ -1877,10 +1877,14 @@ def find_disjoint(prob):
     dv_offsets = []
     start = 0
     end = -1
-    for name, data in iteritems(prob.driver._designvars):
+    dvs = prob.driver._designvars
+    ovars = prob.model._var_allprocs_abs_names['output']
+    ordered_dvs = [dv for dv in ovars if dv in dvs]
+    for name in ordered_dvs:
+        data = dvs[name]
         end += data['size']
         dv_offsets.append((start, end, name))
-        # print("dv range[%s] = %s" % (name, (start, end)))
+        print("dv range[%s] = %s" % (name, (start, end)))
         start = end + 1
 
     res_offsets = []
@@ -1889,7 +1893,7 @@ def find_disjoint(prob):
     for name, data in iteritems(prob.driver._responses):
         end += data['size']
         res_offsets.append((start, end, name))
-        # print("res range[%s] = %s" % (name, (start, end)))
+        print("res range[%s] = %s" % (name, (start, end)))
         start = end + 1
 
     print("")
