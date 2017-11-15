@@ -227,7 +227,7 @@ class DistribGatherComp(ExplicitComponent):
         start = self.offsets[rank]
         end = start + self.sizes[rank]
 
-        #need to initialize the variable to have the correct local size
+        # need to initialize the variable to have the correct local size
         self.add_input('invec', np.ones(self.sizes[rank], float),
                        src_indices=np.arange(start, end, dtype=int))
         self.add_output('outvec', np.ones(self.arr_size, float))
@@ -537,8 +537,6 @@ class TestGroupMPI(unittest.TestCase):
                 outputs['y'] = np.sum(inputs['x'])*2.0
 
         p = Problem(model=Group())
-
-        #import wingdbstub
 
         p.model.add_subsystem('indep', IndepVarComp('x', np.arange(5, dtype=float)),
                               promotes_outputs=['x'])

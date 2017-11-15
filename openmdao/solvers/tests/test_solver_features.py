@@ -68,5 +68,6 @@ class TestSolverFeatures(unittest.TestCase):
         assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
+
 if __name__ == "__main__":
     unittest.main()

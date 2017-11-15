@@ -1,6 +1,7 @@
 """
 A collection of functions for modifying source code that is embeded into the Sphinx documentation.
 """
+from pprint import pprint
 
 import sys
 import os
@@ -341,7 +342,7 @@ def is_output_node(node):
     return False
 
 
-def split_source_into_input_blocks(src):
+def split_source_into_input_blocks(src, indentation=''):
     """
     Split source into blocks; the splits occur at prints.
 
@@ -355,6 +356,7 @@ def split_source_into_input_blocks(src):
     list
         List of input code sections.
     """
+    print('split_source_into_input_blocks', src)
     rb = RedBaron(src)
 
     # find lines with trailing comments so we can preserve them properly
@@ -370,7 +372,8 @@ def split_source_into_input_blocks(src):
 
     # group code until the first print, then repeat
     for r in rb:
-        line = r.dumps()
+        line = r.indentation + str(r)
+        print("input:", line)
 
         # if line is followed by a trailing comment, append teh comment
         trailing_comment = lines_with_comments.get(r)
@@ -383,6 +386,27 @@ def split_source_into_input_blocks(src):
         if in_code_block is None:
             in_code_block = []
 
+        # if it's a compound statement, we have to recurse
+        if r.type in ['ifelseblock', 'if']:
+            print("----------------------")
+            print("recursing on", str(r.value))
+            print("----------------------")
+            code_blocks = split_source_into_input_blocks(r.value, indentation=r.indentation)
+            if r.type == 'if':
+                in_code_block.append(line.split('\n')[0]+'\n')
+            for block in code_blocks:
+                in_code_block.append(block)
+                in_code_block = ''.join(in_code_block)
+                in_code_blocks.append(in_code_block)
+                in_code_block = []
+            in_code_block = None
+            continue
+        elif r.type in ['elif', 'else']:
+            in_code_block.append(r.dumps())
+            in_code_blocks.append(in_code_block)
+            in_code_block = None
+            continue
+
         # ensure it ends with `\n`
         if not line.endswith('\n'):
             line += '\n'
@@ -394,7 +418,14 @@ def split_source_into_input_blocks(src):
             in_code_block = ''.join(in_code_block)
             in_code_block = remove_leading_trailing_whitespace_lines(in_code_block)
             in_code_blocks.append(in_code_block)
+            print("input block completed:")
+            print("----------------------")
+            for l in in_code_block.split('\n'):
+                print(l)
+            print("----------------------")
             in_code_block = None
+
+
 
     if in_code_block is not None:  # If anything left over
         in_code_blocks.append(''.join(in_code_block))
@@ -569,10 +600,10 @@ def get_test_src(method_path):
 
     1. Get the source code for a unit test method
     2. Replace the asserts with prints -> source_minus_docstrings_with_prints_cleaned
-    3. Split source_minus_docstrings_with_prints_cleaned up into groups of "In" blocks -> input_blocks
-    4. Insert extra print statements into source_minus_docstrings_with_prints_cleaned
+    3. Insert extra print statements into source_minus_docstrings_with_prints_cleaned
             to indicate start and end of print Out blocks -> source_with_output_start_stop_indicators
-    5. Run the test using source_with_out_start_stop_indicators -> run_outputs
+    4. Run the test using source_with_out_start_stop_indicators -> run_outputs
+    5. Split source_minus_docstrings_with_prints_cleaned up into groups of "In" blocks -> input_blocks
     6. Extract from run_outputs, the Out blocks -> output_blocks
     7. Return source_minus_docstrings_with_prints_cleaned, input_blocks, output_blocks, skipped, failed
 
@@ -674,7 +705,7 @@ def get_test_src(method_path):
         remove_initial_empty_lines_from_source(source_minus_docstrings_with_prints)
 
     #-----------------------------------------------------------------------------------
-    # 4. Insert extra print statements into source_minus_docstrings_with_prints_cleaned
+    # 3. Insert extra print statements into source_minus_docstrings_with_prints_cleaned
     #    to indicate start and end of print Out blocks -> source_with_output_start_stop_indicators
     #-----------------------------------------------------------------------------------
     source_with_output_start_stop_indicators = \
@@ -704,43 +735,59 @@ def get_test_src(method_path):
                              teardown_source_code])
 
     #-----------------------------------------------------------------------------------
-    # 5. Run the test using source_with_out_start_stop_indicators -> run_outputs
+    # 4. Run the test using source_with_out_start_stop_indicators -> run_outputs
     #-----------------------------------------------------------------------------------
 
     skipped = False
     failed = False
-    try:
-        # Use Subprocess if we are under MPI.
-        if use_mpi:
-            # Write it to a file so we can run it.
-            fd, code_to_run_path = tempfile.mkstemp()
 
+    try:
+        if use_mpi:
+            # use subprocess to run test with `mpirun`
+
+            # write code to a file so we can run it.
+            fd, code_to_run_path = tempfile.mkstemp()
             with os.fdopen(fd, 'w') as tmp:
                 tmp.write(code_to_run)
                 tmp.close()
+
+            # output will be written to one file per process
             env = os.environ.copy()
             env['USE_PROC_FILES'] = '1'
+
             p = subprocess.Popen(['mpirun', '-n', str(N_PROCS), 'python', code_to_run_path],
                                  env=env)
             p.wait()
+
+            # extract output blocks from all output files & merge them
+            from pprint import pprint
             multi_out_blocks = []
             for i in range(N_PROCS):
                 with open('%d.out' % i) as f:
                     multi_out_blocks.append(extract_output_blocks(f.read()))
-                os.remove('%d.out' % i)
+                # os.remove('%d.out' % i)
+                print("output from proc", i)
+                print('-------------------')
+                pprint(multi_out_blocks[i])
+
             output_blocks = []
             for i in range(len(multi_out_blocks[0])):
-                output_blocks.append('\n'.join(["(rank %d) %s" % (j, m[i]) for j, m in enumerate(multi_out_blocks) if m[i]]))
-
-        # Just Exec the code for serial tests.
+                output_blocks.append('\n'.join(["(rank %d) %s" %
+                                     (j, m[i]) for j, m in enumerate(multi_out_blocks) if m[i]]))
+            print("output from all procs")
+            print('---------------------')
+            pprint(output_blocks)
         else:
+            # Just Exec the code for serial tests.
+
+            # capture all output
             stdout = sys.stdout
             stderr = sys.stderr
             strout = cStringIO()
             sys.stdout = strout
             sys.stderr = strout
 
-            # reset all the loggers
+            # set all the loggers to write to our captured stream
             from openmdao.utils.logger_utils import _loggers
             for name in _loggers:
                 _loggers[name]['logger'].handlers[0].stream = strout
@@ -783,8 +830,7 @@ def get_test_src(method_path):
 
     finally:
         if use_mpi:
-            # os.remove(code_to_run_path)
-            pass
+            os.remove(code_to_run_path)
         else:
             sys.stdout = stdout
             sys.stderr = stderr
@@ -794,7 +840,7 @@ def get_test_src(method_path):
 
     if not skipped and not failed:
         #####################
-        ### 3. Split source_minus_docstrings_with_prints_cleaned up into groups of "In" blocks -> input_blocks ###
+        ### 5. Split source_minus_docstrings_with_prints_cleaned up into groups of "In" blocks -> input_blocks ###
         #####################
         input_blocks = split_source_into_input_blocks(source_minus_docstrings_with_prints_cleaned)
 
@@ -804,6 +850,8 @@ def get_test_src(method_path):
         if not use_mpi:
             output_blocks = extract_output_blocks(run_outputs)
 
+        # make sure we have the same number of input and output blocks
+        # if this fails, then something in the docs is not being handled properly
         if len(output_blocks) != len(input_blocks):
             print('==========================================================================')
             print("Mismatch in input and output blocks processing %s.%s.%s" %
@@ -825,9 +873,6 @@ def get_test_src(method_path):
                 print('-- %d --' % counter)
                 print(b)
                 counter += 1
-
-        # failsafe: make sure we have the same number of input and output blocks
-        # if this fails, then something in the docs is not being handled properly
         # assert len(output_blocks) == len(input_blocks), \
         #     "Mismatch in input and output blocks processing %s.%s.%s" % \
         #     (module_path, class_name, method_name)
