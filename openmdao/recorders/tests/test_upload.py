@@ -299,6 +299,7 @@ class TestDataUploader(unittest.TestCase):
         self.prob.driver.recording_options['record_responses'] = False
         self.prob.driver.recording_options['record_objectives'] = False
         self.prob.driver.recording_options['record_constraints'] = False
+        self.prob.driver.recording_options['includes'] = []
         self.prob.driver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
@@ -325,6 +326,7 @@ class TestDataUploader(unittest.TestCase):
         self.prob.driver.recording_options['record_responses'] = False
         self.prob.driver.recording_options['record_objectives'] = True
         self.prob.driver.recording_options['record_constraints'] = False
+        self.prob.driver.recording_options['includes'] = []
         self.prob.driver.add_recorder(self.recorder)
         self.prob.setup(check=False)
 
@@ -349,6 +351,7 @@ class TestDataUploader(unittest.TestCase):
         self.prob.driver.recording_options['record_responses'] = False
         self.prob.driver.recording_options['record_objectives'] = False
         self.prob.driver.recording_options['record_constraints'] = True
+        self.prob.driver.recording_options['includes'] = []
         self.prob.driver.add_recorder(self.recorder)
         self.prob.setup(check=False)
 
@@ -402,10 +405,10 @@ class TestDataUploader(unittest.TestCase):
         sysincludes = driver_iteration_data['sysincludes']
 
         self.assertEqual(len(driver_iteration_data['sysincludes']), 2)
-        self.assertEqual(len(driver_iteration_data['objectives']), 1)
-        self.assertEqual(len(driver_iteration_data['desvars']), 2)
-        self.assertEqual(len(driver_iteration_data['constraints']), 2)
-        self.assertEqual(driver_iteration_data['responses'], [])
+        self.assertEqual(len(driver_iteration_data['objectives']), 0)
+        self.assertEqual(len(driver_iteration_data['desvars']), 0)
+        self.assertEqual(len(driver_iteration_data['constraints']), 0)
+        self.assertEqual(len(driver_iteration_data['responses']), 0)
 
     @unittest.skipIf(PETScVector is None or os.environ.get("TRAVIS"),
                      "PETSc is required." if PETScVector is None
