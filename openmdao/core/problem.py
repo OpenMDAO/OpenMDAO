@@ -1222,8 +1222,7 @@ class Problem(object):
         owning_ranks = self.model._owning_rank['output']
 
         if fwd:
-            oset = set(of)
-            input_list, output_list = wrt, [o for o in self.model._var_allprocs_abs_names['output'] if o in oset]
+            input_list, output_list = wrt, of
             old_input_list, old_output_list = oldwrt, oldof
             input_vec, output_vec = vec_dresid, vec_doutput
             input_vois = self.driver._designvars

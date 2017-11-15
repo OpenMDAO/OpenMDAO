@@ -94,6 +94,9 @@ class ParameterizedTestCasesSubset(unittest.TestCase):
             totals = param_instance.compute_totals('fwd')
             assert_rel_error(self, totals, expected_totals, 1e-8)
 
+            # Reverse Derivatives Check
+            totals = param_instance.compute_totals('rev')
+            assert_rel_error(self, totals, expected_totals, 1e-8)
 
 
 if __name__ == '__main__':
