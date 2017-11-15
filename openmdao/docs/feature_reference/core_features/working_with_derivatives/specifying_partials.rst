@@ -43,5 +43,4 @@ Here are several examples of how you can specify derivative values for different
     openmdao.jacobians.tests.test_jacobian_features.SimpleCompConst
 
 
-.. tags:: Partial Derivatives
-
+.. tags:: PartialDerivatives

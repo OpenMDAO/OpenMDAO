@@ -17,7 +17,7 @@ at https://github.com/OpenMDAO/OpenMDAO1
 The OpenMDAO 2.0.x code has taken the name OpenMDAO,
 and it resides at https://github.com/OpenMDAO/OpenMDAO.
 
-Installation of 2.0.x code will now work with `pip install openmdao`.  
+Installation of 2.0.x code will now work with `pip install openmdao`.
 Installation of 1.7.3 code will now only work with a version specifier: `pip install openmdao==1.7.3`
 
 To use the OpenMDAO v0.x legacy version
@@ -50,18 +50,17 @@ Features of OpenMDAO 1.7.x Not Yet in 2.x
 Be aware that this is an Alpha.
 Not all the features of 1.7.x exist in 2.x yet.
 
-Here is a list of things that have not yet been fully developed in 2.x:
+Here is a list of things that have not yet been developed in 2.x:
 
 * Pass-by-object variables
 * automatic ordering of groups/components based on data connections
 * DOE (Design of Experiment) driver and all other case drivers
 * Parallel Finite Difference
-* File-wrapping utilities
 * File variables
 * Active-set constraint calculation disabling
 * Brent Solver
-* CaseRecording using CSV, HDF5, and dump recorders (SqliteRecorder and WebRecorder are currently supported)
-* 'auto' selection of mode based on sizes of design variables and responses
+    * CaseRecording using CSV, HDF5, and dump recorders (SqliteRecorder and WebRecorder are currently supported)
+* 'auto' selection of derivatives mode based on sizes of design variables and responses
 
 Installation Instructions:
 --------------------------

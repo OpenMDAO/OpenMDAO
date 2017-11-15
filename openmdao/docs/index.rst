@@ -53,6 +53,7 @@ Other Useful Docs
     :caption: Other Docs
     :name: otherdocs
 
-    api_translation/index.rst
+    other/api_translation.rst
+    other/file_wrap.rst
     _srcdocs/index.rst
     developer_docs/index.rst
