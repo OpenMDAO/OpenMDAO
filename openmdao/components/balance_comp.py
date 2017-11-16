@@ -32,8 +32,8 @@ class BalanceComp(ImplicitComponent):
         Where :math:`f_{lhs}` represents the left-hand-side of the equation,
         :math:`f_{rhs}` represents the right-hand-side, and :math:`f_{mult}`
         is an optional multiplier on the left hand side.  At least one of these
-        quantities should be a function of the associated state variable.  If left
-        unconnected the multiplier is simply 1.0.
+        quantities should be a function of the associated state variable.  If
+        use_mult is True the default value of the multiplier is 1.
 
         New state variables, and their associated residuals are created by
         calling `add_balance`.  As an example, solving the equation
@@ -68,7 +68,7 @@ class BalanceComp(ImplicitComponent):
             prob.run_model()
 
         The arguments to add_balance can be provided on initialization to provide a balance
-        with a one state/residual without the need to call `add_output`:
+        with a one state/residual without the need to call `add_balance`:
 
         ::
             prob = Problem(model=Group())
