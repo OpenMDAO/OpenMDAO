@@ -177,7 +177,6 @@ class ScipyOptimizer(Driver):
 
         self.objs = list(self.get_objective_values())
         self._con_cache = self.get_constraint_values()
-
         desvar_vals = self.get_design_var_values()
 
         # maxiter and disp get passsed into scipy with all the other options.
