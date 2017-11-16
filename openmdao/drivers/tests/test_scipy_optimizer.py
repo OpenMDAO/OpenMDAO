@@ -405,8 +405,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         model.add_design_var('widths', lower=-50.0, upper=50.0)
         model.add_objective('o')
-        # model.add_constraint('areas', lower=np.array([24.0, 21.0, 3.5, 17.5]), upper=np.array([24.0, 21.0, 3.5, 17.5]))
-        model.add_constraint('areas', upper=np.array([24.0, 21.0, 3.5, 17.5]))
+        model.add_constraint('areas', lower=np.array([24.0, 21.0, 3.5, 17.5]), upper=np.array([24.0, 21.0, 3.5, 17.5]))
 
         prob.setup(check=False)
         prob.run_driver()

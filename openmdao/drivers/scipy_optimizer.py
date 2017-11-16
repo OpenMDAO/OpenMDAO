@@ -140,16 +140,15 @@ class ScipyOptimizer(Driver):
         self.supports['two_sided_constraints'] = opt in _constraint_optimizers
         self.supports['equality_constraints'] = opt in _eq_constraint_optimizers
 
-
-        # qqq
-        # Need to add to the _cons metadata for any bounds that
+        # Since COBYLA does not support bounds, we
+        #   need to add to the _cons metadata for any bounds that
         #   need to be translated into a constraint
-        #
         if opt == 'COBYLA':
             for name, meta in iteritems(self._designvars):
                 lower = meta['lower']
                 upper = meta['upper']
-                if isinstance(lower, np.ndarray) or lower != - sys.float_info.max or isinstance(upper, np.ndarray) or upper != sys.float_info.max: # user set a value for lower
+                if isinstance(lower, np.ndarray) or lower != - sys.float_info.max \
+                        or isinstance(upper, np.ndarray) or upper != sys.float_info.max:
                     dict = OrderedDict()
                     dict['lower'] = lower
                     dict['upper'] = upper
@@ -157,51 +156,8 @@ class ScipyOptimizer(Driver):
                     dict['indices'] = None  # qqq really needs to be figured out
                     dict['adder'] = None
                     dict['scaler'] = None
-                    # dict['args'] = [name, j]
-                    dict['size'] = meta['size']  # qqq really needs to be figured out
+                    dict['size'] = meta['size']
                     self._cons[name] = dict
-
-                # for j in range(0, size):
-                #
-                # # lower and upper can be arrays
-                #
-                # # Do we look at each individual value in the array and add
-                # # individual constraints for each ?
-                #
-                # # Can constraints be arrays? Yes they can.
-                #     if isinstance(meta_upper, np.ndarray):
-                #         upper = meta_upper[j]
-                #     else:
-                #         upper = meta_upper
-                #
-                #     if isinstance(meta_lower, np.ndarray):
-                #         lower = meta_lower[j]
-                #     else:
-                #         lower = meta_lower
-                #
-                #     if lower > - sys.float_info.max:
-                #         dict = OrderedDict()
-                #         dict['lower'] = lower
-                #         dict['upper'] = sys.float_info.max
-                #         dict['equals'] = None
-                #         dict['indices'] = None # qqq really needs to be figured out
-                #         dict['adder'] = None
-                #         dict['scaler'] = None
-                #         dict['args'] = [name, j]
-                #         dict['size'] = 1 # qqq really needs to be figured out
-                #         self._cons[name] = dict
-                #     if upper < sys.float_info.max:
-                #         dict = OrderedDict()
-                #         dict['lower'] = - sys.float_info.max
-                #         dict['upper'] = upper
-                #         dict['equals'] = None
-                #         dict['adder'] = None
-                #         dict['scaler'] = None
-                #         dict['args'] = [name, j]
-                #         dict['indices'] = None # qqq really needs to be figured out
-                #         dict['size'] = 1 # qqq really needs to be figured out
-                #         self._cons[name] = dict
-
 
     def run(self):
         """
@@ -223,57 +179,7 @@ class ScipyOptimizer(Driver):
         self.objs = list(self.get_objective_values())
         self._con_cache = self.get_constraint_values() # qqq comes back as an array
 
-        # qqq
         desvar_vals = self.get_design_var_values()
-        if False:
-            if opt == 'COBYLA':
-                constraints_from_bounds = []
-
-                for name, meta in iteritems(self._designvars):
-                    lower = meta['lower']
-                    upper = meta['upper']
-                    value = desvar_vals[name]
-                    size = meta['size']
-
-                    # Loop over every index separately, because scipy calls each constraint by index.
-                    for j in range(0, size):
-
-                        con_dict['args'] = [name, j]
-
-                        upper = meta['upper']
-                        if isinstance(upper, np.ndarray):
-                            upper = upper[j]
-
-                        lower = meta['lower']
-                        if isinstance(lower, np.ndarray):
-                            lower = lower[j]
-
-                        # elif values == float('inf'):
-
-                        # lower and upper can be arrays
-
-                        # Do we look at each individual value in the array and add
-                        # individual constraints for each ?
-
-                        # Can constraints be arrays? Yes they can.
-
-                    if lower > - sys.float_info.max:
-                        self._con_cache[name] = value # qqq not correct!
-                    if upper < sys.float_info.max:
-                        self._con_cache[name] = value  # qqq not correct!
-
-
-            # Look through the desvars looking for lower or uppers that are not
-            #    +/- max float
-            # If yes, add to the dict with the name of the desvar as the key and
-            #    the value is lower or upper but maybe +/-
-            #
-            # We just need to pass to the optimizer the value of the desvar +/-
-            #    depending on if it is lower or upper
-
-            # Note, scipy defines constraints to be satisfied when positive,
-            # which is the opposite of OpenMDAO.
-
 
         # maxiter and disp get passsed into scipy with all the other options.
         self.opt_settings['maxiter'] = self.options['maxiter']
@@ -357,7 +263,7 @@ class ScipyOptimizer(Driver):
                         con_dict['args'] = [dblname, j]
                         constraints.append(con_dict)
 
-                self._con_idx[name] = i # qqq what is this used for ?
+                self._con_idx[name] = i
                 i += size
 
         # Provide gradients for optimizers that support it
@@ -499,10 +405,10 @@ class ScipyOptimizer(Driver):
 
         lower = meta['lower']
         if isinstance(lower, np.ndarray):
-            lower = lower[idx] # qqq need to get the right idx here
+            lower = lower[idx]
 
         if (lower == -sys.float_info.max) or dbl_side:
-            return upper - cons[name][idx] # qqq need to get the right idx here
+            return upper - cons[name][idx]
         else:
             return cons[name][idx] - lower
 
