@@ -21,7 +21,7 @@ _optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
                'TNC', 'COBYLA', 'SLSQP']
 _gradient_optimizers = ['CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC',
                         'SLSQP', 'dogleg', 'trust-ncg']
-_bounds_optimizers = ['L-BFGS-B', 'TNC', 'SLSQP'] #qqq add COBYLA ?
+_bounds_optimizers = ['L-BFGS-B', 'TNC', 'SLSQP']
 _constraint_optimizers = ['COBYLA', 'SLSQP']
 _constraint_grad_optimizers = ['SLSQP']
 _eq_constraint_optimizers = ['SLSQP']
@@ -192,7 +192,7 @@ class ScipyOptimizer(Driver):
 
         # Initial Design Vars
         i = 0
-        use_bounds = (opt in _bounds_optimizers) # qqq Should COBYLA be in this list ? We don't
+        use_bounds = (opt in _bounds_optimizers)
         if use_bounds:
             bounds = []
         else:
