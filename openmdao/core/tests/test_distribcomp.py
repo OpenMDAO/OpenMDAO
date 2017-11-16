@@ -538,19 +538,22 @@ class TestGroupMPI(unittest.TestCase):
 
         p = Problem(model=Group())
 
-        p.model.add_subsystem('indep', IndepVarComp('x', np.arange(5, dtype=float)),
-                              promotes_outputs=['x'])
-        C1 = p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
+        p.model.add_subsystem('indep', IndepVarComp('x', np.arange(5, dtype=float)))
+        p.model.add_subsystem('C1', MyComp())
+
+        p.model.connect('indep.x', 'C1.x')
 
         p.set_solver_print(level=0)
         p.setup(PETScVector)
         p.run_model()
-        if C1.comm.rank == 0:
-            assert_rel_error(self, p['C1.x'], np.arange(3, dtype=float))
-            assert_rel_error(self, p['C1.y'], 6.)
-        else:
-            assert_rel_error(self, p['C1.x'], np.arange(3, 5, dtype=float))
-            assert_rel_error(self, p['C1.y'], 14.)
+
+        # each rank holds the assigned portion of the input array
+        assert_rel_error(self, p['C1.x'],
+                         np.arange(3, dtype=float) if p.model.C1.comm.rank == 0 else
+                         np.arange(3, 5, dtype=float))
+
+        # the output in each rank is based on the local inputs
+        assert_rel_error(self, p['C1.y'], 6. if p.model.C1.comm.rank == 0 else 14.)
 
 
 if __name__ == '__main__':
