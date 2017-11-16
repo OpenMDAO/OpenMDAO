@@ -336,6 +336,8 @@ def is_output_node(node):
         func_name = node.value[-2].value
         if tuple(sig) in output_signatures and func_name in output_functions:
             return True
+        else:
+            print(node.dumps(), "is NOT an output node!")
 
     return False
 
@@ -371,7 +373,7 @@ def split_source_into_input_blocks(src, indentation=''):
     for r in rb:
         line = r.indentation + str(r)
 
-        # if line is followed by a trailing comment, append teh comment
+        # if line is followed by a trailing comment, append the comment
         trailing_comment = lines_with_comments.get(r)
         if trailing_comment:
             line += str(trailing_comment)
@@ -384,14 +386,17 @@ def split_source_into_input_blocks(src, indentation=''):
 
         # if it's a compound statement, we have to recurse
         if r.type in ['ifelseblock', 'if']:
-            code_blocks = split_source_into_input_blocks(r.value, indentation=r.indentation)
             if r.type == 'if':
                 in_code_block.append(line.split('\n')[0]+'\n')
-            for block in code_blocks:
-                in_code_block.append(block)
-                in_code_block = ''.join(in_code_block)
-                in_code_blocks.append(in_code_block)
-                in_code_block = []
+            code_blocks = split_source_into_input_blocks(r.value, indentation=r.indentation)
+            if len(code_blocks) > 1:
+                for block in code_blocks:
+                    in_code_block.append(block)
+                    in_code_block = ''.join(in_code_block)
+                    in_code_blocks.append(in_code_block)
+                    in_code_block = []
+            elif code_blocks:
+                in_code_block.append(code_blocks[0])
             in_code_block = None
             continue
         elif r.type in ['elif', 'else']:
@@ -411,8 +416,6 @@ def split_source_into_input_blocks(src, indentation=''):
             in_code_block = remove_leading_trailing_whitespace_lines(in_code_block)
             in_code_blocks.append(in_code_block)
             in_code_block = None
-
-
 
     if in_code_block is not None:  # If anything left over
         in_code_blocks.append(''.join(in_code_block))
@@ -444,10 +447,20 @@ def insert_output_start_stop_indicators(src):
             lines_with_comments[c.previous] = c
 
     input_block_number = 0
+    insert_before = False
 
     # find all nodes that might produce output
     nodes = rb.findAll(lambda identifier: identifier in ['print', 'atomtrailers'])
     for r in nodes:
+        if insert_before:
+            try:
+                insert_before = False
+                r.insert_before('print(">>>>>%d")\n' % input_block_number)
+                input_block_number += 1
+            except Exception as err:
+                print(err)
+                r.help()
+
         # output within if/else statements is not a good idea for docs, but try
         # to handle one level of if/else statements (will fail with nested ifs)
         # the else blocks must start with the same block number as the if block
@@ -455,6 +468,7 @@ def insert_output_start_stop_indicators(src):
             if_block_number = input_block_number
         if hasattr(r.parent, 'type') and r.parent.type in ['elif', 'else']:
             input_block_number = if_block_number
+
         if is_output_node(r):
             if r in lines_with_comments:
                 r = lines_with_comments[r]  # r is now the comment
@@ -462,12 +476,11 @@ def insert_output_start_stop_indicators(src):
                     r.previous.value = ''   # don't want endl before comment
             try:
                 r.insert_after('print(">>>>>%d")\n' % input_block_number)
+                input_block_number += 1
             except Exception as err:
-                print('------------ FIXME ------------------')
-                print(err)
-                r.help()
-                print('------------ FIXME ------------------')
-            input_block_number += 1
+                # if we can't insert after, because... redbaron
+                # then try to do it before next node
+                insert_before = True
 
     return rb.dumps()
 
@@ -680,8 +693,8 @@ def get_test_src(method_path):
         N_PROCS = getattr(cls, 'N_PROCS', 1)
         use_mpi =  N_PROCS > 1
 
-    meth = getattr(cls, method_name)
-    method_source = inspect.getsource(meth)
+    method = getattr(cls, method_name)
+    method_source = inspect.getsource(method)
     method_source = strip_header(method_source)
     method_source = remove_docstrings(method_source)
     method_source = replace_asserts_with_prints(method_source)
@@ -825,40 +838,40 @@ def get_test_src(method_path):
         if not use_mpi:
             output_blocks = extract_output_blocks(run_outputs)
 
-        # if the last input block produces no output, add an empty output block
-        if len(output_blocks) == len(input_blocks) - 1:
-            output_blocks.append('')
+        # Need to deal with the cases when there is no outputblock for a given input block
+        # Merge an input block with the previous block and throw away the output block
+        # input_blocks, output_blocks = clean_up_empty_output_blocks(input_blocks, output_blocks)
 
         # make sure we have the same number of input and output blocks
         # if this fails, then something in the docs is not being handled properly
-        if len(output_blocks) != len(input_blocks):
-            print('==========================================================================')
-            print("Mismatch in input and output blocks processing %s.%s.%s" %
-                  (module_path, class_name, method_name))
-            print('========== code_to_run ===================')
-            print(code_to_run)
-            print('===================')
-            print('input_blocks (%d):' % len(input_blocks))
-            counter = 0
-            for b in input_blocks:
-                print('-- %d --' % counter)
-                print(b)
-                counter += 1
-            print('----')
-            print('===================')
-            print('output_blocks (%d):' % len(output_blocks))
-            counter = 0
-            for b in output_blocks:
-                print('-- %d --' % counter)
-                print(b)
-                counter += 1
-        assert len(output_blocks) == len(input_blocks), \
+        # if len(output_blocks) != len(input_blocks):
+        print('==========================================================================')
+        print("DEBUGGING for %s.%s.%s" %
+              (module_path, class_name, method_name))
+        print('========== code_to_run ===================')
+        print(code_to_run)
+        print('========== run_outputs ===================')
+        print(run_outputs)
+        print('===================')
+        print('input_blocks (%d):' % len(input_blocks))
+        counter = 0
+        for b in input_blocks:
+            print('-- %d --' % counter)
+            print(b)
+            counter += 1
+        print('----')
+        print('===================')
+        print('output_blocks (%d):' % len(output_blocks))
+        counter = 0
+        for b in output_blocks:
+            print('-- %d --' % counter)
+            print(b)
+            counter += 1
+
+        assert len(input_blocks) == len(output_blocks), \
             "Mismatch in input and output blocks processing %s.%s.%s" % \
             (module_path, class_name, method_name)
 
-        # Need to deal with the cases when there is no outputblock for a given input block
-        # Merge an input block with the previous block and throw away the output block
-        input_blocks, output_blocks = clean_up_empty_output_blocks(input_blocks, output_blocks)
         skipped_failed_output = None
     else:
         input_blocks = output_blocks = None

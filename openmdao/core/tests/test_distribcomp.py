@@ -538,10 +538,11 @@ class TestGroupMPI(unittest.TestCase):
 
         p = Problem(model=Group())
 
-        p.model.add_subsystem('indep', IndepVarComp('x', np.arange(5, dtype=float)))
-        p.model.add_subsystem('C1', MyComp())
+        p.model.add_subsystem('indep', IndepVarComp('x', np.arange(5, dtype=float)),
+                              promotes_outputs=['x'])
 
-        p.model.connect('indep.x', 'C1.x')
+        p.model.add_subsystem('C1', MyComp(),
+                              promotes_inputs=['x'])
 
         p.set_solver_print(level=0)
         p.setup(PETScVector)
