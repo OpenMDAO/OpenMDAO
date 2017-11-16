@@ -169,7 +169,6 @@ class ScipyOptimizer(Driver):
             Failure flag; True if failed to converge, False is successful.
         """
         opt = self.options['optimizer']
-        problem = self._problem # qqq do we need this?
         model = self._problem.model
         self.iter_count = 0
 
@@ -177,7 +176,7 @@ class ScipyOptimizer(Driver):
         model._solve_nonlinear()
 
         self.objs = list(self.get_objective_values())
-        self._con_cache = self.get_constraint_values() # qqq comes back as an array
+        self._con_cache = self.get_constraint_values()
 
         desvar_vals = self.get_design_var_values()
 
