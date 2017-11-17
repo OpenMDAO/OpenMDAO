@@ -484,6 +484,7 @@ def extract_output_blocks(run_output):
 
     if output_block is not None:
         output_blocks.append('\n'.join(output_block))
+
     return output_blocks
 
 
@@ -773,15 +774,19 @@ def get_test_src(method_path):
         if not use_mpi:
             output_blocks = extract_output_blocks(run_outputs)
 
-        # Need to deal with the cases when there is no output block for a given input block
-        # Merge an input block with the previous block and throw away the output block
-        input_blocks, output_blocks = clean_up_empty_output_blocks(input_blocks, output_blocks)
+        # the last input block may not produce any output
+        if len(output_blocks) == len(input_blocks) - 1:
+            output_blocks.append('')
 
         # make sure we have the same number of input and output blocks
         # if this fails, then something in the docs is not being handled properly
         assert len(input_blocks) == len(output_blocks), \
             "Mismatch in input and output blocks processing %s.%s.%s" % \
             (module_path, class_name, method_name)
+
+        # Need to deal with the cases when there is no output for a given input block
+        # Merge an input block with the previous block and throw away the output block
+        input_blocks, output_blocks = clean_up_empty_output_blocks(input_blocks, output_blocks)
 
         skipped_failed_output = None
     else:
