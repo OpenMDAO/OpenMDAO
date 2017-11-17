@@ -113,7 +113,16 @@ deploy:
   script:
   - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
       if [ "$MPI" ] && [ "$PY" = "3.6" ]; then
-        rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/twodocversions/latest;
+        # values of all these env vars are set in _util/automate.py
+        if ["$OPENMDAO_NEW_RELEASE" = "0"]; then
+          # if it is just a "daily" build, send to "latest"
+          rsync -r --delete-after -v _build/html/* "OPENMDAO_SERVER_PATH";
+        fi
+        if ["$OPENMDAO_NEW_RELEASE" = "1"]; then
+          # make new version dir, then send to versioned dir
+          # add a line to make the dir, unless rsync will do it for you.
+          rsync -r --delete-after -v _build/html/* "OPENMDAO_SERVER_PATH";
+        fi
       fi
     fi
   on:
