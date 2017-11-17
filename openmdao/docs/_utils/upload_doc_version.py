@@ -60,26 +60,24 @@ def get_doc_version():
         return tag, 1
 
 
-def automate():
+def upload_doc_version():
     """
     Perform operations, then set environment variables for later use in conf.py and .travis.yml
     """
-    tag = get_tag_info()
-    remote_host = 'openmdao@web543.webfaction.com'
-    remote_path = '/home/openmdao/webapps/twodocversions/' + tag
+    name, rel = get_doc_version()
 
     sync_cmd = "rsync -r --delete -after -v _build/html/* " \
                "openmdao@web543.webfaction.com:/home/openmdao/webapps/twodocversions/"
 
-    # if the remote path exists, daily build, send to latest
-    if exists_remote(remote_host, remote_path):
-        sync_cmd += "latest"
-    # if the remote path doesn't exist, this is a release.
+    # if release, send to version numbered dir
+    if rel:
+        sync_cmd += name
+    # if not release, daily build, send to latest
     else:
-        sync_cmd += tag
+        sync_cmd += "latest"
 
     # execute the rsync
     os.system(sync_cmd)
 
 if __name__ == "__main__":
-    automate()
+    upload_doc_version()
