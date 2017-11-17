@@ -1,7 +1,6 @@
 import subprocess
-import os
 import pipes
-import openmdao
+import os
 
 
 def get_tag_info():
@@ -17,17 +16,9 @@ def get_tag_info():
 
     # use sort to put the versions list in order from lowest to highest
     version_tags.sort(key=lambda s: [int(u) for u in s.split('.')])
-    print("The tags in this repo, sorted, are: " + str(version_tags))
 
     # grab the highest tag that this repo knows about
     latest_tag = version_tags[-1]
-
-    # grab the version of the most recent openmdao release
-    om_version = openmdao.__version__
-    if (om_version not in version_tags):
-        print("The tag " + om_version + " does not exist in this repo!")
-
-    print("LATEST TAG: " + latest_tag + ", OPENMDAO VERSION: " + om_version)
     return latest_tag
 
 
@@ -38,7 +29,6 @@ def get_commit_info():
     git_commit = subprocess.Popen(['git', 'show', '--oneline', '-s'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     commit_cmd_out, commit_cmd_err = git_commit.communicate()
     commit_id = commit_cmd_out.split()[0]
-    print("COMMIT ID: " + commit_id)
     return commit_id
 
 
@@ -49,12 +39,25 @@ def exists_remote(host, path):
     status = subprocess.call(
         ['ssh', host, 'test -d {}'.format(pipes.quote(path))])
     if status == 0:
-        print ("Remote directory " + path + " exists.")
         return True
     elif status == 1:
-        print("Remote directory " + path + " does not exist.")
         return False
     raise Exception('SSH failed')
+
+
+def get_doc_version():
+    """
+    Returns either a git commit ID, or a X.Y.Z release number,
+    and an indicator if this is a release or not
+    """
+    tag = get_tag_info()
+    remote_host = 'openmdao@web543.webfaction.com'
+    remote_path = '/home/openmdao/webapps/twodocversions/' + tag
+
+    if exists_remote(remote_host, remote_path):
+        return get_commit_info(), 0
+    else:
+        return tag, 1
 
 
 def automate():
@@ -62,29 +65,21 @@ def automate():
     Perform operations, then set environment variables for later use in conf.py and .travis.yml
     """
     tag = get_tag_info()
-    release_path = '/home/openmdao/webapps/twodocversions/' + tag
     remote_host = 'openmdao@web543.webfaction.com'
+    remote_path = '/home/openmdao/webapps/twodocversions/' + tag
 
-    # if the remote path exists, release docs have happened already
-    # and with commit ID as identifier in docs title. (used in conf.py)
-    # finally, set the place for travis to send docs to "latest" .
-    if exists_remote(remote_host, release_path):
-        commit = get_commit_info()
-        os.environ['OPENMDAO_NEW_RELEASE'] = '0'
-        os.environ['OPENMDAO_DOC_VERSION'] = commit
-        os.environ['OPENMDAO_SERVER_PATH'] = remote_host + ':/home/openmdao/webapps/twodocversions/latest'
+    sync_cmd = "rsync -r --delete -after -v _build/html/* " \
+               "openmdao@web543.webfaction.com:/home/openmdao/webapps/twodocversions/"
 
-    # if the remote path doesn't exist, this is a release. Need
-    # to use the tag as identifier in docs title. (used in conf.py)
-    # and make a new remote dir.
+    # if the remote path exists, daily build, send to latest
+    if exists_remote(remote_host, remote_path):
+        sync_cmd += "latest"
+    # if the remote path doesn't exist, this is a release.
     else:
-        os.environ['OPENMDAO_NEW_RELEASE'] = '1'
-        os.environ['OPENMDAO_DOC_VERSION'] = tag
-        os.environ['OPENMDAO_SERVER_PATH'] = remote_host + ":" + remote_path
+        sync_cmd += tag
 
-    print("NEW RELEASE? " + os.environ['OPENMDAO_NEW_RELEASE'])
-    print("DOC VERSION: " + os.environ['OPENMDAO_DOC_VERSION'])
-    print("SERVER PATH: " + os.environ['OPENMDAO_SERVER_PATH'])
+    # execute the rsync
+    os.system(sync_cmd)
 
 if __name__ == "__main__":
     automate()
