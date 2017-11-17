@@ -326,6 +326,7 @@ def is_output_node(node):
     ]
     output_functions = [
         'setup', 'run_model', 'run_driver',
+        'check_partials', 'check_totals',
         'list_inputs', 'list_outputs', 'list_residuals'
     ]
 
@@ -336,15 +337,13 @@ def is_output_node(node):
         func_name = node.value[-2].value
         if tuple(sig) in output_signatures and func_name in output_functions:
             return True
-        else:
-            print(node.dumps(), "is NOT an output node!")
 
     return False
 
 
-def split_source_into_input_blocks(src, indentation=''):
+def split_source_into_input_blocks(src):
     """
-    Split source into blocks; the splits occur at prints.
+    Split source into blocks; the splits occur at inserted prints.
 
     Parameters
     ----------
@@ -356,71 +355,21 @@ def split_source_into_input_blocks(src, indentation=''):
     list
         List of input code sections.
     """
-    rb = RedBaron(src)
+    input_blocks = []
 
-    # find lines with trailing comments so we can preserve them properly
-    lines_with_comments = {}
-    comments = rb.findAll('comment')
-    for c in comments:
-        if c.previous and c.previous.type != 'endl':
-            lines_with_comments[c.previous] = c
-    trailing_comments = lines_with_comments.values()
+    current_block = ""
 
-    in_code_blocks = []
-    in_code_block = None
+    for line in src.split('\n'):
+        if 'print(">>>>>' in line:
+            input_blocks.append(current_block)
+            current_block = ""
+        else:
+            current_block += line + '\n'
 
-    # group code until the first print, then repeat
-    for r in rb:
-        line = r.indentation + str(r)
+    if current_block.strip():
+        input_blocks.append(current_block)
 
-        # if line is followed by a trailing comment, append the comment
-        trailing_comment = lines_with_comments.get(r)
-        if trailing_comment:
-            line += str(trailing_comment)
-        elif r in trailing_comments:
-            # we already handled it above
-            continue
-
-        if in_code_block is None:
-            in_code_block = []
-
-        # if it's a compound statement, we have to recurse
-        if r.type in ['ifelseblock', 'if']:
-            if r.type == 'if':
-                in_code_block.append(line.split('\n')[0]+'\n')
-            code_blocks = split_source_into_input_blocks(r.value, indentation=r.indentation)
-            if len(code_blocks) > 1:
-                for block in code_blocks:
-                    in_code_block.append(block)
-                    in_code_block = ''.join(in_code_block)
-                    in_code_blocks.append(in_code_block)
-                    in_code_block = []
-            elif code_blocks:
-                in_code_block.append(code_blocks[0])
-            in_code_block = None
-            continue
-        elif r.type in ['elif', 'else']:
-            # don't generate input blocks for the 'else' branches
-            in_code_block.append(r.dumps())
-            continue
-
-        # ensure it ends with `\n`
-        if not line.endswith('\n'):
-            line += '\n'
-
-        in_code_block.append(line)
-
-        if is_output_node(r):
-            # stop and make an input code block
-            in_code_block = ''.join(in_code_block)
-            in_code_block = remove_leading_trailing_whitespace_lines(in_code_block)
-            in_code_blocks.append(in_code_block)
-            in_code_block = None
-
-    if in_code_block is not None:  # If anything left over
-        in_code_blocks.append(''.join(in_code_block))
-
-    return in_code_blocks
+    return input_blocks
 
 
 def insert_output_start_stop_indicators(src):
@@ -827,31 +776,33 @@ def get_test_src(method_path):
         run_outputs = "".join(map(chr, run_outputs))  # in Python 3, run_outputs is of type bytes!
 
     if not skipped and not failed:
+        print('==========================================================================')
+        print("DEBUGGING for %s.%s.%s" %
+              (module_path, class_name, method_name))
+        print('========== code_to_run ===================')
+        print(code_to_run)
+
         #####################
         ### 5. Split method_source up into groups of "In" blocks -> input_blocks ###
         #####################
-        input_blocks = split_source_into_input_blocks(method_source)
+        input_blocks = split_source_into_input_blocks(source_with_output_start_stop_indicators)
 
         #####################
         ### 6. Extract from run_outputs, the Out blocks -> output_blocks ###
         #####################
         if not use_mpi:
             output_blocks = extract_output_blocks(run_outputs)
+            print('========== run_outputs ===================')
+            print(run_outputs)
 
-        # Need to deal with the cases when there is no outputblock for a given input block
+        # Need to deal with the cases when there is no output block for a given input block
         # Merge an input block with the previous block and throw away the output block
-        # input_blocks, output_blocks = clean_up_empty_output_blocks(input_blocks, output_blocks)
+        input_blocks, output_blocks = clean_up_empty_output_blocks(input_blocks, output_blocks)
 
         # make sure we have the same number of input and output blocks
         # if this fails, then something in the docs is not being handled properly
         # if len(output_blocks) != len(input_blocks):
-        print('==========================================================================')
-        print("DEBUGGING for %s.%s.%s" %
-              (module_path, class_name, method_name))
-        print('========== code_to_run ===================')
-        print(code_to_run)
-        print('========== run_outputs ===================')
-        print(run_outputs)
+
         print('===================')
         print('input_blocks (%d):' % len(input_blocks))
         counter = 0
