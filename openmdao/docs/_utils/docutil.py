@@ -393,42 +393,32 @@ def insert_output_start_stop_indicators(src):
             lines_with_comments[c.previous] = c
 
     input_block_number = 0
-    insert_before = False
 
     # find all nodes that might produce output
     nodes = rb.findAll(lambda identifier: identifier in ['print', 'atomtrailers'])
     for r in nodes:
-        if insert_before:
-            try:
-                insert_before = False
-                r.insert_before('print(">>>>>%d")\n' % input_block_number)
-                input_block_number += 1
-            except Exception as err:
-                warnings.warn("Could not insert output marker before:")
-                print(r.dumps)
-                r.help()
-                print(err)
-
-        # output within if/else statements is not a good idea for docs, but try
-        # to handle one level of if/else statements (will fail with nested ifs)
-        # the else blocks must start with the same block number as the if block
+        # Output within if/else statements is not a good idea for docs, because
+        # we don't know which branch execution will follow and thus where to put
+        # the output block. Regardless of which branch is taken, though, the
+        # output blocks must start with the same block number.
         if hasattr(r.parent, 'type') and r.parent.type == 'if':
             if_block_number = input_block_number
         if hasattr(r.parent, 'type') and r.parent.type in ['elif', 'else']:
             input_block_number = if_block_number
 
         if is_output_node(r):
+            # if there was a trailing comment on this line, output goes after it
             if r in lines_with_comments:
                 r = lines_with_comments[r]  # r is now the comment
                 if r.previous.value == '\n':
                     r.previous.value = ''   # don't want endl before comment
-            try:
-                r.insert_after('print(">>>>>%d")\n' % input_block_number)
-                input_block_number += 1
-            except Exception as err:
-                # if we can't insert after, because... redbaron
-                # then try to do it before next node
-                insert_before = True
+
+            # find the correct node to 'insert_after'
+            while hasattr(r, 'parent') and not hasattr(r.parent, 'insert'):
+                r = r.parent
+
+            r.insert_after('print(">>>>>%d")\n' % input_block_number)
+            input_block_number += 1
 
     return rb.dumps()
 
@@ -651,7 +641,7 @@ def get_test_src(method_path):
     #-----------------------------------------------------------------------------------
     source_with_output_start_stop_indicators = insert_output_start_stop_indicators(method_source)
 
-    #----------------`-------------------------------------------------------------------
+    #------------------------------------------------------------------------------------
     # Get all the pieces of code needed to run the unit test method
     #-----------------------------------------------------------------------------------
 

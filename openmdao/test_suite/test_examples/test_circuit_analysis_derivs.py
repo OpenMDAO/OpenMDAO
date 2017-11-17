@@ -144,7 +144,8 @@ class TestNonlinearCircuit(unittest.TestCase):
         assert_rel_error(self, p['circuit.R1.I'], 0.09908303, 1e-5)
         assert_rel_error(self, p['circuit.R2.I'], 0.00091697, 1e-5)
         assert_rel_error(self, p['circuit.D1.I'], 0.00091697, 1e-5)
-        # 'Sanity check: should sum to .1 Amps
+
+        # sanity check: should sum to .1 Amps
         assert_rel_error(self, p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
 
