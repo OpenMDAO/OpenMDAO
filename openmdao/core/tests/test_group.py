@@ -12,9 +12,9 @@ import numpy as np
 from parameterized import parameterized
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, \
-    NonlinearRunOnce, NonLinearRunOnce, ScipyIterativeSolver
+    NonlinearRunOnce, NonLinearRunOnce
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
+from openmdao.test_suite.components.sellar import SellarDis2
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -98,7 +98,6 @@ class TestGroup(unittest.TestCase):
         self.assertTrue(issubclass(w[0].category, DeprecationWarning))
         self.assertEqual(str(w[0].message),
                          "NonLinearRunOnce is deprecated.  Use NonlinearRunOnce instead.")
-
 
     def test_group_simple(self):
         from openmdao.api import ExecComp, Problem
@@ -276,11 +275,8 @@ class TestGroup(unittest.TestCase):
     def test_group_promotes(self):
         """Promoting a single variable."""
         p = Problem()
-        p.model.add_subsystem('comp1', IndepVarComp([
-                ('a', 2.0),
-                ('x', 5.0),
-            ]),
-            promotes_outputs=['x'])
+        p.model.add_subsystem('comp1', IndepVarComp([('a', 2.0), ('x', 5.0)]),
+                              promotes_outputs=['x'])
         p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
 
@@ -337,12 +333,10 @@ class TestGroup(unittest.TestCase):
     def test_group_promotes_multiple(self):
         """Promoting multiple variables."""
         p = Problem()
-        p.model.add_subsystem('comp1', IndepVarComp([
-                ('a', 2.0),
-                ('x', 5.0),
-            ]),
-            promotes_outputs=['a', 'x'])
-        p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
+        p.model.add_subsystem('comp1', IndepVarComp([('a', 2.0), ('x', 5.0)]),
+                              promotes_outputs=['a', 'x'])
+        p.model.add_subsystem('comp2', ExecComp('y=2*x'),
+                              promotes_inputs=['x'])
         p.setup()
 
         p.set_solver_print(level=0)
@@ -355,12 +349,10 @@ class TestGroup(unittest.TestCase):
     def test_group_promotes_all(self):
         """Promoting all variables with asterisk."""
         p = Problem()
-        p.model.add_subsystem('comp1', IndepVarComp([
-                ('a', 2.0),
-                ('x', 5.0),
-            ]),
-            promotes_outputs=['*'])
-        p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
+        p.model.add_subsystem('comp1', IndepVarComp([('a', 2.0), ('x', 5.0)]),
+                               promotes_outputs=['*'])
+        p.model.add_subsystem('comp2', ExecComp('y=2*x'),
+                               promotes_inputs=['x'])
         p.setup()
 
         p.set_solver_print(level=0)
@@ -524,6 +516,7 @@ class TestGroup(unittest.TestCase):
         p.set_solver_print(level=0)
         p.setup()
         p.run_model()
+
         assert_rel_error(self, p['C1.x'], np.ones(3))
         assert_rel_error(self, p['C1.y'], 6.)
         assert_rel_error(self, p['C2.x'], np.ones(2))
@@ -649,6 +642,7 @@ class TestGroup(unittest.TestCase):
         p.set_solver_print(level=0)
         p.setup()
         p.run_model()
+
         assert_rel_error(self, p['C1.x'], np.ones(3))
         assert_rel_error(self, p['C1.y'], 6.)
         assert_rel_error(self, p['C2.x'], np.ones(2))
@@ -684,11 +678,13 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('indep',
                               IndepVarComp('x', np.arange(12).reshape((4,3))),
                               promotes_outputs=['x'])
-        p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
+        p.model.add_subsystem('C1', MyComp(),
+                              promotes_inputs=['x'])
 
         p.set_solver_print(level=0)
         p.setup()
         p.run_model()
+
         assert_rel_error(self, p['C1.x'],
                          np.array([[0., 10.],
                                    [7., 4.]]))
@@ -893,6 +889,7 @@ class TestGroup(unittest.TestCase):
 
         # this test passes if it doesn't raise an exception
 
+
 class MyComp(ExplicitComponent):
     def __init__(self, input_shape, src_indices=None, flat_src_indices=False):
         super(MyComp, self).__init__()
@@ -912,7 +909,8 @@ class MyComp(ExplicitComponent):
 def src_indices_model(src_shape, tgt_shape, src_indices=None, flat_src_indices=False,
                       promotes=None):
     prob = Problem()
-    prob.model.add_subsystem('indeps', IndepVarComp('x', shape=src_shape), promotes=promotes)
+    prob.model.add_subsystem('indeps', IndepVarComp('x', shape=src_shape),
+                             promotes=promotes)
     prob.model.add_subsystem('C1', MyComp(tgt_shape,
                                           src_indices=src_indices if promotes else None,
                                           flat_src_indices=flat_src_indices),

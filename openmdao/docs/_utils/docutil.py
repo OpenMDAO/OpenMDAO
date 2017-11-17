@@ -10,6 +10,7 @@ import inspect
 import sqlite3
 import subprocess
 import tempfile
+import warnings
 
 import numpy as np
 
@@ -168,7 +169,7 @@ def get_method_body(method_code):
     return def_node.value.dumps()
 
 
-def remove_initial_empty_lines_from_source(source):
+def remove_initial_empty_lines(source):
     """
     Some initial empty lines were added to keep RedBaron happy.
     Need to strip these out before we pass the source code to the
@@ -222,10 +223,6 @@ def get_source_code_of_class_or_method(class_or_method_path, remove_docstring=Tr
         source = remove_docstrings(source)
 
     return source
-
-
-sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
-table_name = 'feature_unit_tests'   # name of the table to be queried
 
 
 def get_test_source_code_for_feature(feature_name):
@@ -407,8 +404,10 @@ def insert_output_start_stop_indicators(src):
                 r.insert_before('print(">>>>>%d")\n' % input_block_number)
                 input_block_number += 1
             except Exception as err:
-                print(err)
+                warnings.warn("Could not insert output marker before:")
+                print(r.dumps)
                 r.help()
+                print(err)
 
         # output within if/else statements is not a good idea for docs, but try
         # to handle one level of if/else statements (will fail with nested ifs)
@@ -448,6 +447,8 @@ def clean_up_empty_output_blocks(input_blocks, output_blocks):
             current_in_block += '\n'
         current_in_block += in_block
         if out_block:
+            current_in_block = remove_leading_trailing_whitespace_lines(current_in_block)
+            out_block = remove_leading_trailing_whitespace_lines(out_block)
             new_input_blocks.append(current_in_block)
             new_output_blocks.append(out_block)
             current_in_block = ''
@@ -627,10 +628,6 @@ def get_test_src(method_path):
     class_name = method_path.split('.')[-2]
     method_name = method_path.split('.')[-1]
 
-    print('==========================================================================')
-    print('========== %s.%s.%s ' % (module_path, class_name, method_name))
-    print('==========================================================================')
-
     test_module = importlib.import_module(module_path)
     cls = getattr(test_module, class_name)
 
@@ -647,7 +644,7 @@ def get_test_src(method_path):
     method_source = strip_header(method_source)
     method_source = remove_docstrings(method_source)
     method_source = replace_asserts_with_prints(method_source)
-    method_source = remove_initial_empty_lines_from_source(method_source)
+    method_source = remove_initial_empty_lines(method_source)
 
     #-----------------------------------------------------------------------------------
     # 3. Insert extra print statements to indicate start and end of print Out blocks
@@ -703,7 +700,6 @@ def get_test_src(method_path):
             p.wait()
 
             # extract output blocks from all output files & merge them
-            from pprint import pprint
             multi_out_blocks = []
             for i in range(N_PROCS):
                 with open('%d.out' % i) as f:
@@ -776,12 +772,6 @@ def get_test_src(method_path):
         run_outputs = "".join(map(chr, run_outputs))  # in Python 3, run_outputs is of type bytes!
 
     if not skipped and not failed:
-        print('==========================================================================')
-        print("DEBUGGING for %s.%s.%s" %
-              (module_path, class_name, method_name))
-        print('========== code_to_run ===================')
-        print(code_to_run)
-
         #####################
         ### 5. Split method_source up into groups of "In" blocks -> input_blocks ###
         #####################
@@ -792,8 +782,6 @@ def get_test_src(method_path):
         #####################
         if not use_mpi:
             output_blocks = extract_output_blocks(run_outputs)
-            print('========== run_outputs ===================')
-            print(run_outputs)
 
         # Need to deal with the cases when there is no output block for a given input block
         # Merge an input block with the previous block and throw away the output block
@@ -801,24 +789,6 @@ def get_test_src(method_path):
 
         # make sure we have the same number of input and output blocks
         # if this fails, then something in the docs is not being handled properly
-        # if len(output_blocks) != len(input_blocks):
-
-        print('===================')
-        print('input_blocks (%d):' % len(input_blocks))
-        counter = 0
-        for b in input_blocks:
-            print('-- %d --' % counter)
-            print(b)
-            counter += 1
-        print('----')
-        print('===================')
-        print('output_blocks (%d):' % len(output_blocks))
-        counter = 0
-        for b in output_blocks:
-            print('-- %d --' % counter)
-            print(b)
-            counter += 1
-
         assert len(input_blocks) == len(output_blocks), \
             "Mismatch in input and output blocks processing %s.%s.%s" % \
             (module_path, class_name, method_name)
