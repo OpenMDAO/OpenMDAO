@@ -14,6 +14,9 @@ def get_tag_info():
     # take the output of git tag -l *.*.*, and split it from one string into a list.
     version_tags = cmd_out.split()
 
+    if not version_tags:
+        raise Exception('No tags found in repository')
+
     # use sort to put the versions list in order from lowest to highest
     version_tags.sort(key=lambda s: [int(u) for u in s.split('.')])
 
@@ -42,7 +45,7 @@ def exists_remote(host, path):
         return True
     elif status == 1:
         return False
-    raise Exception('SSH failed')
+    raise Exception('SSH failed.')
 
 
 def get_doc_version():
@@ -69,15 +72,20 @@ def upload_doc_version():
     sync_cmd = "rsync -r --delete -after -v _build/html/* " \
                "openmdao@web543.webfaction.com:/home/openmdao/webapps/twodocversions/"
 
-    # if release, send to version numbered dir
+    # if release, send to version-numbered dir
     if rel:
         sync_cmd += name
-    # if not release, daily build, send to latest
+    # if not release, it's a "daily build," send to latest
     else:
         sync_cmd += "latest"
 
     # execute the rsync
-    os.system(sync_cmd)
+    status = os.system(sync_cmd)
+
+    if status == 0:
+        return True
+    elif status == 1:
+        raise Exception('Doc transfer failed.')
 
 if __name__ == "__main__":
     upload_doc_version()
