@@ -10,7 +10,6 @@ import inspect
 import sqlite3
 import subprocess
 import tempfile
-import warnings
 
 import numpy as np
 
@@ -777,12 +776,6 @@ def get_test_src(method_path):
         # the last input block may not produce any output
         if len(output_blocks) == len(input_blocks) - 1:
             output_blocks.append('')
-
-        # make sure we have the same number of input and output blocks
-        # if this fails, then something in the docs is not being handled properly
-        assert len(input_blocks) == len(output_blocks), \
-            "Mismatch in input and output blocks processing %s.%s.%s" % \
-            (module_path, class_name, method_name)
 
         # Need to deal with the cases when there is no output for a given input block
         # Merge an input block with the previous block and throw away the output block
