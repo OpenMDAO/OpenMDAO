@@ -247,7 +247,7 @@ class Driver(object):
                        if check_path(n, incl, excl, True)}
         all_objectives = {n for n in self._objs
                           if check_path(n, incl, excl, True)}
-        all_constratins = {n for n in self._cons
+        all_constraints = {n for n in self._cons
                            if check_path(n, incl, excl, True)}
         if rec_desvars:
             mydesvars = all_desvars
@@ -256,7 +256,7 @@ class Driver(object):
             myobjectives = all_objectives
 
         if rec_constraints:
-            myconstraints = all_constratins
+            myconstraints = all_constraints
 
         if rec_responses:
             myresponses = {n for n in self._responses
@@ -284,7 +284,7 @@ class Driver(object):
 
             # de-duplicate mysystem_outputs
             mysystem_outputs = mysystem_outputs.difference(all_desvars, all_objectives,
-                                                           all_constratins)
+                                                           all_constraints)
 
         if MPI:  # filter based on who owns the variables
             # TODO Eventually, we think we can get rid of this next check. But to be safe,
