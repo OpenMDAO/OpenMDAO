@@ -19,7 +19,7 @@ def get_tag_info():
         raise Exception('No tags found in repository')
 
     # use sort to put the versions list in order from lowest to highest
-    version_tags.sort(key=lambda s: [int(bytes(u)) for u in s.split('.')])
+    version_tags.sort(key=lambda s: [int(u) for u in s.split('.')])
 
     # grab the highest tag that this repo knows about
     latest_tag = version_tags[-1]
