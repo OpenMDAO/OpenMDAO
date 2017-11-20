@@ -7,8 +7,9 @@ from six.moves import cStringIO
 import numpy as np
 
 from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, \
-    NewtonSolver, ScipyKrylov
+    NewtonSolver, ScipyKrylov, LinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
+from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
 
 
 # Note: The following class definitions are used in feature docs
@@ -619,6 +620,30 @@ class ListFeatureTestCase(unittest.TestCase):
             'sub.comp2.x',
             'sub.comp3.x'
         ])
+
+    def test_list_residuals_with_tol(self):
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 1.0))
+        model.add_subsystem('d1', SellarImplicitDis1())
+        model.add_subsystem('d2', SellarImplicitDis2())
+        model.connect('d1.y1', 'd2.y1')
+        model.connect('d2.y2', 'd1.y2')
+
+        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver.options['maxiter'] = 5
+        model.linear_solver = ScipyKrylov()
+        model.linear_solver.precon = LinearBlockGS()
+
+        prob.setup(check=False)
+        prob.set_solver_print(level=0)
+
+        prob.run_model()
+        res = model._residuals.get_norm()
+        resids = model.list_residuals(tol=0.01, values=False)
+
+        self.assertEqual(sorted(resids), ['d2.y2',])
 
 
 if __name__ == '__main__':
