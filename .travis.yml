@@ -67,7 +67,10 @@ before_install:
 
 install:
 
-- git clone --depth 5000  https://github.com/OpenMDAO/OpenMDAO.git
+git:
+  depth: 99999
+
+ - git fetch --unshallow --tags
 
 # keeping numpy pinned at 1.12 because pySNOPT dies with 1.13 because numpy broke callback
 - conda install --yes python=$PY numpy==1.12 scipy nose sphinx mock swig
