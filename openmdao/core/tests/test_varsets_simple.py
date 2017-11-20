@@ -2,7 +2,7 @@ from __future__ import division
 import numpy as np
 import unittest
 
-from openmdao.api import Problem, ExplicitComponent, Group, DefaultVector
+from openmdao.api import Problem, ExplicitComponent, Group, ParallelGroup, DefaultVector
 from openmdao.devtools.testutil import assert_rel_error
 
 try:
@@ -50,7 +50,7 @@ class Comp4(ExplicitComponent):
         self.add_output('v4', var_set=4)
 
 
-class GroupG(Group):
+class GroupG(ParallelGroup):
 
     def __init__(self):
         super(GroupG, self).__init__()
@@ -66,7 +66,6 @@ class TestNumpyVec(unittest.TestCase):
         group = GroupG()
         self.p = Problem(group).setup(DefaultVector, check=False)
         self.p.final_setup()
-        self.p.model.proc_allocator.parallel = True
 
     def test_prom_names(self):
         root = self.p.model
@@ -84,10 +83,10 @@ class TestNumpyVec(unittest.TestCase):
         root = self.p.model
 
         if root.comm.size == 1:
-            comp1 = root.get_subsystem('C1')
-            comp2 = root.get_subsystem('C2')
-            comp3 = root.get_subsystem('C3')
-            comp4 = root.get_subsystem('C4')
+            comp1 = root.C1
+            comp2 = root.C2
+            comp3 = root.C3
+            comp4 = root.C4
 
             comp1._outputs['v1'] = 2.0
             comp2._outputs['v2'] = 4.0
@@ -130,12 +129,11 @@ class TestNumpyVec(unittest.TestCase):
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
-class TestPetscVec(TestNumpyVec):
+class TestPETScVec(TestNumpyVec):
 
     def setUp(self):
         group = GroupG()
         self.p = Problem(group).setup(PETScVector, check=False)
-        self.p.model.proc_allocator.parallel = True
         self.p.final_setup()
 
 

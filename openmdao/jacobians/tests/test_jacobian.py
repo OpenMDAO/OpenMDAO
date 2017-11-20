@@ -12,8 +12,9 @@ from scipy.sparse import coo_matrix, csr_matrix
 
 from openmdao.api import IndepVarComp, Group, Problem, \
                          ExplicitComponent, ImplicitComponent, ExecComp, \
-                         NewtonSolver, ScipyIterativeSolver, \
-                         DenseJacobian, CSRJacobian, CSCJacobian, COOJacobian
+                         NewtonSolver, ScipyKrylov, \
+                         DenseJacobian, CSRJacobian, CSCJacobian, COOJacobian, \
+                         LinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
@@ -67,6 +68,7 @@ class MyExplicitComp(ExplicitComponent):
 
         partials['f', 'y'] = jac2
 
+
 class MyExplicitComp2(ExplicitComponent):
     def __init__(self, jac_type):
         super(MyExplicitComp2, self).__init__()
@@ -108,6 +110,7 @@ class MyExplicitComp2(ExplicitComponent):
 
         partials['f', 'w'] = jac
 
+
 class ExplicitSetItemComp(ExplicitComponent):
     def __init__(self, dtype, value, shape, constructor):
         self._dtype = dtype
@@ -136,6 +139,8 @@ class ExplicitSetItemComp(ExplicitComponent):
 
         self.add_input('in', val=in_val*scale)
         self.add_output('out', val=out_val*scale)
+
+        self.declare_partials(of='*', wrt='*')
 
     def compute_partials(self, inputs, partials):
         partials['out', 'in'] = self._constructor(self._value)
@@ -234,8 +239,8 @@ class TestJacobian(unittest.TestCase):
 
         top.jacobian = jac_class()
         top.nonlinear_solver = NewtonSolver()
-        top.nonlinear_solver.linear_solver = ScipyIterativeSolver(maxiter=100)
-        top.linear_solver = ScipyIterativeSolver(
+        top.nonlinear_solver.linear_solver = ScipyKrylov(maxiter=100)
+        top.linear_solver = ScipyKrylov(
             maxiter=200, atol=1e-10, rtol=1e-10)
         prob.set_solver_print(level=0)
 
@@ -340,9 +345,9 @@ class TestJacobian(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
-        d1 = prob.model.get_subsystem('d1')
+        d1 = prob.model.d1
 
         d1.jacobian = DenseJacobian()
         prob.set_solver_print(level=0)
@@ -352,6 +357,108 @@ class TestJacobian(unittest.TestCase):
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+    def test_group_assembled_jac_with_ext_mat(self):
+
+        class TwoSellarDis1(ExplicitComponent):
+            """
+            Component containing Discipline 1 -- no derivatives version.
+            """
+            def setup(self):
+                self.add_input('z', val=np.zeros(2))
+                self.add_input('x', val=np.zeros(2))
+                self.add_input('y2', val=np.ones(2))
+                self.add_output('y1', val=np.ones(2))
+
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                z1 = inputs['z'][0]
+                z2 = inputs['z'][1]
+                x1 = inputs['x']
+                y2 = inputs['y2']
+
+                outputs['y1'][0] = z1**2 + z2 + x1[0] - 0.2*y2[0]
+                outputs['y1'][1] = z1**2 + z2 + x1[0] - 0.2*y2[0]
+
+            def compute_partials(self, inputs, partials):
+                """
+                Jacobian for Sellar discipline 1.
+                """
+                partials['y1', 'y2'] =np.array([[-0.2, 0.], [0., -0.2]])
+                partials['y1', 'z'] = np.array([[2.0 * inputs['z'][0], 1.0], [2.0 * inputs['z'][0], 1.0]])
+                partials['y1', 'x'] = np.eye(2)
+
+
+        class TwoSellarDis2(ExplicitComponent):
+            def setup(self):
+                self.add_input('z', val=np.zeros(2))
+                self.add_input('y1', val=np.ones(2))
+                self.add_output('y2', val=np.ones(2))
+
+                self.declare_partials('*', '*', method='fd')
+
+            def compute(self, inputs, outputs):
+
+                z1 = inputs['z'][0]
+                z2 = inputs['z'][1]
+                y1 = inputs['y1']
+
+                # Note: this may cause some issues. However, y1 is constrained to be
+                # above 3.16, so lets just let it converge, and the optimizer will
+                # throw it out
+                if y1[0].real < 0.0:
+                    y1[0] *= -1
+                if y1[1].real < 0.0:
+                    y1[1] *= -1
+
+                outputs['y2'][0] = y1[0]**.5 + z1 + z2
+                outputs['y2'][1] = y1[1]**.5 + z1 + z2
+
+            def compute_partials(self, inputs, J):
+                y1 = inputs['y1']
+                if y1[0].real < 0.0:
+                    y1[0] *= -1
+                if y1[1].real < 0.0:
+                    y1[1] *= -1
+
+                J['y2', 'y1'] = np.array([[.5*y1[0]**-.5, 0.], [0., .5*y1[1]**-.5]])
+                J['y2', 'z'] = np.array([[1.0, 1.0], [1.0, 1.0]])
+
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', np.array([1.0, 1.0])), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        sup = model.add_subsystem('sup', Group(), promotes=['*'])
+
+        sub1 = sup.add_subsystem('sub1', Group(), promotes=['*'])
+        sub2 = sup.add_subsystem('sub2', Group(), promotes=['*'])
+
+        d1 = sub1.add_subsystem('d1', TwoSellarDis1(), promotes=['x', 'z', 'y1', 'y2'])
+        sub2.add_subsystem('d2', TwoSellarDis2(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1[0] - y1[1]', y1=np.array([0.0, 0.0])),
+                            promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2[0] + y2[1] - 24.0', y2=np.array([0.0, 0.0])),
+                            promotes=['con2', 'y2'])
+
+        model.linear_solver = LinearBlockGS()
+        sup.linear_solver = LinearBlockGS()
+
+        sub1.jacobian = DenseJacobian()
+        sub2.jacobian = DenseJacobian()
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False, mode='rev')
+        prob.run_model()
+
+        of = ['con1', 'con2']
+        wrt = ['x', 'z']
+
+        # Make sure we don't get a size mismatch.
+        derivs = prob.compute_totals(of=of, wrt=wrt)
 
     def test_assembled_jac_bad_key(self):
         # this test fails if AssembledJacobian._update sets in_start with 'output' instead of 'input'
@@ -392,7 +499,7 @@ class TestJacobian(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
         prob.model.jacobian = DenseJacobian()
 
@@ -423,12 +530,12 @@ class TestJacobian(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
         prob.setup(check=False)
         prob.final_setup()
 
-        d1 = prob.model.get_subsystem('d1')
+        d1 = prob.model.d1
         d1.jacobian = DenseJacobian()
 
         msg = "d1: jacobian has changed and setup was not called."
@@ -617,8 +724,7 @@ class TestJacobian(unittest.TestCase):
             def linearize(self, inputs, outputs, jacobian):
                 return
 
-            def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, d_residuals,
-                                       mode):
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, d_residuals, mode):
                 d_residuals['x'] += (np.exp(outputs['x']) - 2*inputs['a']**2 * outputs['x'])*d_outputs['x']
                 d_residuals['x'] += (-2 * inputs['a'] * outputs['x']**2)*d_inputs['a']
 
@@ -641,6 +747,36 @@ class TestJacobian(unittest.TestCase):
         msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
             prob.run_model()
+
+    def test_access_undeclared_subjac(self):
+
+        class Undeclared(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_output('y', val=0.0)
+
+            def compute(self, inputs, outputs):
+                pass
+
+            def compute_partials(self, inputs, partials):
+                partials['y', 'x'] = 1.0
+
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        model.add_subsystem('comp', Undeclared())
+
+        model.connect('p1.x', 'comp.x')
+
+        prob.setup()
+        prob.run_model()
+
+        msg = 'Variable name pair \("{}", "{}"\) must first be declared.'
+        with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
+            J = prob.compute_totals(of=['comp.y'], wrt=['p.x'])
 
 if __name__ == '__main__':
     unittest.main()

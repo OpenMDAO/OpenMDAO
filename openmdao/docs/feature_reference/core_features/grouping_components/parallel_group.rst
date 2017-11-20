@@ -27,4 +27,25 @@ MPI and give it 2 processes using the following command:
   in OpenMDAO.
 
 
+In the previous example, both components in the ParallelGroup required just a single MPI process, but
+what happens if we want to add subsystems to a ParallelGroup that have other processor requirements?
+In OpenMDAO, we control process allocation behavior by setting the *min_procs* and/or *max_procs* or
+*proc_weights* args when we call the *add_subsystem* function to add a particular subsystem to
+a ParallelGroup.
 
+
+.. automethod:: openmdao.core.group.Group.add_subsystem
+    :noindex:
+
+
+If you use both *min_procs/max_procs* and *proc_weights*, it can become less obvious what the
+resulting process allocation will be, so you may want to stick to just using one or the other.
+The algorithm used for the allocation starts, assuming that the number of processes is greater or
+equal to the number of subsystems, by assigning the *min_procs* for each subsystem.  It then adds
+any remaining processes to subsystems based on their weights, being careful not to exceed their
+specified *max_procs*, if any.
+
+If the  number of processes is less than the number of subsystems then each subsystem, one at a
+time starting with the one with the highest *proc_weight*, is allocated to the least
+loaded process.  An exception will be raised if any of the subsystems in this case have a
+*min_procs* value greater than 1.

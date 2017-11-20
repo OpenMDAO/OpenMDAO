@@ -63,6 +63,8 @@ class DefaultTransfer(Transfer):
         out_inds = self._out_inds
 
         if mode == 'fwd':
+            do_complex = in_vec._vector_info._under_complex_step and out_vec._alloc_complex
+
             for key in in_inds:
                 in_set_name, out_set_name = key
                 # this works whether the vecs have multi columns or not due to broadcasting
@@ -71,11 +73,11 @@ class DefaultTransfer(Transfer):
 
                 # Imaginary transfer
                 # (for CS, so only need in fwd)
-                if in_vec._vector_info._under_complex_step and out_vec._alloc_complex:
+                if do_complex:
                     in_vec._imag_data[in_set_name][in_inds[key]] = \
                         out_vec._imag_data[out_set_name][out_inds[key]]
 
-        elif mode == 'rev':
+        else:  # rev
             for key in in_inds:
                 in_set_name, out_set_name = key
                 np.add.at(
@@ -94,6 +96,9 @@ class DefaultVector(Vector):
         """
         Allocate list of arrays, one for each var_set.
 
+        This happens only in the top level system.  Child systems use views of the arrays
+        we allocate here.
+
         Returns
         -------
         [ndarray[:], ...]
@@ -109,26 +114,31 @@ class DefaultVector(Vector):
 
         data = {}
         indices = {}
+        nsets = len(sizes_byset_t)  # if we only have 1 varset, we can do some speedups
         for set_name in system._num_var_byset[self._name][type_]:
             size = np.sum(sizes_byset_t[set_name][iproc, :])
             data[set_name] = np.zeros(size) if ncol == 1 else np.zeros((size, ncol))
-            indices[set_name] = np.zeros(size, int)
+            if nsets == 1:
+                indices[set_name] = slice(None)
+            else:
+                indices[set_name] = np.empty(size, int)
 
-        abs2meta_t = system._var_abs2meta[type_]
-        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[self._name][type_]
-        allprocs_abs2idx_t = system._var_allprocs_abs2idx[self._name][type_]
-        for abs_name in system._var_relevant_names[self._name][type_]:
-            set_name = abs2meta_t[abs_name]['var_set']
+        if nsets > 1:
+            abs2meta_t = system._var_abs2meta[type_]
+            allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[self._name][type_]
+            allprocs_abs2idx_t = system._var_allprocs_abs2idx[self._name][type_]
+            for abs_name in system._var_relevant_names[self._name][type_]:
+                set_name = abs2meta_t[abs_name]['var_set']
 
-            idx_byset = allprocs_abs2idx_byset_t[abs_name]
-            ind_byset1 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset])
-            ind_byset2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1])
+                idx_byset = allprocs_abs2idx_byset_t[abs_name]
+                ind_byset1 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset])
+                ind_byset2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1])
 
-            idx = allprocs_abs2idx_t[abs_name]
-            ind1 = np.sum(sizes_t[iproc, :idx])
-            ind2 = np.sum(sizes_t[iproc, :idx + 1])
+                idx = allprocs_abs2idx_t[abs_name]
+                ind1 = np.sum(sizes_t[iproc, :idx])
+                ind2 = np.sum(sizes_t[iproc, :idx + 1])
 
-            indices[set_name][ind_byset1:ind_byset2] = np.arange(ind1, ind2)
+                indices[set_name][ind_byset1:ind_byset2] = np.arange(ind1, ind2)
 
         return data, indices
 
@@ -160,6 +170,18 @@ class DefaultVector(Vector):
         )
 
         sizes_byset = system._var_sizes_byset[vec_name]
+        nsets = len(sizes_byset)
+
+        if nsets > 1:
+            for set_name in system._num_var_byset[self._name][type_]:
+                if isinstance(tmp_indices[set_name], slice):
+                    start, stop, _ = tmp_indices[set_name].indices(old_sizes_total)
+                    tmp_indices[set_name] = np.arange(start, stop, dtype=int)
+
+                if isinstance(root_vec._indices[set_name], slice):
+                    start, stop, _ = \
+                        root_vec._indices[set_name].indices(root_vec._data[set_name].size)
+                    root_vec._indices[set_name] = np.arange(start, stop, dtype=int)
 
         for set_name in system._num_var_byset[self._name][type_]:
             ext_sizes_byset_t = system._ext_sizes_byset[vec_name][type_][set_name]
@@ -183,12 +205,15 @@ class DefaultVector(Vector):
                 root_vec._data[set_name][old_sizes_byset[0] + old_sizes_byset[1]:],
             ])
 
-            root_vec._indices[set_name] = np.concatenate([
-                root_vec._indices[set_name][:old_sizes_byset[0]],
-                tmp_indices[set_name] + new_sizes[0],
-                root_vec._indices[set_name][old_sizes_byset[0] + old_sizes_byset[1]:]
-                    + new_sizes[1] - old_sizes[1],
-            ])
+            if nsets == 1:
+                root_vec._indices[set_name] = slice(None)
+            else:
+                root_vec._indices[set_name] = np.concatenate([
+                    root_vec._indices[set_name][:old_sizes_byset[0]],
+                    tmp_indices[set_name] + new_sizes[0],
+                    root_vec._indices[set_name][old_sizes_byset[0] + old_sizes_byset[1]:]
+                        + new_sizes[1] - old_sizes[1],
+                ])
 
         root_vec._initialize_views()
 
@@ -212,12 +237,22 @@ class DefaultVector(Vector):
         data = {}
         imag_data = {}
         indices = {}
+        scaling = {}
+        if self._do_scaling:
+            scaling['phys'] = {}
+            scaling['norm'] = {}
+
+        nsets = len(sizes_byset)  # if we only have 1 varset, we can do some speedups
+
         for set_name, sizes in iteritems(sizes_byset):
             ind_byset1 = system._ext_sizes_byset[self._name][type_][set_name][0]
             ind_byset2 = ind_byset1 + np.sum(sizes[iproc, :])
 
             data[set_name] = root_vec._data[set_name][ind_byset1:ind_byset2]
-            indices[set_name] = root_vec._indices[set_name][ind_byset1:ind_byset2] - offset
+            if nsets == 1:
+                indices[set_name] = slice(None)
+            else:
+                indices[set_name] = root_vec._indices[set_name][ind_byset1:ind_byset2] - offset
 
             # Extract view for imaginary part too
             if self._alloc_complex:
@@ -227,7 +262,17 @@ class DefaultVector(Vector):
                     shape = root_vec._data[set_name][ind_byset1:ind_byset2].shape
                     imag_data[set_name] = np.zeros(shape)
 
-        return data, imag_data, indices
+            if self._do_scaling:
+                for typ in ('phys', 'norm'):
+                    root_scale = root_vec._scaling[typ][set_name]
+                    rs0 = root_scale[0]
+                    if rs0 is None:
+                        scaling[typ][set_name] = (rs0, root_scale[1][ind_byset1:ind_byset2])
+                    else:
+                        scaling[typ][set_name] = (rs0[ind_byset1:ind_byset2],
+                                                  root_scale[1][ind_byset1:ind_byset2])
+
+        return data, imag_data, scaling, indices
 
     def _initialize_data(self, root_vector):
         """
@@ -242,15 +287,36 @@ class DefaultVector(Vector):
         root_vector : Vector or None
             the root's vector instance or None, if we are at the root.
         """
-        if root_vector is None:
+        if root_vector is None:  # we're the root
             self._data, self._indices = self._create_data()
+
+            if self._do_scaling:
+                self._scaling = {'phys': {}, 'norm': {}}
+                for set_name, data in iteritems(self._data):
+                    if self._name == 'linear':
+                        # reuse the nonlinear scaling vecs since they're the same as ours
+                        nlvec = self._system._root_vecs[self._kind]['nonlinear']
+                        self._scaling['phys'][set_name] = (None,
+                                                           nlvec._scaling['phys'][set_name][1])
+                        self._scaling['norm'][set_name] = (None,
+                                                           nlvec._scaling['norm'][set_name][1])
+                    else:
+                        dphys1 = np.ones(data.size)
+                        dnorm1 = np.ones(data.size)
+                        if self._name == 'nonlinear':
+                            dphys0 = np.zeros(data.size)
+                            dnorm0 = np.zeros(data.size)
+                        else:
+                            dphys0 = dnorm0 = None
+                        self._scaling['phys'][set_name] = (dphys0, dphys1)
+                        self._scaling['norm'][set_name] = (dnorm0, dnorm1)
 
             # Allocate imaginary for complex step
             if self._alloc_complex:
                 self._imag_data = deepcopy(self._data)
 
         else:
-            self._data, self._imag_data, self._indices = self._extract_data()
+            self._data, self._imag_data, self._scaling, self._indices = self._extract_data()
 
     def _initialize_views(self):
         """
@@ -259,12 +325,16 @@ class DefaultVector(Vector):
         Sets the following attributes:
         _views
         _views_flat
-        _idxs
         """
         system = self._system
         type_ = self._typ
+        kind = self._kind
         iproc = self._iproc
         ncol = self._ncol
+        do_scaling = self._do_scaling
+        if do_scaling:
+            factors = system._scale_factors
+            scaling = self._scaling
 
         self._views = self._names = views = {}
         self._views_flat = views_flat = {}
@@ -300,6 +370,14 @@ class DefaultVector(Vector):
                     v = v.view()
                     v.shape = shape
                 imag_views[abs_name] = v
+
+            if do_scaling:
+                for scaleto in ('phys', 'norm'):
+                    scale0, scale1 = factors[abs_name][kind, scaleto]
+                    vec = scaling[scaleto][set_name]
+                    if vec[0] is not None:
+                        vec[0][ind_byset1:ind_byset2] = scale0
+                    vec[1][ind_byset1:ind_byset2] = scale1
 
     def _clone_data(self):
         """
@@ -403,22 +481,6 @@ class DefaultVector(Vector):
         else:
             for set_name, data in iteritems(self._data):
                 data += val * vec._data[set_name]
-
-    def elem_mult(self, vec):
-        """
-        Perform element-wise multiplication and store the result in this vector.
-
-        Parameters
-        ----------
-        vec : <Vector>
-            The vector to perform element-wise multiplication with.
-        """
-        if self._ncol == 1:
-            for set_name, data in iteritems(self._data):
-                data[:] *= vec._data[set_name]
-        else:
-            for set_name, data in iteritems(self._data):
-                data *= vec._data[set_name][:, np.newaxis]
 
     def set_vec(self, vec):
         """

@@ -1,4 +1,5 @@
 """Management of iteration stack for recording."""
+from openmdao.utils.mpi import MPI
 
 
 class _RecIteration(object):
@@ -33,7 +34,10 @@ def get_formatted_iteration_coordinate():
     for name, iter_count in recording_iteration.stack:
         iteration_coord_list.append('{}{}{}'.format(name, separator, iter_count))
 
-    rank = 0  # TODO_PARALLEL needs to be updated when we go parallel
+    if MPI and MPI.COMM_WORLD.rank > 0:
+        rank = MPI.COMM_WORLD.rank
+    else:
+        rank = 0
     formatted_iteration_coordinate = ':'.join(["rank%d" % rank,
                                                separator.join(iteration_coord_list)])
     return formatted_iteration_coordinate
@@ -47,7 +51,7 @@ class Recording(object):
     where solvers are concerned.
     """
 
-    def __init__(self, name, iter_count, object_requesting_recording):
+    def __init__(self, name, iter_count, recording_requester):
         """
         Initialize Recording.
 
@@ -57,7 +61,7 @@ class Recording(object):
             Name of object getting recorded.
         iter_count : int
             Current counter of iterations completed.
-        object_requesting_recording : object
+        recording_requester : object
             The object that wants to be recorded.
 
         Attributes
@@ -66,7 +70,7 @@ class Recording(object):
             Name of object getting recorded.
         iter_count : int
             Current counter of iterations completed.
-        object_requesting_recording : object
+        recording_requester : object
             The object that wants to be recorded.
         abs : float
             Absolute error.
@@ -75,17 +79,16 @@ class Recording(object):
         method : str
             Current method.
         _is_solver : bool
-            True if object_requesting_recording is a Solver.
+            True if recording_requester is a Solver.
         """
         self.name = name
         self.iter_count = iter_count
-        self.object_requesting_recording = object_requesting_recording
+        self.recording_requester = recording_requester
         self.abs = 0
         self.rel = 0
-        self.method = ''
 
         from openmdao.solvers.solver import Solver
-        self._is_solver = isinstance(self.object_requesting_recording, Solver)
+        self._is_solver = isinstance(self.recording_requester, Solver)
 
     def __enter__(self):
         """
@@ -102,15 +105,15 @@ class Recording(object):
         do_recording = True
 
         for stack_item in recording_iteration.stack:
-            if stack_item[0] in ('_run_apply', '_compute_total_derivs'):
+            if stack_item[0] in ('_run_apply', '_compute_totals'):
                 do_recording = False
                 break
 
         if do_recording:
             if self._is_solver:
-                self.object_requesting_recording.record_iteration(abs=self.abs, rel=self.rel)
+                self.recording_requester.record_iteration(abs=self.abs, rel=self.rel)
             else:
-                self.object_requesting_recording.record_iteration()
+                self.recording_requester.record_iteration()
 
         # Enable the following line for stack debugging.
         # print_recording_iteration_stack()

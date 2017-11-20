@@ -1,5 +1,5 @@
 """Define the DefaultAllocator class."""
-from __future__ import division
+from __future__ import division, print_function
 
 import warnings
 
@@ -15,16 +15,16 @@ class DefaultAllocator(ProcAllocator):
     Default processor allocator.
     """
 
-    def _divide_procs(self, req_procs, comm):
+    def _divide_procs(self, proc_info, comm):
         """
         Perform the parallel processor allocation.
 
         Parameters
         ----------
-        req_procs : list of (int, int)
-            List of min/max usable procs for each subsystem.
+        proc_info : list of (min_procs, max_procs, weight)
+            Information used to determine MPI process allocation to subsystems.
         comm : MPI.Comm or <FakeComm>
-            communicator of the owning system.
+            communicator of the owning System.
 
         Returns
         -------
@@ -37,108 +37,102 @@ class DefaultAllocator(ProcAllocator):
         """
         iproc = comm.rank
         nproc = comm.size
-        nsub = len(req_procs)
 
-        min_req_procs = [minproc for minproc, _ in req_procs]
-        max_req_procs = [maxproc for _, maxproc in req_procs]
+        nsubs = len(proc_info)
+        min_procs, max_procs, proc_weights = self._split_proc_info(proc_info, comm)
+        min_sum = np.sum(min_procs)
 
-        assigned_procs = np.zeros(nsub, dtype=int)
+        if np.sum(max_procs) < nproc:
+            raise ProcAllocationError("too many MPI procs allocated. Comm is size %d but "
+                                      "can only use %d." % (nproc, np.sum(max_procs)))
+        if min_sum > nproc and np.any(min_procs > 1):
+            raise ProcAllocationError("can't meet min_procs required because the sum of the "
+                                      "min procs required exceeds the procs allocated and the "
+                                      "min procs required is > 1",
+                                      np.array(list(range(nsubs)))[min_procs > 1])
 
-        assigned = 0
+        # Define the normalized weights for all subsystems
+        proc_weights /= np.sum(proc_weights)
 
-        total_req = np.sum(min_req_procs)
+        if min_sum > nproc:
+            isubs_list = [[] for ind in range(nproc)]
+            proc_load = np.zeros(nproc)
 
-        if None in max_req_procs:
-            limit = nproc
-            max_requested = nproc
-        else:
-            max_requested = np.sum(max_req_procs)
-            limit = min(nproc, max_requested)
+            sub_sort_idxs = np.flipud(np.argsort(proc_weights))
+            vals = proc_weights
 
-        # first, just use simple round robin assignment of requested procs
-        # until everybody has what they asked for or we run out
-        if total_req:
-            if nproc >= total_req:  # we have enough for all subsystems
-                while assigned < limit:
-                    for i, max_req in enumerate(max_req_procs):
-                        if max_req is None or assigned_procs[i] < max_req:
-                            assigned_procs[i] += 1
-                            assigned += 1
-                            if assigned == limit:
-                                break
+            # Assign the slowest subsystem to the most free processor
+            for isub in sub_sort_idxs:
+                min_loads = np.argsort(proc_load)
+                for i in range(min_procs[isub]):
+                    iproc1 = min_loads[i]
+                    isubs_list[iproc1].append(isub)
+                    proc_load[iproc1] += vals[isub]
 
-                # create buckets (one sub per bucket) to be consistent in how
-                # we split procs below
-                buckets = [(n, [i]) for i, n in enumerate(assigned_procs)]
+            # Result
+            sub_comm = comm.Split(iproc)
+            return isubs_list[iproc], sub_comm, [comm.rank, comm.rank + sub_comm.size]
 
-            else:  # we don't have enough, so have to group subsystems
-                remaining = nproc
-                # sort req procs in descending order
-                tups = sorted([(req[0], i) for i, req in enumerate(req_procs)],
-                              reverse=True)
-                buckets = []
-                for i, (req, sub_idx) in enumerate(tups):
-                    if remaining >= req:
-                        buckets.append([req, [sub_idx]])
-                        remaining -= req
-                    elif i == 0:
-                        # since we sorted in descending order by number of
-                        # requested procs, only in the first iteration is there
-                        # a chance that we've requested more procs than we have
-                        raise ProcAllocationError(sub_idx, req, remaining)
-                    else:
-                        # we already have at least one in the bucket list that's
-                        # big enough, so go through buckets, find all that are
-                        # big enough, and add the current sub to the one with
-                        # the fewest number of subs already in it. In the event
-                        # of a tie, take the bucket with the lowest number of
-                        # requested procs.
-                        lenlist = sorted([b for b in buckets if b[0] >= req],
-                                         key=lambda t: len(t[1]))
-                        shortest = len(lenlist[0][1])
-                        final = sorted(b for b in lenlist
-                                       if len(b[1]) == shortest)
-                        final[0][1].append(sub_idx)
+        num_procs = min_procs.copy()
 
-                warnings.warn("System requested %d processes to run fully "
-                              "in parallel, but it only got %d" %
-                              (total_req, nproc))
+        if min_sum < nproc:
+            # weighted sums to nproc
+            weighted = proc_weights * nproc
 
-                # if we have any procs left over, apply them to any sub that
-                # can use them
-                while remaining > 0:
-                    for i, max_req in enumerate(max_req_procs):
-                        procs, subs = buckets[i]
-                        for sub_idx in subs:
-                            if (max_req is None or max_req > procs):
-                                # add 1 to procs for this bucket
-                                buckets[i][0] += 1
-                                remaining -= 1
-                                break
-                        if remaining == 0:
-                            break
+            # the number of procs expected beyond the min requested
+            weighted_less_min = weighted.astype(int) - min_procs
+            weighted_less_min[weighted_less_min < 0] = 0
 
-                assigned = nproc - remaining
+            if np.sum(weighted_less_min) + min_sum <= nproc:
+                # start with min procs then add what's left over using weights
+                num_procs += weighted_less_min
 
-        # a 'color' is assigned to each bucket, with
-        # an entry for each processor it will be given
-        # e.g. [0, 1, 1, 1, 1, 2, 2, 3, 3, 3, UND, UND]
-        color = np.full(nproc, MPI.UNDEFINED, dtype=int)
-        comm_sizes = np.empty(nproc, int)
+        excess_idxs = (max_procs - num_procs) < 0
+
+        # limit all procs to their stated max
+        num_procs[excess_idxs] = max_procs[excess_idxs]
+
+        expected_total = np.sum(num_procs)
+        extras = nproc - expected_total
+
+        if extras > 0:  # we have some extra procs lying around.
+            # give remaining procs such that after each addition we are closest to
+            # desired weights
+            newsum = expected_total
+            eye = np.eye(weighted.size)
+            weighted[:] = proc_weights
+            for i in range(extras):
+                mask = max_procs <= num_procs
+                weighted[mask] = 0.0
+                weighted *= (1. / np.sum(weighted))
+                newsum += 1
+                mat = eye + num_procs
+                mat *= (1. / newsum)
+                mat -= weighted
+                # prevent rows associated with the maxed out subsystems from having the
+                # smallest norm.
+                mat[mask] = 1e99
+                # zero out columns for maxed out subsystems
+                mat[:, mask] = 0.0
+                norm = np.linalg.norm(mat, axis=1)
+                # add a proc to a subsystem based on matching closest to desired weights for
+                # the remaining 'active' subsystems.
+                num_procs[np.argmin(norm)] += 1
+
+        # Compute the coloring
+        color = np.zeros(nproc, int)
         start, end = 0, 0
-        for i, b in enumerate(buckets):
-            num_procs = b[0]
-            end += num_procs
-            color[start:end] = i
-            comm_sizes[start:end] = num_procs
-            start += num_procs
+        for isub in range(nsubs):
+            end += num_procs[isub]
+            color[start:end] = isub
+            start += num_procs[isub]
 
-        # create a sub-communicator for each color and
-        # get the one assigned to our color/process
-        rank_color = color[iproc]
-        sub_comm = comm.Split(rank_color)
-        sub_proc_range = (np.sum(comm_sizes[:iproc]), np.sum(comm_sizes[:iproc + 1]))
+        isub = color[iproc]
 
-        isubs = [] if sub_comm == MPI.COMM_NULL else buckets[rank_color][1]
+        # Result
+        isubs = [isub]
+        sub_comm = comm.Split(isub)
+        start = list(color).index(isub)  # find lowest matching color
+        sub_proc_range = [start, start + sub_comm.size]
 
         return isubs, sub_comm, sub_proc_range

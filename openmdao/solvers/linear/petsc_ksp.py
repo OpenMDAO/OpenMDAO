@@ -150,7 +150,7 @@ class Monitor(object):
         norm : float
             the norm.
         """
-        with Recording('PetscKSP', self._solver._iter_count, self._solver) as rec:
+        with Recording('PETScKrylov', self._solver._iter_count, self._solver) as rec:
             if counter == 0 and norm != 0.0:
                 self._norm0 = norm
             self._norm = norm
@@ -161,7 +161,7 @@ class Monitor(object):
         self._solver._iter_count += 1
 
 
-class PetscKSP(LinearSolver):
+class PETScKrylov(LinearSolver):
     """
     LinearSolver that uses PetSC KSP to solve for a system's derivatives.
 
@@ -178,7 +178,7 @@ class PetscKSP(LinearSolver):
         dictionary of KSP instances (keyed on vector name).
     """
 
-    SOLVER = 'LN: PetscKSP'
+    SOLVER = 'LN: PETScKrylov'
 
     def __init__(self, **kwargs):
         """
@@ -192,7 +192,7 @@ class PetscKSP(LinearSolver):
         if PETSc is None:
             raise RuntimeError("PETSc is not available.")
 
-        super(PetscKSP, self).__init__(**kwargs)
+        super(PETScKrylov, self).__init__(**kwargs)
 
         # initialize dictionary of KSP instances (keyed on vector name)
         self._ksp = {}
@@ -207,7 +207,7 @@ class PetscKSP(LinearSolver):
         self.options.declare('ksp_type', default='fgmres', values=KSP_TYPES,
                              desc="KSP algorithm to use. Default is 'fgmres'.")
 
-        self.options.declare('restart', default=1000, type_=int,
+        self.options.declare('restart', default=1000, types=int,
                              desc='Number of iterations between restarts. Larger values increase '
                              'iteration cost, but may be necessary for convergence')
 
@@ -228,7 +228,7 @@ class PetscKSP(LinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(PetscKSP, self)._setup_solvers(system, depth)
+        super(PETScKrylov, self)._setup_solvers(system, depth)
 
         if self.precon is not None:
             self.precon._setup_solvers(self._system, self._depth + 1)
@@ -246,7 +246,7 @@ class PetscKSP(LinearSolver):
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        super(PetscKSP, self)._set_solver_print(level=level, type_=type_)
+        super(PETScKrylov, self)._set_solver_print(level=level, type_=type_)
 
         if self.precon is not None and type_ != 'NL':
             self.precon._set_solver_print(level=level, type_=type_)
@@ -359,17 +359,17 @@ class PetscKSP(LinearSolver):
                 x_vec = system._vectors['residual'][vec_name]
                 b_vec = system._vectors['output'][vec_name]
 
-            # create numpy arrays to interface with Petsc
+            # create numpy arrays to interface with PETSc
             sol_array = x_vec.get_data()
             rhs_array = b_vec.get_data()
 
-            # create Petsc vectors from numpy arrays
+            # create PETSc vectors from numpy arrays
             self.sol_petsc_vec = PETSc.Vec().createWithArray(sol_array,
                                                              comm=system.comm)
             self.rhs_petsc_vec = PETSc.Vec().createWithArray(rhs_array,
                                                              comm=system.comm)
 
-            # run Petsc solver
+            # run PETSc solver
             self._iter_count = 0
             ksp = self._get_ksp_solver(system, vec_name)
             ksp.setTolerances(max_it=maxiter, atol=atol, rtol=rtol)
@@ -498,3 +498,21 @@ class PetscKSP(LinearSolver):
         warn_deprecation("The 'preconditioner' property provides backwards compatibility "
                          "with OpenMDAO <= 1.x ; use 'precon' instead.")
         self.precon = precon
+
+
+class PetscKSP(PETScKrylov):
+    """
+    Deprecated.  Use PETScKrylov.
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize attributes.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Named args.
+        """
+        super(PetscKSP, self).__init__(**kwargs)
+        warn_deprecation('PetscKSP is deprecated.  Use PETScKrylov instead.')

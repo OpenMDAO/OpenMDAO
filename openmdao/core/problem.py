@@ -12,6 +12,7 @@ from six.moves import range
 import numpy as np
 import scipy.sparse as sparse
 
+from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
 from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
 from openmdao.components.deprecated_component import Component as DepComponent
 from openmdao.core.component import Component
@@ -279,6 +280,7 @@ class Problem(object):
             raise RuntimeError("The `setup` method must be called before `run_model`.")
 
         self.final_setup()
+        self.model._clear_iprint()
         return self.model.run_solve_nonlinear()
 
     def run_driver(self):
@@ -294,6 +296,7 @@ class Problem(object):
             raise RuntimeError("The `setup` method must be called before `run_driver`.")
 
         self.final_setup()
+        self.model._clear_iprint()
         with self.model._scaled_context_all():
             return self.driver.run()
 
@@ -335,7 +338,7 @@ class Problem(object):
         """
         self.driver.cleanup()
 
-    def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='auto',
+    def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='rev',
               force_alloc_complex=False):
         """
         Set up the model hierarchy.
@@ -355,8 +358,7 @@ class Problem(object):
             Object for logging config checks if check is True.
         mode : string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
-            reverse (adjoint). Default is 'auto', which lets OpenMDAO choose
-            the best mode for your problem.
+            reverse (adjoint). Default is 'rev'.
         force_alloc_complex : bool
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
@@ -377,13 +379,10 @@ class Problem(object):
                    % vector_class.__name__)
             raise ValueError(msg)
 
-        if mode not in ['fwd', 'rev', 'auto']:
-            msg = "Unsupported mode: '%s'" % mode
+        if mode not in ['fwd', 'rev']:
+            msg = "Unsupported mode: '%s'. Use either 'fwd' or 'rev'." % mode
             raise ValueError(msg)
 
-        # TODO: fix this so it computes the proper type based on sizes of VOIs
-        if mode == 'auto':
-            mode = 'rev'
         self._mode = mode
 
         model._setup(comm, 'full', mode)
@@ -433,7 +432,9 @@ class Problem(object):
             self._set_initial_conditions()
 
     def check_partials(self, logger=None, comps=None, compact_print=False,
-                       abs_err_tol=1e-6, rel_err_tol=1e-6, global_options=None,
+                       abs_err_tol=1e-6, rel_err_tol=1e-6,
+                       method='fd', step=None, form=DEFAULT_FD_OPTIONS['form'],
+                       step_calc=DEFAULT_FD_OPTIONS['step_calc'],
                        force_dense=True, suppress_output=False):
         """
         Check partial derivatives comprehensively for all components in your model.
@@ -454,13 +455,21 @@ class Problem(object):
             Threshold value for relative error.  Errors about this value will have a '*' displayed
             next to them in output, making them easy to search for. Note at times there may be a
             significant relative error due to a minor absolute error.  Default is 1.0E-6.
-        global_options : dict
-            Dictionary of options that override options specified in ALL components. Only
-            'form', 'step', 'step_calc', and 'method' can be specified in this way.
+        method : str
+            Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
+        step : float
+            Step size for approximation. Default is None.
+        form : string
+            Form for finite difference, can be 'forward', 'backward', or 'central'. The
+            default value is the value of DEFAULT_FD_OPTIONS['form']. Default is
+            the value of DEFAULT_FD_OPTIONS['form']
+        step_calc : string
+            Step type for finite difference, can be 'abs' for absolute', or 'rel' for
+            relative. The default value is the value of DEFAULT_FD_OPTIONS['step_calc']
         force_dense : bool
-            If True, analytic derivatives will be coerced into arrays.
+            If True, analytic derivatives will be coerced into arrays. Default is True.
         suppress_output : bool
-            Set to True to suppress all output.
+            Set to True to suppress all output. Default is False.
 
         Returns
         -------
@@ -480,15 +489,6 @@ class Problem(object):
         if self._setup_status < 2:
             self.final_setup()
 
-        if not global_options:
-            global_options = DEFAULT_FD_OPTIONS.copy()
-            global_options['method'] = 'fd'
-
-        if global_options['method'] == 'fd':
-            scheme = FiniteDifference
-        else:
-            raise ValueError('Unrecognized method: "{}"'.format(global_options['method']))
-
         model = self.model
         logger = logger if logger else get_logger('check_partials')
 
@@ -504,7 +504,7 @@ class Problem(object):
             if extra:
                 msg = 'The following are not valid comp names: {}'.format(sorted(list(extra)))
                 raise ValueError(msg)
-            comps = [model.get_subsystem(c_name) for c_name in comps]
+            comps = [model._get_subsystem(c_name) for c_name in comps]
 
         current_mode = self._mode
         self.set_solver_print(level=0)
@@ -642,32 +642,30 @@ class Problem(object):
 
                             # Testing for pairs that are not dependent so that we suppress printing
                             # them unless the fd is non zero. Note: subjacs_info is empty for
-                            # undeclared partials on implicit components.
+                            # undeclared partials, which is the default behavior now.
                             try:
                                 if comp._jacobian._subjacs_info[abs_key][0]['dependent'] is False:
                                     indep_key[c_name].add(rel_key)
                             except KeyError:
-                                pass
+                                indep_key[c_name].add(rel_key)
 
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
                                 try:
-                                    in_size = np.prod(comp._var_abs2meta['input'][wrt]['shape'])
+                                    in_size = comp._var_abs2meta['input'][wrt]['size']
                                 except KeyError:
-                                    in_size = np.prod(comp._var_abs2meta['output'][wrt]['shape'])
+                                    in_size = comp._var_abs2meta['output'][wrt]['size']
 
-                                out_size = np.prod(comp._var_abs2meta['output'][of]['shape'])
+                                out_size = comp._var_abs2meta['output'][of]['size']
                                 deriv_value = np.zeros((out_size, in_size))
 
                             if force_dense:
                                 if isinstance(deriv_value, list):
                                     try:
-                                        in_size = np.prod(
-                                            comp._var_abs2meta['input'][wrt]['shape'])
+                                        in_size = comp._var_abs2meta['input'][wrt]['size']
                                     except KeyError:
-                                        in_size = np.prod(
-                                            comp._var_abs2meta['output'][wrt]['shape'])
-                                    out_size = np.prod(comp._var_abs2meta['output'][of]['shape'])
+                                        in_size = comp._var_abs2meta['output'][wrt]['size']
+                                    out_size = comp._var_abs2meta['output'][of]['size']
                                     tmp_value = np.zeros((out_size, in_size))
                                     jac_val, jac_i, jac_j = deriv_value
                                     # if a scalar value is provided (in declare_partials),
@@ -690,20 +688,23 @@ class Problem(object):
         model._outputs.set_vec(output_cache)
         model.run_apply_nonlinear()
 
-        # Finite Difference (or TODO: Complex Step) to calculate Jacobian
+        # Finite Difference to calculate Jacobian
         jac_key = 'J_fd'
+        alloc_complex = model._outputs._alloc_complex
+        all_fd_options = {}
         for comp in comps:
-
-            c_name = comp.pathname
 
             # Skip IndepVarComps
             if isinstance(comp, IndepVarComp):
                 continue
 
-            subjac_info = comp._subjacs_info
+            c_name = comp.pathname
+            all_fd_options[c_name] = {}
             explicit = isinstance(comp, ExplicitComponent)
             deprecated = isinstance(comp, DepComponent)
-            approximation = scheme()
+
+            approximations = {'fd': FiniteDifference(),
+                              'cs': ComplexStep()}
 
             of = list(comp._var_allprocs_prom2abs_list['output'].keys())
             wrt = list(comp._var_allprocs_prom2abs_list['input'].keys())
@@ -714,15 +715,60 @@ class Problem(object):
             elif not explicit:
                 wrt.extend(of)
 
+            # Load up approximation objects with the requested settings.
+            local_opts = comp._get_check_partial_options()
             for rel_key in product(of, wrt):
                 abs_key = rel_key2abs_key(comp, rel_key)
-                approximation.add_approximation(abs_key, global_options)
+                local_wrt = rel_key[1]
+
+                # Determine if fd or cs.
+                if local_wrt in local_opts:
+                    local_method = local_opts[local_wrt]['method']
+                    if local_method:
+                        method = local_method
+
+                fd_options = {'order': None,
+                              'method': method}
+
+                if method == 'cs':
+                    if not alloc_complex:
+                        msg = 'In order to check partials with complex step, you need to set ' + \
+                            '"force_alloc_complex" to True during setup.'
+                        raise RuntimeError(msg)
+
+                    defaults = DEFAULT_CS_OPTIONS
+
+                    fd_options['form'] = None
+                    fd_options['step_calc'] = None
+
+                elif method == 'fd':
+                    defaults = DEFAULT_FD_OPTIONS
+
+                    fd_options['form'] = form
+                    fd_options['step_calc'] = step_calc
+
+                if step:
+                    fd_options['step'] = step
+                else:
+                    fd_options['step'] = defaults['step']
+
+                # Precedence: component options > global options > defaults
+                if local_wrt in local_opts:
+                    for name in ['form', 'step', 'step_calc']:
+                        value = local_opts[local_wrt][name]
+                        if value is not None:
+                            fd_options[name] = value
+
+                all_fd_options[c_name][local_wrt] = fd_options
+
+                approximations[fd_options['method']].add_approximation(abs_key, fd_options)
 
             approx_jac = {}
-            approximation._init_approximations()
+            for approximation in itervalues(approximations):
+                approximation._init_approximations()
 
-            # Peform the FD here.
-            approximation.compute_approximations(comp, jac=approx_jac)
+                # Peform the FD here.
+                approximation.compute_approximations(comp, jac=approx_jac)
 
             for rel_key, partial in iteritems(approx_jac):
                 abs_key = rel_key2abs_key(comp, rel_key)
@@ -737,14 +783,14 @@ class Problem(object):
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, logger, compact_print,
-                                  comps, global_options, suppress_output=suppress_output,
+                                  comps, all_fd_options, suppress_output=suppress_output,
                                   indep_key=indep_key)
 
         return partials_data
 
-    def check_total_derivatives(self, of=None, wrt=None, logger=None, compact_print=False,
-                                abs_err_tol=1e-6, rel_err_tol=1e-6, method='fd', step=1e-6,
-                                form='forward', step_calc='abs', suppress_output=False):
+    def check_totals(self, of=None, wrt=None, logger=None, compact_print=False, abs_err_tol=1e-6,
+                     rel_err_tol=1e-6, method='fd', step=1e-6, form='forward', step_calc='abs',
+                     suppress_output=False):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -768,15 +814,17 @@ class Problem(object):
             next to them in output, making them easy to search for. Note at times there may be a
             significant relative error due to a minor absolute error.  Default is 1.0E-6.
         method : str
-            Method, 'fd' for finite difference or 'cs' for complex step.
+            Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'
         step : float
-            Step size for approximation.
+            Step size for approximation. Default is 1e-6.
         form : string
-            Form for finite difference, can be 'forward', 'backward', or 'central'.
+            Form for finite difference, can be 'forward', 'backward', or 'central'. Default
+            'forward'.
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
+            Default is 'abs'.
         suppress_output : bool
-            Set to True to suppress all output.
+            Set to True to suppress all output. Default is False.
 
         Returns
         -------
@@ -793,7 +841,7 @@ class Problem(object):
         model = self.model
         global_names = False
 
-        logger = logger if logger else get_logger('check_total_derivatives')
+        logger = logger if logger else get_logger('check_totals')
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -808,7 +856,7 @@ class Problem(object):
         with self.model._scaled_context_all():
 
             # Calculate Total Derivatives
-            Jcalc = self._compute_total_derivs(of=of, wrt=wrt, global_names=global_names)
+            Jcalc = self._compute_totals(of=of, wrt=wrt, global_names=global_names)
 
             # Approximate FD
             fd_args = {
@@ -816,8 +864,9 @@ class Problem(object):
                 'form': form,
                 'step_calc': step_calc,
             }
-            model.approx_total_derivs(method=method, **fd_args)
-            Jfd = self._compute_total_derivs_approx(of=of, wrt=wrt, global_names=global_names)
+            model.approx_totals(method=method, **fd_args)
+            Jfd = self._compute_totals_approx(of=of, wrt=wrt, global_names=global_names,
+                                              initialize=True)
 
         # Assemble and Return all metrics.
         data = {}
@@ -829,10 +878,10 @@ class Problem(object):
         fd_args['method'] = 'fd'
 
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, logger, compact_print, [model],
-                                  fd_args, totals=True, suppress_output=suppress_output)
+                                  {'': fd_args}, totals=True, suppress_output=suppress_output)
         return data['']
 
-    def compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict'):
+    def compute_totals(self, of=None, wrt=None, return_format='flat_dict'):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -858,17 +907,18 @@ class Problem(object):
 
         with self.model._scaled_context_all():
             if self.model._owns_approx_jac:
-                totals = self._compute_total_derivs_approx(of=of, wrt=wrt,
-                                                           return_format=return_format,
-                                                           global_names=False)
+                totals = self._compute_totals_approx(of=of, wrt=wrt,
+                                                     return_format=return_format,
+                                                     global_names=False,
+                                                     initialize=True)
             else:
-                totals = self._compute_total_derivs(of=of, wrt=wrt,
-                                                    return_format=return_format,
-                                                    global_names=False)
+                totals = self._compute_totals(of=of, wrt=wrt,
+                                              return_format=return_format,
+                                              global_names=False)
         return totals
 
-    def _compute_total_derivs_approx(self, of=None, wrt=None, return_format='flat_dict',
-                                     global_names=True):
+    def _compute_totals_approx(self, of=None, wrt=None, return_format='flat_dict',
+                               global_names=True, initialize=False):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -885,13 +935,16 @@ class Problem(object):
             returns them in a dictionary whose keys are tuples of form (of, wrt).
         global_names : bool
             Set to True when passing in global names to skip some translation steps.
+        initialize : bool
+            Set to True to re-initialize the FD in model. This is only needed when manually
+            calling compute_totals on the problem.
 
         Returns
         -------
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        recording_iteration.stack.append(('_compute_total_derivs', 0))
+        recording_iteration.stack.append(('_compute_totals', 0))
         model = self.model
         mode = self._mode
         vec_dinput = model._vectors['input']
@@ -916,10 +969,7 @@ class Problem(object):
             vec_doutput[vec_name].set_const(0.0)
             vec_dresid[vec_name].set_const(0.0)
 
-        # Linearize Model
-        model._linearize()
-
-        # Convert of and wrt names from promoted to bsolute path
+        # Convert of and wrt names from promoted to absolute path
         oldwrt, oldof = wrt, of
         if not global_names:
             of = [prom2abs[name][0] for name in oldof]
@@ -932,12 +982,14 @@ class Problem(object):
         # This cuts out the middleman by grabbing the Jacobian directly after linearization.
 
         # Re-initialize so that it is clean.
-        if model._approx_schemes:
-            method = list(model._approx_schemes.keys())[0]
-            kwargs = model._owns_approx_jac_meta
-            model.approx_total_derivs(method=method, **kwargs)
-        else:
-            model.approx_total_derivs(method='fd')
+        if initialize:
+
+            if model._approx_schemes:
+                method = list(model._approx_schemes.keys())[0]
+                kwargs = model._owns_approx_jac_meta
+                model.approx_totals(method=method, **kwargs)
+            else:
+                model.approx_totals(method='fd')
 
         # Initialization based on driver (or user) -requested "of" and "wrt".
         if not model._owns_approx_jac or model._owns_approx_of != set(of) \
@@ -963,8 +1015,12 @@ class Problem(object):
 
         model._setup_jacobians(recurse=False)
 
+        # Need to temporarily disable size checking to support indices in des_vars and quantities.
         model.jacobian._override_checks = True
+
+        # Linearize Model
         model._linearize()
+
         model.jacobian._override_checks = False
         approx_jac = model._jacobian._subjacs
 
@@ -981,6 +1037,12 @@ class Problem(object):
                     if isinstance(jac, list):
                         # This is a design variable that was declared as an obj/con.
                         totals[okey, ikey] = np.eye(len(jac[0]))
+                        odx = model._owns_approx_of_idx.get(okey)
+                        idx = model._owns_approx_wrt_idx.get(ikey)
+                        if odx is not None:
+                            totals[okey, ikey] = totals[okey, ikey][odx, :]
+                        if idx is not None:
+                            totals[okey, ikey] = totals[okey, ikey][:, idx]
                     else:
                         totals[okey, ikey] = -jac
 
@@ -1020,6 +1082,9 @@ class Problem(object):
 
                 in_var_idx = model._var_allprocs_abs2idx[vecname]['output'][input_name]
                 in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
+
+                dup = not in_var_meta['distributed']
+
                 start = np.sum(sizes[:iproc, in_var_idx])
                 end = np.sum(sizes[:iproc + 1, in_var_idx])
 
@@ -1035,7 +1100,7 @@ class Problem(object):
                     min_i = np.min(in_idxs)
                     loc_size = len(in_idxs)
                 else:
-                    irange = list(range(in_var_meta['global_size']))
+                    irange = np.arange(in_var_meta['global_size'], dtype=int)
                     max_i = in_var_meta['global_size'] - 1
                     min_i = 0
                     loc_size = end - start
@@ -1048,30 +1113,37 @@ class Problem(object):
                             loc_size = sz
                             break
 
-                dup = not in_var_meta['distributed']
-
                 # set totals to zeros instead of None in those cases when none
                 # of the specified indices are within the range of interest
                 # for this proc.
                 store = True if ((start <= min_i < end) or (start <= max_i < end)) else dup
 
                 if store:
-                    offset = start + min_i
-                    loc_idxs = irange - offset
+                    loc_idxs = irange
+                    if min_i > 0:
+                        loc_idxs = irange - min_i
+                else:
+                    loc_idxs = []
 
                 voi_info[input_name] = (dinputs, doutputs, irange, loc_idxs, max_i, min_i,
                                         loc_size, start, end, dup, store)
 
         return voi_info
 
-    def _compute_total_derivs_multi(self, totals, vois, voi_info, lin_vec_names, mode,
-                                    output_list, old_output_list, output_vois,
-                                    use_rel_reduction, rel_systems, return_format):
+    def _compute_totals_multi(self, totals, vois, voi_info, lin_vec_names, mode,
+                              output_list, old_output_list, output_vois,
+                              use_rel_reduction, rel_systems, return_format):
         fwd = mode == 'fwd'
+        if fwd:
+            remote_outputs = self.driver._remote_responses
+        else:
+            remote_outputs = self.driver._remote_dvs
+
         model = self.model
         nproc = model.comm.size
         iproc = model.comm.rank
         sizes = model._var_sizes['nonlinear']['output']
+        owning_ranks = model._owning_rank['output']
 
         # this sets dinputs for the current parallel_deriv_color to 0
         voi_info[vois[0][0]][0].set_const(0.0)
@@ -1116,10 +1188,14 @@ class Problem(object):
                     if out_idxs is None:
                         out_var_idx = \
                             model._var_allprocs_abs2idx['nonlinear']['output'][output_name]
-                        if ncol > 1:
-                            deriv_val = np.zeros((sizes[iproc, out_var_idx], ncol))
+                        if output_name in remote_outputs:
+                            _, sz = remote_outputs[output_name]
                         else:
-                            deriv_val = np.zeros(sizes[iproc, out_var_idx])
+                            sz = sizes[iproc, out_var_idx]
+                        if ncol > 1:
+                            deriv_val = np.zeros((sz, ncol))
+                        else:
+                            deriv_val = np.zeros(sz)
                     else:
                         if ncol > 1:
                             deriv_val = np.zeros((len(out_idxs), ncol))
@@ -1140,14 +1216,16 @@ class Problem(object):
                     if dup and nproc > 1:
                         out_var_idx = \
                             model._var_allprocs_abs2idx['nonlinear']['output'][output_name]
-                        # TODO: do during setup
-                        root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
+                        root = owning_ranks[output_name]
                         if deriv_val is None:
                             if out_idxs is not None:
                                 sz = size
                             else:
                                 sz = sizes[root, out_var_idx]
-                            deriv_val = np.empty(sz, dtype=float)
+                            if ncol > 1:
+                                deriv_val = np.empty((sz, ncol))
+                            else:
+                                deriv_val = np.empty(sz, dtype=float)
                         self.comm.Bcast(deriv_val, root=root)
 
                 len_val = len(deriv_val)
@@ -1189,8 +1267,7 @@ class Problem(object):
                 else:
                     raise RuntimeError("unsupported return format")
 
-    def _compute_total_derivs(self, of=None, wrt=None, return_format='flat_dict',
-                              global_names=True):
+    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1213,7 +1290,7 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        recording_iteration.stack.append(('_compute_total_derivs', 0))
+        recording_iteration.stack.append(('_compute_totals', 0))
         model = self.model
         mode = self._mode
         vec_dinput = model._vectors['input']
@@ -1279,18 +1356,22 @@ class Problem(object):
             of = [prom2abs[name][0] for name in oldof]
             wrt = [prom2abs[name][0] for name in oldwrt]
 
+        owning_ranks = self.model._owning_rank['output']
+
         if fwd:
             input_list, output_list = wrt, of
             old_input_list, old_output_list = oldwrt, oldof
             input_vec, output_vec = vec_dresid, vec_doutput
             input_vois = self.driver._designvars
             output_vois = self.driver._responses
+            remote_outputs = self.driver._remote_responses
         else:  # rev
             input_list, output_list = of, wrt
             old_input_list, old_output_list = oldof, oldwrt
             input_vec, output_vec = vec_doutput, vec_dresid
             input_vois = self.driver._responses
             output_vois = self.driver._designvars
+            remote_outputs = self.driver._remote_dvs
 
         # Solve for derivs using linear solver.
 
@@ -1356,10 +1437,10 @@ class Problem(object):
                         rel_systems.update(relevant[voi]['@all'][1])
                 else:
                     rel_systems = _contains_all
-                self._compute_total_derivs_multi(totals, vois, voi_info, lin_vec_names, mode,
-                                                 output_list, old_output_list,
-                                                 output_vois, use_rel_reduction, rel_systems,
-                                                 return_format)
+                self._compute_totals_multi(totals, vois, voi_info, lin_vec_names, mode,
+                                           output_list, old_output_list,
+                                           output_vois, use_rel_reduction, rel_systems,
+                                           return_format)
             recording_iteration.stack.pop()
             return totals
 
@@ -1437,7 +1518,11 @@ class Problem(object):
                             # irrelevant output, just give zeros
                             if out_idxs is None:
                                 out_var_idx = abs2idx_out[output_name]
-                                deriv_val = np.zeros(sizes[iproc, out_var_idx])
+                                if output_name in remote_outputs:
+                                    _, sz = remote_outputs[output_name]
+                                    deriv_val = np.zeros(sz)
+                                else:
+                                    deriv_val = np.zeros(sizes[iproc, out_var_idx])
                             else:
                                 deriv_val = np.zeros(len(out_idxs))
                         else:  # relevant output
@@ -1454,7 +1539,7 @@ class Problem(object):
 
                             if dup and nproc > 1:
                                 out_var_idx = abs2idx_out[output_name]
-                                root = np.min(np.nonzero(sizes[:, out_var_idx])[0][0])
+                                root = owning_ranks[output_name]
                                 if deriv_val is None:
                                     if out_idxs is not None:
                                         sz = size
@@ -1548,25 +1633,20 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
     global_options : dict
         Dictionary containing the options for the approximation.
     totals : bool
-        Set to True if we are doing check_total_derivs to skip a bunch of stuff.
+        Set to True if we are doing check_totals to skip a bunch of stuff.
     suppress_output : bool
         Set to True to suppress all output. Just calculate errors and add the keys.
     indep_key : dict of sets, optional
         Keyed by component name, contains the of/wrt keys that are declared not dependent.
     """
-    fd_desc = "{}:{}".format(global_options['method'],
-                             global_options['form'])
     nan = float('nan')
 
     if compact_print:
-        check_desc = "    (Check Type: {})".format(fd_desc)
         if totals:
             deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
         else:
             deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e} | {6:.4e} | {7:.4e}"\
                          " | {8:.4e} | {9:.4e} | {10:.4e}"
-    else:
-        check_desc = ""
 
     for system in system_list:
         # No need to see derivatives of IndepVarComps
@@ -1592,7 +1672,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
 
         if not suppress_output:
             logger.info('-' * (len(sys_name) + 15))
-            logger.info("{}: '{}'{}".format(sys_type, sys_name, check_desc))
+            logger.info("{}: '{}'".format(sys_type, sys_name))
             logger.info('-' * (len(sys_name) + 15))
 
             if compact_print:
@@ -1629,6 +1709,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
         sorted_keys = sorted(iterkeys(derivatives))
 
         for of, wrt in sorted_keys:
+
             derivative_info = derivatives[of, wrt]
             forward = derivative_info['J_fwd']
             if not totals:
@@ -1697,6 +1778,20 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
                             rel_err.forward_reverse,
                         ))
                 else:
+
+                    if totals:
+                        fd_desc = "{}:{}".format(global_options['']['method'],
+                                                 global_options['']['form'])
+
+                    else:
+                        fd_desc = "{}:{}".format(global_options[sys_name][wrt]['method'],
+                                                 global_options[sys_name][wrt]['form'])
+
+                    if compact_print:
+                        check_desc = "    (Check Type: {})".format(fd_desc)
+                    else:
+                        check_desc = ""
+
                     # Magnitudes
                     logger.info("  {}: '{}' wrt '{}'\n".format(sys_name, of, wrt))
                     logger.info('    Forward Magnitude : {:.6e}'.format(magnitude.forward))

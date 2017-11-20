@@ -8,7 +8,7 @@ import time
 import random
 
 from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, DefaultVector, \
-    ExecComp, ExplicitComponent, PETScVector, ScipyIterativeSolver, NonlinearBlockGS
+    ExecComp, ExplicitComponent, PETScVector, ScipyKrylov, NonlinearBlockGS
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped
@@ -21,6 +21,7 @@ else:
     vector_class = DefaultVector
 
 
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
 class ParDerivTestCase(unittest.TestCase):
 
     N_PROCS = 2
@@ -30,7 +31,7 @@ class ParDerivTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = FanInGrouped()
         prob.model.linear_solver = LinearBlockGS()
-        prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x1')
         prob.model.add_design_var('iv.x2')
@@ -42,7 +43,7 @@ class ParDerivTestCase(unittest.TestCase):
         indep_list = ['iv.x1', 'iv.x2']
         unknown_list = ['c3.y']
 
-        J = prob.compute_total_derivs(unknown_list, indep_list, return_format='dict')
+        J = prob.compute_totals(unknown_list, indep_list, return_format='dict')
         assert_rel_error(self, J['c3.y']['iv.x1'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y']['iv.x2'][0][0], 35.0, 1e-6)
 
@@ -51,7 +52,7 @@ class ParDerivTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = FanInGrouped()
         prob.model.linear_solver = LinearBlockGS()
-        prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x1')
         prob.model.add_design_var('iv.x2')
@@ -63,7 +64,7 @@ class ParDerivTestCase(unittest.TestCase):
         indep_list = ['iv.x1', 'iv.x2']
         unknown_list = ['c3.y']
 
-        J = prob.compute_total_derivs(unknown_list, indep_list, return_format='flat_dict')
+        J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
         assert_rel_error(self, J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
 
@@ -72,7 +73,7 @@ class ParDerivTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = FanOutGrouped()
         prob.model.linear_solver = LinearBlockGS()
-        prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x')
         prob.model.add_constraint('c2.y', upper=0.0)
@@ -84,7 +85,7 @@ class ParDerivTestCase(unittest.TestCase):
         unknown_list = ['c2.y', 'c3.y']
         indep_list = ['iv.x']
 
-        J = prob.compute_total_derivs(unknown_list, indep_list, return_format='flat_dict')
+        J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
         assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
@@ -93,7 +94,7 @@ class ParDerivTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = FanOutGrouped()
         prob.model.linear_solver = LinearBlockGS()
-        prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x')
         prob.model.add_constraint('c2.y', upper=0.0)
@@ -105,7 +106,7 @@ class ParDerivTestCase(unittest.TestCase):
         unknown_list = ['c3.y','c2.y'] #['c2.y', 'c3.y']
         indep_list = ['iv.x']
 
-        J = prob.compute_total_derivs(unknown_list, indep_list, return_format='flat_dict')
+        J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
         assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
@@ -114,7 +115,7 @@ class ParDerivTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = FanInGrouped()
         prob.model.linear_solver = LinearBlockGS()
-        prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x1', parallel_deriv_color='par_dv')
         prob.model.add_design_var('iv.x2', parallel_deriv_color='par_dv')
@@ -127,7 +128,7 @@ class ParDerivTestCase(unittest.TestCase):
         indep_list = ['iv.x1', 'iv.x2']
         unknown_list = ['c3.y']
 
-        J = prob.compute_total_derivs(unknown_list, indep_list, return_format='flat_dict')
+        J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
         assert_rel_error(self, J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
 
@@ -136,7 +137,7 @@ class ParDerivTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = FanOutGrouped()
         prob.model.linear_solver = LinearBlockGS()
-        prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x')
         prob.model.add_constraint('c2.y', upper=0.0, parallel_deriv_color='par_resp')
@@ -148,11 +149,12 @@ class ParDerivTestCase(unittest.TestCase):
         unknown_list = ['c2.y', 'c3.y']
         indep_list = ['iv.x']
 
-        J = prob.compute_total_derivs(unknown_list, indep_list, return_format='flat_dict')
+        J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
         assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
 
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
 class DecoupledTestCase(unittest.TestCase):
     N_PROCS = 2
     asize = 3
@@ -169,7 +171,7 @@ class DecoupledTestCase(unittest.TestCase):
         G1 = root.add_subsystem('G1', ParallelGroup())
         G1.linear_solver = LinearBlockGS()
 
-        c1 = G1.add_subsystem('c1', ExecComp('y = numpy.ones(3).T*x.dot(numpy.arange(3.,6.))',
+        c1 = G1.add_subsystem('c1', ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
                                                   x=np.zeros(asize), y=np.zeros(asize)))
         c2 = G1.add_subsystem('c2', ExecComp('y = x[:%d] * 2.0' % asize,
                                         x=np.zeros(asize+2), y=np.zeros(asize)))
@@ -197,8 +199,8 @@ class DecoupledTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class, check=False, mode='fwd')
         prob.run_model()
 
-        J = prob.compute_total_derivs(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.zeros((asize, asize+2))
@@ -219,8 +221,8 @@ class DecoupledTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class, check=False, mode='fwd')
         prob.run_driver()
 
-        J = prob.compute_total_derivs(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.zeros((asize, asize+2))
@@ -241,14 +243,13 @@ class DecoupledTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class, check=False, mode='fwd')
         prob.run_driver()
 
-        J = prob.compute_total_derivs(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.zeros((asize, asize+2))
         expected[:,:asize] = np.eye(asize)*8.0
         assert_rel_error(self, J['Con2.y', 'Indep2.x'], expected, 1e-6)
-
 
     def test_serial_rev(self):
         asize = self.asize
@@ -262,8 +263,8 @@ class DecoupledTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class, check=False, mode='rev')
         prob.run_driver()
 
-        J = prob.compute_total_derivs(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.zeros((asize, asize+2))
@@ -282,14 +283,16 @@ class DecoupledTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class, check=False, mode='rev')
         prob.run_driver()
 
-        J = prob.compute_total_derivs(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.zeros((asize, asize+2))
         expected[:,:asize] = np.eye(asize)*8.0
         assert_rel_error(self, J['Con2.y', 'Indep2.x'], expected, 1e-6)
 
+
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
 class IndicesTestCase(unittest.TestCase):
 
     N_PROCS = 2
@@ -306,7 +309,7 @@ class IndicesTestCase(unittest.TestCase):
 
         c2 = G1.add_subsystem('c2', ExecComp('y = x * 2.0',
                                         x=np.zeros(asize), y=np.zeros(asize)))
-        c3 = G1.add_subsystem('c3', ExecComp('y = numpy.ones(3).T*x.dot(numpy.arange(3.,6.))',
+        c3 = G1.add_subsystem('c3', ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
                                         x=np.zeros(asize), y=np.zeros(asize)))
         c4 = root.add_subsystem('c4', ExecComp('y = x * 4.0',
                                           x=np.zeros(asize), y=np.zeros(asize)))
@@ -330,21 +333,22 @@ class IndicesTestCase(unittest.TestCase):
     def test_indices_fwd(self):
         prob = self.setup_model('fwd')
 
-        J = prob.compute_total_derivs(['c4.y', 'c5.y'], ['p.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['c4.y', 'c5.y'], ['p.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['c5.y', 'p.x'][0], np.array([20., 25.]), 1e-6)
         assert_rel_error(self, J['c4.y', 'p.x'][0], np.array([8., 0.]), 1e-6)
 
     def test_indices_rev(self):
         prob = self.setup_model('rev')
-        J = prob.compute_total_derivs(['c4.y', 'c5.y'], ['p.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['c4.y', 'c5.y'], ['p.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['c5.y', 'p.x'][0], np.array([20., 25.]), 1e-6)
         assert_rel_error(self, J['c4.y', 'p.x'][0], np.array([8., 0.]), 1e-6)
 
 
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
 class IndicesTestCase2(unittest.TestCase):
 
     N_PROCS = 2
@@ -369,7 +373,7 @@ class IndicesTestCase2(unittest.TestCase):
 
         c2 = par1.add_subsystem('c2', ExecComp('y = x * 2.0',
                                         x=np.zeros(asize), y=np.zeros(asize)))
-        c3 = par2.add_subsystem('c3', ExecComp('y = numpy.ones(3).T*x.dot(numpy.arange(3.,6.))',
+        c3 = par2.add_subsystem('c3', ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
                                         x=np.zeros(asize), y=np.zeros(asize)))
         c4 = par1.add_subsystem('c4', ExecComp('y = x * 4.0',
                                           x=np.zeros(asize), y=np.zeros(asize)))
@@ -400,23 +404,24 @@ class IndicesTestCase2(unittest.TestCase):
         responses = prob.model.get_responses()
         self.assertEqual(set(responses), set(['G1.par1.c4.y', 'G1.par2.c5.y']))
 
-        J = prob.compute_total_derivs(of=['G1.par1.c4.y', 'G1.par2.c5.y'],
-                                      wrt=['G1.par1.p.x', 'G1.par2.p.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(of=['G1.par1.c4.y', 'G1.par2.c5.y'],
+                                wrt=['G1.par1.p.x', 'G1.par2.p.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['G1.par2.c5.y', 'G1.par2.p.x'][0], np.array([20., 25.]), 1e-6)
         assert_rel_error(self, J['G1.par1.c4.y', 'G1.par1.p.x'][0], np.array([8., 0.]), 1e-6)
 
     def test_indices_rev(self):
         prob = self.setup_model('rev')
-        J = prob.compute_total_derivs(['G1.par1.c4.y', 'G1.par2.c5.y'],
-                                      ['G1.par1.p.x', 'G1.par2.p.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['G1.par1.c4.y', 'G1.par2.c5.y'],
+                                ['G1.par1.p.x', 'G1.par2.p.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['G1.par2.c5.y', 'G1.par2.p.x'][0], np.array([20., 25.]), 1e-6)
         assert_rel_error(self, J['G1.par1.c4.y', 'G1.par1.p.x'][0], np.array([8., 0.]), 1e-6)
 
 
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
 class MatMatTestCase(unittest.TestCase):
     N_PROCS = 2
     asize = 3
@@ -432,7 +437,7 @@ class MatMatTestCase(unittest.TestCase):
         G1 = root.add_subsystem('G1', ParallelGroup())
         G1.linear_solver = LinearBlockGS()
 
-        c1 = G1.add_subsystem('c1', ExecComp('y = numpy.ones(3).T*x.dot(numpy.arange(3.,6.))',
+        c1 = G1.add_subsystem('c1', ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
                                                   x=np.zeros(asize), y=np.zeros(asize)))
         c2 = G1.add_subsystem('c2', ExecComp('y = x * 2.0',
                                         x=np.zeros(asize), y=np.zeros(asize)))
@@ -460,8 +465,8 @@ class MatMatTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class, check=False, mode='fwd')
         prob.run_driver()
 
-        J = prob.compute_total_derivs(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.eye(asize)*8.0
@@ -479,13 +484,12 @@ class MatMatTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class, check=False, mode='fwd')
         prob.run_driver()
 
-        J = prob.compute_total_derivs(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.eye(asize)*8.0
         assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
-
 
     def test_parallel_rev(self):
         asize = self.asize
@@ -499,8 +503,8 @@ class MatMatTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class, check=False, mode='rev')
         prob.run_driver()
 
-        J = prob.compute_total_derivs(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.eye(asize)*8.0
@@ -518,12 +522,13 @@ class MatMatTestCase(unittest.TestCase):
         prob.setup(vector_class=vector_class,  check=False, mode='rev')
         prob.run_driver()
 
-        J = prob.compute_total_derivs(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
-                                      return_format='flat_dict')
+        J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
+                                return_format='flat_dict')
 
         assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.eye(asize)*8.0
         assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
+
 
 class SumComp(ExplicitComponent):
     def __init__(self, size):
@@ -533,6 +538,8 @@ class SumComp(ExplicitComponent):
     def setup(self):
         self.add_input('x', val=np.zeros(self.size))
         self.add_output('y', val=0.0)
+
+        self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
         outputs['y'] = np.sum(inputs['x'])
@@ -556,6 +563,8 @@ class SlowComp(ExplicitComponent):
         self.add_input('x', val=0.0)
         self.add_output('y', val=np.zeros(self.size))
 
+        self.declare_partials(of='*', wrt='*')
+
     def compute(self, inputs, outputs):
         outputs['y'] = inputs['x'] * self.mult
 
@@ -565,6 +574,7 @@ class SlowComp(ExplicitComponent):
     def _apply_linear(self, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         time.sleep(self.delay)
         super(SlowComp, self)._apply_linear(vec_names, rel_systems, mode, scope_out, scope_in)
+
 
 class PartialDependGroup(Group):
     def setup(self):
@@ -593,11 +603,18 @@ class PartialDependGroup(Group):
         self.add_constraint('ParallelGroup1.Con2.y', upper=0.0, parallel_deriv_color=color)
 
 
-@unittest.skipUnless(MPI, "MPI is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ParDerivColorFeatureTestCase(unittest.TestCase):
     N_PROCS = 2
 
     def test_fwd_vs_rev(self):
+        import time
+
+        import numpy as np
+
+        from openmdao.api import Problem, PETScVector
+        from openmdao.core.tests.test_parallel_derivatives import PartialDependGroup
+
         size = 4
 
         of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
@@ -609,7 +626,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         p.run_model()
 
         elapsed_fwd = time.time()
-        J = p.compute_total_derivs(of, wrt, return_format='dict')
+        J = p.compute_totals(of, wrt, return_format='dict')
         elapsed_fwd = time.time() - elapsed_fwd
 
         assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
@@ -621,7 +638,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         p.run_model()
 
         elapsed_rev = time.time()
-        J = p.compute_total_derivs(of, wrt, return_format='dict')
+        J = p.compute_totals(of, wrt, return_format='dict')
         elapsed_rev = time.time() - elapsed_rev
 
         assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
@@ -684,8 +701,8 @@ class CleanupTestCase(unittest.TestCase):
         p.run_model()
 
         # test will fail if this fails to converge
-        J = p.compute_total_derivs(['con.y', 'obj.y'],
-                                   ['inputs.x'], return_format='dict')
+        J = p.compute_totals(['con.y', 'obj.y'],
+                             ['inputs.x'], return_format='dict')
 
 
 if __name__ == "__main__":

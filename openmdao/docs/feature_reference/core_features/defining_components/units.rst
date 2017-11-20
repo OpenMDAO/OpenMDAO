@@ -3,9 +3,15 @@
 Specifying Units for Variables
 ==============================
 
-As we saw in <Section declaring_variables>, we can specify units for inputs, outputs, and residuals.
-There is a :code:`units` argument on :code:`add_input` to specify input units, and there are :code:`units` and :code:`res_units` arguments on :code:`add_output` to specify output and residual units, respectively.
-We note that residual units are only specified in rare cases and they default to output units in explicit components.
+As we saw in :ref:`declaring-variables`, we can specify units for inputs, outputs, and residuals.
+There is a :code:`units` argument on :code:`add_input` to specify input units,
+and there are :code:`units` and :code:`res_units` arguments on :code:`add_output` to specify output and residual units, respectively.
+A complete listing of all available units is given :ref:`here <feature_units>`.
+
+.. note::
+
+    Residual units, if not specified, default to the same units as the output variable.
+    :code:`res_units` is very rarely specified.
 
 Specifying units has the following result:
 
@@ -15,7 +21,7 @@ If we connect :code:`TimeComp.time1` to :code:`SpeedComp.time2` with hours/secon
 
 2. The user always gets/sets the variable in the specified units.
 Declaring an input, output, or residual to have certain units means that any value 'set' into the variable is assumed to be in the given units and any time the user asks to 'get' the variable, the value is return in the given units.
-This is the case not only in <Component> methods such as :code:`compute`, :code:`apply_nonlinear`, and :code:`apply_linear`, but everywhere, including the user's run script.
+This is the case not only in <Component> methods such as :code:`compute`, :code:`apply_nonlinear`, and :code:`apply_linear`, but everywhere, including the user's run-script.
 
 3. In :code:`add_input` and :code:`add_output`, all arguments are assumed given in the specified units.
 In the case of :code:`add_input`, if :code:`units` is specified, then :code:`val` is assumed to be given in those units.
@@ -27,10 +33,7 @@ Units syntax
 Units are specified as a string that adheres to the following syntax.
 The string is a composition of numbers and known units that are combined with multiplication (:code:`*`), division (:code:`/`), and exponentiation (:code:`**`) operators.
 The known units can be prefixed by kilo (`k`), Mega (`M`), and so on.
-
-The list of known units and valid prefixes can be found in the units library (`openmdao/utils/unit_library.ini`) (ADD REFERENCE TO SEPARATE DOC PAGE LATER).
-Any entry in the :code:`[base_units]` or :code:`[units]` sections of the library is a known unit.
-Valid prefixes are given in the :code:`[prefixes]` section of the library.
+The list of units and valid prefixes can be found in the :ref:`units library <feature_units>`.
 
 For illustration, each of the following is a valid unit string representing the same quantity:
 

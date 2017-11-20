@@ -16,4 +16,13 @@ variable 'z'.
 .. embed-test::
     openmdao.solvers.linear.tests.test_direct_solver.TestDirectSolverFeature.test_specify_solver
 
+
+DirectSolver Options
+--------------------
+
+.. embed-options::
+    openmdao.solvers.linear.direct
+    DirectSolver
+    options
+
 .. tags:: Solver, LinearSolver

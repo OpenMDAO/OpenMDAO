@@ -465,7 +465,7 @@ class TestShapes(unittest.TestCase):
         p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('x', val=np.arange(10)))
         p.model.add_subsystem('C1',
-                              ExecComp('y=numpy.dot(x, A)',
+                              ExecComp('y=dot(x, A)',
                                        x={'value': np.zeros((1, 10))},
                                        A={'value': np.eye(10)},
                                        y={'value': np.zeros((1, 10))}))
@@ -478,7 +478,7 @@ class TestShapes(unittest.TestCase):
         p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('x', val=np.arange(10)))
         p.model.add_subsystem('C1',
-                              ExecComp('y=numpy.dot(A, x)',
+                              ExecComp('y=dot(A, x)',
                                        x={'value': np.zeros((10, 1))},
                                        A={'value': np.eye(10)},
                                        y={'value': np.zeros((10, 1))}))
@@ -556,7 +556,7 @@ class TestShapes(unittest.TestCase):
     #def test_ubcs(self):
         #p = Problem(model=Group())
         #root = p.model
-        #root._linear_solver = ScipyGMRES()
+        #root._linear_solver = ScipyKrylov()
 
         #self.P1 = root.add_subsystem("P1", IndepVarComp('x', 1.0))
         #self.C1 = root.add_subsystem("C1", ExecComp('y=x1*2.0+x2*3.0', x2=1.0))

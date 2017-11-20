@@ -11,6 +11,9 @@ from collections import OrderedDict
 import traceback
 
 from six import iteritems
+
+import numpy as np
+
 from pyoptsparse import Optimization
 
 from openmdao.core.analysis_error import AnalysisError
@@ -126,7 +129,7 @@ class pyOptSparseDriver(Driver):
                              desc='Name of optimizers to use')
         self.options.declare('title', default='Optimization using pyOpt_sparse',
                              desc='Title of this optimization run')
-        self.options.declare('print_results', type_=bool, default=True,
+        self.options.declare('print_results', types=bool, default=True,
                              desc='Print pyOpt results if True')
         self.options.declare('gradient method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
@@ -222,8 +225,7 @@ class pyOptSparseDriver(Driver):
         con_meta = self._cons
         lcons = [key for (key, con) in iteritems(con_meta) if con['linear'] is True]
         if len(lcons) > 0:
-            _lin_jacs = problem._compute_total_derivs(of=lcons, wrt=indep_list,
-                                                      return_format='dict')
+            _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list, return_format='dict')
 
         # Add all equality constraints
         self.active_tols = {}
@@ -388,6 +390,7 @@ class pyOptSparseDriver(Driver):
 
                 # Let the optimizer try to handle the error
                 except AnalysisError:
+                    model._clear_iprint()
                     fail = 1
 
                 func_dict = self.get_objective_values()
@@ -443,12 +446,13 @@ class pyOptSparseDriver(Driver):
         try:
 
             try:
-                sens_dict = self._compute_total_derivs(of=self._quantities,
-                                                       wrt=self._indep_list,
-                                                       return_format='dict')
+                sens_dict = self._compute_totals(of=self._quantities,
+                                                 wrt=self._indep_list,
+                                                 return_format='dict')
 
             # Let the optimizer try to handle the error
             except AnalysisError:
+                self._problem.model._clear_iprint()
                 fail = 1
 
                 # We need to cobble together a sens_dict of the correct size.

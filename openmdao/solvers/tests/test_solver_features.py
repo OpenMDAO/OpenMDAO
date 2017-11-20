@@ -6,7 +6,7 @@ from openmdao.api import Problem
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 from openmdao.solvers.linear.direct import DirectSolver
-from openmdao.solvers.linear.scipy_iter_solver import ScipyIterativeSolver
+from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 
 from openmdao.devtools.testutil import assert_rel_error
@@ -17,13 +17,16 @@ from openmdao.test_suite.components.double_sellar import DoubleSellar
 class TestSolverFeatures(unittest.TestCase):
 
     def test_specify_solver(self):
+        from openmdao.api import Problem, NewtonSolver, ScipyKrylov, DirectSolver
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
         prob = Problem()
         model = prob.model = SellarDerivatives()
 
         model.nonlinear_solver = newton = NewtonSolver()
 
         # using a different linear solver for Newton with a looser tolerance
-        newton.linear_solver = ScipyIterativeSolver()
+        newton.linear_solver = ScipyKrylov()
         newton.linear_solver.options['atol'] = 1e-4
 
         # used for analytic derivatives
@@ -36,23 +39,25 @@ class TestSolverFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_specify_subgroup_solvers(self):
+        from openmdao.api import Problem, NewtonSolver, ScipyKrylov, DirectSolver, NonlinearBlockGS, LinearBlockGS
+        from openmdao.test_suite.components.double_sellar import DoubleSellar
 
         prob = Problem()
         model = prob.model = DoubleSellar()
 
         # each SubSellar group converges itself
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.linear_solver = DirectSolver()  # used for derivatives
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.linear_solver = DirectSolver()
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
         model.nonlinear_solver = NonlinearBlockGS()
         model.nonlinear_solver.options['rtol'] = 1.0e-5
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
         model.linear_solver.precon = LinearBlockGS()
 
         prob.setup()

@@ -8,8 +8,8 @@ from six.moves import cStringIO
 
 import numpy as np
 
-from openmdao.api import Problem, IndepVarComp, Component, Group, NewtonSolver, NonLinearRunOnce
-from openmdao.api import ScipyIterativeSolver as ScipyGMRES
+from openmdao.api import Problem, IndepVarComp, Component, Group, NewtonSolver, NonlinearRunOnce
+from openmdao.api import ScipyKrylov
 from openmdao.devtools.testutil import assert_rel_error, TestLogger
 
 
@@ -23,6 +23,8 @@ class Paraboloid(Component):
         self.add_param('y', val=0.0)
 
         self.add_output('f_xy', val=0.0)
+
+        self.declare_partials(of='*', wrt='*')
 
     def solve_nonlinear(self, params, unknowns, resids):
         """f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
@@ -105,6 +107,9 @@ class SimpleImplicitComp(Component):
         self.maxiter = 10
         self.atol = 1.0e-12
         self.self_solve = False
+
+        # Derivatives
+        self.declare_partials(of='*', wrt='*')
 
     def solve_nonlinear(self, params, unknowns, resids):
         """ Simple iterative solve. (Babylonian method)."""
@@ -202,7 +207,7 @@ class DepCompTestCase(unittest.TestCase):
 
         prob.model.connect('px.x', 'comp.x')
         prob.model.connect('py.y', 'comp.y')
-        prob.model.linear_solver = ScipyGMRES()
+        prob.model.linear_solver = ScipyKrylov()
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
@@ -210,7 +215,7 @@ class DepCompTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['comp.f_xy'], 27.0, 1e-6)
 
-        J = prob.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = prob.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
         assert_rel_error(self, J[('comp.f_xy', 'px.x')][0][0], -3.0, 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')][0][0], 11.0, 1e-5)
 
@@ -219,7 +224,7 @@ class DepCompTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['comp.f_xy'], 27.0, 1e-6)
 
-        J = prob.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = prob.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
         assert_rel_error(self, J[('comp.f_xy', 'px.x')][0][0], -3.0, 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')][0][0], 11.0, 1e-5)
 
@@ -244,7 +249,7 @@ class DepCompTestCase(unittest.TestCase):
 
         prob.model.connect('px.x', 'comp.x')
         prob.model.connect('py.y', 'comp.y')
-        prob.model.linear_solver = ScipyGMRES()
+        prob.model.linear_solver = ScipyKrylov()
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
@@ -252,7 +257,7 @@ class DepCompTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['comp.f_xy'], 27.0, 1e-6)
 
-        J = prob.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = prob.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
         assert_rel_error(self, J[('comp.f_xy', 'px.x')][0][0], -3.0, 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')][0][0], 11.0, 1e-5)
 
@@ -261,7 +266,7 @@ class DepCompTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['comp.f_xy'], 27.0, 1e-6)
 
-        J = prob.compute_total_derivs(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+        J = prob.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
         assert_rel_error(self, J[('comp.f_xy', 'px.x')][0][0], -3.0, 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')][0][0], 11.0, 1e-5)
 
@@ -282,7 +287,7 @@ class DepCompTestCase(unittest.TestCase):
         prob.model.add_subsystem('p1', IndepVarComp('x', 0.5))
         prob.model.add_subsystem('comp', SimpleImplicitComp())
 
-        prob.model.linear_solver = ScipyGMRES()
+        prob.model.linear_solver = ScipyKrylov()
         prob.model.nonlinear_solver = NewtonSolver()
         prob.set_solver_print(level=0)
 
@@ -295,7 +300,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 2.666, 1e-3)
         self.assertLess(prob.model.nonlinear_solver._iter_count, 5)
 
-        J = prob.compute_total_derivs(of=['comp.y', 'comp.z'], wrt=['p1.x'])
+        J = prob.compute_totals(of=['comp.y', 'comp.z'], wrt=['p1.x'])
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
@@ -306,7 +311,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 2.666, 1e-3)
         self.assertLess(prob.model.nonlinear_solver._iter_count, 5)
 
-        J = prob.compute_total_derivs(of=['comp.y', 'comp.z'], wrt=['p1.x'])
+        J = prob.compute_totals(of=['comp.y', 'comp.z'], wrt=['p1.x'])
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
@@ -359,8 +364,9 @@ class DepCompTestCase(unittest.TestCase):
         comp = prob.model.add_subsystem('comp', SimpleImplicitComp())
         comp.self_solve = True
 
-        prob.model.linear_solver = ScipyGMRES()
-        prob.model.nonlinear_solver = NonLinearRunOnce()
+        prob.model.linear_solver = ScipyKrylov()
+        prob.model.nonlinear_solver = NonlinearRunOnce()
+
         prob.set_solver_print(level=0)
 
         prob.model.connect('p1.x', 'comp.x')
@@ -371,7 +377,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 2.666, 1e-3)
         self.assertLess(prob.model.nonlinear_solver._iter_count, 5)
 
-        J = prob.compute_total_derivs(of=['comp.y', 'comp.z'], wrt=['p1.x'])
+        J = prob.compute_totals(of=['comp.y', 'comp.z'], wrt=['p1.x'])
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
@@ -381,7 +387,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 2.666, 1e-3)
         self.assertLess(prob.model.nonlinear_solver._iter_count, 5)
 
-        J = prob.compute_total_derivs(of=['comp.y', 'comp.z'], wrt=['p1.x'])
+        J = prob.compute_totals(of=['comp.y', 'comp.z'], wrt=['p1.x'])
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
@@ -406,7 +412,7 @@ class DepCompTestCase(unittest.TestCase):
         prob.model.add_subsystem('p1', IndepVarComp('x', 0.5))
         prob.model.add_subsystem('comp', SimpleImplicitComp(resid_scaler=0.001))
 
-        prob.model.linear_solver = ScipyGMRES()
+        prob.model.linear_solver = ScipyKrylov()
         prob.model.nonlinear_solver = NewtonSolver()
         prob.set_solver_print(level=0)
 
@@ -418,7 +424,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 2.666, 1e-3)
         self.assertLess(prob.model.nonlinear_solver._iter_count, 5)
 
-        J = prob.compute_total_derivs(of=['comp.y', 'comp.z'], wrt=['p1.x'])
+        J = prob.compute_totals(of=['comp.y', 'comp.z'], wrt=['p1.x'])
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
@@ -428,7 +434,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 2.666, 1e-3)
         self.assertLess(prob.model.nonlinear_solver._iter_count, 5)
 
-        J = prob.compute_total_derivs(of=['comp.y', 'comp.z'], wrt=['p1.x'])
+        J = prob.compute_totals(of=['comp.y', 'comp.z'], wrt=['p1.x'])
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
@@ -452,7 +458,7 @@ class DepCompTestCase(unittest.TestCase):
         prob.model.add_subsystem('p1', IndepVarComp('x', 0.5))
         prob.model.add_subsystem('comp', SimpleImplicitCompApply())
 
-        prob.model.linear_solver = ScipyGMRES()
+        prob.model.linear_solver = ScipyKrylov()
         prob.model.nonlinear_solver = NewtonSolver()
         prob.set_solver_print(level=0)
 
@@ -464,7 +470,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 2.666, 1e-3)
         self.assertLess(prob.model.nonlinear_solver._iter_count, 5)
 
-        J = prob.compute_total_derivs(of=['comp.y', 'comp.z'], wrt=['p1.x'])
+        J = prob.compute_totals(of=['comp.y', 'comp.z'], wrt=['p1.x'])
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 
@@ -474,7 +480,7 @@ class DepCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 2.666, 1e-3)
         self.assertLess(prob.model.nonlinear_solver._iter_count, 5)
 
-        J = prob.compute_total_derivs(of=['comp.y', 'comp.z'], wrt=['p1.x'])
+        J = prob.compute_totals(of=['comp.y', 'comp.z'], wrt=['p1.x'])
         assert_rel_error(self, J[('comp.y', 'p1.x')][0][0], -2.5555511, 1e-5)
         assert_rel_error(self, J[('comp.z', 'p1.x')][0][0], -1.77777777, 1e-5)
 

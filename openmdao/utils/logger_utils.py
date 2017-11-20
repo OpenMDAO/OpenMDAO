@@ -24,9 +24,9 @@ def _set_handler(logger, stream, level, use_format):
     use_format : bool
         Set to True to use the openmdao format "Level: message".
     """
-    if stream is 'stdout':
+    if stream == 'stdout':
         stream = sys.stdout
-    elif stream is 'stderr':
+    elif stream == 'stderr':
         stream = sys.stderr
     handler = logging.StreamHandler(stream)
 

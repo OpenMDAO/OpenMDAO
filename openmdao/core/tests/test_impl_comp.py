@@ -6,8 +6,8 @@ import unittest
 from six.moves import cStringIO
 import numpy as np
 
-from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, NewtonSolver, \
-                         ScipyIterativeSolver
+from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, \
+    NewtonSolver, ScipyKrylov
 from openmdao.devtools.testutil import assert_rel_error
 
 
@@ -22,12 +22,13 @@ class QuadraticComp(ImplicitComponent):
     Solution via Quadratic Formula:
     x = (-b + sqrt(b^2 - 4ac)) / 2a
     """
-
     def setup(self):
         self.add_input('a', val=1.)
         self.add_input('b', val=1.)
         self.add_input('c', val=1.)
         self.add_output('x', val=0.)
+
+        self.declare_partials(of='*', wrt='*')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         a = inputs['a']
@@ -123,6 +124,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         group.connect('comp1.a', 'comp2.a')
         group.connect('comp1.b', 'comp2.b')
         group.connect('comp1.c', 'comp2.c')
+
         group.connect('comp1.a', 'comp3.a')
         group.connect('comp1.b', 'comp3.b')
         group.connect('comp1.c', 'comp3.c')
@@ -139,7 +141,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp2.x'], 3.)
         assert_rel_error(self, prob['comp2.x'], 3.)
 
-        total_derivs = prob.compute_total_derivs(
+        total_derivs = prob.compute_totals(
             wrt=['comp1.a', 'comp1.b', 'comp1.c'],
             of=['comp2.x', 'comp3.x']
         )
@@ -272,7 +274,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         group.nonlinear_solver = NewtonSolver()
         group.nonlinear_solver.options['solve_subsystems'] = True
         group.nonlinear_solver.options['max_sub_solves'] = 1
-        group.linear_solver = ScipyIterativeSolver()
+        group.linear_solver = ScipyKrylov()
 
         prob.setup(check=False)
 
@@ -415,6 +417,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['sub.comp2.y'], 77., 1e-5)
 
     def test_guess_nonlinear_feature(self):
+        from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, NewtonSolver, ScipyKrylov
 
         class ImpWithInitial(ImplicitComponent):
 
@@ -423,6 +426,8 @@ class ImplicitCompTestCase(unittest.TestCase):
                 self.add_input('b', val=1.)
                 self.add_input('c', val=1.)
                 self.add_output('x', val=0.)
+
+                self.declare_partials(of='*', wrt='*')
 
             def apply_nonlinear(self, inputs, outputs, residuals):
                 a = inputs['a']
@@ -474,7 +479,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         model.nonlinear_solver = NewtonSolver()
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 1
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
         prob.setup(check=False)
 
@@ -487,9 +492,31 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp2.x'], 3.)
 
 
+class QuadGroup(Group):
+    def setup(self):
+        comp1 = self.add_subsystem('comp1', IndepVarComp())
+        comp1.add_output('a', 1.0)
+        comp1.add_output('b', 1.0)
+        comp1.add_output('c', 1.0)
+
+        sub = self.add_subsystem('sub', Group())
+        sub.add_subsystem('comp2', QuadraticComp())
+        sub.add_subsystem('comp3', QuadraticComp())
+
+        self.connect('comp1.a', 'sub.comp2.a')
+        self.connect('comp1.b', 'sub.comp2.b')
+        self.connect('comp1.c', 'sub.comp2.c')
+        self.connect('comp1.a', 'sub.comp3.a')
+        self.connect('comp1.b', 'sub.comp3.b')
+        self.connect('comp1.c', 'sub.comp3.c')
+
+
 class ListFeatureTestCase(unittest.TestCase):
 
     def setUp(self):
+        from openmdao.api import Group, Problem, IndepVarComp
+        from openmdao.core.tests.test_impl_comp import QuadraticComp
+
         group = Group()
 
         comp1 = group.add_subsystem('comp1', IndepVarComp())
@@ -504,11 +531,12 @@ class ListFeatureTestCase(unittest.TestCase):
         group.connect('comp1.a', 'sub.comp2.a')
         group.connect('comp1.b', 'sub.comp2.b')
         group.connect('comp1.c', 'sub.comp2.c')
+
         group.connect('comp1.a', 'sub.comp3.a')
         group.connect('comp1.b', 'sub.comp3.b')
         group.connect('comp1.c', 'sub.comp3.c')
 
-        global prob  # so we don't need `self.` in feature doc
+        global prob
         prob = Problem(model=group)
         prob.setup()
 

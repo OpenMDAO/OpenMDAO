@@ -2,7 +2,6 @@
 
 from __future__ import division
 
-from fnmatch import fnmatchcase
 import numpy as np
 from itertools import product
 from six import string_types, iteritems, itervalues
@@ -16,7 +15,7 @@ from openmdao.core.system import System
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    warn_deprecation, ContainsAll
+    warn_deprecation, ContainsAll, find_matches
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 
 
@@ -50,6 +49,8 @@ class Component(System):
         Cached storage of user-declared partials.
     _approximated_partials : list
         Cached storage of user-declared approximations.
+    _declared_partial_checks : list
+        Cached storage of user-declared check partial options.
     """
 
     def __init__(self, **kwargs):
@@ -78,6 +79,7 @@ class Component(System):
 
         self._declared_partials = []
         self._approximated_partials = []
+        self._declared_partial_checks = []
 
     def setup(self):
         """
@@ -147,9 +149,11 @@ class Component(System):
         else:
             prefix = ''
 
-        meta_names = {
-            'input': ('units', 'shape', 'var_set'),
-            'output': ('units', 'shape', 'var_set', 'ref', 'ref0', 'distributed'),
+        # the following metadata will be accessible for vars on all procs
+        global_meta_names = {
+            'input': ('units', 'shape', 'size', 'var_set'),
+            'output': ('units', 'shape', 'size', 'var_set',
+                       'ref', 'ref0', 'res_ref', 'distributed'),
         }
 
         for type_ in ['input', 'output']:
@@ -168,7 +172,7 @@ class Component(System):
                 # Compute allprocs_abs2meta
                 allprocs_abs2meta[type_][abs_name] = {
                     meta_name: metadata[meta_name]
-                    for meta_name in meta_names[type_]
+                    for meta_name in global_meta_names[type_]
                 }
 
                 # Compute abs2meta
@@ -214,7 +218,7 @@ class Component(System):
                 for idx, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
                     meta = abs2meta_t[abs_name]
                     set_name = meta['var_set']
-                    size = np.prod(meta['shape'])
+                    size = meta['size']
                     idx_byset = allprocs_abs2idx_byset_t[abs_name]
 
                     sz[iproc, idx] = size
@@ -325,9 +329,8 @@ class Component(System):
         metadata = {}
 
         # value, shape: based on args, making sure they are compatible
-        metadata['value'], metadata['shape'] = ensure_compatible(name, val,
-                                                                 shape,
-                                                                 src_indices)
+        metadata['value'], metadata['shape'] = ensure_compatible(name, val, shape, src_indices)
+        metadata['size'] = np.prod(metadata['shape'])
 
         # src_indices: None or ndarray
         if src_indices is None:
@@ -398,13 +401,13 @@ class Component(System):
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no upper bound.
             Default is None.
-        ref : float
+        ref : float or ndarray
             Scaling parameter. The value in the user-defined units of this output variable when
             the scaled value is 1. Default is 1.
-        ref0 : float
+        ref0 : float or ndarray
             Scaling parameter. The value in the user-defined units of this output variable when
             the scaled value is 0. Default is 0.
-        res_ref : float
+        res_ref : float or ndarray
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
         var_set : hashable object
@@ -457,6 +460,7 @@ class Component(System):
 
         # value, shape: based on args, making sure they are compatible
         metadata['value'], metadata['shape'] = ensure_compatible(name, val, shape)
+        metadata['size'] = np.prod(metadata['shape'])
 
         # units, res_units: taken as is
         metadata['units'] = units
@@ -474,11 +478,25 @@ class Component(System):
         metadata['upper'] = upper
 
         # All refs: check the shape if necessary
-        for item, msg in zip([ref, ref0, res_ref],
-                             ['ref', 'ref0', 'res_ref']):
-            if not np.isscalar(item) and \
-               np.atleast_1d(item).shape != metadata['shape']:
-                raise ValueError('The %s argument has the wrong shape' % msg)
+        for item, item_name in zip([ref, ref0, res_ref], ['ref', 'ref0', 'res_ref']):
+            if not np.isscalar(item):
+                if np.atleast_1d(item).shape != metadata['shape']:
+                    raise ValueError('The %s argument has the wrong shape' % item_name)
+
+        if np.isscalar(ref):
+            self._has_output_scaling |= ref != 1.0
+        else:
+            self._has_output_scaling |= np.any(ref != 1.0)
+
+        if np.isscalar(ref0):
+            self._has_output_scaling |= ref0 != 0.0
+        else:
+            self._has_output_scaling |= np.any(ref0)
+
+        if np.isscalar(res_ref):
+            self._has_resid_scaling |= res_ref != 1.0
+        else:
+            self._has_resid_scaling |= np.any(res_ref != 1.0)
 
         ref = format_as_float_or_array('ref', ref, flatten=True)
         ref0 = format_as_float_or_array('ref0', ref0, flatten=True)
@@ -514,37 +532,6 @@ class Component(System):
         var_rel_names['output'].append(name)
 
         return metadata
-
-    def approx_partials(self, of, wrt, method='fd', **kwargs):
-        """
-        Inform the framework that the specified derivatives are to be approximated.
-
-        Parameters
-        ----------
-        of : str or list of str
-            The name of the residual(s) that derivatives are being computed for.
-            May also contain a glob pattern.
-        wrt : str or list of str
-            The name of the variables that derivatives are taken with respect to.
-            This can contain the name of any input or output variable.
-            May also contain a glob pattern.
-        method : str
-            The type of approximation that should be used. Valid options include:
-                - 'fd': Finite Difference, 'cs': Complex Step
-        **kwargs : dict
-            Keyword arguments for controlling the behavior of the approximation.
-        """
-        supported_methods = {'fd': FiniteDifference,
-                             'cs': ComplexStep}
-
-        if method not in supported_methods:
-            msg = 'Method "{}" is not supported, method must be one of {}'
-            raise ValueError(msg.format(method, supported_methods.keys()))
-
-        if method not in self._approx_schemes:
-            self._approx_schemes[method] = supported_methods[method]()
-
-        self._approximated_partials.append((of, wrt, method, kwargs))
 
     def _approx_partials(self, of, wrt, method='fd', **kwargs):
         """
@@ -585,8 +572,8 @@ class Component(System):
                 meta.update(kwargs)
                 self._subjacs_info[abs_key] = meta
 
-    def declare_partials(self, of, wrt, dependent=True,
-                         rows=None, cols=None, val=None):
+    def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None,
+                         method='exact', **kwargs):
         """
         Declare information about this component's subjacobians.
 
@@ -603,7 +590,7 @@ class Component(System):
             If False, specifies no dependence between the output(s) and the
             input(s). This is only necessary in the case of a sparse global
             jacobian, because if 'dependent=False' is not specified and
-            set_subjac_info is not called for a given pair, then a dense
+            declare_partials is not called for a given pair, then a dense
             matrix of zeros will be allocated in the sparse global jacobian
             for that pair.  In the case of a dense global jacobian it doesn't
             matter because the space for a dense subjac will always be
@@ -615,12 +602,109 @@ class Component(System):
         val : float or ndarray of float or scipy.sparse
             Value of subjacobian.  If rows and cols are not None, this will
             contain the values found at each (row, col) location in the subjac.
+        method : str
+            The type of approximation that should be used. Valid options include:
+            'fd': Finite Difference, 'cs': Complex Step, 'exact': use the component
+            defined analytic derivatives. Default is 'exact'.
+        **kwargs : dict
+            Keyword arguments for controlling the behavior of the approximation.
         """
-        # If only one of rows/cols is specified
-        if (rows is None) ^ (cols is None):
-            raise ValueError('If one of rows/cols is specified, then both must be specified')
+        supported_methods = {'fd': FiniteDifference,
+                             'cs': ComplexStep,
+                             'exact': None}
 
-        self._declared_partials.append((of, wrt, dependent, rows, cols, val))
+        if method not in supported_methods:
+            msg = 'Method "{}" is not supported, method must be one of {}'
+            raise ValueError(msg.format(method, supported_methods.keys()))
+
+        # Analytic Derivative for this jacobian pair
+        if method == 'exact':
+
+            # If only one of rows/cols is specified
+            if (rows is None) ^ (cols is None):
+                raise ValueError('If one of rows/cols is specified, then both must be specified')
+
+            self._declared_partials.append((of, wrt, dependent, rows, cols, val))
+
+        # Approximation of the derivative, former API call approx_partials.
+        else:
+
+            if method not in self._approx_schemes:
+                self._approx_schemes[method] = supported_methods[method]()
+
+            # If rows/cols is specified
+            if rows is not None or cols is not None:
+                raise ValueError('Sparse FD specification not supported yet.')
+
+            # Need to declare the Jacobian element too.
+            self._declared_partials.append((of, wrt, True, rows, cols, val))
+
+            self._approximated_partials.append((of, wrt, method, kwargs))
+
+    def set_check_partial_options(self, wrt, method='fd', form=None, step=None, step_calc=None):
+        """
+        Set options that will be used for checking partial derivatives.
+
+        Parameters
+        ----------
+        wrt : str or list of str
+            The name or names of the variables that derivatives are taken with respect to.
+            This can contain the name of any input or output variable.
+            May also contain a glob pattern.
+        method : str
+            Method for check: "fd" for finite difference, "cs" for complex step.
+        form : str
+            Finite difference form for check, can be "forward", "central", or "backward". Leave
+            undeclared to keep unchanged from previous or default value.
+        step : float
+            Step size for finite difference check. Leave undeclared to keep unchanged from previous
+            or default value.
+        step_calc : str
+            Type of step calculation for check, can be "abs" for absolute (default) or "rel" for
+            relative.  Leave undeclared to keep unchanged from previous or default value.
+        """
+        supported_methods = ('fd', 'cs')
+
+        if method not in supported_methods:
+            msg = 'Method "{}" is not supported, method must be one of {}'
+            raise ValueError(msg.format(method, supported_methods.keys()))
+
+        wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
+        self._declared_partial_checks.append((wrt_list, method, form, step, step_calc))
+
+    def _get_check_partial_options(self):
+        """
+        Return dictionary of partial options with pattern matches processed.
+
+        This is called by check_partials.
+
+        Returns
+        -------
+        dict(wrt : (options))
+            Dictionary keyed by name with tuples of options (method, form, step, step_calc)
+        """
+        opts = {}
+        outs = list(self._var_allprocs_prom2abs_list['output'].keys())
+        ins = list(self._var_allprocs_prom2abs_list['input'].keys())
+        for wrt_list, method, form, step, step_calc in self._declared_partial_checks:
+            for pattern in wrt_list:
+                for match in find_matches(pattern, outs + ins):
+                    if match in opts:
+                        opt = opts[match]
+
+                        # New assignments take precedence
+                        for name, value in zip(['method', 'form', 'step', 'step_calc'],
+                                               [method, form, step, step_calc]):
+                            if value is not None:
+                                opt[name] = value
+
+                    else:
+                        opts[match] = {'method': method,
+                                       'form': form,
+                                       'step': step,
+                                       'step_calc': step_calc}
+
+        return opts
 
     def _declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None):
         """
@@ -639,7 +723,7 @@ class Component(System):
             If False, specifies no dependence between the output(s) and the
             input(s). This is only necessary in the case of a sparse global
             jacobian, because if 'dependent=False' is not specified and
-            set_subjac_info is not called for a given pair, then a dense
+            declare_partials is not called for a given pair, then a dense
             matrix of zeros will be allocated in the sparse global jacobian
             for that pair.  In the case of a dense global jacobian it doesn't
             matter because the space for a dense subjac will always be
@@ -728,16 +812,8 @@ class Component(System):
         """
         of_list = [of] if isinstance(of, string_types) else of
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
-        glob_patterns = {'*', '?', '['}
-        outs = list(self._var_allprocs_prom2abs_list['output'].keys())
-        ins = list(self._var_allprocs_prom2abs_list['input'].keys())
-
-        def find_matches(pattern, var_list):
-            if glob_patterns.intersection(pattern):
-                return [name for name in var_list if fnmatchcase(name, pattern)]
-            elif pattern in var_list:
-                return [pattern]
-            return []
+        outs = list(self._var_allprocs_prom2abs_list['output'])
+        ins = list(self._var_allprocs_prom2abs_list['input'])
 
         of_pattern_matches = [(pattern, find_matches(pattern, outs)) for pattern in of_list]
         wrt_pattern_matches = [(pattern, find_matches(pattern, outs + ins)) for pattern in wrt_list]
@@ -758,9 +834,9 @@ class Component(System):
         if meta['dependent']:
             out_size = np.prod(self._var_abs2meta['output'][abs_key[0]]['shape'])
             if abs_key[1] in self._var_abs2meta['input']:
-                in_size = np.prod(self._var_abs2meta['input'][abs_key[1]]['shape'])
+                in_size = self._var_abs2meta['input'][abs_key[1]]['size']
             else:  # assume output (or get a KeyError)
-                in_size = np.prod(self._var_abs2meta['output'][abs_key[1]]['shape'])
+                in_size = self._var_abs2meta['output'][abs_key[1]]['size']
 
             if in_size == 0 and self.comm.rank != 0:  # 'inactive' component
                 return
@@ -815,5 +891,13 @@ class Component(System):
         Provide initial guess for states.
 
         Does nothing on any non-implicit component.
+        """
+        pass
+
+    def _clear_iprint(self):
+        """
+        Clear out the iprint stack from the solvers.
+
+        Components don't have nested solvers, so do nothing to prevent errors.
         """
         pass

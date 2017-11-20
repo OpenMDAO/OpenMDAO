@@ -81,9 +81,9 @@ class NewtonSolver(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('solve_subsystems', type_=bool, default=False,
+        self.options.declare('solve_subsystems', types=bool, default=False,
                              desc='Set to True to turn on sub-solvers (Hybrid Newton).')
-        self.options.declare('max_sub_solves', type_=int, default=10,
+        self.options.declare('max_sub_solves', types=int, default=10,
                              desc='Maximum number of subsystem solves.')
         self.supports['gradients'] = True
 
@@ -184,6 +184,9 @@ class NewtonSolver(NonlinearSolver):
         """
         system = self._system
 
+        # Execute guess_nonlinear if specified.
+        system._guess_nonlinear()
+
         with Recording('Newton_subsolve', 0, self):
             if self.options['solve_subsystems'] and \
                (self._iter_count <= self.options['max_sub_solves']):
@@ -202,10 +205,6 @@ class NewtonSolver(NonlinearSolver):
                 self._solver_info.pop()
 
         if self.options['maxiter'] > 0:
-
-            # Execute guess_nonlinear if specified.
-            system._guess_nonlinear()
-
             self._run_apply()
             norm = self._iter_get_norm()
         else:

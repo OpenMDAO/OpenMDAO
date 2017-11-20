@@ -10,6 +10,11 @@ from openmdao.utils.name_maps import name2abs_name
 
 
 _full_slice = slice(None)
+_type_map = {
+    'input': 'input',
+    'output': 'output',
+    'residual': 'output'
+}
 
 
 class VectorInfo(object):
@@ -46,6 +51,8 @@ class Vector(object):
         The name of the vector: 'nonlinear', 'linear', or right-hand side name.
     _typ : str
         Type: 'input' for input vectors; 'output' for output/residual vectors.
+    _kind : str
+        Specific kind of vector, either 'input', 'output', or 'residual'.
     _system : System
         Pointer to the owning system.
     _iproc : int
@@ -56,8 +63,6 @@ class Vector(object):
         Dictionary mapping absolute variable names to the ndarray views.
     _views_flat : dict
         Dictionary mapping absolute variable names to the flattened ndarray views.
-    _idxs : dict
-        Either 0 or slice(None), used so that 1-sized vectors are made floats.
     _names : set([str, ...])
         Set of variables that are relevant in the current context.
     _root_vector : Vector
@@ -89,11 +94,15 @@ class Vector(object):
     _relevant : dict
         Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
         and dependent systems.
+    _do_scaling : bool
+        True if this vector performs scaling.
+    _scaling : dict
+        Contains scale factors to convert data arrays.
     """
 
     _vector_info = VectorInfo()
 
-    def __init__(self, name, typ, system, root_vector=None, resize=False, alloc_complex=False,
+    def __init__(self, name, kind, system, root_vector=None, resize=False, alloc_complex=False,
                  ncol=1, relevant=None):
         """
         Initialize all attributes.
@@ -102,8 +111,8 @@ class Vector(object):
         ----------
         name : str
             The name of the vector: 'nonlinear', 'linear', or right-hand side name.
-        typ : str
-            Type: 'input' for input vectors; 'output' for output/residual vectors.
+        kind : str
+            The kind of vector, 'input', 'output', or 'residual'.
         system : <System>
             Pointer to the owning system.
         root_vector : <Vector>
@@ -119,7 +128,8 @@ class Vector(object):
             and dependent systems.
         """
         self._name = name
-        self._typ = typ
+        self._typ = _type_map[kind]
+        self._kind = kind
         self._ncol = ncol
         self._icol = None
         self._relevant = relevant
@@ -145,6 +155,12 @@ class Vector(object):
             self._imag_views = {}
             self._complex_view_cache = {}
             self._imag_views_flat = {}
+
+        self._do_scaling = ((kind == 'input' and system._has_input_scaling) or
+                            (kind == 'output' and system._has_output_scaling) or
+                            (kind == 'residual' and system._has_resid_scaling))
+
+        self._scaling = {}
 
         if root_vector is None:
             self._root_vector = self
@@ -188,23 +204,6 @@ class Vector(object):
         """
         return self._length
 
-    def _create_subvector(self, system):
-        """
-        Return a smaller vector for a subsystem.
-
-        Parameters
-        ----------
-        system : <System>
-            system for the subvector that is a subsystem of self._system.
-
-        Returns
-        -------
-        <Vector>
-            subvector instance.
-        """
-        return self.__class__(self._name, self._typ, system,
-                              self._root_vector)
-
     def _clone(self, initialize_views=False):
         """
         Return a copy that optionally provides view access to its data.
@@ -242,7 +241,7 @@ class Vector(object):
         """
         if new_array is None:
             ncol = self._ncol
-            new_array = np.zeros(self._length) if ncol == 1 else np.zeros((self._length, ncol))
+            new_array = np.empty(self._length) if ncol == 1 else np.zeros((self._length, ncol))
 
         for set_name, data in iteritems(self._data):
             new_array[self._indices[set_name]] = data
@@ -386,7 +385,7 @@ class Vector(object):
                 slc = _full_slice
             else:
                 slc = (_full_slice, self._icol)
-            value, shape = ensure_compatible(name, value, self._views[abs_name][slc].shape)
+            value, _ = ensure_compatible(name, value, self._views[abs_name][slc].shape)
             if self._vector_info._under_complex_step:
 
                 # setitem overwrites anything you may have done with numpy indexing
@@ -430,8 +429,6 @@ class Vector(object):
 
         - _views
         - _views_flat
-        - _idxs
-
         """
         pass
 
@@ -496,6 +493,27 @@ class Vector(object):
             this vector times val is added to self.
         """
         pass
+
+    def scale(self, scale_to):
+        """
+        Scale this vector to normalized or physical form.
+
+        Parameters
+        ----------
+        scale_to : str
+            Values are "phys" or "norm" to scale to physical or normalized.
+        """
+        scaling = self._scaling[scale_to]
+        if self._ncol == 1:
+            for set_name, data in iteritems(self._data):
+                data *= scaling[set_name][1]
+                if scaling[set_name][0] is not None:  # nonlinear only
+                    data += scaling[set_name][0]
+        else:
+            for set_name, data in iteritems(self._data):
+                data *= scaling[set_name][1][:, np.newaxis]
+                if scaling[set_name][0] is not None:  # nonlinear only
+                    data += scaling[set_name][0]
 
     def set_vec(self, vec):
         """

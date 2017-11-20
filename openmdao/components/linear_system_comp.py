@@ -26,7 +26,7 @@ class LinearSystemComp(ImplicitComponent):
         """
         Declare metadata.
         """
-        self.metadata.declare('size', default=1, type_=int, desc='the size of the linear system')
+        self.metadata.declare('size', default=1, types=int, desc='the size of the linear system')
         self.metadata.declare('partial_type', default='dense',
                               values=['dense', 'sparse', 'matrix_free'],
                               desc='the way the derivatives are defined')
@@ -70,7 +70,10 @@ class LinearSystemComp(ImplicitComponent):
             self.declare_partials('x', 'A', val=np.ones(size**2), rows=rows, cols=cols)
 
         elif partial_type == "dense":
-            self.declare_partials('x', 'b', val=-np.eye(size))
+            self.declare_partials(of='x', wrt='b', val=-np.eye(size))
+            self.declare_partials(of='x', wrt='A')
+
+        self.declare_partials(of='x', wrt='x')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """

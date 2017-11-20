@@ -88,7 +88,7 @@ class MetaModel(ExplicitComponent):
         self._input_size += input_size
 
         train_name = 'train:%s' % name
-        self.metadata.declare(train_name, desc='Training data for %s' % name)
+        self.metadata.declare(train_name, default=None, desc='Training data for %s' % name)
         if training_data is not None:
             self.metadata[train_name] = training_data
 
@@ -135,7 +135,7 @@ class MetaModel(ExplicitComponent):
             metadata['default_surrogate'] = True
 
         train_name = 'train:%s' % name
-        self.metadata.declare(train_name, desc='Training data for %s' % name)
+        self.metadata.declare(train_name, default=None, desc='Training data for %s' % name)
         if training_data is not None:
             self.metadata[train_name] = training_data
 
@@ -333,6 +333,21 @@ class MetaModel(ExplicitComponent):
             for pname, sz in self._surrogate_input_names:
                 partials[(uname, pname)] = sjac[:, idx:idx + sz]
                 idx += sz
+
+    def _setup_partials(self, recurse=True):
+        """
+        Process all partials and approximations that the user declared.
+
+        Metamodel needs to declare its partials after inputs and outputs are known.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        super(MetaModel, self)._setup_partials()
+        self._declare_partials(of=[name[0] for name in self._surrogate_output_names],
+                               wrt=[name[0] for name in self._surrogate_input_names])
 
     def _train(self):
         """

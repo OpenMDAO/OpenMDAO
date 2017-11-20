@@ -1,0 +1,75 @@
+---------------------------------------------------------------------------------------------------
+Release Notes for OpenMDAO 2.0.2
+October 19, 2017
+
+- Fixing further packaging errors by updating packaging information.
+- Added tutorials for derivatives of explicit and implicit components.
+
+---------------------------------------------------------------------------------------------------
+Release Notes for OpenMDAO 2.0.1
+October 19, 2017
+
+- Attempting to fix test errors that were happening by updating the packaging information.
+
+
+---------------------------------------------------------------------------------------------------
+Release Notes for OpenMDAO 2.0.0
+October 19, 2017
+
+First public release of 2.0.0.
+
+
+New Features:
+--------------
+(first release... so EVERYTHING!)
+- Drivers:
+    - ScipyOptimizer
+    - PyoptSparseOptimizer
+- Solvers:
+    - Nonlinear:
+        - NonlinearBlockGS
+        - NonlinearBlockJac
+        - NonlinearRunOnce
+        - NewtonSolver
+    - Linear:
+        - LinearBlockGS
+        - LinearBlockJac
+        - LinearRunOnce
+        - DirectSolver
+        - PetscKSP
+        - ScipyIterativeSolver
+        - LinearUserDefined
+    - LineSearch
+        - AmijoGoldsetinLS
+        - BoundsEnforceLS
+- Components:
+    - MetaModel
+    - ExecComp
+    - BalanceComp
+    - LinearSystemComp
+
+- General Capability:
+    - Implicit and Explicit Components
+    - Serial and Parallel Groups
+    - Parallel distributed components (components that need an MPI comm)
+    - Unit conversions
+    - Variable scaling
+    - Specifying component metadata
+    - Analytic derivatives
+
+
+Currently Missing Features that existed in 1.7.3:
+-------------------------------------------------
+- Pass-by-object variables (anything that is not a float)
+- File Variables
+- automatic ordering of groups/components based on connections
+- Design of Experiments Driver (DOE)
+- Parallel Finite Difference
+- File-Wrapping utility library & External Code Component
+- Approximate active set constraint calculation skipping
+- Brent Solver
+- CaseRecorders for CSV, HDF5, and Dump formats
+
+Bug Fixes
+----------
+N/A

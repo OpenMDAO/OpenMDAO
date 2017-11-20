@@ -6,7 +6,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Group, Problem, ImplicitComponent, PetscKSP, LinearRunOnce, \
+from openmdao.api import Group, Problem, ImplicitComponent, PETScKrylov, LinearRunOnce, \
      IndepVarComp
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.solvers.linear.user_defined import LinearUserDefined
@@ -32,11 +32,8 @@ class DistribStateImplicit(ImplicitComponent):
         self.add_output('out_var', shape=1)
         self.local_size = sizes[rank]
 
-        self.linear_solver = PetscKSP()
+        self.linear_solver = PETScKrylov()
         self.linear_solver.precon = LinearUserDefined(self.mysolve)
-
-    def get_req_procs(self):
-        return 1,10
 
     def solve_nonlinear(self, i, o):
         o['states'] = i['a']
@@ -138,12 +135,12 @@ class TestUserDefinedSolver(unittest.TestCase):
 
         model = p.model
 
-        model.linear_solver = PetscKSP()
+        model.linear_solver = PETScKrylov()
         model.linear_solver.precon = LinearRunOnce()
 
         p.setup(vector_class=PETScVector, mode='rev', check=False)
         p.run_model()
-        jac = p.compute_total_derivs(of=['out_var'], wrt=['a'], return_format='dict')
+        jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
 
         assert_rel_error(self, 15.0, jac['out_var']['a'][0][0])
 
@@ -175,7 +172,7 @@ class TestUserDefinedSolver(unittest.TestCase):
 
         p.setup(vector_class=PETScVector, mode='rev', check=False)
         p.run_model()
-        jac = p.compute_total_derivs(of=['out_var'], wrt=['a'], return_format='dict')
+        jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
 
     def test_method_default(self):
         # Uses `solve_linear` by default
@@ -187,7 +184,7 @@ class TestUserDefinedSolver(unittest.TestCase):
 
         model = p.model
 
-        model.linear_solver = PetscKSP()
+        model.linear_solver = PETScKrylov()
         model.linear_solver.precon = LinearRunOnce()
 
         p.setup(vector_class=PETScVector, mode='rev', check=False)
@@ -195,11 +192,15 @@ class TestUserDefinedSolver(unittest.TestCase):
         model.icomp.linear_solver.precon = LinearUserDefined()
 
         p.run_model()
-        jac = p.compute_total_derivs(of=['out_var'], wrt=['a'], return_format='dict')
+        jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
 
         assert_rel_error(self, 15.0, jac['out_var']['a'][0][0])
 
     def test_feature(self):
+        import numpy as np
+
+        from openmdao.api import Problem, ImplicitComponent, IndepVarComp, LinearRunOnce, PETScKrylov, PETScVector, LinearUserDefined
+        from openmdao.utils.array_utils import evenly_distrib_idxs
 
         class CustomSolveImplicit(ImplicitComponent):
 
@@ -216,11 +217,8 @@ class TestUserDefinedSolver(unittest.TestCase):
                 self.add_output('out_var', shape=1)
                 self.local_size = sizes[rank]
 
-                self.linear_solver = PetscKSP()
+                self.linear_solver = PETScKrylov()
                 self.linear_solver.precon = LinearUserDefined(solve_function=self.mysolve)
-
-            def get_req_procs(self):
-                return 1,10
 
             def solve_nonlinear(self, i, o):
                 o['states'] = i['a']
@@ -312,12 +310,12 @@ class TestUserDefinedSolver(unittest.TestCase):
 
         model = prob.model
 
-        model.linear_solver = PetscKSP()
+        model.linear_solver = PETScKrylov()
         model.linear_solver.precon = LinearRunOnce()
 
         prob.setup(vector_class=PETScVector, mode='rev', check=False)
         prob.run_model()
-        jac = prob.compute_total_derivs(of=['out_var'], wrt=['a'], return_format='dict')
+        jac = prob.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
 
         assert_rel_error(self, 15.0, jac['out_var']['a'][0][0])
 

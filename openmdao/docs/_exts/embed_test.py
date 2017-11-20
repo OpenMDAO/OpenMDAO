@@ -1,11 +1,19 @@
+"""
+Sphinx directive to embed an OpenMDAO test in the docs.
+
+The test is executed and the output is captured.
+"""
+
 import sys
+from docutils import nodes
+from docutils.parsers.rst.directives import unchanged
+
 import sphinx
 from sphinx.util.compat import Directive
 from sphinx.writers.html import HTMLTranslator
-from docutils import nodes
-from docutils.parsers.rst.directives import unchanged
-from openmdao.docs._utils.docutil import get_unit_test_source_and_run_outputs
-from openmdao.docs._utils.docutil import get_unit_test_source_and_run_outputs_in_out
+
+from openmdao.docs._utils.docutil import get_test_src
+
 
 if sys.version_info[0] == 2:
     import cgi as cgiesc
@@ -55,7 +63,8 @@ def depart_in_or_out_node(self, node):
 
 
 class EmbedTestDirective(Directive):
-    """EmbedTestDirective is a custom directive to allow a unit test and the result
+    """
+    EmbedTestDirective is a custom directive to allow a unit test and the result
     of running the test to be shown in feature docs.
     An example usage would look like this:
 
@@ -88,45 +97,42 @@ class EmbedTestDirective(Directive):
     }
 
     def run(self):
-        # create a list of document nodes to return
+        """
+        Create a list of document nodes to return.
+        """
         doc_nodes = []
         n = 1
         # grabbing source, and output of a test segment
         method_path = self.arguments[0]
-        if 'no-split' in self.options:
-            src, output, skipped, failed = get_unit_test_source_and_run_outputs(method_path)
+
+        src, exc_txt, input_blocks, output_blocks, skipped, failed = get_test_src(method_path)
+
+        if skipped or failed:  # do the old way
             # we want the body of test code to be formatted and code highlighted
             body = nodes.literal_block(src, src)
             body['language'] = 'python'
             doc_nodes.append(body)
 
-            # we want the output block to also be formatted similarly unless test was skipped
+            # We want the output block to also be formatted similarly unless test was skipped
             if skipped:
-                output = "Test skipped because " + output
+                output = "Test skipped because " + exc_txt
                 output_node = skipped_or_failed_node(text=output, number=n, kind="skipped")
             elif failed:
-                output_node = skipped_or_failed_node(text=output, number=n, kind="failed")
-            else:
-                output_node = in_or_out_node(kind="Out", number=n, text=src)
+                output_node = skipped_or_failed_node(text=exc_txt, number=n, kind="failed")
 
             doc_nodes.append(output_node)
 
         else:
-            src, skipped_failed_output, input_blocks, output_blocks, skipped, failed = get_unit_test_source_and_run_outputs_in_out(method_path)
+            output_blocks = [cgiesc.escape(ob) for ob in output_blocks]
+            if 'no-split' in self.options:
+                input_block = '\n'.join(input_blocks)
+                output_block = '\n'.join(output_blocks)
 
-            if skipped or failed:  # do the old way
-                # we want the body of test code to be formatted and code highlighted
-                body = nodes.literal_block(src, src)
-                body['language'] = 'python'
-                doc_nodes.append(body)
+                input_node = nodes.literal_block(input_block, input_block)
+                input_node['language'] = 'python'
+                doc_nodes.append(input_node)
 
-                # we want the output block to also be formatted similarly unless test was skipped
-                if skipped:
-                    output = "Test skipped because " + skipped_failed_output
-                    output_node = skipped_or_failed_node(text=output, number=n, kind="skipped")
-                elif failed:
-                    output_node = skipped_or_failed_node(text=skipped_failed_output, number=n, kind="failed")
-
+                output_node = in_or_out_node(kind="Out", number=n, text=output_block)
                 doc_nodes.append(output_node)
 
             else:
@@ -136,8 +142,7 @@ class EmbedTestDirective(Directive):
                     doc_nodes.append(input_node)
                     output_node = in_or_out_node(kind="Out", number=n, text=output_block)
                     doc_nodes.append(output_node)
-
-                    n = n + 1
+                    n += 1
 
         return doc_nodes
 

@@ -1,6 +1,8 @@
-****************************
-Adding Subsystems to a Group
-****************************
+.. _feature_adding_subsystem_to_a_group:
+
+******************************************************
+Adding Subsystems to a Group and Promoting Variables
+******************************************************
 
 To add a Component or another Group to a Group, use the add_subsystem method.
 
@@ -8,16 +10,17 @@ To add a Component or another Group to a Group, use the add_subsystem method.
     :noindex:
 
 Usage
------
+*********
 
-1. Add a component to a Group.
+Add a component to a Group.
+-----------------------------------------------------------------------------
 
 .. embed-test::
     openmdao.core.tests.test_group.TestGroup.test_group_simple
 
-2. Promote the input and output of a component.  Because the promoted names
-of `indep.a` and `comp.a` are the same, `indep.a` is automatically connected
-to `comp1.a`.
+Promote the input and output of a component
+-----------------------------------------------------------------------------
+Because the promoted names of `indep.a` and `comp.a` are the same, `indep.a` is automatically connected to `comp1.a`.
 
 .. note::
 
@@ -30,12 +33,14 @@ to `comp1.a`.
 .. embed-test::
     openmdao.core.tests.test_group.TestGroup.test_group_simple_promoted
 
-3. Add 2 components to a Group nested within another Group.
+Add 2 components to a Group nested within another Group
+-----------------------------------------------------------------------------
 
 .. embed-test::
     openmdao.core.tests.test_group.TestGroup.test_group_nested
 
-4. Promote the input and output of components to subgroup level.
+Promote the input and output of components to subgroup level
+-----------------------------------------------------------------------------
 
 In this example, there are two inputs promoted to the same name, so
 the promoted name *G1.a* is not unique.
@@ -43,13 +48,15 @@ the promoted name *G1.a* is not unique.
 .. embed-test::
     openmdao.core.tests.test_group.TestGroup.test_group_nested_promoted1
 
-5. Promote the input and output of components from subgroup level up
-to top level.
+
+Promote the input and output of components from subgroup level up to top level
+-------------------------------------------------------------------------------
 
 .. embed-test::
     openmdao.core.tests.test_group.TestGroup.test_group_nested_promoted2
 
-6. Promote with an alias to connect an input to a source.
+Promote with an alias to connect an input to a source
+-----------------------------------------------------------------------------
 
 .. embed-test::
     openmdao.core.tests.test_group.TestGroup.test_group_rename_connect

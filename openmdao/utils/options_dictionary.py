@@ -1,6 +1,11 @@
 """Define the OptionsDictionary class."""
 from __future__ import division, print_function
 
+from openmdao.utils.general_utils import warn_deprecation
+
+# unique object to check if default is given
+_undefined = object()
+
 
 class OptionsDictionary(object):
     """
@@ -15,7 +20,7 @@ class OptionsDictionary(object):
     ----------
     _dict : dict of dict
         Dictionary of entries. Each entry is a dictionary consisting of value, values,
-        type_, desc, lower, and upper.
+        types, desc, lower, and upper.
     _read_only : bool
         If True, setting (via __setitem__ or update) is not permitted.
     """
@@ -47,90 +52,100 @@ class OptionsDictionary(object):
         value : object
             The default or user-set value to check for value, type, lower, and upper.
         """
-        values = self._dict[name]['values']
-        type_ = self._dict[name]['type_']
-        lower = self._dict[name]['lower']
-        upper = self._dict[name]['upper']
-        is_valid = self._dict[name]['is_valid']
+        meta = self._dict[name]
+        values = meta['values']
+        types = meta['types']
+        lower = meta['lower']
+        upper = meta['upper']
+        is_valid = meta['is_valid']
 
-        # If values and type_ are both declared
-        if values is not None and type_ is not None:
-            if value not in values and not isinstance(value, type_):
-                raise ValueError(
-                    "Entry '{}'\'s value is not one of {}".format(name, values)
-                    + " and entry '{}' has the wrong type ({})".format(name, type_))
-        # If only values is declared
-        elif values is not None:
-            if value not in values:
-                raise ValueError("Entry '{}'\'s value is not one of {}".format(name, values))
-        # If only type_ is declared
-        elif type_ is not None:
-            if not isinstance(value, type_):
-                raise TypeError("Entry '{}' has the wrong type ({})".format(name, type_))
+        if not (value is None and meta['allow_none']):
+            # If only values is declared
+            if values is not None:
+                if value not in values:
+                    raise ValueError("Entry '{}'\'s value is not one of {}".format(name, values))
+            # If only types is declared
+            elif types is not None:
+                if not isinstance(value, types):
+                    raise TypeError("Entry '{}' has the wrong type ({})".format(name, types))
 
-        if upper is not None:
-            if value > upper:
-                msg = ("Value of {} exceeds maximum of {} for entry 'x'")
-                raise ValueError(msg.format(value, upper))
-        if lower is not None:
-            if value < lower:
-                msg = ("Value of {} exceeds minimum of {} for entry 'x'")
-                raise ValueError(msg.format(value, lower))
+            if upper is not None:
+                if value > upper:
+                    msg = ("Value of {} exceeds maximum of {} for entry 'x'")
+                    raise ValueError(msg.format(value, upper))
+            if lower is not None:
+                if value < lower:
+                    msg = ("Value of {} exceeds minimum of {} for entry 'x'")
+                    raise ValueError(msg.format(value, lower))
 
         # General function test
         if is_valid is not None and not is_valid(value):
             raise ValueError("Function is_valid returns False for {}.".format(name))
 
-    def declare(self, name, default=None, values=None, type_=None, desc='', required=False,
-                upper=None, lower=None, is_valid=None):
-        """
+    def declare(self, name, default=_undefined, values=None, types=None, type_=None, desc='',
+                upper=None, lower=None, is_valid=None, allow_none=False):
+        r"""
         Declare an option.
 
         The value of the option must satisfy the following:
-        1. If values and not type_ was given when declaring, value must be in values.
-        2. If type_ and not values was given when declaring, value must be an instance of type_.
-        3. If values and type_ were given when declaring, either of the above must be true.
+        1. If values only was given when declaring, value must be in values.
+        2. If types only was given when declaring, value must satisfy isinstance(value, types).
+        3. It is an error if both values and types are given.
 
         Parameters
         ----------
         name : str
             Name of the option.
-        default : object or None
+        default : object or Null
             Optional default value that must be valid under the above 3 conditions.
         values : set or list or tuple or None
             Optional list of acceptable option values.
-        type_ : type or tuple of types or None
+        types : type or tuple of types or None
             Optional type or list of acceptable option types.
+        type_ : type or tuple of types or None
+            Deprecated.  Use types instead.
         desc : str
             Optional description of the option.
-        required : bool
-            Whether the key must be set prior to reading its value
-            (as opposed to just using the default).
         upper : float or None
             Maximum allowable value.
         lower : float or None
             Minimum allowable value.
         is_valid : function or None
             General check function that returns True if valid.
+        allow_none : bool
+            If True, allow None as a value regardless of values or types.
         """
+        if type_ is not None:
+            warn_deprecation("In declaration of option '%s' the '_type' arg is deprecated.  "
+                             "Use 'types' instead." % name)
+        if types is None:
+            types = type_
+
         if values is not None and not isinstance(values, (set, list, tuple)):
             raise TypeError("'values' must be of type None, list, or tuple - not %s." % values)
-        if type_ is not None and not isinstance(type_, (type, tuple)):
-            raise TypeError("'type_' must be None, a type or a tuple  - not %s." % type_)
+        if types is not None and not isinstance(types, (type, set, list, tuple)):
+            raise TypeError("'types' must be None, a type or a tuple  - not %s." % types)
+
+        if types is not None and values is not None:
+            raise RuntimeError("'types' and 'values' were both specified for option '%s'." %
+                               name)
+
+        default_provided = default is not _undefined
 
         self._dict[name] = {
             'value': default,
             'values': values,
-            'type_': type_,
+            'types': types,
             'desc': desc,
             'upper': upper,
             'lower': lower,
             'is_valid': is_valid,
-            'has_been_set': not required,  # If not required, has_been_set is True from the getgo
+            'has_been_set': default_provided,
+            'allow_none': allow_none,
         }
 
         # If a default is given, check for validity
-        if default is not None:
+        if default_provided:
             self._assert_valid(name, default)
 
     def update(self, in_dict):
@@ -211,10 +226,11 @@ class OptionsDictionary(object):
             value of the entry.
         """
         # If the entry has been set in this system, return the set value
-        if name in self._dict:
-            if self._dict[name]['has_been_set']:
-                return self._dict[name]['value']
+        try:
+            meta = self._dict[name]
+            if meta['has_been_set']:
+                return meta['value']
             else:
                 raise RuntimeError("Entry '{}' is required but has not been set.".format(name))
-        else:
+        except KeyError:
             raise KeyError("Entry '{}' cannot be found".format(name))

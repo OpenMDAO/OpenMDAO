@@ -1,5 +1,6 @@
 from openmdao.api import OptionsDictionary
 import unittest
+import warnings
 from six import PY3, assertRegex
 
 
@@ -9,7 +10,7 @@ class TestOptionsDict(unittest.TestCase):
         self.dict = OptionsDictionary()
 
     def test_type_checking(self):
-        self.dict.declare('test', type_=int, desc='Test integer value')
+        self.dict.declare('test', types=int, desc='Test integer value')
 
         self.dict['test'] = 1
         self.assertEqual(self.dict['test'], 1)
@@ -22,14 +23,19 @@ class TestOptionsDict(unittest.TestCase):
         self.assertEqual(expected_msg, str(context.exception))
 
         # make sure bools work
-        self.dict.declare('flag', default=False, type_=bool)
+        self.dict.declare('flag', default=False, types=bool)
         self.assertEqual(self.dict['flag'], False)
         self.dict['flag'] = True
         self.assertEqual(self.dict['flag'], True)
 
+    def test_allow_none(self):
+        self.dict.declare('test', types=int, allow_none=True, desc='Test integer value')
+        self.dict['test'] = None
+        self.assertEqual(self.dict['test'], None)
+
     def test_type_and_values(self):
         # Test with only type_
-        self.dict.declare('test1', type_=int)
+        self.dict.declare('test1', types=int)
         self.dict['test1'] = 1
         self.assertEqual(self.dict['test1'], 1)
 
@@ -39,23 +45,30 @@ class TestOptionsDict(unittest.TestCase):
         self.assertEqual(self.dict['test2'], 'a')
 
         # Test with both type_ and values
-        self.dict.declare('test3', type_=int, values=['a', 'b'])
-        self.dict['test3'] = 1
-        self.assertEqual(self.dict['test3'], 1)
-        self.dict['test3'] = 'a'
-        self.assertEqual(self.dict['test3'], 'a')
-
-    def test_required(self):
-        self.dict.declare('test', required=True)
-
-        with self.assertRaises(RuntimeError) as context:
-            self.dict['test']
-
-        expected_msg = "Entry 'test' is required but has not been set."
-        self.assertEqual(expected_msg, str(context.exception))
+        with self.assertRaises(Exception) as context:
+            self.dict.declare('test3', types=int, values=['a', 'b'])
+        self.assertEqual(str(context.exception),
+                         "'types' and 'values' were both specified for option 'test3'.")
 
     def test_isvalid(self):
-        self.dict.declare('even_test', type_=int, is_valid=lambda x: x%2 == 0)
+        self.dict.declare('even_test', types=int, is_valid=lambda x: x%2 == 0)
+        self.dict['even_test'] = 2
+        self.dict['even_test'] = 4
+
+        with self.assertRaises(ValueError) as context:
+            self.dict['even_test'] = 3
+
+        expected_msg = "Function is_valid returns False for {}.".format('even_test')
+        self.assertEqual(expected_msg, str(context.exception))
+
+    def test_isvalid_deprecated_type(self):
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            self.dict.declare('even_test', type_=int, is_valid=lambda x: x%2 == 0)
+            self.assertEqual(len(w), 1)
+            self.assertEqual(str(w[-1].message), "In declaration of option 'even_test' the '_type' arg is deprecated.  Use 'types' instead.")
+
         self.dict['even_test'] = 2
         self.dict['even_test'] = 4
 
@@ -83,7 +96,7 @@ class TestOptionsDict(unittest.TestCase):
         self.assertTrue(contains)
 
     def test_update(self):
-        self.dict.declare('test', default='Test value', type_=object)
+        self.dict.declare('test', default='Test value', types=object)
 
         obj = object()
         self.dict.update({'test': obj})
@@ -108,7 +121,7 @@ class TestOptionsDict(unittest.TestCase):
         obj_def = object()
         obj_new = object()
 
-        self.dict.declare('test', default=obj_def, type_=object)
+        self.dict.declare('test', default=obj_def, types=object)
 
         self.assertIs(self.dict['test'], obj_def)
 

@@ -140,6 +140,25 @@ class ScipyOptimizer(Driver):
         self.supports['two_sided_constraints'] = opt in _constraint_optimizers
         self.supports['equality_constraints'] = opt in _eq_constraint_optimizers
 
+        # Since COBYLA does not support bounds, we
+        #   need to add to the _cons metadata for any bounds that
+        #   need to be translated into a constraint
+        if opt == 'COBYLA':
+            for name, meta in iteritems(self._designvars):
+                lower = meta['lower']
+                upper = meta['upper']
+                if isinstance(lower, np.ndarray) or lower != - sys.float_info.max \
+                        or isinstance(upper, np.ndarray) or upper != sys.float_info.max:
+                    dict = OrderedDict()
+                    dict['lower'] = lower
+                    dict['upper'] = upper
+                    dict['equals'] = None
+                    dict['indices'] = None  # qqq really needs to be figured out
+                    dict['adder'] = None
+                    dict['scaler'] = None
+                    dict['size'] = meta['size']
+                    self._cons[name] = dict
+
     def run(self):
         """
         Optimize the problem using selected Scipy optimizer.
@@ -150,7 +169,6 @@ class ScipyOptimizer(Driver):
             Failure flag; True if failed to converge, False is successful.
         """
         opt = self.options['optimizer']
-        problem = self._problem
         model = self._problem.model
         self.iter_count = 0
 
@@ -253,17 +271,26 @@ class ScipyOptimizer(Driver):
             jac = None
 
         # optimize
-        result = minimize(self._objfunc, x_init,
-                          # args=(),
-                          method=opt,
-                          jac=jac,
-                          # hess=None,
-                          # hessp=None,
-                          bounds=bounds,
-                          constraints=constraints,
-                          tol=self.options['tol'],
-                          # callback=None,
-                          options=self.opt_settings)
+        try:
+            result = minimize(self._objfunc, x_init,
+                              # args=(),
+                              method=opt,
+                              jac=jac,
+                              # hess=None,
+                              # hessp=None,
+                              bounds=bounds,
+                              constraints=constraints,
+                              tol=self.options['tol'],
+                              # callback=None,
+                              options=self.opt_settings)
+
+        # If an exception was swallowed in one of our callbacks, we want to raise it
+        # rather than the cryptic message from scipy.
+        except Exception as msg:
+            if self._exc_info is not None:
+                self._reraise()
+            else:
+                raise
 
         if self._exc_info is not None:
             self._reraise()
@@ -271,7 +298,12 @@ class ScipyOptimizer(Driver):
         self.result = result
         self.fail = False if self.result.success else True
 
-        if self.options['disp']:
+        if self.fail:
+            print('Optimization FAILED.')
+            print(result.message)
+            print('-' * 35)
+
+        elif self.options['disp']:
             print('Optimization Complete')
             print('-' * 35)
 
@@ -396,8 +428,8 @@ class ScipyOptimizer(Driver):
         """
         try:
             quantities = list(self._objs) + list(self._cons)
-            grad = self._compute_total_derivs(of=quantities, wrt=list(self._designvars),
-                                              return_format='array')
+            grad = self._compute_totals(of=quantities, wrt=list(self._designvars),
+                                        return_format='array')
             self._grad_cache = grad
 
         except Exception as msg:

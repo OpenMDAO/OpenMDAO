@@ -1,8 +1,12 @@
 """
 Utility functions related to recording or execution metadata.
 """
+from fnmatch import fnmatchcase
 from six.moves import map, zip
+from six import iteritems
 import os
+
+import numpy as np
 
 
 def create_local_meta(name):
@@ -82,3 +86,72 @@ def is_valid_sqlite3_db(filename):
         header = fd.read(100)
 
     return header[:16] == b'SQLite format 3\x00'
+
+
+def check_path(path, includes, excludes, include_all_path=False):
+    """
+    Calculate whether `path` should be recorded.
+
+    Parameters
+    ----------
+    path : str
+        path proposed to be recorded
+    includes : list
+        list of things to be included in recording list.
+    excludes : list
+        list of things to be excluded from recording list.
+    include_all_path : bool
+        If set to True, will return True unless it is in excludes
+
+    Returns
+    -------
+    boolean
+        True if path should be recorded, False if it's been excluded.
+    """
+    # First see if it's included
+    for pattern in includes:
+        if fnmatchcase(path, pattern) or include_all_path:
+            # We found a match. Check to see if it is excluded.
+            for ex_pattern in excludes:
+                if fnmatchcase(path, ex_pattern):
+                    return False
+            return True
+
+    # the case where includes is empty but include_all_path is True
+    if include_all_path:
+        for ex_pattern in excludes:
+            if fnmatchcase(path, ex_pattern):
+                return False
+        return True
+
+    return False
+
+
+def values_to_array(values):
+    """
+    Convert a dict of variable names and values into a numpy named array.
+
+    Parameters
+    ----------
+    values : dict
+        dict of variable names and values
+
+    Returns
+    -------
+    array: numpy named array
+        named array containing the same names and values as the input values dict.
+    """
+    if values:
+        dtype_tuples = []
+        for name, value in iteritems(values):
+            tple = (name, '{}f8'.format(value.shape))
+            dtype_tuples.append(tple)
+
+        array = np.zeros((1,), dtype=dtype_tuples)
+
+        for name, value in iteritems(values):
+            array[name] = value
+    else:
+        array = None
+
+    return array

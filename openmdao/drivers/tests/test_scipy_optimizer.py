@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizer
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizer, ExplicitComponent
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -15,7 +15,7 @@ from openmdao.test_suite.groups.sin_fitter import SineFitter
 
 class TestScipyOptimizer(unittest.TestCase):
 
-    def test_compute_total_derivs_basic_return_array(self):
+    def test_compute_totals_basic_return_array(self):
         # Make sure 'array' return_format works.
 
         prob = Problem()
@@ -34,7 +34,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         of = ['comp.f_xy']
         wrt = ['p1.x', 'p2.y']
-        derivs = prob.driver._compute_total_derivs(of=of, wrt=wrt, return_format='array')
+        derivs = prob.driver._compute_totals(of=of, wrt=wrt, return_format='array')
 
         assert_rel_error(self, derivs[0, 0], -6.0, 1e-6)
         assert_rel_error(self, derivs[0, 1], 8.0, 1e-6)
@@ -44,12 +44,12 @@ class TestScipyOptimizer(unittest.TestCase):
 
         of = ['comp.f_xy']
         wrt = ['p1.x', 'p2.y']
-        derivs = prob.driver._compute_total_derivs(of=of, wrt=wrt, return_format='array')
+        derivs = prob.driver._compute_totals(of=of, wrt=wrt, return_format='array')
 
         assert_rel_error(self, derivs[0, 0], -6.0, 1e-6)
         assert_rel_error(self, derivs[0, 1], 8.0, 1e-6)
 
-    def test_compute_total_derivs_return_array_non_square(self):
+    def test_compute_totals_return_array_non_square(self):
 
         prob = Problem()
         prob.model = model = Group()
@@ -66,7 +66,7 @@ class TestScipyOptimizer(unittest.TestCase):
         prob.setup(check=False)
         prob.run_driver()
 
-        derivs = prob.driver._compute_total_derivs(of=['comp.y1'], wrt=['px.x'],
+        derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'],
                                                    return_format='array')
 
         J = comp.JJ[0:3, 0:2]
@@ -74,7 +74,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         # Support for a name to be in 'of' and 'wrt'
 
-        derivs = prob.driver._compute_total_derivs(of=['comp.y2', 'px.x', 'comp.y1'], wrt=['px.x'],
+        derivs = prob.driver._compute_totals(of=['comp.y2', 'px.x', 'comp.y1'], wrt=['px.x'],
                                                    return_format='array')
 
         assert_rel_error(self, J, derivs[3:, :], 1.0e-3)
@@ -96,7 +96,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         # Support for a name to be in 'of' and 'wrt'
 
-        J = prob.driver._compute_total_derivs(of=['px.x'], wrt=['px.x'],
+        J = prob.driver._compute_totals(of=['px.x'], wrt=['px.x'],
                                                    return_format='array')
 
         assert_rel_error(self, J, np.eye(2), 1.0e-3)
@@ -240,6 +240,39 @@ class TestScipyOptimizer(unittest.TestCase):
         # (Note, loose tol because of appveyor py3.4 machine.)
         assert_rel_error(self, prob['x'], 7.16667, 1e-4)
         assert_rel_error(self, prob['y'], -7.833334, 1e-4)
+
+    def test_unsupported_equality(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizer()
+        prob.driver.options['optimizer'] = 'COBYLA'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', equals=-15.0)
+
+        prob.setup(check=False)
+
+        with self.assertRaises(Exception) as raises_cm:
+            prob.run_driver()
+
+        exception = raises_cm.exception
+
+        msg = "Constraints of type 'eq' not handled by COBYLA."
+
+        self.assertEqual(exception.args[0], msg)
 
     def test_simple_paraboloid_double_sided_low(self):
 
@@ -611,10 +644,115 @@ class TestScipyOptimizer(unittest.TestCase):
         max_defect = np.max(np.abs(p['defect.defect']))
         assert_rel_error(self, max_defect, 0.0, 1e-10)
 
+    def test_reraise_exception_from_callbacks(self):
+        class ReducedActuatorDisc(ExplicitComponent):
+
+            def setup(self):
+
+                # Inputs
+                self.add_input('a', 0.5, desc="Induced Velocity Factor")
+                self.add_input('Vu', 10.0, units="m/s", desc="Freestream air velocity, upstream of rotor")
+
+                # Outputs
+                self.add_output('Vd', 0.0, units="m/s",
+                                desc="Slipstream air velocity, downstream of rotor")
+
+            def compute(self, inputs, outputs):
+                a = inputs['a']
+                Vu = inputs['Vu']
+
+                outputs['Vd'] = Vu * (1 - 2 * a)
+
+            def compute_partials(self, inputs, J):
+                Vu = inputs['Vu']
+
+                J['Vd', 'a'] = -2.0 * Vu
+
+        prob = Problem()
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('a', .5)
+        indeps.add_output('Vu', 10.0, units='m/s')
+
+        prob.model.add_subsystem('a_disk', ReducedActuatorDisc(),
+                                 promotes_inputs=['a', 'Vu'])
+
+        # setup the optimization
+        prob.driver = ScipyOptimizer()
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+        prob.model.add_design_var('a', lower=0., upper=1.)
+        # negative one so we maximize the objective
+        prob.model.add_objective('a_disk.Vd', scaler=-1)
+
+        prob.setup()
+
+        with self.assertRaises(KeyError) as context:
+            prob.run_driver()
+
+        msg = 'Variable name pair ("Vd", "a") must first be declared.'
+        self.assertTrue(msg in str(context.exception))
+
+    def test_simple_paraboloid_upper_COBYLA(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizer()
+        prob.driver.options['optimizer'] = 'COBYLA'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
+        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+
+    def test_sellar_mdf_COBYLA(self):
+
+        prob = Problem()
+        model = prob.model = SellarDerivativesGrouped()
+
+        prob.driver = ScipyOptimizer()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['optimizer'] = 'COBYLA'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup(check=False, mode='rev')
+        prob.run_driver()
+
+        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
+        assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
+        assert_rel_error(self, prob['x'], 0.0, 1e-3)
+
+
 
 class TestScipyOptimizerFeatures(unittest.TestCase):
 
     def test_feature_basic(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -638,6 +776,9 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
 
     def test_feature_optimizer(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -660,6 +801,9 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
 
     def test_feature_maxiter(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -681,6 +825,9 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
 
     def test_feature_tol(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
         prob = Problem()
         model = prob.model = Group()
 
