@@ -9,7 +9,6 @@ import numpy as np
 from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, \
     NewtonSolver, ScipyKrylov, LinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
-from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
 
 
 # Note: The following class definitions are used in feature docs
@@ -622,6 +621,8 @@ class ListFeatureTestCase(unittest.TestCase):
         ])
 
     def test_list_residuals_with_tol(self):
+        from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, LinearBlockGS
         prob = Problem()
         model = prob.model = Group()
 
@@ -637,12 +638,11 @@ class ListFeatureTestCase(unittest.TestCase):
         model.linear_solver.precon = LinearBlockGS()
 
         prob.setup(check=False)
-        prob.set_solver_print(level=0)
+        prob.set_solver_print(level=-1)
 
         prob.run_model()
-        res = model._residuals.get_norm()
-        resids = model.list_residuals(tol=0.01, values=False)
 
+        resids = model.list_residuals(tol=0.01, values=False)
         self.assertEqual(sorted(resids), ['d2.y2',])
 
 

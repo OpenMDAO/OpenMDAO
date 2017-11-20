@@ -2575,7 +2575,8 @@ class System(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def list_residuals(self, explicit=True, implicit=True, values=True, out_stream='stdout', tol=None):
+    def list_residuals(self, explicit=True, implicit=True, values=True, out_stream='stdout',
+                       tol=None):
         """
         List residuals.
 
