@@ -69,9 +69,6 @@ before_install:
   fi
 
 install:
-
-- git fetch --unshallow --tags
-
 # keeping numpy pinned at 1.12 because pySNOPT dies with 1.13 because numpy broke callback
 - conda install --yes python=$PY numpy==1.12 scipy nose sphinx mock swig
 
