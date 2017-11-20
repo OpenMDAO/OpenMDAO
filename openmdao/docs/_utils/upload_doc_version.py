@@ -11,6 +11,7 @@ def get_tag_info():
     git_versions = subprocess.Popen(['git', 'tag', '-l', '*.*.*'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     cmd_out, cmd_err = git_versions.communicate()
 
+    cmd_out = cmd_out.decode('utf8')
     # take the output of git tag -l *.*.*, and split it from one string into a list.
     version_tags = cmd_out.split()
 
@@ -18,7 +19,7 @@ def get_tag_info():
         raise Exception('No tags found in repository')
 
     # use sort to put the versions list in order from lowest to highest
-    version_tags.sort(key=lambda s: [int(u) for u in s.split('.')])
+    version_tags.sort(key=lambda s: [int(bytes(u)) for u in s.split('.')])
 
     # grab the highest tag that this repo knows about
     latest_tag = version_tags[-1]
