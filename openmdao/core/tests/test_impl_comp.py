@@ -7,7 +7,7 @@ from six.moves import cStringIO
 import numpy as np
 
 from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, \
-    NewtonSolver, ScipyKrylov, LinearBlockGS
+    NewtonSolver, ScipyKrylov
 from openmdao.devtools.testutil import assert_rel_error
 
 

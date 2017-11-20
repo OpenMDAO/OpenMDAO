@@ -87,7 +87,7 @@ argument.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In some cases, it might be convenient to only list residuals above a given tolerance. The
-:code:`list_residuals` method provides an optional argument, `tol` for this purpose.
+:code:`System.list_residuals` method provides an optional argument, `tol` for this purpose.
 
 .. embed-test::
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_residuals_with_tol
