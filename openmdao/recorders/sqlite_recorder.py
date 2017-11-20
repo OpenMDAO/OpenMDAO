@@ -256,7 +256,7 @@ class SqliteRecorder(BaseRecorder):
                                          pickle.HIGHEST_PROTOCOL)
 
         with self.con:
-            self.con.execute("INSERT INTO driver_metadata(id, model_viewer_data) "
+            self.con.execute("INSERT OR IGNORE INTO driver_metadata(id, model_viewer_data) "
                              "VALUES(?,?)", (driver_class, sqlite3.Binary(model_viewer_data)))
 
     def record_metadata_system(self, recording_requester):

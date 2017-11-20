@@ -1020,7 +1020,8 @@ class TestPyoptSparse(unittest.TestCase):
 
                 self.declare_partials('*', '*')
 
-                self.fail_deriv = [2, 4]
+                #self.fail_deriv = [2, 4]
+                self.fail_deriv = [3,5]
                 self.count_iter = 0
                 self.failed = 0
 

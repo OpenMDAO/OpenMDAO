@@ -98,4 +98,4 @@ def array_viz(arr):
                 sys.stdout.write('.')
             else:
                 sys.stdout.write('x')
-        sys.stdout.write('\n')
+        sys.stdout.write(' %d\n' % r)

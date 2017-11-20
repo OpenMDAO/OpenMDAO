@@ -1331,6 +1331,8 @@ class Problem(object):
                 info = voi_info[input_name]
                 dinputs = info[0]
                 colors = set(simul_coloring)
+                if not isinstance(simul_coloring, np.ndarray):
+                    simul_coloring = np.array(simul_coloring, dtype=int)
                 def idx_iter():
                     for c in colors:
                         # iterate over negative colors individually
@@ -1338,7 +1340,11 @@ class Problem(object):
                             for i in np.nonzero(simul_coloring == c)[0]:
                                 yield (c, i)
                         else:
-                            yield (c, np.nonzero(simul_coloring == c)[0])
+                            nzs = np.nonzero(simul_coloring == c)[0]
+                            if nzs.size == 1:
+                                yield (c, nzs[0])
+                            else:
+                                yield (c, nzs)
                 idx_iter = idx_iter()
             else:
                 loc_idx_dict = defaultdict(lambda: -1)
@@ -1350,7 +1356,7 @@ class Problem(object):
                 if simul_coloring is not None:
                     color, i = i
                     #print('color', color)
-                    do_color_iter = i.size > 1
+                    do_color_iter = isinstance(i, np.ndarray) and i.size > 1
 
                 # this sets dinputs for the current parallel_deriv_color to 0
                 # dinputs is dresids in fwd, doutouts in rev
@@ -1373,20 +1379,25 @@ class Problem(object):
                             for ii, idx in enumerate(idxs):
                                 if start <= idx < end:
                                     dinputs._views_flat[input_name][idx - start, ii] = 1.0
-                    elif simul_coloring is not None and do_color_iter:
+                    elif simul is not None and do_color_iter:
                         final_idxs = i[np.logical_and(i >= start, i < end)]
+                        vec_dinput['linear'].set_const(0.0)
                         dinputs._views_flat[input_name][final_idxs - start] = 1.0
                     else:
-                        if i >= len(idxs):
-                            # reuse the last index if loop iter is larger than current var size
-                            idx = idxs[-1]
+                        if simul is None:
+                            if i >= len(idxs):
+                                # reuse the last index if loop iter is larger than current var size
+                                idx = idxs[-1]
+                            else:
+                                idx = idxs[i]
+                            if start <= idx < end and input_name in dinputs._views_flat:
+                                # Dictionary access returns a scaler for 1d input, and we
+                                # need a vector for clean code, so use _views_flat.
+                                dinputs._views_flat[input_name][idx - start] = 1.0
                         else:
-                            idx = idxs[i]
+                            if input_name in dinputs._views_flat:
+                                dinputs._views_flat[input_name][i - start] = 1.0
 
-                        if start <= idx < end and input_name in dinputs._views_flat:
-                            # Dictionary access returns a scaler for 1d input, and we
-                            # need a vector for clean code, so use _views_flat.
-                            dinputs._views_flat[input_name][idx - start] = 1.0
                     #print(i, input_name, simul, dinputs._data[0])
 
                 model._solve_linear(lin_vec_names, mode, rel_systems)
@@ -1401,22 +1412,23 @@ class Problem(object):
                     elif simul is not None and do_color_iter:
                         loc_idx = loc_idxs[i - start]
                     else:
-                        if i >= len(idxs):
-                            idx = idxs[-1]  # reuse the last index
-                            delta_loc_idx = 0  # don't increment local_idx
+                        if simul is None:
+                            if i >= len(idxs):
+                                idx = idxs[-1]  # reuse the last index
+                                delta_loc_idx = 0  # don't increment local_idx
+                            else:
+                                idx = idxs[i]
+                                delta_loc_idx = 1
+                            # totals to zeros instead of None in those cases when none
+                            # of the specified indices are within the range of interest
+                            # for this proc.
+                            # store = True if start <= idx < end else dup
+                            if store:
+                                loc_idx_dict[input_name] += delta_loc_idx
+                            loc_idx = loc_idx_dict[input_name]
                         else:
-                            idx = idxs[i]
-                            delta_loc_idx = 1
-
-                        # totals to zeros instead of None in those cases when none
-                        # of the specified indices are within the range of interest
-                        # for this proc.
-                        store = True if start <= idx < end else dup
-                        if store:
-                            loc_idx_dict[input_name] += delta_loc_idx
-                        loc_idx = loc_idx_dict[input_name]
-
-                    orelcount = -1
+                            idx = loc_idx = i
+                            # store = True if start <= idx < end else dup
 
                     # Pull out the answers and pack into our data structure.
                     for ocount, output_name in enumerate(output_list):
@@ -1442,7 +1454,6 @@ class Problem(object):
                             else:
                                 deriv_val = np.zeros(len(out_idxs))
                         else:  # relevant output
-                            orelcount += 1
                             if output_name in doutputs._views_flat:
                                 deriv_val = doutputs._views_flat[output_name]
                                 size = deriv_val.size
@@ -1472,6 +1483,8 @@ class Problem(object):
 
                         if store and ncol > 1 and len(deriv_val.shape) == 1:
                             deriv_val = np.atleast_2d(deriv_val).T
+                            
+                        #deriv_val[np.abs(deriv_val) < 1e-15] = 0.0
 
                         if return_format == 'flat_dict':
                             if fwd:
@@ -1498,15 +1511,17 @@ class Problem(object):
                                 if store:
                                     if simul is not None and do_color_iter:
                                         smap = output_vois[output_name]['simul_map']
-                                        if smap is not None:
-                                            out_simul_idxs = np.array(smap[input_name][color], dtype=int)
-                                            if out_simul_idxs is not None and len(out_simul_idxs):
-                                                nzeros = np.nonzero(deriv_val)[0]
+                                        if smap is not None and input_name in smap and color in smap[input_name]:
+                                            col_idxs = smap[input_name][color][1]
+                                            if col_idxs:
+                                                row_idxs = smap[input_name][color][0]
                                                 mat = totals[okey][old_input_name]
-                                                for idx, col in enumerate(out_simul_idxs):
-                                                    mat[nzeros[idx], col] = deriv_val[nzeros[idx]]
+                                                for idx, col in enumerate(col_idxs):
+                                                    mat[row_idxs[idx], col] = deriv_val[row_idxs[idx]]
                                     else:
                                         totals[okey][old_input_name][:, loc_idx] = deriv_val
+                                    #if input_name=='phase0.indep_controls.controls:alpha' and output_name=='phase0.collocation_constraint.defects:gam':
+                                        #print(i, loc_idx, totals[okey][old_input_name][:, loc_idx])
                             else:
                                 ikey = old_output_list[ocount]
 
@@ -1826,7 +1841,7 @@ def find_var_from_range(idx, ranges):
             return name, idx - start
 
 
-def find_disjoint(prob):
+def find_disjoint(prob, of=None, wrt=None, global_names=True):
     """
     Given a problem, find all sets of disjoint columns in the total jacobian and their
     corresponding rows.
@@ -1836,11 +1851,13 @@ def find_disjoint(prob):
     from collections import defaultdict
     from itertools import combinations, product
     from openmdao.jacobians.assembled_jacobian import DenseJacobian
+    from openmdao.utils.array_utils import array_viz
+
     prob.run_model()
 
-    J = prob.driver._compute_totals(return_format='array')
-    J[J == -0.0] = 0.0
-    J[J != 0.0] = 1.
+    J = prob.driver._compute_totals(return_format='array', of=of, wrt=wrt)
+    J[np.abs(J) < 1e-99] = 0.0
+    J[np.abs(J) >= 1e-99] = 1.0
 
     allcols = list(range(J.shape[1]))
 
@@ -1872,35 +1889,42 @@ def find_disjoint(prob):
                 full_disjoint[col].add(other_col)
                 allrows[col].update(rows[other_col])
 
+    if wrt is None:
+        wrt = list(prob.driver._designvars)
+    if of is None:
+        of = list(prob.driver._objs)
+        of.extend(list(prob.driver._cons))
+
+    if not global_names:
+        prom2abs = model._var_allprocs_prom2abs_list['output']
+        of = [prom2abs[name][0] for name in of]
+        wrt = [prom2abs[name][0] for name in wrt]
+
     # find column and row ranges (inclusive) for dvs and responses respectively
     dv_offsets = []
     start = 0
     end = -1
-    dvs = prob.driver._designvars
-    ovars = prob.model._var_allprocs_abs_names['output']
-    ordered_dvs = [dv for dv in ovars if dv in dvs]
-    for name in ordered_dvs:
-        data = dvs[name]
+    for name in wrt:
+        data = prob.driver._designvars[name]
         end += data['size']
         dv_offsets.append((start, end, name))
-        print("dv range[%s] = %s" % (name, (start, end)))
+        # print("dv range[%s] = %s" % (name, (start, end)))
         start = end + 1
 
     res_offsets = []
     start = 0
     end = -1
-    for name, data in iteritems(prob.driver._responses):
+    for name in of:
+        data = prob.driver._responses[name]
         end += data['size']
         res_offsets.append((start, end, name))
-        print("res range[%s] = %s" % (name, (start, end)))
+        # print("res range[%s] = %s" % (name, (start, end)))
         start = end + 1
 
     print("")
-    # for col, s in full_disjoint.items():
-    #     print('cols:', sorted(s), 'rows:', sorted(allrows[col]))
 
     total_dv_offsets = defaultdict(lambda: defaultdict(list))
-    total_res_offsets = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    total_res_offsets = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: ([], []))))
     for color, cols in enumerate(full_disjoint.values()):
         print("\ncolor %d:" % color)
         for c in sorted(cols):
@@ -1910,25 +1934,37 @@ def find_disjoint(prob):
             for crow in rows[c]:
                 res, resoffset = find_var_from_range(crow, res_offsets)
                 print("   ", res, resoffset, 'row', crow)
-                total_res_offsets[res][dv][color].append((resoffset, dvoffset))
+                dct = total_res_offsets[res][dv][color]
+                dct[0].append(resoffset)
+                dct[1].append(dvoffset)
 
-    # sort dvoffsets by resoffsets so rows will be in right order
-    for res, resoffs in iteritems(total_res_offsets):
-        for dv, resoffs2 in iteritems(resoffs):
-            for color, lst in iteritems(resoffs2):
-                resoffs2[color] = [t[1] for t in sorted(lst, key=lambda x: x[0])]
-    # print("\n")
-    # import pprint
-    # pprint.pprint(dict(total_dv_offsets))
-    # print("\n")
-    # pprint.pprint(dict(total_res_offsets))
+    ## throw out any dv offsets that contain only one idx
+    #new_dv_offsets = {}
+    #for dv, coldict in iteritems(total_dv_offsets):
+        #new_dv_offsets[dv] = {}
+        #for color, lst in iteritems(coldict):
+            #if len(lst) > 1:
+                #new_dv_offsets[dv][color] = lst
+        #if not new_dv_offsets[dv]:
+            #del new_dv_offsets[dv]
+
+    #new_res_offsets = {}
+    #for res, dct1 in iteritems(total_res_offsets):
+        #new_res_offsets[res] = {}
+        #for dv, dct2 in iteritems(dct1):
+            #if dv not in new_dv_offsets:
+                #continue
+            #new_res_offsets[res][dv] = {}
+            #for color, tup in iteritems(dct2):
+                #if len(tup[0]) > 1:
+                    #new_res_offsets[res][dv][color] = tup
 
     return total_dv_offsets, total_res_offsets
 
 
-def set_simul_meta(problem):
+def set_simul_meta(problem, of=None, wrt=None, global_names=True):
     driver = problem.driver
-    dv_idxs, res_idxs = find_disjoint(problem)
+    dv_idxs, res_idxs = find_disjoint(problem, of=of, wrt=wrt, global_names=global_names)
     for dv in dv_idxs:
         # negative colors will be iterated over individually, so start by filling the coloring array
         # with -1.  We then replace specific entries with positive colors which will be iterated over
@@ -1937,11 +1973,16 @@ def set_simul_meta(problem):
         for color in dv_idxs[dv]:
             coloring[np.array(dv_idxs[dv][color], dtype=int)] = color
         driver._designvars[dv]['simul_coloring'] = coloring
-        print("coloring:", coloring)
+        print("coloring:", coloring, dv)
 
     for res in res_idxs:
         simul_map = {}
         for dv in res_idxs[res]:
-            simul_map[dv] = res_idxs[res][dv]
-        print(res, simul_map)
-        driver._responses[res]['simul_map'] = simul_map
+            simul_map[dv] = {n: v for n,v in iteritems(res_idxs[res][dv])}
+        if simul_map:
+            print(res, 'simul_map')
+            for n, color_dict in simul_map.items():
+                print("    ", n)
+                for c, idxs in color_dict.items():
+                    print("       ", c, ":", idxs)
+            driver._responses[res]['simul_map'] = simul_map

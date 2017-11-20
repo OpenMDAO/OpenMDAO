@@ -196,6 +196,11 @@ class Driver(object):
                           "(objectives and constraints)." %
                           (problem._mode, desvar_size, response_size), RuntimeWarning)
 
+        self._has_scaling = (
+            np.any([r['scaler'] is not None for r in self._responses.values()]) or
+            np.any([dv['scaler'] is not None for dv in self._designvars.values()])
+        )
+
         con_set = set()
         obj_set = set()
         dv_set = set()
@@ -356,14 +361,15 @@ class Driver(object):
             else:
                 val = vec[name][indices]
 
-        # Scale design variable values
-        adder = meta['adder']
-        if adder is not None:
-            val += adder
+        if self._has_scaling:
+            # Scale design variable values
+            adder = meta['adder']
+            if adder is not None:
+                val += adder
 
-        scaler = meta['scaler']
-        if scaler is not None:
-            val *= scaler
+            scaler = meta['scaler']
+            if scaler is not None:
+                val *= scaler
 
         return val
 
@@ -414,14 +420,15 @@ class Driver(object):
         desvar = self._problem.model._outputs._views_flat[name]
         desvar[indices] = value
 
-        # Scale design variable values
-        scaler = meta['scaler']
-        if scaler is not None:
-            desvar[indices] *= 1.0 / scaler
+        if self._has_scaling:
+            # Scale design variable values
+            scaler = meta['scaler']
+            if scaler is not None:
+                desvar[indices] *= 1.0 / scaler
 
-        adder = meta['adder']
-        if adder is not None:
-            desvar[indices] -= adder
+            adder = meta['adder']
+            if adder is not None:
+                desvar[indices] -= adder
 
     def get_response_values(self, filter=None):
         """
@@ -530,6 +537,34 @@ class Driver(object):
         self.iter_count += 1
         return failure_flag
 
+    def _dict2array_jac(self, derivs):
+        osize = 0
+        isize = 0
+        do_wrt = True
+        islices = {}
+        oslices = {}
+        for okey, oval in iteritems(derivs):
+            if do_wrt:
+                for ikey, val in iteritems(oval):
+                    istart = isize
+                    isize += val.shape[1]
+                    islices[ikey] = slice(istart, isize)
+                do_wrt = False
+            ostart = osize
+            osize += oval[ikey].shape[0]
+            oslices[okey] = slice(ostart, osize)
+
+        new_derivs = np.zeros((osize, isize))
+
+        relevant = self._problem.model._relevant
+
+        for okey, odict in iteritems(derivs):
+            for ikey, val in iteritems(odict):
+                if okey in relevant[ikey] or ikey in relevant[okey]:
+                    new_derivs[oslices[okey], islices[ikey]] = val
+
+        return new_derivs
+
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
@@ -567,54 +602,13 @@ class Driver(object):
                                           global_names=global_names)
 
         # ... then convert to whatever the driver needs.
-        if return_format == 'dict':
+        if return_format in ('dict', 'array'):
+            if self._has_scaling:
+                for okey, odict in iteritems(derivs):
+                    for ikey, val in iteritems(odict):
 
-            for okey, oval in iteritems(derivs):
-                for ikey, val in iteritems(oval):
-
-                    imeta = self._designvars[ikey]
-                    ometa = self._responses[okey]
-
-                    iscaler = imeta['scaler']
-                    oscaler = ometa['scaler']
-
-                    # Scale response side
-                    if oscaler is not None:
-                        val[:] = (oscaler * val.T).T
-
-                    # Scale design var side
-                    if iscaler is not None:
-                        val *= 1.0 / iscaler
-
-        elif return_format == 'array':
-
-            # Use sizes pre-computed in derivs for ease
-            osize = 0
-            isize = 0
-            do_wrt = True
-            islices = {}
-            oslices = {}
-            for okey, oval in iteritems(derivs):
-                if do_wrt:
-                    for ikey, val in iteritems(oval):
-                        istart = isize
-                        isize += val.shape[1]
-                        islices[ikey] = slice(istart, isize)
-                    do_wrt = False
-                ostart = osize
-                osize += oval[ikey].shape[0]
-                oslices[okey] = slice(ostart, osize)
-
-            new_derivs = np.zeros((osize, isize))
-
-            relevant = prob.model._relevant
-
-            # Apply driver ref/ref0 and position subjac into array jacobian.
-            for okey, oval in iteritems(derivs):
-                oscaler = self._responses[okey]['scaler']
-                for ikey, val in iteritems(oval):
-                    if okey in relevant[ikey] or ikey in relevant[okey]:
                         iscaler = self._designvars[ikey]['scaler']
+                        oscaler = self._responses[okey]['scaler']
 
                         # Scale response side
                         if oscaler is not None:
@@ -623,14 +617,51 @@ class Driver(object):
                         # Scale design var side
                         if iscaler is not None:
                             val *= 1.0 / iscaler
-
-                        new_derivs[oslices[okey], islices[ikey]] = val
-
-            derivs = new_derivs
-
         else:
             msg = "Derivative scaling by the driver only supports the 'dict' format at present."
             raise RuntimeError(msg)
+
+        if return_format == 'array':
+            derivs = self._dict2array_jac(derivs)
+
+        # print("NEW JACOBIAN", return_format)
+        # if return_format == 'dict':
+        #     jj = self._dict2array_jac(derivs)
+        # else:
+        #     jj = derivs
+        #
+        # if jj.shape not in prob._jacs:
+        #     prob._jacs[jj.shape] = np.zeros(jj.shape)
+        #
+        # prob._jacs[jj.shape][jj > 1.e-99] = 1.0
+        # prob._jacs[jj.shape][jj < -1.e-99] = 1.0
+
+        # if self._old_jac is None:
+        #     if return_format == 'dict':
+        #         jj = self._dict2array_jac(derivs)
+        #         if jj.shape[0] < 60:
+        #             return derivs
+        #         self._old_jac = jj
+        #     else:
+        #         self._old_jac = derivs
+        #     self._old_jac[self._old_jac != 0.0] = 1.0
+        # else:
+        #     if return_format == 'dict':
+        #         newjac = self._dict2array_jac(derivs)
+        #     else:
+        #         newjac = derivs
+        #     newjac[newjac != 0.0] = 1.0
+        #
+        #     from openmdao.utils.array_utils import array_viz
+        #     if newjac.shape == self._old_jac.shape:
+        #         dmat = self._old_jac - newjac
+        #         print("\n\n\n")
+        #         array_viz(dmat)
+        #
+        #     print('shapes:', self._old_jac.shape, newjac.shape)
+        #
+        #     if newjac.shape[0] != 123:
+        #         raise RuntimeError("%s" % list(newjac.shape))
 
         return derivs
 

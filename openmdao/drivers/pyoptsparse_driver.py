@@ -20,6 +20,7 @@ from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta
+from openmdao.core.problem import set_simul_meta
 
 # names of optimizers that use gradients
 grad_drivers = {'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
@@ -134,6 +135,8 @@ class pyOptSparseDriver(Driver):
         self.options.declare('gradient method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
+        self.options.declare('simul_derivs', default=False, types=bool,
+                             desc='If True, use simultaneous derivatives.')
 
         # The user places optimizer-specific settings in here.
         self.opt_settings = {}
@@ -271,6 +274,25 @@ class pyOptSparseDriver(Driver):
             else:
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt)
                 self._quantities.append(name)
+
+        print("DVS:")
+        start = 0
+        end = -1
+        for dv in self._indep_list:
+            end += self._designvars[dv]['size']
+            print(dv, self._designvars[dv]['size'], "[%d, %d]" % (start, end))
+            start = end + 1
+
+        print("QUANTITIES:")
+        start = 0
+        end = -1
+        for r in self._quantities:
+            end += self._responses[r]['size']
+            print(r, self._responses[r]['size'], "[%d, %d]" % (start, end))
+            start = end + 1
+
+        if self.options['simul_derivs']:
+            set_simul_meta(self._problem, of=self._quantities, wrt=self._indep_list)
 
         # Instantiate the requested optimizer
         optimizer = self.options['optimizer']
