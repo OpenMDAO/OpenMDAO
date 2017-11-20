@@ -4,9 +4,6 @@ branches:
 
 sudo: false
 
-git:
-  depth: 99999
-
 os:
 - linux
 
@@ -69,11 +66,13 @@ before_install:
   fi
 
 install:
+
+- git clone --depth 5000  https://github.com/OpenMDAO/OpenMDAO.git
+
 # keeping numpy pinned at 1.12 because pySNOPT dies with 1.13 because numpy broke callback
 - conda install --yes python=$PY numpy==1.12 scipy nose sphinx mock swig
 
 # install pyoptsparse
-- git fetch --unshallow
 - wget https://bitbucket.org/mdolab/pyoptsparse/get/tip.zip;
 - unzip tip.zip;
 - cd mdolab-pyoptsparse*;
