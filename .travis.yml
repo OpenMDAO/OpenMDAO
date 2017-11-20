@@ -73,6 +73,7 @@ install:
 - conda install --yes python=$PY numpy==1.12 scipy nose sphinx mock swig
 
 # install pyoptsparse
+- git fetch --unshallow
 - wget https://bitbucket.org/mdolab/pyoptsparse/get/tip.zip;
 - unzip tip.zip;
 - cd mdolab-pyoptsparse*;
