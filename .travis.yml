@@ -15,6 +15,9 @@ env:
 - PY=2.7 MPI=
 - PY=3.6 MPI=
 
+git:
+  depth: 99999
+
 addons:
   apt:
     sources:
@@ -67,10 +70,7 @@ before_install:
 
 install:
 
-git:
-  depth: 99999
-
- - git fetch --unshallow --tags
+- git fetch --unshallow --tags
 
 # keeping numpy pinned at 1.12 because pySNOPT dies with 1.13 because numpy broke callback
 - conda install --yes python=$PY numpy==1.12 scipy nose sphinx mock swig
