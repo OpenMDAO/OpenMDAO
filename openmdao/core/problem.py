@@ -1483,9 +1483,9 @@ class Problem(object):
 
                         if store and ncol > 1 and len(deriv_val.shape) == 1:
                             deriv_val = np.atleast_2d(deriv_val).T
-                            
-                        #deriv_val[np.abs(deriv_val) < 1e-15] = 0.0
 
+                        #deriv_val[np.abs(deriv_val) < 1e-15] = 0.0
+                        print(input_name, output_name, i, deriv_val)
                         if return_format == 'flat_dict':
                             if fwd:
                                 key = (old_output_list[ocount], old_input_name)
@@ -1853,6 +1853,8 @@ def find_disjoint(prob, of=None, wrt=None, global_names=True):
     from openmdao.jacobians.assembled_jacobian import DenseJacobian
     from openmdao.utils.array_utils import array_viz
 
+    prob.model.jacobian = DenseJacobian()
+    prob.setup(mode=prob._mode)
     prob.run_model()
 
     J = prob.driver._compute_totals(return_format='array', of=of, wrt=wrt)
@@ -1986,3 +1988,5 @@ def set_simul_meta(problem, of=None, wrt=None, global_names=True):
                 for c, idxs in color_dict.items():
                     print("       ", c, ":", idxs)
             driver._responses[res]['simul_map'] = simul_map
+
+    print('foo')

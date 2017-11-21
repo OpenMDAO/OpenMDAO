@@ -35,6 +35,7 @@ class LinearBlockGS(BlockLinearSolver):
                         b_vec = system._vectors['residual'][vec_name]
                         b_vec *= -1.0
                         b_vec += self._rhs_vecs[vec_name]
+                        print("bvec",b_vec._data)
                 subsys._solve_linear(vec_names, mode, self._rel_systems)
 
         else:  # rev

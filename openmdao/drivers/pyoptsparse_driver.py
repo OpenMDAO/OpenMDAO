@@ -7,17 +7,19 @@ additional MPI capability.
 """
 
 from __future__ import print_function
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import traceback
 
 from six import iteritems
 
 import numpy as np
+from scipy.sparse import coo_matrix
 
 from pyoptsparse import Optimization
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta
 from openmdao.core.problem import set_simul_meta
@@ -230,6 +232,25 @@ class pyOptSparseDriver(Driver):
         if len(lcons) > 0:
             _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list, return_format='dict')
 
+        if isinstance(model._jacobian, AssembledJacobian):
+            submats = model._jacobian._int_mtx._submats
+            # put in nested dict form instead of flat dict
+            dct = defaultdict(dict)
+            for key in submats:
+                out, inp = key
+                dct[out][inp] = submats[key]
+
+            info = dct[name]
+            jac = {}
+            for inp in info:
+                if info[inp][0]['rows'] is not None:
+                    row = info[inp][0]['rows']
+                    jac[inp] = coo_matrix((np.ones(row.size), (row, info[inp][0]['cols'])))
+                elif not isinstance(info[inp][0]['value'], np.ndarray):  # sparse
+                    jac[inp] = info[inp][0]['value']
+        else:
+            jac = None
+
         # Add all equality constraints
         self.active_tols = {}
         eqcons = OrderedDict((key, con) for (key, con) in iteritems(con_meta)
@@ -248,7 +269,14 @@ class pyOptSparseDriver(Driver):
                                      linear=True, wrt=wrt,
                                      jac=_lin_jacs[name])
             else:
-                opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrt)
+                if jac is not None:
+                    subjac = {}
+                    for n in wrt:
+                        if n in jac:
+                            subjac[n] = jac[n]
+                else:
+                    subjac = None
+                opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrt, jac=subjac)
                 self._quantities.append(name)
 
         # Add all inequality constraints
@@ -272,7 +300,14 @@ class pyOptSparseDriver(Driver):
                                      linear=True, wrt=wrt,
                                      jac=_lin_jacs[name])
             else:
-                opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt)
+                if jac is not None:
+                    subjac = {}
+                    for n in wrt:
+                        if n in jac:
+                            subjac[n] = jac[n]
+                else:
+                    subjac = None
+                opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=subjac)
                 self._quantities.append(name)
 
         print("DVS:")
