@@ -129,8 +129,10 @@ version = openmdao.__version__
 # The full version, including alpha/beta/rc tags.
 release = openmdao.__version__ + ' Alpha'
 
+# we are only doing the commit number/latest tag choice when we are on Travis.
 if 'TRAVIS' in os.environ:
     version, rel = get_doc_version()
+    print("RELEASE? VERSION?:" + rel + " ," + version)
     if rel:
         release = version
     else:
