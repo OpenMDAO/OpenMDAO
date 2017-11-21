@@ -51,3 +51,4 @@ Turn off standard output and just view the derivatives in the return:
 .. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_check_totals_suppress
 
+.. tags:: Derivatives

@@ -4,15 +4,12 @@ import unittest
 import warnings
 
 from six import iteritems
-from six.moves import cStringIO, range
 
-import numpy as np
-
-from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, IndepVarComp, DenseJacobian, DirectSolver
+from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp, DenseJacobian, DirectSolver
 from openmdao.api import ExecComp
 from openmdao.devtools.testutil import assert_rel_error
 from openmdao.test_suite.components.unit_conv import UnitConvGroup, SrcComp, TgtCompC, TgtCompF, \
-     TgtCompK, SrcCompFD, TgtCompCFD, TgtCompFFD, TgtCompKFD, TgtCompFMulti
+    TgtCompK, SrcCompFD, TgtCompCFD, TgtCompFFD, TgtCompKFD, TgtCompFMulti
 
 
 class SpeedComp(ExplicitComponent):
@@ -163,7 +160,6 @@ class TestUnitConversion(unittest.TestCase):
                 else:
                     d_inputs['x1'] += d_outputs['x2']
 
-
         class TgtCompFa(ExplicitComponent):
             """Target expressed in degrees F."""
 
@@ -182,7 +178,6 @@ class TestUnitConversion(unittest.TestCase):
                     d_outputs['x3'] += d_inputs['x2']
                 else:
                     d_inputs['x2'] += d_outputs['x3']
-
 
         prob = Problem()
         model = prob.model = Group()
@@ -422,7 +417,7 @@ class TestUnitConversion(unittest.TestCase):
 
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
         sub1 = prob.model.add_subsystem('sub1', Group(), promotes=['x2'])
-        sub1.add_subsystem('src', SrcComp(), promotes = ['x2'])
+        sub1.add_subsystem('src', SrcComp(), promotes=['x2'])
         root.add_subsystem('tgtF', TgtCompFMulti())
         root.add_subsystem('tgtC', TgtCompC())
         root.add_subsystem('tgtK', TgtCompK())

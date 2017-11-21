@@ -140,8 +140,9 @@ class EmbedTestDirective(Directive):
                     input_node = nodes.literal_block(input_block, input_block)
                     input_node['language'] = 'python'
                     doc_nodes.append(input_node)
-                    output_node = in_or_out_node(kind="Out", number=n, text=output_block)
-                    doc_nodes.append(output_node)
+                    if len(output_block) > 0:
+                        output_node = in_or_out_node(kind="Out", number=n, text=output_block)
+                        doc_nodes.append(output_node)
                     n += 1
 
         return doc_nodes
