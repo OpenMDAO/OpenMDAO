@@ -172,8 +172,6 @@ class Solver(object):
         self.recording_options.declare('record_rel_error', types=bool, default=True,
                                        desc='Set to True to record relative error at the \
                                        solver level')
-        self.recording_options.declare('record_solver_output', types=bool, default=False,
-                                       desc='Set to True to record output at the solver level')
         self.recording_options.declare('record_solver_residuals', types=bool, default=False,
                                        desc='Set to True to record residuals at the solver level')
         self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
@@ -248,14 +246,13 @@ class Solver(object):
             myresiduals = {n for n in residuals._names
                            if check_path(n, incl, excl)}
 
-        if self.recording_options['record_solver_output']:
-            if isinstance(self, NonlinearSolver):
-                outputs = self._system._outputs
-            else:  # it's a LinearSolver
-                outputs = self._system._vectors['output']['linear']
-            # myoutputs = {n for n in outputs
-            myoutputs = {n for n in outputs._names
-                         if check_path(n, incl, excl)}
+        if isinstance(self, NonlinearSolver):
+            outputs = self._system._outputs
+        else:  # it's a LinearSolver
+            outputs = self._system._vectors['output']['linear']
+
+        myoutputs = {n for n in outputs._names
+                     if check_path(n, incl, excl)}
 
         self._filtered_vars_to_record = {
             'out': myoutputs,
@@ -484,22 +481,18 @@ class Solver(object):
         else:
             data['rel'] = None
 
-        if self.recording_options['record_solver_output']:
+        if isinstance(self, NonlinearSolver):
+            outputs = self._system._outputs
+        else:  # it's a LinearSolver
+            outputs = self._system._vectors['output']['linear']
 
-            if isinstance(self, NonlinearSolver):
-                outputs = self._system._outputs
-            else:  # it's a LinearSolver
-                outputs = self._system._vectors['output']['linear']
-
-            data['o'] = {}
-            if 'out' in self._filtered_vars_to_record:
-                for out in self._filtered_vars_to_record['out']:
-                    if out in outputs._names:
-                        data['o'][out] = outputs._names[out]
-            else:
-                data['o'] = outputs
+        data['o'] = {}
+        if 'out' in self._filtered_vars_to_record:
+            for out in self._filtered_vars_to_record['out']:
+                if out in outputs._names:
+                    data['o'][out] = outputs._names[out]
         else:
-            data['o'] = None
+            data['o'] = outputs
 
         if self.recording_options['record_solver_residuals']:
 

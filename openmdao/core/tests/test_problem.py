@@ -31,10 +31,75 @@ class TestProblem(unittest.TestCase):
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['comp.f_xy'], -15.0)
+
+    def test_feature_simple_run_once_input_input(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 3.0))
+
+        #promote the two inputs to the same name
+        model.add_subsystem('comp1', Paraboloid(), promotes_inputs=['x'])
+        model.add_subsystem('comp2', Paraboloid(), promotes_inputs=['x'])
+
+        #connect the source to the common name
+        model.connect('p1.x', 'x')
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp1.f_xy'], 13.0)
+        assert_rel_error(self, prob['comp2.f_xy'], 13.0)
+
+    def test_feature_simple_run_once_compute_totals(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        model.add_subsystem('p2', IndepVarComp('y', -4.0))
+        model.add_subsystem('comp', Paraboloid())
+
+        model.connect('p1.x', 'comp.x')
+        model.connect('p2.y', 'comp.y')
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.f_xy'], -15.0)
+
+        prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'])
+
+    def test_feature_simple_run_once_set_deriv_mode(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        model.add_subsystem('p2', IndepVarComp('y', -4.0))
+        model.add_subsystem('comp', Paraboloid())
+
+        model.connect('p1.x', 'comp.x')
+        model.connect('p2.y', 'comp.y')
+
+        prob.setup(mode='rev')
+        #prob.setup(mode='fwd')
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.f_xy'], -15.0)
+
+        prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'])
 
     def test_set_2d_array(self):
         import numpy as np
@@ -445,14 +510,15 @@ class TestProblem(unittest.TestCase):
 
         # default value from the class definition
         assert_rel_error(self, prob['x'], 1.0, 1e-6)
+
         prob['x'] = 2.75
         assert_rel_error(self, prob['x'], 2.75, 1e-6)
 
+        # default value from the class definition
         assert_rel_error(self, prob['z'], [5.0, 2.0], 1e-6)
+
         prob['z'] = [1.5, 1.5]  # for convenience we convert the list to an array.
         assert_rel_error(self, prob['z'], [1.5, 1.5], 1e-6)
-        prob['z'] = [1.5, 1.5]  # for convenience we convert the list to an array.
-        assert_rel_error(self, prob['z'], (1.5, 1.5), 1e-6)
 
         prob.run_model()
         assert_rel_error(self, prob['y1'], 5.43379016853, 1e-6)
@@ -474,8 +540,6 @@ class TestProblem(unittest.TestCase):
         prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()
-
-        # default value from the class definition
 
         prob['z'] = [1.5, 1.5]  # for convenience we convert the list to an array.
         prob.run_model()
@@ -884,6 +948,7 @@ class TestProblem(unittest.TestCase):
 
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
         self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyKrylov))
+
 
 if __name__ == "__main__":
     unittest.main()

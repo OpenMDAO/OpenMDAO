@@ -1,7 +1,6 @@
 """
 A collection of functions for modifying source code that is embeded into the Sphinx documentation.
 """
-
 import sys
 import os
 import re
@@ -169,7 +168,7 @@ def get_method_body(method_code):
     return def_node.value.dumps()
 
 
-def remove_initial_empty_lines_from_source(source):
+def remove_initial_empty_lines(source):
     """
     Some initial empty lines were added to keep RedBaron happy.
     Need to strip these out before we pass the source code to the
@@ -225,10 +224,6 @@ def get_source_code_of_class_or_method(class_or_method_path, remove_docstring=Tr
     return source
 
 
-sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
-table_name = 'feature_unit_tests'   # name of the table to be queried
-
-
 def get_test_source_code_for_feature(feature_name):
     '''The function to be called from the custom Sphinx directive code
     that includes relevant unit test code(s).
@@ -263,12 +258,12 @@ def get_test_source_code_for_feature(feature_name):
     return test_source_code_for_feature
 
 
-def remove_raise_skip_tests(source):
+def remove_raise_skip_tests(src):
     """
     Remove from the code any raise unittest.SkipTest lines since we don't want those in
     what the user sees.
     """
-    rb = RedBaron(source)
+    rb = RedBaron(src)
     raise_nodes = rb.findAll("RaiseNode")
     for rn in raise_nodes:
         # only the raise for SkipTest
@@ -303,9 +298,48 @@ def remove_leading_trailing_whitespace_lines(src):
     return '\n'.join(lines[imin: imax+1])
 
 
+def is_output_node(node):
+    """
+    Determine whether a RedBaron node may be expected to generate output.
+
+    Parameters
+    ----------
+    node : <Node>
+        a RedBaron Node.
+
+    Returns
+    -------
+    bool
+        True if node may be expected to generate output, otherwise False.
+    """
+    if node.type == 'print':
+        return True
+
+    # lines with the following signatures and function names may generate output
+    output_signatures = [
+        ('name', 'name', 'call'),
+        ('name', 'name', 'name', 'call')
+    ]
+    output_functions = [
+        'setup', 'run_model', 'run_driver',
+        'check_partials', 'check_totals',
+        'list_inputs', 'list_outputs', 'list_residuals'
+    ]
+
+    if node.type == 'atomtrailers' and len(node.value) in (3, 4):
+        sig = []
+        for val in node.value:
+            sig.append(val.type)
+        func_name = node.value[-2].value
+        if tuple(sig) in output_signatures and func_name in output_functions:
+            return True
+
+    return False
+
+
 def split_source_into_input_blocks(src):
     """
-    Split source into blocks; the splits occur at prints.
+    Split source into blocks; the splits occur at inserted prints.
 
     Parameters
     ----------
@@ -317,30 +351,21 @@ def split_source_into_input_blocks(src):
     list
         List of input code sections.
     """
-    rb = RedBaron(src)
-    in_code_blocks = []
-    in_code_block = []
-    # group code until the first print, then repeat
-    for r in rb:
-        line = r.dumps()
-        if not line.endswith('\n'):
-            line += '\n'
-        in_code_block.append(line)
-        if r.type == 'print' or \
-            (len(r.value) == 3 and
-             (r.type, r.value[0].type, r.value[1].type, r.value[2].type) ==
-                ('atomtrailers', 'name', 'name', 'call') and
-                r.value[1].value in ['run_model', 'run_driver', 'setup']):
-            # stop and make an input code block
-            in_code_block = ''.join(in_code_block)
-            in_code_block = remove_leading_trailing_whitespace_lines(in_code_block)
-            in_code_blocks.append(in_code_block)
-            in_code_block = []
+    input_blocks = []
 
-    if in_code_block: # If anything left over
-        in_code_blocks.append(''.join(in_code_block))
+    current_block = ""
 
-    return in_code_blocks
+    for line in src.split('\n'):
+        if 'print(">>>>>' in line:
+            input_blocks.append(current_block)
+            current_block = ""
+        else:
+            current_block += line + '\n'
+
+    if current_block.strip():
+        input_blocks.append(current_block)
+
+    return input_blocks
 
 
 def insert_output_start_stop_indicators(src):
@@ -359,27 +384,42 @@ def insert_output_start_stop_indicators(src):
     """
     rb = RedBaron(src)
 
-    src_with_out_start_stop_indicators = []
+    # find lines with trailing comments so we can preserve them properly
+    lines_with_comments = {}
+    comments = rb.findAll('comment')
+    for c in comments:
+        if c.previous and c.previous.type != 'endl':
+            lines_with_comments[c.previous] = c
+
     input_block_number = 0
-    for r in rb:
-        line = r.dumps()
-        # not sure why some lines from RedBaron do not have newlines
-        if not line.endswith('\n'):
-            line += '\n'
-        if r.type == 'print':
-            # src_with_out_start_stop_indicators += 'print("<<<<<{}")'.format(input_block_number) + '\n'
-            src_with_out_start_stop_indicators.append(line)
-            src_with_out_start_stop_indicators.append('print(">>>>>{}")\n'.format(input_block_number))
-        elif len(r.value) == 3 and \
-            (r.type, r.value[0].type, r.value[1].type, r.value[2].type) == \
-                ('atomtrailers', 'name', 'name', 'call') and \
-                r.value[1].value in ['run_model', 'run_driver', 'setup']:
-            src_with_out_start_stop_indicators.append(line)
-            src_with_out_start_stop_indicators.append('print(">>>>>{}")\n'.format(input_block_number))
-        else:
-            src_with_out_start_stop_indicators.append(line)
-        input_block_number += 1
-    return ''.join(src_with_out_start_stop_indicators)
+
+    # find all nodes that might produce output
+    nodes = rb.findAll(lambda identifier: identifier in ['print', 'atomtrailers'])
+    for r in nodes:
+        # Output within if/else statements is not a good idea for docs, because
+        # we don't know which branch execution will follow and thus where to put
+        # the output block. Regardless of which branch is taken, though, the
+        # output blocks must start with the same block number.
+        if hasattr(r.parent, 'type') and r.parent.type == 'if':
+            if_block_number = input_block_number
+        if hasattr(r.parent, 'type') and r.parent.type in ['elif', 'else']:
+            input_block_number = if_block_number
+
+        if is_output_node(r):
+            # if there was a trailing comment on this line, output goes after it
+            if r in lines_with_comments:
+                r = lines_with_comments[r]  # r is now the comment
+                if r.previous.value == '\n':
+                    r.previous.value = ''   # don't want endl before comment
+
+            # find the correct node to 'insert_after'
+            while hasattr(r, 'parent') and not hasattr(r.parent, 'insert'):
+                r = r.parent
+
+            r.insert_after('print(">>>>>%d")\n' % input_block_number)
+            input_block_number += 1
+
+    return rb.dumps()
 
 
 def clean_up_empty_output_blocks(input_blocks, output_blocks):
@@ -390,11 +430,14 @@ def clean_up_empty_output_blocks(input_blocks, output_blocks):
     new_input_blocks = []
     new_output_blocks = []
     current_in_block = ''
+
     for in_block, out_block in zip(input_blocks, output_blocks):
         if current_in_block and not current_in_block.endswith('\n'):
             current_in_block += '\n'
         current_in_block += in_block
         if out_block:
+            current_in_block = remove_leading_trailing_whitespace_lines(current_in_block)
+            out_block = remove_leading_trailing_whitespace_lines(out_block)
             new_input_blocks.append(current_in_block)
             new_output_blocks.append(out_block)
             current_in_block = ''
@@ -422,20 +465,25 @@ def extract_output_blocks(run_output):
         List containing output text blocks.
     """
 
-    output_blocks = []
     # Look for start and end lines that look like this:
     #  <<<<<4
     #  >>>>>4
-    output_block = []
+
+    output_blocks = []
+    output_block = None
+
     for line in run_output.splitlines():
+        if output_block is None:
+            output_block = []
         if line.startswith('>>>>>'):
             output_blocks.append('\n'.join(output_block))
-            output_block = []
+            output_block = None
         else:
             output_block.append(line)
 
-    if output_block:
+    if output_block is not None:
         output_blocks.append('\n'.join(output_block))
+
     return output_blocks
 
 
@@ -487,6 +535,46 @@ def globals_for_imports(src):
     return '\n'.join(new_txt)
 
 
+def strip_header(src):
+    """
+    Directly manipulating function text to strip header and remove leading whitespace.
+
+    Should be faster than redbaron.
+
+    Parameters
+    ----------
+    src : str
+        sourec code for method
+    """
+    meth_lines = src.split('\n')
+    counter = 0
+    past_header = False
+    new_lines = []
+    for line in meth_lines:
+        if not past_header:
+            n1 = len(line)
+            newline = line.lstrip()
+            n2 = len(newline)
+            tab = n1-n2
+            if counter == 0:
+                first_len = tab
+            elif n1 == 0:
+                continue
+            if tab == first_len:
+                counter += 1
+                newline = line[tab:]
+            else:
+                past_header = True
+        else:
+            newline = line[tab:]
+
+        # exclude 'global' directives, not needed the way we are running things
+        if not newline.startswith("global "):
+            new_lines.append(newline)
+
+    return '\n'.join(new_lines[counter:])
+
+
 def get_test_src(method_path):
     """
     Return desired source code for a single feature after testing it.
@@ -494,13 +582,12 @@ def get_test_src(method_path):
     Used by embed_test.
 
     1. Get the source code for a unit test method
-    2. Replace the asserts with prints -> source_minus_docstrings_with_prints_cleaned
-    3. Split source_minus_docstrings_with_prints_cleaned up into groups of "In" blocks -> input_blocks
-    4. Insert extra print statements into source_minus_docstrings_with_prints_cleaned
-            to indicate start and end of print Out blocks -> source_with_output_start_stop_indicators
-    5. Run the test using source_with_out_start_stop_indicators -> run_outputs
+    2. Replace the asserts with prints
+    3. Insert extra print statements to indicate start and end of print Out blocks
+    4. Run the test using source_with_out_start_stop_indicators -> run_outputs
+    5. Split method_source up into groups of "In" blocks -> input_blocks
     6. Extract from run_outputs, the Out blocks -> output_blocks
-    7. Return source_minus_docstrings_with_prints_cleaned, input_blocks, output_blocks, skipped, failed
+    7. Return method_source, input_blocks, output_blocks, skipped, failed
 
     Parameters
     ----------
@@ -531,10 +618,6 @@ def get_test_src(method_path):
     class_name = method_path.split('.')[-2]
     method_name = method_path.split('.')[-1]
 
-    # make 'self' available to test code
-    self_code = "from %s import %s; self = %s('%s')" % \
-                (module_path, class_name, class_name, method_name)
-
     test_module = importlib.import_module(module_path)
     cls = getattr(test_module, class_name)
 
@@ -545,127 +628,92 @@ def get_test_src(method_path):
     else:
         N_PROCS = getattr(cls, 'N_PROCS', 1)
         use_mpi =  N_PROCS > 1
-    meth = getattr(cls, method_name)
-    class_source_code = inspect.getsource(cls)
 
-    # Directly manipulating function text to strip header and remove leading whitespace.
-    # Should be faster than redbaron
-    method_source_code = inspect.getsource(meth)
-    meth_lines = method_source_code.split('\n')
-    counter = 0
-    past_header = False
-    new_lines = []
-    for line in meth_lines:
-        if not past_header:
-            n1 = len(line)
-            newline = line.lstrip()
-            n2 = len(newline)
-            tab = n1-n2
-            if counter == 0:
-                first_len = tab
-            elif n1 == 0:
-                continue
-            if tab == first_len:
-                counter += 1
-                newline = line[tab:]
-            else:
-                past_header = True
-        else:
-            newline = line[tab:]
-        # exclude 'global' directives, not needed the way we are running things
-        if not newline.startswith("global "):
-            new_lines.append(newline)
-
-    method_source = '\n'.join(new_lines[counter:])
-
-    # Remove docstring from source code
-    source_minus_docstrings = remove_docstrings(method_source)
+    method = getattr(cls, method_name)
+    method_source = inspect.getsource(method)
+    method_source = strip_header(method_source)
+    method_source = remove_docstrings(method_source)
+    method_source = replace_asserts_with_prints(method_source)
+    method_source = remove_initial_empty_lines(method_source)
 
     #-----------------------------------------------------------------------------------
-    # 2. Replace the asserts with prints -> source_minus_docstrings_with_prints_cleaned
+    # 3. Insert extra print statements to indicate start and end of print Out blocks
     #-----------------------------------------------------------------------------------
+    source_with_output_start_stop_indicators = insert_output_start_stop_indicators(method_source)
 
-    # Replace some of the asserts with prints of the actual values
-    # This calls RedBaron
-    source_minus_docstrings_with_prints = replace_asserts_with_prints(source_minus_docstrings)
-
-    # remove raise SkipTest lines
-    # We decided to leave them in for now
-    # source_minus_docstrings_with_prints = remove_raise_skip_tests(source_minus_docstrings_with_prints)
-
-    # Remove the initial empty lines
-    source_minus_docstrings_with_prints_cleaned = remove_initial_empty_lines_from_source(
-        source_minus_docstrings_with_prints)
-
-    #-----------------------------------------------------------------------------------
-    # 4. Insert extra print statements into source_minus_docstrings_with_prints_cleaned
-    #        to indicate start and end of print Out blocks -> source_with_output_start_stop_indicators
-    #-----------------------------------------------------------------------------------
-    source_with_output_start_stop_indicators = insert_output_start_stop_indicators(source_minus_docstrings_with_prints_cleaned)
-
-    #-----------------------------------------------------------------------------------
-    # 5. Run the test using source_with_out_start_stop_indicators -> run_outputs
-    #-----------------------------------------------------------------------------------
-
+    #------------------------------------------------------------------------------------
     # Get all the pieces of code needed to run the unit test method
+    #-----------------------------------------------------------------------------------
+
     global_imports = globals_for_imports(method_source)
-    setup_source_code = get_method_body(inspect.getsource(getattr(cls, 'setUp')))
-    teardown_source_code = get_method_body(inspect.getsource(getattr(cls, 'tearDown')))
+
+    # make 'self' available to test code (as an instance of the test case)
+    self_code = "from %s import %s\nself = %s('%s')\n" % \
+                (module_path, class_name, class_name, method_name)
+
+    # get setUp and tearDown but don't duplicate if it is the method being tested
+    setup_code = '' if method_name == 'setUp' else \
+        get_method_body(inspect.getsource(getattr(cls, 'setUp')))
+
+    teardown_code = '' if method_name == 'tearDown' else \
+        get_method_body(inspect.getsource(getattr(cls, 'tearDown')))
 
     code_to_run = '\n'.join([global_imports,
                              self_code,
-                             setup_source_code,
+                             setup_code,
                              source_with_output_start_stop_indicators,
-                             teardown_source_code])
+                             teardown_code])
+
+    #-----------------------------------------------------------------------------------
+    # 4. Run the test using source_with_out_start_stop_indicators -> run_outputs
+    #-----------------------------------------------------------------------------------
 
     skipped = False
     failed = False
+
     try:
-
-        # Use Subprocess if we are under MPI.
         if use_mpi:
+            # use subprocess to run test with `mpirun`
 
-            # Write it to a file so we can run it.
+            # write code to a file so we can run it.
             fd, code_to_run_path = tempfile.mkstemp()
-
             with os.fdopen(fd, 'w') as tmp:
                 tmp.write(code_to_run)
                 tmp.close()
+
+            # output will be written to one file per process
             env = os.environ.copy()
             env['USE_PROC_FILES'] = '1'
+
             p = subprocess.Popen(['mpirun', '-n', str(N_PROCS), 'python', code_to_run_path],
                                  env=env)
             p.wait()
+
+            # extract output blocks from all output files & merge them
             multi_out_blocks = []
             for i in range(N_PROCS):
                 with open('%d.out' % i) as f:
                     multi_out_blocks.append(extract_output_blocks(f.read()))
                 os.remove('%d.out' % i)
+
             output_blocks = []
             for i in range(len(multi_out_blocks[0])):
-                output_blocks.append('\n'.join(["(rank %d) %s" % (j, m[i]) for j, m in enumerate(multi_out_blocks) if m[i]]))
-
-        # Just Exec the code for serial tests.
+                output_blocks.append('\n'.join(["(rank %d) %s" %
+                                     (j, m[i]) for j, m in enumerate(multi_out_blocks) if m[i]]))
         else:
+            # just exec() the code for serial tests.
 
+            # capture all output
             stdout = sys.stdout
             stderr = sys.stderr
             strout = cStringIO()
             sys.stdout = strout
             sys.stderr = strout
 
-            # Hacking, but trying to make sure we capture the check config messages.
-            from openmdao.utils.logger_utils import _loggers, get_logger
-            if 'check_config' not in _loggers:
-                get_logger('check_config', use_format=True)
-            if 'check_partials' not in _loggers:
-                get_logger('check_partials')
-            if 'check_totals' not in _loggers:
-                get_logger('check_totals')
-
-            _loggers['check_config']['logger'].handlers[0].stream = strout
-            _loggers['check_partials']['logger'].handlers[0].stream = strout
-            _loggers['check_totals']['logger'].handlers[0].stream = strout
+            # set all the loggers to write to our captured stream
+            from openmdao.utils.logger_utils import _loggers
+            for name in _loggers:
+                _loggers[name]['logger'].handlers[0].stream = strout
 
             # We need more precision from numpy
             save_opts = np.get_printoptions()
@@ -715,9 +763,9 @@ def get_test_src(method_path):
 
     if not skipped and not failed:
         #####################
-        ### 3. Split source_minus_docstrings_with_prints_cleaned up into groups of "In" blocks -> input_blocks ###
+        ### 5. Split method_source up into groups of "In" blocks -> input_blocks ###
         #####################
-        input_blocks = split_source_into_input_blocks(source_minus_docstrings_with_prints_cleaned)
+        input_blocks = split_source_into_input_blocks(source_with_output_start_stop_indicators)
 
         #####################
         ### 6. Extract from run_outputs, the Out blocks -> output_blocks ###
@@ -725,12 +773,17 @@ def get_test_src(method_path):
         if not use_mpi:
             output_blocks = extract_output_blocks(run_outputs)
 
-        # Need to deal with the cases when there is no outputblock for a given input block
+        # the last input block may not produce any output
+        if len(output_blocks) == len(input_blocks) - 1:
+            output_blocks.append('')
+
+        # Need to deal with the cases when there is no output for a given input block
         # Merge an input block with the previous block and throw away the output block
         input_blocks, output_blocks = clean_up_empty_output_blocks(input_blocks, output_blocks)
+
         skipped_failed_output = None
     else:
         input_blocks = output_blocks = None
         skipped_failed_output = run_outputs
 
-    return source_minus_docstrings_with_prints_cleaned, skipped_failed_output, input_blocks, output_blocks, skipped, failed
+    return method_source, skipped_failed_output, input_blocks, output_blocks, skipped, failed

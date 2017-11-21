@@ -101,7 +101,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertTrue(lines[y_wrt_x1_line+5].endswith('*'),
                         msg='Error flag expected in output but not displayed')
         self.assertFalse(lines[y_wrt_x1_line+6].endswith('*'),
-                        msg='Error flag not expected in output but displayed')
+                         msg='Error flag not expected in output but displayed')
 
     def test_component_only(self):
         class MyComp(ExplicitComponent):
@@ -143,7 +143,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertTrue(lines[y_wrt_x1_line+5].endswith('*'),
                         msg='Error flag expected in output but not displayed')
         self.assertFalse(lines[y_wrt_x1_line+6].endswith('*'),
-                        msg='Error flag not expected in output but displayed')
+                         msg='Error flag not expected in output but displayed')
 
     def test_component_only_suppress(self):
         class MyComp(ExplicitComponent):
@@ -339,7 +339,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.val = val
 
                 if isinstance(val, (float, int)) or np.isscalar(val):
-                    size=1
+                    size = 1
                 else:
                     size = np.prod(val.shape)
 
@@ -460,8 +460,8 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.add_output('y', np.ones(2))
                 self.add_output('extra', np.ones(2))
                 self.mtx = np.array([
-                    [ 3., 4.],
-                    [ 2., 3.],
+                    [3., 4.],
+                    [2., 3.],
                 ])
 
                 self.declare_partials(of='*', wrt='*')
@@ -612,12 +612,10 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        opts = {'step' : 1e-2}
-
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True, global_options=opts)
+        data = prob.check_partials(suppress_output=True, step=1e-2)
 
         # This will fail unless you set the global step.
         x_error = data['comp']['f_xy', 'x']['rel error']
@@ -686,12 +684,10 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        opts = {'method' : 'cs'}
-
         prob.setup(check=False, force_alloc_complex=True)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True, global_options=opts)
+        data = prob.check_partials(suppress_output=True, method='cs')
 
         x_error = data['comp']['f_xy', 'x']['rel error']
         self.assertLess(x_error.forward, 1e-5)
@@ -735,12 +731,10 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        opts = {'form' : 'central'}
-
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True, global_options=opts)
+        data = prob.check_partials(suppress_output=True, form='central')
 
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
@@ -785,12 +779,10 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        opts = {'step_calc' : 'rel'}
-
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True, global_options=opts)
+        data = prob.check_partials(suppress_output=True, step_calc='rel')
 
         # This will fail unless you set the global step.
         x_error = data['comp']['f_xy', 'x']['rel error']
@@ -925,10 +917,12 @@ class TestCheckPartialsFeature(unittest.TestCase):
         data = prob.check_partials()
 
         x1_error = data['comp']['y', 'x1']['abs error']
+
         assert_rel_error(self, x1_error.forward, 1., 1e-8)
         assert_rel_error(self, x1_error.reverse, 1., 1e-8)
 
         x2_error = data['comp']['y', 'x2']['rel error']
+
         assert_rel_error(self, x2_error.forward, 9., 1e-8)
         assert_rel_error(self, x2_error.reverse, 9., 1e-8)
 
@@ -1019,12 +1013,10 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        opts = {'step' : 1e-2}
-
         prob.setup()
         prob.run_model()
 
-        prob.check_partials(global_options=opts)
+        prob.check_partials(step=1e-2)
 
     def test_set_method_on_comp(self):
         from openmdao.api import Problem, Group, IndepVarComp
@@ -1071,12 +1063,10 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        opts = {'method' : 'cs'}
-
         prob.setup(force_alloc_complex=True)
         prob.run_model()
 
-        prob.check_partials(global_options=opts)
+        prob.check_partials(method='cs')
 
     def test_set_form_on_comp(self):
         from openmdao.api import Problem, Group, IndepVarComp
@@ -1123,12 +1113,10 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        opts = {'form' : 'central'}
-
         prob.setup()
         prob.run_model()
 
-        prob.check_partials(global_options=opts)
+        prob.check_partials(form='central')
 
     def test_set_step_calc_on_comp(self):
         from openmdao.api import Problem, Group, IndepVarComp
@@ -1172,13 +1160,10 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        opts = {'step_calc' : 'rel'}
-
         prob.setup()
         prob.run_model()
 
-        prob.check_partials(global_options=opts)
-
+        prob.check_partials(step_calc='rel')
 
 
 class TestProblemCheckTotals(unittest.TestCase):
@@ -1474,6 +1459,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[0.0, 1.0]], 1e-5)
         assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0, 1.0]], 1e-5)
+
 
 if __name__ == "__main__":
     unittest.main()

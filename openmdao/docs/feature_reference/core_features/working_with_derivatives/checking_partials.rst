@@ -112,6 +112,4 @@ However, we choose here to use this setting for all comps.
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_step_calc_global
 
 
-Related Features
------------------
-check-total-derivatives
+.. tags:: Derivatives

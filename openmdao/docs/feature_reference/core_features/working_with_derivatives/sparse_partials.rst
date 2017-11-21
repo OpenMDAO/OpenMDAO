@@ -1,3 +1,5 @@
+.. _feature_sparse_partials:
+
 **************************
 Sparse Partial Derivatives
 **************************

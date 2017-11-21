@@ -444,7 +444,9 @@ class Problem(object):
             sys.exit(0)
 
     def check_partials(self, logger=None, comps=None, compact_print=False,
-                       abs_err_tol=1e-6, rel_err_tol=1e-6, global_options=None,
+                       abs_err_tol=1e-6, rel_err_tol=1e-6,
+                       method='fd', step=None, form=DEFAULT_FD_OPTIONS['form'],
+                       step_calc=DEFAULT_FD_OPTIONS['step_calc'],
                        force_dense=True, suppress_output=False):
         """
         Check partial derivatives comprehensively for all components in your model.
@@ -465,14 +467,21 @@ class Problem(object):
             Threshold value for relative error.  Errors about this value will have a '*' displayed
             next to them in output, making them easy to search for. Note at times there may be a
             significant relative error due to a minor absolute error.  Default is 1.0E-6.
-        global_options : dict
-            Dictionary of options that are used as default unless overridden by calling
-            set_check_partial_options on a component. Only 'form', 'step', 'step_calc', and
-            'method' can be specified in this way.
+        method : str
+            Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
+        step : float
+            Step size for approximation. Default is None.
+        form : string
+            Form for finite difference, can be 'forward', 'backward', or 'central'. The
+            default value is the value of DEFAULT_FD_OPTIONS['form']. Default is
+            the value of DEFAULT_FD_OPTIONS['form']
+        step_calc : string
+            Step type for finite difference, can be 'abs' for absolute', or 'rel' for
+            relative. The default value is the value of DEFAULT_FD_OPTIONS['step_calc']
         force_dense : bool
-            If True, analytic derivatives will be coerced into arrays.
+            If True, analytic derivatives will be coerced into arrays. Default is True.
         suppress_output : bool
-            Set to True to suppress all output.
+            Set to True to suppress all output. Default is False.
 
         Returns
         -------
@@ -491,9 +500,6 @@ class Problem(object):
         """
         if self._setup_status < 2:
             self.final_setup()
-
-        if not global_options:
-            global_options = {}
 
         model = self.model
         logger = logger if logger else get_logger('check_partials')
@@ -728,7 +734,6 @@ class Problem(object):
                 local_wrt = rel_key[1]
 
                 # Determine if fd or cs.
-                method = global_options.get('method', 'fd')
                 if local_wrt in local_opts:
                     local_method = local_opts[local_wrt]['method']
                     if local_method:
@@ -751,10 +756,13 @@ class Problem(object):
                 elif method == 'fd':
                     defaults = DEFAULT_FD_OPTIONS
 
-                    fd_options['form'] = global_options.get('form', defaults['form'])
-                    fd_options['step_calc'] = global_options.get('step_calc', defaults['step_calc'])
+                    fd_options['form'] = form
+                    fd_options['step_calc'] = step_calc
 
-                fd_options['step'] = global_options.get('step', defaults['step'])
+                if step:
+                    fd_options['step'] = step
+                else:
+                    fd_options['step'] = defaults['step']
 
                 # Precedence: component options > global options > defaults
                 if local_wrt in local_opts:
@@ -818,15 +826,17 @@ class Problem(object):
             next to them in output, making them easy to search for. Note at times there may be a
             significant relative error due to a minor absolute error.  Default is 1.0E-6.
         method : str
-            Method, 'fd' for finite difference or 'cs' for complex step.
+            Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'
         step : float
-            Step size for approximation.
+            Step size for approximation. Default is 1e-6.
         form : string
-            Form for finite difference, can be 'forward', 'backward', or 'central'.
+            Form for finite difference, can be 'forward', 'backward', or 'central'. Default
+            'forward'.
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
+            Default is 'abs'.
         suppress_output : bool
-            Set to True to suppress all output.
+            Set to True to suppress all output. Default is False.
 
         Returns
         -------
