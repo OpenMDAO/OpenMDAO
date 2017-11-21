@@ -186,11 +186,11 @@ def tree(top, show_solvers=True, show_colors=True, filter=None, max_depth=0, str
             if s.nonlinear_solver is not None and nlsolver != "NonlinearRunOnce":
                 cprint("  NL: ")
                 cprint(nlsolver, color=Fore.MAGENTA + Style.BRIGHT)
-        print()
+        print(file=stream)
 
         vindent = indent + '  '
         for name, val in ret:
-            print("%s%s: %s" % (vindent, name, val))
+            print("%s%s: %s" % (vindent, name, val), file=stream)
 
 
 def config_summary(problem, stream=sys.stdout):

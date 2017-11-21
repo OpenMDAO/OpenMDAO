@@ -73,6 +73,8 @@ class Problem(object):
         2 -- The `final_setup` has been run, everything ready to run.
     """
 
+    _post_setup_func = None
+
     def __init__(self, model=None, comm=None, use_ref_vector=True, root=None):
         """
         Initialize attributes.
@@ -435,12 +437,8 @@ class Problem(object):
             self._set_initial_conditions()
 
         # check for post-setup hook
-        post_setup_str = os.environ.get("OPENMDAO_POST_SETUP", None)
-        if post_setup_str is not None:
-            modpath, funcname = post_setup_str.split(':')
-            __import__(modpath)
-            mod = sys.modules[modpath]
-            getattr(mod, funcname)(self)
+        if Problem._post_setup_func is not None:
+            Problem._post_setup_func(self)
             sys.exit(0)
 
     def check_partials(self, logger=None, comps=None, compact_print=False,
