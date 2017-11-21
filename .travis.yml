@@ -64,9 +64,9 @@ before_install:
 - export PATH=$PATHPREFIX:$PATH
 - export OPENMDAO_TEST_DOCS=1
 
-- if [[ "$TRAVIS_PULL_REQUEST" = "false" ]]; then
-    echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
-  fi
+#- if [[ "$TRAVIS_PULL_REQUEST" = "false" ]]; then
+- echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
+# fi
 
 install:
 # keeping numpy pinned at 1.12 because pySNOPT dies with 1.13 because numpy broke callback
