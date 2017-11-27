@@ -789,7 +789,6 @@ class TestRegularGridMap(unittest.TestCase):
 
 
     def test_training_gradient(self):
-        print("start")
         model = Group()
         ivc = IndepVarComp()
 
