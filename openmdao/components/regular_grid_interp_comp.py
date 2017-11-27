@@ -410,7 +410,57 @@ class RegularGridInterpolator(object):
 
 
 class RegularGridInterpComp(ExplicitComponent):
-    """Interpolation Component generated from data on a regular grid."""
+    """Interpolation Component generated from data on a regular grid.
+
+    Produces smooth fits through provided training data using polynomial 
+    splines of order 1 (linear), 3 (cubic), or 5 (quintic). Analytic 
+    derivatives are automatically computed. 
+
+    For multi-dimensional data, fits are computed
+    on a separable per-axis basis. If a particular dimension does not have 
+    enough training data points to support a selected spline order (e.g. 3 
+    sample points, but an order 5 quintic spline is specified) the order of the
+    fitted spline with be automatically reduced for that dimension alone.
+    
+    Extrapolation is supported, but disabled by default. It can be enabled 
+    via initialization attribute (see below).
+
+    Attributes
+    ----------
+    param_data : list of dict objects
+        Training data and other attributes for the model's input parameters.
+        It is a list of dictionary objects, with each dictionary containing 
+        information for an individual parameter. The order that these dictionaries are
+        given sets the expected shape of the output training data (see 
+        `output_data` below).
+
+        The relevent fields for these dictionaries are:
+
+        - "name" : string; Name of the input parameter
+        - "values" : 1D numpy array or list; sample points for the input parameter
+        - "default" : float; the default value for the input parameter
+        - "units" : string or NoneType; physical units for the input parameter
+
+    output_data : list of dict objects
+        Training data and other attributes for the model's outputs.
+        It is a list of dictionary objects, with each dictionary containing 
+        information for an individual output. The relevent fields for these
+        dictionaries are:
+
+        - "name" : string; Name of the output
+        - "values" : numpy array or list; training data for the output. The 
+        dimension of this array must match the order and dimension of the list
+        of parameters given in the `param_data` attribute. E.g., if 3 parameters
+        are given with 5, 10, and 12 sample points respectively, than each 
+        of the `values` arrays in the dictionaries of `output_data` must 
+        identically have shape 5x10x12.
+        - "default" : float; the default value for the output
+        - "units" : string or NoneType; physical units for the output
+
+    method : string
+        Interpolation order of the fitting spline polynomials.
+
+    """
 
     def __init__(self, param_data, output_data, method="cubic",
                  extrapolate=True, training_data_gradients=False, num_nodes=1):
