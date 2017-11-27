@@ -44,7 +44,7 @@ def exists_remote(host, path):
 
     if status == 0:
         return True
-    elif status == 1:quit
+    elif status == 1:
         return False
     raise Exception('SSH failed.')
 
