@@ -40,7 +40,7 @@ def exists_remote(host, path):
     """
     Test if a dir exists at path on a host accessible with SSH.
     """
-    status = subprocess.call(['ssh', '-v', '-o PasswordAuthentication=no', host, 'test -d {}'.format(pipes.quote(path))])
+    status = subprocess.call(['ssh', '-o PasswordAuthentication=no', host, 'test -d {}'.format(pipes.quote(path))])
 
     if status == 0:
         return True
@@ -66,26 +66,26 @@ def get_doc_version():
 
 def upload_doc_version():
     """
-    Perform operations, then set environment variables for later use in conf.py and .travis.yml
+    Perform operations, then upload properly-named docs to WebFaction
     """
     name, rel = get_doc_version()
-
-    sync_cmd = "rsync -r --delete -after -v _build/html/* " \
-               "openmdao@web543.webfaction.com:/home/openmdao/webapps/twodocversions/"
+    destination = "openmdao@web543.webfaction.com:/home/openmdao/webapps/twodocversions/"
 
     # if release, send to version-numbered dir
     if rel:
-        sync_cmd += name
+        destination += name
     # if not release, it's a "daily build," send to latest
     else:
-        sync_cmd += "latest"
+        destination += "latest"
 
-    # execute the rsync
-    status = os.system(sync_cmd)
+    # execute the rsync to upload docs
+    cmd = "rsync -r --delete-after -v _build/html/* " + destination
+    status = subprocess.call(cmd, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, shell=True)
 
     if status == 0:
         return True
-    elif status == 1:
+    else:
         raise Exception('Doc transfer failed.')
 
 if __name__ == "__main__":
