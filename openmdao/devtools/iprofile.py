@@ -44,9 +44,6 @@ _inst_data = {}
 
 
 def _setup(options, finalize=True):
-    """
-    Instruments certain important openmdao methods for profiling.
-    """
 
     global _profile_prefix, _matches
     global _profile_setup, _profile_total, _profile_out

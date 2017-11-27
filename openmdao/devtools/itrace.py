@@ -110,17 +110,7 @@ def _trace_return(frame, arg, stack, context):
     sys.stdout.flush()
 
 
-def setup(options):
-    """
-    Setup call tracing.
-
-    Parameters
-    ----------
-    methods : list of (glob, (classes...)) or None
-        Methods to be traced, based on glob patterns and isinstance checks.
-    verbose : bool
-        If True, show function locals and return values.
-    """
+def _setup(options):
     if not func_group:
         _setup_func_group()
 
@@ -143,6 +133,20 @@ def setup(options):
                                                 do_ret=do_ret,
                                                 context=(qual_cache, method_counts,
                                                          class_counts, verbose))
+
+
+def setup(methods=None, verbose=None):
+    """
+    Setup call tracing.
+
+    Parameters
+    ----------
+    methods : list of (glob, (classes...)) or None
+        Methods to be traced, based on glob patterns and isinstance checks.
+    verbose : bool
+        If True, show function locals and return values.
+    """
+    _setup(_Options(methods=methods, verbose=verbose))
 
 
 def start():
@@ -177,7 +181,7 @@ def tracing(methods=None, verbose=False):
     verbose : bool
         If True, show function locals and return values.
     """
-    setup(_Options(verbose=verbose, methods=methods))
+    setup(methods=methods, verbose=verbose)
     start()
     yield
     stop()
@@ -201,7 +205,7 @@ class tracedfunc(object):
     def __call__(self, func):
         def wrapped(*args, **kwargs):
             if self._call_setup:
-                setup(self.options)
+                _setup(self.options)
                 self._call_setup = False
             start()
             func(*args, **kwargs)
@@ -239,7 +243,7 @@ def _itrace_exec(options):
         '__cached__': None,
     }
 
-    setup(options)
+    _setup(options)
     start()
 
     exec (code, globals_dict)

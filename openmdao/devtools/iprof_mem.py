@@ -39,15 +39,7 @@ def _trace_mem_ret(frame, arg, stack, context):
         # print("%g (+%g) MB %s:%d:%s" % (usage, delta,
         #                                 key[0], key[1], key[2]))
 
-def setup(methods=None):
-    """
-    Setup memory profiling.
-
-    Parameters
-    ----------
-    methods : list of (glob, (classes...)) or None
-        Methods to be profiled, based on glob patterns and isinstance checks.
-    """
+def _setup(options):
     global _registered, _trace_memory, mem_usage
     if not _registered:
         from openmdao.devtools.debug import mem_usage
@@ -55,7 +47,9 @@ def setup(methods=None):
         mem_changes = defaultdict(lambda: [0., 0, set()])
         memstack = []
         callstack = []
-        _trace_memory = _create_profile_callback(callstack,  _collect_methods(methods),
+        _trace_memory = _create_profile_callback(callstack,
+                                                 _collect_methods(
+                                                    _get_methods(options, default='openmdao_all')),
                                                  do_call=_trace_mem_call, do_ret=_trace_mem_ret,
                                                  context=(memstack, mem_changes))
 
@@ -70,6 +64,18 @@ def setup(methods=None):
 
         atexit.register(print_totals)
         _registered = True
+
+
+def setup(methods=None):
+    """
+    Setup memory profiling.
+
+    Parameters
+    ----------
+    methods : list of (glob, (classes...)) or None
+        Methods to be profiled, based on glob patterns and isinstance checks.
+    """
+    _setup(_Options(methods=methods))
 
 
 def start():
@@ -111,7 +117,7 @@ def _mem_prof_exec(options):
     progname = options.file[0]
     sys.path.insert(0, os.path.dirname(progname))
 
-    setup(methods=_get_methods(options, default='openmdao_all'))
+    _setup(options)
     with open(progname, 'rb') as fp:
         code = compile(fp.read(), progname, 'exec')
 
