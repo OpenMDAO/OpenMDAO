@@ -2,7 +2,7 @@ branches:
   only:
   - master
 
-sudo: true
+sudo: false
 
 os:
 - linux
@@ -65,7 +65,7 @@ before_install:
 - export OPENMDAO_TEST_DOCS=1
 
 #- if [[ "$TRAVIS_PULL_REQUEST" = "false" ]]; then
-- echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
+echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
 # fi
 
 install:
@@ -91,9 +91,12 @@ install:
 - pip install .  # Not using -e on purpose here, to catch pkging errors
 
 script:
+- ls -al /home/travis/.ssh
+- cat /home/travis/.ssh/config
 # make docs first
 - cd openmdao/docs;
-- sudo make all
+- make all
+- cat /var/log/auth.log
 # run the tests from down here to see if it can work without being at top level
 - testflo -n 1 openmdao  -m "ptest*"
 - testflo -n 1 openmdao  --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*
@@ -116,7 +119,7 @@ deploy:
   script:
   - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
       if [ "$MPI" ] && [ "$PY" = "3.6" ]; then
-        sudo python _utils/upload_doc_version.py;
+        python _utils/upload_doc_version.py;
       fi
     fi
   on:
