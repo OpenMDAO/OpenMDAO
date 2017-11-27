@@ -1,5 +1,5 @@
 """
-A console script wrapper for multiple post setup hook functions.
+A console script wrapper for multiple openmdao functions.
 """
 
 import sys
