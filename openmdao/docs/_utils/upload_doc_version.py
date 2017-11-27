@@ -40,8 +40,10 @@ def exists_remote(host, path):
     """
     Test if a dir exists at path on a host accessible with SSH.
     """
-    status = subprocess.call(
-        ['ssh', host, 'test -d {}'.format(pipes.quote(path))])
+    #status = subprocess.call(['ssh', host, 'test -d {}'.format(pipes.quote(path))])
+    test_cmd = "ssh " + host + " test -d " + format(pipes.quote(path))
+    status = os.system(test_cmd)
+
     if status == 0:
         return True
     elif status == 1:
