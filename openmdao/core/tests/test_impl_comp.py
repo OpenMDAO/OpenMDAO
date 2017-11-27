@@ -615,6 +615,31 @@ class ListFeatureTestCase(unittest.TestCase):
             'sub.comp3.x'
         ])
 
+    def test_list_residuals_with_tol(self):
+        from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, LinearBlockGS
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 1.0))
+        model.add_subsystem('d1', SellarImplicitDis1())
+        model.add_subsystem('d2', SellarImplicitDis2())
+        model.connect('d1.y1', 'd2.y1')
+        model.connect('d2.y2', 'd1.y2')
+
+        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver.options['maxiter'] = 5
+        model.linear_solver = ScipyKrylov()
+        model.linear_solver.precon = LinearBlockGS()
+
+        prob.setup(check=False)
+        prob.set_solver_print(level=-1)
+
+        prob.run_model()
+
+        resids = model.list_residuals(tol=0.01, values=False)
+        self.assertEqual(sorted(resids), ['d2.y2',])
+
 
 if __name__ == '__main__':
     unittest.main()
