@@ -12,8 +12,8 @@ from six.moves import cStringIO
 from numpy import ndarray
 
 from openmdao.devtools.iprof_utils import _create_profile_callback, find_qualified_name, \
-                                         func_group, _collect_methods
-
+                                         func_group, _collect_methods, _Options, _setup_func_group,\
+                                         _get_methods
 
 _trace_calls = None  # pointer to function that implements the trace
 _registered = False  # prevents multiple atexit registrations
@@ -110,7 +110,7 @@ def _trace_return(frame, arg, stack, context):
     sys.stdout.flush()
 
 
-def setup(methods=None, verbose=False):
+def setup(options):
     """
     Setup call tracing.
 
@@ -121,14 +121,14 @@ def setup(methods=None, verbose=False):
     verbose : bool
         If True, show function locals and return values.
     """
+    if not func_group:
+        _setup_func_group()
+
     global _registered, _trace_calls
+
+    verbose=options.verbose
     if not _registered:
-        if methods is None:
-            methods = func_group['openmdao']
-        elif isinstance(methods, string_types):
-            methods = func_group.get(methods)
-            if methods is None:
-                methods = func_group['openmdao']
+        methods = _get_methods(options, default='openmdao')
 
         call_stack = []
         qual_cache = {}
@@ -171,12 +171,13 @@ def tracing(methods=None, verbose=False):
 
     Parameters
     ----------
-    methods : list of (glob, (classes...)) or None
-        Methods to be traced, based on glob patterns and isinstance checks.
+    methods : list of (glob, (classes...)) or str or None
+        Methods to be traced, based on glob patterns and isinstance checks. If value
+        is a string, use that string to lookup a 'canned' method list by name.
     verbose : bool
         If True, show function locals and return values.
     """
-    setup(methods=methods, verbose=verbose)
+    setup(_Options(verbose=verbose, methods=methods))
     start()
     yield
     stop()
@@ -194,39 +195,40 @@ class tracedfunc(object):
         If True, show function locals and return values.
     """
     def __init__(self, methods=None, verbose=False):
-        self.methods = methods
-        self.verbose = verbose
+        self.options = _Options(methods=methods, verbose=verbose)
+        self._call_setup = True
 
     def __call__(self, func):
-        setup(methods=self.methods, verbose=self.verbose)
-
         def wrapped(*args, **kwargs):
+            if self._call_setup:
+                setup(self.options)
+                self._call_setup = False
             start()
             func(*args, **kwargs)
             stop()
         return wrapped
 
 
-def _trace_py_file():
-    """
-    Process command line args and perform tracing on a specified python file.
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-g', '--group', action='store', dest='group',
+def _itrace_setup_parser(parser):
+    if not func_group:
+        _setup_func_group()
+
+    parser.add_argument('file', nargs=1, help='Python file to be traced.')
+    parser.add_argument('-g', '--group', action='store', dest='methods',
                         default='openmdao',
-                        help='Determines which group of methods will be tracked. Default is "openmdao".'
+                        help='Determines which group of methods will be traced. Default is "openmdao".'
                               ' Options are: %s' % sorted(func_group.keys()))
     parser.add_argument('-v', '--verbose', action='store_true', dest='verbose',
                         help="Show function locals and return values.")
-    parser.add_argument('file', metavar='file', nargs=1,
-                        help='Python file to profile.')
 
-    options = parser.parse_args()
 
+def _itrace_exec(options):
+    """
+    Process command line args and perform tracing on a specified python file.
+    """
     progname = options.file[0]
     sys.path.insert(0, os.path.dirname(progname))
 
-    setup(methods=func_group[options.group], verbose=options.verbose)
     with open(progname, 'rb') as fp:
         code = compile(fp.read(), progname, 'exec')
 
@@ -237,10 +239,7 @@ def _trace_py_file():
         '__cached__': None,
     }
 
+    setup(options)
     start()
 
     exec (code, globals_dict)
-
-
-if __name__ == '__main__':
-    _trace_py_file()

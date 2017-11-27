@@ -9,7 +9,7 @@ import atexit
 from collections import defaultdict
 from itertools import chain
 
-from six import iteritems
+from six import iteritems, string_types
 
 try:
     from mpi4py import MPI
@@ -17,7 +17,8 @@ except ImportError:
     MPI = None
 
 from openmdao.devtools.webview import webview
-from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _collect_methods
+from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _collect_methods, \
+     _setup_func_group, _get_methods
 
 
 def _prof_node(fpath, parts):
@@ -42,16 +43,37 @@ _call_stack = []
 _inst_data = {}
 
 
-def setup(prefix='iprof', methods=None, prof_dir=None, finalize=True):
+def _setup(options, finalize=True):
+    """
+    Instruments certain important openmdao methods for profiling.
+    """
+
+    global _profile_prefix, _matches
+    global _profile_setup, _profile_total, _profile_out
+
+    if _profile_setup:
+        raise RuntimeError("profiling is already set up.")
+
+    _profile_prefix = os.path.join(os.getcwd(), 'iprof')
+    _profile_setup = True
+
+    methods = _get_methods(options, default='openmdao')
+
+    rank = MPI.COMM_WORLD.rank if MPI else 0
+    _profile_out = open("%s.%s" % (_profile_prefix, rank), 'wb')
+
+    if finalize:
+        atexit.register(_finalize_profile)
+
+    _matches = _collect_methods(methods)
+
+
+def setup(methods=None, finalize=True):
     """
     Instruments certain important openmdao methods for profiling.
 
     Parameters
     ----------
-
-    prefix : str ('iprof')
-        Prefix used for the raw profile data. Process rank will be appended
-        to it to get the actual filename.  When not using MPI, rank=0.
 
     methods : list, optional
         A list of tuples of profiled methods to override the default set.  The first
@@ -64,38 +86,11 @@ def setup(prefix='iprof', methods=None, prof_dir=None, finalize=True):
                 "*": (System, Jacobian, Matrix, Solver, Driver, Problem),
             ]
 
-    prof_dir : str
-        Directory where the profile files will be written. Defaults to the
-        current directory.
-
-    finallize : bool
+    finalize : bool
         If True, register a function to finalize the profile before exit.
 
     """
-
-    global _profile_prefix, _matches
-    global _profile_setup, _profile_total, _profile_out
-
-    if _profile_setup:
-        raise RuntimeError("profiling is already set up.")
-
-    if prof_dir is None:
-        _profile_prefix = os.path.join(os.getcwd(), prefix)
-    else:
-        _profile_prefix = os.path.join(os.path.abspath(prof_dir), prefix)
-
-    _profile_setup = True
-
-    if methods is None:
-        methods = func_group['openmdao']
-
-    rank = MPI.COMM_WORLD.rank if MPI else 0
-    _profile_out = open("%s.%s" % (_profile_prefix, rank), 'wb')
-
-    if finalize:
-        atexit.register(_finalize_profile)
-
-    _matches = _collect_methods(methods)
+    _setup(_Options(methods=methods), finalize=finalize)
 
 
 def start():
@@ -287,28 +282,28 @@ def _process_profile(flist):
     return tree_nodes, totals
 
 
-def _prof_totals():
-    """
-    Called from the command line to create a file containing total elapsed
-    times and number of calls for all profiled functions.
-
-    """
-    parser = argparse.ArgumentParser()
+def _iprof_totals_setup_parser(parser):
     parser.add_argument('-o', '--outfile', action='store', dest='outfile',
                         metavar='OUTFILE', default='sys.stdout',
                         help='Name of file containing function total counts and elapsed times.')
-    parser.add_argument('-g', '--group', action='store', dest='group',
+    parser.add_argument('-g', '--group', action='store', dest='methods',
                         default='openmdao',
                         help='Determines which group of methods will be tracked.')
     parser.add_argument('-m', '--maxcalls', action='store', dest='maxcalls', type=int,
                         default=999999,
                         help='Max number of results to display.')
-    parser.add_argument('files', metavar='file', nargs='*',
+    parser.add_argument('file', metavar='file', nargs='*',
                         help='Raw profile data files or a python file.')
 
-    options = parser.parse_args()
 
-    if not options.files:
+def _iprof_totals_exec(options):
+    """
+    Called from the command line to create a file containing total elapsed
+    times and number of calls for all profiled functions.
+
+    """
+
+    if not options.file:
         print("No files to process.")
         sys.exit(0)
 
@@ -317,14 +312,14 @@ def _prof_totals():
     else:
         out_stream = open(options.outfile, 'w')
 
-    if options.files[0].endswith('.py'):
-        if len(options.files) > 1:
+    if options.file[0].endswith('.py'):
+        if len(options.file) > 1:
             print("iprofview can only process a single python file.", file=sys.stderr)
             sys.exit(-1)
-        _profile_py_file(options.files[0], methods=func_group[options.group])
-        options.files = ['iprof.0']
+        _iprof_py_file(options)
+        options.file = ['iprof.0']
 
-    call_data, totals = _process_profile(options.files)
+    call_data, totals = _process_profile(options.file)
 
     total_time = totals['$total']['tot_time']
 
@@ -342,36 +337,32 @@ def _prof_totals():
             out_stream.close()
 
 
-def _profile_py_file(fname=None, methods=None):
+def _iprof_py_file(options):
     """
     Run instance-based profiling on the given python script.
 
     Parameters
     ----------
-    fname : str
-        Name of the python script.
-    methods : list of (glob, (classes...)) tuples or None
-        List indicating which methods to track.
+    options : argparse Namespace
+        Command line options.
     """
-    if fname is None:
-        args = sys.argv[1:]
-        if not args:
-            print("No files to process.", file=sys.stderr)
-            sys.exit(2)
-        fname = args[0]
-    sys.path.insert(0, os.path.dirname(fname))
+    if not func_group:
+        _setup_func_group()
 
-    with open(fname, 'rb') as fp:
-        code = compile(fp.read(), fname, 'exec')
+    progname = options.file[0]
+    sys.path.insert(0, os.path.dirname(progname))
+
+    with open(progname, 'rb') as fp:
+        code = compile(fp.read(), progname, 'exec')
 
     globals_dict = {
-        '__file__': fname,
+        '__file__': progname,
         '__name__': '__main__',
         '__package__': None,
         '__cached__': None,
     }
 
-    setup(methods=methods, finalize=False)
+    _setup(options, finalize=False)
     start()
     exec (code, globals_dict)
     _finalize_profile()

@@ -11,6 +11,10 @@ from openmdao.core.problem import Problem
 from openmdao.devtools.problem_viewer.problem_viewer import view_model
 from openmdao.devtools.viewconns import view_connections
 from openmdao.devtools.debug import config_summary, tree, dump_dist_idxs
+from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
+from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setup_parser
+from openmdao.devtools.iprofile import _iprof_totals_exec, _iprof_totals_setup_parser
+from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser
 
 
 def _view_model_setup_parser(parser):
@@ -124,28 +128,15 @@ def _dump_dist_idxs_cmd(options):
     return lambda prob: dump_dist_idxs(prob, vec_name=options.vecname, stream=out)
 
 
-_func_map = {
-    'view_model': (_view_model_setup_parser, _view_model_cmd),
-    'view_connections': (_view_connections_setup_parser, _view_connections_cmd),
-    'summary': (_config_summary_setup_parser, _config_summary_cmd),
-    'tree': (_tree_setup_parser, _tree_cmd),
-    'dump_idxs': (_dump_dist_idxs_setup_parser, _dump_dist_idxs_cmd),
-}
-
-
-def om_cmd():
+def _post_setup_exec(options):
     """
-    Wrap a number of Problem viewing/debugging command line functions.
+    Use this as executor for commands that run as Problem post-setup commands.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
     """
-    parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(help='sub-command help')
-    for p, (setup_func, cmd) in iteritems(_func_map):
-        subp = subparsers.add_parser(p)
-        setup_func(subp)
-        subp.set_defaults(func=cmd)
-
-    options = parser.parse_args()
-
     progname = options.file[0]
 
     sys.path.insert(0, os.path.dirname(progname))
@@ -163,3 +154,42 @@ def om_cmd():
     Problem._post_setup_func = options.func(options)
 
     exec (code, globals_dict)
+
+
+# this dict should contain names mapped to tuples of the form:
+#   (setup_parser_func, func)
+_post_setup_map = {
+    'view_model': (_view_model_setup_parser, _view_model_cmd),
+    'view_connections': (_view_connections_setup_parser, _view_connections_cmd),
+    'summary': (_config_summary_setup_parser, _config_summary_cmd),
+    'tree': (_tree_setup_parser, _tree_cmd),
+    'dump_idxs': (_dump_dist_idxs_setup_parser, _dump_dist_idxs_cmd),
+}
+
+_iprof_map = {
+    'trace': (_itrace_setup_parser, _itrace_exec),
+    'iprof': (_iprof_setup_parser, _iprof_exec),
+    'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec),
+    'mem': (_mem_prof_setup_parser, _mem_prof_exec),
+}
+
+
+def om_cmd():
+    """
+    Wrap a number of Problem viewing/debugging command line functions.
+    """
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(help='sub-command help')
+    for p, (parser_setup_func, cmd) in iteritems(_post_setup_map):
+        subp = subparsers.add_parser(p)
+        parser_setup_func(subp)
+        subp.set_defaults(func=cmd, executor=_post_setup_exec)
+
+    for p, (parser_setup_func, cmd) in iteritems(_iprof_map):
+        subp = subparsers.add_parser(p)
+        parser_setup_func(subp)
+        subp.set_defaults(executor=cmd)
+
+    options = parser.parse_args()
+
+    options.executor(options)
