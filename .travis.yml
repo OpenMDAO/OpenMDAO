@@ -93,7 +93,7 @@ install:
 script:
 # make docs first
 - cd openmdao/docs;
-- make all
+- sudo make all
 # run the tests from down here to see if it can work without being at top level
 - testflo -n 1 openmdao  -m "ptest*"
 - testflo -n 1 openmdao  --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*
