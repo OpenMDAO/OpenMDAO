@@ -10,7 +10,14 @@ import unittest
 from numpy.testing import (assert_array_almost_equal, assert_almost_equal,
     assert_allclose, assert_array_equal, assert_equal)
 
-from openmdao.components.regular_grid_interp_comp import RegularGridInterpolator, RegularGridInterpComp
+scipy_gte_019 = True
+try:
+    from scipy.interpolate._bsplines import make_interp_spline
+except ImportError:
+    scipy_gte_019 = False
+
+if scipy_gte_019:
+    from openmdao.components.regular_grid_interp_comp import RegularGridInterpolator, RegularGridInterpComp
 
 x = np.array([-0.97727788, -0.15135721, -0.10321885,  0.40015721,  0.4105985 ,
         0.95008842,  0.97873798,  1.76405235,  1.86755799,  2.2408932 ])
@@ -417,11 +424,13 @@ class SampleMap(object):
                        'default' : 0,
                        'values' : g})
 
+@unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
 class TestRegularGridInterpolator(unittest.TestCase):
     """Tests the functionality of the regular grid interpolator."""
 
-    config = RegularGridInterpolator._interp_methods()
-    spline_methods, valid_methods, interp_configs = config
+    def setUp(self):
+      self.config = RegularGridInterpolator._interp_methods()
+      self.spline_methods, self.valid_methods, self.interp_configs = self.config
 
     def _get_sample_4d_large(self):
         def f(x, y, z, w):
@@ -728,7 +737,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
         self.assertRaises(ValueError, RegularGridInterpolator,
                       (x, y), values, fill_value=1 + 2j)
 
-
+@unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
 class TestRegularGridMap(unittest.TestCase):
     """
     Tests the regular grid map component. specifically the analytic derivatives

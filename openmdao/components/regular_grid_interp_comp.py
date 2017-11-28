@@ -1,7 +1,15 @@
 """Define the RegularGridInterpComp class."""
 
 from __future__ import division, print_function, absolute_import
-from scipy.interpolate._bsplines import make_interp_spline
+
+try:
+    from scipy.interpolate._bsplines import make_interp_spline
+except ImportError:
+    from scipy import __version__ as scipy_version
+    msg = "'RegularGridInterpComp' requires scipy>=0.19, but the currently" \
+          " installed version is %s." % scipy_version
+    raise ImportError(msg)
+
 from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 import numpy as np
 
