@@ -1,10 +1,11 @@
+"""Define the RegularGridInterpComp class."""
+
 from __future__ import division, print_function, absolute_import
 from scipy.interpolate._bsplines import make_interp_spline
 from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 import numpy as np
 
 from openmdao.api import ExplicitComponent
-
 
 
 class RegularGridInterpolator(object):
@@ -82,7 +83,7 @@ class RegularGridInterpolator(object):
 
     def __init__(self, points, values, method="slinear", bounds_error=True,
                  fill_value=np.nan, spline_dim_error=True):
-
+        """Initialize instance of interpolation class."""
         configs = RegularGridInterpolator._interp_methods()
         self._spline_methods, self._all_methods, self._interp_config = configs
         if method not in self._all_methods:
@@ -139,7 +140,8 @@ class RegularGridInterpolator(object):
                                      "" % (n_p, i, method, k + 1))
 
         if np.iscomplexobj(values[:]):
-            raise ValueError("method '%s' does not support complex values." % method)
+            raise ValueError(
+                "method '%s' does not support complex values." % method)
         self.grid = tuple([np.asarray(p) for p in points])
         self.values = values
         self._xi = None
@@ -149,7 +151,7 @@ class RegularGridInterpolator(object):
 
     def __call__(self, xi, method=None, compute_gradients=True):
         """
-        Interpolation at coordinates
+        Interpolation at coordinates.
 
         Parameters
         ----------
@@ -234,7 +236,7 @@ class RegularGridInterpolator(object):
     def _evaluate_splines(self, data_values, xi, indices, interpolator, method,
                           ki, compute_gradients=True,
                           first_dim_gradient=False):
-        """Convenience method for separable regular grid interpolation."""
+        """Inner method for separable regular grid interpolation."""
         # for spline based methods
 
         # requires floating point input
@@ -345,6 +347,7 @@ class RegularGridInterpolator(object):
         return values, local_derivs
 
     def _find_indices(self, xi):
+        """Find the correct search indices for table lookups."""
         # find relevant edges between which xi are situated
         indices = []
         # compute distance to lower edge in unity units
@@ -365,7 +368,8 @@ class RegularGridInterpolator(object):
         return indices, norm_distances, out_of_bounds
 
     def gradient(self, xi, method=None):
-        """Return the computed gradients at the specified point.
+        """
+        Return the computed gradients at the specified point.
 
         The gradients are computed as the interpolation itself is performed,
         but are cached and returned separately by this method.
@@ -391,7 +395,6 @@ class RegularGridInterpolator(object):
             respect to each value in xi
         """
         # Determine if the needed gradients have been cached already
-
         if not method:
             method = self.method
         if method not in self._spline_methods:
@@ -408,32 +411,32 @@ class RegularGridInterpolator(object):
         return gradients
 
 
-
 class RegularGridInterpComp(ExplicitComponent):
-    """Interpolation Component generated from data on a regular grid.
+    """
+    Interpolation Component generated from data on a regular grid.
 
-    Produces smooth fits through provided training data using polynomial 
-    splines of order 1 (linear), 3 (cubic), or 5 (quintic). Analytic 
-    derivatives are automatically computed. 
+    Produces smooth fits through provided training data using polynomial
+    splines of order 1 (linear), 3 (cubic), or 5 (quintic). Analytic
+    derivatives are automatically computed.
 
     For multi-dimensional data, fits are computed
-    on a separable per-axis basis. If a particular dimension does not have 
-    enough training data points to support a selected spline order (e.g. 3 
+    on a separable per-axis basis. If a particular dimension does not have
+    enough training data points to support a selected spline order (e.g. 3
     sample points, but an order 5 quintic spline is specified) the order of the
     fitted spline with be automatically reduced for that dimension alone.
-    
-    Extrapolation is supported, but disabled by default. It can be enabled 
+
+    Extrapolation is supported, but disabled by default. It can be enabled
     via initialization attribute (see below).
 
     Examples
-    ---------
+    --------
     ::
         import numpy as np
 
         from openmdao.api import Group, Problem, IndepVarComp
 
         from openmdao.components.regular_grid_interp_comp import RegularGridInterpComp
-        
+
         # Set up input and output data
 
         x = {'name' : 'x', 'values' : np.array([0.0, 1.0]), 'default' : 0, 'units' : None}
@@ -441,11 +444,11 @@ class RegularGridInterpComp(ExplicitComponent):
         y = {'name' : 'y', 'values' : np.array([0.0, 1.0]), 'default' : 1, 'units' : None}
 
         xor = {'name' : 'xor', 'values' : np.array([[0.0, 1.0], [1.0, 0.0]]), 'default' : 1.0, 'units' : None}
-        
+
         params = [x, y]
-        
+
         outputs = [xor]
-        
+
         # Create regular grid interpolator instance
 
         xor_interp = RegularGridInterpComp(params, outputs, method='slinear')
@@ -467,7 +470,7 @@ class RegularGridInterpComp(ExplicitComponent):
         prob = Problem(model)
 
         prob.setup()
-        
+
         # Now test out a 'fuzzy' XOR
 
         prob['x'] = 0.9
@@ -482,10 +485,10 @@ class RegularGridInterpComp(ExplicitComponent):
     ----------
     param_data : list of dict objects
         Training data and other attributes for the model's input parameters.
-        It is a list of dictionary objects, with each dictionary containing 
+        It is a list of dictionary objects, with each dictionary containing
         information for an individual parameter. The order that these dictionaries are
-        given sets the expected shape of the output training data (see 
-        `output_data` below). 
+        given sets the expected shape of the output training data (see
+        `output_data` below).
 
         The relevant fields for these dictionaries are:
 
@@ -498,40 +501,40 @@ class RegularGridInterpComp(ExplicitComponent):
             added as inputs to the component under the provided name.
     output_data : list of dict objects
         Training data and other attributes for the model's outputs.
-        It is a list of dictionary objects, with each dictionary containing 
+        It is a list of dictionary objects, with each dictionary containing
         information for an individual output. The relevant fields for these
         dictionaries are:
 
         - "name" : string; Name of the output
-        - "values" : numpy array or list; training data for the output. The 
+        - "values" : numpy array or list; training data for the output. The
         dimension of this array must match the order and dimension of the list
         of parameters given in the `param_data` attribute. E.g., if 3 parameters
-        are given with 5, 10, and 12 sample points respectively, than each 
-        of the `values` arrays in the dictionaries of `output_data` must 
+        are given with 5, 10, and 12 sample points respectively, than each
+        of the `values` arrays in the dictionaries of `output_data` must
         identically have shape 5x10x12.
-        
+
         - "default" : float; the default value for the output
         - "units" : string or NoneType; physical units for the output
 
         Upon instantiation, each of these model outputs are automatically
             added as outputs to the component under the provided name.
     method : str
-        Interpolation order of the fitting spline polynomials. Supported are 
+        Interpolation order of the fitting spline polynomials. Supported are
         'slinear', 'cubic',  and 'quintic'. Default is "cubic".
     training_data_gradients : bool
-        Sets whether gradients of the model's outputs are computed with 
+        Sets whether gradients of the model's outputs are computed with
         respect to the output training data. Note that gradients of the model's
         outputs with respect to the inputs are always computed.
         If set to True, in addition to this extra gradient information being
         computed, each of the provided outputs will have a corresponding
         input added the component with the prefix "_train"; with the same shape
-        as the training data. E.g. if the model has an output named "y" and 
-        training_data_gradients is set to True, then "y_train" will exist as 
-        an input parameter to the model. Default is False. 
+        as the training data. E.g. if the model has an output named "y" and
+        training_data_gradients is set to True, then "y_train" will exist as
+        an input parameter to the model. Default is False.
     num_nodes : int
         Sets the number of concurrent evaluation points for the interpolation
         to be computed at once during execution. Useful for transient models.
-        This attribute sets the dimension of the inputs and outputs that 
+        This attribute sets the dimension of the inputs and outputs that
         are automatically added to the component upon instantiation.
         E.g., if num_nodes = 4, then each of the component's input parameters
         and outputs will be a 1D array of length 4.
@@ -540,6 +543,7 @@ class RegularGridInterpComp(ExplicitComponent):
 
     def __init__(self, param_data, output_data, method="cubic",
                  extrapolate=True, training_data_gradients=False, num_nodes=1):
+        """Initialize the interpolation component."""
         super(RegularGridInterpComp, self).__init__()
         self.param_data = param_data
         self.output_data = output_data
@@ -550,6 +554,7 @@ class RegularGridInterpComp(ExplicitComponent):
         self.n = num_nodes
 
     def setup(self):
+        """Set up the interpolation component within its problem instance."""
         n = self.n
         bounds_error = True
         if self.extrapolate:
@@ -578,11 +583,11 @@ class RegularGridInterpComp(ExplicitComponent):
             if 'units' in odict:
                 units = odict['units']
             outputs.append(values)
-            self.interps[name] = RegularGridInterpolator(self.params, values, 
-                                     method=self.method,
-                                     bounds_error=bounds_error,
-                                     fill_value=None,
-                                     spline_dim_error=False)
+            self.interps[name] = RegularGridInterpolator(self.params, values,
+                                                         method=self.method,
+                                                         bounds_error=bounds_error,
+                                                         fill_value=None,
+                                                         spline_dim_error=False)
             self.add_output(name, val=default, units=units)
 
             self._ki = self.interps[name]._ki
@@ -593,21 +598,29 @@ class RegularGridInterpComp(ExplicitComponent):
             self.declare_partials(name, '*')
 
     def compute(self, inputs, outputs):
+        """Perform the interpolation at run time."""
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
         for out_name in self.interps:
             if self.training_data_gradients:
                 values = inputs["%s_train" % out_name]
                 self.interps[out_name] = RegularGridInterpolator(self.params,
-                                             values,
-                                             method=self.method,
-                                             bounds_error=False,
-                                             fill_value=None,
-                                             spline_dim_error=False)
+                                                                 values,
+                                                                 method=self.method,
+                                                                 bounds_error=False,
+                                                                 fill_value=None,
+                                                                 spline_dim_error=False)
 
             val = self.interps[out_name](pt)
             outputs[out_name] = val
 
     def compute_partials(self, inputs, partials):
+        """
+        Collect computed partial derivatives and return them.
+
+        Checks if the needed derivatives are cached already based on the
+        inputs vector. Refreshes the cache by re-computing the current point
+        if necessary.
+        """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
         if self.training_data_gradients:
             dy_ddata = np.zeros(self.sh)
