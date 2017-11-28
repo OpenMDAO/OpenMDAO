@@ -107,13 +107,13 @@ class Driver(object):
                                        driver level')
         self.recording_options.declare('record_responses', types=bool, default=False,
                                        desc='Set to True to record responses at the driver level')
-        self.recording_options.declare('record_objectives', types=bool, default=False,
+        self.recording_options.declare('record_objectives', types=bool, default=True,
                                        desc='Set to True to record objectives at the \
                                        driver level')
-        self.recording_options.declare('record_constraints', types=bool, default=False,
+        self.recording_options.declare('record_constraints', types=bool, default=True,
                                        desc='Set to True to record constraints at the \
                                        driver level')
-        self.recording_options.declare('includes', types=list, default=[],
+        self.recording_options.declare('includes', types=list, default=['*'],
                                        desc='Patterns for variables to include in recording')
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
@@ -243,21 +243,24 @@ class Driver(object):
         rec_constraints = self.recording_options['record_constraints']
         rec_responses = self.recording_options['record_responses']
 
-        if rec_desvars or incl:
-            mydesvars = {n for n in self._designvars
-                         if check_path(n, incl, excl, rec_desvars)}
+        all_desvars = {n for n in self._designvars
+                       if check_path(n, incl, excl, True)}
+        all_objectives = {n for n in self._objs
+                          if check_path(n, incl, excl, True)}
+        all_constraints = {n for n in self._cons
+                           if check_path(n, incl, excl, True)}
+        if rec_desvars:
+            mydesvars = all_desvars
 
-        if rec_objectives or incl:
-            myobjectives = {n for n in self._objs
-                            if check_path(n, incl, excl, rec_objectives)}
+        if rec_objectives:
+            myobjectives = all_objectives
 
-        if rec_constraints or incl:
-            myconstraints = {n for n in self._cons
-                             if check_path(n, incl, excl, rec_constraints)}
+        if rec_constraints:
+            myconstraints = all_constraints
 
-        if rec_responses or incl:
+        if rec_responses:
             myresponses = {n for n in self._responses
-                           if check_path(n, incl, excl, rec_responses)}
+                           if check_path(n, incl, excl, True)}
 
         # get the includes that were requested for this Driver recording
         if incl:
@@ -280,7 +283,8 @@ class Driver(object):
                         mysystem_outputs.update(d)
 
             # de-duplicate mysystem_outputs
-            mysystem_outputs = mysystem_outputs.difference(mydesvars, myobjectives, myconstraints)
+            mysystem_outputs = mysystem_outputs.difference(all_desvars, all_objectives,
+                                                           all_constraints)
 
         if MPI:  # filter based on who owns the variables
             # TODO Eventually, we think we can get rid of this next check. But to be safe,
@@ -641,33 +645,27 @@ class Driver(object):
 
         # Get the data to record
         data = {}
-        if self.recording_options['includes']:
+        if self.recording_options['record_desvars']:
+            # collective call that gets across all ranks
             desvars = self.get_design_var_values()
-            objectives = self.get_objective_values()
-            constraints = self.get_constraint_values()
+        else:
+            desvars = {}
+
+        if self.recording_options['record_responses']:
+            # responses = self.get_response_values() # not really working yet
             responses = {}
         else:
-            if self.recording_options['record_desvars']:
-                # collective call that gets across all ranks
-                desvars = self.get_design_var_values()
-            else:
-                desvars = {}
+            responses = {}
 
-            if self.recording_options['record_responses']:
-                # responses = self.get_response_values() # not really working yet
-                responses = {}
-            else:
-                responses = {}
+        if self.recording_options['record_objectives']:
+            objectives = self.get_objective_values()
+        else:
+            objectives = {}
 
-            if self.recording_options['record_objectives']:
-                objectives = self.get_objective_values()
-            else:
-                objectives = {}
-
-            if self.recording_options['record_constraints']:
-                constraints = self.get_constraint_values()
-            else:
-                constraints = {}
+        if self.recording_options['record_constraints']:
+            constraints = self.get_constraint_values()
+        else:
+            constraints = {}
 
         desvars = {name: desvars[name]
                    for name in self._filtered_vars_to_record['des']}
