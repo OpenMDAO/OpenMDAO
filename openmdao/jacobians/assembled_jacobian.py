@@ -150,7 +150,9 @@ class AssembledJacobian(Jacobian):
                     min_res_offset = res_offset
 
                 # only need to collect subjac info for components, not subgroups
-                if not isinstance(s, Component):
+                # if not isinstance(s, Component):
+                    # continue
+                if s is not system:
                     continue
 
                 res_size = abs2meta_out[res_abs_name]['size']
