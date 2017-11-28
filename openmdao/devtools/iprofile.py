@@ -295,7 +295,7 @@ def _iprof_totals_setup_parser(parser):
 
 def _iprof_totals_exec(options):
     """
-    Called from the command line to create a file containing total elapsed
+    Called from the command line (om prof_totals command) to create a file containing total elapsed
     times and number of calls for all profiled functions.
 
     """

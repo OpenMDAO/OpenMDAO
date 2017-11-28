@@ -13,10 +13,11 @@ collect information about the entire run of the Problem, things like profilers a
 Post-setup Commands
 -------------------
 
-The following commands all run immediately after a Problem's final_setup function.  After they
-complete, the program will exit, rather than continuing to the end of the user's run script.
-This makes it convenient to view or check the configuration of a model in any run script without
-having to wait around for the entire script to run.
+The following commands all register a function that will run at the end of a Problem's
+final_setup function.  After the registered function completes, the program will exit, rather than
+continuing to the end of the user's run script. This makes it convenient to view or check the
+configuration of a model in any run script without having to wait around for the entire script
+to run.
 
 
 om view_model

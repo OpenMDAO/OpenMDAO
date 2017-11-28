@@ -18,6 +18,14 @@ from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser
 
 
 def _view_model_setup_parser(parser):
+    """
+    Set up the om subparser for the 'om view_model' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', default='n2.html', action='store', dest='outfile',
                         help='html output file.')
@@ -31,6 +39,19 @@ def _view_model_setup_parser(parser):
 
 
 def _view_model_cmd(options):
+    """
+    Return the post_setup hook function for 'om view_model'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
     def _viewmod(prob):
         view_model(prob, outfile=options.outfile,
                    show_browser=not options.no_browser,
@@ -41,6 +62,14 @@ def _view_model_cmd(options):
 
 
 def _view_connections_setup_parser(parser):
+    """
+    Set up the om subparser for the 'om view_connections' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', default='connections.html', action='store', dest='outfile',
                         help='html output file.')
@@ -49,6 +78,19 @@ def _view_connections_setup_parser(parser):
 
 
 def _view_connections_cmd(options):
+    """
+    Return the post_setup hook function for 'om view_connections'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
     def _viewconns(prob):
         view_connections(prob, outfile=options.outfile, show_browser=not options.no_browser)
         exit()
@@ -56,10 +98,31 @@ def _view_connections_cmd(options):
 
 
 def _config_summary_setup_parser(parser):
+    """
+    Set up the om subparser for the 'om summary' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
 
 
 def _config_summary_cmd(options):
+    """
+    Return the post_setup hook function for 'om summary'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
     def summary(prob):
         config_summary(prob)
         exit()
@@ -67,6 +130,14 @@ def _config_summary_cmd(options):
 
 
 def _tree_setup_parser(parser):
+    """
+    Set up the om subparser for the 'om tree' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', default=None, action='store', dest='outfile',
                         help='Output file name. By default, output goes to stdout.')
@@ -81,6 +152,21 @@ def _tree_setup_parser(parser):
 
 
 def _get_tree_filter(attrs, vecvars):
+    """
+    Pull attributes and input/output vector variables out of a tree System.
+
+    Parameters
+    ----------
+    attrs : list of str
+        Names of attributes (may contain dots).
+    vecvars : list of str
+        Names of variables contained in the input or output vectors.
+
+    Returns
+    -------
+    function
+        A function that takes a System and returns a list of name value pairs.
+    """
     def _finder(system):
         found = []
         for attr in attrs:
@@ -105,6 +191,19 @@ def _get_tree_filter(attrs, vecvars):
 
 
 def _tree_cmd(options):
+    """
+    Return the post_setup hook function for 'om tree'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
     if options.outfile is None:
         out = sys.stdout
     else:
@@ -123,6 +222,14 @@ def _tree_cmd(options):
 
 
 def _dump_dist_idxs_setup_parser(parser):
+    """
+    Set up the om subparser for the 'om dump_idxs' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', default=None, action='store', dest='outfile',
                         help='Name of output file.  By default, output goes to stdout.')
@@ -131,6 +238,19 @@ def _dump_dist_idxs_setup_parser(parser):
 
 
 def _dump_dist_idxs_cmd(options):
+    """
+    Return the post_setup hook function for 'om dump_idxs'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
     if options.outfile is None:
         out = sys.stdout
     else:
