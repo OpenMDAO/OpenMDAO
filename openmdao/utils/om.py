@@ -153,9 +153,10 @@ def _post_setup_exec(options):
 
     Problem._post_setup_func = options.func(options)
 
-    exec (code, globals_dict)
+    exec(code, globals_dict)
 
 
+# All post-setup functions go here.
 # this dict should contain names mapped to tuples of the form:
 #   (setup_parser_func, func)
 _post_setup_map = {
@@ -166,6 +167,7 @@ _post_setup_map = {
     'dump_idxs': (_dump_dist_idxs_setup_parser, _dump_dist_idxs_cmd),
 }
 
+# Other non-post-setup functions go here
 _iprof_map = {
     'trace': (_itrace_setup_parser, _itrace_exec),
     'iprof': (_iprof_setup_parser, _iprof_exec),
