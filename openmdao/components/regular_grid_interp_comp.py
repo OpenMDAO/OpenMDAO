@@ -164,7 +164,7 @@ class RegularGridInterpolator(object):
             which will use the method defined at
             the construction of the interpolation object instance.
 
-        computer_gradients : bool, optional
+        compute_gradients : bool, optional
             If a spline interpolation method is chosen, this determines
             whether gradient calculations should be made and cached.
             Default is True.
@@ -443,7 +443,8 @@ class RegularGridInterpComp(ExplicitComponent):
 
         y = {'name' : 'y', 'values' : np.array([0.0, 1.0]), 'default' : 1, 'units' : None}
 
-        xor = {'name' : 'xor', 'values' : np.array([[0.0, 1.0], [1.0, 0.0]]), 'default' : 1.0, 'units' : None}
+        xor = {'name' : 'xor', 'values' : np.array([[0.0, 1.0], [1.0, 0.0]]),
+               'default' : 1.0, 'units' : None}
 
         params = [x, y]
 

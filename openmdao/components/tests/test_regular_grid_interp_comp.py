@@ -829,8 +829,8 @@ class TestRegularGridMap(unittest.TestCase):
         self.run_and_check_derivs(prob)
 
     def run_and_check_derivs(self, prob, tol=1e-5, verbose=False):
-      """Runs check_partials and compares to analytic derivatives."""
-      
+        """Runs check_partials and compares to analytic derivatives."""
+
         prob.run_model()
         derivs = prob.check_partials(suppress_output=True)
 
