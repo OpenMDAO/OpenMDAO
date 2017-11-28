@@ -31,11 +31,13 @@ def _view_model_setup_parser(parser):
 
 
 def _view_model_cmd(options):
-    return lambda prob: view_model(prob,
-                                   outfile=options.outfile,
-                                   show_browser=not options.no_browser,
-                                   embeddable=options.embeddable,
-                                   draw_potential_connections=options.draw_potential_connections)
+    def _viewmod(prob):
+        view_model(prob, outfile=options.outfile,
+                   show_browser=not options.no_browser,
+                   embeddable=options.embeddable,
+                   draw_potential_connections=options.draw_potential_connections)
+        exit()  # could make this command line selectable later
+    return _viewmod
 
 
 def _view_connections_setup_parser(parser):
@@ -47,8 +49,10 @@ def _view_connections_setup_parser(parser):
 
 
 def _view_connections_cmd(options):
-    return lambda prob: view_connections(prob, outfile=options.outfile,
-                                         show_browser=not options.no_browser)
+    def _viewconns(prob):
+        view_connections(prob, outfile=options.outfile, show_browser=not options.no_browser)
+        exit()
+    return _viewconns
 
 
 def _config_summary_setup_parser(parser):
@@ -56,7 +60,10 @@ def _config_summary_setup_parser(parser):
 
 
 def _config_summary_cmd(options):
-    return config_summary
+    def summary(prob):
+        config_summary(prob)
+        exit()
+    return summary
 
 
 def _tree_setup_parser(parser):
@@ -108,8 +115,11 @@ def _tree_cmd(options):
     else:
         filt = None
 
-    return lambda prob: tree(prob, show_colors=options.show_colors,
-                             filter=filt, max_depth=options.depth, stream=out)
+    def _tree(prob):
+        tree(prob, show_colors=options.show_colors,
+             filter=filt, max_depth=options.depth, stream=out)
+        exit()
+    return _tree
 
 
 def _dump_dist_idxs_setup_parser(parser):
@@ -125,7 +135,11 @@ def _dump_dist_idxs_cmd(options):
         out = sys.stdout
     else:
         out = open(options.outfile, 'w')
-    return lambda prob: dump_dist_idxs(prob, vec_name=options.vecname, stream=out)
+
+    def _dumpdist(prob):
+        dump_dist_idxs(prob, vec_name=options.vecname, stream=out)
+        exit()
+    return _dumpdist
 
 
 def _post_setup_exec(options):
@@ -155,6 +169,10 @@ def _post_setup_exec(options):
 
     exec(code, globals_dict)
 
+
+# NOTE: any post_setup functions must handle their own exit behavior. If you want them
+# to exit after running, exit() must be called from within your function.  This also gives
+# you the option of controlling the exit behavior via a command line argument.
 
 # All post-setup functions go here.
 # this dict should contain names mapped to tuples of the form:

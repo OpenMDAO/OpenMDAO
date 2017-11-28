@@ -439,7 +439,6 @@ class Problem(object):
         # check for post-setup hook
         if Problem._post_setup_func is not None:
             Problem._post_setup_func(self)
-            sys.exit(0)
 
     def check_partials(self, logger=None, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6,
