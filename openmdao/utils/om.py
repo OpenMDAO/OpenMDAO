@@ -15,11 +15,12 @@ from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
 from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setup_parser
 from openmdao.devtools.iprofile import _iprof_totals_exec, _iprof_totals_setup_parser
 from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser
+from openmdao.devtools.iprof_utils import _Options
 
 
 def _view_model_setup_parser(parser):
     """
-    Set up the om subparser for the 'om view_model' command.
+    Set up the openmdaosubparser for the 'openmdaoview_model' command.
 
     Parameters
     ----------
@@ -40,7 +41,7 @@ def _view_model_setup_parser(parser):
 
 def _view_model_cmd(options):
     """
-    Return the post_setup hook function for 'om view_model'.
+    Return the post_setup hook function for 'openmdaoview_model'.
 
     Parameters
     ----------
@@ -63,7 +64,7 @@ def _view_model_cmd(options):
 
 def _view_connections_setup_parser(parser):
     """
-    Set up the om subparser for the 'om view_connections' command.
+    Set up the openmdaosubparser for the 'openmdaoview_connections' command.
 
     Parameters
     ----------
@@ -79,7 +80,7 @@ def _view_connections_setup_parser(parser):
 
 def _view_connections_cmd(options):
     """
-    Return the post_setup hook function for 'om view_connections'.
+    Return the post_setup hook function for 'openmdaoview_connections'.
 
     Parameters
     ----------
@@ -99,7 +100,7 @@ def _view_connections_cmd(options):
 
 def _config_summary_setup_parser(parser):
     """
-    Set up the om subparser for the 'om summary' command.
+    Set up the openmdaosubparser for the 'openmdaosummary' command.
 
     Parameters
     ----------
@@ -111,7 +112,7 @@ def _config_summary_setup_parser(parser):
 
 def _config_summary_cmd(options):
     """
-    Return the post_setup hook function for 'om summary'.
+    Return the post_setup hook function for 'openmdaosummary'.
 
     Parameters
     ----------
@@ -131,7 +132,7 @@ def _config_summary_cmd(options):
 
 def _tree_setup_parser(parser):
     """
-    Set up the om subparser for the 'om tree' command.
+    Set up the openmdaosubparser for the 'openmdaotree' command.
 
     Parameters
     ----------
@@ -192,7 +193,7 @@ def _get_tree_filter(attrs, vecvars):
 
 def _tree_cmd(options):
     """
-    Return the post_setup hook function for 'om tree'.
+    Return the post_setup hook function for 'openmdaotree'.
 
     Parameters
     ----------
@@ -223,7 +224,7 @@ def _tree_cmd(options):
 
 def _dump_dist_idxs_setup_parser(parser):
     """
-    Set up the om subparser for the 'om dump_idxs' command.
+    Set up the openmdaosubparser for the 'openmdaodump_idxs' command.
 
     Parameters
     ----------
@@ -239,7 +240,7 @@ def _dump_dist_idxs_setup_parser(parser):
 
 def _dump_dist_idxs_cmd(options):
     """
-    Return the post_setup hook function for 'om dump_idxs'.
+    Return the post_setup hook function for 'openmdaodump_idxs'.
 
     Parameters
     ----------
@@ -285,7 +286,8 @@ def _post_setup_exec(options):
         '__cached__': None,
     }
 
-    Problem._post_setup_func = options.func(options)
+    if options.func is not None:
+        Problem._post_setup_func = options.func(options)
 
     exec(code, globals_dict)
 
@@ -314,22 +316,27 @@ _iprof_map = {
 }
 
 
-def om_cmd():
+def openmdao_cmd():
     """
     Wrap a number of Problem viewing/debugging command line functions.
     """
     parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(help='sub-command help')
+
+    subs = parser.add_subparsers(help='sub-command help')
     for p, (parser_setup_func, cmd) in iteritems(_post_setup_map):
-        subp = subparsers.add_parser(p)
+        subp = subs.add_parser(p)
         parser_setup_func(subp)
         subp.set_defaults(func=cmd, executor=_post_setup_exec)
 
     for p, (parser_setup_func, cmd) in iteritems(_iprof_map):
-        subp = subparsers.add_parser(p)
+        subp = subs.add_parser(p)
         parser_setup_func(subp)
         subp.set_defaults(executor=cmd)
 
-    options = parser.parse_args()
-
-    options.executor(options)
+    # handle case where someone just runs `openmdao <script>`
+    args = [a for a in sys.argv[1:] if not a.startswith('-')]
+    if not set(args).intersection(subs.choices) and len(args) == 1 and os.path.isfile(args[0]):
+        _post_setup_exec(_Options(file=[args[0]], func=None))
+    else:
+        options = parser.parse_args()
+        options.executor(options)

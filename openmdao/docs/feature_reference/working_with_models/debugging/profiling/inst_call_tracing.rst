@@ -4,11 +4,11 @@
 Instance-based Call Tracing
 ***************************
 
-The `om trace` command can be used to print a trace of each instance method call.  For example:
+The `openmdao trace` command can be used to print a trace of each instance method call.  For example:
 
 .. code-block:: none
 
-   om trace <your_python_script_here>
+   openmdao trace <your_python_script_here>
 
 
 Whenever a method is called that matches the search criteria, the pathname of the object instance, if
@@ -77,7 +77,7 @@ the number of times a function has been called, use the `-v` arg. For example:
 
 .. code-block:: none
 
-   om trace -v <your_python_script_here>
+   openmdao trace -v <your_python_script_here>
 
 
 Which will result in output that looks like this:
@@ -138,7 +138,7 @@ setup related functions, do the following:
 
 .. code-block:: none
 
-   om trace -v <your_python_script_here> -g setup
+   openmdao trace -v <your_python_script_here> -g setup
 
 
 To see a list of the available pre-defined sets of functions to trace, look at the usage info
@@ -147,7 +147,7 @@ for the `-g` command that can be obtained as follows:
 
 .. code-block:: none
 
-   om trace -h
+   openmdao trace -h
 
 
 The `-h` command line option will display descriptions of all of the available command line options.
