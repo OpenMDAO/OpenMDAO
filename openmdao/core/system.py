@@ -2575,7 +2575,8 @@ class System(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def list_residuals(self, explicit=True, implicit=True, values=True, out_stream='stdout'):
+    def list_residuals(self, explicit=True, implicit=True, values=True, out_stream='stdout',
+                       tol=None):
         """
         List residuals.
 
@@ -2594,6 +2595,11 @@ class System(object):
             Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
 
+        tol : float, optional
+            If set, limits the output of list_residuals to only variables where
+            the norm of the resids array is greater than the given 'tol'.
+            Default is None.
+
         Returns
         -------
         list
@@ -2607,6 +2613,8 @@ class System(object):
         expl_resids = []
         impl_resids = []
         for name, val in iteritems(self._residuals._views):
+            if tol and np.linalg.norm(val) < tol:
+                continue
             if name in states:
                 impl_resids.append((name, val)) if values else impl_resids.append(name)
             else:
