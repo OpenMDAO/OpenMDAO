@@ -35,18 +35,48 @@ openmdao view_connections
 
 The `openmdao view_connections` command generates a table of connection information for all input and
 output variables in the model.  Units can be compared for each connection and unconnected inputs
-and outputs can be easily identified.
+and outputs can be easily identified.  The displayed variables can be filtered by source system
+and/or target system.  They can also be filtered by NO CONNECTION, which will show all of the
+unconnected inputs or outputs, depending on whether the NO CONNECTION filter is active for the
+source or target side.  When units differ between a source and a target they are highlighted in
+red, and when inputs are connected to outputs outside of the currently selected top level system,
+they are highlighted in purple.  This can be used to easily identify variables that are connected
+across group boundaries.  Below is an example of a connection viewer for a pycycle propulsor
+model:
+
+
+.. figure:: view_connections.png
+   :align: center
+   :alt: An example of a connection viewer
+
+   An example of a connection viewer.
+
 
 
 openmdao tree
 #############
 
 The `openmdao tree` command prints an indented list of all systems in the model tree.  Each system's
-type and name are shown, along with linear and nonlinear solvers if they differ from the default
-which are LinearRunOnce and NonlinearRunOnce.  If the `-c` option is used, the tree will print
+type and name are shown, along with linear and nonlinear solvers if they differ from the defaults,
+which are LinearRunOnce and NonlinearRunOnce respectively.  If the `-c` option is used, the tree will print
 in color if the terminal supports it and the *colorama* package is installed.  The tree Command
 also allows specific attributes and/or vector variables to be printed out along with their
 corresponding system in the tree.
+
+Here's an example of the tree output for a simple model:
+
+.. code-block:: none
+
+    Driver: Driver
+        Group
+            IndepVarComp ground
+            IndepVarComp source
+            Circuit circuit  LN: DirectSolver  NL: NewtonSolver
+                Node n1
+                Node n2
+                Resistor R1
+                Resistor R2
+                Diode D1
 
 
 openmdao summary

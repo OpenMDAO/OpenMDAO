@@ -161,6 +161,7 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.driver.recording_options['record_responses'] = True
         prob.driver.recording_options['record_objectives'] = True
         prob.driver.recording_options['record_constraints'] = True
+        prob.driver.recording_options['includes'] = []
         prob.driver.add_recorder(self.recorder)
 
         prob.model.add_design_var('x')
