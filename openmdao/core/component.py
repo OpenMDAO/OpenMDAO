@@ -784,7 +784,10 @@ class Component(System):
                     'dependent': dependent
                 }
                 abs_key = rel_key2abs_key(self, rel_key)
-                meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
+                if abs_key in self._subjacs_info:
+                    meta = self._subjacs_info[abs_key]
+                else:
+                    meta = SUBJAC_META_DEFAULTS.copy()
                 meta.update(meta_changes)
                 self._check_partials_meta(abs_key, meta)
                 self._subjacs_info[abs_key] = meta
