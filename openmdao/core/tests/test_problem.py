@@ -36,7 +36,6 @@ class TestProblem(unittest.TestCase):
 
         assert_rel_error(self, prob['comp.f_xy'], -15.0)
 
-
     def test_feature_simple_run_once_input_input(self):
         from openmdao.api import Problem, Group, IndepVarComp
         from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -511,14 +510,15 @@ class TestProblem(unittest.TestCase):
 
         # default value from the class definition
         assert_rel_error(self, prob['x'], 1.0, 1e-6)
+
         prob['x'] = 2.75
         assert_rel_error(self, prob['x'], 2.75, 1e-6)
 
+        # default value from the class definition
         assert_rel_error(self, prob['z'], [5.0, 2.0], 1e-6)
+
         prob['z'] = [1.5, 1.5]  # for convenience we convert the list to an array.
         assert_rel_error(self, prob['z'], [1.5, 1.5], 1e-6)
-        prob['z'] = [1.5, 1.5]  # for convenience we convert the list to an array.
-        assert_rel_error(self, prob['z'], (1.5, 1.5), 1e-6)
 
         prob.run_model()
         assert_rel_error(self, prob['y1'], 5.43379016853, 1e-6)
@@ -540,8 +540,6 @@ class TestProblem(unittest.TestCase):
         prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()
-
-        # default value from the class definition
 
         prob['z'] = [1.5, 1.5]  # for convenience we convert the list to an array.
         prob.run_model()
@@ -950,6 +948,31 @@ class TestProblem(unittest.TestCase):
 
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
         self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyKrylov))
+
+    def test_post_setup_hook(self):
+        def hook_func(prob):
+            prob['p2.y'] = 5.0
+
+        prob = Problem()
+        model = prob.model
+        Problem._post_setup_func = hook_func
+
+        try:
+            model.add_subsystem('p1', IndepVarComp('x', 3.0))
+            model.add_subsystem('p2', IndepVarComp('y', -4.0))
+            model.add_subsystem('comp', ExecComp("f_xy=2.0*x+3.0*y"))
+    
+            model.connect('p1.x', 'comp.x')
+            model.connect('p2.y', 'comp.y')
+    
+            prob.setup()
+            prob.run_model()
+    
+            assert_rel_error(self, prob['p2.y'], 5.0)
+            assert_rel_error(self, prob['comp.f_xy'], 21.0)
+        finally:
+            Problem._post_setup_func = None
+
 
 if __name__ == "__main__":
     unittest.main()

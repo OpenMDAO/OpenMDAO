@@ -1,14 +1,11 @@
-***********
+*********
 Debugging
-***********
-
+*********
 
 
 .. toctree::
     :maxdepth: 1
 
+    om_command.rst
     listing_variables.rst
-
-
-Coming Soon!!!!!!
-********************
+    profiling/index.rst

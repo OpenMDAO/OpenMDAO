@@ -101,7 +101,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertTrue(lines[y_wrt_x1_line+5].endswith('*'),
                         msg='Error flag expected in output but not displayed')
         self.assertFalse(lines[y_wrt_x1_line+6].endswith('*'),
-                        msg='Error flag not expected in output but displayed')
+                         msg='Error flag not expected in output but displayed')
 
     def test_component_only(self):
         class MyComp(ExplicitComponent):
@@ -143,7 +143,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertTrue(lines[y_wrt_x1_line+5].endswith('*'),
                         msg='Error flag expected in output but not displayed')
         self.assertFalse(lines[y_wrt_x1_line+6].endswith('*'),
-                        msg='Error flag not expected in output but displayed')
+                         msg='Error flag not expected in output but displayed')
 
     def test_component_only_suppress(self):
         class MyComp(ExplicitComponent):
@@ -339,7 +339,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.val = val
 
                 if isinstance(val, (float, int)) or np.isscalar(val):
-                    size=1
+                    size = 1
                 else:
                     size = np.prod(val.shape)
 
@@ -460,8 +460,8 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.add_output('y', np.ones(2))
                 self.add_output('extra', np.ones(2))
                 self.mtx = np.array([
-                    [ 3., 4.],
-                    [ 2., 3.],
+                    [3., 4.],
+                    [2., 3.],
                 ])
 
                 self.declare_partials(of='*', wrt='*')
@@ -917,10 +917,12 @@ class TestCheckPartialsFeature(unittest.TestCase):
         data = prob.check_partials()
 
         x1_error = data['comp']['y', 'x1']['abs error']
+
         assert_rel_error(self, x1_error.forward, 1., 1e-8)
         assert_rel_error(self, x1_error.reverse, 1., 1e-8)
 
         x2_error = data['comp']['y', 'x2']['rel error']
+
         assert_rel_error(self, x2_error.forward, 9., 1e-8)
         assert_rel_error(self, x2_error.reverse, 9., 1e-8)
 
@@ -1162,7 +1164,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.run_model()
 
         prob.check_partials(step_calc='rel')
-
 
 
 class TestProblemCheckTotals(unittest.TestCase):
@@ -1458,6 +1459,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[0.0, 1.0]], 1e-5)
         assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0, 1.0]], 1e-5)
+
 
 if __name__ == "__main__":
     unittest.main()

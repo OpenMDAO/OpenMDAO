@@ -348,6 +348,25 @@ class TestServerRecorder(unittest.TestCase):
 
         driver_iteration_data = json.loads(self.driver_iteration_data)
         self.assertEqual(len(driver_iteration_data['sysincludes']), 2)
+        self.assertEqual(len(driver_iteration_data['objectives']), 0)
+        self.assertEqual(len(driver_iteration_data['desvars']), 0)
+        self.assertEqual(len(driver_iteration_data['constraints']), 0)
+        self.assertEqual(len(driver_iteration_data['responses']), 0)
+    
+    def test_driver_everything_recorded_by_default(self, m):
+        self.setup_endpoints(m)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
+
+        self.setup_sellar_model()
+        self.prob.driver.add_recorder(recorder)
+        self.prob.setup(check=False)
+
+        t0, t1 = run_driver(self.prob)
+
+        self.prob.cleanup()
+
+        driver_iteration_data = json.loads(self.driver_iteration_data)
+        self.assertEqual(len(driver_iteration_data['sysincludes']), 2)
         self.assertEqual(len(driver_iteration_data['objectives']), 1)
         self.assertEqual(len(driver_iteration_data['desvars']), 2)
         self.assertEqual(len(driver_iteration_data['constraints']), 2)
@@ -375,9 +394,9 @@ class TestServerRecorder(unittest.TestCase):
         driver_iteration_data = json.loads(self.driver_iteration_data)
         self.assertEqual(len(driver_iteration_data['sysincludes']), 2)
         self.assertEqual(len(driver_iteration_data['objectives']), 0)
-        self.assertEqual(len(driver_iteration_data['desvars']), 2)
-        self.assertEqual(len(driver_iteration_data['constraints']), 2)
-        self.assertEqual(driver_iteration_data['responses'], [])
+        self.assertEqual(len(driver_iteration_data['desvars']), 0)
+        self.assertEqual(len(driver_iteration_data['constraints']), 0)
+        self.assertEqual(len(driver_iteration_data['responses']), 0)
 
     def test_only_constraints_recorded(self, m):
         self.setup_endpoints(m)
