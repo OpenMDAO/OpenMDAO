@@ -7,7 +7,7 @@ import argparse
 from collections import defaultdict
 
 from openmdao.devtools.iprof_utils import _create_profile_callback, find_qualified_name, func_group, \
-     _collect_methods
+     _collect_methods, _setup_func_group, _get_methods
 
 
 _registered = False  # prevents multiple atexit registrations
@@ -39,25 +39,17 @@ def _trace_mem_ret(frame, arg, stack, context):
         # print("%g (+%g) MB %s:%d:%s" % (usage, delta,
         #                                 key[0], key[1], key[2]))
 
-def setup(methods=None):
-    """
-    Setup memory profiling.
-
-    Parameters
-    ----------
-    methods : list of (glob, (classes...)) or None
-        Methods to be profiled, based on glob patterns and isinstance checks.
-    """
+def _setup(options):
     global _registered, _trace_memory, mem_usage
     if not _registered:
         from openmdao.devtools.debug import mem_usage
-        if methods is None:
-            methods = func_group['openmdao_all']
 
         mem_changes = defaultdict(lambda: [0., 0, set()])
         memstack = []
         callstack = []
-        _trace_memory = _create_profile_callback(callstack,  _collect_methods(methods),
+        _trace_memory = _create_profile_callback(callstack,
+                                                 _collect_methods(
+                                                    _get_methods(options, default='openmdao_all')),
                                                  do_call=_trace_mem_call, do_ret=_trace_mem_ret,
                                                  context=(memstack, mem_changes))
 
@@ -72,6 +64,18 @@ def setup(methods=None):
 
         atexit.register(print_totals)
         _registered = True
+
+
+def setup(methods=None):
+    """
+    Setup memory profiling.
+
+    Parameters
+    ----------
+    methods : list of (glob, (classes...)) or None
+        Methods to be profiled, based on glob patterns and isinstance checks.
+    """
+    _setup(_Options(methods=methods))
 
 
 def start():
@@ -93,25 +97,27 @@ def stop():
     sys.setprofile(None)
 
 
-def _profile_py_file():
-    """
-    Process command line args and perform memory profiling on a specified python file.
-    """
+def _mem_prof_setup_parser(parser):
+    if not func_group:
+        _setup_func_group()
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-g', '--group', action='store', dest='group',
+    parser.add_argument('-g', '--group', action='store', dest='methods',
                         default='openmdao_all',
                         help='Determines which group of methods will be tracked. Options are %s' %
                              sorted(func_group.keys()))
     parser.add_argument('file', metavar='file', nargs=1,
                         help='Python file to profile.')
 
-    options = parser.parse_args()
+
+def _mem_prof_exec(options):
+    """
+    Process command line args and perform memory profiling on a specified python file.
+    """
 
     progname = options.file[0]
     sys.path.insert(0, os.path.dirname(progname))
 
-    setup(methods=func_group[options.group])
+    _setup(options)
     with open(progname, 'rb') as fp:
         code = compile(fp.read(), progname, 'exec')
 
@@ -125,7 +131,3 @@ def _profile_py_file():
     start()
 
     exec (code, globals_dict)
-
-
-if __name__ == '__main__':
-    _profile_py_file()
