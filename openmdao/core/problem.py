@@ -1290,7 +1290,7 @@ class Problem(object):
 
             if parallel_deriv_color is None:  # variable is not in an parallel_deriv_color
                 if name in voi_lists:
-                    raise RuntimeError("Variable name '%s' matches an parallel_deriv_color name." %
+                    raise RuntimeError("Variable name '%s' matches a parallel_deriv_color name." %
                                        name)
                 else:
                     # store the absolute name along with the original name, which
@@ -1387,26 +1387,21 @@ class Problem(object):
                             for ii, idx in enumerate(idxs):
                                 if start <= idx < end:
                                     dinputs._views_flat[input_name][idx - start, ii] = 1.0
-                    elif simul is not None and do_color_iter:
-                        final_idxs = i[np.logical_and(i >= start, i < end)]
+                    elif simul is not None:
+                        ii = idxs[i]
+                        final_idxs = ii[np.logical_and(ii >= start, ii < end)]
                         vec_dinput['linear'].set_const(0.0)
-                        dinputs._views_flat[input_name][final_idxs - start] = 1.0
+                        dinputs._views_flat[input_name][final_idxs] = 1.0
                     else:
-                        if simul is None:
-                            if i >= len(idxs):
-                                # reuse the last index if loop iter is larger than current var size
-                                idx = idxs[-1]
-                            else:
-                                idx = idxs[i]
-                            if start <= idx < end and input_name in dinputs._views_flat:
-                                # Dictionary access returns a scaler for 1d input, and we
-                                # need a vector for clean code, so use _views_flat.
-                                dinputs._views_flat[input_name][idx - start] = 1.0
+                        if i >= len(idxs):
+                            # reuse the last index if loop iter is larger than current var size
+                            idx = idxs[-1]
                         else:
-                            if input_name in dinputs._views_flat:
-                                dinputs._views_flat[input_name][i - start] = 1.0
-
-                    #print(i, input_name, simul, dinputs._data[0])
+                            idx = idxs[i]
+                        if start <= idx < end and input_name in dinputs._views_flat:
+                            # Dictionary access returns a scaler for 1d input, and we
+                            # need a vector for clean code, so use _views_flat.
+                            dinputs._views_flat[input_name][idx - start] = 1.0
 
                 model._solve_linear(lin_vec_names, mode, rel_systems)
 
@@ -1430,13 +1425,11 @@ class Problem(object):
                             # totals to zeros instead of None in those cases when none
                             # of the specified indices are within the range of interest
                             # for this proc.
-                            # store = True if start <= idx < end else dup
                             if store:
                                 loc_idx_dict[input_name] += delta_loc_idx
                             loc_idx = loc_idx_dict[input_name]
                         else:
                             idx = loc_idx = i
-                            # store = True if start <= idx < end else dup
 
                     # Pull out the answers and pack into our data structure.
                     for ocount, output_name in enumerate(output_list):
@@ -1492,7 +1485,6 @@ class Problem(object):
                         if store and ncol > 1 and len(deriv_val.shape) == 1:
                             deriv_val = np.atleast_2d(deriv_val).T
 
-                        #deriv_val[np.abs(deriv_val) < 1e-15] = 0.0
                         print(input_name, output_name, i, deriv_val)
                         if return_format == 'flat_dict':
                             if fwd:
@@ -1501,7 +1493,17 @@ class Problem(object):
                                 if totals[key] is None:
                                     totals[key] = np.zeros((len_val, loc_size))
                                 if store:
-                                    totals[key][:, loc_idx] = deriv_val
+                                    if simul is not None and do_color_iter:
+                                        smap = output_vois[output_name]['simul_map']
+                                        if smap is not None and input_name in smap and color in smap[input_name]:
+                                            col_idxs = smap[input_name][color][1]
+                                            if col_idxs:
+                                                row_idxs = smap[input_name][color][0]
+                                                mat = totals[key]
+                                                for idx, col in enumerate(col_idxs):
+                                                    mat[row_idxs[idx], col] = deriv_val[row_idxs[idx]]
+                                    else:
+                                        totals[key][:, loc_idx] = deriv_val
                             else:
                                 key = (old_input_name, old_output_list[ocount])
 
@@ -1528,8 +1530,6 @@ class Problem(object):
                                                     mat[row_idxs[idx], col] = deriv_val[row_idxs[idx]]
                                     else:
                                         totals[okey][old_input_name][:, loc_idx] = deriv_val
-                                    #if input_name=='phase0.indep_controls.controls:alpha' and output_name=='phase0.collocation_constraint.defects:gam':
-                                        #print(i, loc_idx, totals[okey][old_input_name][:, loc_idx])
                             else:
                                 ikey = old_output_list[ocount]
 
@@ -1541,7 +1541,7 @@ class Problem(object):
                             raise RuntimeError("unsupported return format")
 
         recording_iteration.stack.pop()
-        #print(totals)
+
         return totals
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
@@ -1948,47 +1948,53 @@ def find_disjoint(prob, of=None, wrt=None, global_names=True):
                 dct[0].append(resoffset)
                 dct[1].append(dvoffset)
 
-    ## throw out any dv offsets that contain only one idx
-    #new_dv_offsets = {}
-    #for dv, coldict in iteritems(total_dv_offsets):
-        #new_dv_offsets[dv] = {}
-        #for color, lst in iteritems(coldict):
-            #if len(lst) > 1:
-                #new_dv_offsets[dv][color] = lst
-        #if not new_dv_offsets[dv]:
-            #del new_dv_offsets[dv]
+    # throw out any dv offsets that contain only one idx
+    # new_dv_offsets = {}
+    # for dv, coldict in iteritems(total_dv_offsets):
+        # new_dv_offsets[dv] = {}
+        # for color, lst in iteritems(coldict):
+            # if len(lst) > 1:
+                # new_dv_offsets[dv][color] = lst
+        # if not new_dv_offsets[dv]:
+            # del new_dv_offsets[dv]
 
-    #new_res_offsets = {}
-    #for res, dct1 in iteritems(total_res_offsets):
-        #new_res_offsets[res] = {}
-        #for dv, dct2 in iteritems(dct1):
-            #if dv not in new_dv_offsets:
-                #continue
-            #new_res_offsets[res][dv] = {}
-            #for color, tup in iteritems(dct2):
-                #if len(tup[0]) > 1:
-                    #new_res_offsets[res][dv][color] = tup
+    # new_res_offsets = {}
+    # for res, dct1 in iteritems(total_res_offsets):
+        # new_res_offsets[res] = {}
+        # for dv, dct2 in iteritems(dct1):
+            # if dv not in new_dv_offsets:
+                # continue
+            # new_res_offsets[res][dv] = {}
+            # for color, tup in iteritems(dct2):
+                # if len(tup[0]) > 1:
+                    # new_res_offsets[res][dv][color] = tup
 
     return total_dv_offsets, total_res_offsets
 
 
-def set_simul_meta(problem, of=None, wrt=None, global_names=True):
+def get_simul_meta(problem, of=None, wrt=None, global_names=True, stream=sys.stdout):
     driver = problem.driver
     dv_idxs, res_idxs = find_disjoint(problem, of=of, wrt=wrt, global_names=global_names)
+    all_colors = set()
     for dv in dv_idxs:
         # negative colors will be iterated over individually, so start by filling the coloring array
         # with -1.  We then replace specific entries with positive colors which will be iterated over
         # as a group.
         coloring = np.full(driver._designvars[dv]['size'], -1)
+        has_color = False
         for color in dv_idxs[dv]:
-            coloring[np.array(dv_idxs[dv][color], dtype=int)] = color
-        driver._designvars[dv]['simul_coloring'] = coloring
-        print("coloring:", coloring, dv)
+            if len(dv_idxs[dv][color]) > 1:
+                coloring[np.array(dv_idxs[dv][color], dtype=int)] = color
+                all_colors.add(color)
+                has_color = True
+        if has_color:
+            # driver._designvars[dv]['simul_coloring'] = coloring
+            print("._design_vars['%s']['simul_coloring'] = %s" % (dv, list(coloring)))
 
     for res in res_idxs:
         simul_map = {}
         for dv in res_idxs[res]:
-            simul_map[dv] = {n: v for n,v in iteritems(res_idxs[res][dv])}
+            simul_map[dv] = {n: v for n,v in iteritems(res_idxs[res][dv]) if n in all_colors}
         if simul_map:
             print(res, 'simul_map')
             for n, color_dict in simul_map.items():
@@ -1996,5 +2002,3 @@ def set_simul_meta(problem, of=None, wrt=None, global_names=True):
                 for c, idxs in color_dict.items():
                     print("       ", c, ":", idxs)
             driver._responses[res]['simul_map'] = simul_map
-
-    print('foo')

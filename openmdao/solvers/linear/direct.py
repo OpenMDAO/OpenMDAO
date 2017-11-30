@@ -35,7 +35,7 @@ class DirectSolver(LinearSolver):
             if isinstance(mtx, DenseMatrix):
                 ranges = system._jacobian._view_ranges[system.pathname]
                 matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
-                print("matrix", matrix)
+                # print("direct solver matrix", matrix)
                 np.set_printoptions(precision=3)
                 self._lup = scipy.linalg.lu_factor(matrix)
             elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
@@ -67,7 +67,7 @@ class DirectSolver(LinearSolver):
             system._vectors['output']['linear'].set_data(x_data)
 
             self._lup = scipy.linalg.lu_factor(mtx)
-        
+
         np.set_printoptions(suppress=True, linewidth=400, threshold=99999999)
 
     def _mat_vec(self, in_vec, out_vec):
@@ -154,7 +154,7 @@ class DirectSolver(LinearSolver):
                             x_data = self._lu.solve(b_data, trans_splu)
                         else:
                             x_data = scipy.linalg.lu_solve(self._lup, b_data, trans=trans_lu)
-                        print('x_data:', x_data)
+                        # print('x_data:', x_data)
                         x_vec.set_data(x_data)
 
                 # MVP-generated jacobians are scaled.
