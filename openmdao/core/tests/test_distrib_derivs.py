@@ -395,7 +395,6 @@ class MPITests3(unittest.TestCase):
         jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
         assert_rel_error(self, jac['out_var']['a'], expected, 1e-6)
 
-
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
     mpirun_tests()
