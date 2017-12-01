@@ -436,60 +436,6 @@ class RegularGridInterpComp(ExplicitComponent):
     Extrapolation is supported, but disabled by default. It can be enabled
     via initialization attribute (see below).
 
-    Examples
-    --------
-    ::
-        import numpy as np
-
-        from openmdao.api import Group, Problem, IndepVarComp
-
-        from openmdao.components.regular_grid_interp_comp import RegularGridInterpComp
-
-        # Set up input and output data
-
-        x = {'name' : 'x', 'values' : np.array([0.0, 1.0]), 'default' : 0, 'units' : None}
-
-        y = {'name' : 'y', 'values' : np.array([0.0, 1.0]), 'default' : 1, 'units' : None}
-
-        xor = {'name' : 'xor', 'values' : np.array([[0.0, 1.0], [1.0, 0.0]]),
-               'default' : 1.0, 'units' : None}
-
-        params = [x, y]
-
-        outputs = [xor]
-
-        # Create regular grid interpolator instance
-
-        xor_interp = RegularGridInterpComp(params, outputs, method='slinear')
-
-        # Set up the OpenMDAO model
-
-        model = Group()
-
-        ivc = IndepVarComp()
-
-        ivc.add_output('x', 0.0)
-
-        ivc.add_output('y', 1.0)
-
-        model.add_subsystem('ivc', ivc, promotes=["*"])
-
-        model.add_subsystem('comp', xor_interp, promotes=["*"])
-
-        prob = Problem(model)
-
-        prob.setup()
-
-        # Now test out a 'fuzzy' XOR
-
-        prob['x'] = 0.9
-
-        prob['y'] = 0.001242
-
-        prob.run_model()
-
-        print(prob['xor'])
-
     Parameters
     ----------
     param_data : list of dict objects
@@ -516,6 +462,7 @@ class RegularGridInterpComp(ExplicitComponent):
 
         - "name" : string; Name of the output
         - "values" : numpy array or list; training data for the output. The
+
         dimension of this array must match the order and dimension of the list
         of parameters given in the `param_data` attribute. E.g., if 3 parameters
         are given with 5, 10, and 12 sample points respectively, than each
@@ -550,27 +497,37 @@ class RegularGridInterpComp(ExplicitComponent):
         Default is 1 (single point scalar evaluation).
     """
 
-    def __init__(self, param_data, output_data, method="cubic",
-                 extrapolate=True, training_data_gradients=False, num_nodes=1):
-        """Initialize the interpolation component."""
-        super(RegularGridInterpComp, self).__init__()
-        self.param_data = param_data
-        self.output_data = output_data
-        self.method = method
-        self.extrapolate = extrapolate
-        self.training_data_gradients = training_data_gradients
-        self.pnames = []
-        self.n = num_nodes
+    # def __init__(self, param_data, output_data, method="cubic",
+    #              extrapolate=True, training_data_gradients=False, num_nodes=1):
+    #     """Initialize the interpolation component."""
+    #     super(RegularGridInterpComp, self).__init__()
+    #     self.param_data = param_data
+    #     self.output_data = output_data
+    #     self.method = method
+    #     self.extrapolate = extrapolate
+    #     self.training_data_gradients = training_data_gradients
+    #     self.pnames = []
+    #     self.n = num_nodes
+
+    def initialize(self):
+
+        self.metadata.declare('param_data', types=list)
+        self.metadata.declare('output_data', types=list)
+        self.metadata.declare('extrapolate', types=bool, default=False)
+        self.metadata.declare('training_data_gradients', types=bool, default=False)
+        self.metadata.declare('num_nodes', types=int, default=1)
+        self.metadata.declare('method', values=('cubic', 'slinear', 'quintic'), default="cubic")
 
     def setup(self):
         """Set up the interpolation component within its problem instance."""
-        n = self.n
+        n = self.metadata['num_nodes']
+        self.pnames = []
         bounds_error = True
-        if self.extrapolate:
+        if self.metadata['extrapolate']:
             bounds_error = False
 
         self.params, outputs = [], []
-        for pdict in self.param_data:
+        for pdict in self.metadata['param_data']:
             name = pdict['name']
             self.pnames.append(name)
             values = pdict['values']
@@ -584,7 +541,7 @@ class RegularGridInterpComp(ExplicitComponent):
         self.sh = tuple([n] + [i.size for i in self.params])
 
         self.interps = {}
-        for odict in self.output_data:
+        for odict in self.metadata['output_data']:
             name = odict['name']
             values = odict['values']
             default = np.array([odict['default'] for i in range(n)])
@@ -593,7 +550,7 @@ class RegularGridInterpComp(ExplicitComponent):
                 units = odict['units']
             outputs.append(values)
             self.interps[name] = RegularGridInterpolator(self.params, values,
-                                                         method=self.method,
+                                                         method=self.metadata['method'],
                                                          bounds_error=bounds_error,
                                                          fill_value=None,
                                                          spline_dim_error=False)
@@ -601,7 +558,7 @@ class RegularGridInterpComp(ExplicitComponent):
 
             self._ki = self.interps[name]._ki
 
-            if self.training_data_gradients:
+            if self.metadata['training_data_gradients']:
                 self.add_input("%s_train" % name, val=values, units=units)
 
             self.declare_partials(name, '*')
@@ -610,11 +567,11 @@ class RegularGridInterpComp(ExplicitComponent):
         """Perform the interpolation at run time."""
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
         for out_name in self.interps:
-            if self.training_data_gradients:
+            if self.metadata['training_data_gradients']:
                 values = inputs["%s_train" % out_name]
                 self.interps[out_name] = RegularGridInterpolator(self.params,
                                                                  values,
-                                                                 method=self.method,
+                                                                 method=self.metadata['method'],
                                                                  bounds_error=False,
                                                                  fill_value=None,
                                                                  spline_dim_error=False)
@@ -631,9 +588,9 @@ class RegularGridInterpComp(ExplicitComponent):
         if necessary.
         """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
-        if self.training_data_gradients:
+        if self.metadata['training_data_gradients']:
             dy_ddata = np.zeros(self.sh)
-            for j in range(self.n):
+            for j in range(self.metadata['num_nodes']):
                 for i, axis in enumerate(self.params):
                     e_i = np.eye(axis.size)
                     interp = make_interp_spline(axis,
@@ -651,5 +608,9 @@ class RegularGridInterpComp(ExplicitComponent):
             for i, p in enumerate(self.pnames):
                 partials[out_name, p] = np.diag(dval[i])
 
-            if self.training_data_gradients:
+            if self.metadata['training_data_gradients']:
                 partials[out_name, "%s_train" % out_name] = dy_ddata
+
+
+def _for_docs():
+    return RegularGridInterpComp(param_data=[], output_data=[])

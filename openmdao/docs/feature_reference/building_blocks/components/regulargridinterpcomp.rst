@@ -1,8 +1,8 @@
 .. index:: RegularGridInterpComp Example
 
-*******************
+*********************************
 RegularGridInterpComp Component
-*******************
+*********************************
 
 `RegularGridInterpComp` is a smooth interpolation Component for data that exists on a regular grid.
 This differs from `MetaModel` which accepts unstructured data as collections of points.
@@ -20,12 +20,23 @@ fitted spline with be automatically reduced for that dimension alone.
 Extrapolation is supported, but disabled by default. It can be enabled
 via initialization attribute (see below).
 
+
+.. embed-options::
+    openmdao.components.regular_grid_interp_comp
+    _for_docs
+    metadata
+
+Examples
+---------------
+
 .. embed-test::
-    openmdao.components.tests.test_regular_grid_interp_comp.TestRegularGridMap.test_xor
+    openmdao.components.tests.test_regular_grid_interp_comp.TestRegularGridMapFeature.test_xor
+
 
 Initialization Parameters
 -------------------------
 param_data : list of dict objects
+
     Training data and other attributes for the model's input parameters.
     It is a list of dictionary objects, with each dictionary containing
     information for an individual parameter. The order that these dictionaries are
@@ -83,8 +94,3 @@ num_nodes : int
     Default is 1 (single point scalar evaluation).
 
 
-
-.. embed-test::
-    openmdao.components.tests.test_meta_model.MetaModelTestCase.test_metamodel_feature2d
-
-.. tags:: RegularGridInterpComp, Examples
