@@ -615,6 +615,163 @@ class ListFeatureTestCase(unittest.TestCase):
             'sub.comp3.x'
         ])
 
+    def test_simple_list_vars_options(self):
+        from openmdao.api import Group, Problem, IndepVarComp
+
+        class QuadraticComp(ImplicitComponent):
+            """
+            A Simple Implicit Component representing a Quadratic Equation.
+
+            R(a, b, c, x) = ax^2 + bx + c
+
+            Solution via Quadratic Formula:
+            x = (-b + sqrt(b^2 - 4ac)) / 2a
+            """
+
+            def setup(self):
+                self.add_input('a', val=1., units='ft')
+                self.add_input('b', val=1., units='inch')
+                self.add_input('c', val=1., units='ft')
+                self.add_output('x', val=0.,
+                                lower=1.0, upper=100.0,
+                                ref=1.1, ref0=2.1,
+                                units='inch')
+
+                self.declare_partials(of='*', wrt='*')
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                a = inputs['a']
+                b = inputs['b']
+                c = inputs['c']
+                x = outputs['x']
+                residuals['x'] = a * x ** 2 + b * x + c
+
+            def solve_nonlinear(self, inputs, outputs):
+                a = inputs['a']
+                b = inputs['b']
+                c = inputs['c']
+                outputs['x'] = (-b + (b ** 2 - 4 * a * c) ** 0.5) / (2 * a)
+
+        group = Group()
+
+        comp1 = group.add_subsystem('comp1', IndepVarComp())
+        comp1.add_output('a', 1.0, units='ft')
+        comp1.add_output('b', 1.0, units='inch')
+        comp1.add_output('c', 1.0, units='ft')
+
+        sub = group.add_subsystem('sub', Group())
+        sub.add_subsystem('comp2', QuadraticComp())
+        sub.add_subsystem('comp3', QuadraticComp())
+
+        group.connect('comp1.a', 'sub.comp2.a')
+        group.connect('comp1.b', 'sub.comp2.b')
+        group.connect('comp1.c', 'sub.comp2.c')
+
+        group.connect('comp1.a', 'sub.comp3.a')
+        group.connect('comp1.b', 'sub.comp3.b')
+        group.connect('comp1.c', 'sub.comp3.c')
+
+        global prob
+        prob = Problem(model=group)
+        prob.setup()
+
+        prob['comp1.a'] = 1.
+        prob['comp1.b'] = -4.
+        prob['comp1.c'] = 3.
+        prob.run_model()
+
+        ###### list_inputs tests #####
+
+        # list inputs
+        inputs = prob.model.list_inputs(values=False, out_stream=None)
+        self.assertEqual(sorted(inputs), [
+            ('sub.comp2.a',),
+            ('sub.comp2.b',),
+            ('sub.comp2.c',),
+            ('sub.comp3.a',),
+            ('sub.comp3.b',),
+            ('sub.comp3.c',),
+        ])
+
+        inputs = prob.model.list_inputs(units=True, out_stream=None)
+        self.assertEqual(sorted(inputs), [
+            ('sub.comp2.a', [1.], 'ft'),
+            ('sub.comp2.b', [-4.], 'inch'),
+            ('sub.comp2.c', [3.], 'ft'),
+            ('sub.comp3.a', [1.], 'ft'),
+            ('sub.comp3.b', [-4.], 'inch'),
+            ('sub.comp3.c', [3.], 'ft')
+        ])
+
+        # ###### list_outputs tests #####
+
+        # list implicit outputs
+        outputs = prob.model.list_outputs(explicit=False, out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('sub.comp2.x', np.array([3.] ), ),
+            ('sub.comp3.x', np.array([3.]),),
+        ])
+
+        # list explicit outputs with units
+        outputs = prob.model.list_outputs(explicit=False, values=False, units=True, out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('sub.comp2.x', 'inch'),
+            ('sub.comp3.x', 'inch'),
+        ])
+
+        # list explicit outputs with bounds
+        outputs = prob.model.list_outputs(explicit=False, bounds=True, out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('sub.comp2.x', [3.], np.array([1.]), np.array([100.])),
+            ('sub.comp3.x', [3.], np.array([1.]), np.array([100.])),
+        ])
+
+
+        # list explicit outputs with scaling
+        outputs = prob.model.list_outputs(explicit=False, scaling=True, out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('sub.comp2.x', [3.], 1.1, 2.1, 1.0),
+            ('sub.comp3.x', [3.], 1.1, 2.1, 1.0),
+        ])
+
+        ###### list_residuals tests #####
+
+        # list residuals
+        resids = prob.model.list_residuals(explicit=False, out_stream=None)
+        self.assertEqual(sorted(resids), [
+            ('sub.comp2.x', 0.0),
+            ('sub.comp3.x', 0.0),
+        ])
+
+        # list explicit residuals with units and values
+        resids = prob.model.list_residuals(explicit=False, values=False, units=True, out_stream=None)
+        self.assertEqual(sorted(resids), [
+            ('sub.comp2.x', 'inch'),
+            ('sub.comp3.x', 'inch'),
+        ])
+        #
+        # # list explicit residuals with bounds
+        # resids = prob.model.list_residuals(implicit=False, bounds=True, out_stream=None)
+        # self.assertEqual(sorted(resids), [
+        #     ('comp.z', [0.], None, None),
+        #     ('p1.x', [0.], [1.0], [100.0]),
+        #     ('p2.y', [0.], [2.0], [200.0]),
+        # ])
+        #
+        # resids = prob.model.list_residuals(implicit=False, scaling=True, out_stream=None)
+        # self.assertEqual(sorted(resids), [
+        #     ('comp.z', [0.], 1.0, 0.0, 1.0),
+        #     ('p1.x', [0.], 1.1, 2.1, 1.1),
+        #     ('p2.y', [0.], 1.2, 0.0, 2.2),
+        # ])
+        #
+
+
+
+
+
+
+
 
 if __name__ == '__main__':
     unittest.main()

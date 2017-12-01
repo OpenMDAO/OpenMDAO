@@ -2475,7 +2475,11 @@ class System(object):
         with self._scaled_context_all():
             self._apply_nonlinear()
 
-    def list_inputs(self, values=True, out_stream='stdout'):
+    def list_inputs(self,
+                    hierarchical=True,
+                    values=True,
+                    units=False,
+                    out_stream='stdout'):
         """
         List inputs.
 
@@ -2484,6 +2488,9 @@ class System(object):
         values : bool, optional
             When True, display/return input values as well as names. Default is True.
 
+        units : bool, optional
+            When True, display/return units. Default is False.
+
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
@@ -2491,14 +2498,20 @@ class System(object):
         Returns
         -------
         list
-            list of of input names, or (name, value) if values is True
+            list of of input names and other optional information about those inputs
         """
         if self._inputs is None:
             raise RuntimeError("Unable to list inputs until model has been run.")
 
+        meta = self._var_abs2meta
         inputs = []
         for name, val in iteritems(self._inputs._views):
-            inputs.append((name, val)) if values else inputs.append(name)
+            out = [name,]
+            if values:
+                out.append(val)
+            if units:
+                out.append(meta['input'][name]['units'])
+            inputs.append(tuple(out))
 
         if out_stream:
             logger = get_logger('list_inputs', out_stream=out_stream)
@@ -2509,6 +2522,11 @@ class System(object):
 
             header = "%d Input(s) to Components in '%s'\n" % (count, pathname)
             logger.info(header)
+
+
+            # qqq TODO needs fixing. Do something like _write_outputs ?? and test it
+
+
 
             if count:
                 logger.info("-" * len(header) + "\n")
@@ -2523,25 +2541,21 @@ class System(object):
 
         return inputs
 
-    def list_outputs(self, explicit=True, implicit=True, values=True, out_stream='stdout'):
+
+    def list_outputs_orig(self, explicit=True, implicit=True, values=True, out_stream='stdout'):
         """
         List outputs.
-
         Parameters
         ----------
         explicit : bool, optional
             include outputs from explicit components. Default is True.
-
         implicit : bool, optional
             include outputs from implicit components. Default is True.
-
         values : bool, optional
             When True, display/return output values as well as names. Default is True.
-
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
-
         Returns
         -------
         list
@@ -2575,7 +2589,149 @@ class System(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def list_residuals(self, explicit=True, implicit=True, values=True, out_stream='stdout'):
+
+    def list_outputs(self, explicit=True, implicit=True,
+                     hierarchical=True,
+                     values=True,
+                     units=False,
+                     bounds=False,
+                     scaling=False,
+                     out_stream='stdout'):
+        """
+        List outputs. Names are always shown.
+
+        Parameters
+        ----------
+        explicit : bool, optional
+            include outputs from explicit components. Default is True.
+
+        implicit : bool, optional
+            include outputs from implicit components. Default is True.
+
+        values : bool, optional
+            When True, display/return output values. Default is True.
+
+        units : bool, optional
+            When True, display/return units. Default is False.
+
+        bounds : bool, optional
+            When True, display/return bounds (lower and upper). Default is False.
+
+        scaling : bool, optional
+            When True, display/return scaling (ref, ref0, and res_ref). Default is False.
+
+        out_stream : 'stdout', 'stderr' or file-like
+            Where to send human readable output. Default is 'stdout'.
+            Set to None to suppress.
+
+        Returns
+        -------
+        list
+            list of of output names and other optional information about those outputs
+        """
+        if self._outputs is None:
+            raise RuntimeError("Unable to list outputs until model has been run.")
+
+        # Make use of _subsystems_myproc to get the execution order !!!!!
+        eo = self._subsystems_myproc
+
+        # FROM Bret TODO
+        # yeah.That will be missing data
+        # for remote vars when running under MPI, but _var_allprocs_abs2meta, which is the
+        # version that is allgathered across all procs, is missing certain metadata like src_indices
+        # ( and probably bounds and scaling), so I would go with _var_abs2meta.I guess you could do your
+        # own gathering in the MPI case if you needed to.
+
+        meta = self._var_abs2meta
+
+
+
+        # allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
+        # for abs_in, abs_out in iteritems(global_abs_in2out):
+        #     # First, check that this system owns both the input and output.
+        #     if abs_in[:len(pathname)] == pathname and abs_out[:len(pathname)] == pathname:
+        #         # Second, check that they are in different subsystems of this system.
+        #         out_subsys = abs_out[path_len:].split('.', 1)[0]
+        #         in_subsys = abs_in[path_len:].split('.', 1)[0]
+        #         if out_subsys != in_subsys:
+        #             abs_in2out[abs_in] = abs_out
+        #
+        #     # if connected output has scaling then we need input scaling
+        #     if not self._has_input_scaling:
+        #         out_units = allprocs_abs2meta_out[abs_out]['units']
+        #         in_units = allprocs_abs2meta_in[abs_in]['units']
+        #
+
+        #     _var_allprocs_abs2meta: {'input': dict, 'output': dict}
+        #     Dictionary
+        #     mapping
+        #     absolute
+        #     names
+        #     to
+        #     metadata
+        #     dictionaries
+        #     for allprocs variables.
+        #         The
+        #         keys
+        #         are
+        #     ('units', 'shape', 'var_set')
+        #     for inputs and
+        #         ('units', 'shape', 'var_set', 'ref', 'ref0')
+        #         for outputs.
+        #
+        # _var_abs2meta: {'input': dict, 'output': dict}
+        # Dictionary
+        # mapping
+        # absolute
+        # names
+        # to
+        # metadata
+        # dictionaries
+        # for myproc variables.
+
+
+
+        states = self._list_states()
+
+        expl_outputs = []
+        impl_outputs = []
+        for name, val in iteritems(self._outputs._views):
+            out = [name,]
+            if values:
+                out.append(val)
+            if units:
+                out.append(meta['output'][name]['units'])
+            if bounds:
+                out.extend((meta['output'][name]['lower'], meta['output'][name]['upper']))
+            if scaling:
+                out.extend((meta['output'][name]['ref'], meta['output'][name]['ref0'], meta['output'][name]['res_ref']))
+            if name in states:
+                impl_outputs.append(tuple(out))
+            else:
+                expl_outputs.append(tuple(out))
+
+        if out_stream:
+            if explicit:
+                self._write_outputs('Explicit', expl_outputs, out_stream)
+            if implicit:
+                self._write_outputs('Implicit', impl_outputs, out_stream)
+
+        if explicit and implicit:
+            return expl_outputs + impl_outputs
+        elif explicit:
+            return expl_outputs
+        elif implicit:
+            return impl_outputs
+        else:
+            raise RuntimeError('You have excluded both Explicit and Implicit components.')
+
+    def list_residuals(self, explicit=True, implicit=True,
+                       hierarchical=True,
+                       values=True,
+                       units=False,
+                       bounds=False,
+                       scaling=False,
+                       out_stream='stdout'):
         """
         List residuals.
 
@@ -2588,7 +2744,16 @@ class System(object):
             include outputs from implicit components. Default is True.
 
         values : bool, optional
-            When True, display/return residual values as well as names. Default is True.
+            When True, display/return output values. Default is True.
+
+        units : bool, optional
+            When True, display/return units. Default is False.
+
+        bounds : bool, optional
+            When True, display/return bounds (lower and upper). Default is False.
+
+        scaling : bool, optional
+            When True, display/return scaling (ref, ref0, and res_ref). Default is False.
 
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
@@ -2597,20 +2762,31 @@ class System(object):
         Returns
         -------
         list
-            list of of residual names, or (name, value) if values is True
+            list of of residual names and other optional information about those residuals
         """
         if self._residuals is None:
             raise RuntimeError("Unable to list residuals until model has been run.")
 
         states = self._list_states()
 
+        meta = self._var_abs2meta
+
         expl_resids = []
         impl_resids = []
         for name, val in iteritems(self._residuals._views):
+            out = [name,]
+            if values:
+                out.append(val)
+            if units:
+                out.append(meta['output'][name]['units'])
+            if bounds:
+                out.extend((meta['output'][name]['lower'], meta['output'][name]['upper']))
+            if scaling:
+                out.extend((meta['output'][name]['ref'], meta['output'][name]['ref0'], meta['output'][name]['res_ref']))
             if name in states:
-                impl_resids.append((name, val)) if values else impl_resids.append(name)
+                impl_resids.append(tuple(out))
             else:
-                expl_resids.append((name, val)) if values else expl_resids.append(name)
+                expl_resids.append(tuple(out))
 
         if out_stream:
             if explicit:

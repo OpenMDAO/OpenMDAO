@@ -620,6 +620,13 @@ class TestExecComp(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
+        outputs = prob.model.list_outputs(implicit=False, values=True, out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('comp.z', 'inch', [24.]),
+            ('p1.x', 'inch', [12.]),
+            ('p2.y', 'ft', [1.]),
+        ])
+
         assert_rel_error(self, prob['comp.z'], 24.0, 0.00001)
 
     @parameterized.expand(itertools.product(
