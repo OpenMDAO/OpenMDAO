@@ -749,7 +749,12 @@ class TestRegularGridMap(unittest.TestCase):
         model = Group()
         ivc = IndepVarComp()
 
-        x, y, z = SampleMap.param_data
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        x, y, z = params
+        outs = mapdata.output_data
+        z = outs[0]
         ivc.add_output('x', x[
                        'default'], units=x['units'])
         ivc.add_output('y', y['default'], units=y['units'])
@@ -757,10 +762,16 @@ class TestRegularGridMap(unittest.TestCase):
                        'default'], units=z['units'])
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
-        model.add_subsystem('comp', RegularGridInterpComp(param_data=SampleMap.param_data,
-                                                          output_data=SampleMap.output_data,
-                                                          method='slinear', extrapolate=True),
-                            promotes=["*"])
+
+        comp = RegularGridInterpComp(method='slinear', extrapolate=True)
+
+        for param in params:
+            comp.add_input(param['name'], param['default'], param['values'])
+
+        for out in outs:
+            comp.add_output(out['name'], out['default'], out['values'])
+        
+        model.add_subsystem('comp', comp, promotes=["*"])
         self.prob = Problem(model)
         self.prob.setup()
         self.prob['x'] = 1.0
@@ -803,26 +814,29 @@ class TestRegularGridMap(unittest.TestCase):
         mapdata = SampleMap()
 
         params = mapdata.param_data
-        x, y, z = params
-
-        values = mapdata.output_data
-        f_train, g_train = values
+        outs = mapdata.output_data
 
         ivc.add_output('x', np.array([-0.3, 0.7, 1.2]))
         ivc.add_output('y', np.array([0.14, 0.313, 1.41]))
         ivc.add_output('z', np.array([-2.11, -1.2, 2.31]))
 
-        ivc.add_output('f_train', f_train['values'])
-        ivc.add_output('g_train', g_train['values'])
+        ivc.add_output('f_train', outs[0]['values'])
+        ivc.add_output('g_train', outs[1]['values'])
+
+        comp = RegularGridInterpComp(training_data_gradients=True,
+                                                  method='cubic',
+                                                  num_nodes=3)
+        for param in params:
+            comp.add_input(param['name'], param['default'], param['values'])
+
+        for out in outs:
+            comp.add_output(out['name'], out['default'], out['values'])
 
         model.add_subsystem('ivc', ivc, promotes=["*"])
         model.add_subsystem('comp',
-                            RegularGridInterpComp(param_data=params,
-                                                  output_data=values,
-                                                  training_data_gradients=True,
-                                                  method='cubic',
-                                                  num_nodes=3),
+                            comp,
                             promotes=["*"])
+
 
         prob = Problem(model)
         prob.setup()
@@ -857,17 +871,14 @@ class TestRegularGridMapFeature(unittest.TestCase):
         from openmdao.api import Group, Problem, IndepVarComp
         from openmdao.components.regular_grid_interp_comp import RegularGridInterpComp
 
-        # Set up input and output data
-        x = {'name' : 'x', 'values' : np.array([0.0, 1.0]), 'default' : 0, 'units' : None}
-        y = {'name' : 'y', 'values' : np.array([0.0, 1.0]), 'default' : 1, 'units' : None}
-        xor = {'name' : 'xor', 'values' : np.array([[0.0, 1.0], [1.0, 0.0]]),
-               'default' : 1.0, 'units' : None}
-
-        params = [x, y]
-        outputs = [xor]
-
         # Create regular grid interpolator instance
-        xor_interp = RegularGridInterpComp(param_data=params, output_data=outputs, method='slinear')
+        xor_interp = RegularGridInterpComp(method='slinear')
+
+        # set up inputs and outputs
+        xor_interp.add_input('x', 0.0, np.array([0.0, 1.0]), units=None)
+        xor_interp.add_input('y', 1.0, np.array([0.0, 1.0]), units=None)
+
+        xor_interp.add_output('xor', 1.0, np.array([[0.0, 1.0], [1.0, 0.0]]), units=None)
 
         # Set up the OpenMDAO model
         model = Group()
