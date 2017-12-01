@@ -1485,7 +1485,6 @@ class Problem(object):
                         if store and ncol > 1 and len(deriv_val.shape) == 1:
                             deriv_val = np.atleast_2d(deriv_val).T
 
-                        print(input_name, output_name, i, deriv_val)
                         if return_format == 'flat_dict':
                             if fwd:
                                 key = (old_output_list[ocount], old_input_name)
