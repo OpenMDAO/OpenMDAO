@@ -2,6 +2,8 @@
 
 from __future__ import division
 
+import sys
+
 from collections import OrderedDict, defaultdict, namedtuple
 from itertools import product
 import logging
@@ -69,6 +71,8 @@ class Problem(object):
         1 -- The `setup` method has been called, but vectors not initialized.
         2 -- The `final_setup` has been run, everything ready to run.
     """
+
+    _post_setup_func = None
 
     def __init__(self, model=None, comm=None, use_ref_vector=True, root=None):
         """
@@ -430,6 +434,10 @@ class Problem(object):
         if self._setup_status < 2:
             self._setup_status = 2
             self._set_initial_conditions()
+
+        # check for post-setup hook
+        if Problem._post_setup_func is not None:
+            Problem._post_setup_func(self)
 
     def check_partials(self, logger=None, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6,
