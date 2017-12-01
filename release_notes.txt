@@ -9,7 +9,9 @@ New Features:
 - Parallel Groups
 - Units Reference added to the Docs
 - Case recording now records all variables by default
-
+- `openmdao` console script that can activate useful debugging features
+  (e.g. view_model) without editing the run script
+-
 
 API Changes:
 -------------
@@ -18,7 +20,7 @@ API Changes:
 - `NonlinearRunOnce` changed `NonLinearRunOnce` for consistency (old class deprecated)
 - `types_` argument to `self.metadata.declare` changed to `types`. (old argument deprecated)
 - `types` and `values` arguments to `self.metadata.declare`
-- `get_subsystem` changed to a private method, removed from public api of System
+- `get_subsystem` changed to a private method, removed from public API of System
 -  `BalanceComp` has a `use_mult` argument to control if it has a `mult` input or not
 - `check_partials` now has a `method` argument that controls which type of check
 
