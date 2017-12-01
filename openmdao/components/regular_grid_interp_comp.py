@@ -439,12 +439,16 @@ class RegularGridInterpComp(ExplicitComponent):
     """
 
     def initialize(self):
-        self.metadata.declare('extrapolate', types=bool, default=True)
+        self.metadata.declare('extrapolate', types=bool, default=False, 
+                        desc='Sets whether extrapolation should be performed \
+                                              when an input is out of bounds.')
         self.metadata.declare('training_data_gradients', types=bool,
-                              default=False)
-        self.metadata.declare('num_nodes', types=int, default=1)
+                              default=False, desc='Sets whether gradients with \
+                              respect to output training data should be computed.')
+        self.metadata.declare('num_nodes', types=int, default=1, desc='Number \
+                                               of points to evaluate at once.')
         self.metadata.declare('method', values=('cubic', 'slinear', 'quintic'),
-                              default="cubic")
+                              default="cubic", desc='Spline interpolation order.')
 
         self.pnames = []
         self.params = []
@@ -557,4 +561,4 @@ class RegularGridInterpComp(ExplicitComponent):
 
 
 def _for_docs():
-    return RegularGridInterpComp(param_data=[], output_data=[])
+    return RegularGridInterpComp()
