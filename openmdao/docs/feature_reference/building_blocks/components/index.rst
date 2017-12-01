@@ -11,3 +11,4 @@ Components
     external_code.rst
     balance.rst
     linearsystem.rst
+    regulargridinterpcomp.rst

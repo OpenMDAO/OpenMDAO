@@ -796,6 +796,44 @@ class TestRegularGridMap(unittest.TestCase):
         self.prob['z'] = 2.5
         self.run_and_check_derivs(self.prob)
 
+    def test_xor(self):
+        import numpy as np
+        from openmdao.api import Group, Problem, IndepVarComp
+        from openmdao.components.regular_grid_interp_comp import RegularGridInterpComp
+
+        # Set up input and output data
+        x = {'name' : 'x', 'values' : np.array([0.0, 1.0]), 'default' : 0, 'units' : None}
+        y = {'name' : 'y', 'values' : np.array([0.0, 1.0]), 'default' : 1, 'units' : None}
+        xor = {'name' : 'xor', 'values' : np.array([[0.0, 1.0], [1.0, 0.0]]),
+               'default' : 1.0, 'units' : None}
+
+        params = [x, y]
+        outputs = [xor]
+
+        # Create regular grid interpolator instance
+        xor_interp = RegularGridInterpComp(params, outputs, method='slinear')
+
+        # Set up the OpenMDAO model
+        model = Group()
+        ivc = IndepVarComp()
+        ivc.add_output('x', 0.0)
+        ivc.add_output('y', 1.0)
+        model.add_subsystem('ivc', ivc, promotes=["*"])
+        model.add_subsystem('comp', xor_interp, promotes=["*"])
+        prob = Problem(model)
+        prob.setup()
+
+        # Now test out a 'fuzzy' XOR
+        prob['x'] = 0.9
+        prob['y'] = 0.001242
+
+        prob.run_model()
+
+        computed = prob['xor']
+        actual = 0.8990064
+
+        assert_almost_equal(computed, actual)
+
 
     def test_training_gradient(self):
         model = Group()
