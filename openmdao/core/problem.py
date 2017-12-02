@@ -1237,7 +1237,6 @@ class Problem(object):
             output_vois = self.driver._responses
             remote_outputs = self.driver._remote_responses
 
-
         else:  # rev
             input_list, output_list = of, wrt
             old_input_list, old_output_list = oldof, oldwrt
@@ -1341,6 +1340,7 @@ class Problem(object):
                 colors = set(simul_coloring)
                 if not isinstance(simul_coloring, np.ndarray):
                     simul_coloring = np.array(simul_coloring, dtype=int)
+
                 def idx_iter():
                     for c in colors:
                         # iterate over negative colors individually
@@ -1360,10 +1360,8 @@ class Problem(object):
                 idx_iter = range(max_len)
 
             for i in idx_iter:
-                #color_count = 0
                 if simul_coloring is not None:
                     color, i = i
-                    #print('color', color)
                     do_color_iter = isinstance(i, np.ndarray) and i.size > 1
 
                 # this sets dinputs for the current parallel_deriv_color to 0
@@ -1494,13 +1492,15 @@ class Problem(object):
                                 if store:
                                     if simul is not None and do_color_iter:
                                         smap = output_vois[output_name]['simul_map']
-                                        if smap is not None and input_name in smap and color in smap[input_name]:
+                                        if (smap is not None and input_name in smap and
+                                                color in smap[input_name]):
                                             col_idxs = smap[input_name][color][1]
                                             if col_idxs:
                                                 row_idxs = smap[input_name][color][0]
                                                 mat = totals[key]
                                                 for idx, col in enumerate(col_idxs):
-                                                    mat[row_idxs[idx], col] = deriv_val[row_idxs[idx]]
+                                                    mat[row_idxs[idx], col] = \
+                                                        deriv_val[row_idxs[idx]]
                                     else:
                                         totals[key][:, loc_idx] = deriv_val
                             else:
@@ -1520,13 +1520,15 @@ class Problem(object):
                                 if store:
                                     if simul is not None and do_color_iter:
                                         smap = output_vois[output_name]['simul_map']
-                                        if smap is not None and input_name in smap and color in smap[input_name]:
+                                        if (smap is not None and input_name in smap and
+                                                color in smap[input_name]):
                                             col_idxs = smap[input_name][color][1]
                                             if col_idxs:
                                                 row_idxs = smap[input_name][color][0]
                                                 mat = totals[okey][old_input_name]
                                                 for idx, col in enumerate(col_idxs):
-                                                    mat[row_idxs[idx], col] = deriv_val[row_idxs[idx]]
+                                                    mat[row_idxs[idx], col] = \
+                                                        deriv_val[row_idxs[idx]]
                                     else:
                                         totals[okey][old_input_name][:, loc_idx] = deriv_val
                             else:
@@ -1841,7 +1843,7 @@ def _format_error(error, tol):
     return '{:.6e} *'.format(error)
 
 
-def find_var_from_range(idx, ranges):
+def _find_var_from_range(idx, ranges):
     # TODO: use bisection
     for start, end, name in ranges:
         if start <= idx <= end:
@@ -1850,21 +1852,23 @@ def find_var_from_range(idx, ranges):
 
 def find_disjoint(prob, of=None, wrt=None, global_names=True):
     """
-    Given a problem, find all sets of disjoint columns in the total jacobian and their
-    corresponding rows.
+    Find all sets of disjoint columns in the total jac and their corresponding rows.
     """
     # TODO: fix this to work in rev mode as well
 
     from collections import defaultdict
     from itertools import combinations, product
-    from openmdao.jacobians.assembled_jacobian import DenseJacobian
+    from openmdao.jacobians.assembled_jacobian import _SimulJacobian
     from openmdao.utils.array_utils import array_viz
 
-    prob.model.jacobian = DenseJacobian()
+    prob.model.jacobian = _SimulJacobian()
     prob.setup(mode=prob._mode)
+    print("running the model")
     prob.run_model()
 
+    print("computing totals")
     J = prob.driver._compute_totals(return_format='array', of=of, wrt=wrt)
+    print("compute_totals DONE")
     J[np.abs(J) < 1e-99] = 0.0
     J[np.abs(J) >= 1e-99] = 1.0
 
@@ -1872,6 +1876,7 @@ def find_disjoint(prob, of=None, wrt=None, global_names=True):
 
     disjoints = defaultdict(set)
     rows = {}
+    print("looping over column pairs")
     for c1, c2 in combinations(allcols, 2):  # loop over column pairs
         result = J[:, c1] + J[:, c2]
         if np.all(result <= 1.0):
@@ -1930,43 +1935,22 @@ def find_disjoint(prob, of=None, wrt=None, global_names=True):
         # print("res range[%s] = %s" % (name, (start, end)))
         start = end + 1
 
-    print("")
+    # print("")
 
     total_dv_offsets = defaultdict(lambda: defaultdict(list))
     total_res_offsets = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: ([], []))))
     for color, cols in enumerate(full_disjoint.values()):
-        print("\ncolor %d:" % color)
+        # print("\ncolor %d:" % color)
         for c in sorted(cols):
-            dv, dvoffset = find_var_from_range(c, dv_offsets)
+            dv, dvoffset = _find_var_from_range(c, dv_offsets)
             total_dv_offsets[dv][color].append(dvoffset)
-            print(dv, dvoffset, 'col', c)
+            # print(dv, dvoffset, 'col', c)
             for crow in rows[c]:
-                res, resoffset = find_var_from_range(crow, res_offsets)
-                print("   ", res, resoffset, 'row', crow)
+                res, resoffset = _find_var_from_range(crow, res_offsets)
+                # print("   ", res, resoffset, 'row', crow)
                 dct = total_res_offsets[res][dv][color]
                 dct[0].append(resoffset)
                 dct[1].append(dvoffset)
-
-    # throw out any dv offsets that contain only one idx
-    # new_dv_offsets = {}
-    # for dv, coldict in iteritems(total_dv_offsets):
-        # new_dv_offsets[dv] = {}
-        # for color, lst in iteritems(coldict):
-            # if len(lst) > 1:
-                # new_dv_offsets[dv][color] = lst
-        # if not new_dv_offsets[dv]:
-            # del new_dv_offsets[dv]
-
-    # new_res_offsets = {}
-    # for res, dct1 in iteritems(total_res_offsets):
-        # new_res_offsets[res] = {}
-        # for dv, dct2 in iteritems(dct1):
-            # if dv not in new_dv_offsets:
-                # continue
-            # new_res_offsets[res][dv] = {}
-            # for color, tup in iteritems(dct2):
-                # if len(tup[0]) > 1:
-                    # new_res_offsets[res][dv][color] = tup
 
     return total_dv_offsets, total_res_offsets
 
@@ -1975,10 +1959,14 @@ def get_simul_meta(problem, of=None, wrt=None, global_names=True, stream=sys.std
     driver = problem.driver
     dv_idxs, res_idxs = find_disjoint(problem, of=of, wrt=wrt, global_names=global_names)
     all_colors = set()
+
+    simul_colorings = {}
+    simul_maps = {}
+
     for dv in dv_idxs:
         # negative colors will be iterated over individually, so start by filling the coloring array
-        # with -1.  We then replace specific entries with positive colors which will be iterated over
-        # as a group.
+        # with -1.  We then replace specific entries with positive colors which will be iterated
+        # over as a group.
         coloring = np.full(driver._designvars[dv]['size'], -1)
         has_color = False
         for color in dv_idxs[dv]:
@@ -1987,17 +1975,20 @@ def get_simul_meta(problem, of=None, wrt=None, global_names=True, stream=sys.std
                 all_colors.add(color)
                 has_color = True
         if has_color:
-            # driver._designvars[dv]['simul_coloring'] = coloring
-            print("._design_vars['%s']['simul_coloring'] = %s" % (dv, list(coloring)))
+            simul_colorings[dv] = coloring
 
     for res in res_idxs:
         simul_map = {}
         for dv in res_idxs[res]:
-            simul_map[dv] = {n: v for n,v in iteritems(res_idxs[res][dv]) if n in all_colors}
+            simul_map[dv] = {c: v for c, v in iteritems(res_idxs[res][dv]) if c in all_colors}
+            if not simul_map[dv]:
+                del simul_map[dv]
+
         if simul_map:
-            print(res, 'simul_map')
-            for n, color_dict in simul_map.items():
-                print("    ", n)
-                for c, idxs in color_dict.items():
-                    print("       ", c, ":", idxs)
-            driver._responses[res]['simul_map'] = simul_map
+            simul_maps[res] = simul_map
+
+    if stream is not None:
+        print(simul_colorings, file=stream)
+        print(simul_maps, file=stream)
+
+    return simul_colorings, simul_maps

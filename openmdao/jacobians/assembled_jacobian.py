@@ -13,7 +13,9 @@ from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
+from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.units import get_conversion
+from openmdao.utils.name_maps import key2abs_key
 
 SUBJAC_META_DEFAULTS = {
     'rows': None,
@@ -123,10 +125,8 @@ class AssembledJacobian(Jacobian):
         }
 
         in_ranges = {}
-        src_indices_dict = {}
         for abs_name in system._var_allprocs_abs_names['input']:
             in_ranges[abs_name] = self._get_var_range(abs_name, 'input')
-            src_indices_dict[abs_name] = abs2meta_in[abs_name]['src_indices']
 
         # set up view ranges for all subsystems
         for s in system.system_iter(local=True, recurse=True, include_self=True):
@@ -188,7 +188,7 @@ class AssembledJacobian(Jacobian):
                 if in_abs_name in system._conn_global_abs_in2out:
                     out_abs_name = system._conn_global_abs_in2out[in_abs_name]
                     out_offset, _ = out_ranges[out_abs_name]
-                    src_indices = src_indices_dict[in_abs_name]
+                    src_indices = abs2meta_in[in_abs_name]['src_indices']
 
                     # calculate unit conversion
                     in_units = abs2meta_in[in_abs_name]['units']
@@ -452,6 +452,60 @@ class AssembledJacobian(Jacobian):
 
         else:
             self._mask_caches[cache_key] = None
+
+
+class _SimulJacobian(AssembledJacobian):
+    """
+    Assemble dense global <Jacobian> for use in disjoint row/column analysis.
+
+    NOTE: DO NOT USE this jacobian for any actual calculations.  This is used purely to determine
+    sparsity of the total jacobian.
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
+        """
+        super(_SimulJacobian, self, **kwargs).__init__()
+        self.options['matrix_class'] = DenseMatrix
+
+    def __setitem__(self, key, subjac):
+        """
+        Set sub-Jacobian.
+
+        Parameters
+        ----------
+        key : (str, str)
+            Promoted or relative name pair of sub-Jacobian.
+        subjac : int or float or ndarray or sparse matrix
+            sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
+        """
+        abs_key = key2abs_key(self._system, key)
+        if abs_key is not None:
+
+            # You can only set declared subjacobians.
+            if abs_key not in self._subjacs_info:
+                msg = 'Variable name pair ("{}", "{}") must first be declared.'
+                raise KeyError(msg.format(key[0], key[1]))
+
+            # get a version of the subjac corresponding to abs_key and fill with 1's
+            info, shape = self._subjacs_info[abs_key]
+            if info['rows'] is not None:  # list form
+                subjac = np.ones(info['rows'].size)
+            elif isinstance(info['value'], np.ndarray):
+                subjac = np.ones(subjac.shape)
+            elif isinstance(info['value'], sparse_types):  # sparse
+                subjac = subjac.copy()
+                subjac.data = np.ones(subjac.data.size)
+            self._set_abs(abs_key, subjac)
+        else:
+            msg = 'Variable name pair ("{}", "{}") not found.'
+            raise KeyError(msg.format(key[0], key[1]))
 
 
 class DenseJacobian(AssembledJacobian):

@@ -328,19 +328,23 @@ class ExplicitComponent(Component):
                             d_outputs = self._vectors['output'][vec_name]
                             d_residuals = self._vectors['residual'][vec_name]
 
-                            with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
+                            with self._unscaled_context(outputs=[d_outputs],
+                                                        residuals=[d_residuals]):
                                 d_outputs.set_vec(d_residuals)
                         else:
-                            self._vectors['output'][vec_name].set_vec(self._vectors['residual'][vec_name])
+                            self._vectors['output'][vec_name].set_vec(
+                                self._vectors['residual'][vec_name])
                     else:  # rev
                         if self._has_resid_scaling:
                             d_outputs = self._vectors['output'][vec_name]
                             d_residuals = self._vectors['residual'][vec_name]
 
-                            with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
+                            with self._unscaled_context(outputs=[d_outputs],
+                                                        residuals=[d_residuals]):
                                 d_residuals.set_vec(d_outputs)
                         else:
-                            self._vectors['residual'][vec_name].set_vec(self._vectors['output'][vec_name])
+                            self._vectors['residual'][vec_name].set_vec(
+                                self._vectors['output'][vec_name])
         return False, 0., 0.
 
     def _linearize(self, do_nl=False, do_ln=False):

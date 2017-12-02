@@ -2090,7 +2090,10 @@ class System(object):
         simul_coloring : ndarray or list of int
             An array or list of integer color values.  Must match the size of the
             response variable.
-
+        simul_map : dict
+            Mapping of this response to each design variable where simultaneous derivs will
+            be used.  Each design variable entry is another dict keyed on color, and the values
+            in the color dict are tuples of the form (resp_idxs, color_idxs).
         Notes
         -----
         The response can be scaled using ref and ref0.
@@ -2255,6 +2258,10 @@ class System(object):
         simul_coloring : ndarray or list of int
             An array or list of integer color values.  Must match the size of the
             constraint variable.
+        simul_map : dict
+            Mapping of this response to each design variable where simultaneous derivs will
+            be used.  Each design variable entry is another dict keyed on color, and the values
+            in the color dict are tuples of the form (resp_idxs, color_idxs).
 
         Notes
         -----
@@ -2301,6 +2308,10 @@ class System(object):
         simul_coloring : ndarray or list of int
             An array or list of integer color values.  Must match the size of the
             objective variable.
+        simul_map : dict
+            Mapping of this response to each design variable where simultaneous derivs will
+            be used.  Each design variable entry is another dict keyed on color, and the values
+            in the color dict are tuples of the form (resp_idxs, color_idxs).
 
         Notes
         -----

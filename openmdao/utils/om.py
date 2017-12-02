@@ -7,7 +7,7 @@ import os
 import argparse
 from six import iteritems
 
-from openmdao.core.problem import Problem
+from openmdao.core.problem import Problem, get_simul_meta
 from openmdao.devtools.problem_viewer.problem_viewer import view_model
 from openmdao.devtools.viewconns import view_connections
 from openmdao.devtools.debug import config_summary, tree, dump_dist_idxs
@@ -20,7 +20,7 @@ from openmdao.devtools.iprof_utils import _Options
 
 def _view_model_setup_parser(parser):
     """
-    Set up the openmdaosubparser for the 'openmdaoview_model' command.
+    Set up the openmdao subparser for the 'openmdao view_model' command.
 
     Parameters
     ----------
@@ -41,7 +41,7 @@ def _view_model_setup_parser(parser):
 
 def _view_model_cmd(options):
     """
-    Return the post_setup hook function for 'openmdaoview_model'.
+    Return the post_setup hook function for 'openmdao view_model'.
 
     Parameters
     ----------
@@ -64,7 +64,7 @@ def _view_model_cmd(options):
 
 def _view_connections_setup_parser(parser):
     """
-    Set up the openmdaosubparser for the 'openmdaoview_connections' command.
+    Set up the openmdao subparser for the 'openmdao view_connections' command.
 
     Parameters
     ----------
@@ -80,7 +80,7 @@ def _view_connections_setup_parser(parser):
 
 def _view_connections_cmd(options):
     """
-    Return the post_setup hook function for 'openmdaoview_connections'.
+    Return the post_setup hook function for 'openmdao view_connections'.
 
     Parameters
     ----------
@@ -100,7 +100,7 @@ def _view_connections_cmd(options):
 
 def _config_summary_setup_parser(parser):
     """
-    Set up the openmdaosubparser for the 'openmdaosummary' command.
+    Set up the openmdao subparser for the 'openmdao summary' command.
 
     Parameters
     ----------
@@ -112,7 +112,7 @@ def _config_summary_setup_parser(parser):
 
 def _config_summary_cmd(options):
     """
-    Return the post_setup hook function for 'openmdaosummary'.
+    Return the post_setup hook function for 'openmdao summary'.
 
     Parameters
     ----------
@@ -132,7 +132,7 @@ def _config_summary_cmd(options):
 
 def _tree_setup_parser(parser):
     """
-    Set up the openmdaosubparser for the 'openmdaotree' command.
+    Set up the openmdao subparser for the 'openmdao tree' command.
 
     Parameters
     ----------
@@ -193,7 +193,7 @@ def _get_tree_filter(attrs, vecvars):
 
 def _tree_cmd(options):
     """
-    Return the post_setup hook function for 'openmdaotree'.
+    Return the post_setup hook function for 'openmdao tree'.
 
     Parameters
     ----------
@@ -224,7 +224,7 @@ def _tree_cmd(options):
 
 def _dump_dist_idxs_setup_parser(parser):
     """
-    Set up the openmdaosubparser for the 'openmdaodump_idxs' command.
+    Set up the openmdao subparser for the 'openmdao dump_idxs' command.
 
     Parameters
     ----------
@@ -240,7 +240,7 @@ def _dump_dist_idxs_setup_parser(parser):
 
 def _dump_dist_idxs_cmd(options):
     """
-    Return the post_setup hook function for 'openmdaodump_idxs'.
+    Return the post_setup hook function for 'openmdao dump_idxs'.
 
     Parameters
     ----------
@@ -261,6 +261,45 @@ def _dump_dist_idxs_cmd(options):
         dump_dist_idxs(prob, vec_name=options.vecname, stream=out)
         exit()
     return _dumpdist
+
+
+def _simul_coloring_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao simul_coloring' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-o', action='store', dest='outfile', help='output file.')
+    parser.add_argument('-p', action='store', dest='prob', help='Problem object name.')
+
+
+def _simul_coloring_cmd(options):
+    """
+    Return the post_setup hook function for 'openmdao simul_coloring'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
+    def _simul_coloring(prob):
+        if options.outfile is None:
+            outfile = sys.stdout
+        else:
+            outfile = open(options.outfile, 'w')
+        Problem._post_setup_func = None  # avoid recursive loop
+        colorings, maps = get_simul_meta(prob, stream=outfile)
+        exit()
+    return _simul_coloring
 
 
 def _post_setup_exec(options):
@@ -305,6 +344,7 @@ _post_setup_map = {
     'summary': (_config_summary_setup_parser, _config_summary_cmd),
     'tree': (_tree_setup_parser, _tree_cmd),
     'dump_idxs': (_dump_dist_idxs_setup_parser, _dump_dist_idxs_cmd),
+    'simul_coloring': (_simul_coloring_setup_parser, _simul_coloring_cmd),
 }
 
 # Other non-post-setup functions go here
