@@ -155,6 +155,9 @@ class pyOptSparseDriver(Driver):
         self._quantities = []
         self.fail = False
 
+        self._simul_coloring_info = None
+        self._res_jacs = {}
+
     def _setup_driver(self, problem):
         """
         Prepare the driver for execution.
@@ -174,6 +177,31 @@ class pyOptSparseDriver(Driver):
             raise RuntimeError('Multiple objectives have been added to pyOptSparseDriver'
                                ' but the selected optimizer ({0}) does not support'
                                ' multiple objectives.'.format(self.options['optimizer']))
+
+        # set up simultaneous deriv coloring
+        if self._simul_coloring_info:
+            coloring, maps = self._simul_coloring_info
+            if problem._mode == 'fwd':
+                for dv, colors in iteritems(coloring):
+                    self._designvars[dv]['simul_coloring'] = colors
+                for res, dvdict in iteritems(maps):
+                    self._responses[res]['simul_map'] = dvdict
+
+                    rows = []
+                    cols = []
+                    for dv, col_dict in iteritems(dvdict):
+                        for color, (row_idxs, col_idxs) in iteritems(col_dict):
+                            rows.append(row_idxs)
+                            cols.append(col_idxs)
+
+                    row = np.hstack(rows)
+                    col = np.hstack(cols)
+                    self._res_jacs[dv] = {
+                        'coo': [row, col, np.empty(row.size)],
+                        'shape': [row.size, col.size]
+                    }
+            else:
+                raise RuntimeError("simultaneous derivs are currently not supported in rev mode.")
 
     def run(self):
         """
@@ -230,25 +258,6 @@ class pyOptSparseDriver(Driver):
         if len(lcons) > 0:
             _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list, return_format='dict')
 
-        if isinstance(model._jacobian, AssembledJacobian):
-            submats = model._jacobian._int_mtx._submats
-            # put in nested dict form instead of flat dict
-            dct = defaultdict(dict)
-            for key in submats:
-                out, inp = key
-                dct[out][inp] = submats[key]
-        #
-        #     # info = dct[name]
-        #     # jac = {}
-        #     # for inp in info:
-        #     #     if info[inp][0]['rows'] is not None:
-        #     #         row = info[inp][0]['rows']
-        #     #         jac[inp] = coo_matrix((np.ones(row.size), (row, info[inp][0]['cols'])))
-        #     #     elif not isinstance(info[inp][0]['value'], np.ndarray):  # sparse
-        #     #         jac[inp] = info[inp][0]['value']
-        # else:
-        jac = None
-
         # Add all equality constraints
         self.active_tols = {}
         eqcons = OrderedDict((key, con) for (key, con) in iteritems(con_meta)
@@ -267,35 +276,11 @@ class pyOptSparseDriver(Driver):
                                      linear=True, wrt=wrt,
                                      jac=_lin_jacs[name])
             else:
-                if isinstance(model._jacobian, AssembledJacobian):
-                    # determine sparsity info to pass to pyoptsparse
-                    info = dct[name]
-                    jac = {}
-                    for inp in info:
-                        meta = info[inp][0]
-                        if meta['dependent']:
-                            if meta['rows'] is not None:
-                                row = meta['rows']
-                                col = meta['cols']
-                                val = meta['value']
-                                if val.size != row.size:
-                                    val = np.ones(row.shape)
-                                jac[inp] = {'coo':[row, col, val],
-                                            'shape':[row.size, col.size]}
-                            # elif not isinstance(meta['value'], np.ndarray):  # sparse
-                            #     jac[inp] = meta['value']
-                            else:
-                                jac[inp] = meta['value']
-
-                    subjac = {}
-                    for n in wrt:
-                        if n in jac:
-                            subjac[n] = jac[n]
-                    if not subjac:
-                        subjac = None
+                if name in self._res_jacs:
+                    jac = self._res_jacs[name]
                 else:
-                    subjac = None
-                opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrt, jac=subjac)
+                    jac = None
+                opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrt, jac=jac)
                 self._quantities.append(name)
 
         # Add all inequality constraints
@@ -319,33 +304,11 @@ class pyOptSparseDriver(Driver):
                                      linear=True, wrt=wrt,
                                      jac=_lin_jacs[name])
             else:
-                if isinstance(model._jacobian, AssembledJacobian):
-                    # determine sparsity info to pass to pyoptsparse
-                    jac = {}
-                    info = dct[name]
-                    for inp in info:
-                        if info[inp][0]['dependent']:
-                            if info[inp][0]['rows'] is not None:
-                                row = info[inp][0]['rows']
-                                col = info[inp][0]['cols']
-                                val = info[inp][0]['value']
-                                if val.size != row.size:
-                                    val = np.ones(row.shape)
-                                jac[inp] = {'coo':[row, col, val],
-                                            'shape':[row.size, col.size]}
-                            # elif not isinstance(info[inp][0]['value'], np.ndarray):  # sparse
-                            #     jac[inp] = info[inp][0]['value']
-                            else:
-                                jac[inp] = info[inp][0]['value']
-                    subjac = {}
-                    for n in wrt:
-                        if n in jac:
-                            subjac[n] = jac[n]
-                    if not subjac:
-                        subjac = None
+                if name in self._res_jacs:
+                    jac = self._res_jacs[name]
                 else:
-                    subjac = None
-                opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=subjac)
+                    jac = None
+                opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=jac)
                 self._quantities.append(name)
 
         # print("DVS:")
@@ -577,3 +540,10 @@ class pyOptSparseDriver(Driver):
         Get name of current driver.
         """
         return self.options['optimizer']
+
+    def set_simul_coloring(self, simul_info):
+        """
+        Sets the coloring for simultaneous derivatives.  It will also update the sparsity
+        patterns passed to pyoptsparse.
+        """
+        self._simul_coloring_info = simul_info

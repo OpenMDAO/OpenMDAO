@@ -1975,7 +1975,7 @@ def get_simul_meta(problem, of=None, wrt=None, global_names=True, stream=sys.std
                 all_colors.add(color)
                 has_color = True
         if has_color:
-            simul_colorings[dv] = coloring
+            simul_colorings[dv] = list(coloring)
 
     for res in res_idxs:
         simul_map = {}
@@ -1988,7 +1988,6 @@ def get_simul_meta(problem, of=None, wrt=None, global_names=True, stream=sys.std
             simul_maps[res] = simul_map
 
     if stream is not None:
-        print(simul_colorings, file=stream)
-        print(simul_maps, file=stream)
+        print((simul_colorings, simul_maps), file=stream)
 
     return simul_colorings, simul_maps
