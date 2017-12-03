@@ -11,7 +11,7 @@ New Features:
 - Case recording now records all variables by default
 - `openmdao` console script that can activate useful debugging features
   (e.g. view_model) without editing the run script
--
+- Scipy COBYLA optimizer converts des var bounds to constraints (the algorithm doesn't natively handle bounds)
 
 API Changes:
 -------------
@@ -21,14 +21,14 @@ API Changes:
 - `types_` argument to `self.metadata.declare` changed to `types`. (old argument deprecated)
 - `types` and `values` arguments to `self.metadata.declare`
 - `get_subsystem` changed to a private method, removed from public API of System
--  `BalanceComp` has a `use_mult` argument to control if it has a `mult` input or not
+-  `BalanceComp` has a `use_mult` argument to control if it has a `mult` input (the mult input isn't used most of the time)
 - `check_partials` now has a `method` argument that controls which type of check
-
 
 Bug Fixes:
 -----------
 - Improved error msg on a corner case for when user doesn't declare a partial derivative
 - Fixed docs embedding bug when `<>` included in the output text
+
 
 ################################################################################################
 Release Notes for OpenMDAO 2.0.2
@@ -36,6 +36,7 @@ October 19, 2017
 
 - Fixing further packaging errors by updating packaging information.
 - Added tutorials for derivatives of explicit and implicit components.
+
 
 ################################################################################################
 Release Notes for OpenMDAO 2.0.1
