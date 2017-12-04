@@ -952,13 +952,53 @@ class TestRegularGridMapFeature(unittest.TestCase):
         # we can verify all gradients by checking against finit-difference
         prob.check_partials(compact_print=True)
 
+    def test_training_derivatives(self):
+        import numpy as np
+        from openmdao.api import Group, Problem, IndepVarComp
+        from openmdao.components.regular_grid_interp_comp import RegularGridInterpComp
 
-    def test_test_training_derivs(self):
-        pass
+        # create input param training data, of sizes 25, 5, and 10 points resp.
+        p1 = np.linspace(0, 100, 25)
+        p2 = np.linspace(-10, 10, 5)
+        p3 = np.linspace(0, 1, 10)
+
+        # can use meshgrid to create a 3D array of test data
+        P1, P2, P3 = np.meshgrid(p1, p2, p3, indexing='ij')
+        f = np.sqrt(P1) + P2 * P3
+
+        # verify the shape matches the order and size of the input params
+        print(f.shape)
 
 
+        # Create regular grid interpolator instance
+        interp = RegularGridInterpComp(method='cubic', training_data_gradients=True)
+        interp.add_input('p1', 0.5, p1)
+        interp.add_input('p2', 0.0, p2)
+        interp.add_input('p3', 3.14, p3)
+
+        interp.add_output('f', 0.0, f)
 
 
+        # Set up the OpenMDAO model
+        model = Group()
+        model.add_subsystem('comp', interp, promotes=["*"])
+        prob = Problem(model)
+        prob.setup()
+
+        # set inputs
+        prob['p1'] = 55.12
+        prob['p2'] = -2.14
+        prob['p3'] = 0.323
+
+        prob.run_model()
+
+        computed = prob['f']
+        actual = 6.73306472
+
+        assert_almost_equal(computed, actual)
+
+        # we can verify all gradients by checking against finit-difference
+        prob.check_partials(compact_print=True)
 
 
 if __name__ == "__main__":
