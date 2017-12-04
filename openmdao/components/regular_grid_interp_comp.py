@@ -11,7 +11,8 @@ except ImportError:
 from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 import numpy as np
 
-from openmdao.api import ExplicitComponent
+from openmdao.core.explicitcomponent import ExplicitComponent
+import warnings
 
 
 class RegularGridInterpolator(object):
@@ -90,11 +91,10 @@ class RegularGridInterpolator(object):
     def __init__(self, points, values, method="slinear", bounds_error=True,
                  fill_value=np.nan, spline_dim_error=True):
         """Initialize instance of interpolation class."""
-
         if not make_interp_spline:
             msg = "'RegularGridInterpComp' requires scipy>=0.19, but the currently" \
                   " installed version is %s." % scipy_version
-            raise ImportError(msg)
+            warnings.warn(msg)
 
         configs = RegularGridInterpolator._interp_methods()
         self._spline_methods, self._all_methods, self._interp_config = configs
@@ -444,6 +444,11 @@ class RegularGridInterpComp(ExplicitComponent):
 
     def initialize(self):
         """Initialize the component."""
+        if not make_interp_spline:
+            msg = "'RegularGridInterpComp' requires scipy>=0.19, but the currently" \
+                  " installed version is %s." % scipy_version
+            warnings.warn(msg)
+
         self.metadata.declare('extrapolate', types=bool, default=False,
                               desc='Sets whether extrapolation should be performed \
                                               when an input is out of bounds.')
