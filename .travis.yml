@@ -15,6 +15,9 @@ env:
 - PY=2.7 MPI=
 - PY=3.6 MPI=
 
+git:
+  depth: 99999
+
 addons:
   apt:
     sources:
@@ -34,10 +37,6 @@ notifications:
 
 before_install:
 - pip install --upgrade pip;
-
-- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-    openssl aes-256-cbc -K $encrypted_74d70a284b7d_key -iv $encrypted_74d70a284b7d_iv -in travis_deploy_rsa.enc -out /tmp/travis_deploy_rsa -d;
-  fi
 
 - OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux"; fi)
 
@@ -61,11 +60,16 @@ before_install:
 - export PATH=$PATHPREFIX:$PATH
 - export OPENMDAO_TEST_DOCS=1
 
-- if [[ "$TRAVIS_PULL_REQUEST" = "false" ]]; then
+install:
+# get key decrypted, placed, chmodded, and added for passwordless access to WebFaction
+- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+    openssl aes-256-cbc -K $encrypted_74d70a284b7d_key -iv $encrypted_74d70a284b7d_iv -in travis_deploy_rsa.enc -out /tmp/travis_deploy_rsa -d;
+    eval "$(ssh-agent -s)";
+    chmod 600 /tmp/travis_deploy_rsa;
+    ssh-add /tmp/travis_deploy_rsa;
     echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
   fi
 
-install:
 # keeping numpy pinned at 1.12 because pySNOPT dies with 1.13 because numpy broke callback
 - conda install --yes python=$PY numpy==1.12 scipy nose sphinx mock swig
 
@@ -100,20 +104,14 @@ after_success:
 - sed 's/\/home\/travis\/miniconda\/lib\/python'"$PY"'\/site-packages\///g' < coveralls.json > coveralls-upd.json
 - coveralls --upload=coveralls-upd.json
 
-before_deploy:
-- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-    eval "$(ssh-agent -s)";
-    chmod 600 /tmp/travis_deploy_rsa;
-    ssh-add /tmp/travis_deploy_rsa;
-  fi
-
 deploy:
   provider: script
   skip_cleanup: true
   script:
+  # only deploy docs in a build after a PR or merge is accepted
   - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
       if [ "$MPI" ] && [ "$PY" = "3.6" ]; then
-        rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/twodocversions/latest;
+        python _utils/upload_doc_version.py;
       fi
     fi
   on:
