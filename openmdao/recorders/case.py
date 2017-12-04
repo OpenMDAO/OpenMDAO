@@ -91,18 +91,23 @@ class DriverCase(Case):
     """
 
     def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, desvars,
-                 responses, objectives, constraints, sysincludes):
+                 responses, objectives, constraints, sysincludes, prom2abs):
         """
         Initialize.
         """
         super(DriverCase, self).__init__(filename, counter, iteration_coordinate,
                                          timestamp, success, msg)
 
-        self.desvars = desvars[0] if desvars.dtype.names else None
-        self.responses = responses[0] if responses.dtype.names else None
-        self.objectives = objectives[0] if objectives.dtype.names else None
-        self.constraints = constraints[0] if constraints.dtype.names else None
-        self.sysincludes = sysincludes[0] if sysincludes.dtype.names else None
+        self.desvars = PromotedToAbsoluteMap(desvars[0] if desvars.dtype.names
+                                             else None, prom2abs)
+        self.responses = PromotedToAbsoluteMap(responses[0] if responses.dtype.names
+                                                else None, prom2abs)
+        self.objectives = PromotedToAbsoluteMap(objectives[0] if objectives.dtype.names
+                                                 else None, prom2abs)
+        self.constraints = PromotedToAbsoluteMap(constraints[0] if constraints.dtype.names
+                                                  else None, prom2abs)
+        self.sysincludes = PromotedToAbsoluteMap(sysincludes[0] if sysincludes.dtype.names
+                                                  else None, prom2abs)
 
 
 class SystemCase(Case):
@@ -141,16 +146,16 @@ class SystemCase(Case):
     """
 
     def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, inputs,
-                 outputs, residuals):
+                 outputs, residuals, prom2abs):
         """
         Initialize.
         """
         super(SystemCase, self).__init__(filename, counter, iteration_coordinate,
                                          timestamp, success, msg)
 
-        self.inputs = inputs[0] if inputs.dtype.names else None
-        self.outputs = outputs[0] if outputs.dtype.names else None
-        self.residuals = residuals[0] if residuals.dtype.names else None
+        self.inputs = PromotedToAbsoluteMap(inputs[0] if inputs.dtype.names else None, prom2abs, False)
+        self.outputs = PromotedToAbsoluteMap(outputs[0] if outputs.dtype.names else None, prom2abs)
+        self.residuals = PromotedToAbsoluteMap(residuals[0] if residuals.dtype.names else None, prom2abs)
 
 
 class SolverCase(Case):
@@ -193,7 +198,7 @@ class SolverCase(Case):
     """
 
     def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg,
-                 abs_err, rel_err, outputs, residuals):
+                 abs_err, rel_err, outputs, residuals, prom2abs):
         """
         Initialize.
         """
@@ -202,5 +207,19 @@ class SolverCase(Case):
 
         self.abs_err = abs_err
         self.rel_err = rel_err
-        self.outputs = outputs[0] if outputs.dtype.names else None
-        self.residuals = residuals[0] if residuals.dtype.names else None
+        self.outputs = PromotedToAbsoluteMap(outputs[0] if outputs.dtype.names else None, prom2abs)
+        self.residuals = PromotedToAbsoluteMap(residuals[0] if residuals.dtype.names else None,
+                                               prom2abs)
+
+
+class PromotedToAbsoluteMap:
+    def __init__(self, values, prom2abs, output=True):
+        """
+        Initialize.
+        """
+        self._values = values
+        self._prom2abs = prom2abs
+        self._input_output = 'output' if output else 'input'
+
+    def __getitem__(self, key):
+        return self._values[self._prom2abs[self._input_output][key][0]]

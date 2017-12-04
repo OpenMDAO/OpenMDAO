@@ -90,20 +90,29 @@ class SqliteCaseReader(BaseCaseReader):
                 self.solver_cases.num_cases = len(self.solver_cases._case_keys)
 
                 # Read in metadata for Drivers, Systems, and Solvers
-                cur.execute("SELECT model_viewer_data FROM driver_metadata")
+                cur.execute("SELECT model_viewer_data, abs2prom, prom2abs FROM driver_metadata")
                 for row in cur:
                     if PY2:
                         self.driver_metadata = pickle.loads(str(row[0]))
+                        self.driver_metadata['abs2prom'] = pickle.loads(str(row[1]))
+                        self.driver_metadata['prom2abs'] = pickle.loads(str(row[2]))
                     if PY3:
                         self.driver_metadata = pickle.loads(row[0])
+                        self.driver_metadata['abs2prom'] = pickle.loads(row[1])
+                        self.driver_metadata['prom2abs'] = pickle.loads(row[2])
+                self.driver_cases._prom2abs = self.driver_metadata['prom2abs']
+                self.system_cases._prom2abs = self.driver_metadata['prom2abs']
+                self.solver_cases._prom2abs = self.driver_metadata['prom2abs']
 
                 cur.execute("SELECT id, scaling_factors FROM system_metadata")
                 for row in cur:
                     id = row[0]
+                    self.system_metadata[id] = {}
+
                     if PY2:
-                        self.system_metadata[id] = pickle.loads(str(row[1]))
+                        self.system_metadata[id]['scaling_factors'] = pickle.loads(str(row[1]))
                     if PY3:
-                        self.system_metadata[id] = pickle.loads(row[1])
+                        self.system_metadata[id]['scaling_factors'] = pickle.loads(row[1])
 
                 cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")
                 for row in cur:
@@ -164,7 +173,7 @@ class DriverCases(BaseCases):
 
         case = DriverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
                           desvars_array, responses_array, objectives_array, constraints_array,
-                          sysincludes_array)
+                          sysincludes_array, self._prom2abs)
 
         return case
 
@@ -200,15 +209,14 @@ class SystemCases(BaseCases):
         con.close()
 
         # inputs , outputs , residuals
-        idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob, outputs_blob, \
-            residuals_blob = row
+        idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob, outputs_blob, residuals_blob = row
 
         inputs_array = blob_to_array(inputs_blob)
         outputs_array = blob_to_array(outputs_blob)
         residuals_array = blob_to_array(residuals_blob)
 
         case = SystemCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
-                          inputs_array, outputs_array, residuals_array)
+                          inputs_array, outputs_array, residuals_array, self._prom2abs)
 
         return case
 
@@ -250,6 +258,6 @@ class SolverCases(BaseCases):
         residuals_array = blob_to_array(residuals_blob)
 
         case = SolverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
-                          abs_err, rel_err, output_array, residuals_array)
+                          abs_err, rel_err, output_array, residuals_array, self._prom2abs)
 
         return case

@@ -111,9 +111,9 @@ class SqliteRecorder(BaseRecorder):
                                     "solver_output BLOB, solver_residuals BLOB)")
 
                 self.cursor.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
-                                    "model_viewer_data BLOB)")
-                self.cursor.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY,"
-                                    " scaling_factors BLOB)")
+                                    "model_viewer_data BLOB, abs2prom BLOB, prom2abs BLOB)")
+                self.cursor.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
+                                    "scaling_factors BLOB)")
                 self.cursor.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
                                     "solver_options BLOB, solver_class TEXT)")
 
@@ -254,10 +254,16 @@ class SqliteRecorder(BaseRecorder):
         driver_class = type(recording_requester).__name__
         model_viewer_data = pickle.dumps(recording_requester._model_viewer_data,
                                          pickle.HIGHEST_PROTOCOL)
-
+        abs2prom = pickle.dumps(recording_requester._problem.model._var_abs2prom,
+                                pickle.HIGHEST_PROTOCOL)
+        prom2abs = pickle.dumps(recording_requester._problem.model._var_allprocs_prom2abs_list,
+                                pickle.HIGHEST_PROTOCOL)
         with self.con:
-            self.con.execute("INSERT INTO driver_metadata(id, model_viewer_data) "
-                             "VALUES(?,?)", (driver_class, sqlite3.Binary(model_viewer_data)))
+            self.con.execute("INSERT INTO driver_metadata(id, model_viewer_data, "
+                             " abs2prom, prom2abs) VALUES(?,?,?,?)",
+                             (driver_class, sqlite3.Binary(model_viewer_data),
+                              sqlite3.Binary(abs2prom),
+                              sqlite3.Binary(prom2abs)))
 
     def record_metadata_system(self, recording_requester):
         """
@@ -281,12 +287,12 @@ class SqliteRecorder(BaseRecorder):
                 scaling[vecname] = vec._scaling
         scaling_factors = pickle.dumps(scaling_vecs,
                                        pickle.HIGHEST_PROTOCOL)
-
         path = recording_requester.pathname
         if not path:
             path = 'root'
         with self.con:
-            self.con.execute("INSERT INTO system_metadata(id, scaling_factors) VALUES(?,?)",
+            self.con.execute("INSERT INTO system_metadata(id, scaling_factors) \
+                              VALUES(?,?)",
                              (path, sqlite3.Binary(scaling_factors)))
 
     def record_metadata_solver(self, recording_requester):
@@ -306,6 +312,7 @@ class SqliteRecorder(BaseRecorder):
 
         solver_options = pickle.dumps(recording_requester.options,
                                       pickle.HIGHEST_PROTOCOL)
+
         with self.con:
             self.con.execute(
                 "INSERT INTO solver_metadata(id, solver_options, solver_class) "
