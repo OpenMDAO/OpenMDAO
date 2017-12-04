@@ -1850,9 +1850,27 @@ def _find_var_from_range(idx, ranges):
             return name, idx - start
 
 
-def find_disjoint(prob, of=None, wrt=None, global_names=True):
+def _find_disjoint(prob, of=None, wrt=None, global_names=True, mode='fwd'):
     """
     Find all sets of disjoint columns in the total jac and their corresponding rows.
+
+    Parameters
+    ----------
+    prob : Problem
+        The Problem being analyzed.
+    of : list of str or None
+        List of names of variables we're taking derivatives of.
+    wrt : list of str or None
+        List of names of variables we're taking derivatives with respect to.
+    global_names : bool
+        If True the variable names are absolute names.
+    mode : str
+        Derivative direction.
+
+    Returns
+    -------
+    tuple
+        Tuple of dicts total_dv_offsets and total_res_offsets.
     """
     # TODO: fix this to work in rev mode as well
 
@@ -1862,13 +1880,14 @@ def find_disjoint(prob, of=None, wrt=None, global_names=True):
     from openmdao.utils.array_utils import array_viz
 
     prob.model.jacobian = _SimulJacobian()
-    prob.setup(mode=prob._mode)
-    print("running the model")
+    # clear out any old simul coloring info
+    prob.driver._simul_coloring_info = None
+    prob.driver._res_jacs = {}
+
+    prob.setup(mode=mode)
     prob.run_model()
 
-    print("computing totals")
     J = prob.driver._compute_totals(return_format='array', of=of, wrt=wrt)
-    print("compute_totals DONE")
     J[np.abs(J) < 1e-99] = 0.0
     J[np.abs(J) >= 1e-99] = 1.0
 
@@ -1876,7 +1895,6 @@ def find_disjoint(prob, of=None, wrt=None, global_names=True):
 
     disjoints = defaultdict(set)
     rows = {}
-    print("looping over column pairs")
     for c1, c2 in combinations(allcols, 2):  # loop over column pairs
         result = J[:, c1] + J[:, c2]
         if np.all(result <= 1.0):
@@ -1952,12 +1970,41 @@ def find_disjoint(prob, of=None, wrt=None, global_names=True):
                 dct[0].append(resoffset)
                 dct[1].append(dvoffset)
 
+    prob.driver._simul_coloring_info = None
+    prob.driver._res_jacs = {}
+
     return total_dv_offsets, total_res_offsets
 
 
-def get_simul_meta(problem, of=None, wrt=None, global_names=True, stream=sys.stdout):
+def get_simul_meta(problem, of=None, wrt=None, global_names=True, mode='fwd', stream=sys.stdout):
+    """
+    Compute simultaneous derivative colorings for the given problem.
+
+    Parameters
+    ----------
+    problem : Problem
+        The Problem being analyzed.
+    of : list of str or None
+        List of names of variables we're taking derivatives of.
+    wrt : list of str or None
+        List of names of variables we're taking derivatives with respect to.
+    global_names : bool
+        If True the variable names are absolute names.
+    mode : str
+        Derivative direction.
+    stream : file-like or None
+        Stream where output coloring info will be written.
+
+    Returns
+    -------
+    tuple of the form (simul_colorings, simul_maps)
+        Where simul_colorings is a dict of the form {dvname1: coloring_array, ...} and
+        simul_maps is a dict of the form
+        {resp_name: {dvname: {color: (row_idxs, col_idxs), ...}, ...}, ...}
+    """
     driver = problem.driver
-    dv_idxs, res_idxs = find_disjoint(problem, of=of, wrt=wrt, global_names=global_names)
+    dv_idxs, res_idxs = _find_disjoint(problem, of=of, wrt=wrt, global_names=global_names,
+                                       mode=mode)
     all_colors = set()
 
     simul_colorings = {}
@@ -1988,6 +2035,6 @@ def get_simul_meta(problem, of=None, wrt=None, global_names=True, stream=sys.std
             simul_maps[res] = simul_map
 
     if stream is not None:
-        print((simul_colorings, simul_maps), file=stream)
+        stream.write("\n%s\n" % ((simul_colorings, simul_maps),))
 
     return simul_colorings, simul_maps

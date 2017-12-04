@@ -2052,6 +2052,10 @@ class System(object):
         r"""
         Add a response variable to this system.
 
+        The response can be scaled using ref and ref0.
+        The argument :code:`ref0` represents the physical value when the scaled value is 0.
+        The argument :code:`ref` represents the physical value when the scaled value is 1.
+
         Parameters
         ----------
         name : string
@@ -2094,11 +2098,6 @@ class System(object):
             Mapping of this response to each design variable where simultaneous derivs will
             be used.  Each design variable entry is another dict keyed on color, and the values
             in the color dict are tuples of the form (resp_idxs, color_idxs).
-        Notes
-        -----
-        The response can be scaled using ref and ref0.
-        The argument :code:`ref0` represents the physical value when the scaled value is 0.
-        The argument :code:`ref` represents the physical value when the scaled value is 1.
 
         """
         # Name must be a string

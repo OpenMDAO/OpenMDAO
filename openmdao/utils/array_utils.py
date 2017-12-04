@@ -45,10 +45,22 @@ def evenly_distrib_idxs(num_divisions, arr_size):
 
 
 def take_nth(rank, size, seq):
-    """Return an iterator over the sequence that returns every
+    """
+    An iterator returning every nth value.
+
+    Return an iterator over the sequence that returns every
     nth element of seq based on the given rank within a group of
     the given size.  For example, if size = 2, a rank of 0 returns
     even indexed elements and a rank of 1 returns odd indexed elements.
+
+    Parameters
+    ----------
+    rank : int
+        MPI rank of this process.
+    size : int
+        Size of the array we're taking nth entries from.
+    seq : iter
+        Iterator containing the values being returned.
     """
     assert(rank < size)
     it = iter(seq)

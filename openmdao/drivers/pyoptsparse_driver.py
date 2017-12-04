@@ -10,7 +10,7 @@ from __future__ import print_function
 from collections import OrderedDict, defaultdict
 import traceback
 
-from six import iteritems
+from six import iteritems, itervalues
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -257,6 +257,17 @@ class pyOptSparseDriver(Driver):
         lcons = [key for (key, con) in iteritems(con_meta) if con['linear'] is True]
         if len(lcons) > 0:
             _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list, return_format='dict')
+            # convert all of our linear constraint jacs to COO format. Otherwise pyoptsparse will
+            # do it for us and we'll end up with a fully dense COO matrix and very slow evaluation
+            # of linear constraints!
+            for jacdct in itervalues(_lin_jacs):
+                for n, subjac in iteritems(jacdct):
+                    if isinstance(subjac, np.ndarray):
+                        # we can safely use coo_matrix to automatically convert the ndarray
+                        # since our linear constraint jacs are constant, so zeros won't become
+                        # nonzero during the optimization.
+                        mat = coo_matrix(subjac)
+                        jacdct[n] = {'coo': [mat.row, mat.col, mat.data], 'shape': mat.shape}
 
         # Add all equality constraints
         self.active_tols = {}
@@ -543,7 +554,13 @@ class pyOptSparseDriver(Driver):
 
     def set_simul_coloring(self, simul_info):
         """
-        Sets the coloring for simultaneous derivatives.  It will also update the sparsity
-        patterns passed to pyoptsparse.
+        Set the coloring for simultaneous derivatives.
+
+        It will also update the sparsity patterns passed to pyoptsparse.
+
+        Parameters
+        ----------
+        simul_info : tuple
+            Information about simultaneous coloring for design vars and responses.
         """
         self._simul_coloring_info = simul_info
