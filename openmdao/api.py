@@ -17,6 +17,7 @@ from openmdao.components.exec_comp import ExecComp
 from openmdao.components.linear_system_comp import LinearSystemComp
 from openmdao.components.meta_model import MetaModel
 from openmdao.components.multifi_meta_model import MultiFiMetaModel
+from openmdao.components.regular_grid_interp_comp import RegularGridInterpComp
 
 # Solvers
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS

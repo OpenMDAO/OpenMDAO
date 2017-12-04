@@ -2,13 +2,11 @@
 
 from __future__ import division, print_function, absolute_import
 
+from scipy import __version__ as scipy_version
 try:
     from scipy.interpolate._bsplines import make_interp_spline
 except ImportError:
-    from scipy import __version__ as scipy_version
-    msg = "'RegularGridInterpComp' requires scipy>=0.19, but the currently" \
-          " installed version is %s." % scipy_version
-    raise ImportError(msg)
+    make_interp_spline = False
 
 from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 import numpy as np
@@ -92,6 +90,12 @@ class RegularGridInterpolator(object):
     def __init__(self, points, values, method="slinear", bounds_error=True,
                  fill_value=np.nan, spline_dim_error=True):
         """Initialize instance of interpolation class."""
+
+        if not make_interp_spline:
+            msg = "'RegularGridInterpComp' requires scipy>=0.19, but the currently" \
+                  " installed version is %s." % scipy_version
+            raise ImportError(msg)
+
         configs = RegularGridInterpolator._interp_methods()
         self._spline_methods, self._all_methods, self._interp_config = configs
         if method not in self._all_methods:
