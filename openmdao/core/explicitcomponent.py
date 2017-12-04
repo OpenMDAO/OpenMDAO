@@ -176,7 +176,10 @@ class ExplicitComponent(Component):
 
             for wrt_name, wrt_vars in (('output', outputs), ('input', inputs)):
                 for abs_key in product(outputs, wrt_vars):
-                    meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
+                    if abs_key in self._subjacs_info:
+                        meta = self._subjacs_info[abs_key]
+                    else:
+                        meta = SUBJAC_META_DEFAULTS.copy()
                     dependent = meta['dependent']
 
                     if not dependent:

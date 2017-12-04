@@ -7,6 +7,7 @@ import importlib
 import inspect
 import re
 import textwrap
+import collections
 from six import PY3
 
 from numpydoc.docscrape import NumpyDocString
@@ -87,7 +88,7 @@ class ReturnFinder(ast.NodeVisitor):
             if node.value is not None:
                 self.has_return = True
 
-        if hasattr(node, 'body'):
+        if hasattr(node, 'body') and isinstance(node.body, collections.Iterable):
             # If the top level function does nothing but pass, note it.
             if is_func_def and self._depth == 2 and len(node.body) <= 2 \
                      and isinstance(node.body[-1], ast.Pass):
