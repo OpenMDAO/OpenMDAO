@@ -863,9 +863,10 @@ class TestRegularGridMap(unittest.TestCase):
                 rel_err = max(derivs['comp'][i]['rel error'])
                 self.assertLessEqual(rel_err, tol)
 
-
+@unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
 class TestRegularGridMapFeature(unittest.TestCase):
 
+    @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
     def test_xor(self):
         import numpy as np
         from openmdao.api import Group, Problem, IndepVarComp
@@ -904,6 +905,7 @@ class TestRegularGridMapFeature(unittest.TestCase):
         # we can verify all gradients by checking against finit-difference
         prob.check_partials(compact_print=True)
 
+    @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
     def test_shape(self):
         import numpy as np
         from openmdao.api import Group, Problem, IndepVarComp
@@ -952,6 +954,7 @@ class TestRegularGridMapFeature(unittest.TestCase):
         # we can verify all gradients by checking against finit-difference
         prob.check_partials(compact_print=True)
 
+    @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
     def test_training_derivatives(self):
         import numpy as np
         from openmdao.api import Group, Problem, IndepVarComp

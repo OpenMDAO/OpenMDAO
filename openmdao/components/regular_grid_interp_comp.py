@@ -439,8 +439,9 @@ class RegularGridInterpComp(ExplicitComponent):
     """
 
     def initialize(self):
-        self.metadata.declare('extrapolate', types=bool, default=False, 
-                        desc='Sets whether extrapolation should be performed \
+        """Initialize the component."""
+        self.metadata.declare('extrapolate', types=bool, default=False,
+                              desc='Sets whether extrapolation should be performed \
                                               when an input is out of bounds.')
         self.metadata.declare('training_data_gradients', types=bool,
                               default=False, desc='Sets whether gradients with \
@@ -470,7 +471,7 @@ class RegularGridInterpComp(ExplicitComponent):
             training data sample points for this input variable.
         """
         n = self.metadata['num_nodes']
-        metadata = super(RegularGridInterpComp, self).add_input(name, val*np.ones(n), **kwargs)
+        super(RegularGridInterpComp, self).add_input(name, val * np.ones(n), **kwargs)
 
         self.pnames.append(name)
         self.params.append(np.asarray(training_data))
@@ -493,9 +494,9 @@ class RegularGridInterpComp(ExplicitComponent):
             training data sample points for this output variable.
         """
         n = self.metadata['num_nodes']
-        metadata = super(RegularGridInterpComp, self).add_output(name, val*np.ones(n), **kwargs)
+        super(RegularGridInterpComp, self).add_output(name, val * np.ones(n), **kwargs)
 
-        self.interps[name] = RegularGridInterpolator(self.params, 
+        self.interps[name] = RegularGridInterpolator(self.params,
                                                      training_data,
                                                      method=self.metadata['method'],
                                                      bounds_error=not self.metadata['extrapolate'],
@@ -505,7 +506,8 @@ class RegularGridInterpComp(ExplicitComponent):
         self._ki = self.interps[name]._ki
         self.declare_partials(name, self.pnames)
         if self.metadata['training_data_gradients']:
-            super(RegularGridInterpComp, self).add_input("%s_train" % name, val=training_data, **kwargs)
+            super(RegularGridInterpComp, self).add_input("%s_train" % name,
+                                                         val=training_data, **kwargs)
             self.declare_partials(name, "%s_train" % name)
 
     def setup(self):
@@ -517,10 +519,12 @@ class RegularGridInterpComp(ExplicitComponent):
         for out_name in self.interps:
             if self.metadata['training_data_gradients']:
                 values = inputs["%s_train" % out_name]
+                method = self.metadata['method']
+                bounds_error = not self.metadata['extrapolate']
                 self.interps[out_name] = RegularGridInterpolator(self.params,
                                                                  values,
-                                                                 method=self.metadata['method'],
-                                                                 bounds_error=not self.metadata['extrapolate'],
+                                                                 method=method,
+                                                                 bounds_error=bounds_error,
                                                                  fill_value=None,
                                                                  spline_dim_error=False)
 
