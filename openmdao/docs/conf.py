@@ -123,7 +123,7 @@ author = u'openmdao.org'
 # built documents.
 #
 import openmdao
-#version = openmdao.__version__
+version = openmdao.__version__
 # The full version, including alpha/beta/rc tags.
 release = openmdao.__version__ + ' Alpha'
 

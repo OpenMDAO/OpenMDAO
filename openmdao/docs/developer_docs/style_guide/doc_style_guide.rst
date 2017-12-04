@@ -294,6 +294,28 @@ embed-test
           openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_feature_simple
 
 
+embed-options
++++++++++++++
+
+        `embed-options` is a custom directive that lets a developer display a set of options
+        directly into a feature doc by including the module, classname, and the options dictionary name.
+        The syntax for invoking the directive looks like this:
+
+        .. code-block:: python
+
+            .. embed-options::
+                openmdao.solvers.linear.linear_block_jac
+                LinearBlockJac
+                options
+
+        The output from the above syntax should result in a neatly-formatted table of options like this:
+
+        .. embed-options::
+            openmdao.solvers.linear.linear_block_jac
+                LinearBlockJac
+                options
+
+
 Tagging
 -------
 
