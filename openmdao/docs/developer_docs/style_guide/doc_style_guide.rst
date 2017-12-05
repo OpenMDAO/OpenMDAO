@@ -204,54 +204,6 @@ which makes a link like this, that leads to the Direct solver's user docs:
 Feature Docs and their Custom Directives for Including Code in Documentation
 ----------------------------------------------------------------------------
 
-show-unittest-examples
-++++++++++++++++++++++
-
-      `show-unittest-examples` is an OpenMDAO custom Sphinx directive that allows unit
-      test examples to be directly incorporated into a feature document.
-      An example usage within a feature document would look like this:
-
-      ::
-
-        .. show-unittest-examples::
-            indepvarcomp
-
-
-      What the above will do is replace the directive and its args with indepvarcomp unit tests
-      and their subsequent output, as shown here:
-
-
-      Define two independent variables at once.
-
-      ::
-
-        comp = IndepVarComp((
-            ('indep_var_1', 1.0),
-            ('indep_var_2', 2.0),
-
-        ))
-
-        prob = Problem(comp).setup(check=False)
-        print(prob['indep_var_1'])
-        print(prob['indep_var_2'])
-
-      ::
-
-        1.0
-        2.0
-
-
-      But how does the directive know which test to go get?  The test or tests that are
-      to be shown will have a "Features" header in their docstring, that says which feature
-      the test is trying out.  It should look like this:
-
-      ::
-
-        Features
-        --------
-        indepvarcomp
-
-
 embed-code
 ++++++++++
 

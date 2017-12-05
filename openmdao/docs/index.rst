@@ -21,7 +21,6 @@ They explain important secondary concepts that you will run into when working wi
 
 .. toctree::
     :maxdepth: 1
-    :caption: User Guide
     :name: userguide
 
     getting_started/index.rst
@@ -37,7 +36,6 @@ documentation of the arguments/options/settings for a specific method, Component
 
 .. toctree::
     :maxdepth: 1
-    :caption: Reference Guide
     :name: referenceguide
 
     feature_reference/index.rst
@@ -50,7 +48,6 @@ Other Useful Docs
 
 .. toctree::
     :maxdepth: 1
-    :caption: Other Docs
     :name: otherdocs
 
     other/api_translation.rst

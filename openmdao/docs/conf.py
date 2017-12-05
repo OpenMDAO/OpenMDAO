@@ -90,7 +90,6 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'numpydoc',
-    'show_unittest_examples',
     'embed_code',
     'embed_options',
     'embed_test',
