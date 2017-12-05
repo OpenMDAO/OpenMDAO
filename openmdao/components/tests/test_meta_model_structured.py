@@ -17,7 +17,7 @@ except ImportError:
     scipy_gte_019 = False
 
 if scipy_gte_019:
-    from openmdao.components.regular_grid_interp_comp import RegularGridInterpolator, RegularGridInterpComp
+    from openmdao.components.meta_model_structured import RegularGridInterp, MetaModelStructured
 
 x = np.array([-0.97727788, -0.15135721, -0.10321885,  0.40015721,  0.4105985 ,
         0.95008842,  0.97873798,  1.76405235,  1.86755799,  2.2408932 ])
@@ -429,7 +429,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
     """Tests the functionality of the regular grid interpolator."""
 
     def setUp(self):
-      self.config = RegularGridInterpolator._interp_methods()
+      self.config = RegularGridInterp._interp_methods()
       self.spline_methods, self.valid_methods, self.interp_configs = self.config
 
     def _get_sample_4d_large(self):
@@ -474,13 +474,13 @@ class TestRegularGridInterpolator(unittest.TestCase):
                              [0.5, 0.5, .5, .5]])
 
         for method in self.valid_methods:
-            interp = RegularGridInterpolator(points,
-                                             values.tolist(),
-                                             method=method)
+            interp = RegularGridInterp(points,
+                                       values.tolist(),
+                                       method=method)
             v1 = interp(sample.tolist(), compute_gradients=False)
-            interp = RegularGridInterpolator(points,
-                                             values,
-                                             method=method)
+            interp = RegularGridInterp(points,
+                                       values,
+                                       method=method)
             v2 = interp(sample, compute_gradients=False)
             assert_allclose(v1, v2)
 
@@ -499,10 +499,10 @@ class TestRegularGridInterpolator(unittest.TestCase):
         values = np.random.randn(2, 10, 20)
 
         # verify that this raises error with dimension checking
-        self.assertRaises(ValueError, RegularGridInterpolator,
-                      points, values, 'cubic')
+        self.assertRaises(ValueError, RegularGridInterp,
+                          points, values, 'cubic')
 
-        interp = RegularGridInterpolator(
+        interp = RegularGridInterp(
             points, values, method='cubic', spline_dim_error=False)
 
         # first dimension (x) should be reduced to k=1 (linear)
@@ -513,7 +513,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
         result = interp(x)
         assert_almost_equal(result, -0.046325695741704434, decimal=5)
 
-        interp = RegularGridInterpolator(
+        interp = RegularGridInterp(
             points, values, method='slinear', spline_dim_error=False)
 
         value1 = interp(x)
@@ -541,8 +541,8 @@ class TestRegularGridInterpolator(unittest.TestCase):
 
         # spline methods dont support complex values
         for method in self.spline_methods:
-            self.assertRaises(ValueError, RegularGridInterpolator, points, values,
-                          method)
+            self.assertRaises(ValueError, RegularGridInterp, points, values,
+                              method)
 
     def test_minimum_required_gridsize(self):
         for method in self.spline_methods:
@@ -552,8 +552,8 @@ class TestRegularGridInterpolator(unittest.TestCase):
             points = [x, y]
             X, Y = np.meshgrid(*points, indexing='ij')
             values = X + Y
-            self.assertRaises(ValueError, RegularGridInterpolator, points, values,
-                          method)
+            self.assertRaises(ValueError, RegularGridInterp, points, values,
+                              method)
 
     def test_method_switching(self):
         # should be able to switch interpolation methods on each __call__
@@ -571,7 +571,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
         x = [0.5, 0, 1001]
 
         # create as cubic
-        interp = RegularGridInterpolator(
+        interp = RegularGridInterp(
             points, values, method='cubic')
 
         # value and gradient work as expected
@@ -600,7 +600,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
         assert_almost_equal(gradient3, result_gradient_1)
 
         # new interpolator and evaluation point
-        interp = RegularGridInterpolator(
+        interp = RegularGridInterp(
             points, values, method='slinear')
         # values will be cast to float for splines/gradient methods
         # otherwise, will get null vector gradient [0,0,0] at all pts
@@ -636,7 +636,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
         for method in self.spline_methods:
             if method == 'slinear':
                 tol = 1.5
-            interp = RegularGridInterpolator(points, values, method)
+            interp = RegularGridInterp(points, values, method)
             computed = interp.gradient(test_pt)
             r_err = rel_error(actual, computed)
             assert r_err < tol
@@ -651,7 +651,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
         points, values, func, df = self. _get_sample_2d()
         np.random.seed(4321)
         for method in self.spline_methods:
-            interp = RegularGridInterpolator(points, values, method)
+            interp = RegularGridInterp(points, values, method)
             x = np.array([0.9, 0.1])
             interp._xi = x
             interp._gmethod = method
@@ -669,7 +669,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
         for method in self.spline_methods:
             if method == 'slinear':
                 tol = 0.5
-            interp = RegularGridInterpolator(points, values, method)
+            interp = RegularGridInterp(points, values, method)
             computed = interp(test_pt, compute_gradients=False)
             r_err = rel_error(actual, computed)
             assert r_err < tol
@@ -685,9 +685,9 @@ class TestRegularGridInterpolator(unittest.TestCase):
             k = self.interp_configs[method]
             if method == 'slinear':
                 tol = 2
-            interp = RegularGridInterpolator(points, values, method,
-                                             bounds_error=False,
-                                             fill_value=None)
+            interp = RegularGridInterp(points, values, method,
+                                       bounds_error=False,
+                                       fill_value=None)
             computed = interp(test_pt)
             computed_grad = interp.gradient(test_pt)
             r_err = rel_error(actual, computed)
@@ -706,7 +706,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
             tol = 1e-1
             if method == 'slinear':
                 tol = 0.5
-            interp = RegularGridInterpolator(points, values, method)
+            interp = RegularGridInterp(points, values, method)
             computed = interp(test_pt, compute_gradients=False)
             r_err = rel_error(actual, computed)
             assert r_err < tol
@@ -718,9 +718,9 @@ class TestRegularGridInterpolator(unittest.TestCase):
         actual = np.asarray([np.nan])
         methods = self.valid_methods
         for method in methods:
-            interp = RegularGridInterpolator(points, values, method,
-                                             bounds_error=False,
-                                             fill_value=np.nan)
+            interp = RegularGridInterp(points, values, method,
+                                       bounds_error=False,
+                                       fill_value=np.nan)
             computed = interp(test_pt, compute_gradients=False)
             assert_array_almost_equal(computed, actual)
 
@@ -731,11 +731,11 @@ class TestRegularGridInterpolator(unittest.TestCase):
         values = np.random.rand(5, 7)
 
         # integers can be cast to floats
-        RegularGridInterpolator((x, y), values, fill_value=1)
+        RegularGridInterp((x, y), values, fill_value=1)
 
         # complex values cannot
-        self.assertRaises(ValueError, RegularGridInterpolator,
-                      (x, y), values, fill_value=1 + 2j)
+        self.assertRaises(ValueError, RegularGridInterp,
+                          (x, y), values, fill_value=1 + 2j)
 
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
 class TestRegularGridMap(unittest.TestCase):
@@ -763,7 +763,7 @@ class TestRegularGridMap(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = RegularGridInterpComp(method='slinear', extrapolate=True)
+        comp = MetaModelStructured(method='slinear', extrapolate=True)
 
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
@@ -823,9 +823,9 @@ class TestRegularGridMap(unittest.TestCase):
         ivc.add_output('f_train', outs[0]['values'])
         ivc.add_output('g_train', outs[1]['values'])
 
-        comp = RegularGridInterpComp(training_data_gradients=True,
-                                                  method='cubic',
-                                                  num_nodes=3)
+        comp = MetaModelStructured(training_data_gradients=True,
+                                   method='cubic',
+                                   num_nodes=3)
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
 
@@ -863,17 +863,18 @@ class TestRegularGridMap(unittest.TestCase):
                 rel_err = max(derivs['comp'][i]['rel error'])
                 self.assertLessEqual(rel_err, tol)
 
+
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
-class TestRegularGridMapFeature(unittest.TestCase):
+class TestMetaModelStructuredMapFeature(unittest.TestCase):
 
     @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
     def test_xor(self):
         import numpy as np
         from openmdao.api import Group, Problem, IndepVarComp
-        from openmdao.components.regular_grid_interp_comp import RegularGridInterpComp
+        from openmdao.components.meta_model_structured import MetaModelStructured
 
         # Create regular grid interpolator instance
-        xor_interp = RegularGridInterpComp(method='slinear')
+        xor_interp = MetaModelStructured(method='slinear')
 
         # set up inputs and outputs
         xor_interp.add_input('x', 0.0, np.array([0.0, 1.0]), units=None)
@@ -909,7 +910,7 @@ class TestRegularGridMapFeature(unittest.TestCase):
     def test_shape(self):
         import numpy as np
         from openmdao.api import Group, Problem, IndepVarComp
-        from openmdao.components.regular_grid_interp_comp import RegularGridInterpComp
+        from openmdao.components.meta_model_structured import MetaModelStructured
 
         # create input param training data, of sizes 25, 5, and 10 points resp.
         p1 = np.linspace(0, 100, 25)
@@ -925,7 +926,7 @@ class TestRegularGridMapFeature(unittest.TestCase):
 
 
         # Create regular grid interpolator instance
-        interp = RegularGridInterpComp(method='cubic')
+        interp = MetaModelStructured(method='cubic')
         interp.add_input('p1', 0.5, p1)
         interp.add_input('p2', 0.0, p2)
         interp.add_input('p3', 3.14, p3)
@@ -958,7 +959,7 @@ class TestRegularGridMapFeature(unittest.TestCase):
     def test_training_derivatives(self):
         import numpy as np
         from openmdao.api import Group, Problem, IndepVarComp
-        from openmdao.components.regular_grid_interp_comp import RegularGridInterpComp
+        from openmdao.components.meta_model_structured import MetaModelStructured
 
         # create input param training data, of sizes 25, 5, and 10 points resp.
         p1 = np.linspace(0, 100, 25)
@@ -974,7 +975,7 @@ class TestRegularGridMapFeature(unittest.TestCase):
 
 
         # Create regular grid interpolator instance
-        interp = RegularGridInterpComp(method='cubic', training_data_gradients=True)
+        interp = MetaModelStructured(method='cubic', training_data_gradients=True)
         interp.add_input('p1', 0.5, p1)
         interp.add_input('p2', 0.0, p2)
         interp.add_input('p3', 3.14, p3)

@@ -8,7 +8,7 @@ from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.utils.class_util import overrides_method
 
 
-class MetaModel(ExplicitComponent):
+class MetaModelUnStructured(ExplicitComponent):
     """
     Class that creates a reduced order model for outputs from inputs.
 
@@ -23,7 +23,7 @@ class MetaModel(ExplicitComponent):
         """
         Initialize all attributes.
         """
-        super(MetaModel, self).__init__()
+        super(MetaModelUnStructured, self).__init__()
 
         # This surrogate will be used for all outputs that don't have
         # a specific surrogate assigned to them
@@ -74,7 +74,7 @@ class MetaModel(ExplicitComponent):
             training data for this variable. Optional, can be set
             by the problem later.
         """
-        metadata = super(MetaModel, self).add_input(name, val, **kwargs)
+        metadata = super(MetaModelUnStructured, self).add_input(name, val, **kwargs)
 
         if self._vectorize is not None:
             if metadata['shape'][0] != self._vectorize:
@@ -113,7 +113,7 @@ class MetaModel(ExplicitComponent):
         """
         surrogate = kwargs.pop('surrogate', None)
 
-        metadata = super(MetaModel, self).add_output(name, val, **kwargs)
+        metadata = super(MetaModelUnStructured, self).add_output(name, val, **kwargs)
 
         if self._vectorize is not None:
             if metadata['shape'][0] != self._vectorize:
@@ -159,7 +159,7 @@ class MetaModel(ExplicitComponent):
         # training will occur on first execution after setup
         self.train = True
 
-        return super(MetaModel, self)._setup_vars()
+        return super(MetaModelUnStructured, self)._setup_vars()
 
     def check_config(self, logger):
         """
@@ -345,7 +345,7 @@ class MetaModel(ExplicitComponent):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        super(MetaModel, self)._setup_partials()
+        super(MetaModelUnStructured, self)._setup_partials()
         self._declare_partials(of=[name[0] for name in self._surrogate_output_names],
                                wrt=[name[0] for name in self._surrogate_input_names])
 
@@ -364,7 +364,7 @@ class MetaModel(ExplicitComponent):
             if num_sample is None:
                 num_sample = len(val)
             elif len(val) != num_sample:
-                msg = "MetaModel: Each variable must have the same number"\
+                msg = "MetaModelUnStructured: Each variable must have the same number"\
                       " of training points. Expected {0} but found {1} "\
                       "points for '{2}'."\
                       .format(num_sample, len(val), name)
@@ -377,14 +377,14 @@ class MetaModel(ExplicitComponent):
                 missing_training_data.append(train_name)
                 continue
             if len(val) != num_sample:
-                msg = "MetaModel: Each variable must have the same number" \
+                msg = "MetaModelUnStructured: Each variable must have the same number" \
                       " of training points. Expected {0} but found {1} " \
                       "points for '{2}'." \
                     .format(num_sample, len(val), name)
                 raise RuntimeError(msg)
 
         if len(missing_training_data) > 0:
-            msg = "MetaModel: The following training data sets must be " \
+            msg = "MetaModelUnStructured: The following training data sets must be " \
                   "provided as metadata for %s: " % self.pathname + \
                   str(missing_training_data)
             raise RuntimeError(msg)

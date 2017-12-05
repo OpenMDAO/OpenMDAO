@@ -1,13 +1,13 @@
-.. index:: RegularGridInterpComp Example
+.. index:: MetaModelStructured Example
 
 *********************************
-RegularGridInterpComp Component
+MetaModelStructured Component
 *********************************
 
-`RegularGridInterpComp` is a smooth interpolation Component for data that exists on a regular grid.
-This differs from `MetaModel` which accepts unstructured data as collections of points.
+`MetaModelStructured` is a smooth interpolation Component for data that exists on a regular grid.
+This differs from `MetaModelUnStructured` which accepts unstructured data as collections of points.
 
-`RegularGridInterpComp` produces smooth fits through provided training data using polynomial
+`MetaModelStructured` produces smooth fits through provided training data using polynomial
 splines of order 1 (linear), 3 (cubic), or 5 (quintic). Analytic
 derivatives are automatically computed.
 
@@ -22,7 +22,7 @@ via initialization attribute (see below).
 
 
 .. embed-options::
-    openmdao.components.regular_grid_interp_comp
+    openmdao.components.meta_model_structured
     _for_docs
     metadata
 
@@ -33,7 +33,7 @@ A simple quick-start example is fitting the exclusive-or ("XOR") operator betwee
 two inputs, `x` and `y`:
 
 .. embed-test::
-    openmdao.components.tests.test_regular_grid_interp_comp.TestRegularGridMapFeature.test_xor
+    openmdao.components.tests.test_meta_model_structured.TestMetaModelStructuredMapFeature.test_xor
 
 
 An important consideration for multi-dimensional input is that the order that
@@ -46,7 +46,7 @@ with shape (5, 12, 20).
 This is illustrated by the example:
 
 .. embed-test::
-    openmdao.components.tests.test_regular_grid_interp_comp.TestRegularGridMapFeature.test_shape
+    openmdao.components.tests.test_meta_model_structured.TestMetaModelStructuredMapFeature.test_shape
 
 Finally, it is possible to compute gradients with respect to the given
 output training data. These gradients are not computed by default, but 
@@ -63,4 +63,4 @@ to `True`. This automatically creates an input named `f_train` when the output
 match the finite-difference estimate in the `check_partials` output.
 
 .. embed-test::
-    openmdao.components.tests.test_regular_grid_interp_comp.TestRegularGridMapFeature.test_training_derivatives
+    openmdao.components.tests.test_meta_model_structured.TestMetaModelStructuredMapFeature.test_training_derivatives

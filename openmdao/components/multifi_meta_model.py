@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from openmdao.components.meta_model import MetaModel
+from openmdao.components.meta_model_unstructured import MetaModelUnStructured
 
 
 def _get_name_fi(name, fi_index):
@@ -28,7 +28,7 @@ def _get_name_fi(name, fi_index):
         return name
 
 
-class MultiFiMetaModel(MetaModel):
+class MultiFiMetaModelUnStructured(MetaModelUnStructured):
     """
     Generalize MetaModel to be able to train surrogates with multi-fidelity training inputs.
 
@@ -48,7 +48,7 @@ class MultiFiMetaModel(MetaModel):
 
     Thus given the initialization::
 
-    >>> mm = MultiFiMetaModel(nfi=2)`
+    >>> mm = MultiFiMetaModelUnStructured(nfi=2)`
     >>> mm.add_input('x1', 0.)
     >>> mm.add_input('x2', 0.)
     >>> mm.add_ouput('y1', 0.)
@@ -79,11 +79,11 @@ class MultiFiMetaModel(MetaModel):
         ----------
         nfi : number of levels of fidelity
         """
-        super(MultiFiMetaModel, self).__init__()
+        super(MultiFiMetaModelUnStructured, self).__init__()
 
         self._nfi = nfi
 
-        # generalize MetaModel training inputs to a list of training inputs
+        # generalize MetaModelUnStructured training inputs to a list of training inputs
         self._training_input = nfi * [np.zeros(0)]
         self._input_sizes = nfi * [0]
 
@@ -115,7 +115,7 @@ class MultiFiMetaModel(MetaModel):
             For advanced users only. ID or color for this variable, relevant for
             reconfigurability. Default is 0.
         """
-        metadata = super(MultiFiMetaModel, self).add_input(name, val, **kwargs)
+        metadata = super(MultiFiMetaModelUnStructured, self).add_input(name, val, **kwargs)
         input_size = metadata['value'].size
 
         self._input_sizes[0] = self._input_size
@@ -172,7 +172,7 @@ class MultiFiMetaModel(MetaModel):
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
         """
-        super(MultiFiMetaModel, self).add_output(name, val, **kwargs)
+        super(MultiFiMetaModelUnStructured, self).add_output(name, val, **kwargs)
         self._training_output[name] = self._nfi * [np.zeros(0)]
 
         # Add train:<outvar>_fi<n>
@@ -184,11 +184,11 @@ class MultiFiMetaModel(MetaModel):
 
     def _train(self):
         """
-        Override MetaModel _train method to take into account multi-fidelity input data.
+        Override MetaModelUnStructured _train method to take into account multi-fidelity input data.
         """
         if self._nfi == 1:
             # shortcut: fallback to base class behaviour immediatly
-            super(MultiFiMetaModel, self)._train()
+            super(MultiFiMetaModelUnStructured, self)._train()
             return
 
         num_sample = self._nfi * [None]
@@ -199,7 +199,7 @@ class MultiFiMetaModel(MetaModel):
                 if num_sample[fi] is None:
                     num_sample[fi] = len(val)
                 elif len(val) != num_sample[fi]:
-                    msg = "MetaModel: Each variable must have the same number"\
+                    msg = "MetaModelUnStructured: Each variable must have the same number"\
                           " of training points. Expected {0} but found {1} "\
                           "points for '{2}'."\
                           .format(num_sample[fi], len(val), name)
@@ -210,7 +210,7 @@ class MultiFiMetaModel(MetaModel):
                 name = _get_name_fi(name, fi)
                 val = self.metadata['train:' + name]
                 if len(val) != num_sample[fi]:
-                    msg = "MetaModel: Each variable must have the same number" \
+                    msg = "MetaModelUnStructured: Each variable must have the same number" \
                           " of training points. Expected {0} but found {1} " \
                           "points for '{2}'." \
                         .format(num_sample[fi], len(val), name)

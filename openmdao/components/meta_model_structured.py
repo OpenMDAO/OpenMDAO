@@ -15,7 +15,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 import warnings
 
 
-class RegularGridInterpolator(object):
+class RegularGridInterp(object):
     """
     Interpolation on a regular grid in arbitrary dimensions.
 
@@ -92,11 +92,11 @@ class RegularGridInterpolator(object):
                  fill_value=np.nan, spline_dim_error=True):
         """Initialize instance of interpolation class."""
         if not make_interp_spline:
-            msg = "'RegularGridInterpComp' requires scipy>=0.19, but the currently" \
+            msg = "'MetaModelStructured' requires scipy>=0.19, but the currently" \
                   " installed version is %s." % scipy_version
             warnings.warn(msg)
 
-        configs = RegularGridInterpolator._interp_methods()
+        configs = RegularGridInterp._interp_methods()
         self._spline_methods, self._all_methods, self._interp_config = configs
         if method not in self._all_methods:
             all_m = ', '.join(['"' + m + '"' for m in self._all_methods])
@@ -195,7 +195,7 @@ class RegularGridInterpolator(object):
         xi = _ndim_coords_from_arrays(xi, ndim=ndim)
         if xi.shape[-1] != len(self.grid):
             raise ValueError("The requested sample points xi have dimension "
-                             "%d, but this RegularGridInterpolator has "
+                             "%d, but this RegularGridInterp has "
                              "dimension %d" % (xi.shape[1], ndim))
 
         xi_shape = xi.shape
@@ -423,7 +423,7 @@ class RegularGridInterpolator(object):
         return gradients
 
 
-class RegularGridInterpComp(ExplicitComponent):
+class MetaModelStructured(ExplicitComponent):
     """
     Interpolation Component generated from data on a regular grid.
 
@@ -445,7 +445,7 @@ class RegularGridInterpComp(ExplicitComponent):
     def initialize(self):
         """Initialize the component."""
         if not make_interp_spline:
-            msg = "'RegularGridInterpComp' requires scipy>=0.19, but the currently" \
+            msg = "'MetaModelStructured' requires scipy>=0.19, but the currently" \
                   " installed version is %s." % scipy_version
             warnings.warn(msg)
 
@@ -480,7 +480,7 @@ class RegularGridInterpComp(ExplicitComponent):
             training data sample points for this input variable.
         """
         n = self.metadata['num_nodes']
-        super(RegularGridInterpComp, self).add_input(name, val * np.ones(n), **kwargs)
+        super(MetaModelStructured, self).add_input(name, val * np.ones(n), **kwargs)
 
         self.pnames.append(name)
         self.params.append(np.asarray(training_data))
@@ -503,20 +503,20 @@ class RegularGridInterpComp(ExplicitComponent):
             training data sample points for this output variable.
         """
         n = self.metadata['num_nodes']
-        super(RegularGridInterpComp, self).add_output(name, val * np.ones(n), **kwargs)
+        super(MetaModelStructured, self).add_output(name, val * np.ones(n), **kwargs)
 
-        self.interps[name] = RegularGridInterpolator(self.params,
-                                                     training_data,
-                                                     method=self.metadata['method'],
-                                                     bounds_error=not self.metadata['extrapolate'],
-                                                     fill_value=None,
-                                                     spline_dim_error=False)
+        self.interps[name] = RegularGridInterp(self.params,
+                                               training_data,
+                                               method=self.metadata['method'],
+                                               bounds_error=not self.metadata['extrapolate'],
+                                               fill_value=None,
+                                               spline_dim_error=False)
 
         self._ki = self.interps[name]._ki
         self.declare_partials(name, self.pnames)
         if self.metadata['training_data_gradients']:
-            super(RegularGridInterpComp, self).add_input("%s_train" % name,
-                                                         val=training_data, **kwargs)
+            super(MetaModelStructured, self).add_input("%s_train" % name,
+                                                       val=training_data, **kwargs)
             self.declare_partials(name, "%s_train" % name)
 
     def setup(self):
@@ -530,12 +530,12 @@ class RegularGridInterpComp(ExplicitComponent):
                 values = inputs["%s_train" % out_name]
                 method = self.metadata['method']
                 bounds_error = not self.metadata['extrapolate']
-                self.interps[out_name] = RegularGridInterpolator(self.params,
-                                                                 values,
-                                                                 method=method,
-                                                                 bounds_error=bounds_error,
-                                                                 fill_value=None,
-                                                                 spline_dim_error=False)
+                self.interps[out_name] = RegularGridInterp(self.params,
+                                                           values,
+                                                           method=method,
+                                                           bounds_error=bounds_error,
+                                                           fill_value=None,
+                                                           spline_dim_error=False)
 
             val = self.interps[out_name](pt)
             outputs[out_name] = val
@@ -574,4 +574,4 @@ class RegularGridInterpComp(ExplicitComponent):
 
 
 def _for_docs():
-    return RegularGridInterpComp()
+    return MetaModelStructured()

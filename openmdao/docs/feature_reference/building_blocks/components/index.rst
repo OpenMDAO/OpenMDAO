@@ -6,9 +6,9 @@ Components
 .. toctree::
     :maxdepth: 1
 
-    metamodel.rst
+    metamodelunstructured.rst
     exec_comp.rst
     external_code.rst
     balance.rst
     linearsystem.rst
-    regulargridinterpcomp.rst
+    metamodelstructured.rst
