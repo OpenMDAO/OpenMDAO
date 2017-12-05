@@ -12,16 +12,23 @@ New Features:
 - `openmdao` console script that can activate useful debugging features
   (e.g. view_model) without editing the run script
 - Scipy COBYLA optimizer converts des var bounds to constraints (the algorithm doesn't natively handle bounds)
+- StructuredMetaModel component offers a simple spline interpolation routine for structured data
 
-API Changes:
--------------
-- Case Recording options API updated with `.recording_options` attribute on Driver, Solver, and System classes
-
+Backwards Compatible API Changes:
+-----------------------------------
 - `NonlinearRunOnce` changed `NonLinearRunOnce` for consistency (old class deprecated)
 - `types_` argument to `self.metadata.declare` changed to `types`. (old argument deprecated)
 - `types` and `values` arguments to `self.metadata.declare`
+-  `BalanceComp` has a `use_mult` argument to control if it has a `mult` input, defaulting to false
+   (the mult input isn't used most of the time)
+- Renamed `MetaModel` to `UnstructuredMetaModel` and `MultiFiMetaModel` to `UnStructuredMultiFiMetaModel`
+
+
+
+Backwards Incompatible API changes:
+-----------------------------------
+- Case Recording options API updated with `.recording_options` attribute on Driver, Solver, and System classes
 - `get_subsystem` changed to a private method, removed from public API of System
--  `BalanceComp` has a `use_mult` argument to control if it has a `mult` input (the mult input isn't used most of the time)
 - `check_partials` now has a `method` argument that controls which type of check
 
 Bug Fixes:
