@@ -6,6 +6,7 @@ from copy import deepcopy
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.utils.class_util import overrides_method
+from openmdao.utils.general_utils import warn_deprecation
 
 
 class MetaModelUnStructured(ExplicitComponent):
@@ -451,3 +452,13 @@ class MetaModelUnStructured(ExplicitComponent):
 
     def _metadata(self, name):
         return self._static_var_rel2data_io[name]['metadata']
+
+
+class MetaModel(MetaModelUnStructured):
+    """Deprecated."""
+
+    def __init__(self, *args, **kwargs):
+        """Capture Initialize to throw warning."""
+        warn_deprecation("'MetaModel' component has been deprecated. Use"
+                         "'MetaModelUnStructured' instead.")
+        super(Metamodel, self).__init__(*args, **kwargs)

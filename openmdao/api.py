@@ -18,6 +18,8 @@ from openmdao.components.linear_system_comp import LinearSystemComp
 from openmdao.components.meta_model_unstructured import MetaModelUnStructured
 from openmdao.components.multifi_meta_model import MultiFiMetaModelUnStructured
 from openmdao.components.meta_model_structured import MetaModelStructured
+from openmdao.components.meta_model_unstructured import MetaModel
+from openmdao.components.multifi_meta_model import MultiFiMetaModel
 
 # Solvers
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS

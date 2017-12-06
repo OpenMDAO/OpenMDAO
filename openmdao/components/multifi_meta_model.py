@@ -3,6 +3,7 @@
 import numpy as np
 
 from openmdao.components.meta_model_unstructured import MetaModelUnStructured
+from openmdao.utils.general_utils import warn_deprecation
 
 
 def _get_name_fi(name, fi_index):
@@ -67,8 +68,8 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
     Where Y is a list [Y1_fi1, Y1_fi2] where Y1_fi1 is a (m1, 1) ndarray of
     y1 values and Y1_fi2 a (m2, 1) ndarray y1_fi2 values.
 
-    .. note:: when *nfi* ==1 a :class:`MultiFiMetaModel` object behaves as
-        a :class:`MetaModel` object.
+    .. note:: when *nfi* ==1 a :class:`MultiFiMetaModelUnStructured` object behaves as
+        a :class:`MetaModelUnStructured` object.
     """
 
     def __init__(self, nfi=1):
@@ -289,3 +290,13 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
                                         self._training_output[name])
 
         self.train = False
+
+
+class MultiFiMetaModel(MultiFiMetaModelUnStructured):
+    """Deprecated."""
+
+    def __init__(self, *args, **kwargs):
+        """Capture Initialize to throw warning."""
+        warn_deprecation("'MultiFiMetaModel' component has been deprecated. Use"
+                         "'MultiFiMetaModelUnStructured' instead.")
+        super(MultiFiMetaModel, self).__init__(*args, **kwargs)
