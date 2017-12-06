@@ -33,9 +33,9 @@ class SqliteCaseReader(BaseCaseReader):
     format_version : int
         The version of the format assumed when loading the file.
     _abs2prom : {'input': dict, 'output': dict}
-        Dictionary mapping absolute names to promoted names
+        Dictionary mapping absolute names to promoted names.
     _prom2abs : {'input': dict, 'output': dict}
-        Dictionary mapping promoted names to absolute names
+        Dictionary mapping promoted names to absolute names.
     """
 
     def __init__(self, filename):

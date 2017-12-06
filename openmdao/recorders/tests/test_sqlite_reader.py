@@ -270,10 +270,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         np.testing.assert_almost_equal(second_last_case.inputs['y2'], [12.05848815, ],
                                        err_msg='Case reader gives '
                                        'incorrect input value for {0}'.format('obj_cmp.y2'))
-        np.testing.assert_almost_equal(second_last_case.outputs['obj_cmp.obj'], [28.58830817, ],
+        np.testing.assert_almost_equal(second_last_case.outputs['obj'], [28.58830817, ],
                                        err_msg='Case reader gives '
                                        'incorrect output value for {0}'.format('obj_cmp.obj'))
-        np.testing.assert_almost_equal(second_last_case.residuals['obj_cmp.obj'], [0.0, ],
+        np.testing.assert_almost_equal(second_last_case.residuals['obj'], [0.0, ],
                                        err_msg='Case reader gives '
                                        'incorrect residual value for {0}'.format('obj_cmp.obj'))
 
@@ -390,8 +390,9 @@ class TestSqliteCaseReader(unittest.TestCase):
                 sorted(cr.system_metadata.keys()),
                 sorted(['root', 'mda.d1', 'pz'])
         )
+        
         assert_rel_error(
-            self, cr.system_metadata['pz']['output']['nonlinear']['phys'][0][1], [2.0, 2.0], 1.0e-3)
+            self, cr.system_metadata['pz']['scaling_factors']['output']['nonlinear']['phys'][0][1], [2.0, 2.0], 1.0e-3)
 
     def test_reading_solver_metadata(self):
         self.setup_sellar_model()
