@@ -157,10 +157,6 @@ class SqliteRecorder(BaseRecorder):
                     self._prom2abs[io][v] = list(set(self._prom2abs[io][v]) |\
                                                 set(system._var_allprocs_prom2abs_list[io][v]))
 
-        print("vars:")
-        print(self._prom2abs)
-        print(self._abs2prom)
-
         # store the updated abs2prom and prom2abs
         abs2prom = pickle.dumps(self._abs2prom)
         prom2abs = pickle.dumps(self._prom2abs)
