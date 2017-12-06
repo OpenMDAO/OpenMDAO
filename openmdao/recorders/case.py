@@ -101,13 +101,13 @@ class DriverCase(Case):
         self.desvars = PromotedToAbsoluteMap(desvars[0] if desvars.dtype.names
                                              else None, prom2abs)
         self.responses = PromotedToAbsoluteMap(responses[0] if responses.dtype.names
-                                                else None, prom2abs)
+                                               else None, prom2abs)
         self.objectives = PromotedToAbsoluteMap(objectives[0] if objectives.dtype.names
-                                                 else None, prom2abs)
+                                                else None, prom2abs)
         self.constraints = PromotedToAbsoluteMap(constraints[0] if constraints.dtype.names
-                                                  else None, prom2abs)
+                                                 else None, prom2abs)
         self.sysincludes = PromotedToAbsoluteMap(sysincludes[0] if sysincludes.dtype.names
-                                                  else None, prom2abs)
+                                                 else None, prom2abs)
 
 
 class SystemCase(Case):

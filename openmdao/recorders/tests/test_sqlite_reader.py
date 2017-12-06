@@ -213,7 +213,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Test to see if the access by case keys works:
         seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|6')
-        np.testing.assert_almost_equal(seventh_slsqp_iteration_case.desvars['pz.z'], [1.97846296,  -2.21388305e-13],
+        np.testing.assert_almost_equal(seventh_slsqp_iteration_case.desvars['z'], [1.97846296,  -2.21388305e-13],
                                        decimal=2,
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
@@ -221,11 +221,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Test values from one case, the last case
         last_case = cr.driver_cases.get_case(-1)
-        np.testing.assert_almost_equal(last_case.desvars['pz.z'], self.prob['z'],
+        np.testing.assert_almost_equal(last_case.desvars['z'], self.prob['z'],
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('pz.z'))
-        np.testing.assert_almost_equal(last_case.desvars['px.x'], [-0.00309521],
+        np.testing.assert_almost_equal(last_case.desvars['x'], [-0.00309521],
                                        decimal=2,
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
@@ -267,7 +267,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Test values from cases
         second_last_case = cr.system_cases.get_case(-2)
-        np.testing.assert_almost_equal(second_last_case.inputs['obj_cmp.y2'], [12.05848815, ],
+        np.testing.assert_almost_equal(second_last_case.inputs['y2'], [12.05848815, ],
                                        err_msg='Case reader gives '
                                        'incorrect input value for {0}'.format('obj_cmp.y2'))
         np.testing.assert_almost_equal(second_last_case.outputs['obj_cmp.obj'], [28.58830817, ],
@@ -315,10 +315,10 @@ class TestSqliteCaseReader(unittest.TestCase):
                                        err_msg='Case reader gives incorrect value for abs_err')
         np.testing.assert_almost_equal(last_case.rel_err, [0.0, ],
                                        err_msg='Case reader gives incorrect value for rel_err')
-        np.testing.assert_almost_equal(last_case.outputs['px.x'], [1.0, ],
+        np.testing.assert_almost_equal(last_case.outputs['x'], [1.0, ],
                                        err_msg='Case reader gives '
-                                       'incorrect output value for {0}'.format('px.x'))
-        np.testing.assert_almost_equal(last_case.residuals['con_cmp2.con2'], [0.0, ],
+                                       'incorrect output value for {0}'.format('x'))
+        np.testing.assert_almost_equal(last_case.residuals['con2'], [0.0, ],
                                        err_msg='Case reader gives '
                                        'incorrect residual value for {0}'.format('con_cmp2.con2'))
 
@@ -452,17 +452,17 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Test values from one case, the last case
         last_case = cr.driver_cases.get_case(-1)
-        np.testing.assert_almost_equal(last_case.desvars['pz.z'],
+        np.testing.assert_almost_equal(last_case.desvars['z'],
                                        self.prob['pz.z'],
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('pz.z'))
-        np.testing.assert_almost_equal(last_case.desvars['px.x'],
+        np.testing.assert_almost_equal(last_case.desvars['x'],
                                        self.prob['px.x'],
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('px.x'))
-        np.testing.assert_almost_equal(last_case.sysincludes['mda.d2.y2'],
+        np.testing.assert_almost_equal(last_case.sysincludes['y2'],
                                        self.prob['mda.d2.y2'],
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
