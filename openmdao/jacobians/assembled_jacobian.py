@@ -454,60 +454,6 @@ class AssembledJacobian(Jacobian):
             self._mask_caches[cache_key] = None
 
 
-class _SimulJacobian(AssembledJacobian):
-    """
-    Assemble dense global <Jacobian> for use in disjoint row/column analysis.
-
-    NOTE: DO NOT USE this jacobian for any actual calculations.  This is used purely to determine
-    sparsity of the total jacobian.
-    """
-
-    def __init__(self, **kwargs):
-        """
-        Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            options dictionary.
-        """
-        super(_SimulJacobian, self, **kwargs).__init__()
-        self.options['matrix_class'] = DenseMatrix
-
-    def __setitem__(self, key, subjac):
-        """
-        Set sub-Jacobian.
-
-        Parameters
-        ----------
-        key : (str, str)
-            Promoted or relative name pair of sub-Jacobian.
-        subjac : int or float or ndarray or sparse matrix
-            sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
-        """
-        abs_key = key2abs_key(self._system, key)
-        if abs_key is not None:
-
-            # You can only set declared subjacobians.
-            if abs_key not in self._subjacs_info:
-                msg = 'Variable name pair ("{}", "{}") must first be declared.'
-                raise KeyError(msg.format(key[0], key[1]))
-
-            # get a version of the subjac corresponding to abs_key and fill with 1's
-            info, shape = self._subjacs_info[abs_key]
-            if info['rows'] is not None:  # list form
-                subjac = np.ones(info['rows'].size)
-            elif isinstance(info['value'], np.ndarray):
-                subjac = np.ones(subjac.shape)
-            elif isinstance(info['value'], sparse_types):  # sparse
-                subjac = subjac.copy()
-                subjac.data = np.ones(subjac.data.size)
-            self._set_abs(abs_key, subjac)
-        else:
-            msg = 'Variable name pair ("{}", "{}") not found.'
-            raise KeyError(msg.format(key[0], key[1]))
-
-
 class DenseJacobian(AssembledJacobian):
     """
     Assemble dense global <Jacobian>.
@@ -578,3 +524,58 @@ class CSCJacobian(AssembledJacobian):
         """
         super(CSCJacobian, self, **kwargs).__init__()
         self.options['matrix_class'] = CSCMatrix
+
+
+class _SimulJacobian(DenseJacobian):
+    """
+    Assemble dense global <Jacobian> for use in disjoint row/column analysis.
+
+    NOTE: DO NOT USE this jacobian for any actual calculations.  This is used purely to determine
+    sparsity of the total jacobian.
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
+        """
+        super(_SimulJacobian, self, **kwargs).__init__()
+        self.options['matrix_class'] = DenseMatrix
+
+    def __setitem__(self, key, subjac):
+        """
+        Set sub-Jacobian.
+
+        Parameters
+        ----------
+        key : (str, str)
+            Promoted or relative name pair of sub-Jacobian.
+        subjac : int or float or ndarray or sparse matrix
+            sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
+        """
+        abs_key = key2abs_key(self._system, key)
+        if abs_key is not None:
+
+            # You can only set declared subjacobians.
+            if abs_key not in self._subjacs_info:
+                msg = 'Variable name pair ("{}", "{}") must first be declared.'
+                raise KeyError(msg.format(key[0], key[1]))
+
+            # get a version of the subjac corresponding to abs_key and fill with 1's
+            info, shape = self._subjacs_info[abs_key]
+            if info['rows'] is not None:  # list form
+                subjac = np.ones(info['rows'].size)
+            elif isinstance(info['value'], sparse_types):  # sparse
+                subjac = subjac.copy()
+                subjac.data = np.ones(subjac.data.size)
+            else:   # dense
+                print("DENSE:", abs_key, subjac.shape)
+                subjac = np.ones(subjac.shape)
+            self._set_abs(abs_key, subjac)
+        else:
+            msg = 'Variable name pair ("{}", "{}") not found.'
+            raise KeyError(msg.format(key[0], key[1]))

@@ -1236,6 +1236,8 @@ class Problem(object):
             input_vois = self.driver._designvars
             output_vois = self.driver._responses
             remote_outputs = self.driver._remote_responses
+            no_simul = np.any([output_vois[n]['linear'] for n in of
+                              if 'linear' in output_vois[n]])
 
         else:  # rev
             input_list, output_list = of, wrt
@@ -1244,6 +1246,7 @@ class Problem(object):
             input_vois = self.driver._responses
             output_vois = self.driver._designvars
             remote_outputs = self.driver._remote_dvs
+            no_simul = False
 
         # Solve for derivs using linear solver.
 
@@ -1320,7 +1323,7 @@ class Problem(object):
                 raise RuntimeError("Mixing of vectorized and non-vectorized derivs in the same "
                                    "parallel color group (%s) is not supported." %
                                    [name for _, name, _, _, _ in vois])
-            simul_coloring = vois[0][4]
+            simul_coloring = vois[0][4] if not no_simul else None
 
             if use_rel_reduction:
                 rel_systems = set()
@@ -1363,6 +1366,8 @@ class Problem(object):
                 if simul_coloring is not None:
                     color, i = i
                     do_color_iter = isinstance(i, np.ndarray) and i.size > 1
+                else:
+                    do_color_iter = False
 
                 # this sets dinputs for the current parallel_deriv_color to 0
                 # dinputs is dresids in fwd, doutouts in rev
@@ -1850,7 +1855,7 @@ def _find_var_from_range(idx, ranges):
             return name, idx - start
 
 
-def _find_disjoint(prob, of=None, wrt=None, global_names=True, mode='fwd'):
+def _find_disjoint(prob, mode='fwd', tol=1e-30):
     """
     Find all sets of disjoint columns in the total jac and their corresponding rows.
 
@@ -1858,14 +1863,10 @@ def _find_disjoint(prob, of=None, wrt=None, global_names=True, mode='fwd'):
     ----------
     prob : Problem
         The Problem being analyzed.
-    of : list of str or None
-        List of names of variables we're taking derivatives of.
-    wrt : list of str or None
-        List of names of variables we're taking derivatives with respect to.
-    global_names : bool
-        If True the variable names are absolute names.
     mode : str
         Derivative direction.
+    tol : float
+        Tolerance on values in jacobian.  Anything smaller in magnitude will be set to 0.0.
 
     Returns
     -------
@@ -1887,9 +1888,32 @@ def _find_disjoint(prob, of=None, wrt=None, global_names=True, mode='fwd'):
     prob.setup(mode=mode)
     prob.run_model()
 
+    of = list(prob.driver._objs)
+    of_lin = []
+    desvars = prob.driver._designvars
+    responses = prob.driver._responses
+
+    wrt = list(desvars)
+    for n, meta in iteritems(prob.driver._cons):
+        if 'linear' in meta and meta['linear']:
+            of_lin.append(n)
+        else:
+            of.append(n)
+        #of.append(n)
+
+    total_dv_offsets = defaultdict(lambda: defaultdict(list))
+    total_res_offsets = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: ([], []))))
+
+    #J = prob._compute_totals()
+    #np.set_printoptions(precision=10, suppress=False)
+    #print("J\n", J["phase0.collocation_constraint.defects:h","phase0.indep_controls.controls:alpha"])
+
     J = prob.driver._compute_totals(return_format='array', of=of, wrt=wrt)
-    J[np.abs(J) < 1e-99] = 0.0
-    J[np.abs(J) >= 1e-99] = 1.0
+    J[np.abs(J) < tol] = 0.0
+    J[np.abs(J) >= tol] = 1.0
+
+    # from openmdao.utils.array_utils import array_viz
+    # array_viz(J)
 
     allcols = list(range(J.shape[1]))
 
@@ -1921,24 +1945,13 @@ def _find_disjoint(prob, of=None, wrt=None, global_names=True, mode='fwd'):
                 full_disjoint[col].add(other_col)
                 allrows[col].update(rows[other_col])
 
-    if wrt is None:
-        wrt = list(prob.driver._designvars)
-    if of is None:
-        of = list(prob.driver._objs)
-        of.extend(list(prob.driver._cons))
-
-    if not global_names:
-        prom2abs = model._var_allprocs_prom2abs_list['output']
-        of = [prom2abs[name][0] for name in of]
-        wrt = [prom2abs[name][0] for name in wrt]
 
     # find column and row ranges (inclusive) for dvs and responses respectively
     dv_offsets = []
     start = 0
     end = -1
     for name in wrt:
-        data = prob.driver._designvars[name]
-        end += data['size']
+        end += prob.driver._designvars[name]['size']
         dv_offsets.append((start, end, name))
         # print("dv range[%s] = %s" % (name, (start, end)))
         start = end + 1
@@ -1947,16 +1960,13 @@ def _find_disjoint(prob, of=None, wrt=None, global_names=True, mode='fwd'):
     start = 0
     end = -1
     for name in of:
-        data = prob.driver._responses[name]
-        end += data['size']
+        end += responses[name]['size']
         res_offsets.append((start, end, name))
         # print("res range[%s] = %s" % (name, (start, end)))
         start = end + 1
 
     # print("")
 
-    total_dv_offsets = defaultdict(lambda: defaultdict(list))
-    total_res_offsets = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: ([], []))))
     for color, cols in enumerate(full_disjoint.values()):
         # print("\ncolor %d:" % color)
         for c in sorted(cols):
@@ -1976,7 +1986,7 @@ def _find_disjoint(prob, of=None, wrt=None, global_names=True, mode='fwd'):
     return total_dv_offsets, total_res_offsets
 
 
-def get_simul_meta(problem, of=None, wrt=None, global_names=True, mode='fwd', stream=sys.stdout):
+def get_simul_meta(problem, mode='fwd', stream=sys.stdout):
     """
     Compute simultaneous derivative colorings for the given problem.
 
@@ -1984,12 +1994,6 @@ def get_simul_meta(problem, of=None, wrt=None, global_names=True, mode='fwd', st
     ----------
     problem : Problem
         The Problem being analyzed.
-    of : list of str or None
-        List of names of variables we're taking derivatives of.
-    wrt : list of str or None
-        List of names of variables we're taking derivatives with respect to.
-    global_names : bool
-        If True the variable names are absolute names.
     mode : str
         Derivative direction.
     stream : file-like or None
@@ -2003,8 +2007,10 @@ def get_simul_meta(problem, of=None, wrt=None, global_names=True, mode='fwd', st
         {resp_name: {dvname: {color: (row_idxs, col_idxs), ...}, ...}, ...}
     """
     driver = problem.driver
-    dv_idxs, res_idxs = _find_disjoint(problem, of=of, wrt=wrt, global_names=global_names,
-                                       mode=mode)
+    if not driver.supports['simultaneous_derivatives']:
+        return {}, {}
+
+    dv_idxs, res_idxs = _find_disjoint(problem, mode=mode)
     all_colors = set()
 
     simul_colorings = {}
@@ -2038,3 +2044,47 @@ def get_simul_meta(problem, of=None, wrt=None, global_names=True, mode='fwd', st
         stream.write("\n%s\n" % ((simul_colorings, simul_maps),))
 
     return simul_colorings, simul_maps
+
+
+def simul_coloring_summary(problem, color_info, stream=sys.stdout):
+    """
+    Print a summary of simultaneous coloring info for the given problem and coloring metadata.
+
+    Parameters
+    ----------
+    problem : Problem
+        The Problem being analyzed.
+    color_info : tuple of (simul_colorings, simul_maps)
+        Coloring metadata.
+    stream : file-like
+        Where the output will go.
+    """
+    simul_colorings, simul_maps = color_info
+
+    desvars = problem.driver._designvars
+    responses = problem.driver._responses
+
+    tot_colors = 0
+    tot_size = 0
+    if problem._mode == 'fwd':
+        for dv in desvars:
+            if dv in simul_colorings:
+                colors = set(simul_colorings[dv])
+                if -1 in colors:
+                    negs = len(np.nonzero(np.array(simul_colorings[dv]) < 0)[0])
+                    tot_colors += (negs + len(colors) - 1)
+                else:
+                    tot_colors += len(colors)
+            else:
+                tot_colors += desvars[dv]['size']
+            tot_size += desvars[dv]['size']
+    else:  # rev
+        raise RuntimeError("rev mode currently not supported for simultaneous derivs.")
+
+    stream.write("\nColoring Summary\n")
+    # for dv, meta in iteritems(desvars):
+    #     stream.write("DV: %s  %d\n" % (dv, meta['size']))
+    # for res, meta in iteritems(responses):
+    #     stream.write("Resp: %s  %d\n" % (res, meta['size']))
+
+    stream.write("Total colors vs. total size: %d vs %d\n" % (tot_colors, tot_size))

@@ -7,7 +7,7 @@ import os
 import argparse
 from six import iteritems
 
-from openmdao.core.problem import Problem, get_simul_meta
+from openmdao.core.problem import Problem, get_simul_meta, simul_coloring_summary
 from openmdao.devtools.problem_viewer.problem_viewer import view_model
 from openmdao.devtools.viewconns import view_connections
 from openmdao.devtools.debug import config_summary, tree, dump_dist_idxs
@@ -297,7 +297,8 @@ def _simul_coloring_cmd(options):
         else:
             outfile = open(options.outfile, 'w')
         Problem._post_setup_func = None  # avoid recursive loop
-        colorings, maps = get_simul_meta(prob, stream=outfile)
+        color_info = get_simul_meta(prob, stream=outfile)
+        simul_coloring_summary(prob, color_info, stream=outfile)
         exit()
     return _simul_coloring
 

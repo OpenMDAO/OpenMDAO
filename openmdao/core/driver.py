@@ -133,6 +133,7 @@ class Driver(object):
         self.supports.declare('integer_design_vars', types=bool, default=False)
         self.supports.declare('gradients', types=bool, default=False)
         self.supports.declare('active_set', types=bool, default=False)
+        self.supports.declare('simultaneous_derivatives', types=bool, default=False)
 
         self.iter_count = 0
         self.metadata = None
@@ -140,6 +141,9 @@ class Driver(object):
 
         # TODO, support these in OpenMDAO
         self.supports.declare('integer_design_vars', types=bool, default=False)
+
+        self._simul_coloring_info = None
+        self._res_jacs = {}
 
         self.fail = False
 
@@ -320,6 +324,32 @@ class Driver(object):
             self._model_viewer_data = _get_viewer_data(problem)
         if self.recording_options['record_metadata']:
             self._rec_mgr.record_metadata(self)
+
+        # set up simultaneous deriv coloring
+        if self._simul_coloring_info:
+            coloring, maps = self._simul_coloring_info
+            if problem._mode == 'fwd':
+                for dv, colors in iteritems(coloring):
+                    self._designvars[dv]['simul_coloring'] = colors
+                for res, dvdict in iteritems(maps):
+                    self._responses[res]['simul_map'] = dvdict
+
+                    for dv, col_dict in iteritems(dvdict):
+                        rows = []
+                        cols = []
+                        for color, (row_idxs, col_idxs) in iteritems(col_dict):
+                            rows.append(row_idxs)
+                            cols.append(col_idxs)
+
+                        row = np.hstack(rows)
+                        col = np.hstack(cols)
+                        print("sparsity for %s, %s: %d of %s" % (res, dv, row.size, (self._responses[res]['size'] * self._designvars[dv]['size'],)))
+                        self._res_jacs[dv] = {
+                            'coo': [row, col, np.empty(row.size)],
+                            'shape': [row.size, col.size]
+                        }
+            else:
+                raise RuntimeError("simultaneous derivs are currently not supported in rev mode.")
 
     def _get_voi_val(self, name, meta, remote_vois):
         """
@@ -627,45 +657,6 @@ class Driver(object):
 
         if return_format == 'array':
             derivs = self._dict2array_jac(derivs)
-
-        # print("NEW JACOBIAN", return_format)
-        # if return_format == 'dict':
-        #     jj = self._dict2array_jac(derivs)
-        # else:
-        #     jj = derivs
-        #
-        # if jj.shape not in prob._jacs:
-        #     prob._jacs[jj.shape] = np.zeros(jj.shape)
-        #
-        # prob._jacs[jj.shape][jj > 1.e-99] = 1.0
-        # prob._jacs[jj.shape][jj < -1.e-99] = 1.0
-
-        # if self._old_jac is None:
-        #     if return_format == 'dict':
-        #         jj = self._dict2array_jac(derivs)
-        #         if jj.shape[0] < 60:
-        #             return derivs
-        #         self._old_jac = jj
-        #     else:
-        #         self._old_jac = derivs
-        #     self._old_jac[self._old_jac != 0.0] = 1.0
-        # else:
-        #     if return_format == 'dict':
-        #         newjac = self._dict2array_jac(derivs)
-        #     else:
-        #         newjac = derivs
-        #     newjac[newjac != 0.0] = 1.0
-        #
-        #     from openmdao.utils.array_utils import array_viz
-        #     if newjac.shape == self._old_jac.shape:
-        #         dmat = self._old_jac - newjac
-        #         print("\n\n\n")
-        #         array_viz(dmat)
-        #
-        #     print('shapes:', self._old_jac.shape, newjac.shape)
-        #
-        #     if newjac.shape[0] != 123:
-        #         raise RuntimeError("%s" % list(newjac.shape))
 
         return derivs
 

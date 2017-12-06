@@ -104,10 +104,12 @@ def array_viz(arr):
     if len(arr.shape) != 2:
         raise RuntimeError("array_viz only works for 2d arrays.")
 
+    f = sys.stdout
+
     for r in range(arr.shape[0]):
         for c in range(arr.shape[1]):
             if arr[r, c] == 0.0:
-                sys.stdout.write('.')
+                f.write('.')
             else:
-                sys.stdout.write('x')
-        sys.stdout.write(' %d\n' % r)
+                f.write('x')
+        f.write(' %d\n' % r)

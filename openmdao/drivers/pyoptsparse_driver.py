@@ -122,6 +122,7 @@ class pyOptSparseDriver(Driver):
         self.supports['multiple_objectives'] = True
         self.supports['two_sided_constraints'] = True
         self.supports['linear_constraints'] = True
+        self.supports['simultaneous_derivatives'] = True
 
         # What we don't support yet
         self.supports['active_set'] = False
@@ -155,9 +156,6 @@ class pyOptSparseDriver(Driver):
         self._quantities = []
         self.fail = False
 
-        self._simul_coloring_info = None
-        self._res_jacs = {}
-
     def _setup_driver(self, problem):
         """
         Prepare the driver for execution.
@@ -177,31 +175,6 @@ class pyOptSparseDriver(Driver):
             raise RuntimeError('Multiple objectives have been added to pyOptSparseDriver'
                                ' but the selected optimizer ({0}) does not support'
                                ' multiple objectives.'.format(self.options['optimizer']))
-
-        # set up simultaneous deriv coloring
-        if self._simul_coloring_info:
-            coloring, maps = self._simul_coloring_info
-            if problem._mode == 'fwd':
-                for dv, colors in iteritems(coloring):
-                    self._designvars[dv]['simul_coloring'] = colors
-                for res, dvdict in iteritems(maps):
-                    self._responses[res]['simul_map'] = dvdict
-
-                    rows = []
-                    cols = []
-                    for dv, col_dict in iteritems(dvdict):
-                        for color, (row_idxs, col_idxs) in iteritems(col_dict):
-                            rows.append(row_idxs)
-                            cols.append(col_idxs)
-
-                    row = np.hstack(rows)
-                    col = np.hstack(cols)
-                    self._res_jacs[dv] = {
-                        'coo': [row, col, np.empty(row.size)],
-                        'shape': [row.size, col.size]
-                    }
-            else:
-                raise RuntimeError("simultaneous derivs are currently not supported in rev mode.")
 
     def run(self):
         """
