@@ -293,10 +293,6 @@ class Component(System):
         dict
             metadata for added variable
         """
-        if self._static_mode:
-            warn_deprecation("In the future, the 'add_input' method must be "
-                             "called from 'setup' rather than "
-                             "in the '__init__' function.")
 
         if units == 'unitless':
             warn_deprecation("Input '%s' has units='unitless' but 'unitless' "
@@ -419,10 +415,6 @@ class Component(System):
         dict
             metadata for added variable
         """
-        if self._static_mode:
-            warn_deprecation("In the future, the 'add_output' method must be "
-                             "called from 'setup' rather than "
-                             "in the '__init__' function.")
 
         if units == 'unitless':
             warn_deprecation("Output '%s' has units='unitless' but 'unitless' "
