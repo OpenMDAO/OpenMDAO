@@ -17,7 +17,7 @@ except ImportError:
     scipy_gte_019 = False
 
 if scipy_gte_019:
-    from openmdao.components.meta_model_structured import RegularGridInterp, MetaModelStructured
+    from openmdao.components.meta_model_structured import _RegularGridInterp, MetaModelStructured
 
 x = np.array([-0.97727788, -0.15135721, -0.10321885,  0.40015721,  0.4105985 ,
         0.95008842,  0.97873798,  1.76405235,  1.86755799,  2.2408932 ])
@@ -429,7 +429,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
     """Tests the functionality of the regular grid interpolator."""
 
     def setUp(self):
-      self.config = RegularGridInterp._interp_methods()
+      self.config = _RegularGridInterp._interp_methods()
       self.spline_methods, self.valid_methods, self.interp_configs = self.config
 
     def _get_sample_4d_large(self):
@@ -499,7 +499,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
         values = np.random.randn(2, 10, 20)
 
         # verify that this raises error with dimension checking
-        self.assertRaises(ValueError, RegularGridInterp,
+        self.assertRaises(ValueError, _RegularGridInterp,
                           points, values, 'cubic')
 
         interp = _RegularGridInterp(
@@ -541,7 +541,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
 
         # spline methods dont support complex values
         for method in self.spline_methods:
-            self.assertRaises(ValueError, RegularGridInterp, points, values,
+            self.assertRaises(ValueError, _RegularGridInterp, points, values,
                               method)
 
     def test_minimum_required_gridsize(self):
@@ -552,7 +552,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
             points = [x, y]
             X, Y = np.meshgrid(*points, indexing='ij')
             values = X + Y
-            self.assertRaises(ValueError, RegularGridInterp, points, values,
+            self.assertRaises(ValueError, _RegularGridInterp, points, values,
                               method)
 
     def test_method_switching(self):
@@ -734,7 +734,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
         _RegularGridInterp((x, y), values, fill_value=1)
 
         # complex values cannot
-        self.assertRaises(ValueError, RegularGridInterp,
+        self.assertRaises(ValueError, _RegularGridInterp,
                           (x, y), values, fill_value=1 + 2j)
 
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
