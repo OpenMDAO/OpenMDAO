@@ -23,6 +23,7 @@ for mod_name in MOCK_MODULES:
 # start off running the monkeypatch to keep options/parameters
 # usable in docstring for autodoc.
 
+
 def __init__(self, docstring, config={}):
     """
     init
@@ -191,7 +192,7 @@ htmlhelp_basename = 'OpenMDAOdoc'
 
 #Customize sidebar
 html_sidebars = {
-   '**': ['globaltoc.html']
+   '**': ['globaltoc.html', 'searchbox.html']
 }
 # -- Options for manual page output ---------------------------------------
 

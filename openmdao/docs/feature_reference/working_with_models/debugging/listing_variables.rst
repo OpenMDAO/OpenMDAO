@@ -16,6 +16,9 @@ output variables. Several methods are provided for this purpose.
 .. automethod:: openmdao.core.system.System.list_residuals
     :noindex:
 
+Example
+-------
+
 In the following example, we create a model consisting of two instances of
 `ImplicitComponent` and an `IndepVarComp`.
 

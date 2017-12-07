@@ -521,7 +521,6 @@ class RegularGridInterpComp(ExplicitComponent):
         are given with 5, 10, and 12 sample points respectively, than each
         of the `values` arrays in the dictionaries of `output_data` must
         identically have shape 5x10x12.
-
         - "default" : float; the default value for the output
         - "units" : string or NoneType; physical units for the output
 
