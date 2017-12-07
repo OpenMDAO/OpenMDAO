@@ -1,6 +1,6 @@
 ---------------------------------------------------------------------------------------------------
 Release Notes for OpenMDAO 2.0.2
-December 7, 2017
+October 19, 2017
 
 - Fixing further packaging errors by updating packaging information.
 - Added tutorials for derivatives of explicit and implicit components.
