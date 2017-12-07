@@ -102,16 +102,16 @@ class DriverCase(Case):
         super(DriverCase, self).__init__(filename, counter, iteration_coordinate,
                                          timestamp, success, msg)
 
-        self.desvars = PromotedToAbsoluteMap(desvars[0] if desvars.dtype.names
-                                             else None, prom2abs)
-        self.responses = PromotedToAbsoluteMap(responses[0] if responses.dtype.names
-                                               else None, prom2abs)
-        self.objectives = PromotedToAbsoluteMap(objectives[0] if objectives.dtype.names
-                                                else None, prom2abs)
-        self.constraints = PromotedToAbsoluteMap(constraints[0] if constraints.dtype.names
-                                                 else None, prom2abs)
-        self.sysincludes = PromotedToAbsoluteMap(sysincludes[0] if sysincludes.dtype.names
-                                                 else None, prom2abs)
+        self.desvars = PromotedToAbsoluteMap(desvars[0], prom2abs)\
+                       if desvars.dtype.names else None
+        self.responses = PromotedToAbsoluteMap(responses[0], prom2abs)\
+                         if responses.dtype.names else None
+        self.objectives = PromotedToAbsoluteMap(objectives[0], prom2abs)\
+                          if objectives.dtype.names else None
+        self.constraints = PromotedToAbsoluteMap(constraints[0], prom2abs)\
+                           if constraints.dtype.names else None
+        self.sysincludes = PromotedToAbsoluteMap(sysincludes[0], prom2abs)\
+                           if sysincludes.dtype.names else None
 
 
 class SystemCase(Case):
@@ -158,9 +158,9 @@ class SystemCase(Case):
         super(SystemCase, self).__init__(filename, counter, iteration_coordinate,
                                          timestamp, success, msg)
 
-        self.inputs = PromotedToAbsoluteMap(inputs[0] if inputs.dtype.names else None, prom2abs, False)
-        self.outputs = PromotedToAbsoluteMap(outputs[0] if outputs.dtype.names else None, prom2abs)
-        self.residuals = PromotedToAbsoluteMap(residuals[0] if residuals.dtype.names else None, prom2abs)
+        self.inputs = PromotedToAbsoluteMap(inputs[0], prom2abs, False) if inputs.dtype.names else None
+        self.outputs = PromotedToAbsoluteMap(outputs[0], prom2abs) if outputs.dtype.names else None
+        self.residuals = PromotedToAbsoluteMap(residuals[0], prom2abs) if residuals.dtype.names else None
 
 
 class SolverCase(Case):
@@ -214,9 +214,9 @@ class SolverCase(Case):
 
         self.abs_err = abs_err
         self.rel_err = rel_err
-        self.outputs = PromotedToAbsoluteMap(outputs[0] if outputs.dtype.names else None, prom2abs)
-        self.residuals = PromotedToAbsoluteMap(residuals[0] if residuals.dtype.names else None,
-                                               prom2abs)
+        self.outputs = PromotedToAbsoluteMap(outputs[0], prom2abs) if outputs.dtype.names else None
+        self.residuals = PromotedToAbsoluteMap(residuals[0], prom2abs) if residuals.dtype.names\
+                                               else None
 
 
 class PromotedToAbsoluteMap:
