@@ -17,6 +17,7 @@ from openmdao.utils.record_util import values_to_array
 from openmdao.core.driver import Driver
 from openmdao.core.system import System
 
+
 def array_to_blob(array):
     """
     Make numpy array in to BLOB type.
@@ -102,7 +103,7 @@ class SqliteRecorder(BaseRecorder):
                 self.cursor.execute("INSERT INTO metadata(format_version, abs2prom, "
                                     "prom2abs) VALUES(?,?,?)",
                                     (format_version, None, None))
-                self._set_full_metadata = False # we haven't inserted abs2prom and prom2abs
+                self._set_full_metadata = False  # we haven't inserted abs2prom and prom2abs
 
                 # used to keep track of the order of the case records across all three tables
                 self.cursor.execute("CREATE TABLE global_iterations(id INTEGER PRIMARY KEY, "
@@ -151,11 +152,11 @@ class SqliteRecorder(BaseRecorder):
             for v in system._var_abs2prom[io]:
                 self._abs2prom[io][v] = system._var_abs2prom[io][v]
             for v in system._var_allprocs_prom2abs_list[io]:
-                if not v in self._prom2abs[io]:
+                if v not in self._prom2abs[io]:
                     self._prom2abs[io][v] = system._var_allprocs_prom2abs_list[io][v]
                 else:
-                    self._prom2abs[io][v] = list(set(self._prom2abs[io][v]) |\
-                                                set(system._var_allprocs_prom2abs_list[io][v]))
+                    self._prom2abs[io][v] = list(set(self._prom2abs[io][v]) |
+                                                 set(system._var_allprocs_prom2abs_list[io][v]))
 
         # store the updated abs2prom and prom2abs
         abs2prom = pickle.dumps(self._abs2prom)

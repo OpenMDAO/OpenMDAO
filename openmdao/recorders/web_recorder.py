@@ -114,11 +114,11 @@ class WebRecorder(BaseRecorder):
             for v in system._var_abs2prom[io]:
                 self._abs2prom[io][v] = system._var_abs2prom[io][v]
             for v in system._var_allprocs_prom2abs_list[io]:
-                if not v in self._prom2abs[io]:
+                if v not in self._prom2abs[io]:
                     self._prom2abs[io][v] = system._var_allprocs_prom2abs_list[io][v]
                 else:
-                    self._prom2abs[io][v] = list(set(self._prom2abs[io][v]) |\
-                                                set(system._var_allprocs_prom2abs_list[io][v]))
+                    self._prom2abs[io][v] = list(set(self._prom2abs[io][v]) |
+                                                 set(system._var_allprocs_prom2abs_list[io][v]))
 
         # store the updated abs2prom and prom2abs
         abs2prom = self.convert_to_list(self._abs2prom)

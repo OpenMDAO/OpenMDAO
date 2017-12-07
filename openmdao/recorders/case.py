@@ -103,15 +103,15 @@ class DriverCase(Case):
                                          timestamp, success, msg)
 
         self.desvars = PromotedToAbsoluteMap(desvars[0], prom2abs)\
-                       if desvars.dtype.names else None
+            if desvars.dtype.names else None
         self.responses = PromotedToAbsoluteMap(responses[0], prom2abs)\
-                         if responses.dtype.names else None
+            if responses.dtype.names else None
         self.objectives = PromotedToAbsoluteMap(objectives[0], prom2abs)\
-                          if objectives.dtype.names else None
+            if objectives.dtype.names else None
         self.constraints = PromotedToAbsoluteMap(constraints[0], prom2abs)\
-                           if constraints.dtype.names else None
+            if constraints.dtype.names else None
         self.sysincludes = PromotedToAbsoluteMap(sysincludes[0], prom2abs)\
-                           if sysincludes.dtype.names else None
+            if sysincludes.dtype.names else None
 
 
 class SystemCase(Case):
@@ -140,6 +140,7 @@ class SystemCase(Case):
         System residuals to read in from the recording file.
     prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
+
     Attributes
     ----------
     inputs : PromotedToAbsoluteMap
@@ -158,9 +159,12 @@ class SystemCase(Case):
         super(SystemCase, self).__init__(filename, counter, iteration_coordinate,
                                          timestamp, success, msg)
 
-        self.inputs = PromotedToAbsoluteMap(inputs[0], prom2abs, False) if inputs.dtype.names else None
-        self.outputs = PromotedToAbsoluteMap(outputs[0], prom2abs) if outputs.dtype.names else None
-        self.residuals = PromotedToAbsoluteMap(residuals[0], prom2abs) if residuals.dtype.names else None
+        self.inputs = PromotedToAbsoluteMap(inputs[0], prom2abs, False) if inputs.dtype.names\
+            else None
+        self.outputs = PromotedToAbsoluteMap(outputs[0], prom2abs) if outputs.dtype.names\
+            else None
+        self.residuals = PromotedToAbsoluteMap(residuals[0], prom2abs) if residuals.dtype.names\
+            else None
 
 
 class SolverCase(Case):
@@ -216,7 +220,7 @@ class SolverCase(Case):
         self.rel_err = rel_err
         self.outputs = PromotedToAbsoluteMap(outputs[0], prom2abs) if outputs.dtype.names else None
         self.residuals = PromotedToAbsoluteMap(residuals[0], prom2abs) if residuals.dtype.names\
-                                               else None
+            else None
 
 
 class PromotedToAbsoluteMap:
@@ -241,6 +245,7 @@ class PromotedToAbsoluteMap:
     _output : bool
         True if this should map using output variable names, False for input variable names.
     """
+
     def __init__(self, values, prom2abs, output=True):
         """
         Initialize.

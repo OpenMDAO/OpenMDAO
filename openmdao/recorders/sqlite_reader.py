@@ -81,7 +81,7 @@ class SqliteCaseReader(BaseCaseReader):
         self.driver_cases = DriverCases(self.filename)
         self.system_cases = SystemCases(self.filename)
         self.solver_cases = SolverCases(self.filename)
-        
+
         self.driver_cases._prom2abs = self._prom2abs
         self.system_cases._prom2abs = self._prom2abs
         self.solver_cases._prom2abs = self._prom2abs
@@ -219,7 +219,8 @@ class SystemCases(BaseCases):
         con.close()
 
         # inputs , outputs , residuals
-        idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob, outputs_blob, residuals_blob = row
+        idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob,\
+            outputs_blob, residuals_blob = row
 
         inputs_array = blob_to_array(inputs_blob)
         outputs_array = blob_to_array(outputs_blob)
