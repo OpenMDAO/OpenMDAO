@@ -233,6 +233,7 @@ class pyOptSparseDriver(Driver):
             # convert all of our linear constraint jacs to COO format. Otherwise pyoptsparse will
             # do it for us and we'll end up with a fully dense COO matrix and very slow evaluation
             # of linear constraints!
+            linjac_size = 0
             for jacdct in itervalues(_lin_jacs):
                 for n, subjac in iteritems(jacdct):
                     if isinstance(subjac, np.ndarray):
@@ -241,6 +242,8 @@ class pyOptSparseDriver(Driver):
                         # nonzero during the optimization.
                         mat = coo_matrix(subjac)
                         jacdct[n] = {'coo': [mat.row, mat.col, mat.data], 'shape': mat.shape}
+                        linjac_size += mat.data.size
+            print("LIN JAC SIZE:", linjac_size)
 
         # Add all equality constraints
         self.active_tols = {}
@@ -504,6 +507,15 @@ class pyOptSparseDriver(Driver):
                     for ikey, ival in iteritems(dv_dict):
                         isize = len(ival)
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
+            else:
+                # if we don't convert to 'coo' here, pyoptsparse will do a brain dead
+                # conversion of our dense array into a fully dense 'coo'
+                for name, dvdct in iteritems(self._res_jacs):
+                    for dv, coo in iteritems(dvdct):
+                        arr = sens_dict[name][dv]
+                        row, col, data = coo['coo']
+                        coo['coo'][2] = arr[row, col].flatten()
+                        sens_dict[name][dv] = coo
 
         except Exception as msg:
             tb = traceback.format_exc()

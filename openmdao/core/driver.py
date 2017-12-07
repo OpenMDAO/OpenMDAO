@@ -331,8 +331,11 @@ class Driver(object):
             if problem._mode == 'fwd':
                 for dv, colors in iteritems(coloring):
                     self._designvars[dv]['simul_coloring'] = colors
+
+                nzeros = 0
                 for res, dvdict in iteritems(maps):
                     self._responses[res]['simul_map'] = dvdict
+                    self._res_jacs[res] = {}
 
                     for dv, col_dict in iteritems(dvdict):
                         rows = []
@@ -344,10 +347,13 @@ class Driver(object):
                         row = np.hstack(rows)
                         col = np.hstack(cols)
                         print("sparsity for %s, %s: %d of %s" % (res, dv, row.size, (self._responses[res]['size'] * self._designvars[dv]['size'],)))
-                        self._res_jacs[dv] = {
-                            'coo': [row, col, np.empty(row.size)],
-                            'shape': [row.size, col.size]
+                        self._res_jacs[res][dv] = {
+                            'coo': [row, col, np.zeros(row.size)],
+                            'shape': [self._responses[res]['size'], self._designvars[dv]['size']]
                         }
+                        nzeros += row.size
+                print("NONZERO NL JAC ENTRIES:", nzeros)
+
             else:
                 raise RuntimeError("simultaneous derivs are currently not supported in rev mode.")
 

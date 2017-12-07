@@ -92,7 +92,7 @@ def convert_neg(arr, dim):
     return arr
 
 
-def array_viz(arr):
+def array_viz(arr, stream=sys.stdout):
     """
     Display the structure of an array in a compact form.
 
@@ -104,12 +104,10 @@ def array_viz(arr):
     if len(arr.shape) != 2:
         raise RuntimeError("array_viz only works for 2d arrays.")
 
-    f = sys.stdout
-
     for r in range(arr.shape[0]):
         for c in range(arr.shape[1]):
             if arr[r, c] == 0.0:
-                f.write('.')
+                stream.write('.')
             else:
-                f.write('x')
-        f.write(' %d\n' % r)
+                stream.write('x')
+        stream.write(' %d\n' % r)

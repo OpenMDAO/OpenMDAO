@@ -1237,7 +1237,7 @@ class Problem(object):
             output_vois = self.driver._responses
             remote_outputs = self.driver._remote_responses
             no_simul = np.any([output_vois[n]['linear'] for n in of
-                              if 'linear' in output_vois[n]])
+                              if n in output_vois and 'linear' in output_vois[n]])
 
         else:  # rev
             input_list, output_list = of, wrt
@@ -1855,7 +1855,7 @@ def _find_var_from_range(idx, ranges):
             return name, idx - start
 
 
-def _find_disjoint(prob, mode='fwd', tol=1e-30):
+def _find_disjoint(prob, mode='fwd', tol=1e-10):
     """
     Find all sets of disjoint columns in the total jac and their corresponding rows.
 
@@ -1901,50 +1901,16 @@ def _find_disjoint(prob, mode='fwd', tol=1e-30):
             of.append(n)
         #of.append(n)
 
-    total_dv_offsets = defaultdict(lambda: defaultdict(list))
-    total_res_offsets = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: ([], []))))
-
-    #J = prob._compute_totals()
-    #np.set_printoptions(precision=10, suppress=False)
-    #print("J\n", J["phase0.collocation_constraint.defects:h","phase0.indep_controls.controls:alpha"])
-
+    # J = prob._compute_totals(of=of, wrt=wrt)
+    # np.set_printoptions(suppress=False)#, precision=10)
+    # print("J\n", J["phase0.collocation_constraint.defects:h","phase0.indep_controls.controls:alpha"])
+    #
     J = prob.driver._compute_totals(return_format='array', of=of, wrt=wrt)
     J[np.abs(J) < tol] = 0.0
     J[np.abs(J) >= tol] = 1.0
 
-    # from openmdao.utils.array_utils import array_viz
+    from openmdao.utils.array_utils import array_viz
     # array_viz(J)
-
-    allcols = list(range(J.shape[1]))
-
-    disjoints = defaultdict(set)
-    rows = {}
-    for c1, c2 in combinations(allcols, 2):  # loop over column pairs
-        result = J[:, c1] + J[:, c2]
-        if np.all(result <= 1.0):
-            disjoints[c1].add(c2)
-            disjoints[c2].add(c1)
-            if c1 not in rows:
-                rows[c1] = set(np.nonzero(J[:, c1])[0])
-            if c2 not in rows:
-                rows[c2] = set(np.nonzero(J[:, c2])[0])
-
-    full_disjoint = {}
-    seen = set()
-    allrows = {}
-    discols = sorted(disjoints.items(), key=lambda x: len(x[1]), reverse=True)
-    for col, s in discols:
-        if col in seen or col in full_disjoint:
-            continue
-        seen.add(col)
-        allrows[col] = set(rows[col])
-        full_disjoint[col] = set([col])
-        for other_col in s:
-            if other_col not in seen and not allrows[col].intersection(rows[other_col]):
-                seen.add(other_col)
-                full_disjoint[col].add(other_col)
-                allrows[col].update(rows[other_col])
-
 
     # find column and row ranges (inclusive) for dvs and responses respectively
     dv_offsets = []
@@ -1965,20 +1931,110 @@ def _find_disjoint(prob, mode='fwd', tol=1e-30):
         # print("res range[%s] = %s" % (name, (start, end)))
         start = end + 1
 
-    # print("")
+    total_dv_offsets = defaultdict(lambda: defaultdict(list))
+    total_res_offsets = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: ([], []))))
 
-    for color, cols in enumerate(full_disjoint.values()):
-        # print("\ncolor %d:" % color)
-        for c in sorted(cols):
-            dv, dvoffset = _find_var_from_range(c, dv_offsets)
-            total_dv_offsets[dv][color].append(dvoffset)
-            # print(dv, dvoffset, 'col', c)
-            for crow in rows[c]:
-                res, resoffset = _find_var_from_range(crow, res_offsets)
-                # print("   ", res, resoffset, 'row', crow)
-                dct = total_res_offsets[res][dv][color]
-                dct[0].append(resoffset)
-                dct[1].append(dvoffset)
+    # loop over each desvar and find disjoint column sets for all columns of that desvar
+    for start, end, dv in dv_offsets:
+        allcols = list(range(start, end + 1))
+        if len(allcols) < 2:
+            continue
+
+        # if dv == "phase0.indep_controls.controls:alpha":
+        #     print("size:", end-start)
+        #     with open("array.out", "w") as f:
+        #         array_viz(J[:, start:end], f)
+        #     np.set_printoptions(suppress=False)#, precision=10)
+        #     print(J[505, start:end])
+        #     res, resoffset = _find_var_from_range(505, res_offsets)
+        #     print("con:", res, resoffset)
+        #     exit()
+        disjoints = defaultdict(set)
+        rows = {}
+        for c1, c2 in combinations(allcols, 2):  # loop over column pairs
+            result = J[:, c1] + J[:, c2]
+            if np.all(result <= 1.0):
+                disjoints[c1].add(c2)
+                disjoints[c2].add(c1)
+                if c1 not in rows:
+                    rows[c1] = set(np.nonzero(J[:, c1])[0])
+                if c2 not in rows:
+                    rows[c2] = set(np.nonzero(J[:, c2])[0])
+
+        full_disjoint = {}
+        seen = set()
+        allrows = {}
+        discols = sorted(disjoints.items(), key=lambda x: len(x[1]), reverse=True)
+        for col, s in discols:
+            if col in seen or col in full_disjoint:
+                continue
+            seen.add(col)
+            allrows[col] = set(rows[col])
+            full_disjoint[col] = set([col])
+            for other_col in s:
+                if other_col not in seen and not allrows[col].intersection(rows[other_col]):
+                    seen.add(other_col)
+                    full_disjoint[col].add(other_col)
+                    allrows[col].update(rows[other_col])
+
+
+        for color, cols in enumerate(full_disjoint.values()):
+            # print("\ncolor %d:" % color)
+            for c in sorted(cols):
+                dvoffset = c - start
+                total_dv_offsets[dv][color].append(dvoffset)
+                # print(dv, dvoffset, 'col', c)
+                for crow in rows[c]:
+                    res, resoffset = _find_var_from_range(crow, res_offsets)
+                    # print("   ", res, resoffset, 'row', crow)
+                    dct = total_res_offsets[res][dv][color]
+                    dct[0].append(resoffset)
+                    dct[1].append(dvoffset)
+
+    # allcols = list(range(J.shape[1]))
+    #
+    # disjoints = defaultdict(set)
+    # rows = {}
+    # for c1, c2 in combinations(allcols, 2):  # loop over column pairs
+    #     result = J[:, c1] + J[:, c2]
+    #     if np.all(result <= 1.0):
+    #         disjoints[c1].add(c2)
+    #         disjoints[c2].add(c1)
+    #         if c1 not in rows:
+    #             rows[c1] = set(np.nonzero(J[:, c1])[0])
+    #         if c2 not in rows:
+    #             rows[c2] = set(np.nonzero(J[:, c2])[0])
+    #
+    # full_disjoint = {}
+    # seen = set()
+    # allrows = {}
+    # discols = sorted(disjoints.items(), key=lambda x: len(x[1]), reverse=True)
+    # for col, s in discols:
+    #     if col in seen or col in full_disjoint:
+    #         continue
+    #     seen.add(col)
+    #     allrows[col] = set(rows[col])
+    #     full_disjoint[col] = set([col])
+    #     for other_col in s:
+    #         if other_col not in seen and not allrows[col].intersection(rows[other_col]):
+    #             seen.add(other_col)
+    #             full_disjoint[col].add(other_col)
+    #             allrows[col].update(rows[other_col])
+    #
+    # # print("")
+    #
+    # for color, cols in enumerate(full_disjoint.values()):
+    #     # print("\ncolor %d:" % color)
+    #     for c in sorted(cols):
+    #         dv, dvoffset = _find_var_from_range(c, dv_offsets)
+    #         total_dv_offsets[dv][color].append(dvoffset)
+    #         # print(dv, dvoffset, 'col', c)
+    #         for crow in rows[c]:
+    #             res, resoffset = _find_var_from_range(crow, res_offsets)
+    #             # print("   ", res, resoffset, 'row', crow)
+    #             dct = total_res_offsets[res][dv][color]
+    #             dct[0].append(resoffset)
+    #             dct[1].append(dvoffset)
 
     prob.driver._simul_coloring_info = None
     prob.driver._res_jacs = {}
@@ -2021,14 +2077,14 @@ def get_simul_meta(problem, mode='fwd', stream=sys.stdout):
         # with -1.  We then replace specific entries with positive colors which will be iterated
         # over as a group.
         coloring = np.full(driver._designvars[dv]['size'], -1)
-        has_color = False
+        #has_color = False
         for color in dv_idxs[dv]:
-            if len(dv_idxs[dv][color]) > 1:
-                coloring[np.array(dv_idxs[dv][color], dtype=int)] = color
-                all_colors.add(color)
-                has_color = True
-        if has_color:
-            simul_colorings[dv] = list(coloring)
+            #if len(dv_idxs[dv][color]) > 1:
+            coloring[np.array(dv_idxs[dv][color], dtype=int)] = color
+            all_colors.add(color)
+            #has_color = True
+        #if has_color:
+        simul_colorings[dv] = list(coloring)
 
     for res in res_idxs:
         simul_map = {}
@@ -2072,11 +2128,13 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
                 colors = set(simul_colorings[dv])
                 if -1 in colors:
                     negs = len(np.nonzero(np.array(simul_colorings[dv]) < 0)[0])
-                    tot_colors += (negs + len(colors) - 1)
+                    ncolors = (negs + len(colors) - 1)
                 else:
-                    tot_colors += len(colors)
+                    ncolors = len(colors)
             else:
-                tot_colors += desvars[dv]['size']
+                ncolors = desvars[dv]['size']
+            print(dv, 'num colors:', ncolors)
+            tot_colors += ncolors
             tot_size += desvars[dv]['size']
     else:  # rev
         raise RuntimeError("rev mode currently not supported for simultaneous derivs.")
