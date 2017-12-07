@@ -293,7 +293,6 @@ class Component(System):
         dict
             metadata for added variable
         """
-
         if units == 'unitless':
             warn_deprecation("Input '%s' has units='unitless' but 'unitless' "
                              "has been deprecated. Use "
@@ -415,7 +414,6 @@ class Component(System):
         dict
             metadata for added variable
         """
-
         if units == 'unitless':
             warn_deprecation("Output '%s' has units='unitless' but 'unitless' "
                              "has been deprecated. Use "

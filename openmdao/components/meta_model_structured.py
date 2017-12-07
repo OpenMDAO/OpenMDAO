@@ -96,7 +96,7 @@ class _RegularGridInterp(object):
                   " installed version is %s." % scipy_version
             warnings.warn(msg)
 
-        configs = RegularGridInterp._interp_methods()
+        configs = _RegularGridInterp._interp_methods()
         self._spline_methods, self._all_methods, self._interp_config = configs
         if method not in self._all_methods:
             all_m = ', '.join(['"' + m + '"' for m in self._all_methods])
@@ -506,11 +506,11 @@ class MetaModelStructured(ExplicitComponent):
         super(MetaModelStructured, self).add_output(name, val * np.ones(n), **kwargs)
 
         self.interps[name] = _RegularGridInterp(self.params,
-                                               training_data,
-                                               method=self.metadata['method'],
-                                               bounds_error=not self.metadata['extrapolate'],
-                                               fill_value=None,
-                                               spline_dim_error=False)
+                                                training_data,
+                                                method=self.metadata['method'],
+                                                bounds_error=not self.metadata['extrapolate'],
+                                                fill_value=None,
+                                                spline_dim_error=False)
 
         self._ki = self.interps[name]._ki
         self.declare_partials(name, self.pnames)
@@ -531,11 +531,11 @@ class MetaModelStructured(ExplicitComponent):
                 method = self.metadata['method']
                 bounds_error = not self.metadata['extrapolate']
                 self.interps[out_name] = _RegularGridInterp(self.params,
-                                                           values,
-                                                           method=method,
-                                                           bounds_error=bounds_error,
-                                                           fill_value=None,
-                                                           spline_dim_error=False)
+                                                            values,
+                                                            method=method,
+                                                            bounds_error=bounds_error,
+                                                            fill_value=None,
+                                                            spline_dim_error=False)
 
             val = self.interps[out_name](pt)
             outputs[out_name] = val
