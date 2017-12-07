@@ -1,11 +1,11 @@
-.. index:: MetaModelStructured Example
+.. _feature_MetaModelStructured:
 
 *********************************
 MetaModelStructured Component
 *********************************
 
-`MetaModelStructured` is a smooth interpolation Component for data that exists on a regular grid.
-This differs from `MetaModelUnStructured` which accepts unstructured data as collections of points.
+`MetaModelStructured` is a smooth interpolation Component for data that exists on a regular, structured, grid.
+This differs from :ref:`MetaModelUnStructured <feature_MetaModelUnStructured>` which accepts unstructured data as collections of points.
 
 `MetaModelStructured` produces smooth fits through provided training data using polynomial
 splines of order 1 (linear), 3 (cubic), or 5 (quintic). Analytic
@@ -34,6 +34,7 @@ two inputs, `x` and `y`:
 
 .. embed-test::
     openmdao.components.tests.test_meta_model_structured.TestMetaModelStructuredMapFeature.test_xor
+    :no-split:
 
 
 An important consideration for multi-dimensional input is that the order that
@@ -47,6 +48,7 @@ This is illustrated by the example:
 
 .. embed-test::
     openmdao.components.tests.test_meta_model_structured.TestMetaModelStructuredMapFeature.test_shape
+    :no-split:
 
 Finally, it is possible to compute gradients with respect to the given
 output training data. These gradients are not computed by default, but 
@@ -64,3 +66,4 @@ match the finite-difference estimate in the `check_partials` output.
 
 .. embed-test::
     openmdao.components.tests.test_meta_model_structured.TestMetaModelStructuredMapFeature.test_training_derivatives
+    :no-split:

@@ -15,7 +15,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 import warnings
 
 
-class RegularGridInterp(object):
+class _RegularGridInterp(object):
     """
     Interpolation on a regular grid in arbitrary dimensions.
 
@@ -505,7 +505,7 @@ class MetaModelStructured(ExplicitComponent):
         n = self.metadata['num_nodes']
         super(MetaModelStructured, self).add_output(name, val * np.ones(n), **kwargs)
 
-        self.interps[name] = RegularGridInterp(self.params,
+        self.interps[name] = _RegularGridInterp(self.params,
                                                training_data,
                                                method=self.metadata['method'],
                                                bounds_error=not self.metadata['extrapolate'],
@@ -530,7 +530,7 @@ class MetaModelStructured(ExplicitComponent):
                 values = inputs["%s_train" % out_name]
                 method = self.metadata['method']
                 bounds_error = not self.metadata['extrapolate']
-                self.interps[out_name] = RegularGridInterp(self.params,
+                self.interps[out_name] = _RegularGridInterp(self.params,
                                                            values,
                                                            method=method,
                                                            bounds_error=bounds_error,

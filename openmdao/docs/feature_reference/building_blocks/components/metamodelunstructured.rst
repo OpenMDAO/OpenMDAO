@@ -1,11 +1,11 @@
-.. index:: MetaModel Example
+.. _feature_MetaModelUnStructured:
 
 *******************************
 MetaModelUnStructured Component
 *******************************
 
 `MetaModelUnStructured` lets you quickly create a component with surrogate models
-used to compute the outputs based on training data. Generally, this is
+used to compute the outputs based on unstructured training data. Generally, this is
 used to construct a low computational cost replacement for computationally
 expensive components.
 
@@ -42,6 +42,7 @@ values. This training step only occurs on the first run.
 
 .. embed-test::
     openmdao.components.tests.test_meta_model_unstructured.MetaModelTestCase.test_metamodel_feature
+    :no-split:
 
 The inputs and outputs of a `MetaModelUnStructured` are not limited to scalar values. The
 following modified version of the example uses an array to predict sine and
@@ -51,6 +52,7 @@ alternative to specifying it later.
 
 .. embed-test::
     openmdao.components.tests.test_meta_model_unstructured.MetaModelTestCase.test_metamodel_feature2d
+    :no-split:
 
 In addition, it's possible to vectorize the input and output variables so that you can
 make multiple predictions for the inputs and outputs in a single execution of the
@@ -64,5 +66,6 @@ to be the same size as specified in the ``vectorize`` argument.
 
 .. embed-test::
     openmdao.components.tests.test_meta_model_unstructured.MetaModelTestCase.test_metamodel_feature_vector2d
+    :no-split:
 
 .. tags:: MetaModel, Examples
