@@ -96,7 +96,7 @@ class _RegularGridInterp(object):
                   " installed version is %s." % scipy_version
             warnings.warn(msg)
 
-        configs = RegularGridInterp._interp_methods()
+        configs = _RegularGridInterp._interp_methods()
         self._spline_methods, self._all_methods, self._interp_config = configs
         if method not in self._all_methods:
             all_m = ', '.join(['"' + m + '"' for m in self._all_methods])
