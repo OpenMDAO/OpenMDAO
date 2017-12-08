@@ -674,6 +674,51 @@ class TestShapes(unittest.TestCase):
         #except TypeError:
             #self.fail('Issuing a connection with src_indices as int raised a TypeError')
 
+class TestMultiConns(unittest.TestCase):
+    def test_mult_conns(self):
+
+        class SubGroup(Group):
+            def setup(self):
+                self.add_subsystem('c1', ExecComp('y = 2*x', x=np.ones(4), y=2*np.ones(4)), promotes=['y', 'x'])
+                self.add_subsystem('c2', ExecComp('z = 2*y', y=np.ones(4), z=2*np.ones(4)), promotes=['z', 'y'])
+
+        prob = Problem()
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('x', 10*np.ones(4))
+        indeps.add_output('y', np.ones(4))
+
+        prob.model.add_subsystem('sub', SubGroup())
+
+        prob.model.connect('x', 'sub.x')
+        prob.model.connect('y', 'sub.y')
+
+
+        with self.assertRaises(Exception) as context:
+            prob.setup()
+
+        self.assertEqual(str(context.exception),
+                         "The following inputs have multiple connections: sub.c2.y from ['indeps.y', 'sub.c1.y']")
+
+    def test_mixed_conns_same_level(self):
+
+        prob = Problem()
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp())
+        indeps.add_output('x', 10*np.ones(4))
+
+        # c2.y is implicitly connected to c1.y
+        prob.model.add_subsystem('c1', ExecComp('y = 2*x', x=np.ones(4), y=2*np.ones(4)), promotes=['y'])
+        prob.model.add_subsystem('c2', ExecComp('z = 2*y', y=np.ones(4), z=2*np.ones(4)), promotes=['y'])
+
+        # make a second, explicit, connection to y (which is c2.y promoted)
+        prob.model.connect('indeps.x', 'y')
+
+        with self.assertRaises(Exception) as context:
+            prob.setup()
+            prob.final_setup()
+
+        self.assertEqual(str(context.exception),
+                         "Input 'c2.y' cannot be connected to 'indeps.x' because it's already connected to 'c1.y'")
+
 
 if __name__ == "__main__":
     unittest.main()
