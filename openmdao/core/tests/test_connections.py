@@ -674,8 +674,8 @@ class TestShapes(unittest.TestCase):
         #except TypeError:
             #self.fail('Issuing a connection with src_indices as int raised a TypeError')
 
-class TestMixedConns(unittest.TestCase):
-    def test_mixed_conns(self):
+class TestMultiConns(unittest.TestCase):
+    def test_mult_conns(self):
 
         class SubGroup(Group):
             def setup(self):
@@ -698,6 +698,22 @@ class TestMixedConns(unittest.TestCase):
 
         self.assertEqual(str(context.exception),
                          "The following inputs have multiple connections: sub.c2.y from ['indeps.y', 'sub.c1.y']")
+
+    def test_mixed_conns_same_level(self):
+
+        prob = Problem()
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('x', 10*np.ones(4))
+
+        prob.model.add_subsystem('c1', ExecComp('y = 2*x', x=np.ones(4), y=2*np.ones(4)), promotes=['y', 'x'])
+
+        prob.model.connect('x', 'c1.x')
+
+        with self.assertRaises(Exception) as context:
+            prob.setup()
+
+        self.assertEqual(str(context.exception),
+                         "Input 'c1.x' does not exist for connection in '' from 'x' to 'c1.x'.")
 
 
 if __name__ == "__main__":
