@@ -77,32 +77,41 @@ class DriverCase(Case):
         Driver objectives to read in from the recording file.
     constraints : array
         Driver constraints to read in from the recording file.
+    sysincludes : array
+        Driver sysincludes to read in from the recording file.
+    prom2abs : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names to absolute names.
 
     Attributes
     ----------
-    desvars : array
+    desvars : PromotedToAbsoluteMap
         Driver design variables that have been read in from the recording file.
-    responses : array
+    responses : PromotedToAbsoluteMap
         Driver responses that have been read in from the recording file.
-    objectives : array
+    objectives : PromotedToAbsoluteMap
         Driver objectives that have been read in from the recording file.
-    constraints : array
+    constraints : PromotedToAbsoluteMap
         Driver constraints that have been read in from the recording file.
     """
 
     def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, desvars,
-                 responses, objectives, constraints, sysincludes):
+                 responses, objectives, constraints, sysincludes, prom2abs):
         """
         Initialize.
         """
         super(DriverCase, self).__init__(filename, counter, iteration_coordinate,
                                          timestamp, success, msg)
 
-        self.desvars = desvars[0] if desvars.dtype.names else None
-        self.responses = responses[0] if responses.dtype.names else None
-        self.objectives = objectives[0] if objectives.dtype.names else None
-        self.constraints = constraints[0] if constraints.dtype.names else None
-        self.sysincludes = sysincludes[0] if sysincludes.dtype.names else None
+        self.desvars = PromotedToAbsoluteMap(desvars[0], prom2abs)\
+            if desvars.dtype.names else None
+        self.responses = PromotedToAbsoluteMap(responses[0], prom2abs)\
+            if responses.dtype.names else None
+        self.objectives = PromotedToAbsoluteMap(objectives[0], prom2abs)\
+            if objectives.dtype.names else None
+        self.constraints = PromotedToAbsoluteMap(constraints[0], prom2abs)\
+            if constraints.dtype.names else None
+        self.sysincludes = PromotedToAbsoluteMap(sysincludes[0], prom2abs)\
+            if sysincludes.dtype.names else None
 
 
 class SystemCase(Case):
@@ -129,28 +138,33 @@ class SystemCase(Case):
         System outputs to read in from the recording file.
     residuals : array
         System residuals to read in from the recording file.
+    prom2abs : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names to absolute names.
 
     Attributes
     ----------
-    inputs : array
+    inputs : PromotedToAbsoluteMap
         System inputs that have been read in from the recording file.
-    outputs : array
+    outputs : PromotedToAbsoluteMap
         System outputs that have been read in from the recording file.
-    residuals : array
+    residuals : PromotedToAbsoluteMap
         System residuals that have been read in from the recording file.
     """
 
     def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, inputs,
-                 outputs, residuals):
+                 outputs, residuals, prom2abs):
         """
         Initialize.
         """
         super(SystemCase, self).__init__(filename, counter, iteration_coordinate,
                                          timestamp, success, msg)
 
-        self.inputs = inputs[0] if inputs.dtype.names else None
-        self.outputs = outputs[0] if outputs.dtype.names else None
-        self.residuals = residuals[0] if residuals.dtype.names else None
+        self.inputs = PromotedToAbsoluteMap(inputs[0], prom2abs, False) if inputs.dtype.names\
+            else None
+        self.outputs = PromotedToAbsoluteMap(outputs[0], prom2abs) if outputs.dtype.names\
+            else None
+        self.residuals = PromotedToAbsoluteMap(residuals[0], prom2abs) if residuals.dtype.names\
+            else None
 
 
 class SolverCase(Case):
@@ -179,6 +193,8 @@ class SolverCase(Case):
         Solver outputs to read in from the recording file.
     residuals : array
         Solver residuals to read in from the recording file.
+    prom2abs : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names to absolute names.
 
     Attributes
     ----------
@@ -186,14 +202,14 @@ class SolverCase(Case):
         Solver absolute error that has been read in from the recording file.
     rel_err : array
         Solver relative error that has been read in from the recording file.
-    outputs : array
+    outputs : PromotedToAbsoluteMap
         Solver outputs that have been read in from the recording file.
-    residuals : array
+    residuals : PromotedToAbsoluteMap
         Solver residuals that have been read in from the recording file.
     """
 
     def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg,
-                 abs_err, rel_err, outputs, residuals):
+                 abs_err, rel_err, outputs, residuals, prom2abs):
         """
         Initialize.
         """
@@ -202,5 +218,53 @@ class SolverCase(Case):
 
         self.abs_err = abs_err
         self.rel_err = rel_err
-        self.outputs = outputs[0] if outputs.dtype.names else None
-        self.residuals = residuals[0] if residuals.dtype.names else None
+        self.outputs = PromotedToAbsoluteMap(outputs[0], prom2abs) if outputs.dtype.names else None
+        self.residuals = PromotedToAbsoluteMap(residuals[0], prom2abs) if residuals.dtype.names\
+            else None
+
+
+class PromotedToAbsoluteMap:
+    """
+    Enables access of values through promoted variable names by mapping to the absolute name.
+
+    Parameters
+    ----------
+    values : array
+        Array of values accessible via absolute variable name.
+    prom2abs : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names to absolute names.
+    output : bool
+        True if this should map using output variable names, False for input variable names.
+
+    Attributes
+    ----------
+    _values : array
+        Array of values accessible via absolute variable name.
+    _prom2abs : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names to absolute names.
+    _output : bool
+        True if this should map using output variable names, False for input variable names.
+    """
+
+    def __init__(self, values, prom2abs, output=True):
+        """
+        Initialize.
+        """
+        self._values = values
+        self._prom2abs = prom2abs
+        self._is_output = output
+
+    def __getitem__(self, key):
+        """
+        Use the promoted variable name to get the corresponding value.
+        """
+        # outputs only have one option in _prom2abs
+        if self._is_output:
+            return self._values[self._prom2abs['output'][key][0]]
+
+        # inputs may have multiple options, so we try until we succeed
+        for k in self._prom2abs['input'][key]:
+            if k in self._values.dtype.names:
+                return self._values[k]
+
+        raise ValueError("no field of name " + key)

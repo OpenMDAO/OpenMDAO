@@ -50,9 +50,16 @@ For example, in the common situation where the user wants to see the last case, 
 .. code-block:: console
 
     last_case = cr.driver_cases.get_case(-1)
-    print('Last value of pz.z =', last_case.desvars['pz.z'])
+    print('Last value of pz.z =', last_case.desvars['z'])
 
 Or, if the case key is known:
+
+.. code-block:: console
+
+    seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|6')
+    print('Value of pz.z after 7th iteration of SLSQP =', seventh_slsqp_iteration_case.desvars['z'])
+
+Note that we access variables in the case reader through the promoted names instead of the absolute variable name. If we had not promoted `pz.z`, we would use:
 
 .. code-block:: console
 
