@@ -71,22 +71,22 @@ def _upload_system_iterations(new_list, recorder):
         outputs = []
         residuals = []
         if data.inputs is not None:
-            for n in data.inputs.dtype.names:
+            for n in data.inputs._values.dtype.names:
                 inputs.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.inputs[n])
+                    'values': recorder.convert_to_list(data.inputs._values[n])
                 })
         if data.outputs is not None:
-            for n in data.outputs.dtype.names:
+            for n in data.outputs._values.dtype.names:
                 outputs.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.outputs[n])
+                    'values': recorder.convert_to_list(data.outputs._values[n])
                 })
         if data.residuals is not None:
-            for n in data.residuals.dtype.names:
+            for n in data.residuals._values.dtype.names:
                 residuals.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.residuals[n])
+                    'values': recorder.convert_to_list(data.residuals._values[n])
                 })
 
         data.inputs = inputs
@@ -114,16 +114,16 @@ def _upload_solver_iterations(new_list, recorder):
         outputs = []
         residuals = []
         if data.outputs is not None:
-            for n in data.outputs.dtype.names:
+            for n in data.outputs._values.dtype.names:
                 outputs.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.outputs[n])
+                    'values': recorder.convert_to_list(data.outputs._values[n])
                 })
         if data.residuals is not None:
-            for n in data.residuals.dtype.names:
+            for n in data.residuals._values.dtype.names:
                 residuals.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.residuals[n])
+                    'values': recorder.convert_to_list(data.residuals._values[n])
                 })
 
         data.outputs = outputs
@@ -153,35 +153,35 @@ def _upload_driver_iterations(new_list, recorder):
         constraints = []
         sysincludes = []
         if data.desvars is not None:
-            for n in data.desvars.dtype.names:
+            for n in data.desvars._values.dtype.names:
                 desvars.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.desvars[n])
+                    'values': recorder.convert_to_list(data.desvars._values[n])
                 })
         if data.responses is not None:
-            for n in data.responses.dtype.names:
+            for n in data.responses._values.dtype.names:
                 responses.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.responses[n])
+                    'values': recorder.convert_to_list(data.responses._values[n])
                 })
         if data.objectives is not None:
-            for n in data.objectives.dtype.names:
+            for n in data.objectives._values.dtype.names:
                 objectives.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.objectives[n])
+                    'values': recorder.convert_to_list(data.objectives._values[n])
                 })
         if data.constraints is not None:
-            for n in data.constraints.dtype.names:
+            for n in data.constraints._values.dtype.names:
                 constraints.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.constraints[n])
+                    'values': recorder.convert_to_list(data.constraints._values[n])
                 })
 
         if data.sysincludes is not None:
-            for n in data.sysincludes.dtype.names:
+            for n in data.sysincludes._values.dtype.names:
                 sysincludes.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.sysincludes[n])
+                    'values': recorder.convert_to_list(data.sysincludes._values[n])
                 })
 
         data.desvars = desvars
