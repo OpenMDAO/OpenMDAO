@@ -3,6 +3,7 @@ from __future__ import division
 
 from six import assertRaisesRegex
 
+from six.moves import cStringIO
 import unittest
 
 import numpy as np
@@ -169,7 +170,6 @@ class ExplCompTestCase(unittest.TestCase):
 
     def test_simple_list_vars_options(self):
 
-
         from openmdao.api import IndepVarComp, Group, Problem, ExecComp
 
         prob = Problem()
@@ -205,8 +205,10 @@ class ExplCompTestCase(unittest.TestCase):
         inputs = prob.model.list_inputs(out_stream=None)
         for actual, expected in zip(sorted(inputs),
                                     [
-                                        ('comp.x', [12.]),
-                                        ('comp.y', [12.]),
+                                        ('comp.x', {'value': [12.]}),
+                                        ('comp.y', {'value': [12.]}),
+                                        # ('comp.x', [12.]),
+                                        # ('comp.y', [12.]),
                                     ]
                                     ):
             self.assertEqual(actual[0], expected[0])
@@ -215,8 +217,10 @@ class ExplCompTestCase(unittest.TestCase):
         # Only other option for list_inputs is units
         inputs = prob.model.list_inputs(values=False, units=True, out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('comp.x', 'inch'),
-            ('comp.y', 'inch'),
+            ('comp.x', {'units': 'inch'}),
+            ('comp.y', {'units': 'inch'}),
+            # ('comp.x', 'inch'),
+            # ('comp.y', 'inch'),
         ])
 
         ###### list_outputs tests #####
@@ -228,68 +232,127 @@ class ExplCompTestCase(unittest.TestCase):
         # list explicit outputs with values
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('comp.z', np.array([24.] ), ),
-            ('p1.x', np.array([12.]), ),
-            ('p2.y', np.array([1.]), ),
+            ('comp.z', { 'value': np.array([24.] ) } ),
+            ('p1.x', { 'value': np.array([12.] ) } ),
+            ('p2.y', { 'value': np.array([1.] ) } ),
+            # ('p1.x', np.array([12.]), ),
+            # ('p2.y', np.array([1.]), ),
+        ])
+
+        # list explicit outputs with residuals
+        outputs = prob.model.list_outputs(implicit=False, values=False,
+                                          residuals=True, out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('comp.z', { 'resids': np.array([0.] ) } ),
+            ('p1.x', { 'resids': np.array([0.] ) } ),
+            ('p2.y', { 'resids': np.array([0.] ) } ),
+            # ('comp.z', np.array([0.])),
+            # ('p1.x', np.array([0.])),
+            # ('p2.y', np.array([0.])),
         ])
 
         # list explicit outputs with units
         outputs = prob.model.list_outputs(implicit=False, values=False, units=True, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('comp.z', 'inch', ),
-            ('p1.x', 'inch', ),
-            ('p2.y', 'ft', ),
+            ('comp.z', { 'units': 'inch' } ),
+            ('p1.x', { 'units': 'inch' } ),
+            ('p2.y', { 'units': 'ft' } ),
+            # ('comp.z', 'inch', ),
+            # ('p1.x', 'inch', ),
+            # ('p2.y', 'ft', ),
         ])
 
         # list explicit outputs with bounds
-        outputs = prob.model.list_outputs(implicit=False, bounds=True, out_stream=None)
+        outputs = prob.model.list_outputs(implicit=False, values=False, bounds=True, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('comp.z', [24.], None, None),
-            ('p1.x', [12.], [1.0], [100.0]),
-            ('p2.y', [1.], [2.0], [200.0]),
+            ('comp.z', { 'lower': None, 'upper': None } ),
+            ('p1.x', { 'lower': [1.0], 'upper': [100.0] } ),
+            ('p2.y', { 'lower': [2.0], 'upper': [200.0] } ),
+            # ('comp.z', [24.], None, None),
+            # ('p1.x', [12.], [1.0], [100.0]),
+            # ('p2.y', [1.], [2.0], [200.0]),
         ])
 
         # list explicit outputs with scaling
         outputs = prob.model.list_outputs(implicit=False, scaling=True, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('comp.z', [24.], 1.0, 0.0, 1.0),
-            ('p1.x', [12.], 1.1, 2.1, 1.1),
-            ('p2.y', [1.], 1.2, 0.0, 2.2),
+            ('comp.z', { 'value': [24.], 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0 } ),
+            ('p1.x', { 'value': [12.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1 } ),
+            ('p2.y', { 'value': [1.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2 } ),
+            # ('comp.z', [24.], 1.0, 0.0, 1.0),
+            # ('p1.x', [12.], 1.1, 2.1, 1.1),
+            # ('p2.y', [1.], 1.2, 0.0, 2.2),
         ])
 
-        ###### list_residuals tests #####
+        # logging inputs
+        stream = cStringIO()
+        inputs = prob.model.list_inputs(values=True, units=True, out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(text.count('comp.'), 2)
+        self.assertEqual(text.count('value:'), 2)
 
-        # list residuals
-        resids = prob.model.list_residuals(implicit=False, out_stream=None)
-        self.assertEqual(sorted(resids), [
-            ('comp.z', np.array([0.])),
-            ('p1.x', np.array([0.])),
-            ('p2.y', np.array([0.])),
+        # logging outputs
+        stream = cStringIO()
+        outputs = prob.model.list_outputs(values=True, units=True, out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(text.count('comp.'), 1)
+        self.assertEqual(text.count('p1.'), 1)
+        self.assertEqual(text.count('p2.'), 1)
+        self.assertEqual(text.count('value:'), 3)
+
+    def test_array_list_vars_options(self):
+
+        class ArrayAdder(ExplicitComponent):
+            """
+            Just a simple component that has array inputs and outputs
+            """
+
+            def __init__(self, size):
+                super(ArrayAdder, self).__init__()
+                self.size = size
+
+            def setup(self):
+                self.add_input('x', val=np.zeros(self.size))
+                self.add_output('y', val=np.zeros(self.size))
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x'] + 10.0
+
+        size = 100 #how many items in the array
+
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
+        prob.model.add_subsystem('mult', ArrayAdder(size), promotes=['x', 'y'])
+
+        prob.setup(check=False)
+
+        prob['x'] = np.ones(size)
+
+        prob.run_driver()
+
+        ###### list_outputs tests #####
+
+        # list outputs for implicit comps - should get none
+        outputs = prob.model.list_outputs(implicit=True, explicit=False, out_stream=None)
+        self.assertEqual(outputs, [])
+
+        # list explicit outputs with values
+        outputs = prob.model.list_outputs(implicit=False, out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('comp.z', { 'value': np.array([24.] ) } ),
+            ('p1.x', { 'value': np.array([12.] ) } ),
+            ('p2.y', { 'value': np.array([1.] ) } ),
         ])
 
-        # list explicit residuals with units and values
-        resids = prob.model.list_residuals(implicit=False, units=True, out_stream=None)
-        self.assertEqual(sorted(resids), [
-            ('comp.z', np.array([0.] ), 'inch'),
-            ('p1.x', np.array([0.]), 'inch'),
-            ('p2.y', np.array([0.]), 'ft'),
-        ])
 
-        # list explicit residuals with bounds
-        resids = prob.model.list_residuals(implicit=False, bounds=True, out_stream=None)
-        self.assertEqual(sorted(resids), [
-            ('comp.z', [0.], None, None),
-            ('p1.x', [0.], [1.0], [100.0]),
-            ('p2.y', [0.], [2.0], [200.0]),
-        ])
 
-        # list explicit residuals with bounds
-        resids = prob.model.list_residuals(implicit=False, scaling=True, out_stream=None)
-        self.assertEqual(sorted(resids), [
-            ('comp.z', [0.], 1.0, 0.0, 1.0),
-            ('p1.x', [0.], 1.1, 2.1, 1.1),
-            ('p2.y', [0.], 1.2, 0.0, 2.2),
-        ])
+
+
+
+
+
 
 
 if __name__ == '__main__':

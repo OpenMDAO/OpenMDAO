@@ -2506,38 +2506,49 @@ class System(object):
         meta = self._var_abs2meta
         inputs = []
         for name, val in iteritems(self._inputs._views):
-            out = [name,]
+
+            outs = {}
             if values:
-                out.append(val)
+                outs['value'] = val
+                # out.append(val)
             if units:
-                out.append(meta['input'][name]['units'])
-            inputs.append(tuple(out))
+                outs['units'] = meta['input'][name]['units']
+            inputs.append((name, outs))
+        # for name, val in iteritems(self._inputs._views):
+        #     out = [name,]
+        #     if values:
+        #         out.append(val)
+        #     if units:
+        #         out.append(meta['input'][name]['units'])
+        #     inputs.append(tuple(out))
+
 
         if out_stream:
-            logger = get_logger('list_inputs', out_stream=out_stream)
-
-            count = len(inputs)
-
-            pathname = self.pathname if self.pathname else 'model'
-
-            header = "%d Input(s) to Components in '%s'\n" % (count, pathname)
-            logger.info(header)
+            self._write_outputs('inputs', None, inputs, out_stream)
 
 
-            # qqq TODO needs fixing. Do something like _write_outputs ?? and test it
-
-
-
-            if count:
-                logger.info("-" * len(header) + "\n")
-                if isinstance(inputs[0], tuple):
-                    for name, val in sorted(inputs):
-                        logger.info(name)
-                        logger.info("  value:    " + str(val) + "\n")
-                else:
-                    for name in sorted(inputs):
-                        logger.info(name)
-                logger.info('\n')
+        # if out_stream:
+        #     logger = get_logger('list_inputs', out_stream=out_stream)
+        #
+        #     count = len(inputs)
+        #
+        #     pathname = self.pathname if self.pathname else 'model'
+        #
+        #     header = "%d Input(s) to Components in '%s'\n" % (count, pathname)
+        #     logger.info(header)
+        #
+        #     # qqq TODO needs fixing. Do something like _write_outputs ?? and test it
+        #
+        #     if count:
+        #         logger.info("-" * len(header) + "\n")
+        #         if isinstance(inputs[0], tuple):
+        #             for name, val in sorted(inputs):
+        #                 logger.info(name)
+        #                 logger.info("  value:    " + str(val) + "\n")
+        #         else:
+        #             for name in sorted(inputs):
+        #                 logger.info(name)
+        #         logger.info('\n')
 
         return inputs
 
@@ -2593,6 +2604,7 @@ class System(object):
     def list_outputs(self, explicit=True, implicit=True,
                      hierarchical=True,
                      values=True,
+                     residuals=False,
                      units=False,
                      bounds=False,
                      scaling=False,
@@ -2610,6 +2622,9 @@ class System(object):
 
         values : bool, optional
             When True, display/return output values. Default is True.
+
+        residuals : bool, optional
+            When True, display/return residual values. Default is False.
 
         units : bool, optional
             When True, display/return units. Default is False.
@@ -2696,25 +2711,36 @@ class System(object):
         expl_outputs = []
         impl_outputs = []
         for name, val in iteritems(self._outputs._views):
-            out = [name,]
+            outs = {}
             if values:
-                out.append(val)
+                outs['value'] = val
+                # out.append(val)
+            if residuals:
+                outs['resids'] = self._residuals._views[name]
+                # out.append(self._residuals._views[name])
             if units:
-                out.append(meta['output'][name]['units'])
+                outs['units'] = meta['output'][name]['units']
+                # out.append(meta['output'][name]['units'])
             if bounds:
-                out.extend((meta['output'][name]['lower'], meta['output'][name]['upper']))
+                outs['lower'] = meta['output'][name]['lower']
+                outs['upper'] = meta['output'][name]['upper']
+                # out.extend((meta['output'][name]['lower'], meta['output'][name]['upper']))
             if scaling:
-                out.extend((meta['output'][name]['ref'], meta['output'][name]['ref0'], meta['output'][name]['res_ref']))
+                outs['ref'] = meta['output'][name]['ref']
+                outs['ref0'] = meta['output'][name]['ref0']
+                outs['res_ref'] = meta['output'][name]['res_ref']
+                # out.extend((meta['output'][name]['ref'], meta['output'][name]['ref0'], meta['output'][name]['res_ref']))
+            # out = [name,]
             if name in states:
-                impl_outputs.append(tuple(out))
+                impl_outputs.append((name,outs))
             else:
-                expl_outputs.append(tuple(out))
+                expl_outputs.append((name,outs))
 
         if out_stream:
             if explicit:
-                self._write_outputs('Explicit', expl_outputs, out_stream)
+                self._write_outputs('outputs', 'Explicit', expl_outputs, out_stream)
             if implicit:
-                self._write_outputs('Implicit', impl_outputs, out_stream)
+                self._write_outputs('outputs', 'Implicit', impl_outputs, out_stream)
 
         if explicit and implicit:
             return expl_outputs + impl_outputs
@@ -2725,85 +2751,85 @@ class System(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def list_residuals(self, explicit=True, implicit=True,
-                       hierarchical=True,
-                       values=True,
-                       units=False,
-                       bounds=False,
-                       scaling=False,
-                       out_stream='stdout'):
-        """
-        List residuals.
+    # def list_residuals(self, explicit=True, implicit=True,
+    #                    hierarchical=True,
+    #                    values=True,
+    #                    units=False,
+    #                    bounds=False,
+    #                    scaling=False,
+    #                    out_stream='stdout'):
+    #     """
+    #     List residuals.
+    #
+    #     Parameters
+    #     ----------
+    #     explicit : bool, optional
+    #         include outputs from explicit components. Default is True.
+    #
+    #     implicit : bool, optional
+    #         include outputs from implicit components. Default is True.
+    #
+    #     values : bool, optional
+    #         When True, display/return output values. Default is True.
+    #
+    #     units : bool, optional
+    #         When True, display/return units. Default is False.
+    #
+    #     bounds : bool, optional
+    #         When True, display/return bounds (lower and upper). Default is False.
+    #
+    #     scaling : bool, optional
+    #         When True, display/return scaling (ref, ref0, and res_ref). Default is False.
+    #
+    #     out_stream : 'stdout', 'stderr' or file-like
+    #         Where to send human readable output. Default is 'stdout'.
+    #         Set to None to suppress.
+    #
+    #     Returns
+    #     -------
+    #     list
+    #         list of of residual names and other optional information about those residuals
+    #     """
+    #     if self._residuals is None:
+    #         raise RuntimeError("Unable to list residuals until model has been run.")
+    #
+    #     states = self._list_states()
+    #
+    #     meta = self._var_abs2meta
+    #
+    #     expl_resids = []
+    #     impl_resids = []
+    #     for name, val in iteritems(self._residuals._views):
+    #         out = [name,]
+    #         if values:
+    #             out.append(val)
+    #         if units:
+    #             out.append(meta['output'][name]['units'])
+    #         if bounds:
+    #             out.extend((meta['output'][name]['lower'], meta['output'][name]['upper']))
+    #         if scaling:
+    #             out.extend((meta['output'][name]['ref'], meta['output'][name]['ref0'], meta['output'][name]['res_ref']))
+    #         if name in states:
+    #             impl_resids.append(tuple(out))
+    #         else:
+    #             expl_resids.append(tuple(out))
+    #
+    #     if out_stream:
+    #         if explicit:
+    #             self._write_outputs('Explicit', expl_resids, out_stream)
+    #         if implicit:
+    #             self._write_outputs('Implicit', impl_resids, out_stream)
+    #
+    #     if explicit and implicit:
+    #         return expl_resids + impl_resids
+    #     elif explicit:
+    #         return expl_resids
+    #     elif implicit:
+    #         return impl_resids
+    #     else:
+    #         raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-        Parameters
-        ----------
-        explicit : bool, optional
-            include outputs from explicit components. Default is True.
-
-        implicit : bool, optional
-            include outputs from implicit components. Default is True.
-
-        values : bool, optional
-            When True, display/return output values. Default is True.
-
-        units : bool, optional
-            When True, display/return units. Default is False.
-
-        bounds : bool, optional
-            When True, display/return bounds (lower and upper). Default is False.
-
-        scaling : bool, optional
-            When True, display/return scaling (ref, ref0, and res_ref). Default is False.
-
-        out_stream : 'stdout', 'stderr' or file-like
-            Where to send human readable output. Default is 'stdout'.
-            Set to None to suppress.
-
-        Returns
-        -------
-        list
-            list of of residual names and other optional information about those residuals
-        """
-        if self._residuals is None:
-            raise RuntimeError("Unable to list residuals until model has been run.")
-
-        states = self._list_states()
-
-        meta = self._var_abs2meta
-
-        expl_resids = []
-        impl_resids = []
-        for name, val in iteritems(self._residuals._views):
-            out = [name,]
-            if values:
-                out.append(val)
-            if units:
-                out.append(meta['output'][name]['units'])
-            if bounds:
-                out.extend((meta['output'][name]['lower'], meta['output'][name]['upper']))
-            if scaling:
-                out.extend((meta['output'][name]['ref'], meta['output'][name]['ref0'], meta['output'][name]['res_ref']))
-            if name in states:
-                impl_resids.append(tuple(out))
-            else:
-                expl_resids.append(tuple(out))
-
-        if out_stream:
-            if explicit:
-                self._write_outputs('Explicit', expl_resids, out_stream)
-            if implicit:
-                self._write_outputs('Implicit', impl_resids, out_stream)
-
-        if explicit and implicit:
-            return expl_resids + impl_resids
-        elif explicit:
-            return expl_resids
-        elif implicit:
-            return impl_resids
-        else:
-            raise RuntimeError('You have excluded both Explicit and Implicit components.')
-
-    def _write_outputs(self, comp_type, outputs, out_stream='stdout'):
+    def _write_outputs(self, out_type, comp_type, outputs, out_stream='stdout'):
         """
         Write formatted output values and residuals to out_stream.
 
@@ -2822,27 +2848,45 @@ class System(object):
         if out_stream is None:
             return
 
-        logger = get_logger('list_outputs', out_stream=out_stream)
+        logger_name = 'list_inputs' if out_type == 'inputs' else 'list_outputs'
+
+
+        logger = get_logger(logger_name, out_stream=out_stream)
 
         count = len(outputs)
 
         pathname = self.pathname if self.pathname else 'model'
 
-        header = "%d %s Output(s) in '%s'\n" % (count, comp_type, pathname)
+        header_name = 'Input' if out_type == 'inputs' else 'Output'
+        if out_type == 'inputs':
+            header = "%d %s(s) in '%s'\n" % (count, header_name, pathname)
+        else:
+            header = "%d %s %s(s) in '%s'\n" % (count, comp_type, header_name, pathname)
         logger.info(header)
+
+        if out_type == 'inputs':
+            out_types = ('value', 'units',)
+        else:
+            out_types = ('value', 'resids', 'units', 'lower', 'upper', 'ref', 'ref0', 'res_ref')
 
         if count:
             logger.info("-" * len(header) + "\n")
-            if isinstance(outputs[0], tuple):
-                for name, _ in sorted(outputs):
-                    logger.info("%s" % name)
-                    logger.info("  value:    " + str(self._outputs._views[name]))
-                    logger.info("  residual: " + str(self._residuals._views[name]))
-                    logger.info('\n')
-            else:
-                for name in sorted(outputs):
-                    logger.info(name)
+            for name, outs in sorted(outputs):
+                logger.info("%s" % name)
+                for out_type in out_types:
+                    if out_type in outs:
+                        logger.info("  {}:    {}".format(out_type,outs[out_type]))
                 logger.info('\n')
+            # if isinstance(outputs[0], tuple):
+            #     for name, _ in sorted(outputs):
+            #         logger.info("%s" % name)
+            #         logger.info("  value:    " + str(self._outputs._views[name]))
+            #         logger.info("  residual: " + str(self._residuals._views[name]))
+            #         logger.info('\n')
+            # else:
+            #     for name in sorted(outputs):
+            #         logger.info(name)
+            #     logger.info('\n')
 
     def run_solve_nonlinear(self):
         """
