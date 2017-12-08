@@ -622,6 +622,10 @@ class Group(System):
                     meta['src_indices'] = np.atleast_1d(src_indices)
                     meta['flat_src_indices'] = flat_src_indices
 
+                if abs_in in abs_in2out:
+                    raise RuntimeError("Input '%s' cannot be connected to '%s' because it's already"
+                                       " connected to '%s'" % (abs_in, abs_out, abs_in2out[abs_in]))
+
                 abs_in2out[abs_in] = abs_out
 
                 # if connection is contained in a subgroup, add to conns to pass down to subsystems.

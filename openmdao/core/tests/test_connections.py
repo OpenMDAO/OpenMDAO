@@ -702,18 +702,22 @@ class TestMultiConns(unittest.TestCase):
     def test_mixed_conns_same_level(self):
 
         prob = Problem()
-        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp())
         indeps.add_output('x', 10*np.ones(4))
 
-        prob.model.add_subsystem('c1', ExecComp('y = 2*x', x=np.ones(4), y=2*np.ones(4)), promotes=['y', 'x'])
+        # c2.y is implicitly connected to c1.y
+        prob.model.add_subsystem('c1', ExecComp('y = 2*x', x=np.ones(4), y=2*np.ones(4)), promotes=['y'])
+        prob.model.add_subsystem('c2', ExecComp('z = 2*y', y=np.ones(4), z=2*np.ones(4)), promotes=['y'])
 
-        prob.model.connect('x', 'c1.x')
+        # make a second, explicit, connection to y (which is c2.y promoted)
+        prob.model.connect('indeps.x', 'y')
 
         with self.assertRaises(Exception) as context:
             prob.setup()
+            prob.final_setup()
 
         self.assertEqual(str(context.exception),
-                         "Input 'c1.x' does not exist for connection in '' from 'x' to 'c1.x'.")
+                         "Input 'c2.y' cannot be connected to 'indeps.x' because it's already connected to 'c1.y'")
 
 
 if __name__ == "__main__":
