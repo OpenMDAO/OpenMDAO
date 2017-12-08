@@ -2,6 +2,9 @@
 
 from __future__ import division, print_function
 
+import sys
+import warnings
+from six import reraise
 from six.moves import range
 
 import numpy as np
@@ -16,12 +19,45 @@ from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.recorders.recording_iteration_stack import Recording
 
 
+def format_singluar_error(err, system):
+    """
+    Format a coherent error message when the matrix is singular.
+
+    Parameters
+    ----------
+    err : Exception
+        Exception object
+    system : <System>
+        OpenMDAO system containing the Directsolver.
+    """
+    loc = int(err.message.split('number ')[1].split(' is exactly')[0])
+
+    n = 0
+    varname = "Unknown"
+    for name in system._var_allprocs_abs_names['output']:
+        relname = system._var_abs2prom['output'][name]
+        n += len(system._outputs[relname])
+        if loc <= n:
+            varname = relname
+            break
+
+    msg = "Singular entry found in '{}' for state/residual '{}'."
+    return msg.format(system.pathname, varname)
+
+
 class DirectSolver(LinearSolver):
     """
     LinearSolver that uses linalg.solve or LU factor/solve.
     """
 
     SOLVER = 'LN: Direct'
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        self.options.declare('err_on_singular', default=True,
+                             desc="Raise an error if LU decomposition is singular.")
 
     def _linearize(self):
         """
@@ -36,10 +72,23 @@ class DirectSolver(LinearSolver):
                 ranges = system._jacobian._view_ranges[system.pathname]
                 matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
                 np.set_printoptions(precision=3)
-                self._lup = scipy.linalg.lu_factor(matrix)
+
+                # During LU decomposition, detect singularities and warn user.
+                with warnings.catch_warnings():
+
+                    if self.options['err_on_singular']:
+                        warnings.simplefilter('error', RuntimeWarning)
+
+                    try:
+                        self._lup = scipy.linalg.lu_factor(matrix)
+
+                    except RuntimeWarning as err:
+                        raise RuntimeError(format_singluar_error(err, system))
+
             elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
                 np.set_printoptions(precision=3)
                 self._lu = scipy.sparse.linalg.splu(mtx._matrix)
+
             elif isinstance(mtx, COOMatrix):
                 # calling scipy.sparse.linalg.splu on a COO actually transposes
                 # the matrix during conversion to csc prior to LU decomp
@@ -65,7 +114,17 @@ class DirectSolver(LinearSolver):
             system._vectors['residual']['linear'].set_data(b_data)
             system._vectors['output']['linear'].set_data(x_data)
 
-            self._lup = scipy.linalg.lu_factor(mtx)
+            # During LU decomposition, detect singularities and warn user.
+            with warnings.catch_warnings():
+
+                if self.options['err_on_singular']:
+                    warnings.simplefilter('error', RuntimeWarning)
+
+                try:
+                    self._lup = scipy.linalg.lu_factor(mtx)
+
+                except RuntimeWarning as err:
+                    raise RuntimeError(format_singluar_error(err, system))
 
     def _mat_vec(self, in_vec, out_vec):
         """
