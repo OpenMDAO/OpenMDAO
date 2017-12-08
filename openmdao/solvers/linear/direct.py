@@ -29,6 +29,11 @@ def format_singluar_error(err, system):
         Exception object
     system : <System>
         OpenMDAO system containing the Directsolver.
+
+    Returns
+    -------
+    str
+        New error string.
     """
     loc = int(err.message.split('number ')[1].split(' is exactly')[0])
 
