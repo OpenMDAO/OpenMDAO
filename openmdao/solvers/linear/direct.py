@@ -4,7 +4,7 @@ from __future__ import division, print_function
 
 import sys
 import warnings
-from six import reraise
+from six import reraise, PY2
 from six.moves import range
 
 import numpy as np
@@ -19,7 +19,7 @@ from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.recorders.recording_iteration_stack import Recording
 
 
-def format_singluar_error(err, system):
+def format_singluar_error(err, system, mtx):
     """
     Format a coherent error message when the matrix is singular.
 
@@ -29,13 +29,28 @@ def format_singluar_error(err, system):
         Exception object
     system : <System>
         OpenMDAO system containing the Directsolver.
+    mtx : ndarray
+        Matrix of interest.
 
     Returns
     -------
     str
         New error string.
     """
-    loc = int(err.message.split('number ')[1].split(' is exactly')[0])
+    if PY2:
+        err_msg = err.message
+    else:
+        err_msg = err.args[0]
+
+    loc = int(err_msg.split('number ')[1].split(' is exactly')[0])
+
+    col_norm = np.linalg.norm(mtx[:, loc-1])
+    row_norm = np.linalg.norm(mtx[loc-1, :])
+
+    if row_norm <= col_norm:
+        loc_txt = "row"
+    else:
+        loc_txt = "column"
 
     n = 0
     varname = "Unknown"
@@ -46,8 +61,8 @@ def format_singluar_error(err, system):
             varname = relname
             break
 
-    msg = "Singular entry found in '{}' for state/residual '{}'."
-    return msg.format(system.pathname, varname)
+    msg = "Singular entry found in '{}' for {} associated with state/residual '{}'."
+    return msg.format(system.pathname, loc_txt, varname)
 
 
 class DirectSolver(LinearSolver):
@@ -88,7 +103,7 @@ class DirectSolver(LinearSolver):
                         self._lup = scipy.linalg.lu_factor(matrix)
 
                     except RuntimeWarning as err:
-                        raise RuntimeError(format_singluar_error(err, system))
+                        raise RuntimeError(format_singluar_error(err, system, matrix))
 
             elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
                 np.set_printoptions(precision=3)
@@ -129,7 +144,7 @@ class DirectSolver(LinearSolver):
                     self._lup = scipy.linalg.lu_factor(mtx)
 
                 except RuntimeWarning as err:
-                    raise RuntimeError(format_singluar_error(err, system))
+                    raise RuntimeError(format_singluar_error(err, system, mtx))
 
     def _mat_vec(self, in_vec, out_vec):
         """
