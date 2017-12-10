@@ -44,8 +44,8 @@ def format_singluar_error(err, system, mtx):
 
     loc = int(err_msg.split('number ')[1].split(' is exactly')[0])
 
-    col_norm = np.linalg.norm(mtx[:, loc-1])
-    row_norm = np.linalg.norm(mtx[loc-1, :])
+    col_norm = np.linalg.norm(mtx[:, loc - 1])
+    row_norm = np.linalg.norm(mtx[loc - 1, :])
 
     if row_norm <= col_norm:
         loc_txt = "row"
