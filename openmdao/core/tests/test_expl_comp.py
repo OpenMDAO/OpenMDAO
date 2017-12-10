@@ -175,6 +175,8 @@ class ExplCompTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = model = Group()
 
+
+
         model.add_subsystem('p1', IndepVarComp('x', 12.0,
                                                lower=1.0, upper=100.0,
                                                ref = 1.1, ref0 = 2.1,
@@ -196,6 +198,9 @@ class ExplCompTestCase(unittest.TestCase):
         prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
+
+        qqq =model._subsystems_myproc
+
 
         ###### list_inputs tests #####
 
@@ -284,6 +289,8 @@ class ExplCompTestCase(unittest.TestCase):
             # ('p2.y', [1.], 1.2, 0.0, 2.2),
         ])
 
+        # qqq TODO need a test for when units are requested and None is the value
+
         # logging inputs
         stream = cStringIO()
         inputs = prob.model.list_inputs(values=True, units=True, out_stream=stream)
@@ -312,8 +319,8 @@ class ExplCompTestCase(unittest.TestCase):
                 self.size = size
 
             def setup(self):
-                self.add_input('x', val=np.zeros(self.size))
-                self.add_output('y', val=np.zeros(self.size))
+                self.add_input('x', val=np.zeros(self.size), units='inch')
+                self.add_output('y', val=np.zeros(self.size), units='ft')
 
             def compute(self, inputs, outputs):
                 outputs['y'] = inputs['x'] + 10.0
@@ -323,7 +330,7 @@ class ExplCompTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = Group()
 
-        prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
+        prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size), units='inch'), promotes=['x'])
         prob.model.add_subsystem('mult', ArrayAdder(size), promotes=['x', 'y'])
 
         prob.setup(check=False)
@@ -340,17 +347,85 @@ class ExplCompTestCase(unittest.TestCase):
 
         # list explicit outputs with values
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
-        self.assertEqual(sorted(outputs), [
-            ('comp.z', { 'value': np.array([24.] ) } ),
-            ('p1.x', { 'value': np.array([12.] ) } ),
-            ('p2.y', { 'value': np.array([1.] ) } ),
-        ])
+        # self.assertEqual(sorted(outputs), [
+        #     ('des_vars.x', { 'value': np.ones(size) } ),
+        #     ('mult.y', { 'value': np.ones(size) * 11.0 } ),
+        # ])
+
+        tol = 1e-7
+
+        for actual, expected in zip(sorted(outputs),
+                                    [
+                                        ('des_vars.x', {'value': np.ones(size)}),
+                                        ('mult.y', {'value': np.ones(size) * 11.0}),
+                                    ]
+                                    ):
+            self.assertEqual(actual[0], expected[0])
+            assert_rel_error(self, actual[1], expected[1], tol)
 
 
+        # logging inputs
+        stream = cStringIO()
+        outputs = prob.model.list_inputs(values=True, units=True, out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(text.count('des_vars.x'), 0)
+        self.assertEqual(text.count('mult.x'), 1)
+        self.assertEqual(text.count('value'), 1)
+        self.assertEqual(text.count('units'), 1)
+
+        # logging outputs
+        stream = cStringIO()
+        outputs = prob.model.list_outputs(values=True, units=True, out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(text.count('des_vars.x'), 1)
+        self.assertEqual(text.count('mult.y'), 1)
+        self.assertEqual(text.count('value'), 2)
+        self.assertEqual(text.count('units'), 2)
 
 
+    def test_hierarchy_list_vars_options(self):
+        from openmdao.test_suite.components.double_sellar import SubSellar
+        from openmdao.api import Problem, NewtonSolver, ScipyKrylov, Group, PETScVector, \
+            IndepVarComp, NonlinearBlockGS, NonlinearBlockJac, LinearBlockGS
 
+        prob = Problem()
+        model = prob.model
 
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])))
+
+        sub1 = model.add_subsystem('sub1', Group())
+        sub2 = sub1.add_subsystem('sub2', Group())
+        g1 = sub2.add_subsystem('g1', SubSellar())
+        g2 = model.add_subsystem('g2', SubSellar())
+
+        model.connect('pz.z', 'sub1.sub2.g1.z')
+        model.connect('sub1.sub2.g1.y2', 'g2.x')
+        model.connect('g2.y2', 'sub1.sub2.g1.x')
+
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyKrylov()
+        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['max_sub_solves'] = 0
+
+        g1.nonlinear_solver = NewtonSolver()
+        g1.linear_solver = LinearBlockGS()
+
+        g2.nonlinear_solver = NewtonSolver()
+        g2.linear_solver = ScipyKrylov()
+        g2.linear_solver.precon = LinearBlockGS()
+        g2.linear_solver.precon.options['maxiter'] = 2
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        # logging outputs
+        stream = cStringIO()
+        outputs = prob.model.list_outputs(values=True, units=True, out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(text.count('comp.'), 1)
+        self.assertEqual(text.count('p1.'), 1)
+        self.assertEqual(text.count('p2.'), 1)
+        self.assertEqual(text.count('value:'), 3)
 
 
 

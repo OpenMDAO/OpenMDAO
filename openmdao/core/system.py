@@ -2606,6 +2606,7 @@ class System(object):
                      values=True,
                      residuals=False,
                      units=False,
+                     shape=False, # qqq TODO
                      bounds=False,
                      scaling=False,
                      out_stream='stdout'):
@@ -2703,6 +2704,10 @@ class System(object):
         # metadata
         # dictionaries
         # for myproc variables.
+
+        qqq =self._subsystems_myproc
+
+
 
 
 
@@ -2829,7 +2834,7 @@ class System(object):
     #     else:
     #         raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def _write_outputs(self, out_type, comp_type, outputs, out_stream='stdout'):
+    def _write_outputs(self, in_or_out, comp_type, outputs, out_stream='stdout'):
         """
         Write formatted output values and residuals to out_stream.
 
@@ -2848,7 +2853,7 @@ class System(object):
         if out_stream is None:
             return
 
-        logger_name = 'list_inputs' if out_type == 'inputs' else 'list_outputs'
+        logger_name = 'list_inputs' if in_or_out == 'inputs' else 'list_outputs'
 
 
         logger = get_logger(logger_name, out_stream=out_stream)
@@ -2857,14 +2862,16 @@ class System(object):
 
         pathname = self.pathname if self.pathname else 'model'
 
-        header_name = 'Input' if out_type == 'inputs' else 'Output'
-        if out_type == 'inputs':
+        header_name = 'Input' if in_or_out == 'inputs' else 'Output'
+        if in_or_out == 'inputs':
             header = "%d %s(s) in '%s'\n" % (count, header_name, pathname)
         else:
             header = "%d %s %s(s) in '%s'\n" % (count, comp_type, header_name, pathname)
         logger.info(header)
 
-        if out_type == 'inputs':
+        # Need an ordered list of possible values for the two cases: inputs and outputs
+        #  So that we do the column output correctly
+        if in_or_out == 'inputs':
             out_types = ('value', 'units',)
         else:
             out_types = ('value', 'resids', 'units', 'lower', 'upper', 'ref', 'ref0', 'res_ref')
@@ -2872,11 +2879,24 @@ class System(object):
         if count:
             logger.info("-" * len(header) + "\n")
             for name, outs in sorted(outputs):
+                have_array_values = []
                 logger.info("%s" % name)
                 for out_type in out_types:
                     if out_type in outs:
-                        logger.info("  {}:    {}".format(out_type,outs[out_type]))
+                        if isinstance(outs[out_type], np.ndarray) and not np.isscalar(outs[out_type]):
+                            have_array_values.append(out_type)
+                        else:
+                            logger.info("  {}:    {}".format(out_type, outs[out_type]))
+                for array_out_types in have_array_values:
+                    from six.moves import cStringIO
+                    sio = cStringIO()
+                    # np.savetxt(sio, outs[array_out_types], fmt='%5s') # qqq TODO need to check the formatting
+                    s = sio.getvalue()
+                    # logger.info("  {}:    {}\n".format(out_type, s))
+                    logger.info("  {}:\n".format(array_out_types))
+                    logger.info(outs[array_out_types])
                 logger.info('\n')
+
             # if isinstance(outputs[0], tuple):
             #     for name, _ in sorted(outputs):
             #         logger.info("%s" % name)
