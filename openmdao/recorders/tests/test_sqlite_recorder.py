@@ -96,10 +96,10 @@ class TestSqliteRecorder(unittest.TestCase):
         assertSolverIterationDataRecorded(self, cur, expected, tolerance)
         con.close()
 
-    def assertMetadataRecorded(self):
+    def assertMetadataRecorded(self, expected_abs2prom, expected_prom2abs):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
-        assertMetadataRecorded(self, cur)
+        assertMetadataRecorded(self, cur, expected_abs2prom, expected_prom2abs)
         con.close()
 
     def assertDriverMetadataRecorded(self, expected_driver_metadata):
@@ -383,7 +383,50 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        self.assertMetadataRecorded()
+        prom2abs = {
+            'input': {
+                'z': ['d1.z', 'd2.z', 'obj_cmp.z'],
+                'x': ['d1.x', 'obj_cmp.x'],
+                'y2': ['d1.y2', 'obj_cmp.y2', 'con_cmp2.y2'],
+                'y1': ['d2.y1', 'obj_cmp.y1', 'con_cmp1.y1']
+            },
+            'output': {
+                'x': ['px.x'],
+                'z': ['pz.z'],
+                'y1': ['d1.y1'],
+                'y2': ['d2.y2'],
+                'obj': ['obj_cmp.obj'],
+                'con1': ['con_cmp1.con1'],
+                'con2': ['con_cmp2.con2']
+            }
+        }
+
+        abs2prom = {
+            'input': {
+                'd1.z': 'z',
+                'd1.x': 'x',
+                'd1.y2': 'y2',
+                'd2.z': 'z',
+                'd2.y1': 'y1',
+                'obj_cmp.x': 'x',
+                'obj_cmp.y1': 'y1',
+                'obj_cmp.y2': 'y2',
+                'obj_cmp.z': 'z',
+                'con_cmp1.y1': 'y1',
+                'con_cmp2.y2': 'y2'
+            },
+            'output': {
+                'px.x': 'x',
+                'pz.z': 'z',
+                'd1.y1': 'y1',
+                'd2.y2': 'y2',
+                'obj_cmp.obj': 'obj',
+                'con_cmp1.con1': 'con1',
+                'con_cmp2.con2': 'con2'
+            }
+        }
+
+        self.assertMetadataRecorded(prom2abs, abs2prom)
         expected_driver_metadata = {
             'connections_list_length': 11,
             'tree_length': 4,
@@ -401,7 +444,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        self.assertMetadataRecorded()
+        self.assertMetadataRecorded(None, None)
         expected_driver_metadata = None
         self.assertDriverMetadataRecorded(expected_driver_metadata)
 
