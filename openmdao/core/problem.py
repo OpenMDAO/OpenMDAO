@@ -1406,8 +1406,10 @@ class Problem(object):
                             # need a vector for clean code, so use _views_flat.
                             dinputs._views_flat[input_name][idx - start] = 1.0
 
+                print(input_name, dinputs._views_flat[input_name])
                 model._solve_linear(lin_vec_names, mode, rel_systems)
-
+                #print("con1.con", doutputs._views_flat['con1.con'])
+                
                 for input_name, old_input_name, _, matmat, simul in vois:
                     dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
                         dup, store = voi_info[input_name]
@@ -1488,6 +1490,7 @@ class Problem(object):
                         if store and ncol > 1 and len(deriv_val.shape) == 1:
                             deriv_val = np.atleast_2d(deriv_val).T
 
+                        #print(output_name, "deriv_val", deriv_val)
                         if return_format == 'flat_dict':
                             if fwd:
                                 key = (old_output_list[ocount], old_input_name)

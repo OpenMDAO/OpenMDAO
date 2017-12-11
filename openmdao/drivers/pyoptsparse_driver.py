@@ -230,6 +230,7 @@ class pyOptSparseDriver(Driver):
         lcons = [key for (key, con) in iteritems(con_meta) if con['linear'] is True]
         if len(lcons) > 0:
             _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list, return_format='dict')
+            print("LIN J:\n", self._compute_totals(of=lcons, wrt=indep_list, return_format='array'))
             #print("lin jacs", _lin_jacs)
             # convert all of our linear constraint jacs to COO format. Otherwise pyoptsparse will
             # do it for us and we'll end up with a fully dense COO matrix and very slow evaluation
@@ -242,8 +243,9 @@ class pyOptSparseDriver(Driver):
                         # since our linear constraint jacs are constant, so zeros won't become
                         # nonzero during the optimization.
                         mat = coo_matrix(subjac)
-                        jacdct[n] = {'coo': [mat.row, mat.col, mat.data], 'shape': mat.shape}
-                        linjac_size += mat.data.size
+                        if mat.row.size > 0:
+                            jacdct[n] = {'coo': [mat.row, mat.col, mat.data], 'shape': mat.shape}
+                            linjac_size += mat.data.size
             print("LIN JAC SIZE:", linjac_size)
 
         # Add all equality constraints
@@ -486,6 +488,7 @@ class pyOptSparseDriver(Driver):
         prob = self._problem
         fail = 0
 
+        np.set_printoptions(linewidth=999)
         try:
 
             try:
@@ -493,7 +496,9 @@ class pyOptSparseDriver(Driver):
                                                  wrt=self._indep_list,
                                                  return_format='dict')
 
-                print(sens_dict['con1.con']['indep.x'],"\n")
+                #print(sens_dict['con1.con']['indep.x'],"\n")
+                #print('partial', prob.model._jacobian['con1.con', 'con1.x'])
+                #print("x", prob['indep.x'])
             # Let the optimizer try to handle the error
             except AnalysisError:
                 self._problem.model._clear_iprint()
