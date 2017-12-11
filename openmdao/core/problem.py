@@ -2146,3 +2146,44 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
     #     stream.write("Resp: %s  %d\n" % (res, meta['size']))
 
     stream.write("Total colors vs. total size: %d vs %d\n" % (tot_colors, tot_size))
+
+
+def get_total_dep(problem, dv, resp):
+    """
+    Compute total subjacobian for a given design var and response.
+
+    Note: This will raise an error if any of the components involved are matrix free.
+
+    Parameters
+    ----------
+    problem : Problem
+        Problem containing the design var and response, and all dependent vars.
+    dv : str
+        Design variable name.
+    resp : str
+        Response name.
+    """
+    inconns = problem.model._conn_global_abs_in2out
+
+    # get a dict of all outputs and their connected inputs.
+    conns = defaultdict(list)
+    for tgt, src in iteritems(inconns):
+        conns[src].append(tgt)
+
+    # get full list of components in execution order
+    comps = list(system.system_iter(include_self=True, recurse=True, typ=Component))
+    needs = {}  # dict of needed inputs vs. sys name
+    for c in comps:
+        needs[c.pathname] = set(c._var_allprocs_abs_names['input']).intersection(inconns)
+
+    relevant = problem.model._relevant
+
+    for dv in problem.driver._designvars:
+        all_ins = set()
+        all_outs = set()
+        all_sys = set()
+        for res in problem.driver._responses:
+            dct, systems = relevant[dv][res]
+            all_ins.update(dct['input'])
+            all_outs.update(dct['output'])
+            all_sys.update(systems)
