@@ -14,3 +14,5 @@ It provides information in a more theoretical and mathematical manner to help us
 
    implicit_transformation_of_vars.rst
    parallel_color.rst
+   simul_derivs.rst
+   

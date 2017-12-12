@@ -22,7 +22,6 @@ from openmdao.core.driver import Driver
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta
-# from openmdao.core.problem import set_simul_meta
 
 # names of optimizers that use gradients
 grad_drivers = {'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
@@ -537,15 +536,39 @@ class pyOptSparseDriver(Driver):
         """
         return self.options['optimizer']
 
-    def set_simul_coloring(self, simul_info):
+    def _setup_simul_coloring(self, mode='fwd'):
         """
-        Set the coloring for simultaneous derivatives.
-
-        It will also update the sparsity patterns passed to pyoptsparse.
+        Set up metadata for simultaneous derivative solution.
 
         Parameters
         ----------
-        simul_info : tuple
-            Information about simultaneous coloring for design vars and responses.
+        mode : str
+            Derivative direction, either 'fwd' or 'rev'.
         """
-        self._simul_coloring_info = simul_info
+        if mode == 'rev':
+            raise NotImplementedError("Simultaneous derivatives are currently not supported "
+                                      "in 'rev' mode")
+
+        coloring, maps = self._simul_coloring_info
+        for dv, colors in iteritems(coloring):
+            self._designvars[dv]['simul_coloring'] = colors
+
+        for res, dvdict in iteritems(maps):
+            self._responses[res]['simul_map'] = dvdict
+            self._res_jacs[res] = {}
+
+            for dv, col_dict in iteritems(dvdict):
+                rows = []
+                cols = []
+                for color, (row_idxs, col_idxs) in iteritems(col_dict):
+                    rows.append(row_idxs)
+                    cols.append(col_idxs)
+
+                row = np.hstack(rows)
+                col = np.hstack(cols)
+                # print("sparsity for %s, %s: %d of %s" % (res, dv, row.size,
+                #       (self._responses[res]['size'] * self._designvars[dv]['size'],)))
+                self._res_jacs[res][dv] = {
+                    'coo': [row, col, np.zeros(row.size)],
+                    'shape': [self._responses[res]['size'], self._designvars[dv]['size']]
+                }

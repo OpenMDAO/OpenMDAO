@@ -331,33 +331,8 @@ class Driver(object):
 
         # set up simultaneous deriv coloring
         if self._simul_coloring_info and self.supports['simultaneous_derivatives']:
-            coloring, maps = self._simul_coloring_info
             if problem._mode == 'fwd':
-                for dv, colors in iteritems(coloring):
-                    self._designvars[dv]['simul_coloring'] = colors
-
-                nzeros = 0
-                for res, dvdict in iteritems(maps):
-                    self._responses[res]['simul_map'] = dvdict
-                    self._res_jacs[res] = {}
-
-                    for dv, col_dict in iteritems(dvdict):
-                        rows = []
-                        cols = []
-                        for color, (row_idxs, col_idxs) in iteritems(col_dict):
-                            rows.append(row_idxs)
-                            cols.append(col_idxs)
-
-                        row = np.hstack(rows)
-                        col = np.hstack(cols)
-                        # print("sparsity for %s, %s: %d of %s" % (res, dv, row.size,
-                        #       (self._responses[res]['size'] * self._designvars[dv]['size'],)))
-                        self._res_jacs[res][dv] = {
-                            'coo': [row, col, np.zeros(row.size)],
-                            'shape': [self._responses[res]['size'], self._designvars[dv]['size']]
-                        }
-                        nzeros += row.size
-                # print("NONZERO NL JAC ENTRIES:", nzeros)
+                self._setup_simul_coloring(problem._mode)
             else:
                 raise RuntimeError("simultaneous derivs are currently not supported in rev mode.")
 
@@ -777,3 +752,30 @@ class Driver(object):
             Name of current Driver.
         """
         return "Driver"
+
+    def set_simul_coloring(self, simul_info):
+        """
+        Set the coloring for simultaneous derivatives.
+
+        Parameters
+        ----------
+        simul_info : tuple
+            Information about simultaneous coloring for design vars and responses.
+        """
+        if self.supports['simultaneous_derivatives']:
+            self._simul_coloring_info = simul_info
+        else:
+            raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
+                               self._get_name())
+
+    def _setup_simul_coloring(self, mode='fwd'):
+        """
+        Set up metadata for simultaneous derivative solution.
+
+        Parameters
+        ----------
+        mode : str
+            Derivative direction, either 'fwd' or 'rev'.
+        """
+        raise NotImplementedError("Driver '%s' does not support simultaneous derivatives." %
+                                  self._get_name())
