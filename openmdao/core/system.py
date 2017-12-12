@@ -2479,6 +2479,7 @@ class System(object):
                     hierarchical=True,
                     values=True,
                     units=False,
+                    print_arrays=False,
                     out_stream='stdout'):
         """
         List inputs.
@@ -2524,7 +2525,7 @@ class System(object):
 
 
         if out_stream:
-            self._write_outputs('inputs', None, inputs, out_stream)
+            self._write_outputs('inputs', None, inputs, print_arrays, out_stream)
 
 
         # if out_stream:
@@ -2609,6 +2610,7 @@ class System(object):
                      shape=False, # qqq TODO
                      bounds=False,
                      scaling=False,
+                     print_arrays=False,
                      out_stream='stdout'):
         """
         List outputs. Names are always shown.
@@ -2705,13 +2707,35 @@ class System(object):
         # dictionaries
         # for myproc variables.
 
+        # hierarchical !
+
         qqq =self._subsystems_myproc
 
+        qqq = self.system_iter(local=True, include_self=True, recurse=True)
 
-
-
+        qqq = list(qqq)
 
         states = self._list_states()
+
+        # print(60*'-')
+        # for s in self.system_iter(local=True, include_self=True, recurse=True):
+        #     if s.pathname:
+        #         pathname_parts = len(s.pathname.split('.'))
+        #     else:
+        #         pathname_parts = 0
+        #     system_indent = 2* pathname_parts
+        #     print( system_indent*' ', 'sys', s.pathname)
+        #     for name, val in iteritems(s._outputs._views):
+        #         var_indent = system_indent + 2
+        #         # print(name)
+        #         if len(name.split('.')) - pathname_parts == 1:
+        #             print( var_indent * ' ', 'var', name.split('.')[-1])
+        # print(60 * '-')
+
+        # Go though the hierarchy. Printing Systems
+        # If the System owns an output directly, show its output
+
+
 
         expl_outputs = []
         impl_outputs = []
@@ -2743,9 +2767,9 @@ class System(object):
 
         if out_stream:
             if explicit:
-                self._write_outputs('outputs', 'Explicit', expl_outputs, out_stream)
+                self._write_outputs('outputs', 'Explicit', expl_outputs, hierarchical, print_arrays, out_stream)
             if implicit:
-                self._write_outputs('outputs', 'Implicit', impl_outputs, out_stream)
+                self._write_outputs('outputs', 'Implicit', impl_outputs, hierarchical, print_arrays, out_stream)
 
         if explicit and implicit:
             return expl_outputs + impl_outputs
@@ -2756,85 +2780,8 @@ class System(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    # def list_residuals(self, explicit=True, implicit=True,
-    #                    hierarchical=True,
-    #                    values=True,
-    #                    units=False,
-    #                    bounds=False,
-    #                    scaling=False,
-    #                    out_stream='stdout'):
-    #     """
-    #     List residuals.
-    #
-    #     Parameters
-    #     ----------
-    #     explicit : bool, optional
-    #         include outputs from explicit components. Default is True.
-    #
-    #     implicit : bool, optional
-    #         include outputs from implicit components. Default is True.
-    #
-    #     values : bool, optional
-    #         When True, display/return output values. Default is True.
-    #
-    #     units : bool, optional
-    #         When True, display/return units. Default is False.
-    #
-    #     bounds : bool, optional
-    #         When True, display/return bounds (lower and upper). Default is False.
-    #
-    #     scaling : bool, optional
-    #         When True, display/return scaling (ref, ref0, and res_ref). Default is False.
-    #
-    #     out_stream : 'stdout', 'stderr' or file-like
-    #         Where to send human readable output. Default is 'stdout'.
-    #         Set to None to suppress.
-    #
-    #     Returns
-    #     -------
-    #     list
-    #         list of of residual names and other optional information about those residuals
-    #     """
-    #     if self._residuals is None:
-    #         raise RuntimeError("Unable to list residuals until model has been run.")
-    #
-    #     states = self._list_states()
-    #
-    #     meta = self._var_abs2meta
-    #
-    #     expl_resids = []
-    #     impl_resids = []
-    #     for name, val in iteritems(self._residuals._views):
-    #         out = [name,]
-    #         if values:
-    #             out.append(val)
-    #         if units:
-    #             out.append(meta['output'][name]['units'])
-    #         if bounds:
-    #             out.extend((meta['output'][name]['lower'], meta['output'][name]['upper']))
-    #         if scaling:
-    #             out.extend((meta['output'][name]['ref'], meta['output'][name]['ref0'], meta['output'][name]['res_ref']))
-    #         if name in states:
-    #             impl_resids.append(tuple(out))
-    #         else:
-    #             expl_resids.append(tuple(out))
-    #
-    #     if out_stream:
-    #         if explicit:
-    #             self._write_outputs('Explicit', expl_resids, out_stream)
-    #         if implicit:
-    #             self._write_outputs('Implicit', impl_resids, out_stream)
-    #
-    #     if explicit and implicit:
-    #         return expl_resids + impl_resids
-    #     elif explicit:
-    #         return expl_resids
-    #     elif implicit:
-    #         return impl_resids
-    #     else:
-    #         raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def _write_outputs(self, in_or_out, comp_type, outputs, out_stream='stdout'):
+    def _write_outputs(self, in_or_out, comp_type, outputs, hierarchical, print_arrays, out_stream='stdout'):
         """
         Write formatted output values and residuals to out_stream.
 
@@ -2855,7 +2802,6 @@ class System(object):
 
         logger_name = 'list_inputs' if in_or_out == 'inputs' else 'list_outputs'
 
-
         logger = get_logger(logger_name, out_stream=out_stream)
 
         count = len(outputs)
@@ -2864,9 +2810,9 @@ class System(object):
 
         header_name = 'Input' if in_or_out == 'inputs' else 'Output'
         if in_or_out == 'inputs':
-            header = "%d %s(s) in '%s'\n" % (count, header_name, pathname)
+            header = "%d %s(s) in '%s'" % (count, header_name, pathname)
         else:
-            header = "%d %s %s(s) in '%s'\n" % (count, comp_type, header_name, pathname)
+            header = "%d %s %s(s) in '%s'" % (count, comp_type, header_name, pathname)
         logger.info(header)
 
         # Need an ordered list of possible values for the two cases: inputs and outputs
@@ -2876,37 +2822,185 @@ class System(object):
         else:
             out_types = ('value', 'resids', 'units', 'lower', 'upper', 'ref', 'ref0', 'res_ref')
 
-        if count:
-            logger.info("-" * len(header) + "\n")
-            for name, outs in sorted(outputs):
-                have_array_values = []
-                logger.info("%s" % name)
-                for out_type in out_types:
-                    if out_type in outs:
-                        if isinstance(outs[out_type], np.ndarray) and not np.isscalar(outs[out_type]):
-                            have_array_values.append(out_type)
-                        else:
-                            logger.info("  {}:    {}".format(out_type, outs[out_type]))
-                for array_out_types in have_array_values:
-                    from six.moves import cStringIO
-                    sio = cStringIO()
-                    # np.savetxt(sio, outs[array_out_types], fmt='%5s') # qqq TODO need to check the formatting
-                    s = sio.getvalue()
-                    # logger.info("  {}:    {}\n".format(out_type, s))
-                    logger.info("  {}:\n".format(array_out_types))
-                    logger.info(outs[array_out_types])
-                logger.info('\n')
+        logger.info("-" * len(header) + "\n")
 
-            # if isinstance(outputs[0], tuple):
-            #     for name, _ in sorted(outputs):
-            #         logger.info("%s" % name)
-            #         logger.info("  value:    " + str(self._outputs._views[name]))
-            #         logger.info("  residual: " + str(self._residuals._views[name]))
-            #         logger.info('\n')
-            # else:
-            #     for name in sorted(outputs):
-            #         logger.info(name)
-            #     logger.info('\n')
+        if not count:
+            return
+
+        # Figure out which columns will be displayed
+        outs = outputs[0][1]
+        column_names = []
+        for out_type in out_types:
+            if out_type in outs:
+                column_names.append(out_type)
+
+        # constants
+        self._column_widths = {
+            'value': 20,
+            'resids': 20,
+            'units': 10,
+            'lower': 20,
+            'upper': 20,
+            'ref': 20,
+            'ref0': 20,
+            'res_ref': 20,
+        }
+        self._align = ''
+        self._column_spacing = 2
+        self._indent_inc = 2
+        self._array_printed_below = '------'
+
+
+        # Find longest first column
+        max_varname_len = 0
+        if hierarchical:
+            for name, outs in outputs:
+                num_parts = len(name.split('.'))
+                indent = self._indent_inc * num_parts
+                varname_len = len(name.split('.')[-1])
+                total_len = indent + varname_len
+                if total_len > max_varname_len:
+                    max_varname_len = total_len
+        else:
+            for name, outs in outputs:
+                if len(name) > max_varname_len:
+                    max_varname_len = len(name)
+
+        # Common to both hierarchical and non-hierarchical
+        column_header = '{:{align}{width}}'.format('varname', align=self._align, width=max_varname_len)
+        column_dashes = max_varname_len * '-'
+        for column_name in column_names:
+            column_header += self._column_spacing * ' '
+            column_header += '{:{align}{width}}'.format(column_name, align=self._align, width=self._column_widths[column_name])
+            column_dashes += self._column_spacing * ' ' + self._column_widths[column_name] * '-'
+        logger.info(column_header)
+        logger.info(column_dashes)
+
+        if hierarchical:
+            # Need to know how to get the output values from the passed in list of tuples
+            name_to_idx_map = {}
+            for idx, (name, outs) in enumerate(sorted(outputs)):
+                name_to_idx_map[name] = idx
+
+            for s in self.system_iter(local=True, include_self=True, recurse=True):
+                if s.pathname:
+                    num_parts = len(s.pathname.split('.'))
+                    system_name = s.pathname.split('.')[-1]
+                else:
+                    num_parts = 0
+                    system_name = 'top'
+                system_indent = self._indent_inc * num_parts
+                logger.info(system_indent * ' ' + system_name)
+                for name, val in iteritems(s._outputs._views):
+                    # Only do outputs at that system level
+                    if len(name.split('.')) - num_parts > 1:
+                        continue
+
+                    varname = name.split('.')[-1]
+                    var_indent = system_indent + self._indent_inc
+                    row = '{:{align}{width}}'.format(var_indent * ' ' + varname, align=self._align, width=max_varname_len)
+
+                    idx = name_to_idx_map[name]
+                    outs = outputs[idx][1]
+                    self._write_outputs_rows(logger, row, column_names, outs, print_arrays)
+                    # for column_name in column_names:
+                    #     row += column_spacing * ' '
+                    #     if isinstance(outs[column_name], np.ndarray) and outs[column_name].size > 1:
+                    #         out = '({})'.format(str(np.linalg.norm(outs[column_name])))
+                    #     else:
+                    #         out = str(outs[column_name])
+                    #     row += '{:{align}{width}}'.format(out, align=align, width=column_widths[column_name])
+                    # logger.info(row)
+        else:
+            for name, outs in sorted(outputs):
+                row = '{:{align}{width}}'.format(name, align=self._align, width=max_varname_len)
+                self._write_outputs_rows(logger, row, column_names, outs, print_arrays)
+                # for column_name in column_names:
+                #     row += column_spacing * ' '
+                #     if isinstance(outs[column_name], np.ndarray) and outs[column_name].size > 1 :
+                #         if print_arrays:
+                #             out = array_printed_below # qqq TODO does not really work yet
+                #         else:
+                #             out = '({})'.format(str(np.linalg.norm(outs[column_name])))
+                #     else:
+                #         out = str(outs[column_name])
+                #     row += '{:{align}{width}}'.format(out, align=align, width=column_widths[column_name])
+                # logger.info(row)
+        logger.info('\n')
+
+
+    def _write_outputs_rows(self, logger, row, column_names, outs, print_arrays):
+        for column_name in column_names:
+            row += self._column_spacing * ' '
+            if isinstance(outs[column_name], np.ndarray) and outs[column_name].size > 1:
+                if print_arrays:
+                    out = self._array_printed_below  # qqq TODO does not really work yet
+                else:
+                    out = '({})'.format(str(np.linalg.norm(outs[column_name])))
+            else:
+                out = str(outs[column_name])
+            row += '{:{align}{width}}'.format(out, align=self._align, width=self._column_widths[column_name])
+        logger.info(row)
+
+
+
+
+
+        #
+        #
+        # if not hierarchical:
+        #     for name, outs in sorted(outputs):
+        #         logger.info("%s" % name)
+        #         for out_type in column_names:
+        #             if isinstance(outs[out_type], np.ndarray) and not np.isscalar(outs[out_type]):
+        #                 logger.info("  {}:".format(out_type))
+        #                 logger.info(outs[out_type])
+        #             else:
+        #                 logger.info("  {}:    {}".format(out_type, outs[out_type]))
+        #         logger.info('\n')
+        # else:
+        #     # Make a map between the list of vars and where they are in the list
+        #     name_to_idx_map = {}
+        #     for idx, (name, outs) in enumerate( sorted(outputs) ):
+        #         name_to_idx_map[name] = idx
+        #
+        #     for s in self.system_iter(local=True, include_self=True, recurse=True):
+        #         if s.pathname:
+        #             pathname_parts = len(s.pathname.split('.'))
+        #             system_name = s.pathname.split('.')[-1]
+        #         else:
+        #             pathname_parts = 0
+        #             system_name = 'top'
+        #         system_indent = 2 * pathname_parts
+        #         logger.info(system_indent * ' ' + system_name)
+        #         for name, val in iteritems(s._outputs._views):
+        #             var_indent = system_indent + 2
+        #             if len(name.split('.')) - pathname_parts == 1:
+        #                 idx = name_to_idx_map[name]
+        #                 outs = outputs[idx][1]
+        #                 have_array_values = []
+        #                 logger.info("{}Output: {}".format(var_indent * ' ', name.split('.')[-1]))
+        #                 for out_type in out_types:
+        #                     if out_type in outs:
+        #                         if isinstance(outs[out_type], np.ndarray) and not outs[out_type].size == 1:
+        #                             logger.info("{}  {}:".format(var_indent * ' ', out_type))
+        #                             logger.info('{}{}'.format((var_indent + 6) * ' ', outs[out_type]))
+        #                             # have_array_values.append(out_type)
+        #                         else:
+        #                             logger.info("{}  {}:    {}".format(var_indent * ' ', out_type, outs[out_type]))
+        #                 for array_out_types in have_array_values:
+        #                     logger.info("{}  {}:".format(var_indent * ' ', array_out_types))
+        #                     logger.info('{}{}'.format((var_indent + 6 )* ' ', outs[array_out_types]))
+        #     logger.info('\n')
+        #
+        #
+        #
+        #
+        #
+
+
+
+
 
     def run_solve_nonlinear(self):
         """
