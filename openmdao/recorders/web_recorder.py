@@ -128,7 +128,19 @@ class WebRecorder(BaseRecorder):
             'prom2abs': prom2abs
         }
 
+        self._record_metadata(metadata_dict)
+
+    def _record_metadata(self, metadata_dict):
+        """
+        Records metadata to the server
+
+        Parameters
+        ----------
+        metadata_dict : dict
+            Dictonary containing abs2prom and prom2abs
+        """
         metadata = json.dumps(metadata_dict)
+
         requests.post(self._endpoint + '/' + self._case_id + '/metadata',
                       data=metadata, headers=self._headers)
 

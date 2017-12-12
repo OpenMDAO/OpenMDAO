@@ -33,6 +33,10 @@ def upload(sqlite_file, token, name=None, case_id=None, suppress_output=False):
         recorder = WebRecorder(token, name, case_id=case_id)
 
     if not suppress_output:
+        print('Data Uploader: Recording metadata')
+    _upload_metadata(reader._abs2prom, reader._prom2abs, recorder)
+
+    if not suppress_output:
         print('Data Uploader: Recording driver iteration data')
     _upload_driver_iterations(reader.driver_cases, recorder)
 
@@ -52,6 +56,25 @@ def upload(sqlite_file, token, name=None, case_id=None, suppress_output=False):
     if not suppress_output:
         print('Finished uploading')
 
+
+def _upload_metadata(abs2prom, prom2abs, recorder):
+    """
+    Upload the abs2prom and prom2abs metadata ot the server.
+
+    Parameters
+    ----------
+    abs2prom : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names to promoted names.
+    prom2abs : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names to absolute names.
+    recorder : WebRecorder
+        The web recorder used to upload this data.
+    """
+    metadata = {
+        'abs2prom': recorder.convert_to_list(abs2prom),
+        'prom2abs': recorder.convert_to_list(prom2abs)
+    }
+    recorder._record_metadata(metadata)
 
 def _upload_system_iterations(new_list, recorder):
     """
