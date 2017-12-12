@@ -50,6 +50,7 @@ class TestDataUploader(unittest.TestCase):
     _default_case_id = '123456'
     _accepted_token = 'test'
     recorded_metadata = False
+    recorded_driver_metadata = False
     recorded_driver_iteration = False
     recorded_global_iteration = False
     recorded_system_metadata = False
@@ -146,6 +147,8 @@ class TestDataUploader(unittest.TestCase):
 
     def setup_endpoints(self, m):
         m.post(self._endpoint_base, json=self.check_header, status_code=200)
+        m.post(self._endpoint_base + '/' + self._default_case_id + '/metadata',
+               json = self.check_metadata)
         m.post(self._endpoint_base + '/' + self._default_case_id + '/global_iterations',
                json=self.check_global_iteration)
         m.post(self._endpoint_base + '/' + self._default_case_id + '/driver_metadata',
@@ -162,6 +165,10 @@ class TestDataUploader(unittest.TestCase):
                json=self.check_solver_iterations)
         m.post(self._endpoint_base + '/' + '54321' + '/driver_metadata',
                json = self.check_driver)
+        m.post(self._endpoint_base + '/' + '54321' + '/metadata',
+               json = self.check_metadata)
+
+
     def check_header(self, request, context):
         if request.headers['token'] == self._accepted_token:
             return {
@@ -175,8 +182,13 @@ class TestDataUploader(unittest.TestCase):
                 'reasoning': 'Bad token'
             }
 
-    def check_driver(self, request, context):
+    def check_metadata(self, request, context):
         self.recorded_metadata = True
+        self.metadata = request.body
+        return {'status': 'Success'}
+
+    def check_driver(self, request, context):
+        self.recorded_driver_metadata = True
         self.driver_data = request.body
         self.update_header = request.headers['update']
         return {'status': 'Success'}
@@ -222,8 +234,8 @@ class TestDataUploader(unittest.TestCase):
 
         self.prob.cleanup()
         upload(self.filename, self._accepted_token, suppress_output=True, case_id='54321')
-        self.assertTrue(self.recorded_metadata)
-        self.recorded_metadata = False
+        self.assertTrue(self.recorded_driver_metadata)
+        self.recorded_driver_metadata = False
 
         self.assertEqual(self.update_header, 'True')
 
@@ -242,8 +254,8 @@ class TestDataUploader(unittest.TestCase):
 
         self.prob.cleanup()
         upload(self.filename, self._accepted_token, suppress_output=True)
-        self.assertTrue(self.recorded_metadata)
-        self.recorded_metadata = False
+        self.assertTrue(self.recorded_driver_metadata)
+        self.recorded_driver_metadata = False
 
         self.assertEqual(self.update_header, 'False')
 
@@ -263,8 +275,8 @@ class TestDataUploader(unittest.TestCase):
         self.prob.cleanup()
 
         upload(self.filename, self._accepted_token, suppress_output=True)
-        self.assertTrue(self.recorded_metadata)
-        self.recorded_metadata = False
+        self.assertTrue(self.recorded_driver_metadata)
+        self.recorded_driver_metadata = False
 
         driv_data = json.loads(self.driver_data)
         self.driver_data = None
@@ -483,6 +495,70 @@ class TestDataUploader(unittest.TestCase):
             self.assert_array_close(o, system_iterations['outputs'])
         for r in residuals:
             self.assert_array_close(r, system_iterations['residuals'])
+
+    def test_record_metadata(self, m):
+        self.setup_endpoints(m)
+
+        self.setup_sellar_model()
+
+        self.prob.driver.add_recorder(self.recorder)
+        self.prob.setup(check=False)
+
+        run_driver(self.prob)
+
+        self.prob.cleanup()
+        upload(self.filename, self._accepted_token)
+        
+        self.assertTrue(self.recorded_metadata)
+        self.recorded_metadata = False
+
+        metadata = json.loads(self.metadata)
+        self.metadata = None
+
+        self.assertEqual(len(metadata['abs2prom']['input']), 11)
+        self.assertEqual(len(metadata['abs2prom']['output']), 7)
+        self.assertEqual(len(metadata['prom2abs']['input']), 4)
+        self.assertEqual(len(metadata['prom2abs']['output']), 7)
+
+    def test_record_metadata_system(self, m):
+        self.setup_endpoints(m)
+
+        self.setup_sellar_model()
+
+        self.prob.model.d1.add_recorder(self.recorder)
+        self.prob.setup(check=False)
+
+        run_driver(self.prob)
+
+        self.prob.cleanup()
+        upload(self.filename, self._accepted_token)
+        self.assertTrue(self.recorded_metadata)
+
+        metadata = json.loads(self.metadata)
+        self.assertEqual(len(metadata['abs2prom']['input']), 3)
+        self.assertEqual(len(metadata['abs2prom']['output']), 1)
+        self.assertEqual(len(metadata['prom2abs']['input']), 3)
+        self.assertEqual(len(metadata['prom2abs']['output']), 1)
+
+    def test_record_metadata_values(self, m):
+        self.setup_endpoints(m)
+
+        self.setup_sellar_model()
+
+        self.prob.model.d1.add_recorder(self.recorder)
+        self.prob.setup(check=False)
+
+        run_driver(self.prob)
+
+        self.prob.cleanup()
+        upload(self.filename, self._accepted_token)
+        self.assertTrue(self.recorded_metadata)
+
+        metadata = json.loads(self.metadata)
+        self.assertEqual(metadata['abs2prom']['input']['d1.z'], 'z')
+        self.assertEqual(metadata['abs2prom']['input']['d1.x'], 'x')
+        self.assertEqual(metadata['prom2abs']['input']['z'][0], 'd1.z')
+        self.assertEqual(metadata['prom2abs']['input']['x'][0], 'd1.x')
 
     def test_simple_driver_recording(self, m):
         self.setup_endpoints(m)
