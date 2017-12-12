@@ -132,7 +132,7 @@ class WebRecorder(BaseRecorder):
 
     def _record_metadata(self, metadata_dict):
         """
-        Records metadata to the server
+        Record metadata to the server.
 
         Parameters
         ----------

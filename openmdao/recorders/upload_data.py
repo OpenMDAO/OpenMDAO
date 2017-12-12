@@ -76,6 +76,7 @@ def _upload_metadata(abs2prom, prom2abs, recorder):
     }
     recorder._record_metadata(metadata)
 
+
 def _upload_system_iterations(new_list, recorder):
     """
     Upload all system iterations to the web server.
