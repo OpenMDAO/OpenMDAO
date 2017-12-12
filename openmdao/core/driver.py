@@ -76,6 +76,10 @@ class Driver(object):
         (owning rank, size).
     _remote_responses : dict
         A combined dict containing entries from _remote_cons and _remote_objs.
+    _simul_coloring_info : tuple of dicts
+        A data structure describing coloring for simultaneous derivs.
+    _res_jacs : dict
+        Dict of sparse subjacobians for use with certain optimizers, e.g. pyOptSparseDriver.
     """
 
     def __init__(self):
@@ -326,7 +330,7 @@ class Driver(object):
             self._rec_mgr.record_metadata(self)
 
         # set up simultaneous deriv coloring
-        if self._simul_coloring_info:
+        if self._simul_coloring_info and self.supports['simultaneous_derivatives']:
             coloring, maps = self._simul_coloring_info
             if problem._mode == 'fwd':
                 for dv, colors in iteritems(coloring):
@@ -346,14 +350,14 @@ class Driver(object):
 
                         row = np.hstack(rows)
                         col = np.hstack(cols)
-                        print("sparsity for %s, %s: %d of %s" % (res, dv, row.size, (self._responses[res]['size'] * self._designvars[dv]['size'],)))
+                        # print("sparsity for %s, %s: %d of %s" % (res, dv, row.size,
+                        #       (self._responses[res]['size'] * self._designvars[dv]['size'],)))
                         self._res_jacs[res][dv] = {
                             'coo': [row, col, np.zeros(row.size)],
                             'shape': [self._responses[res]['size'], self._designvars[dv]['size']]
                         }
                         nzeros += row.size
-                print("NONZERO NL JAC ENTRIES:", nzeros)
-
+                # print("NONZERO NL JAC ENTRIES:", nzeros)
             else:
                 raise RuntimeError("simultaneous derivs are currently not supported in rev mode.")
 

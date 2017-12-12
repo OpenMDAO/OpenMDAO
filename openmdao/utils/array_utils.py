@@ -46,7 +46,7 @@ def evenly_distrib_idxs(num_divisions, arr_size):
 
 def take_nth(rank, size, seq):
     """
-    An iterator returning every nth value.
+    Iterate returning every nth value.
 
     Return an iterator over the sequence that returns every
     nth element of seq based on the given rank within a group of
@@ -100,6 +100,8 @@ def array_viz(arr, stream=sys.stdout):
     ----------
     arr : ndarray
         Array being visualized.
+    stream : file-like
+        Stream where output will be written.
     """
     if len(arr.shape) != 2:
         raise RuntimeError("array_viz only works for 2d arrays.")

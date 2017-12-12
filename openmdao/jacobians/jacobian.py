@@ -252,8 +252,6 @@ class Jacobian(object):
         """
         Store subjacobian metadata.
 
-        Note: this method MUST be called by a Component because prom_key is otherwise non-unique.
-
         Parameters
         ----------
         abs_key : (str, str)

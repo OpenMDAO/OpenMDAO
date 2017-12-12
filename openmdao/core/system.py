@@ -6,6 +6,7 @@ from collections import OrderedDict, Iterable, defaultdict
 from fnmatch import fnmatchcase
 import sys
 from itertools import product
+from numbers import Integral
 
 from six import iteritems, string_types
 from six.moves import range
@@ -2033,6 +2034,11 @@ class System(object):
         dvs['ref'] = ref
         dvs['ref0'] = ref0
         if indices is not None:
+            # If given, indices must be a sequence
+            if not (isinstance(indices, Iterable) and
+                    all([isinstance(i, Integral) for i in indices])):
+                raise ValueError("If specified, indices must be a sequence of integers.")
+
             indices = np.atleast_1d(indices)
             dvs['size'] = len(indices)
         dvs['indices'] = indices
@@ -2130,19 +2136,9 @@ class System(object):
             raise ValueError(msg.format(name))
 
         # If given, indices must be a sequence
-        err = False
-        if indices is not None:
-            if isinstance(indices, string_types):
-                err = True
-            elif isinstance(indices, Iterable):
-                all_int = all([isinstance(item, int) for item in indices])
-                if not all_int:
-                    err = True
-            else:
-                err = True
-        if err:
-            msg = "If specified, indices must be a sequence of integers."
-            raise ValueError(msg)
+        if (indices is not None and not (
+                isinstance(indices, Iterable) and all([isinstance(i, Integral) for i in indices]))):
+            raise ValueError("If specified, indices must be a sequence of integers.")
 
         if self._static_mode:
             responses = self._static_responses
