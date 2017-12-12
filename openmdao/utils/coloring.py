@@ -5,16 +5,14 @@ from __future__ import division, print_function
 
 import sys
 
-from collections import OrderedDict, defaultdict, namedtuple
-from itertools import product
-import logging
+from collections import OrderedDict, defaultdict
+from itertools import combinations
 
-from six import iteritems, iterkeys, itervalues
+from six import iteritems
 from six.moves import range
 
 import numpy as np
 
-from openmdao.core.component import Component
 from openmdao.jacobians.assembled_jacobian import DenseJacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
 
@@ -102,10 +100,6 @@ def _find_disjoint(prob, mode='fwd', tol=1e-10):
         Tuple of dicts total_dv_offsets and total_res_offsets.
     """
     # TODO: fix this to work in rev mode as well
-
-    from collections import defaultdict
-    from itertools import combinations, product
-    from openmdao.utils.array_utils import array_viz
 
     # prob.model.jacobian = _SimulJacobian()
     # clear out any old simul coloring info
