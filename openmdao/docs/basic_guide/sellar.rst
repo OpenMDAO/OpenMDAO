@@ -1,21 +1,21 @@
-In previous tutorials, you built and optimized models comprised of only a single component.
-Now, we'll work through a slightly more complex problem that involves two disciplines and hence two main components.
+In the monodisciplinary tutorials, we built and optimized models comprised of only a single component.
+Now, we'll work through a slightly more complex problem that involves two disciplines, and hence two main components.
 You'll learn how to group components together into a larger model and how to use
 a :ref:`NonlinearBlockGaussSeidel <nlbgs>` nonlinear solver to converge a group with coupled components.
 
 .. _sellar:
 
-***********************************************************
+*********************************************************
 Sellar - A Two-Discipline Problem with a Nonlinear Solver
-***********************************************************
+*********************************************************
 
-The Sellar problem is a two discipline toy problem with each discipline described by a single equation.
-There isn't any physical significance to the equations, its just compact example to use as a means of understanding
+The Sellar problem is a two-discipline toy problem with each discipline described by a single equation.
+There isn't any physical significance to the equations, it's just a compact example to use as a means of understanding
 simple coupled models.
 The output of each component feeds into the input of the other, which creates a coupled model that needs to
 be converged in order for the outputs to be valid.
-You can see the coupling between the two disciplines show up through the :math:`y_1` and :math:`y_2` variables in the
-`XDSM <http://mdolab.engin.umich.edu/content/xdsm-overview>`_ diagram describing the problem structure below:
+You can see the coupling between the two disciplines show up through the :math:`y_1` and :math:`y_2` variables in the following
+`XDSM <http://mdolab.engin.umich.edu/content/xdsm-overview>`_ diagram that describes the problem structure:
 
 .. figure:: images/sellar_xdsm.png
    :align: center
@@ -25,7 +25,7 @@ You can see the coupling between the two disciplines show up through the :math:`
 ----
 
 Building the Disciplinary Components
-****************************************
+************************************
 
 In the component definitions, there is a call to :ref:`declare_partials <feature_declare_partials_approx>` in the setup method that looks like this:
 
@@ -33,7 +33,7 @@ In the component definitions, there is a call to :ref:`declare_partials <feature
 
     self.declare_partials('*', '*', method='fd')
 
-This tells OpenMDAO to approximate all the partial derivatives of that component using finite-difference.
+This tells OpenMDAO to approximate all the partial derivatives of that component using finite difference.
 The default settings will use forward difference with an absolute step size of 1e-6, but you can change the :ref:`FD settings <feature_declare_partials_approx>` to work well for your component.
 
 .. embed-code::
@@ -46,7 +46,7 @@ The default settings will use forward difference with an absolute step size of 1
 
 
 Grouping and Connecting Components
-**************************************************
+**********************************
 
 We want to build the model represented by the XDSM diagram above.
 We've defined the two disciplinary components, but there are still the three outputs of the model that need to be computed.
@@ -61,9 +61,9 @@ We're working with a new type of class: :ref:`Group <feature_grouping_components
 This is the container that lets you build up complex model hierarchies.
 Groups can contain other groups, components, or combinations of groups and components.
 
-You can directly create instances of :code:`Group` to work with, or you can sub-class from it to define your own custom
-groups. We're doing both things here. First, we define our own custom :code:`Group` sub-class called :code:`SellarMDA`.
-In our run-script well create an instance of :code:`SellarMDA` to actually run it.
+You can directly create instances of :code:`Group` to work with, or you can subclass from it to define your own custom
+groups. We're doing both things here. First, we define our own custom :code:`Group` subclass called :code:`SellarMDA`.
+In our run script well create an instance of :code:`SellarMDA` to actually run it.
 Then inside the :code:`setup` method of :code:`SellarMDA` we're also working directly with a group instance by doing this:
 
 .. code::

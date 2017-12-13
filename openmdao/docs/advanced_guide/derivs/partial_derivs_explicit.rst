@@ -79,7 +79,7 @@ Any time you implement analytic derivatives, or change the nonlinear equations o
 
 There is a lot of information there, including checks for both forward and reverse derivatives.
 If you've taken our advice and stuck with the :code:`compute_partials` method, then you can ignore all the reverse stuff.
-For now, just take a look at the third-to-last column, which shows the norm of the difference between the analytic derivatives Jacobian and one that was approximated using finite-difference.
+For now, just take a look at the third-to-last column, which shows the norm of the difference between the analytic derivatives Jacobian and one that was approximated using finite difference.
 Here, all the numbers are really small, and that's what you want to see.
-Its rare, except for linear functions, that the finite-difference and analytic derivatives will match exactly, but they should be pretty close.
+Its rare, except for linear functions, that the finite difference and analytic derivatives will match exactly, but they should be pretty close.
 

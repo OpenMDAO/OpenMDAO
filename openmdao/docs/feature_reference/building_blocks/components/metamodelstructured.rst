@@ -62,7 +62,7 @@ The following example shows the use of training data gradients. This is the
 same example problem as above, but note `training_data_gradients` has been set 
 to `True`. This automatically creates an input named `f_train` when the output
 `f` was added. The gradient of `f` with respect to `f_train` is also seen to 
-match the finite-difference estimate in the `check_partials` output.
+match the finite difference estimate in the `check_partials` output.
 
 .. embed-test::
     openmdao.components.tests.test_meta_model_structured.TestMetaModelStructuredMapFeature.test_training_derivatives

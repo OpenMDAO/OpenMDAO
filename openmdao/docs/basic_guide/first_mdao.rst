@@ -21,7 +21,7 @@ Remember that we built our Sellar model as follows:
 .. embed-code::
     openmdao.test_suite.components.sellar_feature.SellarMDA
 
-All the variables we need to set up the optimization are there. So now we just need the run-script to execute the optimization.
+All the variables we need to set up the optimization are there. So now we just need the run script to execute the optimization.
 
 .. embed-test::
     openmdao.test_suite.test_examples.test_sellar_opt.TestSellarOpt.test_sellar_opt
@@ -40,7 +40,7 @@ Approximate the total derivatives with finite difference
 
 In this case we're using the `SLSQP` algorithm, which is a gradient based optimization approach.
 Up to this point none of our components have provided any analytic derivatives,
-so we'll just finite-difference across the whole model to approximate the derivatives.
+so we'll just finite difference across the whole model to approximate the derivatives.
 That is accompished by this line of code:
 
 .. code::
@@ -49,7 +49,7 @@ That is accompished by this line of code:
 
 .. note::
 
-    We're using finite-difference here for simplicity,
+    We're using finite difference here for simplicity,
     but for larger models finite differencing results in a high computational cost and can have limited accuracy.
     Its much better to use analytic derivatives with your models.
     You can learn more about that in the advanced tutorials.

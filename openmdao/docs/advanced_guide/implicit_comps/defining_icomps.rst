@@ -115,7 +115,7 @@ Modifying Solver Settings in Your Run Script
 In the above run script, we set some initial guess values: :code:`prob['n1.V']=10` and :code:`prob['n2.V']=1`.
 If you try to play around with those initial guesses a bit, you will see that convergence is really sensitive to
 the initial guess you used for *n2.V*.
-Here is a second run-script that uses the same :code:`Circuit` group we defined previously, but modifies some solvers settings and initial guesses.
+Here is a second run script that uses the same :code:`Circuit` group we defined previously, but modifies some solvers settings and initial guesses.
 If we set the initial guess for :code:`prob['n2.V']=1e-3`, then the model starts out with a massive residual.
 It also converges much more slowly so although we gave it more than twice the number of iterations it doesn't even get close to a converged answer.
 
@@ -158,5 +158,5 @@ but you need to be careful about the :ref:`execution order <feature_set_order>` 
 
 
 .. note::
-    This tutorial used finite-difference to approximate the partial derivatives for all the components.
+    This tutorial used finite difference to approximate the partial derivatives for all the components.
     Check out :ref:`this example <circuit_analysis_examples>` if you want to see the same problem solved with analytic derivatives.
