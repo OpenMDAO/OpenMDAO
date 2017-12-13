@@ -2526,7 +2526,7 @@ class System(object):
                      values=True,
                      residuals=False,
                      units=False,
-                     shape=False, # qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq TODO
+                     shape=False,
                      bounds=False,
                      scaling=False,
                      print_arrays=False,
@@ -2642,6 +2642,8 @@ class System(object):
                 outs['resids'] = self._residuals._views[name]
             if units:
                 outs['units'] = meta['output'][name]['units']
+            if shape:
+                outs['shape'] = val.shape
             if bounds:
                 outs['lower'] = meta['output'][name]['lower']
                 outs['upper'] = meta['output'][name]['upper']
@@ -2709,7 +2711,7 @@ class System(object):
         if in_or_out == 'inputs':
             out_types = ('value', 'units',)
         else:
-            out_types = ('value', 'resids', 'units', 'lower', 'upper', 'ref', 'ref0', 'res_ref')
+            out_types = ('value', 'resids', 'units', 'shape', 'lower', 'upper', 'ref', 'ref0', 'res_ref')
 
         logger.info("-" * len(header) + "\n")
 
@@ -2728,6 +2730,7 @@ class System(object):
             'value': 20,
             'resids': 20,
             'units': 10,
+            'shape': 10,
             'lower': 20,
             'upper': 20,
             'ref': 20,
@@ -2818,77 +2821,6 @@ class System(object):
         for column_name in have_array_values:
             logger.info("{}  {}:".format(left_column_width * ' ', column_name))
             logger.info('{}{}'.format((left_column_width + 6) * ' ', outs[column_name]))
-
-
-        #                 have_array_values = []
-        #                 logger.info("{}Output: {}".format(var_indent * ' ', name.split('.')[-1]))
-        #                 for out_type in out_types:
-        #                     if out_type in outs:
-        #                         if isinstance(outs[out_type], np.ndarray) and not outs[out_type].size == 1:
-        #                             logger.info("{}  {}:".format(var_indent * ' ', out_type))
-        #                             logger.info('{}{}'.format((var_indent + 6) * ' ', outs[out_type]))
-        #                             # have_array_values.append(out_type)
-        #                         else:
-        #                             logger.info("{}  {}:    {}".format(var_indent * ' ', out_type, outs[out_type]))
-        #                 for array_out_types in have_array_values:
-        #                     logger.info("{}  {}:".format(var_indent * ' ', array_out_types))
-        #                     logger.info('{}{}'.format((var_indent + 6 )* ' ', outs[array_out_types]))
-
-
-
-
-
-        #
-        #
-        # if not hierarchical:
-        #     for name, outs in sorted(outputs):
-        #         logger.info("%s" % name)
-        #         for out_type in column_names:
-        #             if isinstance(outs[out_type], np.ndarray) and not np.isscalar(outs[out_type]):
-        #                 logger.info("  {}:".format(out_type))
-        #                 logger.info(outs[out_type])
-        #             else:
-        #                 logger.info("  {}:    {}".format(out_type, outs[out_type]))
-        #         logger.info('\n')
-        # else:
-        #     # Make a map between the list of vars and where they are in the list
-        #     name_to_idx_map = {}
-        #     for idx, (name, outs) in enumerate( sorted(outputs) ):
-        #         name_to_idx_map[name] = idx
-        #
-        #     for s in self.system_iter(local=True, include_self=True, recurse=True):
-        #         if s.pathname:
-        #             pathname_parts = len(s.pathname.split('.'))
-        #             system_name = s.pathname.split('.')[-1]
-        #         else:
-        #             pathname_parts = 0
-        #             system_name = 'top'
-        #         system_indent = 2 * pathname_parts
-        #         logger.info(system_indent * ' ' + system_name)
-        #         for name, val in iteritems(s._outputs._views):
-        #             var_indent = system_indent + 2
-        #             if len(name.split('.')) - pathname_parts == 1:
-        #                 idx = name_to_idx_map[name]
-        #                 outs = outputs[idx][1]
-        #                 have_array_values = []
-        #                 logger.info("{}Output: {}".format(var_indent * ' ', name.split('.')[-1]))
-        #                 for out_type in out_types:
-        #                     if out_type in outs:
-        #                         if isinstance(outs[out_type], np.ndarray) and not outs[out_type].size == 1:
-        #                             logger.info("{}  {}:".format(var_indent * ' ', out_type))
-        #                             logger.info('{}{}'.format((var_indent + 6) * ' ', outs[out_type]))
-        #                             # have_array_values.append(out_type)
-        #                         else:
-        #                             logger.info("{}  {}:    {}".format(var_indent * ' ', out_type, outs[out_type]))
-        #                 for array_out_types in have_array_values:
-        #                     logger.info("{}  {}:".format(var_indent * ' ', array_out_types))
-        #                     logger.info('{}{}'.format((var_indent + 6 )* ' ', outs[array_out_types]))
-        #     logger.info('\n')
-        #
-        #
-        #
-        #
-        #
 
 
 

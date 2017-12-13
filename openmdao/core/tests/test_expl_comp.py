@@ -230,6 +230,14 @@ class ExplCompTestCase(unittest.TestCase):
             ('p2.y', { 'units': 'ft' } ),
         ])
 
+        # list explicit outputs with shape
+        outputs = prob.model.list_outputs(implicit=False, values=False, shape=True, out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('comp.z', { 'shape': (1,) } ),
+            ('p1.x', { 'shape': (1,) } ),
+            ('p2.y', { 'shape': (1,) } ),
+        ])
+
         # list explicit outputs with bounds
         outputs = prob.model.list_outputs(implicit=False, values=False, bounds=True, out_stream=None)
         self.assertEqual(sorted(outputs), [
@@ -368,6 +376,7 @@ class ExplCompTestCase(unittest.TestCase):
         stream = cStringIO()
         outputs = prob.model.list_outputs(values=True,
                                           units=True,
+                                          shape=True,
                                           bounds=True,
                                           residuals=True,
                                           scaling=True,
