@@ -2515,99 +2515,18 @@ class System(object):
             if units:
                 outs['units'] = meta['input'][name]['units']
             inputs.append((name, outs))
-        # for name, val in iteritems(self._inputs._views):
-        #     out = [name,]
-        #     if values:
-        #         out.append(val)
-        #     if units:
-        #         out.append(meta['input'][name]['units'])
-        #     inputs.append(tuple(out))
-
 
         if out_stream:
-            self._write_outputs('inputs', None, inputs, print_arrays, out_stream)
-
-
-        # if out_stream:
-        #     logger = get_logger('list_inputs', out_stream=out_stream)
-        #
-        #     count = len(inputs)
-        #
-        #     pathname = self.pathname if self.pathname else 'model'
-        #
-        #     header = "%d Input(s) to Components in '%s'\n" % (count, pathname)
-        #     logger.info(header)
-        #
-        #     # qqq TODO needs fixing. Do something like _write_outputs ?? and test it
-        #
-        #     if count:
-        #         logger.info("-" * len(header) + "\n")
-        #         if isinstance(inputs[0], tuple):
-        #             for name, val in sorted(inputs):
-        #                 logger.info(name)
-        #                 logger.info("  value:    " + str(val) + "\n")
-        #         else:
-        #             for name in sorted(inputs):
-        #                 logger.info(name)
-        #         logger.info('\n')
+            self._write_outputs('inputs', None, inputs, hierarchical, print_arrays, out_stream)
 
         return inputs
-
-
-    def list_outputs_orig(self, explicit=True, implicit=True, values=True, out_stream='stdout'):
-        """
-        List outputs.
-        Parameters
-        ----------
-        explicit : bool, optional
-            include outputs from explicit components. Default is True.
-        implicit : bool, optional
-            include outputs from implicit components. Default is True.
-        values : bool, optional
-            When True, display/return output values as well as names. Default is True.
-        out_stream : 'stdout', 'stderr' or file-like
-            Where to send human readable output. Default is 'stdout'.
-            Set to None to suppress.
-        Returns
-        -------
-        list
-            list of of output names, or (name, value) if values is True
-        """
-        if self._outputs is None:
-            raise RuntimeError("Unable to list outputs until model has been run.")
-
-        states = self._list_states()
-
-        expl_outputs = []
-        impl_outputs = []
-        for name, val in iteritems(self._outputs._views):
-            if name in states:
-                impl_outputs.append((name, val)) if values else impl_outputs.append(name)
-            else:
-                expl_outputs.append((name, val)) if values else expl_outputs.append(name)
-
-        if out_stream:
-            if explicit:
-                self._write_outputs('Explicit', expl_outputs, out_stream)
-            if implicit:
-                self._write_outputs('Implicit', impl_outputs, out_stream)
-
-        if explicit and implicit:
-            return expl_outputs + impl_outputs
-        elif explicit:
-            return expl_outputs
-        elif implicit:
-            return impl_outputs
-        else:
-            raise RuntimeError('You have excluded both Explicit and Implicit components.')
-
 
     def list_outputs(self, explicit=True, implicit=True,
                      hierarchical=True,
                      values=True,
                      residuals=False,
                      units=False,
-                     shape=False, # qqq TODO
+                     shape=False, # qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq TODO
                      bounds=False,
                      scaling=False,
                      print_arrays=False,
@@ -2709,57 +2628,27 @@ class System(object):
 
         # hierarchical !
 
-        qqq =self._subsystems_myproc
-
-        qqq = self.system_iter(local=True, include_self=True, recurse=True)
-
-        qqq = list(qqq)
-
         states = self._list_states()
-
-        # print(60*'-')
-        # for s in self.system_iter(local=True, include_self=True, recurse=True):
-        #     if s.pathname:
-        #         pathname_parts = len(s.pathname.split('.'))
-        #     else:
-        #         pathname_parts = 0
-        #     system_indent = 2* pathname_parts
-        #     print( system_indent*' ', 'sys', s.pathname)
-        #     for name, val in iteritems(s._outputs._views):
-        #         var_indent = system_indent + 2
-        #         # print(name)
-        #         if len(name.split('.')) - pathname_parts == 1:
-        #             print( var_indent * ' ', 'var', name.split('.')[-1])
-        # print(60 * '-')
 
         # Go though the hierarchy. Printing Systems
         # If the System owns an output directly, show its output
-
-
-
         expl_outputs = []
         impl_outputs = []
         for name, val in iteritems(self._outputs._views):
             outs = {}
             if values:
                 outs['value'] = val
-                # out.append(val)
             if residuals:
                 outs['resids'] = self._residuals._views[name]
-                # out.append(self._residuals._views[name])
             if units:
                 outs['units'] = meta['output'][name]['units']
-                # out.append(meta['output'][name]['units'])
             if bounds:
                 outs['lower'] = meta['output'][name]['lower']
                 outs['upper'] = meta['output'][name]['upper']
-                # out.extend((meta['output'][name]['lower'], meta['output'][name]['upper']))
             if scaling:
                 outs['ref'] = meta['output'][name]['ref']
                 outs['ref0'] = meta['output'][name]['ref0']
                 outs['res_ref'] = meta['output'][name]['res_ref']
-                # out.extend((meta['output'][name]['ref'], meta['output'][name]['ref0'], meta['output'][name]['res_ref']))
-            # out = [name,]
             if name in states:
                 impl_outputs.append((name,outs))
             else:
@@ -2848,8 +2737,6 @@ class System(object):
         self._align = ''
         self._column_spacing = 2
         self._indent_inc = 2
-        self._array_printed_below = '------'
-
 
         # Find longest first column
         max_varname_len = 0
@@ -2891,7 +2778,12 @@ class System(object):
                     system_name = 'top'
                 system_indent = self._indent_inc * num_parts
                 logger.info(system_indent * ' ' + system_name)
-                for name, val in iteritems(s._outputs._views):
+                if in_or_out == 'inputs':
+                    in_or_out_views = s._inputs._views
+                else:
+                    in_or_out_views = s._outputs._views
+
+                for name, val in iteritems(in_or_out_views):
                     # Only do outputs at that system level
                     if len(name.split('.')) - num_parts > 1:
                         continue
@@ -2903,44 +2795,44 @@ class System(object):
                     idx = name_to_idx_map[name]
                     outs = outputs[idx][1]
                     self._write_outputs_rows(logger, row, column_names, outs, print_arrays)
-                    # for column_name in column_names:
-                    #     row += column_spacing * ' '
-                    #     if isinstance(outs[column_name], np.ndarray) and outs[column_name].size > 1:
-                    #         out = '({})'.format(str(np.linalg.norm(outs[column_name])))
-                    #     else:
-                    #         out = str(outs[column_name])
-                    #     row += '{:{align}{width}}'.format(out, align=align, width=column_widths[column_name])
-                    # logger.info(row)
         else:
             for name, outs in sorted(outputs):
                 row = '{:{align}{width}}'.format(name, align=self._align, width=max_varname_len)
                 self._write_outputs_rows(logger, row, column_names, outs, print_arrays)
-                # for column_name in column_names:
-                #     row += column_spacing * ' '
-                #     if isinstance(outs[column_name], np.ndarray) and outs[column_name].size > 1 :
-                #         if print_arrays:
-                #             out = array_printed_below # qqq TODO does not really work yet
-                #         else:
-                #             out = '({})'.format(str(np.linalg.norm(outs[column_name])))
-                #     else:
-                #         out = str(outs[column_name])
-                #     row += '{:{align}{width}}'.format(out, align=align, width=column_widths[column_name])
-                # logger.info(row)
         logger.info('\n')
 
 
     def _write_outputs_rows(self, logger, row, column_names, outs, print_arrays):
+        left_column_width = len(row)
+        have_array_values = []
         for column_name in column_names:
             row += self._column_spacing * ' '
             if isinstance(outs[column_name], np.ndarray) and outs[column_name].size > 1:
                 if print_arrays:
-                    out = self._array_printed_below  # qqq TODO does not really work yet
-                else:
-                    out = '({})'.format(str(np.linalg.norm(outs[column_name])))
+                    have_array_values.append(column_name)
+                out = '({})'.format(str(np.linalg.norm(outs[column_name])))
             else:
                 out = str(outs[column_name])
             row += '{:{align}{width}}'.format(out, align=self._align, width=self._column_widths[column_name])
         logger.info(row)
+        for column_name in have_array_values:
+            logger.info("{}  {}:".format(left_column_width * ' ', column_name))
+            logger.info('{}{}'.format((left_column_width + 6) * ' ', outs[column_name]))
+
+
+        #                 have_array_values = []
+        #                 logger.info("{}Output: {}".format(var_indent * ' ', name.split('.')[-1]))
+        #                 for out_type in out_types:
+        #                     if out_type in outs:
+        #                         if isinstance(outs[out_type], np.ndarray) and not outs[out_type].size == 1:
+        #                             logger.info("{}  {}:".format(var_indent * ' ', out_type))
+        #                             logger.info('{}{}'.format((var_indent + 6) * ' ', outs[out_type]))
+        #                             # have_array_values.append(out_type)
+        #                         else:
+        #                             logger.info("{}  {}:    {}".format(var_indent * ' ', out_type, outs[out_type]))
+        #                 for array_out_types in have_array_values:
+        #                     logger.info("{}  {}:".format(var_indent * ' ', array_out_types))
+        #                     logger.info('{}{}'.format((var_indent + 6 )* ' ', outs[array_out_types]))
 
 
 

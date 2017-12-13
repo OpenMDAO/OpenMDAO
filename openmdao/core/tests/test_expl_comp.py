@@ -8,8 +8,10 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp
+from openmdao.api import Problem, ExplicitComponent, NewtonSolver, ScipyKrylov, Group, \
+    IndepVarComp, LinearBlockGS
 from openmdao.devtools.testutil import assert_rel_error
+from openmdao.test_suite.components.double_sellar import SubSellar
 
 
 # Note: The following class definitions are used in feature docs
@@ -104,14 +106,6 @@ class ExplCompTestCase(unittest.TestCase):
         else:
             self.fail("Exception expected")
 
-        msg = "Unable to list residuals until model has been run."
-        try:
-            prob.model.list_residuals()
-        except Exception as err:
-            self.assertTrue(msg == str(err))
-        else:
-            self.fail("Exception expected")
-
         prob['comp1.length'] = 3.
         prob['comp1.width'] = 2.
         prob.run_model()
@@ -131,42 +125,30 @@ class ExplCompTestCase(unittest.TestCase):
         # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('comp2.length', [3.]),
-            ('comp2.width',  [2.]),
-            ('comp3.length', [3.]),
-            ('comp3.width',  [2.]),
+            ('comp2.length', { 'value' :[3.]}),
+            ('comp2.width',  { 'value' :[2.]}),
+            ('comp3.length', { 'value' :[3.]}),
+            ('comp3.width',  { 'value' :[2.]}),
         ])
 
         # list explicit outputs
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('comp1.length', [3.]),
-            ('comp1.width',  [2.]),
-            ('comp2.area',   [6.]),
-            ('comp3.area',   [6.]),
+            ('comp1.length', { 'value' :[3.]}),
+            ('comp1.width',  { 'value' :[2.]}),
+            ('comp2.area',   { 'value' :[6.]}),
+            ('comp3.area',   { 'value' :[6.]}),
         ])
 
         # list states
         states = prob.model.list_outputs(explicit=False, out_stream=None)
         self.assertEqual(states, [])
 
-        # list residuals
-        resids = prob.model.list_residuals(out_stream=None)
-        self.assertEqual(sorted(resids), [
-            ('comp1.length', [0.]),
-            ('comp1.width',  [0.]),
-            ('comp2.area',   [0.]),
-            ('comp3.area',   [0.]),
-        ])
-
         # list excluding both explicit and implicit components raises error
         msg = "You have excluded both Explicit and Implicit components."
 
         with assertRaisesRegex(self, RuntimeError, msg):
             prob.model.list_outputs(explicit=False, implicit=False)
-
-        with assertRaisesRegex(self, RuntimeError, msg):
-            prob.model.list_residuals(explicit=False, implicit=False)
 
     def test_simple_list_vars_options(self):
 
@@ -268,17 +250,17 @@ class ExplCompTestCase(unittest.TestCase):
         stream = cStringIO()
         prob.model.list_inputs(values=True, units=True, out_stream=stream)
         text = stream.getvalue()
-        self.assertEqual(text.count('comp.'), 2)
-        self.assertEqual(text.count('value:'), 2)
+        self.assertEqual(text.count('top'), 1)
+        self.assertEqual(text.count('    y'), 1)
 
         # logging outputs
         stream = cStringIO()
         prob.model.list_outputs(values=True, units=True, out_stream=stream)
         text = stream.getvalue()
-        self.assertEqual(text.count('comp.'), 1)
-        self.assertEqual(text.count('p1.'), 1)
-        self.assertEqual(text.count('p2.'), 1)
-        self.assertEqual(text.count('value:'), 3)
+        self.assertEqual(text.count('top'), 1)
+        self.assertEqual(text.count('    z'), 1)
+
+
 
     def test_array_list_vars_options(self):
 
@@ -335,25 +317,20 @@ class ExplCompTestCase(unittest.TestCase):
         stream = cStringIO()
         prob.model.list_inputs(values=True, units=True, out_stream=stream)
         text = stream.getvalue()
-        self.assertEqual(text.count('des_vars.x'), 0)
-        self.assertEqual(text.count('mult.x'), 1)
-        self.assertEqual(text.count('value'), 1)
-        self.assertEqual(text.count('units'), 1)
+        self.assertEqual(text.count('  des_vars'), 1)
+        self.assertEqual(text.count('    x'), 1)
 
         # logging outputs
         stream = cStringIO()
-        prob.model.list_outputs(values=True, units=True, out_stream=stream)
+        prob.model.list_outputs(values=True, units=True, hierarchical=False, out_stream=stream)
         text = stream.getvalue()
         self.assertEqual(text.count('des_vars.x'), 1)
         self.assertEqual(text.count('mult.y'), 1)
-        self.assertEqual(text.count('value'), 2)
-        self.assertEqual(text.count('units'), 2)
+        self.assertEqual(text.count('value'), 1)
+        self.assertEqual(text.count('units'), 1)
 
 
     def test_hierarchy_list_vars_options(self):
-        from openmdao.test_suite.components.double_sellar import SubSellar
-        from openmdao.api import Problem, NewtonSolver, ScipyKrylov, Group, PETScVector, \
-            IndepVarComp, NonlinearBlockGS, NonlinearBlockJac, LinearBlockGS
 
         prob = Problem()
         model = prob.model
@@ -405,7 +382,7 @@ class ExplCompTestCase(unittest.TestCase):
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(num_non_empty_lines, 11)
 
-        # Not hierarchical
+        # Hierarchical
         stream = cStringIO()
         outputs = prob.model.list_outputs(values=True,
                                           units=True,
@@ -420,6 +397,25 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('  g2'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(num_non_empty_lines, 21)
+
+        # Hierarchical with printing arrays
+        stream = cStringIO()
+        outputs = prob.model.list_outputs(values=True,
+                                          units=True,
+                                          bounds=True,
+                                          residuals=True,
+                                          scaling=True,
+                                          print_arrays=True,
+                                          hierarchical=True,
+                                          out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(text.count('top'), 1)
+        self.assertEqual(text.count('          y1'), 1)
+        self.assertEqual(text.count('  g2'), 1)
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(num_non_empty_lines, 21)
+
+
 
 
 if __name__ == '__main__':
