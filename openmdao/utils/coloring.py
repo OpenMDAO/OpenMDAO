@@ -7,71 +7,18 @@ import sys
 
 from collections import OrderedDict, defaultdict
 from itertools import combinations
+from numbers import Integral
 
 from six import iteritems
 from six.moves import range
 
 import numpy as np
+from numpy.random import rand
 
-from openmdao.jacobians.assembled_jacobian import DenseJacobian
+from openmdao.jacobians.jacobian import Jacobian
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
-
-from openmdao.utils.name_maps import rel_key2abs_key, key2abs_key
-
-
-class _SimulJacobian(DenseJacobian):
-    """
-    Assemble dense global <Jacobian> for use in disjoint row/column analysis.
-
-    NOTE: DO NOT USE this jacobian for any actual calculations.  This is used purely to determine
-    sparsity of the total jacobian.
-    """
-
-    def __init__(self, **kwargs):
-        """
-        Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            options dictionary.
-        """
-        super(_SimulJacobian, self, **kwargs).__init__()
-        self.options['matrix_class'] = DenseMatrix
-
-    def __setitem__(self, key, subjac):
-        """
-        Set sub-Jacobian.
-
-        Parameters
-        ----------
-        key : (str, str)
-            Promoted or relative name pair of sub-Jacobian.
-        subjac : int or float or ndarray or sparse matrix
-            sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
-        """
-        abs_key = key2abs_key(self._system, key)
-        if abs_key is not None:
-
-            # You can only set declared subjacobians.
-            if abs_key not in self._subjacs_info:
-                msg = 'Variable name pair ("{}", "{}") must first be declared.'
-                raise KeyError(msg.format(key[0], key[1]))
-
-            # get a version of the subjac corresponding to abs_key and fill with 1's
-            info, shape = self._subjacs_info[abs_key]
-            if info['rows'] is not None:  # list form
-                subjac = np.ones(info['rows'].size, dtype=bool)
-            elif isinstance(info['value'], sparse_types):  # sparse
-                subjac = subjac.copy()
-                subjac.data = np.ones(subjac.data.size, dtype=bool)
-            else:   # dense
-                print("DENSE:", abs_key, subjac.shape)
-                subjac = np.ones(subjac.shape, dtype=bool)
-            self._set_abs(abs_key, subjac)
-        else:
-            msg = 'Variable name pair ("{}", "{}") not found.'
-            raise KeyError(msg.format(key[0], key[1]))
+from openmdao.matrices.matrix import sparse_types
 
 
 def _find_var_from_range(idx, ranges):
@@ -81,7 +28,20 @@ def _find_var_from_range(idx, ranges):
             return name, idx - start
 
 
-def _find_disjoint(prob, mode='fwd', tol=1e-10):
+def _wrapper_set_abs(jac, set_abs, key, subjac):
+    info, shape = jac._subjacs_info[key]
+    if info['rows'] is not None:  # list form
+        subjac = rand(info['rows'].size)
+    elif isinstance(info['value'], sparse_types):  # sparse
+        subjac = subjac.copy()
+        subjac.data = rand(subjac.data.size)
+    else:   # dense
+        subjac = rand(*(subjac.shape))
+
+    return set_abs(key, subjac)
+
+
+def _find_disjoint(prob, mode='fwd', tol=1e-30):
     """
     Find all sets of disjoint columns in the total jac and their corresponding rows.
 
@@ -101,7 +61,12 @@ def _find_disjoint(prob, mode='fwd', tol=1e-10):
     """
     # TODO: fix this to work in rev mode as well
 
-    # prob.model.jacobian = _SimulJacobian()
+    jac = prob.model._jacobian
+    set_abs = jac._set_abs
+
+    # replace existing jacobian set_abs with ours that replaces all subjacs with random numbers
+    jac._set_abs = lambda key, subjac: _wrapper_set_abs(jac, set_abs, key, subjac)
+
     # clear out any old simul coloring info
     prob.driver._simul_coloring_info = None
     prob.driver._res_jacs = {}
@@ -109,21 +74,23 @@ def _find_disjoint(prob, mode='fwd', tol=1e-10):
     prob.setup(mode=mode)
     prob.run_model()
 
-    of = list(prob.driver._objs)
-    of_lin = []
     desvars = prob.driver._designvars
     responses = prob.driver._responses
-
+    of = list(prob.driver._objs)
     wrt = list(desvars)
+
+    # remove linear constraints from consideration
     for n, meta in iteritems(prob.driver._cons):
-        if 'linear' in meta and meta['linear']:
-            of_lin.append(n)
-        else:
+        if not ('linear' in meta and meta['linear']):
             of.append(n)
 
     J = prob.driver._compute_totals(return_format='array', of=of, wrt=wrt)
-    J[np.abs(J) < tol] = 0.0
-    J[np.abs(J) >= tol] = 1.0
+    absJ = np.abs(J)
+    J[absJ < tol] = 0.0
+    J[absJ >= tol] = 1.0
+
+    # from openmdao.utils.array_utils import array_viz
+    # array_viz(J)
 
     # find column and row ranges (inclusive) for dvs and responses respectively
     dv_offsets = []
@@ -141,7 +108,6 @@ def _find_disjoint(prob, mode='fwd', tol=1e-10):
     for name in of:
         end += responses[name]['size']
         res_offsets.append((start, end, name))
-        # print("res range[%s] = %s" % (name, (start, end)))
         start = end + 1
 
     total_dv_offsets = defaultdict(lambda: defaultdict(list))

@@ -6,8 +6,8 @@ import math
 
 from numpy.testing import assert_array_almost_equal, assert_almost_equal
 
-from openmdao.api import Problem, IndepVarComp, ExecComp, DenseJacobian, DirectSolver, ExplicitComponent,\
-    LinearRunOnce
+from openmdao.api import Problem, IndepVarComp, ExecComp, DenseJacobian, DirectSolver,\
+    ExplicitComponent, LinearRunOnce
 from openmdao.devtools.testutil import assert_rel_error
 
 from openmdao.utils.general_utils import set_pyoptsparse_opt
@@ -68,7 +68,7 @@ def run_opt(SIZE, color_info=None):
 
     p.driver = pyOptSparseDriver()
     p.driver.options['optimizer'] = OPTIMIZER
-    # p.driver.options['print_results'] = False
+    p.driver.options['print_results'] = False
 
     p.model.add_design_var('indeps.x')
     p.model.add_design_var('indeps.y')
@@ -149,4 +149,5 @@ class SimulColoringTestCase(unittest.TestCase):
                          p_color.model.linear_solver._solve_count)
 
 if __name__ == '__main__':
-    unittest.main()
+    #unittest.main()
+    run_opt(10)
