@@ -161,9 +161,10 @@ class SqliteRecorder(BaseRecorder):
         # store the updated abs2prom and prom2abs
         abs2prom = pickle.dumps(self._abs2prom)
         prom2abs = pickle.dumps(self._prom2abs)
-        with self.con:
-            self.con.execute("UPDATE metadata SET abs2prom=?, prom2abs=?",
-                             (abs2prom, prom2abs))
+        if self._open_close_sqlite:
+            with self.con:
+                self.con.execute("UPDATE metadata SET abs2prom=?, prom2abs=?",
+                                 (abs2prom, prom2abs))
 
     def record_iteration_driver(self, recording_requester, data, metadata):
         """
