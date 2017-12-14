@@ -297,22 +297,6 @@ class pyOptSparseDriver(Driver):
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=jac)
                 self._quantities.append(name)
 
-        # print("DVS:")
-        # start = 0
-        # end = -1
-        # for dv in self._indep_list:
-            # end += self._designvars[dv]['size']
-            # print(dv, self._designvars[dv]['size'], "[%d, %d]" % (start, end))
-            # start = end + 1
-
-        # print("QUANTITIES:")
-        # start = 0
-        # end = -1
-        # for r in self._quantities:
-        #     end += self._responses[r]['size']
-        #     print(r, self._responses[r]['size'], "[%d, %d]" % (start, end))
-        #     start = end + 1
-
         # Instantiate the requested optimizer
         optimizer = self.options['optimizer']
         try:
