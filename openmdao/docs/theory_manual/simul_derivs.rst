@@ -60,3 +60,15 @@ design variable for each response.  For example:
     responses will be 'flipped', i.e., the array of colors will be specified for the
     responses instead of the design variables, and the mapping of row indices to
     column indices for each color for each response will be specified for each design variable.
+
+
+The *color_info* data structure can be generated automatically using the following command:
+
+.. code-block:: none
+
+    openmdao simul_coloring <your_script_name>
+
+
+The data structure will be written to the console and can be cut and pasted into your script
+file and passed into the *set_simul_coloring* function.  Note that for many problems, there
+will be no derivatives that can be computed simultaneously.

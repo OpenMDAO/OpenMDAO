@@ -35,11 +35,8 @@ class DirectSolver(LinearSolver):
             if isinstance(mtx, DenseMatrix):
                 ranges = system._jacobian._view_ranges[system.pathname]
                 matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
-                # print("direct solver matrix", matrix)
-                np.set_printoptions(precision=3)
                 self._lup = scipy.linalg.lu_factor(matrix)
             elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
-                np.set_printoptions(precision=3)
                 self._lu = scipy.sparse.linalg.splu(mtx._matrix)
             elif isinstance(mtx, COOMatrix):
                 # calling scipy.sparse.linalg.splu on a COO actually transposes
@@ -154,7 +151,6 @@ class DirectSolver(LinearSolver):
                             x_data = self._lu.solve(b_data, trans_splu)
                         else:
                             x_data = scipy.linalg.lu_solve(self._lup, b_data, trans=trans_lu)
-                        # print('x_data:', x_data)
                         x_vec.set_data(x_data)
 
                 # MVP-generated jacobians are scaled.

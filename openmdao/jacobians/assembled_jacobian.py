@@ -486,7 +486,7 @@ class COOJacobian(AssembledJacobian):
         **kwargs : dict
             options dictionary.
         """
-        super(COOJacobian, self, **kwargs).__init__()
+        super(COOJacobian, self).__init__(**kwargs)
         self.options['matrix_class'] = COOMatrix
 
 
@@ -504,7 +504,7 @@ class CSRJacobian(AssembledJacobian):
         **kwargs : dict
             options dictionary.
         """
-        super(CSRJacobian, self, **kwargs).__init__()
+        super(CSRJacobian, self).__init__(**kwargs)
         self.options['matrix_class'] = CSRMatrix
 
 
@@ -522,5 +522,5 @@ class CSCJacobian(AssembledJacobian):
         **kwargs : dict
             options dictionary.
         """
-        super(CSCJacobian, self, **kwargs).__init__()
+        super(CSCJacobian, self).__init__(**kwargs)
         self.options['matrix_class'] = CSCMatrix

@@ -13,7 +13,6 @@ from openmdao.devtools.testutil import assert_rel_error
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 # check that pyoptsparse is installed
-# if it is, try to use SNOPT but fall back to SLSQP
 OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
@@ -99,7 +98,7 @@ def run_opt(SIZE, color_info=None):
 class SimulColoringTestCase(unittest.TestCase):
 
     def test_simul_coloring(self):
-        if OPTIMIZER is not 'SNOPT':
+        if OPTIMIZER != 'SNOPT':
             raise unittest.SkipTest("This test needs SNOPT.")
 
         #note: size must always be an even number!!
@@ -149,5 +148,4 @@ class SimulColoringTestCase(unittest.TestCase):
                          p_color.model.linear_solver._solve_count)
 
 if __name__ == '__main__':
-    #unittest.main()
-    run_opt(10)
+    unittest.main()

@@ -275,7 +275,6 @@ def _simul_coloring_setup_parser(parser):
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', action='store', dest='outfile', help='output file.')
-    parser.add_argument('-p', action='store', dest='prob', help='Problem object name.')
 
 
 def _simul_coloring_cmd(options):

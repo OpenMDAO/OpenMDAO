@@ -79,12 +79,17 @@ def _find_disjoint(prob, mode='fwd', tol=1e-30):
     of = list(prob.driver._objs)
     wrt = list(desvars)
 
+    if not of or not wrt:
+        raise RuntimeError("Sparsity structure cannot be computed without declaration of design "
+                           "variables and responses.")
+
     # remove linear constraints from consideration
     for n, meta in iteritems(prob.driver._cons):
         if not ('linear' in meta and meta['linear']):
             of.append(n)
 
     J = prob.driver._compute_totals(return_format='array', of=of, wrt=wrt)
+
     absJ = np.abs(J)
     J[absJ < tol] = 0.0
     J[absJ >= tol] = 1.0
@@ -99,7 +104,6 @@ def _find_disjoint(prob, mode='fwd', tol=1e-30):
     for name in wrt:
         end += prob.driver._designvars[name]['size']
         dv_offsets.append((start, end, name))
-        # print("dv range[%s] = %s" % (name, (start, end)))
         start = end + 1
 
     res_offsets = []
@@ -149,14 +153,11 @@ def _find_disjoint(prob, mode='fwd', tol=1e-30):
                     allrows[col].update(rows[other_col])
 
         for color, cols in enumerate(full_disjoint.values()):
-            # print("\ncolor %d:" % color)
             for c in sorted(cols):
                 dvoffset = c - start
                 total_dv_offsets[dv][color].append(dvoffset)
-                # print(dv, dvoffset, 'col', c)
                 for crow in rows[c]:
                     res, resoffset = _find_var_from_range(crow, res_offsets)
-                    # print("   ", res, resoffset, 'row', crow)
                     dct = total_res_offsets[res][dv][color]
                     dct[0].append(resoffset)
                     dct[1].append(dvoffset)
@@ -188,8 +189,8 @@ def get_simul_meta(problem, mode='fwd', stream=sys.stdout):
         {resp_name: {dvname: {color: (row_idxs, col_idxs), ...}, ...}, ...}
     """
     driver = problem.driver
-    if not driver.supports['simultaneous_derivatives']:
-        return {}, {}
+    # if not driver.supports['simultaneous_derivatives']:
+    #     return {}, {}
 
     dv_idxs, res_idxs = _find_disjoint(problem, mode=mode)
     all_colors = set()
@@ -202,13 +203,11 @@ def get_simul_meta(problem, mode='fwd', stream=sys.stdout):
         # with -1.  We then replace specific entries with positive colors which will be iterated
         # over as a group.
         coloring = np.full(driver._designvars[dv]['size'], -1)
-        # has_color = False
+
         for color in dv_idxs[dv]:
-            # if len(dv_idxs[dv][color]) > 1:
             coloring[np.array(dv_idxs[dv][color], dtype=int)] = color
             all_colors.add(color)
-            # has_color = True
-        # if has_color:
+
         simul_colorings[dv] = list(coloring)
 
     for res in res_idxs:
@@ -245,6 +244,8 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
     desvars = problem.driver._designvars
     responses = problem.driver._responses
 
+    stream.write("\nColoring Summary\n")
+
     tot_colors = 0
     tot_size = 0
     if problem._mode == 'fwd':
@@ -258,16 +259,13 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
                     ncolors = len(colors)
             else:
                 ncolors = desvars[dv]['size']
-            print(dv, 'num colors:', ncolors)
+            stream.write("%s num colors: %d\n" % (dv, ncolors))
             tot_colors += ncolors
             tot_size += desvars[dv]['size']
     else:  # rev
         raise RuntimeError("rev mode currently not supported for simultaneous derivs.")
 
-    stream.write("\nColoring Summary\n")
-    # for dv, meta in iteritems(desvars):
-    #     stream.write("DV: %s  %d\n" % (dv, meta['size']))
-    # for res, meta in iteritems(responses):
-    #     stream.write("Resp: %s  %d\n" % (res, meta['size']))
-
-    stream.write("Total colors vs. total size: %d vs %d\n" % (tot_colors, tot_size))
+    if not simul_colorings:
+        stream.write("No simultaneous derivative solves are possible in this configuration.\n")
+    else:
+        stream.write("Total colors vs. total size: %d vs %d\n" % (tot_colors, tot_size))

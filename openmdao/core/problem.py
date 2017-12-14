@@ -1231,6 +1231,9 @@ class Problem(object):
 
         owning_ranks = self.model._owning_rank['output']
 
+        # we don't do simultaneous derivatives when compute_totals is called for linear constaints
+        has_lin_constraints = False
+
         if fwd:
             input_list, output_list = wrt, of
             old_input_list, old_output_list = oldwrt, oldof
@@ -1238,9 +1241,10 @@ class Problem(object):
             input_vois = self.driver._designvars
             output_vois = self.driver._responses
             remote_outputs = self.driver._remote_responses
-            no_simul = np.any([output_vois[n]['linear'] for n in of
-                              if n in output_vois and 'linear' in output_vois[n]])
-
+            for n in of:
+                if n in output_vois and 'linear' in output_vois[n] and output_vois[n]['linear']:
+                    has_lin_constraints = True
+                    break
         else:  # rev
             input_list, output_list = of, wrt
             old_input_list, old_output_list = oldof, oldwrt
@@ -1248,7 +1252,6 @@ class Problem(object):
             input_vois = self.driver._responses
             output_vois = self.driver._designvars
             remote_outputs = self.driver._remote_dvs
-            no_simul = False
 
         # Solve for derivs using linear solver.
 
@@ -1325,7 +1328,7 @@ class Problem(object):
                 raise RuntimeError("Mixing of vectorized and non-vectorized derivs in the same "
                                    "parallel color group (%s) is not supported." %
                                    [name for _, name, _, _, _ in vois])
-            simul_coloring = vois[0][4] if not no_simul else None
+            simul_coloring = vois[0][4] if not has_lin_constraints else None
 
             if use_rel_reduction:
                 rel_systems = set()
@@ -1408,9 +1411,7 @@ class Problem(object):
                             # need a vector for clean code, so use _views_flat.
                             dinputs._views_flat[input_name][idx - start] = 1.0
 
-                # print(input_name, dinputs._views_flat[input_name])
                 model._solve_linear(lin_vec_names, mode, rel_systems)
-                # print("con1.con", doutputs._views_flat['con1.con'])
 
                 for input_name, old_input_name, _, matmat, simul in vois:
                     dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \

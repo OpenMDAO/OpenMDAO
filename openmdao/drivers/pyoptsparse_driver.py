@@ -298,20 +298,20 @@ class pyOptSparseDriver(Driver):
                 self._quantities.append(name)
 
         # print("DVS:")
-        start = 0
-        end = -1
-        for dv in self._indep_list:
-            end += self._designvars[dv]['size']
+        # start = 0
+        # end = -1
+        # for dv in self._indep_list:
+            # end += self._designvars[dv]['size']
             # print(dv, self._designvars[dv]['size'], "[%d, %d]" % (start, end))
-            start = end + 1
+            # start = end + 1
 
         # print("QUANTITIES:")
-        start = 0
-        end = -1
-        for r in self._quantities:
-            end += self._responses[r]['size']
-            # print(r, self._responses[r]['size'], "[%d, %d]" % (start, end))
-            start = end + 1
+        # start = 0
+        # end = -1
+        # for r in self._quantities:
+        #     end += self._responses[r]['size']
+        #     print(r, self._responses[r]['size'], "[%d, %d]" % (start, end))
+        #     start = end + 1
 
         # Instantiate the requested optimizer
         optimizer = self.options['optimizer']
@@ -484,7 +484,6 @@ class pyOptSparseDriver(Driver):
         prob = self._problem
         fail = 0
 
-        np.set_printoptions(linewidth=999)
         try:
 
             try:
@@ -507,8 +506,9 @@ class pyOptSparseDriver(Driver):
                         isize = len(ival)
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
             else:
-                # if we don't convert to 'coo' here, pyoptsparse will do a brain dead
-                # conversion of our dense array into a fully dense 'coo'
+                # if we don't convert to 'coo' here, pyoptsparse will do a
+                # conversion of our dense array into a fully dense 'coo', which is bad.
+                # TODO: look into getting rid of all of these conversions!
                 for name, dvdct in iteritems(self._res_jacs):
                     for dv, coo in iteritems(dvdct):
                         arr = sens_dict[name][dv]
