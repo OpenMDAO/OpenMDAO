@@ -72,7 +72,7 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
                 with self.assertRaises(Exception) as context:
                     prob.run_model()
                 self.assertEqual(str(context.exception),
-                                 "Direct solver is not compatible with mtx type COOMatrix in system ''.")
+                                 "Direct solver is not compatible with matrix type COOMatrix in system ''.")
                 continue
 
             prob.run_model()
