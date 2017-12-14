@@ -1,8 +1,6 @@
 """
 Various graph related utilities.
 """
-from openmdao.utils.general_utils import ContainsAll
-from itertools import combinations
 import networkx as nx
 
 
