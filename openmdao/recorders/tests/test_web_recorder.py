@@ -42,12 +42,14 @@ class TestServerRecorder(unittest.TestCase):
     _default_case_id = '123456'
     _accepted_token = 'test'
     recorded_metadata = False
+    recorded_driver_metadata = False
     recorded_driver_iteration = False
     recorded_global_iteration = False
     recorded_system_metadata = False
     recorded_system_iteration = False
     recorded_solver_metadata = False
     recorded_solver_iterations = False
+    metadata = None
     driver_data = None
     driver_iteration_data = None
     gloabl_iteration_data = None
@@ -123,6 +125,8 @@ class TestServerRecorder(unittest.TestCase):
 
     def setup_endpoints(self, m):
         m.post(self._endpoint_base, json=self.check_header, status_code=200)
+        m.post(self._endpoint_base + '/' + self._default_case_id + '/metadata',
+               json = self.check_metadata)
         m.post(self._endpoint_base + '/' + self._default_case_id + '/global_iterations',
                json=self.check_global_iteration)
         m.post(self._endpoint_base + '/' + self._default_case_id + '/driver_metadata',
@@ -139,6 +143,8 @@ class TestServerRecorder(unittest.TestCase):
                json=self.check_solver_iterations)
         m.post(self._endpoint_base + '/' + '54321' + '/driver_metadata',
                json = self.check_driver)
+        m.post(self._endpoint_base + '/' + '54321' + '/metadata',
+               json = self.check_metadata)
 
     def check_header(self, request, context):
         if request.headers['token'] == self._accepted_token:
@@ -153,8 +159,13 @@ class TestServerRecorder(unittest.TestCase):
                 'reasoning': 'Bad token'
             }
 
-    def check_driver(self, request, context):
+    def check_metadata(self, request, context):
         self.recorded_metadata = True
+        self.metadata = request.body
+        return {'status': 'Success'}
+
+    def check_driver(self, request, context):
+        self.recorded_driver_metadata = True
         self.driver_data = request.body
         self.update_header = request.headers['update']
         return {'status': 'Success'}
@@ -195,6 +206,72 @@ class TestServerRecorder(unittest.TestCase):
         recorder = WebRecorder('', suppress_output=True)
         self.assertEqual(recorder._case_id, '-1')
 
+    def test_record_metadata(self, m):
+        self.setup_endpoints(m)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
+
+        self.setup_sellar_model()
+
+        self.prob.driver.add_recorder(recorder)
+        self.prob.setup(check=False)
+
+        # Need this since we aren't running the model.
+        self.prob.final_setup()
+
+        self.prob.cleanup()
+        self.assertTrue(self.recorded_metadata)
+        self.recorded_metadata = False
+
+        metadata = json.loads(self.metadata)
+        self.metadata = None
+
+        self.assertEqual(len(metadata['abs2prom']['input']), 11)
+        self.assertEqual(len(metadata['abs2prom']['output']), 7)
+        self.assertEqual(len(metadata['prom2abs']['input']), 4)
+        self.assertEqual(len(metadata['prom2abs']['output']), 7)
+
+    def test_record_metadata_system(self, m):
+        self.setup_endpoints(m)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
+
+        self.setup_sellar_model()
+
+        self.prob.model.d1.add_recorder(recorder)
+        self.prob.setup(check=False)
+
+        # Need this since we aren't running the model.
+        self.prob.final_setup()
+
+        self.prob.cleanup()
+        self.assertTrue(self.recorded_metadata)
+
+        metadata = json.loads(self.metadata)
+        self.assertEqual(len(metadata['abs2prom']['input']), 3)
+        self.assertEqual(len(metadata['abs2prom']['output']), 1)
+        self.assertEqual(len(metadata['prom2abs']['input']), 3)
+        self.assertEqual(len(metadata['prom2abs']['output']), 1)
+
+    def test_record_metadata_values(self, m):
+        self.setup_endpoints(m)
+        recorder = WebRecorder(self._accepted_token, suppress_output=True)
+
+        self.setup_sellar_model()
+
+        self.prob.model.d1.add_recorder(recorder)
+        self.prob.setup(check=False)
+
+        # Need this since we aren't running the model.
+        self.prob.final_setup()
+
+        self.prob.cleanup()
+        self.assertTrue(self.recorded_metadata)
+
+        metadata = json.loads(self.metadata)
+        self.assertEqual(metadata['abs2prom']['input']['d1.z'], 'z')
+        self.assertEqual(metadata['abs2prom']['input']['d1.x'], 'x')
+        self.assertEqual(metadata['prom2abs']['input']['z'][0], 'd1.z')
+        self.assertEqual(metadata['prom2abs']['input']['x'][0], 'd1.x')
+
     def test_driver_records_metadata(self, m):
         self.setup_endpoints(m)
         recorder = WebRecorder(self._accepted_token, suppress_output=True)
@@ -210,8 +287,8 @@ class TestServerRecorder(unittest.TestCase):
         self.prob.final_setup()
 
         self.prob.cleanup()
-        self.assertTrue(self.recorded_metadata)
-        self.recorded_metadata = False
+        self.assertTrue(self.recorded_driver_metadata)
+        self.recorded_driver_metadata = False
 
         driv_data = json.loads(self.driver_data)
         self.driver_data = None
@@ -237,8 +314,8 @@ class TestServerRecorder(unittest.TestCase):
         self.prob.final_setup()
 
         self.prob.cleanup()
-        self.assertTrue(self.recorded_metadata)
-        self.recorded_metadata = False
+        self.assertTrue(self.recorded_driver_metadata)
+        self.recorded_driver_metadata = False
 
         self.assertEqual(self.update_header, 'True')
 
@@ -257,8 +334,8 @@ class TestServerRecorder(unittest.TestCase):
         self.prob.final_setup()
 
         self.prob.cleanup()
-        self.assertTrue(self.recorded_metadata)
-        self.recorded_metadata = False
+        self.assertTrue(self.recorded_driver_metadata)
+        self.recorded_driver_metadata = False
 
         self.assertEqual(self.update_header, 'False')
 
@@ -274,7 +351,7 @@ class TestServerRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        self.assertFalse(self.recorded_metadata)
+        self.assertFalse(self.recorded_driver_metadata)
         self.assertEqual(self.driver_data, None)
 
     def test_only_desvars_recorded(self, m):
