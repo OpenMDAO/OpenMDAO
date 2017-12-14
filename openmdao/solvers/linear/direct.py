@@ -145,8 +145,6 @@ class DirectSolver(LinearSolver):
                 except RuntimeWarning as err:
                     raise RuntimeError(format_singluar_error(err, system, mtx))
 
-        np.set_printoptions(suppress=True, linewidth=400, threshold=99999999)
-
     def _mat_vec(self, in_vec, out_vec):
         """
         Compute matrix-vector product.
