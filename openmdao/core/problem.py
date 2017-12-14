@@ -29,7 +29,6 @@ from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.vectors.default_vector import DefaultVector
-from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
