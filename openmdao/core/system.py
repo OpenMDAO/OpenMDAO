@@ -2532,7 +2532,8 @@ class System(object):
                      print_arrays=False,
                      out_stream='stdout'):
         """
-        List outputs. Names are always shown.
+        Return a list outputs and optional metadata for the outputs. Names are always shown.
+        Optionally write a human readable output to an output stream.
 
         Parameters
         ----------
@@ -2551,11 +2552,20 @@ class System(object):
         units : bool, optional
             When True, display/return units. Default is False.
 
+        shape : bool, optional
+            When True, display/return the shape of the value. Default is False.
+
         bounds : bool, optional
             When True, display/return bounds (lower and upper). Default is False.
 
         scaling : bool, optional
             When True, display/return scaling (ref, ref0, and res_ref). Default is False.
+
+        print_arrays : bool, optional
+            When False, in the columnar display, just display the norm of any ndarrays with size > 1.
+                        The norm is surrounded by parens to indicate that it is a norm.
+            When True, also display the full values of the ndarray below the row
+            Default is False.
 
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
@@ -2564,7 +2574,7 @@ class System(object):
         Returns
         -------
         list
-            list of of output names and other optional information about those outputs
+            list of output names and other optional information about those outputs
         """
         if self._outputs is None:
             raise RuntimeError("Unable to list outputs until model has been run.")
@@ -2740,21 +2750,19 @@ class System(object):
         self._align = ''
         self._column_spacing = 2
         self._indent_inc = 2
+        top_level_system_name = 'top'
 
         # Find longest first column
-        max_varname_len = 0
+        max_varname_len = len(top_level_system_name)
         if hierarchical:
             for name, outs in outputs:
-                num_parts = len(name.split('.'))
-                indent = self._indent_inc * num_parts
-                varname_len = len(name.split('.')[-1])
-                total_len = indent + varname_len
-                if total_len > max_varname_len:
-                    max_varname_len = total_len
+                # This could be more efficient since there will be duplication here
+                for i, name_part in enumerate(name.split('.')):
+                    total_len = (i + 1) * self._indent_inc + len(name_part)
+                    max_varname_len = max(max_varname_len, total_len)
         else:
             for name, outs in outputs:
-                if len(name) > max_varname_len:
-                    max_varname_len = len(name)
+                max_varname_len = max(max_varname_len,len(name))
 
         # Common to both hierarchical and non-hierarchical
         column_header = '{:{align}{width}}'.format('varname', align=self._align, width=max_varname_len)
@@ -2766,19 +2774,43 @@ class System(object):
         logger.info(column_header)
         logger.info(column_dashes)
 
+        name_to_idx_map = {}
+        for idx, (name, outs) in enumerate(sorted(outputs)):
+            name_to_idx_map[name] = idx
         if hierarchical:
             # Need to know how to get the output values from the passed in list of tuples
-            name_to_idx_map = {}
-            for idx, (name, outs) in enumerate(sorted(outputs)):
-                name_to_idx_map[name] = idx
+
+            from openmdao.api import ImplicitComponent, ExplicitComponent
+            if comp_type == 'Explicit':
+                comp_class = ExplicitComponent
+            else:
+                comp_class = ImplicitComponent
+
+            vars_to_output = []
+            for s in self.system_iter(local=True, include_self=True, recurse=True, typ=comp_class):
+                if in_or_out == 'inputs':
+                    in_or_out_views = s._inputs._views
+                else:
+                    in_or_out_views = s._outputs._views
+                for name, val in iteritems(in_or_out_views):
+                    vars_to_output.append(name)
 
             for s in self.system_iter(local=True, include_self=True, recurse=True):
+                # is the path for this System a subset of the path for one of the variables to output?
+                output_this_system = False
+                for var in vars_to_output:
+                    if var.startswith(s.pathname):
+                        output_this_system = True
+                        break
+                if not output_this_system:
+                    continue
+
                 if s.pathname:
                     num_parts = len(s.pathname.split('.'))
                     system_name = s.pathname.split('.')[-1]
                 else:
                     num_parts = 0
-                    system_name = 'top'
+                    system_name = top_level_system_name
                 system_indent = self._indent_inc * num_parts
                 logger.info(system_indent * ' ' + system_name)
                 if in_or_out == 'inputs':
@@ -2799,9 +2831,24 @@ class System(object):
                     outs = outputs[idx][1]
                     self._write_outputs_rows(logger, row, column_names, outs, print_arrays)
         else:
-            for name, outs in sorted(outputs):
-                row = '{:{align}{width}}'.format(name, align=self._align, width=max_varname_len)
-                self._write_outputs_rows(logger, row, column_names, outs, print_arrays)
+            for s in self.system_iter(local=True, include_self=True, recurse=True):
+                if s.pathname:
+                    num_parts = len(s.pathname.split('.'))
+                else:
+                    num_parts = 0
+                if in_or_out == 'inputs':
+                    in_or_out_views = s._inputs._views
+                else:
+                    in_or_out_views = s._outputs._views
+
+                for name, val in iteritems(in_or_out_views):
+                    # Only do outputs at that system level
+                    if len(name.split('.')) - num_parts > 1:
+                        continue
+                    row = '{:{align}{width}}'.format(name, align=self._align, width=max_varname_len)
+                    idx = name_to_idx_map[name]
+                    outs = outputs[idx][1]
+                    self._write_outputs_rows(logger, row, column_names, outs, print_arrays)
         logger.info('\n')
 
 
