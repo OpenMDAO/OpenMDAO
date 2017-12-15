@@ -2747,7 +2747,7 @@ class System(object):
             'ref0': 20,
             'res_ref': 20,
         }
-        self._align = ''
+        self._align = '' # qqq move to init
         self._column_spacing = 2
         self._indent_inc = 2
         top_level_system_name = 'top'
@@ -2781,12 +2781,18 @@ class System(object):
             # Need to know how to get the output values from the passed in list of tuples
 
             from openmdao.api import ImplicitComponent, ExplicitComponent
+            from openmdao.core.component import Component
             if comp_type == 'Explicit':
                 comp_class = ExplicitComponent
-            else:
+            elif comp_type == 'Implicit':
                 comp_class = ImplicitComponent
+            else:
+                comp_class = Component
 
             vars_to_output = []
+
+            # qqq if comp_class is None, we really want to iterate over both types
+
             for s in self.system_iter(local=True, include_self=True, recurse=True, typ=comp_class):
                 if in_or_out == 'inputs':
                     in_or_out_views = s._inputs._views
@@ -2867,7 +2873,10 @@ class System(object):
         logger.info(row)
         for column_name in have_array_values:
             logger.info("{}  {}:".format(left_column_width * ' ', column_name))
-            logger.info('{}{}'.format((left_column_width + 6) * ' ', outs[column_name]))
+            out_str = str(outs[column_name])
+            indented_lines = [(left_column_width + self._indent_inc) * ' ' + s for s in out_str.splitlines()]
+            logger.info('\n'.join(indented_lines))
+            # logger.info('{}{}'.format((left_column_width + self._indent_inc) * ' ', outs[column_name]))
 
 
 
