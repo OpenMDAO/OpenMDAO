@@ -33,7 +33,7 @@ def run_opt(SIZE, color_info=None):
 
     p.model.linear_solver = RunOnceCounter()
 
-    indeps = p.model.add_subsystem('indeps', IndepVarComp())
+    indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['*'])
     indeps.add_output('x', np.ones(SIZE))
     indeps.add_output('y', np.ones(SIZE))
     indeps.add_output('r', 1.)
@@ -58,20 +58,20 @@ def run_opt(SIZE, color_info=None):
     # linear constraint
     p.model.add_subsystem('l_conx', ExecComp('g=x-1', g=np.ones(SIZE), x=np.ones(SIZE)))
 
-    p.model.connect('indeps.r', ('circle.r', 'r_con.r'))
-    p.model.connect('indeps.x', ['r_con.x', 'theta_con.x', 'delta_theta_con.x'])
+    p.model.connect('r', ('circle.r', 'r_con.r'))
+    p.model.connect('x', ['r_con.x', 'theta_con.x', 'delta_theta_con.x'])
 
-    p.model.connect('indeps.x', 'l_conx.x')
+    p.model.connect('x', 'l_conx.x')
 
-    p.model.connect('indeps.y', ['r_con.y', 'theta_con.y', 'delta_theta_con.y'])
+    p.model.connect('y', ['r_con.y', 'theta_con.y', 'delta_theta_con.y'])
 
     p.driver = pyOptSparseDriver()
     p.driver.options['optimizer'] = OPTIMIZER
     p.driver.options['print_results'] = False
 
-    p.model.add_design_var('indeps.x')
-    p.model.add_design_var('indeps.y')
-    p.model.add_design_var('indeps.r', lower=.5, upper=10)
+    p.model.add_design_var('x')
+    p.model.add_design_var('y')
+    p.model.add_design_var('r', lower=.5, upper=10)
     p.model.add_constraint('r_con.g', equals=0)
 
     IND = np.arange(SIZE, dtype=int)
@@ -82,7 +82,7 @@ def run_opt(SIZE, color_info=None):
     #TODO: setting this one to true breaks the optimization
     # p.model.add_constraint('l_conx.g', equals=0, linear=False)
     p.model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
-    p.model.add_constraint('indeps.y', equals=0, indices=[0,], linear=True)
+    p.model.add_constraint('y', equals=0, indices=[0,], linear=True)
 
     p.model.add_objective('circle.area', ref=-1)
 
@@ -109,7 +109,7 @@ class SimulColoringTestCase(unittest.TestCase):
         color_info = (
         {
             'indeps.y': [0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
-            'indeps.x': [0, 1, 0, 1, 0, 1, 0, 1, 0, 1]
+            'x': [0, 1, 0, 1, 0, 1, 0, 1, 0, 1]
         },
         {
             'delta_theta_con.g': {
@@ -123,7 +123,7 @@ class SimulColoringTestCase(unittest.TestCase):
                 'indeps.y': {
                     0: ([0, 2, 4, 6, 8], [0, 2, 4, 6, 8]),
                     1: ([1, 3, 5, 7, 9], [1, 3, 5, 7, 9])},
-                'indeps.x': {
+                'x': {
                     0: ([0, 2, 4, 6, 8], [0, 2, 4, 6, 8]),
                     1: ([1, 3, 5, 7, 9], [1, 3, 5, 7, 9])}},
             'l_conx.g': {
