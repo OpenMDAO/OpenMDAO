@@ -81,6 +81,8 @@ PETScKrylov Option Examples
   .. embed-test::
       openmdao.solvers.linear.tests.test_petsc_ksp.TestPETScKrylovSolverFeature.test_specify_ksp_type
 
+.. _petscksp_precon:
+
 Specifying a Preconditioner
 ---------------------------
 

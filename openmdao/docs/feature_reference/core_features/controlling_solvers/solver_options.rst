@@ -46,6 +46,8 @@ iprint = 2: Print the residual for every solver iteration
 .. embed-test::
     openmdao.solvers.tests.test_solver_iprint.TestSolverPrint.test_feature_iprint_2
 
+.. _solver-options-set_solver_print:
+
 Controlling Solver Output in Large Models
 -----------------------------------------
 

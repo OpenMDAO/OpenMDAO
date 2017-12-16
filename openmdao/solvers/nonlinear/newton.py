@@ -188,8 +188,8 @@ class NewtonSolver(NonlinearSolver):
         system._guess_nonlinear()
 
         with Recording('Newton_subsolve', 0, self):
-            if self.options['solve_subsystems'] and \
-               (self._iter_count <= self.options['max_sub_solves']):
+            if (self.options['solve_subsystems'] and \
+               (self._iter_count <= self.options['max_sub_solves'])):
 
                 self._solver_info.append_solver()
 
@@ -204,11 +204,9 @@ class NewtonSolver(NonlinearSolver):
 
                 self._solver_info.pop()
 
-        if self.options['maxiter'] > 0:
-            self._run_apply()
-            norm = self._iter_get_norm()
-        else:
-            norm = 1.0
+        self._run_apply()
+        norm = self._iter_get_norm()
+
         norm0 = norm if norm != 0.0 else 1.0
         return norm0, norm
 
@@ -216,6 +214,8 @@ class NewtonSolver(NonlinearSolver):
         """
         Perform the operations in the iteration loop.
         """
+
+
         system = self._system
         self._solver_info.append_subsolver()
         do_subsolve = self.options['solve_subsystems'] and \
