@@ -43,7 +43,7 @@ This can be caused by several different things:
 
     - You did run :ref:`check_partials()<feature_check_partials>` right?!!!
     - Check for missing or incorrect data connections to one or more components.
-        * Use the :ref:`N2 diagram<om-command-view_model>` to inspect your model hierarchy and connections in a matrix format
+        * Use the :ref:`N2 d    iagram<om-command-view_model>` to inspect your model hierarchy and connections in a matrix format
         * Use the :ref:`connection viewer <om-command-view_connections>` in a list format
     - Use :ref:`list_outputs()<list_outputs>` to look at the state variable values and see if anything has taken on a bad value (e.g. 0 or 1e500) that causes the derivative to be ill defined.
     - Seriously, run :ref:`check_partials()<feature_check_partials>` and look carefully at the output!
