@@ -41,14 +41,14 @@ MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 _contains_all = ContainsAll()
 
-CITATION = """@inproceedings{openmdao_1,
-    Address = {Victoria, Canada},
-    Author = {Moore, K.T. and Naylor, B.A. and Gray, J.S.},
-    Booktitle = {10th AIAA/ISSMO Multidisciplinary Analysis and Optimization Conference},
-    Month = {August},
-    Note = {AIAA 2008-6069},
-    Title = {The Development of an Open-Source Framework for Multidisciplinary Analysis and Optimization},
-    Year = {2008}
+CITATION = """@inproceedings{2014_openmdao_derivs,
+    Author = {Justin S. Gray and Tristan A. Hearn and Kenneth T. Moore and John Hwang and Joaquim Martins and Andrew Ning},
+    Booktitle = {15th AIAA/ISSMO Multidisciplinary Analysis and Optimization Conference},
+    Doi = {doi:10.2514/6.2014-2042},
+    Month = {2014/07/08},
+    Publisher = {American Institute of Aeronautics and Astronautics},
+    Title = {Automatic Evaluation of Multidisciplinary Derivatives Using a Graph-Based Problem Formulation in OpenMDAO},
+    Year = {2014}
 }"""
 
 class Problem(object):

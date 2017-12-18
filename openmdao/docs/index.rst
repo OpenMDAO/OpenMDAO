@@ -8,30 +8,7 @@ It enables you to decompose your models, making them easier to build and maintai
 The OpenMDAO project is primarily focused on supporting gradient based optimization with analytic derivatives to allow you to explore large design spaces with 100's or 1000's of design variables,
 but the framework also has a number of parallel computing features that can work with gradient free optimization, mixed integer nonlinear programming, and traditional design space exploration.
 
-If you are using OpenMDAO, please cite the following paper:
-
-.. ::
-
-    @inproceedings{openmdao_1,
-        Address = {Victoria, Canada},
-        Author = {Moore, K.T. and Naylor, B.A. and Gray, J.S.},
-        Booktitle = {10th AIAA/ISSMO Multidisciplinary Analysis and Optimization Conference},
-        Month = {August},
-        Note = {AIAA 2008-6069},
-        Title = {The Development of an Open-Source Framework for Multidisciplinary Analysis and Optimization},
-        Year = {2008}
-    }
-
-if you are using the analytic derivatives features in OpenMDAO please cite:
-
-.. ::
-
-    @phdthesis{hwang_thesis_2015,
-        author       = {John T. Hwang},
-        title        = {A Modular Approach to Large-Scale Design Optimization of Aerospace Systems},
-        school       = {University of Michigan},
-        year         = 2015
-    }
+If you are using OpenMDAO, please :ref:`cite us <citing>`!
 
 User Guide
 ***************************
@@ -78,6 +55,7 @@ Other Useful Docs
     :caption: Other Docs
     :name: otherdocs
 
+    other/citing.rst
     other/api_translation.rst
     other/file_wrap.rst
     _srcdocs/index.rst
