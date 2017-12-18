@@ -1,5 +1,5 @@
 import unittest
-from io import StringIO
+from six.moves import cStringIO as StringIO
 
 from openmdao.api import Problem, Group, ExecComp, IndepVarComp, NonlinearRunOnce, LinearRunOnce, NewtonSolver
 
@@ -90,12 +90,14 @@ class TestFindCite(unittest.TestCase):
 
         expected = """Class: <class 'openmdao.core.problem.Problem'>
     @inproceedings{2014_openmdao_derivs,
-        Author = {Justin S. Gray and Tristan A. Hearn and Kenneth T. Moore and John Hwang and Joaquim Martins and Andrew Ning},
+        Author = {Justin S. Gray and Tristan A. Hearn and Kenneth T. Moore
+                  and John Hwang and Joaquim Martins and Andrew Ning},
         Booktitle = {15th AIAA/ISSMO Multidisciplinary Analysis and Optimization Conference},
         Doi = {doi:10.2514/6.2014-2042},
         Month = {2014/07/08},
         Publisher = {American Institute of Aeronautics and Astronautics},
-        Title = {Automatic Evaluation of Multidisciplinary Derivatives Using a Graph-Based Problem Formulation in OpenMDAO},
+        Title = {Automatic Evaluation of Multidisciplinary Derivatives Using
+                 a Graph-Based Problem Formulation in OpenMDAO},
         Year = {2014}
     }
 Class: <class 'openmdao.core.group.Group'>
