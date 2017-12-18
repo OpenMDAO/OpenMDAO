@@ -57,6 +57,7 @@ def find_citations(prob, out_stream=sys.stdout):
 
         for klass, cite in citations.items():
             print("Class: {}".format(klass), file=out_stream)
+
             lines = cite.split('\n')
             for line in lines:
                 print("    {}".format(line), file=out_stream)
