@@ -271,13 +271,8 @@ def _cite_setup_parser(parser):
 
     Parameters
     ----------
-    options : argparse Namespace
-        Command line options.
-
-    Returns
-    -------
-    function
-        The post-setup hook function.
+    parser : argparse subparser
+        The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', default=None, action='store', dest='outfile',
@@ -298,7 +293,6 @@ def _cite_cmd(options):
     function
         The post-setup hook function.
     """
-
     if options.outfile is None:
         out = sys.stdout
     else:

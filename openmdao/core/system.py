@@ -57,7 +57,8 @@ class System(object):
         in a recording run.
     #
     cite: str
-        listing of relevant citataions that should be referenced when publishing work that uses this class
+        listing of relevant citataions that should be referenced when
+        publishing work that uses this class
     #
     _subsystems_allprocs : [<System>, ...]
         List of all subsystems (children of this system).

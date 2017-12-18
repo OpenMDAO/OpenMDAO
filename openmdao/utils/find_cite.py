@@ -1,9 +1,21 @@
+"""
+Helper function to find all the `cite` attributes throughout a model.
+"""
+
 import sys
 
 
 def _check_cite(instance, citations):
-    """helper function to grab the cite attribute, if it exists"""
+    """
+    Grab the cite attribute, if it exists.
 
+    Parameters
+    ----------
+    instance : object
+        the instance to check for citations on
+    citations : dict
+        the dictionary to add a citation to, if found
+    """
     if instance.cite:
         klass = instance.__class__
         # return klass, cite
@@ -11,7 +23,8 @@ def _check_cite(instance, citations):
 
 
 def find_citations(prob, out_stream=sys.stdout):
-    """Compiles a list of citations from all classes in the problem
+    """
+    Compiles a list of citations from all classes in the problem.
 
     Parameters
     ----------
@@ -19,11 +32,14 @@ def find_citations(prob, out_stream=sys.stdout):
         The Problem instance to be searched
     out_stream : File like
         defaults to sys.stdout. False will prevent printed output
+
+    Returns
+    -------
+    dict
+        dict of citations keyed by class
     """
-
-    #dict keyed by the class so we don't report multiple citations
-    #for the same class showing up in multiple instances
-
+    # dict keyed by the class so we don't report multiple citations
+    # for the same class showing up in multiple instances
     citations = {}
     _check_cite(prob, citations)
     _check_cite(prob.driver, citations)

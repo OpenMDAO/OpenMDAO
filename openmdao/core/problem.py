@@ -42,14 +42,17 @@ MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 _contains_all = ContainsAll()
 
 CITATION = """@inproceedings{2014_openmdao_derivs,
-    Author = {Justin S. Gray and Tristan A. Hearn and Kenneth T. Moore and John Hwang and Joaquim Martins and Andrew Ning},
+    Author = {Justin S. Gray and Tristan A. Hearn and Kenneth T. Moore
+              and John Hwang and Joaquim Martins and Andrew Ning},
     Booktitle = {15th AIAA/ISSMO Multidisciplinary Analysis and Optimization Conference},
     Doi = {doi:10.2514/6.2014-2042},
     Month = {2014/07/08},
     Publisher = {American Institute of Aeronautics and Astronautics},
-    Title = {Automatic Evaluation of Multidisciplinary Derivatives Using a Graph-Based Problem Formulation in OpenMDAO},
+    Title = {Automatic Evaluation of Multidisciplinary Derivatives Using
+             a Graph-Based Problem Formulation in OpenMDAO},
     Year = {2014}
 }"""
+
 
 class Problem(object):
     """
@@ -80,7 +83,8 @@ class Problem(object):
         1 -- The `setup` method has been called, but vectors not initialized.
         2 -- The `final_setup` has been run, everything ready to run.
     cite: str
-        listing of relevant citataions that should be referenced when publishing work that uses this class
+        listing of relevant citataions that should be referenced when
+        publishing work that uses this class
     """
 
     _post_setup_func = None
@@ -100,7 +104,6 @@ class Problem(object):
         root : <System> or None
             Deprecated kwarg for `model`.
         """
-
         self.cite = CITATION
 
         if comm is None:

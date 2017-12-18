@@ -48,7 +48,8 @@ class Driver(object):
     recording_options : <OptionsDictionary>
         Dictionary with driver recording options.
     cite: str
-        listing of relevant citataions that should be referenced when publishing work that uses this class
+        listing of relevant citataions that should be referenced when
+        publishing work that uses this class
     _problem : <Problem>
         Pointer to the containing problem.
     supports : <OptionsDictionary>
@@ -124,7 +125,6 @@ class Driver(object):
                                        desc='Set to True to record derivatives at the driver \
                                        level')
         ###########################
-
 
         # What the driver supports.
         self.supports = OptionsDictionary()
