@@ -5,6 +5,11 @@ from __future__ import print_function
 from collections import OrderedDict
 import sys
 
+if sys.version_info[0] == 2:  # Not named on 2.6
+    from StringIO import StringIO
+else:
+    from io import StringIO
+
 
 def _check_cite(instance, citations):
     """
@@ -56,10 +61,11 @@ def find_citations(prob, out_stream=sys.stdout):
     if out_stream:
 
         for klass, cite in citations.items():
-            print("Class: {}".format(klass), file=out_stream)
-
+            # print("Class: {}".format(klass), file=out_stream)
+            out_stream.write("Class: {}\n".format(klass))
             lines = cite.split('\n')
             for line in lines:
-                print("    {}".format(line), file=out_stream)
+                # print("    {}".format(line), file=out_stream)
+                out_stream.write("    {}\n".format(line))
 
     return citations
