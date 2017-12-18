@@ -1,6 +1,6 @@
-*********************************************************
+********************************
 Understanding How Variables Work
-*********************************************************
+********************************
 
 In general, a numerical model can be complex, multidisciplinary, and heterogeneous.
 It can be decomposed into a series of smaller computations that are chained together.

@@ -26,22 +26,22 @@ to the balance, it solves the following equation:
 .. math::
      lhs(var) \cdot mult(var) = rhs(var)
 
-The _mult_ term is an optional multipler than can be applied to the
-left-hand-side (LHS) of the equation.  For our example we will assign the right-hand-side
-(RHS) to the mean anomaly (M) and the left-hand-side to :math:`E - e \sin{E}`
+The *mult* term is an optional multiplier than can be applied to the
+left-hand side (LHS) of the equation.  For our example, we will assign the right-hand side
+(RHS) to the mean anomaly (M), and the left-hand side to :math:`E - e \sin{E}`
 
 In this implementation, we rely on an ExecComp to compute the value of the LHS.
 
 Implicit components in OpenMDAO also provide an "initial guess" method,
-*guess_nonlinear* which provides the starting value for the implicit state
+*guess_nonlinear*, which provides the starting value for the implicit state
 variable (`E` in this case) for the nonlinear solver.  When solving Kepler's
 equation, using `M` as the initial guess for `E` is a good starting point.
 
 In summary, the recipe for solving Kepler's equation is as follows:
 
-- Define a problem with a `Group` as it's model.
-- To that Group, add components which provide, `M`, `e`, and the left-hand-side of Kepler's equation.
-- Add a linear and nonlinear solver to the Group, since the default solver's do not iterate.
+- Define a problem with a `Group` as its model.
+- To that Group, add components which provide, `M`, `e`, and the left-hand side of Kepler's equation.
+- Add a linear and nonlinear solver to the Group, since the default solvers do not iterate.
 - Setup the problem, set values for the inputs, and run the model.
 
 .. embed-test::
