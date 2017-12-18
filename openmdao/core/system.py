@@ -732,6 +732,8 @@ class System(object):
             'r': myresiduals
         }
 
+        self._rec_mgr.startup(self)
+
         # Recursion
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -802,7 +804,6 @@ class System(object):
         if setup_mode in ('full', 'reconf'):
             self.set_initial_values()
 
-        self._rec_mgr.startup(self)
         for sub in self.system_iter(recurse=True, include_self=True):
             sub._rec_mgr.record_metadata(sub)
 

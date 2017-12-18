@@ -1,6 +1,7 @@
 ################################################################################################
 Release Notes for OpenMDAO 2.1.0
-December 1, 2017
+
+December 7, 2017
 
 New Features:
 -------------
@@ -22,7 +23,6 @@ Backwards Compatible API Changes:
 -  `BalanceComp` has a `use_mult` argument to control if it has a `mult` input, defaulting to false
    (the mult input isn't used most of the time)
 - Renamed `MetaModel` to `UnstructuredMetaModel` and `MultiFiMetaModel` to `UnStructuredMultiFiMetaModel`
-
 
 
 Backwards Incompatible API changes:
