@@ -17,6 +17,8 @@ from openmdao.devtools.iprofile import _iprof_totals_exec, _iprof_totals_setup_p
 from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser
 from openmdao.devtools.iprof_utils import _Options
 
+from openmdao.utils.find_cite import find_citations
+
 
 def _view_model_setup_parser(parser):
     """
@@ -263,6 +265,52 @@ def _dump_dist_idxs_cmd(options):
     return _dumpdist
 
 
+def _cite_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao cite' command.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-o', default=None, action='store', dest='outfile',
+                        help='Name of output file.  By default, output goes to stdout.')
+
+
+def _cite_cmd(options):
+    """
+    Return the post setup hook function for `openmdao cite`.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
+
+    if options.outfile is None:
+        out = sys.stdout
+    else:
+        out = open(options.outfile, 'w')
+
+    def _cite(prob):
+        find_citations(prob, out_stream=out)
+        exit()
+
+    return _cite
+
+
 def _post_setup_exec(options):
     """
     Use this as executor for commands that run as Problem post-setup commands.
@@ -305,6 +353,7 @@ _post_setup_map = {
     'summary': (_config_summary_setup_parser, _config_summary_cmd),
     'tree': (_tree_setup_parser, _tree_cmd),
     'dump_idxs': (_dump_dist_idxs_setup_parser, _dump_dist_idxs_cmd),
+    'cite': (_cite_setup_parser, _cite_cmd),
 }
 
 # Other non-post-setup functions go here

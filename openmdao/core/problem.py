@@ -41,6 +41,15 @@ MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 _contains_all = ContainsAll()
 
+CITATION = """@inproceedings{openmdao_1,
+    Address = {Victoria, Canada},
+    Author = {Moore, K.T. and Naylor, B.A. and Gray, J.S.},
+    Booktitle = {10th AIAA/ISSMO Multidisciplinary Analysis and Optimization Conference},
+    Month = {August},
+    Note = {AIAA 2008-6069},
+    Title = {The Development of an Open-Source Framework for Multidisciplinary Analysis and Optimization},
+    Year = {2008}
+}"""
 
 class Problem(object):
     """
@@ -70,6 +79,8 @@ class Problem(object):
         0 -- Newly initialized problem or newly added model.
         1 -- The `setup` method has been called, but vectors not initialized.
         2 -- The `final_setup` has been run, everything ready to run.
+    cite: str
+        listing of relevant citataions that should be referenced when publishing work that uses this class
     """
 
     _post_setup_func = None
@@ -89,6 +100,9 @@ class Problem(object):
         root : <System> or None
             Deprecated kwarg for `model`.
         """
+
+        self.cite = CITATION
+
         if comm is None:
             try:
                 from mpi4py import MPI

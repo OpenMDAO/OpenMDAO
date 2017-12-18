@@ -45,6 +45,15 @@ def _check_imports():
     return optlist
 
 
+CITATIONS = """
+@phdthesis{hwang_thesis_2015,
+  author       = {John T. Hwang},
+  title        = {A Modular Approach to Large-Scale Design Optimization of Aerospace Systems},
+  school       = {University of Michigan},
+  year         = 2015
+}
+"""
+
 class pyOptSparseDriver(Driver):
     """
     Driver wrapper for pyoptsparse.
@@ -151,6 +160,8 @@ class pyOptSparseDriver(Driver):
         self._indep_list = []
         self._quantities = []
         self.fail = False
+
+        self.cite = CITATIONS
 
     def _setup_driver(self, problem):
         """
