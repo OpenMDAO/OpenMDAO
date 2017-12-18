@@ -2,7 +2,7 @@
 Helper function to find all the `cite` attributes throughout a model.
 """
 from __future__ import print_function
-
+from collections import OrderedDict
 import sys
 
 
@@ -41,7 +41,7 @@ def find_citations(prob, out_stream=sys.stdout):
     """
     # dict keyed by the class so we don't report multiple citations
     # for the same class showing up in multiple instances
-    citations = {}
+    citations = OrderedDict()
     _check_cite(prob, citations)
     _check_cite(prob.driver, citations)
 
