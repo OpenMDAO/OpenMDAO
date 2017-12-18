@@ -1,6 +1,7 @@
 """
 Helper function to find all the `cite` attributes throughout a model.
 """
+from __future__ import print_function
 
 import sys
 
@@ -55,9 +56,9 @@ def find_citations(prob, out_stream=sys.stdout):
     if out_stream:
 
         for klass, cite in citations.items():
-            out_stream.write("Class: {}\n".format(klass))
+            print("Class: {}".format(klass), file=out_stream)
             lines = cite.split('\n')
             for line in lines:
-                out_stream.write("    {}\n".format(line))
+                print("    {}".format(line), file=out_stream)
 
     return citations
