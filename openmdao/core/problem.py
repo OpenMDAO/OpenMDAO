@@ -1280,7 +1280,7 @@ class Problem(object):
             if name in input_vois:
                 meta = input_vois[name]
                 parallel_deriv_color = meta['parallel_deriv_color']
-                simul_coloring = meta['simul_coloring']
+                simul_coloring = meta['simul_deriv_color']
                 matmat = (meta['vectorize_derivs'] and meta['size'] > 1)
             else:
                 parallel_deriv_color = simul_coloring = None

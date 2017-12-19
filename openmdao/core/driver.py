@@ -637,8 +637,8 @@ class Driver(object):
                         if iscaler is not None:
                             val *= 1.0 / iscaler
         else:
-            msg = "Derivative scaling by the driver only supports the 'dict' format at present."
-            raise RuntimeError(msg)
+            raise RuntimeError("Derivative scaling by the driver only supports the 'dict' and "
+                               "'array' formats at present.")
 
         if return_format == 'array':
             derivs = self._dict2array_jac(derivs)
@@ -753,13 +753,13 @@ class Driver(object):
         """
         return "Driver"
 
-    def set_simul_coloring(self, simul_info):
+    def set_simul_deriv_color(self, simul_info):
         """
         Set the coloring for simultaneous derivatives.
 
         Parameters
         ----------
-        simul_info : tuple
+        simul_info : ({dv1: colors, ...}, {resp1: {dv1: {0: [res_idxs, dv_idxs]} ...} ...})
             Information about simultaneous coloring for design vars and responses.
         """
         if self.supports['simultaneous_derivatives']:

@@ -233,7 +233,8 @@ class pyOptSparseDriver(Driver):
             # do it for us and we'll end up with a fully dense COO matrix and very slow evaluation
             # of linear constraints!
             linjac_size = 0
-            for jacdct in itervalues(_lin_jacs):
+            to_remove = []
+            for oname, jacdct in iteritems(_lin_jacs):
                 for n, subjac in iteritems(jacdct):
                     if isinstance(subjac, np.ndarray):
                         # we can safely use coo_matrix to automatically convert the ndarray
@@ -258,9 +259,9 @@ class pyOptSparseDriver(Driver):
                 wrt = [v for v in indep_list if v in rels]
 
             if meta['linear']:
+                jac = {w: _lin_jacs[name][w] for w in wrt}
                 opt_prob.addConGroup(name, size, lower=lower, upper=upper,
-                                     linear=True, wrt=wrt,
-                                     jac=_lin_jacs[name])
+                                     linear=True, wrt=wrt, jac=jac)
             else:
                 if name in self._res_jacs:
                     jac = self._res_jacs[name]
@@ -286,9 +287,9 @@ class pyOptSparseDriver(Driver):
                 wrt = [v for v in indep_list if v in rels]
 
             if meta['linear']:
+                jac = {w: _lin_jacs[name][w] for w in wrt}
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower,
-                                     linear=True, wrt=wrt,
-                                     jac=_lin_jacs[name])
+                                     linear=True, wrt=wrt, jac=jac)
             else:
                 if name in self._res_jacs:
                     jac = self._res_jacs[name]
@@ -538,17 +539,20 @@ class pyOptSparseDriver(Driver):
         coloring, maps = self._simul_coloring_info
         for dv, colors in iteritems(coloring):
             if dv not in self._designvars:
+                # convert name from promoted to absolute
                 dv = prom2abs[dv][0]
-            self._designvars[dv]['simul_coloring'] = colors
+            self._designvars[dv]['simul_deriv_color'] = colors
 
         for res, dvdict in iteritems(maps):
             if res not in self._responses:
+                # convert name from promoted to absolute
                 res = prom2abs[res][0]
             self._responses[res]['simul_map'] = dvdict
             self._res_jacs[res] = {}
 
             for dv, col_dict in dvdict.items():
                 if dv not in self._designvars:
+                    # convert name from promoted to absolute and replace dictionary key
                     del dvdict[dv]
                     dv = prom2abs[dv][0]
                     dvdict[dv] = col_dict

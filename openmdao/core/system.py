@@ -2049,7 +2049,7 @@ class System(object):
         #       makes the flat_earth test run faster on one proc.
         if vectorize_derivs and parallel_deriv_color is None:
             dvs['parallel_deriv_color'] = '@matmat'
-        dvs['simul_coloring'] = simul_coloring
+        dvs['simul_deriv_color'] = simul_coloring
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None,
@@ -2208,7 +2208,7 @@ class System(object):
         resp['vectorize_derivs'] = vectorize_derivs
         if vectorize_derivs and parallel_deriv_color is None:
             resp['parallel_deriv_color'] = '@matmat'
-        resp['simul_coloring'] = simul_coloring
+        resp['simul_deriv_color'] = simul_coloring
         resp['simul_map'] = simul_map
 
         responses[name] = resp
