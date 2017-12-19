@@ -17,7 +17,7 @@ With the `openmdao` command
 ----------------------------------
 
 If you copy the above script into a file called `paraboloid.py`,
-then you can get the citations from the command line using the :ref:`openmdao run script<om-command>`.
+then you can get the citations from the command line using the :ref:`openmdao command-line script<om-command>`.
 
 ::
 
