@@ -5,15 +5,10 @@ from openmdao.api import Problem, Group, ExecComp, IndepVarComp, NonlinearRunOnc
 
 from openmdao.utils.find_cite import find_citations
 
-class CiteProblem(Problem):
-
-    def __init__(self):
-        super(Problem, self).__init__()
-
-        self.cite = "foobar prob"
-        # self.driver.cite = "foobar driver"
-
-
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class TestFindCite(unittest.TestCase):
@@ -35,14 +30,61 @@ class TestFindCite(unittest.TestCase):
         ec.nonlinear_solver = NewtonSolver()
         ec.cite = "foobar exec comp"
 
-        p.setup()
-
         self.prob = p
 
+    @unittest.skipUnless(PETScVector, "PETSc is required.")
+    def test_find_cite_no_write_petsc(self):
+        p = self.prob
+        p.setup(vector_class=PETScVector)
+
+        p._vector_class.cite = "foobar PETScVector"
+
+        citations = find_citations(p, out_stream=False)
+
+        # these two shouldn't have citations
+        self.assertFalse(IndepVarComp in citations)
+        self.assertFalse(NewtonSolver in citations)
+
+        try:
+            cite = citations[Problem]
+            self.assertEqual(p.cite, cite)
+        except KeyError:
+            self.fail('Citation for Problem class expected')
+
+        try:
+            cite = citations[Group]
+            self.assertEqual('foobar model', cite)
+        except KeyError:
+            self.fail('Citation for Group class expected')
+
+        try:
+            cite = citations[NonlinearRunOnce]
+            self.assertEqual('foobar nonlinear_solver', cite)
+        except KeyError:
+            self.fail('Citation for NonlinearRunOnce class expected')
+
+        try:
+            cite = citations[LinearRunOnce]
+            self.assertEqual('foobar linear_solver', cite)
+        except KeyError:
+            self.fail('Citation for LinearRunOnce class expected')
+
+        try:
+            cite = citations[ExecComp]
+            self.assertEqual('foobar exec comp', cite)
+        except KeyError:
+            self.fail('Citation for ExecComp class expected')
+
+        try:
+            cite = citations[PETScVector]
+            self.assertEqual('foobar PETScVector', cite)
+        except KeyError:
+            self.fail('Citation for PETScVector class expected')
 
     def test_find_cite_no_write(self):
 
         p = self.prob
+        p.setup()
 
         citations = find_citations(p, out_stream=False)
 
@@ -84,6 +126,7 @@ class TestFindCite(unittest.TestCase):
     def test_find_cite_with_write(self):
 
         p = self.prob
+        p.setup()
 
         dest = StringIO()
         find_citations(p, out_stream=dest)

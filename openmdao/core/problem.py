@@ -28,6 +28,7 @@ from openmdao.utils.general_utils import warn_deprecation, ContainsAll
 from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
+from openmdao.utils.find_cite import find_citations
 from openmdao.vectors.default_vector import DefaultVector
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -82,9 +83,9 @@ class Problem(object):
         0 -- Newly initialized problem or newly added model.
         1 -- The `setup` method has been called, but vectors not initialized.
         2 -- The `final_setup` has been run, everything ready to run.
-    cite: str
-        listing of relevant citataions that should be referenced when
-        publishing work that uses this class
+    cite : str
+        Listing of relevant citataions that should be referenced when
+        publishing work that uses this class.
     """
 
     _post_setup_func = None
@@ -360,7 +361,7 @@ class Problem(object):
         self.driver.cleanup()
 
     def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='rev',
-              force_alloc_complex=False):
+              force_alloc_complex=False, print_citations=False):
         """
         Set up the model hierarchy.
 
@@ -384,6 +385,10 @@ class Problem(object):
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
             after a reconfiguration) you may need to set this to True.
+        print_citations : bool
+            Find all revelant citations listed by classes in the model and print them
+            to std out.
+
 
         Returns
         -------
@@ -415,6 +420,10 @@ class Problem(object):
         self._force_alloc_complex = force_alloc_complex
 
         self._setup_status = 1
+
+        if print_citations:
+            find_citations(self)
+
         return self
 
     def final_setup(self):

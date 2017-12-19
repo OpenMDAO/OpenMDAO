@@ -10,8 +10,10 @@ The output of this helper function will tell you which citations you should incl
 
 There are two ways use the citation helper
 
-Directly from inside your script
+Directly from setup()
 ----------------------------------
+You can get the list of citations by adding passing :code:`print_citations=True` as an
+argument to the :ref:`Problem setup()<setup>`
 
 .. embed-test::
     openmdao.test_suite.test_examples.tldr_paraboloid.TestParaboloidTLDR.test_feature_tldr_citation

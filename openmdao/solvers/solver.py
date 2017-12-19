@@ -120,9 +120,9 @@ class Solver(object):
         object that manages all recorders added to this solver
     _solver_info : <SolverInfo>
         Object to store some formatting for iprint that is shared across all solvers.
-    cite: str
-        listing of relevant citataions that should be referenced when
-        publishing work that uses this class
+    cite : str
+        Listing of relevant citataions that should be referenced when
+        publishing work that uses this class.
     options : <OptionsDictionary>
         Options dictionary.
     recording_options : <OptionsDictionary>

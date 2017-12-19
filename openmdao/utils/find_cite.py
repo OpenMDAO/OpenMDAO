@@ -3,6 +3,7 @@ Helper function to find all the `cite` attributes throughout a model.
 """
 from __future__ import print_function
 from collections import OrderedDict
+import inspect
 import sys
 
 if sys.version_info[0] == 2:  # Not named on 2.6
@@ -11,7 +12,7 @@ else:
     from io import StringIO
 
 
-def _check_cite(instance, citations):
+def _check_cite(obj, citations):
     """
     Grab the cite attribute, if it exists.
 
@@ -22,10 +23,14 @@ def _check_cite(instance, citations):
     citations : dict
         the dictionary to add a citation to, if found
     """
-    if instance.cite:
-        klass = instance.__class__
+
+    if inspect.isclass(obj):
+        if obj.cite:
+            citations[obj] = obj.cite
+    if obj.cite:
+        klass = obj.__class__
         # return klass, cite
-        citations[klass] = instance.cite
+        citations[klass] = obj.cite
 
 
 def find_citations(prob, out_stream=sys.stdout):
@@ -49,6 +54,8 @@ def find_citations(prob, out_stream=sys.stdout):
     citations = OrderedDict()
     _check_cite(prob, citations)
     _check_cite(prob.driver, citations)
+
+    _check_cite(prob._vector_class, citations)
 
     # recurse down the model
     for subsys in prob.model.system_iter(include_self=True, recurse=True):
