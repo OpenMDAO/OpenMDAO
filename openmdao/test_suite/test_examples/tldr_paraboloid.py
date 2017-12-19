@@ -43,7 +43,7 @@ class TestParaboloidTLDR(unittest.TestCase):
 
 
     def test_feature_tldr_citation(self):
-        from openmdao.api import Problem, ScipyOptimizer, ExecComp, IndepVarComp, find_citations
+        from openmdao.api import Problem, ScipyOptimizer, ExecComp, IndepVarComp
 
         # build the model
         prob = Problem()
@@ -66,6 +66,14 @@ class TestParaboloidTLDR(unittest.TestCase):
 
         prob.setup(print_citations=True)
 
+        prob.run_driver()
+
+        # minimum value
+        assert_rel_error(self, prob['paraboloid.f'], -27.33333, 1e-6)
+
+        # location of the minimum
+        assert_rel_error(self, prob['indeps.x'], 6.6667, 1e-4)
+        assert_rel_error(self, prob['indeps.y'], -7.33333, 1e-4)
 
 
 if __name__ == "__main__":
