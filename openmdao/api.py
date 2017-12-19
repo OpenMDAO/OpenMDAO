@@ -45,6 +45,8 @@ from openmdao.surrogate_models.response_surface import ResponseSurface
 from openmdao.surrogate_models.surrogate_model import SurrogateModel, \
     MultiFiSurrogateModel
 
+from openmdao.utils.find_cite import find_citations
+
 # Vectors
 from openmdao.vectors.default_vector import DefaultVector
 try:

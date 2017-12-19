@@ -47,6 +47,9 @@ class Driver(object):
         Dictionary with general pyoptsparse options.
     recording_options : <OptionsDictionary>
         Dictionary with driver recording options.
+    cite : str
+        Listing of relevant citataions that should be referenced when
+        publishing work that uses this class.
     _problem : <Problem>
         Pointer to the containing problem.
     supports : <OptionsDictionary>
@@ -137,6 +140,7 @@ class Driver(object):
         self.iter_count = 0
         self.metadata = None
         self._model_viewer_data = None
+        self.cite = ""
 
         # TODO, support these in OpenMDAO
         self.supports.declare('integer_design_vars', types=bool, default=False)

@@ -3,7 +3,7 @@ from distutils.core import setup
 setup(
     name='openmdao',
     version='2.1.0',
-    description="OpenMDAO v2.0 framework infrastructure",
+    description="OpenMDAO v2 framework infrastructure",
     long_description="""OpenMDAO is an open-source high-performance computing platform
     for systems analysis and multidisciplinary optimization, written in Python. It
     enables you to decompose your models, making them easier to build and maintain,

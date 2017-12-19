@@ -56,6 +56,10 @@ class System(object):
         Int that holds the number of times this system has iterated
         in a recording run.
     #
+    cite : str
+        Listing of relevant citataions that should be referenced when
+        publishing work that uses this class.
+    #
     _subsystems_allprocs : [<System>, ...]
         List of all subsystems (children of this system).
     _subsystems_myproc : [<System>, ...]
@@ -287,6 +291,8 @@ class System(object):
 
         # Case recording related
         self.iter_count = 0
+
+        self.cite = ""
 
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
