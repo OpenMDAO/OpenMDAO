@@ -6,10 +6,7 @@ from collections import OrderedDict
 import inspect
 import sys
 
-if sys.version_info[0] == 2:  # Not named on 2.6
-    from StringIO import StringIO
-else:
-    from io import StringIO
+from openmdao.utils.logger_utils import get_logger
 
 
 def _check_cite(obj, citations):
@@ -32,7 +29,7 @@ def _check_cite(obj, citations):
         citations[klass] = obj.cite
 
 
-def find_citations(prob, out_stream=sys.stdout):
+def find_citations(prob, out_stream='stdout'):
     """
     Compiles a list of citations from all classes in the problem.
 
@@ -40,8 +37,9 @@ def find_citations(prob, out_stream=sys.stdout):
     ----------
     prob : <Problem>
         The Problem instance to be searched
-    out_stream : File like
-        defaults to sys.stdout. False will prevent printed output
+    out_stream : 'stdout', 'stderr' or file-like
+            Where to send human readable output. Default is 'stdout'.
+            Set to None to suppress.
 
     Returns
     -------
@@ -65,13 +63,13 @@ def find_citations(prob, out_stream=sys.stdout):
             _check_cite(subsys.linear_solver, citations)
 
     if out_stream:
-
+        logger = get_logger('list_inputs', out_stream=out_stream)
         for klass, cite in citations.items():
             # print("Class: {}".format(klass), file=out_stream)
-            out_stream.write("Class: {}\n".format(klass))
+            logger.info("Class: {}".format(klass))
             lines = cite.split('\n')
             for line in lines:
                 # print("    {}".format(line), file=out_stream)
-                out_stream.write("    {}\n".format(line))
+                logger.info("    {}".format(line))
 
     return citations

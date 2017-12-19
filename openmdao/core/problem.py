@@ -361,7 +361,7 @@ class Problem(object):
         self.driver.cleanup()
 
     def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='rev',
-              force_alloc_complex=False, print_citations=False):
+              force_alloc_complex=False):
         """
         Set up the model hierarchy.
 
@@ -420,9 +420,6 @@ class Problem(object):
         self._force_alloc_complex = force_alloc_complex
 
         self._setup_status = 1
-
-        if print_citations:
-            find_citations(self)
 
         return self
 

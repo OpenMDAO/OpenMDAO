@@ -5,26 +5,19 @@ How to Cite OpenMDAO
 **************************
 
 Depending on which parts of OpenMDAO you are using, there are diferent papers that are appropriate to cite.
-We've provided a helper function that will look at all the parts of your model and give you a list of the relevant citations.
-The output of this helper function will tell you which citations you should include and which classes those citations relate to.
+OpenMDAO can tell you which citations are appropriate, accouting for what classes you're actually using in your model.
 
-There are two ways use the citation helper
-
-Directly from setup()
-----------------------------------
-You can get the list of citations by adding passing :code:`print_citations=True` as an
-argument to the :ref:`Problem setup()<setup>`
+Here is a simple example
 
 .. embed-test::
-    openmdao.test_suite.test_examples.tldr_paraboloid.TestParaboloidTLDR.test_feature_tldr_citation
-
+    openmdao.test_suite.test_examples.tldr_paraboloid.TestParaboloidTLDR.test_tldr
+    :no-split:
 
 With the `openmdao` command
 ----------------------------------
 
-If you copy the above script into a file called `paraboloid.py` and remove the call to `find_citations`,
+If you copy the above script into a file called `paraboloid.py`,
 then you can get the citations from the command line using the :ref:`openmdao run script<om-command>`.
-
 
 ::
 
