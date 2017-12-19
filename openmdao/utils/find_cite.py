@@ -18,12 +18,11 @@ def _check_cite(obj, citations):
 
     Parameters
     ----------
-    instance : object
+    obj : object
         the instance to check for citations on
     citations : dict
         the dictionary to add a citation to, if found
     """
-
     if inspect.isclass(obj):
         if obj.cite:
             citations[obj] = obj.cite

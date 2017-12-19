@@ -20,6 +20,7 @@ CITATION = '''@InProceedings{petsc-efficient,
     Year = "1997"
 }'''
 
+
 class PETScTransfer(DefaultTransfer):
     """
     PETSc Transfer implementation for running in parallel.
