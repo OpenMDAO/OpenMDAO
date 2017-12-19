@@ -33,6 +33,7 @@ in alphabetical order with their values.
 .. embed-test::
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_inputs
 
+.. _list_outputs:
 
 *List Outputs and Residuals*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
