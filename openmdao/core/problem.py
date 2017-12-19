@@ -385,10 +385,6 @@ class Problem(object):
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
             after a reconfiguration) you may need to set this to True.
-        print_citations : bool
-            Find all revelant citations listed by classes in the model and print them
-            to std out.
-
 
         Returns
         -------
