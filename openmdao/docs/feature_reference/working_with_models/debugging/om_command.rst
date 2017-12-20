@@ -63,20 +63,12 @@ in color if the terminal supports it and the *colorama* package is installed.  T
 also allows specific attributes and/or vector variables to be printed out along with their
 corresponding system in the tree.
 
-Here's an example of the tree output for a simple model:
+Here's an example of the tree output for a simple circuit model:
 
-.. code-block:: none
 
-    Driver: Driver
-        Group
-            IndepVarComp ground
-            IndepVarComp source
-            Circuit circuit  LN: DirectSolver  NL: NewtonSolver
-                Node n1
-                Node n2
-                Resistor R1
-                Resistor R2
-                Diode D1
+.. embed-shell-cmd::
+    :cmd: openmdao tree circuit.py
+    :dir: ../test_suite/scripts
 
 
 openmdao summary
@@ -84,19 +76,10 @@ openmdao summary
 
 The `openmdao summary` command prints a high level summary of the model.  For example:
 
-.. code-block:: none
+.. embed-shell-cmd::
+    :cmd: openmdao summary circuit.py
+    :dir: ../test_suite/scripts
 
-    ============== Problem Summary ============
-    Groups:             173
-    Components:         524
-    Max tree depth:       8
-
-    Design variables:    10   Total size:       10
-    Constraints:         20   Total size:       20
-    Objectives:           1   Total size:        1
-
-    Input variables:   2894   Total size:    10734
-    Output variables:  2130   Total size:     6648
 
 
 Profiling and Tracing Commands
