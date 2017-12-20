@@ -23,8 +23,17 @@ to run.
 openmdao view_model
 ###################
 
-The `openmdao view_model` command will generate an :math:`N^2` diagram of the model that is viewable in
-a browser, for example:
+The :code:`openmdao view_model` command will generate an :math:`N^2` diagram of the model that is
+viewable in a browser, for example:
+
+
+.. code-block:: none
+
+    openmdao view_model circuit_example.py
+
+
+will generate an :math:`N^2` diagram like the one below.
+
 
 .. raw:: html
     :file: ../../../advanced_guide/implicit_comps/n2.html
@@ -33,7 +42,7 @@ a browser, for example:
 openmdao view_connections
 #########################
 
-The `openmdao view_connections` command generates a table of connection information for all input and
+The :code:`openmdao view_connections` command generates a table of connection information for all input and
 output variables in the model.  Units can be compared for each connection and unconnected inputs
 and outputs can be easily identified.  The displayed variables can be filtered by source system
 and/or target system.  They can also be filtered by NO CONNECTION, which will show all of the
@@ -42,7 +51,11 @@ source or target side.  When units differ between a source and a target they are
 red, and when inputs are connected to outputs outside of the currently selected top level system,
 they are highlighted in purple.  This can be used to easily identify variables that are connected
 across group boundaries.  Below is an example of a connection viewer for a pycycle propulsor
-model:
+model obtained using the command:
+
+.. code-block:: none
+
+    openmdao view_connections propulsor.py
 
 
 .. figure:: view_connections.png
@@ -56,7 +69,7 @@ model:
 openmdao tree
 #############
 
-The `openmdao tree` command prints an indented list of all systems in the model tree.  Each system's
+The :code:`openmdao tree` command prints an indented list of all systems in the model tree.  Each system's
 type and name are shown, along with linear and nonlinear solvers if they differ from the defaults,
 which are LinearRunOnce and NonlinearRunOnce respectively.  If the `-c` option is used, the tree will print
 in color if the terminal supports it and the *colorama* package is installed.  The tree Command
@@ -74,7 +87,7 @@ Here's an example of the tree output for a simple circuit model:
 openmdao summary
 ################
 
-The `openmdao summary` command prints a high level summary of the model.  For example:
+The :code:`openmdao summary` command prints a high level summary of the model.  For example:
 
 .. embed-shell-cmd::
     :cmd: openmdao summary circuit.py
@@ -109,7 +122,7 @@ the function groups available at the time of this writing:
 openmdao iprof
 ##############
 
-The `openmdao iprof` command will display an icicle plot showing the time elapsed in all of the target
+The :code:`openmdao iprof` command will display an icicle plot showing the time elapsed in all of the target
 methods corresponding to each object instance that they were called on.  For more details, see
 :ref:`Instance-based Profiling <instbasedprofile>`.
 
@@ -117,20 +130,20 @@ methods corresponding to each object instance that they were called on.  For mor
 openmdao iprof_totals
 #####################
 
-The `openmdao iprof_totals` command performs the same profiling as `openmdao iprof`, but it outputs a simple
+The :code:`openmdao iprof_totals` command performs the same profiling as `openmdao iprof`, but it outputs a simple
 text based summary of the total time spent in each method.  The :ref:`Instance-based Profiling <instbasedprofile>`
 section contains more details.
 
 openmdao mem
 ############
 
-The `openmdao mem` command profiles the memory usage of a specified set of functions.  For more detail,
+The :code:`openmdao mem` command profiles the memory usage of a specified set of functions.  For more detail,
 see :ref:`Memory Profiling <instbasedmemory>`.
 
 
 openmdao trace
 ##############
 
-The `openmdao trace` command prints a call trace for a specified set of functions.  Optionally it can
+The :code:`openmdao trace` command prints a call trace for a specified set of functions.  Optionally it can
 display values of function locals and return values.  For more detail, see
 :ref:`Instance-based Call Tracing <instbasedtrace>`.

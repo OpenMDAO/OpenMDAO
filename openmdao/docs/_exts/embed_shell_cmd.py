@@ -119,7 +119,7 @@ class EmbedShellCmdDirective(Directive):
 
         os.chdir(workdir)
         try:
-            output = subprocess.check_output(cmd)
+            output = subprocess.check_output(cmd).decode('utf-8', 'ignore')
         except subprocess.CalledProcessError as err:
             output = str(err)
             success = False
