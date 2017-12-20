@@ -8,7 +8,7 @@ Implicit variables are those that are computed as an implicit function of other 
 For instance, :math:`y` would be an implicit variable, given that it is computed by solving :math:`\cos(x \cdot y) - z \cdot y = 0`.
 In OpenMDAO, implicit variables are defined as the outputs of components that inherit from :ref:`ImplicitComponent <openmdao.core.implicitcomponent.py>`.
 
-In this above implict expression :math:`y` is the implicit variable while :math:`x` and :math:`z` would be considered inputs.
+In the above implict expression, :math:`y` is the implicit variable while :math:`x` and :math:`z` would be considered inputs.
 
 ImplicitComponent Methods
 -------------------------

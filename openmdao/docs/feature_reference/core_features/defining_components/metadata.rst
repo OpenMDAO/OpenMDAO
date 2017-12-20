@@ -1,13 +1,13 @@
 .. _component_metadata:
 
 ********************************************
-Component metadata (arguments to components)
+Component Metadata (Arguments to Components)
 ********************************************
 
 The primary job of a component, whether explicit or implicit, is to define inputs and outputs,
-as well as the mapping that computes the outputs given the inputs.
-Often, however, there are incidental parameters that affect the behavior of the component
-but are not considered input variables in the sense of being computed as an output of another component.
+as well as to do the mapping that computes the outputs given the inputs.
+Often, however, there are incidental parameters that affect the behavior of the component,
+but which are not considered input variables in the sense of being computed as an output of another component.
 
 OpenMDAO provides a way of declaring these parameters, which are referred to as *metadata*.
 They are declared in the 'initialize' method of the user's component,
@@ -24,10 +24,10 @@ The full list of options can be found in the method signature below.
 .. automethod:: openmdao.utils.options_dictionary.OptionsDictionary.declare
     :noindex:
 
-A simple example
+A Simple Example
 ----------------
 
-A common use of metadata is to specify the shape or size of the component's input and output variables.
+Metadata is commonly used to specify the shape or size of the component's input and output variables.
 
 .. embed-code::
     openmdao.test_suite.components.metadata_feature_vector
@@ -36,14 +36,14 @@ A common use of metadata is to specify the shape or size of the component's inpu
     openmdao.utils.tests.test_options_dictionary_feature.TestOptionsDictionaryFeature.test_simple
 
 In this example, 'size' is required; the first time we try to get 'size',
-we would have got an error if we
+we would have gotten an error if we:
 
 1. did not pass in 'size' when instantiating 'VectorDoublingComp' and
 2. did not set its value in the code for VectorDoublingComp.
 
 Not setting a default value when declaring it implies that the value must be set prior to getting it.
 
-Providing default values
+Providing Default Values
 ------------------------
 
 One reason why using metadata is convenient is that a default value can be specified,
@@ -57,8 +57,8 @@ making it optional to pass the value in during component instantiation.
 
 In this example, both 'a' and 'b' are optional, so it is valid to pass in 'a', but not 'b'.
 
-Specifying values or types
----------------------------
+Specifying Values or Types
+--------------------------
 
 Another commonly-used metadata feature is specifying acceptable values or types.
 If only the list of acceptable values is specified,
