@@ -2,12 +2,12 @@ branches:
   only:
   - master
 
-#sudo: false
-filter_secrets: false
-
 sudo: required
 dist: trusty
 group: deprecated-2017Q4
+
+#sudo: false
+filter_secrets: false
 
 os:
 - linux
@@ -76,8 +76,8 @@ install:
   fi
 
 # keeping numpy pinned at 1.12 because pySNOPT dies with 1.13 because numpy broke callback
-- conda install --quiet --yes nomkl
-- conda install --quiet --yes python=$PY numpy==1.12 scipy nose sphinx mock swig
+- conda install --yes nomkl
+- conda install --yes python=$PY numpy==1.12 scipy nose sphinx mock swig
 
 # install pyoptsparse
 - wget https://bitbucket.org/mdolab/pyoptsparse/get/tip.zip;
