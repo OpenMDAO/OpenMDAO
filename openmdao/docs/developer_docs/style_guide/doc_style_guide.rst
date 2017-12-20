@@ -316,6 +316,26 @@ embed-options
                 options
 
 
+embed-shell-cmd
++++++++++++++++
+
+    `embed-shell-cmd` is a custom directive that lets a developer insert a shell command and
+    its corresponding console output into a doc.  The developer must supply the shell command
+    and optionally the directory where the command will run.
+
+    .. code-block:: none
+
+        .. embed-shell-cmd::
+            :cmd: openmdao tree circuit.py
+            :dir: ../test_suite/scripts
+
+    The output from the above syntax should look like this:
+
+    .. embed-shell-cmd::
+        :cmd: openmdao tree circuit.py
+        :dir: ../test_suite/scripts
+
+
 Tagging
 -------
 
