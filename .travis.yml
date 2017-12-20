@@ -71,7 +71,7 @@ install:
   fi
 
 # keeping numpy pinned at 1.12 because pySNOPT dies with 1.13 because numpy broke callback
-- conda install --yes python=$PY numpy==1.12 scipy nose sphinx mock swig nomkl
+- conda install --yes python=$PY numpy==1.12 scipy=0.18.2 nose sphinx mock swig nomkl
 
 # install pyoptsparse
 - wget https://bitbucket.org/mdolab/pyoptsparse/get/tip.zip;
