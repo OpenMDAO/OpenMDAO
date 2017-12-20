@@ -2,8 +2,12 @@ branches:
   only:
   - master
 
-sudo: false
+#sudo: false
 filter_secrets: false
+
+sudo: required
+dist: trusty
+group: deprecated-2017Q4
 
 os:
 - linux
