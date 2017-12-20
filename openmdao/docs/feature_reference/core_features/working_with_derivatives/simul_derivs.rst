@@ -106,22 +106,25 @@ look like this:
     prob.driver.set_simul_deriv_color(color_info)
 
 
-.. note::
 
-    Currently, simultaneous derivatives are only supported in 'fwd' mode.  Once 'rev' mode
-    support does exist, a structure similar to the one above can be used to specify the
-    coloring.  The difference in the 'rev' case will be that the design variables and
-    responses will be 'flipped', i.e., the array of colors will be specified for the
-    responses instead of the design variables, and the mapping of row indices to
-    column indices for each color for each response will be specified for each design variable.
-
-
-You can find another example of setting up simultaneous derivatives in the
+You can more complete example of setting up an optimization with simultaneous derivatives in the
 :ref:`Simple Optimization using Simultaneous Derivatives <simul_deriv_example>` example.
 
 
 Automatic Generation of Coloring
 ################################
+Although you can compute the coloring manually, if you know enough information about your problem, doing so can be challenging.
+Also, it should be noted that even small changes to your model (e.g. adding new constraints or chaning the sparsity of a sub-component)
+can totally change the simultaneous coloring of your model.
+So care must be taken to keep the coloring up to date when you change your model.
+
+To streamline the process, OpenMDAO provides an automatic coloring algorithm.
+OpenMDAO assigns random numbers to the non-zero entries of the partial derivative jacobian,
+then solves for the total derivatives to find the non-zero entries which it runs a coloring algorithm on.
+
+OpenMDAO finds the non-zero entries based on the :ref:`declare_partials<feature_sparse_partials>` calls from all
+the components in your model, so if you're not specifying the sparsity of the partial derivatives of your components, then
+the automatic coloring isn't going to work for your model.
 
 The *color_info* data structure can be generated automatically using the following command:
 
@@ -146,13 +149,27 @@ would look like this:
     indeps.r num colors: 1
     Total colors vs. total size: 5 vs 21
 
-
-After activating simultaneous derivatives, it's always a good idea to check your total
-derivatives using the :ref:`check_totals<check-total-derivatives>` function.  If you run
-*openmdao simul_coloring* and it turns out there is no simultaneous coloring available,
+If you run *openmdao simul_coloring* and it turns out there is no simultaneous coloring available,
 don't be surprised.  Problems that have the necessary total jacobian sparsity to allow
 simultaneous derivatives are relatively uncommon.
 
+
+Checking that it works
+#######################
+
+After activating simultaneous derivatives, you need to check your total
+derivatives using the :ref:`check_totals<check-total-derivatives>` function.
+If you provided a manually compute coloring, you need to be sure it was correct.
+If you used the automatic coloring, the algorithm that we use still has a very small chance of computing an incorrect coloring.
+Using :ref:`check_totals<check-total-derivatives>` is the way to be sure that something hasn't go amis.
+
+If you used the automatic coloring algorithm and you find that :ref:`check_totals<check-total-derivatives>`
+is reporting incorrect total derivatives then you should try increasing the number of derivative computations that the algorithm used
+to compute the total derivative sparsity pattern. The default is 1, but you can increment that to 2 or higher as need be.
+
+.. code-block:: none
+
+    openmdao simul_coloring -n 2 <your_script_name>
 
 .. warning::
 
