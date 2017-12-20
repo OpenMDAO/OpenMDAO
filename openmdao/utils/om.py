@@ -275,6 +275,8 @@ def _simul_coloring_setup_parser(parser):
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', action='store', dest='outfile', help='output file.')
+    parser.add_argument('-n', action='store', dest='num_jacs', default=1, type=int,
+                        help='number of times to repeat total deriv computation.')
 
 
 def _simul_coloring_cmd(options):
@@ -297,7 +299,7 @@ def _simul_coloring_cmd(options):
         else:
             outfile = open(options.outfile, 'w')
         Problem._post_setup_func = None  # avoid recursive loop
-        color_info = get_simul_meta(prob, stream=outfile)
+        color_info = get_simul_meta(prob, repeats=options.num_jacs, stream=outfile)
         simul_coloring_summary(prob, color_info, stream=outfile)
         exit()
     return _simul_coloring

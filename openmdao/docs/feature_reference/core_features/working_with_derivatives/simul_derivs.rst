@@ -113,18 +113,20 @@ You can more complete example of setting up an optimization with simultaneous de
 
 Automatic Generation of Coloring
 ################################
-Although you can compute the coloring manually, if you know enough information about your problem, doing so can be challenging.
-Also, it should be noted that even small changes to your model (e.g. adding new constraints or chaning the sparsity of a sub-component)
-can totally change the simultaneous coloring of your model.
-So care must be taken to keep the coloring up to date when you change your model.
+Although you can compute the coloring manually if you know enough information about your problem,
+doing so can be challenging. Also, it should be noted that even small changes to your model,
+e.g., adding new constraints or changing the sparsity of a sub-component, can change the
+simultaneous coloring of your model. So care must be taken to keep the coloring up to date when
+you change your model.
 
 To streamline the process, OpenMDAO provides an automatic coloring algorithm.
 OpenMDAO assigns random numbers to the non-zero entries of the partial derivative jacobian,
 then solves for the total derivatives to find the non-zero entries which it runs a coloring algorithm on.
 
-OpenMDAO finds the non-zero entries based on the :ref:`declare_partials<feature_sparse_partials>` calls from all
-the components in your model, so if you're not specifying the sparsity of the partial derivatives of your components, then
-the automatic coloring isn't going to work for your model.
+OpenMDAO finds the non-zero entries based on the :ref:`declare_partials<feature_sparse_partials>`
+calls from all of the components in your model, so if you're not specifying the sparsity of the
+partial derivatives of your components, then it won't be possible to find an automatic coloring
+for your model.
 
 The *color_info* data structure can be generated automatically using the following command:
 
@@ -155,24 +157,22 @@ simultaneous derivatives are relatively uncommon.
 
 
 Checking that it works
-#######################
+######################
 
 After activating simultaneous derivatives, you need to check your total
 derivatives using the :ref:`check_totals<check-total-derivatives>` function.
-If you provided a manually compute coloring, you need to be sure it was correct.
-If you used the automatic coloring, the algorithm that we use still has a very small chance of computing an incorrect coloring.
-Using :ref:`check_totals<check-total-derivatives>` is the way to be sure that something hasn't go amis.
+If you provided a manually computed coloring, you need to be sure it was correct.
+If you used the automatic coloring, the algorithm that we use still has a small chance of
+computing an incorrect coloring due to the possibility that the total jacobian being analyzed
+by the algorithm contained one or more zero values that are only incidentally zero.
+Using :ref:`check_totals<check-total-derivatives>` is the way to be sure that something hasn't
+gone wrong.
 
 If you used the automatic coloring algorithm and you find that :ref:`check_totals<check-total-derivatives>`
-is reporting incorrect total derivatives then you should try increasing the number of derivative computations that the algorithm used
-to compute the total derivative sparsity pattern. The default is 1, but you can increment that to 2 or higher as need be.
+is reporting incorrect total derivatives then you should try increasing the number of derivative
+computations that the algorithm used to compute the total derivative sparsity pattern. The default
+is 1, but you can increment that to 2 or higher if needed.
 
 .. code-block:: none
 
     openmdao simul_coloring -n 2 <your_script_name>
-
-.. warning::
-
-    If you make any changes to your model after generating your coloring data that could
-    possibly modify the sparsity structure of your total jacobian, you must regenerate a
-    new set of coloring data or you will get the wrong answer.

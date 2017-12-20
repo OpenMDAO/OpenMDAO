@@ -41,7 +41,7 @@ def _wrapper_set_abs(jac, set_abs, key, subjac):
     return set_abs(key, subjac)
 
 
-def _find_disjoint(prob, mode='fwd', tol=1e-30):
+def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     """
     Find all sets of disjoint columns in the total jac and their corresponding rows.
 
@@ -51,6 +51,8 @@ def _find_disjoint(prob, mode='fwd', tol=1e-30):
         The Problem being analyzed.
     mode : str
         Derivative direction.
+    repeats : int
+        Number of times to repeat total jacobian computation.
     tol : float
         Tolerance on values in jacobian.  Anything smaller in magnitude will be set to 0.0.
 
@@ -88,11 +90,18 @@ def _find_disjoint(prob, mode='fwd', tol=1e-30):
         if not ('linear' in meta and meta['linear']):
             of.append(n)
 
-    J = prob.driver._compute_totals(return_format='array', of=of, wrt=wrt)
+    sumJ = None
+    for i in range(repeats):
+        J = prob.driver._compute_totals(return_format='array', of=of, wrt=wrt)
+        absJ = np.abs(J)
+        if sumJ is None:
+            sumJ = absJ
+        else:
+            sumJ += absJ
 
-    absJ = np.abs(J)
-    J[absJ < tol] = 0.0
-    J[absJ >= tol] = 1.0
+    J = sumJ
+    J[J < tol] = 0.0
+    J[J >= tol] = 1.0
 
     # from openmdao.utils.array_utils import array_viz
     # array_viz(J)
@@ -167,7 +176,7 @@ def _find_disjoint(prob, mode='fwd', tol=1e-30):
     return total_dv_offsets, total_res_offsets
 
 
-def get_simul_meta(problem, mode='fwd', stream=sys.stdout):
+def get_simul_meta(problem, mode='fwd', repeats=1, stream=sys.stdout):
     """
     Compute simultaneous derivative colorings for the given problem.
 
@@ -177,6 +186,8 @@ def get_simul_meta(problem, mode='fwd', stream=sys.stdout):
         The Problem being analyzed.
     mode : str
         Derivative direction.
+    repeats : int
+        Number of times to repeat total jacobian computation.
     stream : file-like or None
         Stream where output coloring info will be written.
 
@@ -189,7 +200,7 @@ def get_simul_meta(problem, mode='fwd', stream=sys.stdout):
     """
     driver = problem.driver
 
-    dv_idxs, res_idxs = _find_disjoint(problem, mode=mode)
+    dv_idxs, res_idxs = _find_disjoint(problem, mode=mode, repeats=repeats)
     all_colors = set()
 
     simul_colorings = {}
