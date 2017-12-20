@@ -4,7 +4,7 @@
 Memory Profiling
 ****************
 
-The `openmdao mem` command can be used to obtain an estimate of the memory usage of method calls for
+The :code:`openmdao mem` command can be used to obtain an estimate of the memory usage of method calls for
 a specified set of functions.  By default, All of the methods of core OpenMDAO classes are included.
 For example:
 

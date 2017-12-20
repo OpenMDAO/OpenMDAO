@@ -119,15 +119,14 @@ def _find_disjoint(prob, mode='fwd', tol=1e-30):
 
     # loop over each desvar and find disjoint column sets for all columns of that desvar
     for start, end, dv in dv_offsets:
-        allcols = list(range(start, end + 1))
-        if len(allcols) < 2:
+        if (end + 1 - start) < 2:
             continue
 
         disjoints = defaultdict(set)
         rows = {}
-        for c1, c2 in combinations(allcols, 2):  # loop over column pairs
+        for c1, c2 in combinations(range(start, end + 1), 2):  # loop over column pairs
             result = J[:, c1] + J[:, c2]
-            if np.all(result <= 1.0):
+            if np.max(result) <= 1.0:
                 disjoints[c1].add(c2)
                 disjoints[c2].add(c1)
                 if c1 not in rows:
@@ -189,8 +188,6 @@ def get_simul_meta(problem, mode='fwd', stream=sys.stdout):
         {resp_name: {dvname: {color: (row_idxs, col_idxs), ...}, ...}, ...}
     """
     driver = problem.driver
-    # if not driver.supports['simultaneous_derivatives']:
-    #     return {}, {}
 
     dv_idxs, res_idxs = _find_disjoint(problem, mode=mode)
     all_colors = set()
