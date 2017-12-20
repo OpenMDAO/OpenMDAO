@@ -7,13 +7,20 @@ Simultaneous Derivatives
 When OpenMDAO solves for total derivatives, it loops over either design variables in 'fwd' mode
 or responses in 'rev' mode.  For each of those variables, it performs a linear solve for each
 member of that variable, so for a scalar variable there would be only a single linear solve, and
-there would be *N* solves for an array variable of size *N*.  For certain models, total derivatives
-can be computed for multiple entries of a given design variable at the same time because those
-entries don't impact the same responses.  In other words, we can solve for multiple columns of
-the total jacobian at the same time because those columns don't have nonzero values in any of the
-same rows.
+there would be *N* solves for an array variable of size *N*.
 
-Consider, for example, a simple problem described by the equation:
+
+Certain models have a special kind of sparsity structure in the total derivative Jacobian that
+allows OpenMDAO to solve for multiple derivatives simultaneously. This results in far fewer linear solves and
+much improved performance. For example 'fwd' mode, this requires that at least a subset of the input variables
+affect subset of all response and that no response is dependent on all inputs.
+
+.. note::
+
+   While it is possible for problems to exist where simultaneous reverse solves would be possible,
+   OpenMDAO does not currently support simultaneous derivatives in reverse mode.
+
+Consider, for example, a hypothetical optimization problem with a constraint that :code:`y=10` where :math:`y` is defined by
 
 
 .. math::
@@ -21,7 +28,7 @@ Consider, for example, a simple problem described by the equation:
   y = 3*x[::2]^2 + 2*x[1::2]^2 ,
 
 
-where :math:`x` is our design variable (size 10) and :math:`y` is our objective (size 5).
+where :math:`x` is our design variable (size 10) and :math:`y` is our constraint (size 5).
 Our derivative looks like this:
 
 
