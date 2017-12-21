@@ -28,7 +28,6 @@ from openmdao.utils.general_utils import warn_deprecation, ContainsAll
 from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
-from openmdao.utils.find_cite import find_citations
 from openmdao.vectors.default_vector import DefaultVector
 
 try:

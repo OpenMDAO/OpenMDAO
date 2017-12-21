@@ -3,7 +3,7 @@ from six.moves import cStringIO as StringIO
 
 from openmdao.api import Problem, Group, ExecComp, IndepVarComp, NonlinearRunOnce, LinearRunOnce, NewtonSolver
 
-from openmdao.utils.find_cite import find_citations
+from openmdao.utils.find_cite import find_citations, print_citations
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -33,13 +33,13 @@ class TestFindCite(unittest.TestCase):
         self.prob = p
 
     @unittest.skipUnless(PETScVector, "PETSc is required.")
-    def test_find_cite_no_write_petsc(self):
+    def test_find_cite_petsc(self):
         p = self.prob
         p.setup(vector_class=PETScVector)
 
         p._vector_class.cite = "foobar PETScVector"
 
-        citations = find_citations(p, out_stream=False)
+        citations = find_citations(p)
 
         # these two shouldn't have citations
         self.assertFalse(IndepVarComp in citations)
@@ -81,12 +81,12 @@ class TestFindCite(unittest.TestCase):
         except KeyError:
             self.fail('Citation for PETScVector class expected')
 
-    def test_find_cite_no_write(self):
+    def test_find_cite(self):
 
         p = self.prob
         p.setup()
 
-        citations = find_citations(p, out_stream=False)
+        citations = find_citations(p)
 
         # these two shouldn't have citations
         self.assertFalse(IndepVarComp in citations)
@@ -123,13 +123,13 @@ class TestFindCite(unittest.TestCase):
             self.fail('Citation for ExecComp class expected')
 
 
-    def test_find_cite_with_write(self):
+    def test_print_citations(self):
 
         p = self.prob
         p.setup()
 
         dest = StringIO()
-        find_citations(p, out_stream=dest)
+        print_citations(p, out_stream=dest)
 
         expected = """Class: <class 'openmdao.core.problem.Problem'>
     @inproceedings{2014_openmdao_derivs,
@@ -154,9 +154,31 @@ Class: <class 'openmdao.components.exec_comp.ExecComp'>
 
         self.assertEqual(expected, dest.getvalue().strip())
 
+    def test_print_citations_class_subset(self):
+
+        p = self.prob
+        p.setup()
+
+        dest = StringIO()
+        print_citations(p, classes=['Problem', 'LinearRunOnce'], out_stream=dest)
+
+        expected = """Class: <class 'openmdao.core.problem.Problem'>
+    @inproceedings{2014_openmdao_derivs,
+        Author = {Justin S. Gray and Tristan A. Hearn and Kenneth T. Moore
+                  and John Hwang and Joaquim Martins and Andrew Ning},
+        Booktitle = {15th AIAA/ISSMO Multidisciplinary Analysis and Optimization Conference},
+        Doi = {doi:10.2514/6.2014-2042},
+        Month = {2014/07/08},
+        Publisher = {American Institute of Aeronautics and Astronautics},
+        Title = {Automatic Evaluation of Multidisciplinary Derivatives Using
+                 a Graph-Based Problem Formulation in OpenMDAO},
+        Year = {2014}
+    }
+Class: <class 'openmdao.solvers.linear.linear_runonce.LinearRunOnce'>
+    foobar linear_solver"""
+
+        self.assertEqual(expected, dest.getvalue().strip())
 
 
 if __name__ == "__main__":
     unittest.main()
-
-

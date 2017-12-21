@@ -321,7 +321,8 @@ embed-shell-cmd
 
     `embed-shell-cmd` is a custom directive that lets a developer insert a shell command and
     its corresponding console output into a doc.  The developer must supply the shell command
-    and optionally the directory where the command will run.
+    and optionally the directory where the command will run.  Also, setting the `show_cmd`
+    option to `false` will hide the shell command and show only the output resulting from it.
 
     .. code-block:: none
 

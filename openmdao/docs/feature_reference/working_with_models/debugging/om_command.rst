@@ -98,6 +98,7 @@ The :code:`openmdao summary` command prints a high level summary of the model.  
 
 .. _om-command-cite:
 
+
 openmdao cite
 #############
 
@@ -107,6 +108,7 @@ For example:
 .. embed-shell-cmd::
     :cmd: openmdao cite circuit.py
     :dir: ../test_suite/scripts
+
 
 
 Profiling and Tracing Commands

@@ -95,7 +95,8 @@ class EmbedShellCmdDirective(Directive):
 
     option_spec = {
         'cmd': unchanged,
-        'dir': unchanged
+        'dir': unchanged,
+        'show_cmd': unchanged
     }
 
     def run(self):
@@ -128,16 +129,27 @@ class EmbedShellCmdDirective(Directive):
 
         output = cgiesc.escape(output)
 
-        input_node = nodes.literal_block(cmdstr, cmdstr)
-        input_node['language'] = 'none'
+        show = True
+        if 'show_cmd' in self.options:
+            show = self.options['show_cmd'].lower().strip() == 'true'
+
+        if show:
+            input_node = nodes.literal_block(cmdstr, cmdstr)
+            input_node['language'] = 'none'
 
         if success:
             output_node = cmd_node(text=output)
         else:
-            output = "Shell command failed:\n" + output
+            if not show:
+                output = "Shell command '%s' failed:\n%s" % (cmdstr, output)
+            else:
+                output = "Shell command failed:\n" + output
             output_node = failed_node(text=output)
 
-        return [input_node, output_node]
+        if show:
+            return [input_node, output_node]
+        else:
+            return [output_node]
 
 
 def setup(app):

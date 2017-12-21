@@ -6,6 +6,8 @@ from collections import OrderedDict
 import inspect
 import sys
 
+from six import iteritems
+
 from openmdao.utils.logger_utils import get_logger
 
 
@@ -29,7 +31,7 @@ def _check_cite(obj, citations):
         citations[klass] = obj.cite
 
 
-def find_citations(prob, out_stream='stdout'):
+def find_citations(prob):
     """
     Compile a list of citations from all classes in the problem.
 
@@ -37,9 +39,6 @@ def find_citations(prob, out_stream='stdout'):
     ----------
     prob : <Problem>
         The Problem instance to be searched
-    out_stream : 'stdout', 'stderr' or file-like
-            Where to send human readable output. Default is 'stdout'.
-            Set to None to suppress.
 
     Returns
     -------
@@ -51,7 +50,6 @@ def find_citations(prob, out_stream='stdout'):
     citations = OrderedDict()
     _check_cite(prob, citations)
     _check_cite(prob.driver, citations)
-
     _check_cite(prob._vector_class, citations)
 
     # recurse down the model
@@ -62,8 +60,28 @@ def find_citations(prob, out_stream='stdout'):
         if subsys.linear_solver is not None:
             _check_cite(subsys.linear_solver, citations)
 
+    return citations
+
+
+def print_citations(prob, classes=None, out_stream='stdout'):
+    """
+    Write a list of citations from classes in the problem to the given stream.
+
+    Parameters
+    ----------
+    prob : <Problem>
+        The Problem instance to be searched
+    classes : list of str
+        List of class names for classes to include in the displayed citations.
+    out_stream : 'stdout', 'stderr' or file-like
+            Where to send human readable output. Default is 'stdout'.
+            Set to None to suppress.
+    """
+    citations = OrderedDict((c, cit) for c, cit in iteritems(find_citations(prob))
+                            if classes is None or c.__name__ in classes)
+
     if out_stream:
-        logger = get_logger('list_inputs', out_stream=out_stream)
+        logger = get_logger('citations', out_stream=out_stream)
         for klass, cite in citations.items():
             # print("Class: {}".format(klass), file=out_stream)
             logger.info("Class: {}".format(klass))
@@ -71,5 +89,3 @@ def find_citations(prob, out_stream='stdout'):
             for line in lines:
                 # print("    {}".format(line), file=out_stream)
                 logger.info("    {}".format(line))
-
-    return citations
