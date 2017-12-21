@@ -63,6 +63,32 @@ def find_citations(prob):
     return citations
 
 
+def _filter_citations(citations, classes):
+    """
+    Filter a dict of citations to include only those matching the give class names.
+
+    Parameters
+    ----------
+    citations : dict
+        Dict of citations keyed by class.
+    classes : list of str
+        List of class names for classes to include in the displayed citations.
+
+    Returns
+    -------
+    dict
+        The filtered dict of citations.
+    """
+    if classes is None:
+        return citations
+
+    cits = OrderedDict()
+    for klass, cit in iteritems(citations):
+        if klass.__name__ in classes or '.'.join((klass.__module__, klass.__name__)) in classes:
+            cits[klass] = cit
+    return cits
+
+
 def print_citations(prob, classes=None, out_stream='stdout'):
     """
     Write a list of citations from classes in the problem to the given stream.
@@ -77,8 +103,7 @@ def print_citations(prob, classes=None, out_stream='stdout'):
             Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
     """
-    citations = OrderedDict((c, cit) for c, cit in iteritems(find_citations(prob))
-                            if classes is None or c.__name__ in classes)
+    citations = _filter_citations(find_citations(prob), classes)
 
     if out_stream:
         logger = get_logger('citations', out_stream=out_stream)

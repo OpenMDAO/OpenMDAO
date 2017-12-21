@@ -337,6 +337,28 @@ embed-shell-cmd
         :dir: ../test_suite/scripts
 
 
+embed-bibtex
++++++++++++++++
+
+    `embed-bibtex` is a custom directive that lets a developer insert a citation for a
+    particular class into a doc.  The arguments are the module path and the name of the
+    class (or the name of a function that returns an instance of the desired class when
+    called with no arguments).
+
+    .. code-block:: none
+
+        .. embed-bibtex::
+            openmdao.drivers.scipy_optimizer
+            ScipyOptimizer
+
+
+    The output from the above syntax should look like this:
+
+    .. embed-bibtex::
+        openmdao.drivers.scipy_optimizer
+        ScipyOptimizer
+
+
 Tagging
 -------
 
