@@ -310,6 +310,7 @@ embed-options
 
         The output from the above syntax should result in a neatly-formatted table of options like this:
 
+
         .. embed-options::
             openmdao.solvers.linear.linear_block_jac
                 LinearBlockJac
