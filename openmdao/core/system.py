@@ -2745,6 +2745,14 @@ class System(object):
 
         # need to preserve execution order
         meta = self._var_abs2meta
+
+        if in_or_out == 'inputs': # qqq change to 'input' singular
+            meta_in_or_out = meta['input']
+        else:
+            meta_in_or_out = meta['output']
+
+        # qqq TODO need to just get the meta for input or output
+
         if MPI:
             # Make a dict of outputs
             from collections import OrderedDict
@@ -2752,15 +2760,47 @@ class System(object):
             for name, vals in outputs:
                 dict_of_outputs[name] = vals
             all_dict_of_outputs = self.comm.gather(dict_of_outputs, root=0) # returns a list, one per proc
+            all_meta = self.comm.gather(meta, root=0) # returns a list, one per proc
 
         if MPI and MPI.COMM_WORLD.rank > 0:  # only the root process should print
             return
 
-        if MPI:
-            merged_dict_of_outputs = all_dict_of_outputs[-1] # qqq no need to do it backwards like this
-            for d in all_dict_of_outputs[:-1]:
+        if MPI: # rest of this only done on rank 0
+            merged_dict_of_outputs = all_dict_of_outputs[0]
+            for d in all_dict_of_outputs[1:]: # in order of rank
+
+                # meta.src_indices has the info we need to decide how to piece together distributed arrays
+                # On rank 0, for the example, src_indices for plus.x is 0..49. On rank 1, it is 50..99
                 # each d is an OrderedDict of names and vals and meta
-                merged_dict_of_outputs.update(d)
+
+                # should look at this
+
+                # if in_or_out == 'inputs':
+                #     out_shape = allprocs_abs2meta_out['plus.x']['global_shape']
+
+                from six import iteritems
+                for name, vals in iteritems(d):
+                    if name not in merged_dict_of_outputs:
+                        merged_dict_of_outputs[name] = d[name]
+                    else:
+                        if in_or_out == 'inputs':
+                            is_distributed = meta_in_or_out[name]['src_indices'] is not None
+                        else:
+                            is_distributed = meta_in_or_out[name]['distributed']
+                        if is_distributed:
+                            # qqq TODO only do this if needed
+                            if 'value' in merged_dict_of_outputs[name]:
+                                merged_dict_of_outputs[name]['value'] = np.append(merged_dict_of_outputs[name]['value'], d[name]['value'])
+                            if 'shape' in merged_dict_of_outputs[name]:
+                                merged_dict_of_outputs[name]['shape'] =  merged_dict_of_outputs[name]['value'].shape
+                            if in_or_out == 'outputs':
+                                if 'resids' in merged_dict_of_outputs[name]:
+                                    merged_dict_of_outputs[name]['resids'] = np.append(merged_dict_of_outputs[name]['resids'], d[name]['resids'])
+                            # qqq also have to merge in the resids
+
+                # merged_dict_of_outputs.update(d)
+
+
             # make them back into a list of tuples
             outputs = []
             from six import iteritems

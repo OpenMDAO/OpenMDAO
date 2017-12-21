@@ -2,6 +2,7 @@ import os
 
 import unittest
 import numpy as np
+from six.moves import cStringIO
 
 from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp
 
@@ -86,21 +87,21 @@ class DistributedAdderTest(unittest.TestCase):
 
     def test_distributed_list_vars(self):
 
-        import pydevd
-        from openmdao.utils.mpi import MPI
-        if MPI.COMM_WORLD.rank:
-            pydevd.settrace('localhost', port=9876, stdoutToServer=True, stderrToServer=True)
-        else:
-            pydevd.settrace('localhost', port=9877, stdoutToServer=True, stderrToServer=True)
+        # import pydevd
+        # from openmdao.utils.mpi import MPI
+        # if MPI.COMM_WORLD.rank:
+        #     pydevd.settrace('localhost', port=9876, stdoutToServer=True, stderrToServer=True)
+        # else:
+        #     pydevd.settrace('localhost', port=9877, stdoutToServer=True, stderrToServer=True)
 
-        size = 100 #how many items in the array
+        size = 100 # how many items in the array
 
         prob = Problem()
         prob.model = Group()
 
         prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
         prob.model.add_subsystem('plus', DistributedAdder(size), promotes=['x', 'y'])
-        summer = prob.model.add_subsystem('summer', Summer(size), promotes=['y', 'sum'])
+        prob.model.add_subsystem('summer', Summer(size), promotes=['y', 'sum'])
 
         prob.setup(vector_class=PETScVector, check=False)
 
@@ -108,10 +109,7 @@ class DistributedAdderTest(unittest.TestCase):
 
         prob.run_driver()
 
-        from six.moves import cStringIO
-
         stream = cStringIO()
-
         inputs = prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream)
         self.assertEqual(inputs[0][0], 'plus.x')
         self.assertEqual(inputs[1][0], 'summer.y')
@@ -122,7 +120,15 @@ class DistributedAdderTest(unittest.TestCase):
         if prob.comm.rank: # Only rank 0 prints
             self.assertEqual(len(text), 0)
         else:
-            print(text)
+            self.assertEqual(text.count('value'), 3)
+            self.assertEqual(text.count('top'), 1)
+            self.assertEqual(text.count('  plus'), 1)
+            self.assertEqual(text.count('    x'), 1)
+            self.assertEqual(text.count('  summer'), 1)
+            self.assertEqual(text.count('    y'), 1)
+            # make sure all the arrays written have 100 elements in them
+            self.assertEqual(len(text.split('[')[1].split(']')[0].split()), 100)
+            self.assertEqual(len(text.split('[')[2].split(']')[0].split()), 100)
 
 
         stream = cStringIO()
@@ -146,20 +152,22 @@ class DistributedAdderTest(unittest.TestCase):
         if prob.comm.rank: # Only rank 0 prints
             self.assertEqual(len(text), 0)
         else:
-            print(text)
+            self.assertEqual(text.count('value'), 3)
+            self.assertEqual(text.count('  des_vars'), 1)
+            self.assertEqual(text.count('    x'), 1)
+            self.assertEqual(text.count('  plus'), 1)
+            self.assertEqual(text.count('    y'), 1)
+            self.assertEqual(text.count('  summer'), 1)
+            self.assertEqual(text.count('    sum'), 1)
+            # make sure all the arrays written have 100 elements in them
+            self.assertEqual(len(text.split('[')[1].split(']')[0].split()), 100)
+            self.assertEqual(len(text.split('[')[2].split(']')[0].split()), 100)
+            self.assertEqual(len(text.split('[')[3].split(']')[0].split()), 100)
+            self.assertEqual(len(text.split('[')[4].split(']')[0].split()), 100)
 
-        # inp = summer._inputs['y']
 
 
-        # for i in range(size):
-        #     diff = 11.0 - inp[i]
-        #     if diff > 1.e-6 or diff < -1.e-6:
-        #         raise RuntimeError("Summer input y[%d] is %f but should be 11.0" %
-        #                             (i, inp[i]))
-        #
-        # assert_rel_error(self, prob['sum'], 11.0 * size, 1.e-6)
-
-    def test_list_vars_remote_voi(self):
+    def test_distributed_arrays_list_vars(self):
         # import pydevd
         # from openmdao.utils.mpi import MPI
         # if MPI.COMM_WORLD.rank:
