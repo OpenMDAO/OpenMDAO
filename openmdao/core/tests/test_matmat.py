@@ -399,8 +399,8 @@ class MatMatTestCase(unittest.TestCase):
 
         #import matplotlib.pyplot as plt
 
-        #plt.plot(x_mid, p['truth.y_mid'], 'ro')
-        #plt.plot(x_lgl, p['y_lgl'], 'bo')
+        #plt.plot(p['y_lgl'], 'bo')
+        #plt.plot(expected, 'go')
         #plt.show()
 
         y_lgl = p['y_lgl']

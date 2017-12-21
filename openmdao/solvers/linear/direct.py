@@ -106,16 +106,15 @@ class DirectSolver(LinearSolver):
                         raise RuntimeError(format_singluar_error(err, system, matrix))
 
             elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
-                np.set_printoptions(precision=3)
                 self._lu = scipy.sparse.linalg.splu(mtx._matrix)
 
             elif isinstance(mtx, COOMatrix):
                 # calling scipy.sparse.linalg.splu on a COO actually transposes
                 # the matrix during conversion to csc prior to LU decomp
-                raise RuntimeError("Direct solver is not compatible with mtx type "
+                raise RuntimeError("Direct solver is not compatible with matrix type "
                                    "COOMatrix in system '%s'." % system.pathname)
             else:
-                raise RuntimeError("Direct solver not implemented for mtx type %s"
+                raise RuntimeError("Direct solver not implemented for matrix type %s"
                                    " in system '%s'." % (type(mtx), system.pathname))
 
         else:

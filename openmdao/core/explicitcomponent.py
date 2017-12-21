@@ -4,6 +4,7 @@ from __future__ import division
 
 import numpy as np
 from six import itervalues, iteritems
+from six.moves import range
 from itertools import product
 
 from openmdao.core.component import Component
@@ -321,17 +322,29 @@ class ExplicitComponent(Component):
         """
         with Recording(self.pathname + '._solve_linear', self.iter_count, self):
             for vec_name in vec_names:
-                if vec_name not in self._rel_vec_names:
-                    continue
-                d_outputs = self._vectors['output'][vec_name]
-                d_residuals = self._vectors['residual'][vec_name]
-
-                with self._unscaled_context(
-                        outputs=[d_outputs], residuals=[d_residuals]):
+                if vec_name in self._rel_vec_names:
                     if mode == 'fwd':
-                        d_outputs.set_vec(d_residuals)
+                        if self._has_resid_scaling:
+                            d_outputs = self._vectors['output'][vec_name]
+                            d_residuals = self._vectors['residual'][vec_name]
+
+                            with self._unscaled_context(outputs=[d_outputs],
+                                                        residuals=[d_residuals]):
+                                d_outputs.set_vec(d_residuals)
+                        else:
+                            self._vectors['output'][vec_name].set_vec(
+                                self._vectors['residual'][vec_name])
                     else:  # rev
-                        d_residuals.set_vec(d_outputs)
+                        if self._has_resid_scaling:
+                            d_outputs = self._vectors['output'][vec_name]
+                            d_residuals = self._vectors['residual'][vec_name]
+
+                            with self._unscaled_context(outputs=[d_outputs],
+                                                        residuals=[d_residuals]):
+                                d_residuals.set_vec(d_outputs)
+                        else:
+                            self._vectors['residual'][vec_name].set_vec(
+                                self._vectors['output'][vec_name])
         return False, 0., 0.
 
     def _linearize(self, do_nl=False, do_ln=False):

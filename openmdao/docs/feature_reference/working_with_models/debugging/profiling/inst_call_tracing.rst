@@ -4,7 +4,7 @@
 Instance-based Call Tracing
 ***************************
 
-The `openmdao trace` command can be used to print a trace of each instance method call.  For example:
+The :code:`openmdao trace` command can be used to print a trace of each instance method call.  For example:
 
 .. code-block:: none
 
@@ -144,10 +144,5 @@ setup related functions, do the following:
 To see a list of the available pre-defined sets of functions to trace, look at the usage info
 for the `-g` command that can be obtained as follows:
 
-
-.. code-block:: none
-
-   openmdao trace -h
-
-
-The `-h` command line option will display descriptions of all of the available command line options.
+.. embed-shell-cmd::
+    :cmd: openmdao trace -h

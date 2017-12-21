@@ -31,7 +31,7 @@ def _check_cite(obj, citations):
 
 def find_citations(prob, out_stream='stdout'):
     """
-    Compiles a list of citations from all classes in the problem.
+    Compile a list of citations from all classes in the problem.
 
     Parameters
     ----------
