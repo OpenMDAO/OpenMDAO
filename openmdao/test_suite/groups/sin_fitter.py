@@ -5,6 +5,7 @@
 from __future__ import print_function, division, absolute_import
 
 import numpy as np
+from six.moves import range
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
 

@@ -34,8 +34,6 @@ from openmdao.api import IndepVarComp
 from openmdao.test_suite.groups.parametric_group import ParametericTestGroup
 from openmdao.test_suite.components.cycle_comps import PSI, \
     ExplicitCycleComp, ExplicitFirstComp, ExplicitLastComp
-from openmdao.test_suite.components.deprecated_cycle_comps import \
-    DeprecatedCycleComp, DeprecatedFirstComp, DeprecatedLastComp
 
 
 class CycleGroup(ParametericTestGroup):
@@ -45,7 +43,6 @@ class CycleGroup(ParametericTestGroup):
 
     def initialize(self):
         self.default_params.update({
-            'component_class': ['explicit', 'deprecated'],
             'connection_type': ['implicit', 'explicit'],
             'partial_type': ['array', 'sparse', 'aij'],
             'finite_difference': [False, True],
@@ -63,9 +60,6 @@ class CycleGroup(ParametericTestGroup):
         self.metadata.declare('connection_type', default='explicit',
                               values=['explicit', 'implicit'],
                               desc='How to connect variables.')
-        self.metadata.declare('component_class', default='explicit',
-                              values=['explicit', 'deprecated'],
-                              desc='Component class to instantiate')
         self.metadata.declare('partial_type', default='array',
                               values=['array', 'sparse', 'aij'],
                               desc='type of partial derivatives')
@@ -87,18 +81,9 @@ class CycleGroup(ParametericTestGroup):
 
         connection_type = self.metadata['connection_type']
 
-        comp_class = self.metadata['component_class']
-
-        if comp_class == 'explicit':
-            first_class = ExplicitFirstComp
-            middle_class = ExplicitCycleComp
-            last_class = ExplicitLastComp
-        elif comp_class == 'deprecated':
-            first_class = DeprecatedFirstComp
-            middle_class = DeprecatedCycleComp
-            last_class = DeprecatedLastComp
-        else:
-            raise ValueError('Should not happen or else metadata dict is broken.')
+        first_class = ExplicitFirstComp
+        middle_class = ExplicitCycleComp
+        last_class = ExplicitLastComp
 
         self._generate_components(connection_type, first_class, middle_class, last_class, num_comp)
 

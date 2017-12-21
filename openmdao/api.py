@@ -11,7 +11,6 @@ from openmdao.core.analysis_error import AnalysisError
 
 # Components
 from openmdao.components.balance_comp import BalanceComp
-from openmdao.components.deprecated_component import Component
 from openmdao.components.external_code import ExternalCode
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.linear_system_comp import LinearSystemComp
@@ -44,6 +43,8 @@ from openmdao.surrogate_models.nearest_neighbor import NearestNeighbor
 from openmdao.surrogate_models.response_surface import ResponseSurface
 from openmdao.surrogate_models.surrogate_model import SurrogateModel, \
     MultiFiSurrogateModel
+
+from openmdao.utils.find_cite import find_citations
 
 # Vectors
 from openmdao.vectors.default_vector import DefaultVector

@@ -6,6 +6,7 @@ from collections import OrderedDict, Iterable, defaultdict
 from fnmatch import fnmatchcase
 import sys
 from itertools import product
+from numbers import Integral
 
 from six import iteritems, string_types
 from six.moves import range
@@ -55,6 +56,10 @@ class System(object):
     iter_count : int
         Int that holds the number of times this system has iterated
         in a recording run.
+    #
+    cite : str
+        Listing of relevant citataions that should be referenced when
+        publishing work that uses this class.
     #
     _subsystems_allprocs : [<System>, ...]
         List of all subsystems (children of this system).
@@ -288,6 +293,8 @@ class System(object):
         # Case recording related
         self.iter_count = 0
 
+        self.cite = ""
+
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
         self._subsystems_myproc_inds = []
@@ -354,8 +361,8 @@ class System(object):
         self._static_mode = True
         self._static_subsystems_allprocs = []
         self._static_manual_connections = {}
-        self._static_design_vars = {}
-        self._static_responses = {}
+        self._static_design_vars = OrderedDict()
+        self._static_responses = OrderedDict()
 
         self._reconfigured = False
         self.supports_multivecs = False
@@ -1938,7 +1945,8 @@ class System(object):
 
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
-                       parallel_deriv_color=None, vectorize_derivs=False):
+                       parallel_deriv_color=None, vectorize_derivs=False,
+                       simul_coloring=None):
         r"""
         Add a design variable to this system.
 
@@ -1969,6 +1977,9 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
+        simul_coloring : ndarray or list of int
+            An array or list of integer color values.  Must match the size of the
+            design variable.
 
         Notes
         -----
@@ -2030,6 +2041,11 @@ class System(object):
         dvs['ref'] = ref
         dvs['ref0'] = ref0
         if indices is not None:
+            # If given, indices must be a sequence
+            if not (isinstance(indices, Iterable) and
+                    all([isinstance(i, Integral) for i in indices])):
+                raise ValueError("If specified, indices must be a sequence of integers.")
+
             indices = np.atleast_1d(indices)
             dvs['size'] = len(indices)
         dvs['indices'] = indices
@@ -2039,13 +2055,19 @@ class System(object):
         #       makes the flat_earth test run faster on one proc.
         if vectorize_derivs and parallel_deriv_color is None:
             dvs['parallel_deriv_color'] = '@matmat'
+        dvs['simul_deriv_color'] = simul_coloring
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None,
                      adder=None, scaler=None, linear=False, parallel_deriv_color=None,
-                     vectorize_derivs=False):
+                     vectorize_derivs=False, simul_coloring=None,
+                     simul_map=None):
         r"""
         Add a response variable to this system.
+
+        The response can be scaled using ref and ref0.
+        The argument :code:`ref0` represents the physical value when the scaled value is 0.
+        The argument :code:`ref` represents the physical value when the scaled value is 1.
 
         Parameters
         ----------
@@ -2082,12 +2104,13 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
-
-        Notes
-        -----
-        The response can be scaled using ref and ref0.
-        The argument :code:`ref0` represents the physical value when the scaled value is 0.
-        The argument :code:`ref` represents the physical value when the scaled value is 1.
+        simul_coloring : ndarray or list of int
+            An array or list of integer color values.  Must match the size of the
+            response variable.
+        simul_map : dict
+            Mapping of this response to each design variable where simultaneous derivs will
+            be used.  Each design variable entry is another dict keyed on color, and the values
+            in the color dict are tuples of the form (resp_idxs, color_idxs).
 
         """
         # Name must be a string
@@ -2120,19 +2143,9 @@ class System(object):
             raise ValueError(msg.format(name))
 
         # If given, indices must be a sequence
-        err = False
-        if indices is not None:
-            if isinstance(indices, string_types):
-                err = True
-            elif isinstance(indices, Iterable):
-                all_int = all([isinstance(item, int) for item in indices])
-                if not all_int:
-                    err = True
-            else:
-                err = True
-        if err:
-            msg = "If specified, indices must be a sequence of integers."
-            raise ValueError(msg)
+        if (indices is not None and not (
+                isinstance(indices, Iterable) and all([isinstance(i, Integral) for i in indices]))):
+            raise ValueError("If specified, indices must be a sequence of integers.")
 
         if self._static_mode:
             responses = self._static_responses
@@ -2201,13 +2214,15 @@ class System(object):
         resp['vectorize_derivs'] = vectorize_derivs
         if vectorize_derivs and parallel_deriv_color is None:
             resp['parallel_deriv_color'] = '@matmat'
+        resp['simul_deriv_color'] = simul_coloring
+        resp['simul_map'] = simul_map
 
         responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
                        indices=None, linear=False, parallel_deriv_color=None,
-                       vectorize_derivs=False):
+                       vectorize_derivs=False, simul_coloring=None, simul_map=None):
         r"""
         Add a constraint variable to this system.
 
@@ -2242,6 +2257,13 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
+        simul_coloring : ndarray or list of int
+            An array or list of integer color values.  Must match the size of the
+            constraint variable.
+        simul_map : dict
+            Mapping of this response to each design variable where simultaneous derivs will
+            be used.  Each design variable entry is another dict keyed on color, and the values
+            in the color dict are tuples of the form (resp_idxs, color_idxs).
 
         Notes
         -----
@@ -2253,11 +2275,12 @@ class System(object):
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
                           ref0=ref0, indices=indices, linear=linear,
                           parallel_deriv_color=parallel_deriv_color,
-                          vectorize_derivs=vectorize_derivs)
+                          vectorize_derivs=vectorize_derivs,
+                          simul_coloring=simul_coloring, simul_map=simul_map)
 
     def add_objective(self, name, ref=None, ref0=None, index=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
-                      vectorize_derivs=False):
+                      vectorize_derivs=False, simul_coloring=None, simul_map=None):
         r"""
         Add a response variable to this system.
 
@@ -2284,6 +2307,13 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
+        simul_coloring : ndarray or list of int
+            An array or list of integer color values.  Must match the size of the
+            objective variable.
+        simul_map : dict
+            Mapping of this response to each design variable where simultaneous derivs will
+            be used.  Each design variable entry is another dict keyed on color, and the values
+            in the color dict are tuples of the form (resp_idxs, color_idxs).
 
         Notes
         -----
@@ -2315,7 +2345,8 @@ class System(object):
         self.add_response(name, type_='obj', scaler=scaler, adder=adder,
                           ref=ref, ref0=ref0, index=index,
                           parallel_deriv_color=parallel_deriv_color,
-                          vectorize_derivs=vectorize_derivs)
+                          vectorize_derivs=vectorize_derivs,
+                          simul_coloring=simul_coloring, simul_map=simul_map)
 
     def get_design_vars(self, recurse=True, get_sizes=True):
         """

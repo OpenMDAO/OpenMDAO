@@ -3,6 +3,7 @@ from __future__ import division
 
 import numpy as np
 import scipy.sparse
+from six.moves import range
 
 from openmdao.jacobians.jacobian import Jacobian
 
@@ -85,30 +86,30 @@ class DictionaryJacobian(Jacobian):
             ncol = d_residuals._ncol
             for abs_key in self._iter_abs_keys(d_residuals._name):
                 subjac = self._subjacs[abs_key]
-
+                res_name, other_name = abs_key
                 if type(subjac) is np.ndarray or scipy.sparse.issparse(subjac):
-                    if d_residuals._contains_abs(abs_key[0]):
-                        if d_outputs._contains_abs(abs_key[1]):
-                            re = d_residuals._views_flat[abs_key[0]]
-                            op = d_outputs._views_flat[abs_key[1]]
+                    if d_residuals._contains_abs(res_name):
+                        if d_outputs._contains_abs(other_name):
+                            re = d_residuals._views_flat[res_name]
+                            op = d_outputs._views_flat[other_name]
                             if fwd:
                                 re += subjac.dot(op)
                             else:  # rev
                                 op += subjac.T.dot(re)
 
-                        elif d_inputs._contains_abs(abs_key[1]):
-                            re = d_residuals._views_flat[abs_key[0]]
-                            ip = d_inputs._views_flat[abs_key[1]]
+                        elif d_inputs._contains_abs(other_name):
+                            re = d_residuals._views_flat[res_name]
+                            ip = d_inputs._views_flat[other_name]
                             if fwd:
                                 re += subjac.dot(ip)
                             else:  # rev
                                 ip += subjac.T.dot(re)
 
                 elif type(subjac) is list:
-                    if d_residuals._contains_abs(abs_key[0]):
-                        if d_outputs._contains_abs(abs_key[1]):
-                            re = d_residuals._views_flat[abs_key[0]]
-                            op = d_outputs._views_flat[abs_key[1]]
+                    if d_residuals._contains_abs(res_name):
+                        if d_outputs._contains_abs(other_name):
+                            re = d_residuals._views_flat[res_name]
+                            op = d_outputs._views_flat[other_name]
                             if fwd:
                                 if len(re.shape) > 1:
                                     for i in range(ncol):
@@ -123,9 +124,9 @@ class DictionaryJacobian(Jacobian):
                                                   re[:, i][subjac[1]] * subjac[0])
                                 else:
                                     np.add.at(op, subjac[2], re[subjac[1]] * subjac[0])
-                        elif d_inputs._contains_abs(abs_key[1]):
-                            re = d_residuals._views_flat[abs_key[0]]
-                            ip = d_inputs._views_flat[abs_key[1]]
+                        elif d_inputs._contains_abs(other_name):
+                            re = d_residuals._views_flat[res_name]
+                            ip = d_inputs._views_flat[other_name]
                             if fwd:
                                 if len(re.shape) > 1:
                                     for i in range(ncol):

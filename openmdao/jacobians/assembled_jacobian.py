@@ -13,7 +13,9 @@ from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
+from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.units import get_conversion
+from openmdao.utils.name_maps import key2abs_key
 
 SUBJAC_META_DEFAULTS = {
     'rows': None,
@@ -123,10 +125,8 @@ class AssembledJacobian(Jacobian):
         }
 
         in_ranges = {}
-        src_indices_dict = {}
         for abs_name in system._var_allprocs_abs_names['input']:
             in_ranges[abs_name] = self._get_var_range(abs_name, 'input')
-            src_indices_dict[abs_name] = abs2meta_in[abs_name]['src_indices']
 
         # set up view ranges for all subsystems
         for s in system.system_iter(local=True, recurse=True, include_self=True):
@@ -188,7 +188,7 @@ class AssembledJacobian(Jacobian):
                 if in_abs_name in system._conn_global_abs_in2out:
                     out_abs_name = system._conn_global_abs_in2out[in_abs_name]
                     out_offset, _ = out_ranges[out_abs_name]
-                    src_indices = src_indices_dict[in_abs_name]
+                    src_indices = abs2meta_in[in_abs_name]['src_indices']
 
                     # calculate unit conversion
                     in_units = abs2meta_in[in_abs_name]['units']
@@ -468,7 +468,7 @@ class DenseJacobian(AssembledJacobian):
         **kwargs : dict
             options dictionary.
         """
-        super(DenseJacobian, self, **kwargs).__init__()
+        super(DenseJacobian, self).__init__(**kwargs)
         self.options['matrix_class'] = DenseMatrix
 
 
@@ -486,7 +486,7 @@ class COOJacobian(AssembledJacobian):
         **kwargs : dict
             options dictionary.
         """
-        super(COOJacobian, self, **kwargs).__init__()
+        super(COOJacobian, self).__init__(**kwargs)
         self.options['matrix_class'] = COOMatrix
 
 
@@ -504,7 +504,7 @@ class CSRJacobian(AssembledJacobian):
         **kwargs : dict
             options dictionary.
         """
-        super(CSRJacobian, self, **kwargs).__init__()
+        super(CSRJacobian, self).__init__(**kwargs)
         self.options['matrix_class'] = CSRMatrix
 
 
@@ -522,5 +522,5 @@ class CSCJacobian(AssembledJacobian):
         **kwargs : dict
             options dictionary.
         """
-        super(CSCJacobian, self, **kwargs).__init__()
+        super(CSCJacobian, self).__init__(**kwargs)
         self.options['matrix_class'] = CSCMatrix

@@ -4,6 +4,7 @@ from __future__ import division
 
 import numpy as np
 from six import itervalues
+from six.moves import range
 
 from openmdao.core.component import Component
 from openmdao.recorders.recording_iteration_stack import Recording
