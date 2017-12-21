@@ -2,10 +2,8 @@ branches:
   only:
   - master
 
+#their updates to images on Dec 14, 2017 ruined us
 group: deprecated-2017Q4
-
-#sudo: false
-filter_secrets: false
 
 os:
 - linux
@@ -48,6 +46,7 @@ before_install:
     brew install openmpi;
   fi
 
+- ompi_info
 - wget "https://repo.continuum.io/miniconda/Miniconda-latest-$OS-x86_64.sh" -O miniconda.sh
 - chmod +x miniconda.sh
 
@@ -76,8 +75,9 @@ install:
 
 # keeping numpy pinned at 1.12 because pySNOPT dies with 1.13 because numpy broke callback
 #- conda install --yes nomkl
-- conda install --yes python=$PY
-- conda install --yes numpy==1.12 scipy=0.19.1 nose sphinx mock swig pip
+#- conda install --yes python=$PY numpy==1.12 scipy=0.19.1 nose sphinx mock swig pip
+- conda install --yes python=$PY numpy==1.12 scipy nose sphinx mock swig pip
+
 - pip install --upgrade pip
 
 # install pyoptsparse
