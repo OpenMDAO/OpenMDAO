@@ -11,16 +11,19 @@ there would be *N* solves for an array variable of size *N*.
 
 
 Certain models have a special kind of sparsity structure in the total derivative Jacobian that
-allows OpenMDAO to solve for multiple derivatives simultaneously. This results in far fewer linear solves and
-much improved performance. For example 'fwd' mode, this requires that at least a subset of the input variables
-affect subset of all response and that no response is dependent on all inputs.
+allows OpenMDAO to solve for multiple derivatives simultaneously. This results in far fewer linear
+solves and much improved performance. For example, in 'fwd' mode, this requires that there is some
+subset of the design variables that don't affect any of the same responses.  In other words, there
+is some subset of columns of the total jacobian where none of those columns have nonzero values
+in any of the same rows.
 
 .. note::
 
    While it is possible for problems to exist where simultaneous reverse solves would be possible,
    OpenMDAO does not currently support simultaneous derivatives in reverse mode.
 
-Consider, for example, a hypothetical optimization problem with a constraint that :code:`y=10` where :math:`y` is defined by
+Consider, for example, a hypothetical optimization problem with a constraint that
+:code:`y=10` where :math:`y` is defined by
 
 
 .. math::
@@ -114,14 +117,15 @@ You can more complete example of setting up an optimization with simultaneous de
 Automatic Generation of Coloring
 ################################
 Although you can compute the coloring manually if you know enough information about your problem,
-doing so can be challenging. Also, it should be noted that even small changes to your model,
+doing so can be challenging. Also, even small changes to your model,
 e.g., adding new constraints or changing the sparsity of a sub-component, can change the
 simultaneous coloring of your model. So care must be taken to keep the coloring up to date when
 you change your model.
 
 To streamline the process, OpenMDAO provides an automatic coloring algorithm.
 OpenMDAO assigns random numbers to the non-zero entries of the partial derivative jacobian,
-then solves for the total derivatives to find the non-zero entries which it runs a coloring algorithm on.
+then solves for the total jacobian.  Given this total jacobian, the coloring algorithm examines
+its sparsity and computes a coloring.
 
 OpenMDAO finds the non-zero entries based on the :ref:`declare_partials<feature_sparse_partials>`
 calls from all of the components in your model, so if you're not specifying the sparsity of the
@@ -151,6 +155,12 @@ would look like this:
     indeps.r num colors: 1
     Total colors vs. total size: 5 vs 21
 
+Note that only the first part of the console output should be cut and pasted into your script.
+The Coloring Summary part is just for informational purposes to help give you an idea of what sort
+of performance improvement you should see when computing your total derivatives.  For example, in
+the output show above, the total number of linear solves to compute the total jacobian will drop
+from 21 down to 5.
+
 If you run *openmdao simul_coloring* and it turns out there is no simultaneous coloring available,
 don't be surprised.  Problems that have the necessary total jacobian sparsity to allow
 simultaneous derivatives are relatively uncommon.
@@ -169,8 +179,8 @@ Using :ref:`check_totals<check-total-derivatives>` is the way to be sure that so
 gone wrong.
 
 If you used the automatic coloring algorithm and you find that :ref:`check_totals<check-total-derivatives>`
-is reporting incorrect total derivatives then you should try increasing the number of derivative
-computations that the algorithm used to compute the total derivative sparsity pattern. The default
+is reporting incorrect total derivatives then you should try increasing the number of total derivative
+computations that the algorithm uses to compute the total derivative sparsity pattern. The default
 is 1, but you can increment that to 2 or higher if needed.
 
 .. code-block:: none

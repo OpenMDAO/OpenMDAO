@@ -20,6 +20,7 @@ configuration of a model in any run script without having to wait around for the
 to run.
 
 .. _om-command-view_model:
+
 openmdao view_model
 ###################
 
@@ -65,7 +66,7 @@ model obtained using the command:
 
    An example of a connection viewer.
 
-
+.. _om-command-tree:
 
 openmdao tree
 #############
@@ -84,6 +85,7 @@ Here's an example of the tree output for a simple circuit model:
     :cmd: openmdao tree circuit.py
     :dir: ../test_suite/scripts
 
+.. _om-command-summary:
 
 openmdao summary
 ################
@@ -94,6 +96,17 @@ The :code:`openmdao summary` command prints a high level summary of the model.  
     :cmd: openmdao summary circuit.py
     :dir: ../test_suite/scripts
 
+.. _om-command-cite:
+
+openmdao cite
+#############
+
+The :code:`openmdao cite` command prints citations for any classes in the model that have them.
+For example:
+
+.. embed-shell-cmd::
+    :cmd: openmdao cite circuit.py
+    :dir: ../test_suite/scripts
 
 
 Profiling and Tracing Commands
@@ -120,6 +133,8 @@ the function groups available at the time of this writing:
       -v, --verbose         Show function locals and return values.
 
 
+.. _om-command-iprof:
+
 openmdao iprof
 ##############
 
@@ -128,6 +143,8 @@ methods corresponding to each object instance that they were called on.  For mor
 :ref:`Instance-based Profiling <instbasedprofile>`.
 
 
+.. _om-command-iprof-totals:
+
 openmdao iprof_totals
 #####################
 
@@ -135,12 +152,15 @@ The :code:`openmdao iprof_totals` command performs the same profiling as `openmd
 text based summary of the total time spent in each method.  The :ref:`Instance-based Profiling <instbasedprofile>`
 section contains more details.
 
+.. _om-command-mem:
+
 openmdao mem
 ############
 
 The :code:`openmdao mem` command profiles the memory usage of a specified set of functions.  For more detail,
 see :ref:`Memory Profiling <instbasedmemory>`.
 
+.. _om-command-trace:
 
 openmdao trace
 ##############
