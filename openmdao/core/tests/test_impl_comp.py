@@ -170,15 +170,6 @@ class ImplicitCompTestCase(unittest.TestCase):
         else:
             self.fail("Exception expected")
 
-    def test_list_residuals_before_run(self):
-        msg = "Unable to list residuals until model has been run."
-        try:
-            self.prob.model.list_residuals()
-        except Exception as err:
-            self.assertTrue(msg == str(err))
-        else:
-            self.fail("Exception expected")
-
     def test_list_inputs(self):
         self.prob.run_model()
 
@@ -231,7 +222,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.prob.run_model()
 
         stream = cStringIO()
-        resids = self.prob.model.list_residuals(out_stream=stream)
+        resids = self.prob.model.list_outputs(residuals=True, out_stream=stream)
         self.assertEqual(sorted(resids), [
             ('comp1.a', [0.]),
             ('comp1.b', [0.]),
@@ -553,7 +544,7 @@ class ListFeatureTestCase(unittest.TestCase):
         prob.model.list_outputs(explicit=False)
 
     def test_list_residuals(self):
-        prob.model.list_residuals()
+        prob.model.list_outputs(residuals=True)
 
     def test_list_return_value(self):
         # list inputs
@@ -575,15 +566,6 @@ class ListFeatureTestCase(unittest.TestCase):
             ('comp1.c', [3.])
         ])
 
-        # list residuals
-        resids = prob.model.list_residuals(out_stream=None)
-        self.assertEqual(sorted(resids), [
-            ('comp1.a', [0.]),
-            ('comp1.b', [0.]),
-            ('comp1.c', [0.]),
-            ('sub.comp2.x', [0.]),
-            ('sub.comp3.x', [0.])
-        ])
 
     def test_list_no_values(self):
         # list inputs
@@ -726,8 +708,8 @@ class ListFeatureTestCase(unittest.TestCase):
         # list explicit outputs with units
         outputs = prob.model.list_outputs(explicit=False, values=False, units=True, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('sub.comp2.x', 'inch'),
-            ('sub.comp3.x', 'inch'),
+            ('sub.comp2.x', {'units' :'inch'}),
+            ('sub.comp3.x', {'units' :'inch'}),
         ])
 
         # list explicit outputs with bounds

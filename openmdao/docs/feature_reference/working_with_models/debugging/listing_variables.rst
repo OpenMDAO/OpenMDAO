@@ -34,18 +34,15 @@ in alphabetical order with their values.
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_inputs
 
 
-*List Outputs and Residuals*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*List Outputs*
+~~~~~~~~~~~~~~
 
-Both the :code:`list_outputs()` and :code:`list_residuals()` methods will
-display all the outputs in alphabetical order with their values and their
-residual values.
+The :code:`list_outputs()` method will display all the outputs in execution order.
+There are many options to this method which we will explore below. For this example,
+we will only display the value in addition to the name of the output.
 
 .. embed-test::
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_outputs
-
-.. embed-test::
-    openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_residuals
 
 
 *List Implicit or Explicit Outputs*
@@ -65,9 +62,9 @@ not wish to see via the :code:`implicit` and :code:`explicit` arguments.
 *Get List via Return Value*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-All three of these methods also return the information in the form of a list.
-You can disable the display of the information using the :code:`out_stream`
-option and access the data instead via the return value.
+Both of these methods also return the information in the form of a list.
+You can disable the display of the information by setting the argument :code:`out_stream`
+to :code:`None` and then access the data instead via the return value.
 
 .. embed-test::
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_return_value
@@ -76,7 +73,7 @@ option and access the data instead via the return value.
 *Get Names Only*
 ~~~~~~~~~~~~~~~~
 
-Finally, if you just need the names of the variables you can disable the
+If you just need the names of the variables you can disable the
 display and return of the values and residual values via the :code:`values`
 argument.
 

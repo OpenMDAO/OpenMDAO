@@ -2501,12 +2501,40 @@ class System(object):
         list
             list of of input names and other optional information about those inputs
         """
+
         if self._inputs is None:
             raise RuntimeError("Unable to list inputs until model has been run.")
 
+
+        # meta = self._var_allprocs_abs2meta['output']
+        #
+        # # now set global sizes and shapes into metadata for distributed outputs
+        # sizes = self._var_sizes['nonlinear']['output']
+        # for idx, abs_name in enumerate(self._var_allprocs_abs_names['output']):
+        #     mymeta = meta[abs_name]
+        #     local_shape = mymeta['shape']
+        #     if not mymeta['distributed']:
+
+
+
+
+        # qqq the metadata is only local
+        #  _var_allprocs_abs2meta has all the variables but only units, shape, and size
         meta = self._var_abs2meta
         inputs = []
-        for name, val in iteritems(self._inputs._views):
+
+
+        #
+        #
+        # if MPI:
+        #     all_vars = self.comm.gather(self._inputs._views, root=0)
+        #     print(all_vars)
+
+
+
+
+
+        for name, val in iteritems(self._inputs._views): # This is only over the locals
 
             outs = {}
             if values:
@@ -2516,6 +2544,7 @@ class System(object):
                 outs['units'] = meta['input'][name]['units']
             inputs.append((name, outs))
 
+        # if MPI and MPI.COMM_WORLD.rank == 0: # only the root process should print
         if out_stream:
             self._write_outputs('inputs', None, inputs, hierarchical, print_arrays, out_stream)
 
@@ -2666,6 +2695,10 @@ class System(object):
             else:
                 expl_outputs.append((name,outs))
 
+
+
+
+        # if MPI and MPI.COMM_WORLD.rank == 0: # only the root process should print
         if out_stream:
             if explicit:
                 self._write_outputs('outputs', 'Explicit', expl_outputs, hierarchical, print_arrays, out_stream)
@@ -2701,20 +2734,83 @@ class System(object):
         if out_stream is None:
             return
 
-        logger_name = 'list_inputs' if in_or_out == 'inputs' else 'list_outputs'
 
-        logger = get_logger(logger_name, out_stream=out_stream)
+        # outputs is a list of tuples
+        #       ( name, dict of vals or metadata )
+
+        # If parallel, gather up vars and metadata
+        # If MPI, and on rank 0, need to gather up all the variables
+        #   even those not local to rank 0
+        ##### Need to do this gather on all the ranks!
+
+        # need to preserve execution order
+        meta = self._var_abs2meta
+        if MPI:
+            # Make a dict of outputs
+            from collections import OrderedDict
+            dict_of_outputs = OrderedDict()
+            for name, vals in outputs:
+                dict_of_outputs[name] = vals
+            all_dict_of_outputs = self.comm.gather(dict_of_outputs, root=0) # returns a list, one per proc
+
+        if MPI and MPI.COMM_WORLD.rank > 0:  # only the root process should print
+            return
+
+        if MPI:
+            merged_dict_of_outputs = all_dict_of_outputs[-1] # qqq no need to do it backwards like this
+            for d in all_dict_of_outputs[:-1]:
+                # each d is an OrderedDict of names and vals and meta
+                merged_dict_of_outputs.update(d)
+            # make them back into a list of tuples
+            outputs = []
+            from six import iteritems
+
+            if in_or_out == 'inputs':
+                allprocs_abs_names = self._var_allprocs_abs_names['input']
+            else:
+                allprocs_abs_names = self._var_allprocs_abs_names['output']
+            for var_name in allprocs_abs_names:
+                if var_name in merged_dict_of_outputs:
+                    outputs.append((var_name, merged_dict_of_outputs[var_name]))
+            #
+            # for name, vals in iteritems(merged_dict_of_outputs):
+            #     outputs.append((name,vals))
+
+        zzz = 1
+
+
+        # In the current code, _write_outputs already only gets what needs to be output, impl or expl
+        # Also, you get the values for the metadata already.
+
+
+        ## I can use this to figure out which values from list_outputs are impl or expl comps
+
+        #         states = self._list_states()
+
+        # for name, val in iteritems(self._outputs._views):
+        #     if name in states:
+        #         impl_outputs.append((name, val)) if values else impl_outputs.append(name)
+        #     else:
+        #         expl_outputs.append((name, val)) if values else expl_outputs.append(name)
+
+        # to figure out
 
         count = len(outputs)
 
+        # Write header
+        logger_name = 'list_inputs' if in_or_out == 'inputs' else 'list_outputs'
+        logger = get_logger(logger_name, out_stream=out_stream)
         pathname = self.pathname if self.pathname else 'model'
-
         header_name = 'Input' if in_or_out == 'inputs' else 'Output'
         if in_or_out == 'inputs':
             header = "%d %s(s) in '%s'" % (count, header_name, pathname)
         else:
             header = "%d %s %s(s) in '%s'" % (count, comp_type, header_name, pathname)
         logger.info(header)
+        logger.info("-" * len(header) + "\n")
+
+        if not count:
+            return
 
         # Need an ordered list of possible values for the two cases: inputs and outputs
         #  So that we do the column output correctly
@@ -2722,11 +2818,6 @@ class System(object):
             out_types = ('value', 'units',)
         else:
             out_types = ('value', 'resids', 'units', 'shape', 'lower', 'upper', 'ref', 'ref0', 'res_ref')
-
-        logger.info("-" * len(header) + "\n")
-
-        if not count:
-            return
 
         # Figure out which columns will be displayed
         outs = outputs[0][1]
@@ -2791,8 +2882,7 @@ class System(object):
 
             vars_to_output = []
 
-            # qqq if comp_class is None, we really want to iterate over both types
-
+            # qqq if MPI, should we iterate with local=False?
             for s in self.system_iter(local=True, include_self=True, recurse=True, typ=comp_class):
                 if in_or_out == 'inputs':
                     in_or_out_views = s._inputs._views
@@ -2819,6 +2909,9 @@ class System(object):
                     system_name = top_level_system_name
                 system_indent = self._indent_inc * num_parts
                 logger.info(system_indent * ' ' + system_name)
+
+
+
                 if in_or_out == 'inputs':
                     in_or_out_views = s._inputs._views
                 else:
@@ -2835,6 +2928,17 @@ class System(object):
 
                     idx = name_to_idx_map[name]
                     outs = outputs[idx][1]
+
+                    if in_or_out == 'inputs':
+                        in_or_out_dict = s._inputs
+                    else:
+                        in_or_out_dict = s._outputs
+
+
+
+
+
+
                     self._write_outputs_rows(logger, row, column_names, outs, print_arrays)
         else:
             for s in self.system_iter(local=True, include_self=True, recurse=True):

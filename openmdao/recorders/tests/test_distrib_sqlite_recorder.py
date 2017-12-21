@@ -149,6 +149,14 @@ class DistributedRecorderTest(unittest.TestCase):
             self.fail('RuntimeError expected.')
 
     def test_distrib_record_driver(self):
+
+        #qqq remove all this
+        import pydevd
+        from openmdao.utils.mpi import MPI
+        if MPI.COMM_WORLD.rank:
+            pydevd.settrace('localhost', port=9876, stdoutToServer=True, stderrToServer=True)
+        else:
+            pydevd.settrace('localhost', port=9877, stdoutToServer=True, stderrToServer=True)
         size = 100  # how many items in the array
 
         prob = Problem()
@@ -161,6 +169,9 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.driver.recording_options['record_responses'] = True
         prob.driver.recording_options['record_objectives'] = True
         prob.driver.recording_options['record_constraints'] = True
+        prob.driver.recording_options['includes'] = ['plus.y',] #qqq remove
+
+
         prob.driver.add_recorder(self.recorder)
 
         prob.model.add_design_var('x')
@@ -168,7 +179,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
         prob.setup(vector_class=PETScVector, check=False)
 
-        prob['x'] = np.ones(size)
+        prob['x'] = np.range(size) # qqq put back to ones??
 
         t0, t1 = run_driver(prob)
         prob.cleanup()

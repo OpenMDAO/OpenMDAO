@@ -341,7 +341,7 @@ class ExplCompTestCase(unittest.TestCase):
         text = stream.getvalue()
         self.assertEqual(text.count('des_vars.x'), 1)
         self.assertEqual(text.count('mult.y'), 1)
-        self.assertEqual(text.count('value'), 1)
+        self.assertEqual(text.count('value'), 3)
         self.assertEqual(text.count('units'), 1)
 
 
@@ -453,8 +453,7 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('          y1'), 1)
         self.assertEqual(text.count('  g2'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        # self.assertEqual(num_non_empty_lines, 21)
-
+        self.assertEqual(num_non_empty_lines, 25)
 
 
 
