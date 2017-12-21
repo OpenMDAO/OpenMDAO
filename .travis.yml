@@ -70,9 +70,6 @@ install:
     echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
   fi
 
-- echo "BEFORE"
-- env | sort
-
 # keeping numpy pinned at 1.12 because pySNOPT dies with 1.13 because numpy broke callback
 - conda install --yes python=$PY numpy==1.12 scipy nose sphinx mock swig
 
@@ -87,9 +84,6 @@ install:
     pip install mpi4py;
     pip install git+https://bitbucket.org/petsc/petsc4py@3.7.0;
   fi
-
-- echo "AFTER"
-- env | sort
 
 - pip install redbaron
 - pip install git+https://github.com/OpenMDAO/testflo.git
