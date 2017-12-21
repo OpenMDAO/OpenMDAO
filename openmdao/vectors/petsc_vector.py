@@ -10,6 +10,17 @@ from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
 from openmdao.utils.mpi import MPI
 
 
+CITATION = '''@InProceedings{petsc-efficient,
+    Author = "Satish Balay and William D. Gropp and Lois Curfman McInnes and Barry F. Smith",
+    Title = "Efficient Management of Parallelism in Object Oriented Numerical Software Libraries",
+    Booktitle = "Modern Software Tools in Scientific Computing",
+    Editor = "E. Arge and A. M. Bruaset and H. P. Langtangen",
+    Pages = "163--202",
+    Publisher = "Birkh{\"{a}}user Press",
+    Year = "1997"
+}'''
+
+
 class PETScTransfer(DefaultTransfer):
     """
     PETSc Transfer implementation for running in parallel.
@@ -154,6 +165,7 @@ class PETScVector(DefaultVector):
     """
 
     TRANSFER = PETScTransfer
+    cite = CITATION
 
     def _initialize_data(self, root_vector):
         """

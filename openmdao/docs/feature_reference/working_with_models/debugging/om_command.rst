@@ -19,7 +19,7 @@ continuing to the end of the user's run script. This makes it convenient to view
 configuration of a model in any run script without having to wait around for the entire script
 to run.
 
-
+.. _om-command-view_model:
 openmdao view_model
 ###################
 
@@ -38,6 +38,7 @@ will generate an :math:`N^2` diagram like the one below.
 .. raw:: html
     :file: ../../../advanced_guide/implicit_comps/n2.html
 
+.. _om-command-view_connections:
 
 openmdao view_connections
 #########################
