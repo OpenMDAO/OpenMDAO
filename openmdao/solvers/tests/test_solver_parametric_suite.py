@@ -128,7 +128,6 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         partial_type=['array', 'sparse', 'aij'],
         num_var=[2, 3],
         var_shape=[(2, 3), (2,)],
-        component_class=['explicit'],
         connection_type=['implicit', 'explicit'],
         run_by_default=False,
     )
