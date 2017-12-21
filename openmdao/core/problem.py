@@ -16,7 +16,6 @@ import scipy.sparse as sparse
 
 from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
 from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
-from openmdao.components.deprecated_component import Component as DepComponent
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver
 from openmdao.core.explicitcomponent import ExplicitComponent
@@ -565,7 +564,6 @@ class Problem(object):
                     continue
 
                 explicit = isinstance(comp, ExplicitComponent)
-                deprecated = isinstance(comp, DepComponent)
                 matrix_free = comp.matrix_free
                 c_name = comp.pathname
                 indep_key[c_name] = set()
@@ -581,9 +579,7 @@ class Problem(object):
                     wrt_list = list(comp._var_allprocs_prom2abs_list['input'].keys())
 
                     # The only outputs in wrt should be implicit states.
-                    if deprecated:
-                        wrt_list.extend(comp._state_names)
-                    elif not explicit:
+                    if not explicit:
                         wrt_list.extend(of_list)
 
                     # Matrix-free components need to calculate their Jacobian by matrix-vector
@@ -618,7 +614,7 @@ class Problem(object):
                                 dstate.set_const(0.0)
 
                                 # TODO - Sort out the minus sign difference.
-                                perturb = 1.0 if (deprecated or not explicit) else -1.0
+                                perturb = 1.0 if not explicit else -1.0
 
                                 # Dictionary access returns a scaler for 1d input, and we
                                 # need a vector for clean code, so use _views_flat.
@@ -729,7 +725,6 @@ class Problem(object):
             c_name = comp.pathname
             all_fd_options[c_name] = {}
             explicit = isinstance(comp, ExplicitComponent)
-            deprecated = isinstance(comp, DepComponent)
 
             approximations = {'fd': FiniteDifference(),
                               'cs': ComplexStep()}
@@ -738,9 +733,7 @@ class Problem(object):
             wrt = list(comp._var_allprocs_prom2abs_list['input'].keys())
 
             # The only outputs in wrt should be implicit states.
-            if deprecated:
-                wrt.extend(comp._state_names)
-            elif not explicit:
+            if not explicit:
                 wrt.extend(of)
 
             # Load up approximation objects with the requested settings.

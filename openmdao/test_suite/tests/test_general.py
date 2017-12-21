@@ -16,8 +16,6 @@ All Parametric Groups
 
 CycleGroup ('group_type': 'cycle')
 ----------------------------------
-'component_class': One of ['explicit', 'deprecated']. Controls the class of Component to use to
-                   build the group. ('explicit')
 'connection_type': One of ['implicit', 'explicit']. If connections are done explicitly or through
                    promotions ('implicit').
 'partial_type': One of ['array', 'sparse', 'aij']. How the component partial derivatives are
@@ -72,8 +70,7 @@ class ParameterizedTestCasesSubset(unittest.TestCase):
     @parametric_suite(jacobian_type='*',
                       num_comp=[2, 5, 10],
                       partial_type='aij',
-                      run_by_default=True,
-                      component_class='*')
+                      run_by_default=True)
     def test_subset(self, param_instance):
         param_instance.setup()
         problem = param_instance.problem
