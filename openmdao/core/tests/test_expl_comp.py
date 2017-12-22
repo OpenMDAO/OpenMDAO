@@ -174,30 +174,34 @@ class ExplCompTestCase(unittest.TestCase):
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
 
-
         prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        # list inputs
+        ###### list_inputs tests #####
         # Cannot do exact equality here because the units cause comp.y to be slightly different than 12.0
+        stream = cStringIO()
+        inputs = prob.model.list_inputs(units=True, out_stream=stream)
         tol = 1e-7
-        inputs = prob.model.list_inputs(out_stream=None)
         for actual, expected in zip(sorted(inputs),
                                     [
-                                        ('comp.x', {'value': [12.]}),
-                                        ('comp.y', {'value': [12.]}),
+                                        ('comp.x', {'value': [12.], 'units':'inch'}),
+                                        ('comp.y', {'value': [12.], 'units':'inch'}),
                                     ]
                                     ):
-            self.assertEqual(actual[0], expected[0])
-            assert_rel_error(self, actual[1], expected[1], tol)
-
-        # Only other option for list_inputs is units
-        inputs = prob.model.list_inputs(values=False, units=True, out_stream=None)
-        self.assertEqual(sorted(inputs), [
-            ('comp.x', {'units': 'inch'}),
-            ('comp.y', {'units': 'inch'}),
-        ])
+            self.assertEqual(expected[0], actual[0])
+            self.assertEqual(expected[1]['units'], actual[1]['units'])
+            assert_rel_error(self, expected[1]['value'], actual[1]['value'], tol)
+        text = stream.getvalue()
+        self.assertEqual(1, text.count("Input(s) in 'model'"))
+        self.assertEqual(1, text.count('varname'))
+        self.assertEqual(1, text.count('value'))
+        self.assertEqual(1, text.count('top'))
+        self.assertEqual(1, text.count('  comp'))
+        self.assertEqual(1, text.count('    x'))
+        self.assertEqual(1, text.count('    y'))
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(8,num_non_empty_lines)
 
         ###### list_outputs tests #####
 
@@ -205,70 +209,237 @@ class ExplCompTestCase(unittest.TestCase):
         outputs = prob.model.list_outputs(implicit=True, explicit=False, out_stream=None)
         self.assertEqual(outputs, [])
 
-        # list explicit outputs with values
-        outputs = prob.model.list_outputs(implicit=False, out_stream=None)
-        self.assertEqual(sorted(outputs), [
-            ('comp.z', { 'value': np.array([24.] ) } ),
-            ('p1.x', { 'value': np.array([12.] ) } ),
-            ('p2.y', { 'value': np.array([1.] ) } ),
-        ])
+        # list outputs with out_stream - just check to see if it was logged to
+        stream = cStringIO()
+        outputs = prob.model.list_outputs(out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(1, text.count('Explicit Output'))
+        self.assertEqual(1, text.count('Implicit Output'))
 
-        # list explicit outputs with residuals
-        outputs = prob.model.list_outputs(implicit=False, values=False,
-                                          residuals=True, out_stream=None)
-        self.assertEqual(sorted(outputs), [
-            ('comp.z', { 'resids': np.array([0.] ) } ),
-            ('p1.x', { 'resids': np.array([0.] ) } ),
-            ('p2.y', { 'resids': np.array([0.] ) } ),
-        ])
+        # list outputs with out_stream and all the optional display values True
+        stream = cStringIO()
+        outputs = prob.model.list_outputs(values=True,
+                                          units=True,
+                                          shape=True,
+                                          bounds=True,
+                                          residuals=True,
+                                          scaling=True,
+                                          hierarchical=False,
+                                          print_arrays=False,
+                                          out_stream=stream)
 
-        # list explicit outputs with units
-        outputs = prob.model.list_outputs(implicit=False, values=False, units=True, out_stream=None)
-        self.assertEqual(sorted(outputs), [
-            ('comp.z', { 'units': 'inch' } ),
-            ('p1.x', { 'units': 'inch' } ),
-            ('p2.y', { 'units': 'ft' } ),
-        ])
+        self.assertEqual( [
+            ('comp.z', {'value': [ 24.], 'resids': [ 0.], 'units': 'inch', 'shape': (1,),
+                        'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0} ),
+            ('p1.x', {'value': [ 12.], 'resids': [ 0.], 'units': 'inch', 'shape': (1,),
+                      'lower': [ 1.], 'upper': [ 100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1} ),
+            ('p2.y', {'value': [ 1.], 'resids': [ 0.], 'units': 'ft', 'shape': (1,),
+                      'lower': [ 2.], 'upper': [ 200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
+            ],
+            sorted(outputs))
 
-        # list explicit outputs with shape
-        outputs = prob.model.list_outputs(implicit=False, values=False, shape=True, out_stream=None)
-        self.assertEqual(sorted(outputs), [
-            ('comp.z', { 'shape': (1,) } ),
-            ('p1.x', { 'shape': (1,) } ),
-            ('p2.y', { 'shape': (1,) } ),
-        ])
+        text = stream.getvalue()
+        self.assertEqual(1, text.count('varname'))
+        self.assertEqual(1, text.count('value'))
+        self.assertEqual(1, text.count('resids'))
+        self.assertEqual(1, text.count('units'))
+        self.assertEqual(1, text.count('shape'))
+        self.assertEqual(1, text.count('lower'))
+        self.assertEqual(1, text.count('upper'))
+        self.assertEqual(3, text.count('ref'))
+        self.assertEqual(1, text.count('ref0'))
+        self.assertEqual(1, text.count('res_ref'))
+        self.assertEqual(1, text.count('p1.x'))
+        self.assertEqual(1, text.count('p2.y'))
+        self.assertEqual(1, text.count('comp.z'))
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(9,num_non_empty_lines)
 
-        # list explicit outputs with bounds
-        outputs = prob.model.list_outputs(implicit=False, values=False, bounds=True, out_stream=None)
-        self.assertEqual(sorted(outputs), [
-            ('comp.z', { 'lower': None, 'upper': None } ),
-            ('p1.x', { 'lower': [1.0], 'upper': [100.0] } ),
-            ('p2.y', { 'lower': [2.0], 'upper': [200.0] } ),
-        ])
 
-        # list explicit outputs with scaling
-        outputs = prob.model.list_outputs(implicit=False, scaling=True, out_stream=None)
-        self.assertEqual(sorted(outputs), [
-            ('comp.z', { 'value': [24.], 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0 } ),
-            ('p1.x', { 'value': [12.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1 } ),
-            ('p2.y', { 'value': [1.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2 } ),
-        ])
+
+
+        #
+        #
+        #
+        #
+        #
+        #
+        # # list explicit outputs with values
+        # outputs = prob.model.list_outputs(implicit=False, out_stream=None)
+        # self.assertEqual(sorted(outputs), [
+        #     ('comp.z', { 'value': np.array([24.] ) } ),
+        #     ('p1.x', { 'value': np.array([12.] ) } ),
+        #     ('p2.y', { 'value': np.array([1.] ) } ),
+        # ])
+        #
+        # # list explicit outputs with residuals
+        # outputs = prob.model.list_outputs(implicit=False, values=False,
+        #                                   residuals=True, out_stream=None)
+        # self.assertEqual(sorted(outputs), [
+        #     ('comp.z', { 'resids': np.array([0.] ) } ),
+        #     ('p1.x', { 'resids': np.array([0.] ) } ),
+        #     ('p2.y', { 'resids': np.array([0.] ) } ),
+        # ])
+        #
+        # # list explicit outputs with units
+        # outputs = prob.model.list_outputs(implicit=False, values=False, units=True, out_stream=None)
+        # self.assertEqual(sorted(outputs), [
+        #     ('comp.z', { 'units': 'inch' } ),
+        #     ('p1.x', { 'units': 'inch' } ),
+        #     ('p2.y', { 'units': 'ft' } ),
+        # ])
+        #
+        # # list explicit outputs with shape
+        # outputs = prob.model.list_outputs(implicit=False, values=False, shape=True, out_stream=None)
+        # self.assertEqual(sorted(outputs), [
+        #     ('comp.z', { 'shape': (1,) } ),
+        #     ('p1.x', { 'shape': (1,) } ),
+        #     ('p2.y', { 'shape': (1,) } ),
+        # ])
+        #
+        # # list explicit outputs with bounds
+        # outputs = prob.model.list_outputs(implicit=False, values=False, bounds=True, out_stream=None)
+        # self.assertEqual(sorted(outputs), [
+        #     ('comp.z', { 'lower': None, 'upper': None } ),
+        #     ('p1.x', { 'lower': [1.0], 'upper': [100.0] } ),
+        #     ('p2.y', { 'lower': [2.0], 'upper': [200.0] } ),
+        # ])
+        #
+        # # list explicit outputs with scaling
+        # outputs = prob.model.list_outputs(implicit=False, scaling=True, out_stream=None)
+        # self.assertEqual(sorted(outputs), [
+        #     ('comp.z', { 'value': [24.], 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0 } ),
+        #     ('p1.x', { 'value': [12.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1 } ),
+        #     ('p2.y', { 'value': [1.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2 } ),
+        # ])
+        #
+        # # logging inputs
+        # stream = cStringIO()
+        # prob.model.list_inputs(values=True, units=True, out_stream=stream)
+        # text = stream.getvalue()
+        # self.assertEqual(text.count('top'), 1)
+        # self.assertEqual(text.count('    y'), 1)
+        #
+        # # logging outputs
+        # stream = cStringIO()
+        # prob.model.list_outputs(values=True, units=True, out_stream=stream)
+        # text = stream.getvalue()
+        # self.assertEqual(text.count('top'), 1)
+        # self.assertEqual(text.count('    z'), 1)
+
+    def test_hierarchy_list_vars_options(self):
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])))
+
+        sub1 = model.add_subsystem('sub1', Group())
+        sub2 = sub1.add_subsystem('sub2', Group())
+        g1 = sub2.add_subsystem('g1', SubSellar())
+        g2 = model.add_subsystem('g2', SubSellar())
+
+        model.connect('pz.z', 'sub1.sub2.g1.z')
+        model.connect('sub1.sub2.g1.y2', 'g2.x')
+        model.connect('g2.y2', 'sub1.sub2.g1.x')
+
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyKrylov()
+        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['max_sub_solves'] = 0
+
+        g1.nonlinear_solver = NewtonSolver()
+        g1.linear_solver = LinearBlockGS()
+
+        g2.nonlinear_solver = NewtonSolver()
+        g2.linear_solver = ScipyKrylov()
+        g2.linear_solver.precon = LinearBlockGS()
+        g2.linear_solver.precon.options['maxiter'] = 2
+
+        prob.setup(check=False)
+        prob.run_driver()
 
         # logging inputs
+        # out_stream - not hierarchical - extras - no print_arrays
         stream = cStringIO()
-        prob.model.list_inputs(values=True, units=True, out_stream=stream)
+        prob.model.list_inputs(values=True,
+                                          units=True,
+                                          hierarchical=False,
+                                          print_arrays=False,
+                                          out_stream=stream)
         text = stream.getvalue()
-        self.assertEqual(text.count('top'), 1)
-        self.assertEqual(text.count('    y'), 1)
+        self.assertEqual(1, text.count("10 Input(s) in 'model'"))
+        # make sure they are in the correct order
+        self.assertTrue(
+                        text.find("sub1.sub2.g1.d1.z") <
+                        text.find('sub1.sub2.g1.d1.x') <
+                        text.find('sub1.sub2.g1.d1.y2') <
+                        text.find('sub1.sub2.g1.d2.z') <
+                        text.find('sub1.sub2.g1.d2.y1') <
+                        text.find('g2.d1.z') <
+                        text.find('g2.d1.x') <
+                        text.find('g2.d1.y2') <
+                        text.find('g2.d2.z') <
+                        text.find('g2.d2.y1')
+                        )
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(14, num_non_empty_lines)
+
+        # out_stream - hierarchical - extras - no print_arrays
+        stream = cStringIO()
+        prob.model.list_inputs(values=True,
+                                          units=True,
+                                          hierarchical=True,
+                                          print_arrays=False,
+                                          out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(1, text.count("10 Input(s) in 'model'"))
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(23, num_non_empty_lines)
+        self.assertEqual(1, text.count('top'))
+        self.assertEqual(1, text.count('  sub1'))
+        self.assertEqual(1, text.count('    sub2'))
+        self.assertEqual(1, text.count('      g1'))
+        self.assertEqual(1, text.count('        d1'))
+        self.assertEqual(2, text.count('          z'))
 
         # logging outputs
+        # out_stream - not hierarchical - extras - no print_arrays
         stream = cStringIO()
-        prob.model.list_outputs(values=True, units=True, out_stream=stream)
+        prob.model.list_outputs(values=True,
+                                          units=True,
+                                          shape=True,
+                                          bounds=True,
+                                          residuals=True,
+                                          scaling=True,
+                                          hierarchical=False,
+                                          print_arrays=False,
+                                          out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(text.count('5 Explicit Output'), 1)
+        # make sure they are in the correct order
+        self.assertTrue(text.find("pz.z") < text.find('sub1.sub2.g1.d1.y1') < text.find('sub1.sub2.g1.d2.y2') < \
+                        text.find('g2.d1.y1') < text.find('g2.d2.y2'))
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(11, num_non_empty_lines)
+
+        # Hierarchical
+        stream = cStringIO()
+        prob.model.list_outputs(values=True,
+                                          units=True,
+                                          shape=True,
+                                          bounds=True,
+                                          residuals=True,
+                                          scaling=True,
+                                          hierarchical=True,
+                                          print_arrays=False,
+                                          out_stream=stream)
         text = stream.getvalue()
         self.assertEqual(text.count('top'), 1)
-        self.assertEqual(text.count('    z'), 1)
-
-
+        self.assertEqual(text.count('          y1'), 1)
+        self.assertEqual(text.count('  g2'), 1)
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(num_non_empty_lines, 21)
 
     def test_array_list_vars_options(self):
 
@@ -303,83 +474,37 @@ class ExplCompTestCase(unittest.TestCase):
 
         prob.run_driver()
 
-
-        ###### list_outputs tests #####
-
-        # list outputs for implicit comps - should get none
-        outputs = prob.model.list_outputs(implicit=True, explicit=False, out_stream=None)
-        self.assertEqual(outputs, [])
-
-        # list explicit outputs with values
-        outputs = prob.model.list_outputs(implicit=False, out_stream=None)
-        tol = 1e-7
-        for actual, expected in zip(sorted(outputs),
-                                    [
-                                        ('des_vars.x', {'value': np.ones(size)}),
-                                        ('mult.y', {'value': np.ones(size) * 11.0}),
-                                    ]
-                                    ):
-            self.assertEqual(actual[0], expected[0])
-            assert_rel_error(self, actual[1], expected[1], tol)
-
-
         # logging inputs
+        # out_stream - not hierarchical - extras - no print_arrays
         stream = cStringIO()
-
-        # np.set_printoptions( linewidth=20, threshold=10)
-
-        # np.set_printoptions(precision=None, threshold=None, edgeitems=None, linewidth=None, suppress=None,
-        #                        nanstr=None, infstr=None, formatter=None
-        prob.model.list_inputs(values=True, units=True, out_stream=stream, print_arrays=True)
+        prob.model.list_inputs(values=True,
+                                          units=True,
+                                          hierarchical=False,
+                                          print_arrays=False,
+                                          out_stream=stream)
         text = stream.getvalue()
-        # self.assertEqual(text.count('  des_vars'), 1)
-        # self.assertEqual(text.count('    x'), 1)
+        self.assertEqual(1, text.count("1 Input(s) in 'model'"))
+        self.assertEqual(1, text.count('mult.x'))
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(5, num_non_empty_lines)
+
+        # out_stream - hierarchical - extras - no print_arrays
+        stream = cStringIO()
+        prob.model.list_inputs(values=True,
+                                          units=True,
+                                          hierarchical=True,
+                                          print_arrays=False,
+                                          out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(1, text.count("1 Input(s) in 'model'"))
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(7, num_non_empty_lines)
+        self.assertEqual(1, text.count('top'))
+        self.assertEqual(1, text.count('  mult'))
+        self.assertEqual(1, text.count('    x'))
 
         # logging outputs
-        stream = cStringIO()
-        prob.model.list_outputs(values=True, units=True, hierarchical=False, print_arrays=True, out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(text.count('des_vars.x'), 1)
-        self.assertEqual(text.count('mult.y'), 1)
-        self.assertEqual(text.count('value'), 3)
-        self.assertEqual(text.count('units'), 1)
-
-
-    def test_hierarchy_list_vars_options(self):
-
-        prob = Problem()
-        model = prob.model
-
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])))
-
-        sub1 = model.add_subsystem('sub1', Group())
-        sub2 = sub1.add_subsystem('sub2', Group())
-        g1 = sub2.add_subsystem('g1', SubSellar())
-        g2 = model.add_subsystem('g2', SubSellar())
-
-        model.connect('pz.z', 'sub1.sub2.g1.z')
-        model.connect('sub1.sub2.g1.y2', 'g2.x')
-        model.connect('g2.y2', 'sub1.sub2.g1.x')
-
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyKrylov()
-        model.nonlinear_solver.options['solve_subsystems'] = True
-        model.nonlinear_solver.options['max_sub_solves'] = 0
-
-        g1.nonlinear_solver = NewtonSolver()
-        g1.linear_solver = LinearBlockGS()
-
-        g2.nonlinear_solver = NewtonSolver()
-        g2.linear_solver = ScipyKrylov()
-        g2.linear_solver.precon = LinearBlockGS()
-        g2.linear_solver.precon.options['maxiter'] = 2
-
-        prob.setup(check=False)
-        prob.run_driver()
-
-        # logging outputs
-
-        # Not hierarchical
+        # out_stream - not hierarchical - extras - no print_arrays
         stream = cStringIO()
         prob.model.list_outputs(values=True,
                                           units=True,
@@ -388,16 +513,14 @@ class ExplCompTestCase(unittest.TestCase):
                                           residuals=True,
                                           scaling=True,
                                           hierarchical=False,
+                                          print_arrays=False,
                                           out_stream=stream)
         text = stream.getvalue()
-        print(text)
-        self.assertEqual(text.count('g2.d1.y1'), 1)
-        self.assertEqual(text.count('g2.d2.y2'), 1)
-        self.assertEqual(text.count('pz.z'), 1)
-        self.assertEqual(text.count('sub1.sub2.g1.d1.y1'), 1)
-        self.assertEqual(text.count('sub1.sub2.g1.d2.y2'), 1)
+        self.assertEqual(text.count('2 Explicit Output'), 1)
+        # make sure they are in the correct order
+        self.assertTrue(text.find("des_vars.x") < text.find('mult.y'))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 11)
+        self.assertEqual(8, num_non_empty_lines)
 
         # Hierarchical
         stream = cStringIO()
@@ -408,16 +531,20 @@ class ExplCompTestCase(unittest.TestCase):
                                           residuals=True,
                                           scaling=True,
                                           hierarchical=True,
+                                          print_arrays=False,
                                           out_stream=stream)
         text = stream.getvalue()
-        print(text)
         self.assertEqual(text.count('top'), 1)
-        self.assertEqual(text.count('          y1'), 1)
-        self.assertEqual(text.count('  g2'), 1)
+        self.assertEqual(text.count('  des_vars'), 1)
+        self.assertEqual(text.count('    x'), 1)
+        self.assertEqual(text.count('  mult'), 1)
+        self.assertEqual(text.count('    y'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 21)
+        self.assertEqual(num_non_empty_lines, 11)
 
-        # Not hierarchical with printing arrays
+
+        # logging outputs
+        # out_stream - not hierarchical - extras - no print_arrays
         stream = cStringIO()
         prob.model.list_outputs(values=True,
                                           units=True,
@@ -425,18 +552,20 @@ class ExplCompTestCase(unittest.TestCase):
                                           bounds=True,
                                           residuals=True,
                                           scaling=True,
-                                          print_arrays=True,
                                           hierarchical=False,
+                                          print_arrays=True,
                                           out_stream=stream)
         text = stream.getvalue()
-        print(text)
-        #######self.assertEqual(text.count('top'), 1)
-        # self.assertEqual(text.count('          y1'), 1)
-        # self.assertEqual(text.count('  g2'), 1)
-        # num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 21)
+        self.assertEqual(text.count('2 Explicit Output'), 1)
+        self.assertEqual(text.count('value:'), 2)
+        self.assertEqual(text.count('resids:'), 2)
+        self.assertEqual(text.count('['), 4)
+        # make sure they are in the correct order
+        self.assertTrue(text.find("des_vars.x") < text.find('mult.y'))
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(37, num_non_empty_lines)
 
-        # Hierarchical with printing arrays
+        # Hierarchical
         stream = cStringIO()
         prob.model.list_outputs(values=True,
                                           units=True,
@@ -444,16 +573,66 @@ class ExplCompTestCase(unittest.TestCase):
                                           bounds=True,
                                           residuals=True,
                                           scaling=True,
-                                          print_arrays=True,
                                           hierarchical=True,
+                                          print_arrays=True,
                                           out_stream=stream)
         text = stream.getvalue()
-        print(text)
+        self.assertEqual(text.count('2 Explicit Output'), 1)
+        self.assertEqual(text.count('value:'), 2)
+        self.assertEqual(text.count('resids:'), 2)
+        self.assertEqual(text.count('['), 4)
         self.assertEqual(text.count('top'), 1)
-        self.assertEqual(text.count('          y1'), 1)
-        self.assertEqual(text.count('  g2'), 1)
+        self.assertEqual(text.count('  des_vars'), 1)
+        self.assertEqual(text.count('    x'), 1)
+        self.assertEqual(text.count('  mult'), 1)
+        self.assertEqual(text.count('    y'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 25)
+        self.assertEqual(num_non_empty_lines, 40)
+
+        #
+        #
+        #
+        # ###### list_outputs tests #####
+        #
+        # # list outputs for implicit comps - should get none
+        # outputs = prob.model.list_outputs(implicit=True, explicit=False, out_stream=None)
+        # self.assertEqual(outputs, [])
+        #
+        # # list explicit outputs with values
+        # outputs = prob.model.list_outputs(implicit=False, out_stream=None)
+        # tol = 1e-7
+        # for actual, expected in zip(sorted(outputs),
+        #                             [
+        #                                 ('des_vars.x', {'value': np.ones(size)}),
+        #                                 ('mult.y', {'value': np.ones(size) * 11.0}),
+        #                             ]
+        #                             ):
+        #     self.assertEqual(actual[0], expected[0])
+        #     assert_rel_error(self, actual[1], expected[1], tol)
+        #
+        #
+        # # logging inputs
+        # stream = cStringIO()
+        #
+        # # np.set_printoptions( linewidth=20, threshold=10)
+        #
+        # # np.set_printoptions(precision=None, threshold=None, edgeitems=None, linewidth=None, suppress=None,
+        # #                        nanstr=None, infstr=None, formatter=None
+        # prob.model.list_inputs(values=True, units=True, out_stream=stream, print_arrays=True)
+        # text = stream.getvalue()
+        # # self.assertEqual(text.count('  des_vars'), 1)
+        # # self.assertEqual(text.count('    x'), 1)
+        #
+        # # logging outputs
+        # stream = cStringIO()
+        # prob.model.list_outputs(values=True, units=True, hierarchical=False, print_arrays=True, out_stream=stream)
+        # text = stream.getvalue()
+        # self.assertEqual(text.count('des_vars.x'), 1)
+        # self.assertEqual(text.count('mult.y'), 1)
+        # self.assertEqual(text.count('value'), 3)
+        # self.assertEqual(text.count('units'), 1)
+
+
 
 
 

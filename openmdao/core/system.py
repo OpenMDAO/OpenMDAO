@@ -2546,7 +2546,7 @@ class System(object):
 
         # if MPI and MPI.COMM_WORLD.rank == 0: # only the root process should print
         if out_stream:
-            self._write_outputs('inputs', None, inputs, hierarchical, print_arrays, out_stream)
+            self._write_outputs('input', None, inputs, hierarchical, print_arrays, out_stream)
 
         return inputs
 
@@ -2593,7 +2593,8 @@ class System(object):
         print_arrays : bool, optional
             When False, in the columnar display, just display the norm of any ndarrays with size > 1.
                         The norm is surrounded by parens to indicate that it is a norm.
-            When True, also display the full values of the ndarray below the row
+            When True, also display the full values of the ndarray below the row. The format of that is affected
+                        by the values set with numpy.set_printoptions
             Default is False.
 
         out_stream : 'stdout', 'stderr' or file-like
@@ -2701,9 +2702,9 @@ class System(object):
         # if MPI and MPI.COMM_WORLD.rank == 0: # only the root process should print
         if out_stream:
             if explicit:
-                self._write_outputs('outputs', 'Explicit', expl_outputs, hierarchical, print_arrays, out_stream)
+                self._write_outputs('output', 'Explicit', expl_outputs, hierarchical, print_arrays, out_stream)
             if implicit:
-                self._write_outputs('outputs', 'Implicit', impl_outputs, hierarchical, print_arrays, out_stream)
+                self._write_outputs('output', 'Implicit', impl_outputs, hierarchical, print_arrays, out_stream)
 
         if explicit and implicit:
             return expl_outputs + impl_outputs
@@ -2725,42 +2726,34 @@ class System(object):
             the type of component with the output values.
 
         outputs : list
-            list of (name, value) tuples.
+            list of (name, dict of vals or metadata) tuples.
 
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
         """
+        from openmdao.api import ImplicitComponent, ExplicitComponent
+        from openmdao.core.component import Component
         if out_stream is None:
             return
-
-
-        # outputs is a list of tuples
-        #       ( name, dict of vals or metadata )
 
         # If parallel, gather up vars and metadata
         # If MPI, and on rank 0, need to gather up all the variables
         #   even those not local to rank 0
-        ##### Need to do this gather on all the ranks!
 
-        # need to preserve execution order
-        meta = self._var_abs2meta
+        #  john execution order   _var_allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
 
-        if in_or_out == 'inputs': # qqq change to 'input' singular
-            meta_in_or_out = meta['input']
-        else:
-            meta_in_or_out = meta['output']
+        # Only local metadata but the most complete
+        meta_in_or_out = self._var_abs2meta[in_or_out]
 
-        # qqq TODO need to just get the meta for input or output
-
+        # If parallel, gather up the outputs qqq TODO really need to change the name of outputs!
         if MPI:
             # Make a dict of outputs
-            from collections import OrderedDict
             dict_of_outputs = OrderedDict()
             for name, vals in outputs:
                 dict_of_outputs[name] = vals
             all_dict_of_outputs = self.comm.gather(dict_of_outputs, root=0) # returns a list, one per proc
-            all_meta = self.comm.gather(meta, root=0) # returns a list, one per proc
+            all_meta = self.comm.gather(meta, root=0) # returns a list, one per proc qqq TODO Why ??
 
         if MPI and MPI.COMM_WORLD.rank > 0:  # only the root process should print
             return
@@ -2774,16 +2767,14 @@ class System(object):
                 # each d is an OrderedDict of names and vals and meta
 
                 # should look at this
-
                 # if in_or_out == 'inputs':
                 #     out_shape = allprocs_abs2meta_out['plus.x']['global_shape']
 
-                from six import iteritems
                 for name, vals in iteritems(d):
                     if name not in merged_dict_of_outputs:
                         merged_dict_of_outputs[name] = d[name]
                     else:
-                        if in_or_out == 'inputs':
+                        if in_or_out == 'input':
                             is_distributed = meta_in_or_out[name]['src_indices'] is not None
                         else:
                             is_distributed = meta_in_or_out[name]['distributed']
@@ -2796,53 +2787,25 @@ class System(object):
                             if in_or_out == 'outputs':
                                 if 'resids' in merged_dict_of_outputs[name]:
                                     merged_dict_of_outputs[name]['resids'] = np.append(merged_dict_of_outputs[name]['resids'], d[name]['resids'])
-                            # qqq also have to merge in the resids
-
-                # merged_dict_of_outputs.update(d)
-
 
             # make them back into a list of tuples
             outputs = []
-            from six import iteritems
-
-            if in_or_out == 'inputs':
+            if in_or_out == 'input':
                 allprocs_abs_names = self._var_allprocs_abs_names['input']
             else:
                 allprocs_abs_names = self._var_allprocs_abs_names['output']
             for var_name in allprocs_abs_names:
                 if var_name in merged_dict_of_outputs:
                     outputs.append((var_name, merged_dict_of_outputs[var_name]))
-            #
-            # for name, vals in iteritems(merged_dict_of_outputs):
-            #     outputs.append((name,vals))
-
-        zzz = 1
-
-
-        # In the current code, _write_outputs already only gets what needs to be output, impl or expl
-        # Also, you get the values for the metadata already.
-
-
-        ## I can use this to figure out which values from list_outputs are impl or expl comps
-
-        #         states = self._list_states()
-
-        # for name, val in iteritems(self._outputs._views):
-        #     if name in states:
-        #         impl_outputs.append((name, val)) if values else impl_outputs.append(name)
-        #     else:
-        #         expl_outputs.append((name, val)) if values else expl_outputs.append(name)
-
-        # to figure out
 
         count = len(outputs)
 
         # Write header
-        logger_name = 'list_inputs' if in_or_out == 'inputs' else 'list_outputs'
+        logger_name = 'list_inputs' if in_or_out == 'input' else 'list_outputs'
         logger = get_logger(logger_name, out_stream=out_stream)
         pathname = self.pathname if self.pathname else 'model'
-        header_name = 'Input' if in_or_out == 'inputs' else 'Output'
-        if in_or_out == 'inputs':
+        header_name = 'Input' if in_or_out == 'input' else 'Output'
+        if in_or_out == 'input':
             header = "%d %s(s) in '%s'" % (count, header_name, pathname)
         else:
             header = "%d %s %s(s) in '%s'" % (count, comp_type, header_name, pathname)
@@ -2854,11 +2817,10 @@ class System(object):
 
         # Need an ordered list of possible values for the two cases: inputs and outputs
         #  So that we do the column output correctly
-        if in_or_out == 'inputs':
+        if in_or_out == 'input':
             out_types = ('value', 'units',)
         else:
             out_types = ('value', 'resids', 'units', 'shape', 'lower', 'upper', 'ref', 'ref0', 'res_ref')
-
         # Figure out which columns will be displayed
         outs = outputs[0][1]
         column_names = []
@@ -2911,8 +2873,6 @@ class System(object):
         if hierarchical:
             # Need to know how to get the output values from the passed in list of tuples
 
-            from openmdao.api import ImplicitComponent, ExplicitComponent
-            from openmdao.core.component import Component
             if comp_type == 'Explicit':
                 comp_class = ExplicitComponent
             elif comp_type == 'Implicit':
@@ -2924,7 +2884,7 @@ class System(object):
 
             # qqq if MPI, should we iterate with local=False?
             for s in self.system_iter(local=True, include_self=True, recurse=True, typ=comp_class):
-                if in_or_out == 'inputs':
+                if in_or_out == 'input':
                     in_or_out_views = s._inputs._views
                 else:
                     in_or_out_views = s._outputs._views
@@ -2950,9 +2910,7 @@ class System(object):
                 system_indent = self._indent_inc * num_parts
                 logger.info(system_indent * ' ' + system_name)
 
-
-
-                if in_or_out == 'inputs':
+                if in_or_out == 'input':
                     in_or_out_views = s._inputs._views
                 else:
                     in_or_out_views = s._outputs._views
@@ -2969,36 +2927,48 @@ class System(object):
                     idx = name_to_idx_map[name]
                     outs = outputs[idx][1]
 
-                    if in_or_out == 'inputs':
+                    if in_or_out == 'input':
                         in_or_out_dict = s._inputs
                     else:
                         in_or_out_dict = s._outputs
 
-
-
-
-
-
                     self._write_outputs_rows(logger, row, column_names, outs, print_arrays)
         else:
-            for s in self.system_iter(local=True, include_self=True, recurse=True):
-                if s.pathname:
-                    num_parts = len(s.pathname.split('.'))
-                else:
-                    num_parts = 0
-                if in_or_out == 'inputs':
-                    in_or_out_views = s._inputs._views
-                else:
-                    in_or_out_views = s._outputs._views
-
-                for name, val in iteritems(in_or_out_views):
-                    # Only do outputs at that system level
-                    if len(name.split('.')) - num_parts > 1:
-                        continue
+            ### new stuff begin
+            # Make a dict of outputs
+            dict_of_outputs = OrderedDict()
+            for name, vals in outputs:
+                dict_of_outputs[name] = vals
+            for name in self._var_allprocs_abs_names[in_or_out]:
+                if name in dict_of_outputs:
                     row = '{:{align}{width}}'.format(name, align=self._align, width=max_varname_len)
-                    idx = name_to_idx_map[name]
-                    outs = outputs[idx][1]
-                    self._write_outputs_rows(logger, row, column_names, outs, print_arrays)
+                    self._write_outputs_rows(logger, row, column_names, dict_of_outputs[name], print_arrays)
+
+            ### new stuff end
+
+
+            ### old stuff begin
+        #     for s in self.system_iter(local=True, include_self=True, recurse=True):
+        #         if s.pathname:
+        #             num_parts = len(s.pathname.split('.'))
+        #         else:
+        #             num_parts = 0
+        #         if in_or_out == 'input':
+        #             in_or_out_views = s._inputs._views
+        #         else:
+        #             in_or_out_views = s._outputs._views
+        #
+        #
+        #         for name, val in iteritems(in_or_out_views):
+        #             # Only do outputs at that system level
+        #             if len(name.split('.')) - num_parts > 1:
+        #                 continue
+        #             row = '{:{align}{width}}'.format(name, align=self._align, width=max_varname_len)
+        #             idx = name_to_idx_map[name]
+        #             outs = outputs[idx][1]
+        #             self._write_outputs_rows(logger, row, column_names, outs, print_arrays)
+        # ### old stuff end
+
         logger.info('\n')
 
 

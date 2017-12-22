@@ -174,19 +174,19 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.prob.run_model()
 
         stream = cStringIO()
-        inputs = self.prob.model.list_inputs(out_stream=stream)
+        inputs = self.prob.model.list_inputs(hierarchical=False, out_stream=stream)
         self.assertEqual(sorted(inputs), [
-            ('comp2.a', [1.]),
-            ('comp2.b', [-4.]),
-            ('comp2.c', [3.]),
-            ('comp3.a', [1.]),
-            ('comp3.b', [-4.]),
-            ('comp3.c', [3.])
+            ('comp2.a', {'value': [1.]}),
+            ('comp2.b', {'value': [-4.]}),
+            ('comp2.c', {'value': [3.]}),
+            ('comp3.a', {'value': [1.]}),
+            ('comp3.b', {'value': [-4.]}),
+            ('comp3.c', {'value': [3.]})
         ])
         text = stream.getvalue()
-        self.assertEqual(text.count('comp2.'), 3)
-        self.assertEqual(text.count('comp3.'), 3)
-        self.assertEqual(text.count('value:'), 6)
+        self.assertEqual(text.count('comp2'), 3)
+        self.assertEqual(text.count('comp3'), 3)
+        self.assertEqual(text.count('value'), 1)
 
     def test_list_explicit_outputs(self):
         self.prob.run_model()
@@ -207,35 +207,38 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.prob.run_model()
 
         stream = cStringIO()
-        states = self.prob.model.list_outputs(explicit=False, hierarchical=False, out_stream=stream)
+        states = self.prob.model.list_outputs(explicit=False, residuals=True,
+                                              hierarchical=False, out_stream=stream)
         self.assertEqual(sorted(states), [
-            ('comp2.x', [3.]),
-            ('comp3.x', [3.])
+            ('comp2.x', {'value': [3.], 'resids': [0.]}),
+            ('comp3.x', {'value': [3.], 'resids': [0.]}),
         ])
         text = stream.getvalue()
-        self.assertEqual(text.count('comp2.x'), 1)
-        self.assertEqual(text.count('comp3.x'), 1)
-        self.assertEqual(text.count('value:'), 2)
-        self.assertEqual(text.count('residual:'), 2)
+        self.assertEqual(1, text.count('comp2.x'))
+        self.assertEqual(1, text.count('comp3.x'))
+        self.assertEqual(1, text.count('value'))
+        self.assertEqual(1, text.count('resids'))
 
     def test_list_residuals(self):
         self.prob.run_model()
 
         stream = cStringIO()
-        resids = self.prob.model.list_outputs(residuals=True, out_stream=stream)
+        resids = self.prob.model.list_outputs(values=False, residuals=True, hierarchical=False,
+                                              out_stream=stream)
         self.assertEqual(sorted(resids), [
-            ('comp1.a', [0.]),
-            ('comp1.b', [0.]),
-            ('comp1.c', [0.]),
-            ('comp2.x', [0.]),
-            ('comp3.x', [0.])
+            ('comp1.a', { 'resids':[0.]}),
+            ('comp1.b', { 'resids':[0.]}),
+            ('comp1.c', { 'resids':[0.]}),
+            ('comp2.x', { 'resids':[0.]}),
+            ('comp3.x', { 'resids':[0.]})
         ])
         text = stream.getvalue()
         self.assertEqual(text.count('comp1.'), 3)
         self.assertEqual(text.count('comp2.x'), 1)
         self.assertEqual(text.count('comp3.x'), 1)
-        self.assertEqual(text.count('value:'), 5)
-        self.assertEqual(text.count('residual:'), 5)
+        self.assertEqual(text.count('varname'), 2)
+        self.assertEqual(text.count('value'), 0)
+        self.assertEqual(text.count('resids'), 2)
 
     def test_guess_nonlinear(self):
 
@@ -550,27 +553,27 @@ class ListFeatureTestCase(unittest.TestCase):
         # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('sub.comp2.a', [1.]),
-            ('sub.comp2.b', [-4.]),
-            ('sub.comp2.c', [3.]),
-            ('sub.comp3.a', [1.]),
-            ('sub.comp3.b', [-4.]),
-            ('sub.comp3.c', [3.])
+            ('sub.comp2.a', {'value': [1.]}),
+            ('sub.comp2.b', {'value': [-4.]}),
+            ('sub.comp2.c', {'value': [3.]}),
+            ('sub.comp3.a', {'value': [1.]}),
+            ('sub.comp3.b', {'value': [-4.]}),
+            ('sub.comp3.c', {'value': [3.]})
         ])
 
         # list explicit outputs
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('comp1.a', [1.]),
-            ('comp1.b', [-4.]),
-            ('comp1.c', [3.])
+            ('comp1.a', {'value': [1.]}),
+            ('comp1.b', {'value': [-4.]}),
+            ('comp1.c', {'value': [3.]})
         ])
 
 
     def test_list_no_values(self):
         # list inputs
         inputs = prob.model.list_inputs(values=False)
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted([n[0] for n in inputs]), [
             'sub.comp2.a',
             'sub.comp2.b',
             'sub.comp2.c',
@@ -581,20 +584,10 @@ class ListFeatureTestCase(unittest.TestCase):
 
         # list explicit outputs
         outputs = prob.model.list_outputs(implicit=False, values=False)
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted([n[0] for n in outputs]), [
             'comp1.a',
             'comp1.b',
             'comp1.c'
-        ])
-
-        # list residuals
-        resids = prob.model.list_residuals(values=False)
-        self.assertEqual(sorted(resids), [
-            'comp1.a',
-            'comp1.b',
-            'comp1.c',
-            'sub.comp2.x',
-            'sub.comp3.x'
         ])
 
     def test_simple_list_vars_options(self):
@@ -665,79 +658,41 @@ class ListFeatureTestCase(unittest.TestCase):
         ###### list_inputs tests #####
 
         # list inputs
-        # inputs = prob.model.list_inputs(values=False, out_stream=None)
         stream = cStringIO()
-
         inputs = prob.model.list_inputs(values=False, out_stream=stream)
         text = stream.getvalue()
-
-        # self.assertEqual(sorted(inputs), [
-        #     ('sub.comp2.a',),
-        #     ('sub.comp2.b',),
-        #     ('sub.comp2.c',),
-        #     ('sub.comp3.a',),
-        #     ('sub.comp3.b',),
-        #     ('sub.comp3.c',),
-        # ])
-
-        stream = cStringIO()
-
-        inputs = prob.model.list_inputs(units=True, out_stream=stream)
-        text = stream.getvalue()
-        # self.assertEqual(sorted(inputs), [
-        #     ('sub.comp2.a', [1.], 'ft'),
-        #     ('sub.comp2.b', [-4.], 'inch'),
-        #     ('sub.comp2.c', [3.], 'ft'),
-        #     ('sub.comp3.a', [1.], 'ft'),
-        #     ('sub.comp3.b', [-4.], 'inch'),
-        #     ('sub.comp3.c', [3.], 'ft')
-        # ])
+        self.assertEqual(sorted(inputs), [
+            ('sub.comp2.a', {}),
+            ('sub.comp2.b', {}),
+            ('sub.comp2.c', {}),
+            ('sub.comp3.a', {}),
+            ('sub.comp3.b', {}),
+            ('sub.comp3.c', {}),
+        ])
+        self.assertEqual(1, text.count("6 Input(s) in 'model'"))
+        self.assertEqual(1, text.count("top"))
+        self.assertEqual(1, text.count("  sub"))
+        self.assertEqual(1, text.count("    comp2"))
+        self.assertEqual(2, text.count("      a"))
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(num_non_empty_lines, 14)
 
         # ###### list_outputs tests #####
-
         # list implicit outputs
-        stream = cStringIO()
-
-        outputs = prob.model.list_outputs(explicit=False, out_stream=stream)
+        outputs = prob.model.list_outputs(explicit=False, out_stream=None)
         text = stream.getvalue()
-        # self.assertEqual(sorted(outputs), [
-        #     ('sub.comp2.x', np.array([3.] ), ),
-        #     ('sub.comp3.x', np.array([3.]),),
-        # ])
-
-        # list explicit outputs with units
-        outputs = prob.model.list_outputs(explicit=False, values=False, units=True, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('sub.comp2.x', {'units' :'inch'}),
-            ('sub.comp3.x', {'units' :'inch'}),
+            ('sub.comp2.x', {'value': [ 3.]} ),
+            ('sub.comp3.x', {'value': [ 3.]})
         ])
-
-        # list explicit outputs with bounds
-        outputs = prob.model.list_outputs(explicit=False, bounds=True, out_stream=None)
+        # list explicit outputs
+        stream = cStringIO()
+        outputs = prob.model.list_outputs(implicit=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('sub.comp2.x', [3.], np.array([1.]), np.array([100.])),
-            ('sub.comp3.x', [3.], np.array([1.]), np.array([100.])),
+            ('comp1.a', {'value': [ 1.]} ),
+            ('comp1.b', {'value': [-4.]}),
+            ('comp1.c', {'value': [3.]}),
         ])
-
-
-        # list explicit outputs with scaling
-        outputs = prob.model.list_outputs(explicit=False, scaling=True, out_stream=None)
-        self.assertEqual(sorted(outputs), [
-            ('sub.comp2.x', [3.], 1.1, 2.1, 1.0),
-            ('sub.comp3.x', [3.], 1.1, 2.1, 1.0),
-        ])
-
-        ###### list_residuals tests #####
-
-        #
-        # # list explicit residuals with bounds
-        # resids = prob.model.list_residuals(implicit=False, bounds=True, out_stream=None)
-        # self.assertEqual(sorted(resids), [
-        #     ('comp.z', [0.], None, None),
-        #     ('p1.x', [0.], [1.0], [100.0]),
-        #     ('p2.y', [0.], [2.0], [200.0]),
-        # ])
-        #
 
 if __name__ == '__main__':
     unittest.main()
