@@ -2848,6 +2848,7 @@ class System(object):
         top_level_system_name = 'top'
 
         # Find longest first column
+        # qqq TODO need to update this using John's var list
         max_varname_len = len(top_level_system_name)
         if hierarchical:
             for name, outs in outputs:
@@ -2877,64 +2878,37 @@ class System(object):
         if hierarchical:
             # Need to know how to get the output values from the passed in list of tuples
 
-            if comp_type == 'Explicit':
-                comp_class = ExplicitComponent
-            elif comp_type == 'Implicit':
-                comp_class = ImplicitComponent
-            else:
-                comp_class = Component
+            logger.info(top_level_system_name)
 
-            vars_to_output = []
+            john_exe_order = self._var_allprocs_abs_names[in_or_out]
 
-            # qqq if MPI, should we iterate with local=False?
-            for s in self.system_iter(local=True, include_self=True, recurse=True, typ=comp_class):
-                if in_or_out == 'input':
-                    in_or_out_views = s._inputs._views
-                else:
-                    in_or_out_views = s._outputs._views
-                for name, val in iteritems(in_or_out_views):
-                    vars_to_output.append(name)
-
-            # for s in self.system_iter(local=True, include_self=True, recurse=True):
-            # for s in self.system_iter(local=False, include_self=True, recurse=True):
-            #     print(s.pathname)
-            for s in self.system_iter(local=True, include_self=True, recurse=True):
-                # is the path for this System a subset of the path for one of the variables to output?
-                output_this_system = False
-                for var in vars_to_output:
-                    if var.startswith(s.pathname):
-                        output_this_system = True
-                        break
-                if not output_this_system:
+            cur_sys_names = []
+            for varname in john_exe_order:
+                if varname not in merged_dict_of_outputs:
                     continue
 
-                if s.pathname:
-                    num_parts = len(s.pathname.split('.'))
-                    system_name = s.pathname.split('.')[-1]
-                else:
-                    num_parts = 0
-                    system_name = top_level_system_name
-                system_indent = self._indent_inc * num_parts
-                logger.info(system_indent * ' ' + system_name)
+                existing_sys_names = []
+                varname_sys_names = varname.split('.')[:-1]
+                for i, sys_name in enumerate(varname_sys_names):
+                    if varname_sys_names[:i+1] != cur_sys_names[:i+1]:
+                        break
+                    else:
+                        existing_sys_names = cur_sys_names[:i+1]
 
-                if in_or_out == 'input':
-                    in_or_out_views = s._inputs._views
-                else:
-                    in_or_out_views = s._outputs._views
+                remaining_sys_path_parts = varname_sys_names[len(existing_sys_names):]
 
-                for name, val in iteritems(in_or_out_views):
-                    # Only do outputs at that system level
-                    if len(name.split('.')) - num_parts > 1:
-                        continue
+                indent = len(existing_sys_names) * self._indent_inc
+                for i, sys_name in enumerate(remaining_sys_path_parts):
+                    num_parts = len(existing_sys_names) + i + 1
+                    system_indent = self._indent_inc * num_parts
+                    indent += self._indent_inc
+                    logger.info(indent * ' ' + sys_name)
+                cur_sys_names = varname_sys_names
 
-                    varname = name.split('.')[-1]
-                    var_indent = system_indent + self._indent_inc
-                    row = '{:{align}{width}}'.format(var_indent * ' ' + varname, align=self._align, width=max_varname_len)
+                indent += self._indent_inc
+                row = '{:{align}{width}}'.format(indent * ' ' + varname.split('.')[-1], align=self._align, width=max_varname_len)
+                self._write_outputs_rows(logger, row, column_names, merged_dict_of_outputs[varname], print_arrays)
 
-                    idx = name_to_idx_map[name]
-                    outs = outputs[idx][1]
-
-                    self._write_outputs_rows(logger, row, column_names, outs, print_arrays)
         else:
             for name in self._var_allprocs_abs_names[in_or_out]:
                 if name in dict_of_outputs:
@@ -2942,8 +2916,21 @@ class System(object):
                     self._write_outputs_rows(logger, row, column_names, dict_of_outputs[name], print_arrays)
         logger.info('\n')
 
-
     def _write_outputs_rows(self, logger, row, column_names, outs, print_arrays):
+        """
+        Return the list of vec_names and the vois dict. qqq TODO
+
+        Parameters
+        ----------
+        logger : str
+            Derivative direction, either 'fwd' or 'rev'.
+        row : list of str or None
+            The list of names of vectors. Depends on the value of mode.
+        column_names : dict
+            Dictionary of either design vars or responses, depending on the value
+            of mode.
+
+        """
         left_column_width = len(row)
         have_array_values = []
         for column_name in column_names:

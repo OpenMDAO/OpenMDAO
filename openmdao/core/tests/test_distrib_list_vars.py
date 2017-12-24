@@ -168,12 +168,12 @@ class DistributedAdderTest(unittest.TestCase):
 
 
     def test_distributed_list_vars(self):
-        # import pydevd
-        # from openmdao.utils.mpi import MPI
-        # if MPI.COMM_WORLD.rank:
-        #     pydevd.settrace('localhost', port=9876, stdoutToServer=True, stderrToServer=True)
-        # else:
-        #     pydevd.settrace('localhost', port=9877, stdoutToServer=True, stderrToServer=True)
+        import pydevd
+        from openmdao.utils.mpi import MPI
+        if MPI.COMM_WORLD.rank:
+            pydevd.settrace('localhost', port=9876, stdoutToServer=True, stderrToServer=True)
+        else:
+            pydevd.settrace('localhost', port=9877, stdoutToServer=True, stderrToServer=True)
 
         from openmdao.utils.general_utils import set_pyoptsparse_opt
         from openmdao.utils.mpi import MPI
@@ -234,8 +234,8 @@ class DistributedAdderTest(unittest.TestCase):
         text = stream.getvalue()
         if prob.comm.rank: # Only rank 0 prints
             self.assertEqual(len(text), 0)
-        # else:
-        #     print(text)
+        else:
+            print(text)
         #   Need some kind of check on the text here qqq TODO
         stream = cStringIO()
         outputs = prob.model.list_outputs(values=True,
