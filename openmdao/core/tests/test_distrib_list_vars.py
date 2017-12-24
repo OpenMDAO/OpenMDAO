@@ -168,12 +168,12 @@ class DistributedAdderTest(unittest.TestCase):
 
 
     def test_distributed_list_vars(self):
-        import pydevd
-        from openmdao.utils.mpi import MPI
-        if MPI.COMM_WORLD.rank:
-            pydevd.settrace('localhost', port=9876, stdoutToServer=True, stderrToServer=True)
-        else:
-            pydevd.settrace('localhost', port=9877, stdoutToServer=True, stderrToServer=True)
+        # import pydevd
+        # from openmdao.utils.mpi import MPI
+        # if MPI.COMM_WORLD.rank:
+        #     pydevd.settrace('localhost', port=9876, stdoutToServer=True, stderrToServer=True)
+        # else:
+        #     pydevd.settrace('localhost', port=9877, stdoutToServer=True, stderrToServer=True)
 
         from openmdao.utils.general_utils import set_pyoptsparse_opt
         from openmdao.utils.mpi import MPI
@@ -225,18 +225,34 @@ class DistributedAdderTest(unittest.TestCase):
         prob.cleanup()
 
         stream = cStringIO()
-
-        # allsystems_pathnames = [s.pathname for s in list(prob.model.system_iter(local=False, recurse=True, include_self=True))]
-        # for s in prob.model.system_iter(local=False, recurse=True, include_self=True):
-        #     print(s)
-        #
         inputs = prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream)
+        if prob.comm.rank: # Only rank 0 prints
+            self.assertEqual(inputs[0][0], 'par.G2.Cy.x')
+            self.assertEqual(inputs[1][0], 'par.G2.Cc.x')
+        else:
+            self.assertEqual(inputs[0][0], 'par.G1.Cy.x')
+            self.assertEqual(inputs[1][0], 'par.G1.Cc.x')
+        self.assertEqual(inputs[2][0], 'Obj.y1')
+        self.assertEqual(inputs[3][0], 'Obj.y2')
+        self.assertTrue('value' in inputs[0][1])
+        self.assertEqual(4, len(inputs))
+
         text = stream.getvalue()
         if prob.comm.rank: # Only rank 0 prints
             self.assertEqual(len(text), 0)
         else:
-            print(text)
-        #   Need some kind of check on the text here qqq TODO
+            self.assertEqual(1, text.count("6 Input(s) in 'model'"), 1)
+            self.assertEqual(1, text.count('value'))
+            self.assertEqual(1, text.count('  par'))
+            self.assertEqual(1, text.count('    G1'))
+            self.assertEqual(1, text.count('    G2'))
+            self.assertEqual(2, text.count('      Cy'))
+            self.assertEqual(2, text.count('      Cc'))
+            self.assertEqual(4, text.count('        x'))
+            self.assertEqual(1, text.count('  Obj'))
+            self.assertEqual(1, text.count('    y1'))
+            self.assertEqual(1, text.count('    y2'))
+
         stream = cStringIO()
         outputs = prob.model.list_outputs(values=True,
                                           units=True,
@@ -247,18 +263,38 @@ class DistributedAdderTest(unittest.TestCase):
                                           hierarchical=True,
                                           print_arrays=True,
                                           out_stream=stream)
-        # self.assertEqual(outputs[0][0], 'des_vars.x')
-        # self.assertEqual(outputs[1][0], 'plus.y')
-        # self.assertEqual(outputs[2][0], 'summer.sum')
-        # self.assertEqual(outputs[0][1]['value'].size, 100)
-        # self.assertEqual(outputs[1][1]['value'].size, 50)
-        # self.assertEqual(outputs[2][1]['value'].size, 1)
+        if prob.comm.rank: # outputs only return what is on their proc
+            self.assertEqual(outputs[0][0], 'par.G2.indep_var_comp.x')
+            self.assertEqual(outputs[1][0], 'par.G2.Cy.y')
+            self.assertEqual(outputs[2][0], 'par.G2.Cc.c')
+        else:
+            self.assertEqual(outputs[0][0], 'par.G1.indep_var_comp.x')
+            self.assertEqual(outputs[1][0], 'par.G1.Cy.y')
+            self.assertEqual(outputs[2][0], 'par.G1.Cc.c')
+        self.assertEqual(4, len(outputs))
+        self.assertEqual(outputs[3][0], 'Obj.obj')
+        self.assertTrue('value' in outputs[0][1])
+        self.assertTrue('units' in outputs[0][1])
 
         text = stream.getvalue()
         if prob.comm.rank: # Only rank 0 prints
             self.assertEqual(len(text), 0)
         else:
-            print(text)
+            self.assertEqual(1, text.count("7 Explicit Output(s) in 'model'"))
+            self.assertEqual(1, text.count('value'))
+            self.assertEqual(1, text.count('units'))
+            self.assertEqual(1, text.count('  par'))
+            self.assertEqual(1, text.count('    G1'))
+            self.assertEqual(1, text.count('    G2'))
+            self.assertEqual(2, text.count('      Cy'))
+            self.assertEqual(2, text.count('      Cc'))
+            self.assertEqual(2, text.count('      indep_var_comp'))
+            self.assertEqual(2, text.count('        x'))
+            self.assertEqual(2, text.count('        y'))
+            self.assertEqual(2, text.count('        c'))
+            self.assertEqual(1, text.count('  Obj'))
+            self.assertEqual(1, text.count('    obj'))
+
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

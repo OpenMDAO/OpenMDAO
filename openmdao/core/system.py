@@ -2732,9 +2732,6 @@ class System(object):
             Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
         """
-        from openmdao.api import ImplicitComponent, ExplicitComponent
-        from openmdao.core.component import Component
-
         if out_stream is None:
             return
 
@@ -2742,12 +2739,10 @@ class System(object):
         # If MPI, and on rank 0, need to gather up all the variables
         #   even those not local to rank 0
 
-        #  john execution order   _var_allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
-
         # Only local metadata but the most complete
         meta_in_or_out = self._var_abs2meta[in_or_out]
 
-        # Make a dict of outputs
+        # Make a dict of outputs. Makes it easier to work with in this method
         dict_of_outputs = OrderedDict()
         for name, vals in outputs:
             dict_of_outputs[name] = vals
@@ -2799,6 +2794,8 @@ class System(object):
             for var_name in allprocs_abs_names:
                 if var_name in merged_dict_of_outputs:
                     outputs.append((var_name, merged_dict_of_outputs[var_name]))
+        else: # If not MPI
+            merged_dict_of_outputs = dict_of_outputs
 
         count = len(outputs)
 
@@ -2870,20 +2867,11 @@ class System(object):
         logger.info(column_header)
         logger.info(column_dashes)
 
-        name_to_idx_map = {}
-        for idx, (name, outs) in enumerate(sorted(outputs)):
-            name_to_idx_map[name] = idx
-
-
         if hierarchical:
-            # Need to know how to get the output values from the passed in list of tuples
-
             logger.info(top_level_system_name)
 
-            john_exe_order = self._var_allprocs_abs_names[in_or_out]
-
             cur_sys_names = []
-            for varname in john_exe_order:
+            for varname in self._var_allprocs_abs_names[in_or_out]:
                 if varname not in merged_dict_of_outputs:
                     continue
 
@@ -2908,7 +2896,6 @@ class System(object):
                 indent += self._indent_inc
                 row = '{:{align}{width}}'.format(indent * ' ' + varname.split('.')[-1], align=self._align, width=max_varname_len)
                 self._write_outputs_rows(logger, row, column_names, merged_dict_of_outputs[varname], print_arrays)
-
         else:
             for name in self._var_allprocs_abs_names[in_or_out]:
                 if name in dict_of_outputs:
