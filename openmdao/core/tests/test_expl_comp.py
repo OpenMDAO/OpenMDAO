@@ -256,77 +256,6 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(9,num_non_empty_lines)
 
 
-
-
-        #
-        #
-        #
-        #
-        #
-        #
-        # # list explicit outputs with values
-        # outputs = prob.model.list_outputs(implicit=False, out_stream=None)
-        # self.assertEqual(sorted(outputs), [
-        #     ('comp.z', { 'value': np.array([24.] ) } ),
-        #     ('p1.x', { 'value': np.array([12.] ) } ),
-        #     ('p2.y', { 'value': np.array([1.] ) } ),
-        # ])
-        #
-        # # list explicit outputs with residuals
-        # outputs = prob.model.list_outputs(implicit=False, values=False,
-        #                                   residuals=True, out_stream=None)
-        # self.assertEqual(sorted(outputs), [
-        #     ('comp.z', { 'resids': np.array([0.] ) } ),
-        #     ('p1.x', { 'resids': np.array([0.] ) } ),
-        #     ('p2.y', { 'resids': np.array([0.] ) } ),
-        # ])
-        #
-        # # list explicit outputs with units
-        # outputs = prob.model.list_outputs(implicit=False, values=False, units=True, out_stream=None)
-        # self.assertEqual(sorted(outputs), [
-        #     ('comp.z', { 'units': 'inch' } ),
-        #     ('p1.x', { 'units': 'inch' } ),
-        #     ('p2.y', { 'units': 'ft' } ),
-        # ])
-        #
-        # # list explicit outputs with shape
-        # outputs = prob.model.list_outputs(implicit=False, values=False, shape=True, out_stream=None)
-        # self.assertEqual(sorted(outputs), [
-        #     ('comp.z', { 'shape': (1,) } ),
-        #     ('p1.x', { 'shape': (1,) } ),
-        #     ('p2.y', { 'shape': (1,) } ),
-        # ])
-        #
-        # # list explicit outputs with bounds
-        # outputs = prob.model.list_outputs(implicit=False, values=False, bounds=True, out_stream=None)
-        # self.assertEqual(sorted(outputs), [
-        #     ('comp.z', { 'lower': None, 'upper': None } ),
-        #     ('p1.x', { 'lower': [1.0], 'upper': [100.0] } ),
-        #     ('p2.y', { 'lower': [2.0], 'upper': [200.0] } ),
-        # ])
-        #
-        # # list explicit outputs with scaling
-        # outputs = prob.model.list_outputs(implicit=False, scaling=True, out_stream=None)
-        # self.assertEqual(sorted(outputs), [
-        #     ('comp.z', { 'value': [24.], 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0 } ),
-        #     ('p1.x', { 'value': [12.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1 } ),
-        #     ('p2.y', { 'value': [1.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2 } ),
-        # ])
-        #
-        # # logging inputs
-        # stream = cStringIO()
-        # prob.model.list_inputs(values=True, units=True, out_stream=stream)
-        # text = stream.getvalue()
-        # self.assertEqual(text.count('top'), 1)
-        # self.assertEqual(text.count('    y'), 1)
-        #
-        # # logging outputs
-        # stream = cStringIO()
-        # prob.model.list_outputs(values=True, units=True, out_stream=stream)
-        # text = stream.getvalue()
-        # self.assertEqual(text.count('top'), 1)
-        # self.assertEqual(text.count('    z'), 1)
-
     def test_hierarchy_list_vars_options(self):
 
         prob = Problem()
@@ -459,7 +388,7 @@ class ExplCompTestCase(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = inputs['x'] + 10.0
 
-        size = 100 #how many items in the array
+        size = 100 # how many items in the array
 
 
         prob = Problem()
@@ -588,51 +517,6 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('    y'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(num_non_empty_lines, 40)
-
-        #
-        #
-        #
-        # ###### list_outputs tests #####
-        #
-        # # list outputs for implicit comps - should get none
-        # outputs = prob.model.list_outputs(implicit=True, explicit=False, out_stream=None)
-        # self.assertEqual(outputs, [])
-        #
-        # # list explicit outputs with values
-        # outputs = prob.model.list_outputs(implicit=False, out_stream=None)
-        # tol = 1e-7
-        # for actual, expected in zip(sorted(outputs),
-        #                             [
-        #                                 ('des_vars.x', {'value': np.ones(size)}),
-        #                                 ('mult.y', {'value': np.ones(size) * 11.0}),
-        #                             ]
-        #                             ):
-        #     self.assertEqual(actual[0], expected[0])
-        #     assert_rel_error(self, actual[1], expected[1], tol)
-        #
-        #
-        # # logging inputs
-        # stream = cStringIO()
-        #
-        # # np.set_printoptions( linewidth=20, threshold=10)
-        #
-        # # np.set_printoptions(precision=None, threshold=None, edgeitems=None, linewidth=None, suppress=None,
-        # #                        nanstr=None, infstr=None, formatter=None
-        # prob.model.list_inputs(values=True, units=True, out_stream=stream, print_arrays=True)
-        # text = stream.getvalue()
-        # # self.assertEqual(text.count('  des_vars'), 1)
-        # # self.assertEqual(text.count('    x'), 1)
-        #
-        # # logging outputs
-        # stream = cStringIO()
-        # prob.model.list_outputs(values=True, units=True, hierarchical=False, print_arrays=True, out_stream=stream)
-        # text = stream.getvalue()
-        # self.assertEqual(text.count('des_vars.x'), 1)
-        # self.assertEqual(text.count('mult.y'), 1)
-        # self.assertEqual(text.count('value'), 3)
-        # self.assertEqual(text.count('units'), 1)
-
-
 
 
 

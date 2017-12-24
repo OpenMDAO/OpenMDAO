@@ -4,6 +4,7 @@ from __future__ import division
 
 import numpy as np
 from six import itervalues
+from six.moves import range
 
 from openmdao.core.component import Component
 from openmdao.recorders.recording_iteration_stack import Recording
@@ -67,7 +68,7 @@ class ImplicitComponent(Component):
                                         new_solve_multi_linear))
 
         self.supports_multivecs = self.has_apply_multi_linear or self.has_solve_multi_linear
-        self.matrix_free |= self.supports_multivecs
+        self.matrix_free |= self.has_apply_multi_linear
 
     def _apply_nonlinear(self):
         """

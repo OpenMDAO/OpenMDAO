@@ -47,6 +47,9 @@ class Driver(object):
         Dictionary with general pyoptsparse options.
     recording_options : <OptionsDictionary>
         Dictionary with driver recording options.
+    cite : str
+        Listing of relevant citataions that should be referenced when
+        publishing work that uses this class.
     _problem : <Problem>
         Pointer to the containing problem.
     supports : <OptionsDictionary>
@@ -76,6 +79,10 @@ class Driver(object):
         (owning rank, size).
     _remote_responses : dict
         A combined dict containing entries from _remote_cons and _remote_objs.
+    _simul_coloring_info : tuple of dicts
+        A data structure describing coloring for simultaneous derivs.
+    _res_jacs : dict
+        Dict of sparse subjacobians for use with certain optimizers, e.g. pyOptSparseDriver.
     """
 
     def __init__(self):
@@ -107,13 +114,13 @@ class Driver(object):
                                        driver level')
         self.recording_options.declare('record_responses', types=bool, default=False,
                                        desc='Set to True to record responses at the driver level')
-        self.recording_options.declare('record_objectives', types=bool, default=False,
+        self.recording_options.declare('record_objectives', types=bool, default=True,
                                        desc='Set to True to record objectives at the \
                                        driver level')
-        self.recording_options.declare('record_constraints', types=bool, default=False,
+        self.recording_options.declare('record_constraints', types=bool, default=True,
                                        desc='Set to True to record constraints at the \
                                        driver level')
-        self.recording_options.declare('includes', types=list, default=[],
+        self.recording_options.declare('includes', types=list, default=['*'],
                                        desc='Patterns for variables to include in recording')
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
@@ -133,13 +140,18 @@ class Driver(object):
         self.supports.declare('integer_design_vars', types=bool, default=False)
         self.supports.declare('gradients', types=bool, default=False)
         self.supports.declare('active_set', types=bool, default=False)
+        self.supports.declare('simultaneous_derivatives', types=bool, default=False)
 
         self.iter_count = 0
         self.metadata = None
         self._model_viewer_data = None
+        self.cite = ""
 
         # TODO, support these in OpenMDAO
         self.supports.declare('integer_design_vars', types=bool, default=False)
+
+        self._simul_coloring_info = None
+        self._res_jacs = {}
 
         self.fail = False
 
@@ -196,6 +208,11 @@ class Driver(object):
                           "(objectives and constraints)." %
                           (problem._mode, desvar_size, response_size), RuntimeWarning)
 
+        self._has_scaling = (
+            np.any([r['scaler'] is not None for r in self._responses.values()]) or
+            np.any([dv['scaler'] is not None for dv in self._designvars.values()])
+        )
+
         con_set = set()
         obj_set = set()
         dv_set = set()
@@ -243,21 +260,24 @@ class Driver(object):
         rec_constraints = self.recording_options['record_constraints']
         rec_responses = self.recording_options['record_responses']
 
-        if rec_desvars or incl:
-            mydesvars = {n for n in self._designvars
-                         if check_path(n, incl, excl, rec_desvars)}
+        all_desvars = {n for n in self._designvars
+                       if check_path(n, incl, excl, True)}
+        all_objectives = {n for n in self._objs
+                          if check_path(n, incl, excl, True)}
+        all_constraints = {n for n in self._cons
+                           if check_path(n, incl, excl, True)}
+        if rec_desvars:
+            mydesvars = all_desvars
 
-        if rec_objectives or incl:
-            myobjectives = {n for n in self._objs
-                            if check_path(n, incl, excl, rec_objectives)}
+        if rec_objectives:
+            myobjectives = all_objectives
 
-        if rec_constraints or incl:
-            myconstraints = {n for n in self._cons
-                             if check_path(n, incl, excl, rec_constraints)}
+        if rec_constraints:
+            myconstraints = all_constraints
 
-        if rec_responses or incl:
+        if rec_responses:
             myresponses = {n for n in self._responses
-                           if check_path(n, incl, excl, rec_responses)}
+                           if check_path(n, incl, excl, True)}
 
         # get the includes that were requested for this Driver recording
         if incl:
@@ -280,7 +300,8 @@ class Driver(object):
                         mysystem_outputs.update(d)
 
             # de-duplicate mysystem_outputs
-            mysystem_outputs = mysystem_outputs.difference(mydesvars, myobjectives, myconstraints)
+            mysystem_outputs = mysystem_outputs.difference(all_desvars, all_objectives,
+                                                           all_constraints)
 
         if MPI:  # filter based on who owns the variables
             # TODO Eventually, we think we can get rid of this next check. But to be safe,
@@ -311,6 +332,13 @@ class Driver(object):
             self._model_viewer_data = _get_viewer_data(problem)
         if self.recording_options['record_metadata']:
             self._rec_mgr.record_metadata(self)
+
+        # set up simultaneous deriv coloring
+        if self._simul_coloring_info and self.supports['simultaneous_derivatives']:
+            if problem._mode == 'fwd':
+                self._setup_simul_coloring(problem._mode)
+            else:
+                raise RuntimeError("simultaneous derivs are currently not supported in rev mode.")
 
     def _get_voi_val(self, name, meta, remote_vois):
         """
@@ -356,14 +384,15 @@ class Driver(object):
             else:
                 val = vec[name][indices]
 
-        # Scale design variable values
-        adder = meta['adder']
-        if adder is not None:
-            val += adder
+        if self._has_scaling:
+            # Scale design variable values
+            adder = meta['adder']
+            if adder is not None:
+                val += adder
 
-        scaler = meta['scaler']
-        if scaler is not None:
-            val *= scaler
+            scaler = meta['scaler']
+            if scaler is not None:
+                val *= scaler
 
         return val
 
@@ -414,14 +443,15 @@ class Driver(object):
         desvar = self._problem.model._outputs._views_flat[name]
         desvar[indices] = value
 
-        # Scale design variable values
-        scaler = meta['scaler']
-        if scaler is not None:
-            desvar[indices] *= 1.0 / scaler
+        if self._has_scaling:
+            # Scale design variable values
+            scaler = meta['scaler']
+            if scaler is not None:
+                desvar[indices] *= 1.0 / scaler
 
-        adder = meta['adder']
-        if adder is not None:
-            desvar[indices] -= adder
+            adder = meta['adder']
+            if adder is not None:
+                desvar[indices] -= adder
 
     def get_response_values(self, filter=None):
         """
@@ -437,8 +467,12 @@ class Driver(object):
         dict
            Dictionary containing values of each response.
         """
-        # TODO: finish this method when we have a driver that requires it.
-        return {}
+        if filter:
+            resps = filter
+        else:
+            resps = self._responses
+
+        return {n: self._get_voi_val(n, self._responses[n], self._remote_objs) for n in resps}
 
     def get_objective_values(self, filter=None):
         """
@@ -526,6 +560,34 @@ class Driver(object):
         self.iter_count += 1
         return failure_flag
 
+    def _dict2array_jac(self, derivs):
+        osize = 0
+        isize = 0
+        do_wrt = True
+        islices = {}
+        oslices = {}
+        for okey, oval in iteritems(derivs):
+            if do_wrt:
+                for ikey, val in iteritems(oval):
+                    istart = isize
+                    isize += val.shape[1]
+                    islices[ikey] = slice(istart, isize)
+                do_wrt = False
+            ostart = osize
+            osize += oval[ikey].shape[0]
+            oslices[okey] = slice(ostart, osize)
+
+        new_derivs = np.zeros((osize, isize))
+
+        relevant = self._problem.model._relevant
+
+        for okey, odict in iteritems(derivs):
+            for ikey, val in iteritems(odict):
+                if okey in relevant[ikey] or ikey in relevant[okey]:
+                    new_derivs[oslices[okey], islices[ikey]] = val
+
+        return new_derivs
+
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
@@ -563,54 +625,13 @@ class Driver(object):
                                           global_names=global_names)
 
         # ... then convert to whatever the driver needs.
-        if return_format == 'dict':
+        if return_format in ('dict', 'array'):
+            if self._has_scaling:
+                for okey, odict in iteritems(derivs):
+                    for ikey, val in iteritems(odict):
 
-            for okey, oval in iteritems(derivs):
-                for ikey, val in iteritems(oval):
-
-                    imeta = self._designvars[ikey]
-                    ometa = self._responses[okey]
-
-                    iscaler = imeta['scaler']
-                    oscaler = ometa['scaler']
-
-                    # Scale response side
-                    if oscaler is not None:
-                        val[:] = (oscaler * val.T).T
-
-                    # Scale design var side
-                    if iscaler is not None:
-                        val *= 1.0 / iscaler
-
-        elif return_format == 'array':
-
-            # Use sizes pre-computed in derivs for ease
-            osize = 0
-            isize = 0
-            do_wrt = True
-            islices = {}
-            oslices = {}
-            for okey, oval in iteritems(derivs):
-                if do_wrt:
-                    for ikey, val in iteritems(oval):
-                        istart = isize
-                        isize += val.shape[1]
-                        islices[ikey] = slice(istart, isize)
-                    do_wrt = False
-                ostart = osize
-                osize += oval[ikey].shape[0]
-                oslices[okey] = slice(ostart, osize)
-
-            new_derivs = np.zeros((osize, isize))
-
-            relevant = prob.model._relevant
-
-            # Apply driver ref/ref0 and position subjac into array jacobian.
-            for okey, oval in iteritems(derivs):
-                oscaler = self._responses[okey]['scaler']
-                for ikey, val in iteritems(oval):
-                    if okey in relevant[ikey] or ikey in relevant[okey]:
                         iscaler = self._designvars[ikey]['scaler']
+                        oscaler = self._responses[okey]['scaler']
 
                         # Scale response side
                         if oscaler is not None:
@@ -619,14 +640,12 @@ class Driver(object):
                         # Scale design var side
                         if iscaler is not None:
                             val *= 1.0 / iscaler
-
-                        new_derivs[oslices[okey], islices[ikey]] = val
-
-            derivs = new_derivs
-
         else:
-            msg = "Derivative scaling by the driver only supports the 'dict' format at present."
-            raise RuntimeError(msg)
+            raise RuntimeError("Derivative scaling by the driver only supports the 'dict' and "
+                               "'array' formats at present.")
+
+        if return_format == 'array':
+            derivs = self._dict2array_jac(derivs)
 
         return derivs
 
@@ -641,33 +660,27 @@ class Driver(object):
 
         # Get the data to record
         data = {}
-        if self.recording_options['includes']:
+        if self.recording_options['record_desvars']:
+            # collective call that gets across all ranks
             desvars = self.get_design_var_values()
-            objectives = self.get_objective_values()
-            constraints = self.get_constraint_values()
+        else:
+            desvars = {}
+
+        if self.recording_options['record_responses']:
+            # responses = self.get_response_values() # not really working yet
             responses = {}
         else:
-            if self.recording_options['record_desvars']:
-                # collective call that gets across all ranks
-                desvars = self.get_design_var_values()
-            else:
-                desvars = {}
+            responses = {}
 
-            if self.recording_options['record_responses']:
-                # responses = self.get_response_values() # not really working yet
-                responses = {}
-            else:
-                responses = {}
+        if self.recording_options['record_objectives']:
+            objectives = self.get_objective_values()
+        else:
+            objectives = {}
 
-            if self.recording_options['record_objectives']:
-                objectives = self.get_objective_values()
-            else:
-                objectives = {}
-
-            if self.recording_options['record_constraints']:
-                constraints = self.get_constraint_values()
-            else:
-                constraints = {}
+        if self.recording_options['record_constraints']:
+            constraints = self.get_constraint_values()
+        else:
+            constraints = {}
 
         desvars = {name: desvars[name]
                    for name in self._filtered_vars_to_record['des']}
@@ -743,3 +756,30 @@ class Driver(object):
             Name of current Driver.
         """
         return "Driver"
+
+    def set_simul_deriv_color(self, simul_info):
+        """
+        Set the coloring for simultaneous derivatives.
+
+        Parameters
+        ----------
+        simul_info : ({dv1: colors, ...}, {resp1: {dv1: {0: [res_idxs, dv_idxs]} ...} ...})
+            Information about simultaneous coloring for design vars and responses.
+        """
+        if self.supports['simultaneous_derivatives']:
+            self._simul_coloring_info = simul_info
+        else:
+            raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
+                               self._get_name())
+
+    def _setup_simul_coloring(self, mode='fwd'):
+        """
+        Set up metadata for simultaneous derivative solution.
+
+        Parameters
+        ----------
+        mode : str
+            Derivative direction, either 'fwd' or 'rev'.
+        """
+        raise NotImplementedError("Driver '%s' does not support simultaneous derivatives." %
+                                  self._get_name())

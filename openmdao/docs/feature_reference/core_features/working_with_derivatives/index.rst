@@ -13,3 +13,4 @@ Working with Derivatives
     approximating_totals.rst
     check_total_derivatives.rst
     picking_mode.rst
+    simul_derivs.rst

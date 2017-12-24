@@ -59,7 +59,15 @@ There are a number of connections in this model, and several different residuals
 Trying to keep track of all the connections in your head can be a bit challenging, but OpenMDAO offers
 some visualization tools to help see whats going on.
 
-Add the following code to your run script to generate an :math:`N^2` diagram that represents the connections.
+The `openmdao view_model` command can be used to view an :math:`N^2` diagram of the model.  It can be used
+as follows:
+
+.. code-block:: none
+
+    openmdao view_model <your_python_script>
+
+
+You can do the same thing programmatically by adding the following to your python script:
 
 .. code::
 

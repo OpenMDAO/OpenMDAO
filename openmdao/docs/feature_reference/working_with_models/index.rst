@@ -7,4 +7,3 @@ Working With Your Models
 
     recording/index.rst
     debugging/index.rst
-    profiling/index.rst

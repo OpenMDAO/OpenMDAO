@@ -25,13 +25,13 @@ To use the OpenMDAO v0.x legacy version
 https://github.com/OpenMDAO/OpenMDAO-Framework
 
 
-OpenMDAO 2.0.x
+OpenMDAO 2
 --------------
 
-This is an ALPHA version of OpenMDAO 2.0.x
+This is an ALPHA version of OpenMDAO 2
 
 Our latest docs are available at [http://openmdao.org/twodocs/versions/latest](http://openmdao.org/twodocs/versions/latest)
-Our archived 2.0.x docs are available at [http://openmdao.org/twodocs](http://openmdao.org/twodocs)
+Our archived 2 docs are available at [http://openmdao.org/twodocs](http://openmdao.org/twodocs)
 
 
 
@@ -59,8 +59,7 @@ Here is a list of things that have not yet been developed in 2.x:
 * File variables
 * Active-set constraint calculation disabling
 * Brent Solver
-    * CaseRecording using CSV, HDF5, and dump recorders (SqliteRecorder and WebRecorder are currently supported)
-* 'auto' selection of derivatives mode based on sizes of design variables and responses
+* CaseRecording using CSV, HDF5, and dump recorders (SqliteRecorder and WebRecorder are currently supported)
 
 Installation Instructions:
 --------------------------

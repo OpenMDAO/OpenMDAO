@@ -2,7 +2,6 @@
 from __future__ import division, print_function
 import numpy as np
 
-from six.moves import range
 from six import iteritems
 
 from openmdao.utils.general_utils import ensure_compatible
@@ -98,9 +97,14 @@ class Vector(object):
         True if this vector performs scaling.
     _scaling : dict
         Contains scale factors to convert data arrays.
+    cite : str
+        Listing of relevant citataions that should be referenced when
+        publishing work that uses this class.
     """
 
     _vector_info = VectorInfo()
+
+    cite = ""
 
     def __init__(self, name, kind, system, root_vector=None, resize=False, alloc_complex=False,
                  ncol=1, relevant=None):

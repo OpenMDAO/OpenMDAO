@@ -135,8 +135,8 @@ class Group(System):
 
         self._subsystems_allprocs = []
         self._manual_connections = {}
-        self._design_vars = {}
-        self._responses = {}
+        self._design_vars = OrderedDict()
+        self._responses = OrderedDict()
 
         self._static_mode = False
         self._subsystems_allprocs.extend(self._static_subsystems_allprocs)
@@ -622,6 +622,10 @@ class Group(System):
                     meta['src_indices'] = np.atleast_1d(src_indices)
                     meta['flat_src_indices'] = flat_src_indices
 
+                if abs_in in abs_in2out:
+                    raise RuntimeError("Input '%s' cannot be connected to '%s' because it's already"
+                                       " connected to '%s'" % (abs_in, abs_out, abs_in2out[abs_in]))
+
                 abs_in2out[abs_in] = abs_out
 
                 # if connection is contained in a subgroup, add to conns to pass down to subsystems.
@@ -639,10 +643,26 @@ class Group(System):
 
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
+        conn_list = list(iteritems(global_abs_in2out))
+        conn_list.extend(iteritems(abs_in2out))
         global_abs_in2out.update(abs_in2out)
 
         for subsys in self._subsystems_myproc:
             global_abs_in2out.update(subsys._conn_global_abs_in2out)
+            conn_list.extend(iteritems(subsys._conn_global_abs_in2out))
+
+        if len(conn_list) > len(global_abs_in2out):
+            dupes = [n for n, val in iteritems(Counter(tgt for tgt, src in conn_list)) if val > 1]
+            dup_info = defaultdict(set)
+            for tgt, src in conn_list:
+                for dup in dupes:
+                    if tgt == dup:
+                        dup_info[tgt].add(src)
+            dup_info = [(n, srcs) for n, srcs in iteritems(dup_info) if len(srcs) > 1]
+            if dup_info:
+                msg = ["%s from %s" % (tgt, sorted(srcs)) for tgt, srcs in dup_info]
+                raise RuntimeError("The following inputs have multiple connections: %s" %
+                                   ", ".join(msg))
 
         # If running in parallel, allgather
         if self.comm.size > 1:

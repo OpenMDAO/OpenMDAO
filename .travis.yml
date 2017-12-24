@@ -2,7 +2,10 @@ branches:
   only:
   - master
 
-sudo: false
+group: deprecated-2017Q4
+
+#sudo: false
+filter_secrets: false
 
 os:
 - linux
@@ -14,6 +17,9 @@ env:
 - PY=3.6 MPI=1
 - PY=2.7 MPI=
 - PY=3.6 MPI=
+
+git:
+  depth: 99999
 
 addons:
   apt:
@@ -33,11 +39,8 @@ notifications:
     secure: Dd+tpZkz48Q47Y+PtdL4b+KAs55PsvWjt9ybhip6xljhA5kVsba9oZS+KsAC8RLWSzVJLOSjz3Cu3MsRym4sTd/g4Pbqyh0ldK2Xnl+n2JOgpPFSXtFuH4Ln3uWB6kYtUK6+aGIC8qhbvEt8tukTBT0RduEmdRyVIZ3oN7YjETPSZXvujeiUFLssfpZW2mqoA/tIgJHFSlySAp6J5694t2Z/p8sHOrK8G/Nm+qlk4xqXHvJ3xablcSBG4BZCrpqmMMdTLXBt2E2K9Rc1P2ZBIrSHVWfSLx+4n79U2385+og7miN1Zuf3gY3YuGKIwnBTtEzTu20905idkr4QdKELCBEcU4azdznwjvUkXWkiFAJII9UELTluSQmZX602zWk4AgJNeHxhN3EbBSMezfYVZjprhlAlwnZZv6t4qAkvuzb7KOA4s679xWzWOBOn1wkynfIF8A66APqssveyz/PvZHSjnHQoLgMU+kwzoX759o0Z/HuRlhCcjv0W9DWxU2bFNi/zVh9YyvR8fG15biGthzOyuf+CHjxohw+J6M+YdR1RIf1g/60nGUPHx4j4SN3kEFPmEDxzZT/f349gvaZGOmKXBi0wH8iY/i9RinM9LJB4t6chj2MkKwUA26bYaVaIO6FYPfE7r+tTG6OXdck4voCs/s4aa9VKEX97yhh0i9g=
 
 before_install:
+#- python -c "import fcntl; fcntl.fcntl(1, fcntl.F_SETFL, 0)"
 - pip install --upgrade pip;
-
-- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-    openssl aes-256-cbc -K $encrypted_74d70a284b7d_key -iv $encrypted_74d70a284b7d_iv -in travis_deploy_rsa.enc -out /tmp/travis_deploy_rsa -d;
-  fi
 
 - OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux"; fi)
 
@@ -61,13 +64,21 @@ before_install:
 - export PATH=$PATHPREFIX:$PATH
 - export OPENMDAO_TEST_DOCS=1
 
-- if [[ "$TRAVIS_PULL_REQUEST" = "false" ]]; then
+install:
+# get key decrypted, placed, chmodded, and added for passwordless access to WebFaction
+- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+    openssl aes-256-cbc -K $encrypted_74d70a284b7d_key -iv $encrypted_74d70a284b7d_iv -in travis_deploy_rsa.enc -out /tmp/travis_deploy_rsa -d;
+    eval "$(ssh-agent -s)";
+    chmod 600 /tmp/travis_deploy_rsa;
+    ssh-add /tmp/travis_deploy_rsa;
     echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
   fi
 
-install:
 # keeping numpy pinned at 1.12 because pySNOPT dies with 1.13 because numpy broke callback
-- conda install --yes python=$PY numpy==1.12 scipy nose sphinx mock swig
+#- conda install --yes nomkl
+- conda install --yes python=$PY
+- conda install --yes numpy==1.12 scipy=0.19.1 nose sphinx mock swig pip
+- pip install --upgrade pip
 
 # install pyoptsparse
 - wget https://bitbucket.org/mdolab/pyoptsparse/get/tip.zip;
@@ -100,20 +111,14 @@ after_success:
 - sed 's/\/home\/travis\/miniconda\/lib\/python'"$PY"'\/site-packages\///g' < coveralls.json > coveralls-upd.json
 - coveralls --upload=coveralls-upd.json
 
-before_deploy:
-- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-    eval "$(ssh-agent -s)";
-    chmod 600 /tmp/travis_deploy_rsa;
-    ssh-add /tmp/travis_deploy_rsa;
-  fi
-
 deploy:
   provider: script
   skip_cleanup: true
   script:
+  # only deploy docs in a build after a PR or merge is accepted
   - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
       if [ "$MPI" ] && [ "$PY" = "3.6" ]; then
-        rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/twodocversions/latest;
+        python _utils/upload_doc_version.py;
       fi
     fi
   on:

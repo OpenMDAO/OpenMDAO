@@ -6,6 +6,7 @@ from collections import OrderedDict, Iterable, defaultdict
 from fnmatch import fnmatchcase
 import sys
 from itertools import product
+from numbers import Integral
 
 from six import iteritems, string_types
 from six.moves import range
@@ -55,6 +56,10 @@ class System(object):
     iter_count : int
         Int that holds the number of times this system has iterated
         in a recording run.
+    #
+    cite : str
+        Listing of relevant citataions that should be referenced when
+        publishing work that uses this class.
     #
     _subsystems_allprocs : [<System>, ...]
         List of all subsystems (children of this system).
@@ -252,6 +257,15 @@ class System(object):
         Dict of list of var names to record
     _norm0: float
         Normalization factor
+    # Constants used by list_inputs and list_outputs methods for formatting tables they write
+    _column_widths : dict
+        widths of the columns
+    _align : str
+        The formatting alignment used when writing values into columns
+    _column_spacing: int
+        Number of spaces between columns
+    _indent_inc: int
+        Number of spaces indented in levels of the hierarchy
     """
 
     def __init__(self, **kwargs):
@@ -287,6 +301,8 @@ class System(object):
 
         # Case recording related
         self.iter_count = 0
+
+        self.cite = ""
 
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
@@ -354,8 +370,8 @@ class System(object):
         self._static_mode = True
         self._static_subsystems_allprocs = []
         self._static_manual_connections = {}
-        self._static_design_vars = {}
-        self._static_responses = {}
+        self._static_design_vars = OrderedDict()
+        self._static_responses = OrderedDict()
 
         self._reconfigured = False
         self.supports_multivecs = False
@@ -391,7 +407,6 @@ class System(object):
         self._align = ''
         self._column_spacing = 2
         self._indent_inc = 2
-
 
     def _check_reconf(self):
         """
@@ -745,6 +760,8 @@ class System(object):
             'r': myresiduals
         }
 
+        self._rec_mgr.startup(self)
+
         # Recursion
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -815,7 +832,6 @@ class System(object):
         if setup_mode in ('full', 'reconf'):
             self.set_initial_values()
 
-        self._rec_mgr.startup(self)
         for sub in self.system_iter(recurse=True, include_self=True):
             sub._rec_mgr.record_metadata(sub)
 
@@ -1955,7 +1971,8 @@ class System(object):
 
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
-                       parallel_deriv_color=None, vectorize_derivs=False):
+                       parallel_deriv_color=None, vectorize_derivs=False,
+                       simul_coloring=None):
         r"""
         Add a design variable to this system.
 
@@ -1986,6 +2003,9 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
+        simul_coloring : ndarray or list of int
+            An array or list of integer color values.  Must match the size of the
+            design variable.
 
         Notes
         -----
@@ -2047,6 +2067,11 @@ class System(object):
         dvs['ref'] = ref
         dvs['ref0'] = ref0
         if indices is not None:
+            # If given, indices must be a sequence
+            if not (isinstance(indices, Iterable) and
+                    all([isinstance(i, Integral) for i in indices])):
+                raise ValueError("If specified, indices must be a sequence of integers.")
+
             indices = np.atleast_1d(indices)
             dvs['size'] = len(indices)
         dvs['indices'] = indices
@@ -2056,13 +2081,19 @@ class System(object):
         #       makes the flat_earth test run faster on one proc.
         if vectorize_derivs and parallel_deriv_color is None:
             dvs['parallel_deriv_color'] = '@matmat'
+        dvs['simul_deriv_color'] = simul_coloring
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None,
                      adder=None, scaler=None, linear=False, parallel_deriv_color=None,
-                     vectorize_derivs=False):
+                     vectorize_derivs=False, simul_coloring=None,
+                     simul_map=None):
         r"""
         Add a response variable to this system.
+
+        The response can be scaled using ref and ref0.
+        The argument :code:`ref0` represents the physical value when the scaled value is 0.
+        The argument :code:`ref` represents the physical value when the scaled value is 1.
 
         Parameters
         ----------
@@ -2099,12 +2130,13 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
-
-        Notes
-        -----
-        The response can be scaled using ref and ref0.
-        The argument :code:`ref0` represents the physical value when the scaled value is 0.
-        The argument :code:`ref` represents the physical value when the scaled value is 1.
+        simul_coloring : ndarray or list of int
+            An array or list of integer color values.  Must match the size of the
+            response variable.
+        simul_map : dict
+            Mapping of this response to each design variable where simultaneous derivs will
+            be used.  Each design variable entry is another dict keyed on color, and the values
+            in the color dict are tuples of the form (resp_idxs, color_idxs).
 
         """
         # Name must be a string
@@ -2137,19 +2169,9 @@ class System(object):
             raise ValueError(msg.format(name))
 
         # If given, indices must be a sequence
-        err = False
-        if indices is not None:
-            if isinstance(indices, string_types):
-                err = True
-            elif isinstance(indices, Iterable):
-                all_int = all([isinstance(item, int) for item in indices])
-                if not all_int:
-                    err = True
-            else:
-                err = True
-        if err:
-            msg = "If specified, indices must be a sequence of integers."
-            raise ValueError(msg)
+        if (indices is not None and not (
+                isinstance(indices, Iterable) and all([isinstance(i, Integral) for i in indices]))):
+            raise ValueError("If specified, indices must be a sequence of integers.")
 
         if self._static_mode:
             responses = self._static_responses
@@ -2218,13 +2240,15 @@ class System(object):
         resp['vectorize_derivs'] = vectorize_derivs
         if vectorize_derivs and parallel_deriv_color is None:
             resp['parallel_deriv_color'] = '@matmat'
+        resp['simul_deriv_color'] = simul_coloring
+        resp['simul_map'] = simul_map
 
         responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
                        indices=None, linear=False, parallel_deriv_color=None,
-                       vectorize_derivs=False):
+                       vectorize_derivs=False, simul_coloring=None, simul_map=None):
         r"""
         Add a constraint variable to this system.
 
@@ -2259,6 +2283,13 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
+        simul_coloring : ndarray or list of int
+            An array or list of integer color values.  Must match the size of the
+            constraint variable.
+        simul_map : dict
+            Mapping of this response to each design variable where simultaneous derivs will
+            be used.  Each design variable entry is another dict keyed on color, and the values
+            in the color dict are tuples of the form (resp_idxs, color_idxs).
 
         Notes
         -----
@@ -2270,11 +2301,12 @@ class System(object):
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
                           ref0=ref0, indices=indices, linear=linear,
                           parallel_deriv_color=parallel_deriv_color,
-                          vectorize_derivs=vectorize_derivs)
+                          vectorize_derivs=vectorize_derivs,
+                          simul_coloring=simul_coloring, simul_map=simul_map)
 
     def add_objective(self, name, ref=None, ref0=None, index=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
-                      vectorize_derivs=False):
+                      vectorize_derivs=False, simul_coloring=None, simul_map=None):
         r"""
         Add a response variable to this system.
 
@@ -2301,6 +2333,13 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
+        simul_coloring : ndarray or list of int
+            An array or list of integer color values.  Must match the size of the
+            objective variable.
+        simul_map : dict
+            Mapping of this response to each design variable where simultaneous derivs will
+            be used.  Each design variable entry is another dict keyed on color, and the values
+            in the color dict are tuples of the form (resp_idxs, color_idxs).
 
         Notes
         -----
@@ -2332,7 +2371,8 @@ class System(object):
         self.add_response(name, type_='obj', scaler=scaler, adder=adder,
                           ref=ref, ref0=ref0, index=index,
                           parallel_deriv_color=parallel_deriv_color,
-                          vectorize_derivs=vectorize_derivs)
+                          vectorize_derivs=vectorize_derivs,
+                          simul_coloring=simul_coloring, simul_map=simul_map)
 
     def get_design_vars(self, recurse=True, get_sizes=True):
         """
@@ -2519,14 +2559,13 @@ class System(object):
         list
             list of of input names and other optional information about those inputs
         """
-
         if self._inputs is None:
             raise RuntimeError("Unable to list inputs until model has been run.")
 
         meta = self._var_abs2meta
         inputs = []
 
-        for name, val in iteritems(self._inputs._views): # This is only over the locals
+        for name, val in iteritems(self._inputs._views):  # This is only over the locals
             outs = {}
             if values:
                 outs['value'] = val
@@ -2548,9 +2587,11 @@ class System(object):
                      bounds=False,
                      scaling=False,
                      print_arrays=False,
+                     tol=None,
                      out_stream='stdout'):
         """
         Return a list outputs and optional metadata for the outputs. Names are always shown.
+
         Optionally write a human readable output to an output stream.
 
         Parameters
@@ -2580,15 +2621,20 @@ class System(object):
             When True, display/return scaling (ref, ref0, and res_ref). Default is False.
 
         print_arrays : bool, optional
-            When False, in the columnar display, just display the norm of any ndarrays with size > 1.
+            When False, in the columnar display, just display  norm of any ndarrays with size > 1.
                         The norm is surrounded by parens to indicate that it is a norm.
-            When True, also display the full values of the ndarray below the row. The format of that is affected
+            When True, also display full values of the ndarray below the row. Format  is affected
                         by the values set with numpy.set_printoptions
             Default is False.
 
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
+
+        tol : float, optional
+            If set, limits the output of list_residuals to only variables where
+            the norm of the resids array is greater than the given 'tol'.
+            Default is None.
 
         Returns
         -------
@@ -2599,7 +2645,7 @@ class System(object):
             raise RuntimeError("Unable to list outputs until model has been run.")
 
         # Only gathering up values and metadata from this proc, if MPI
-        meta = self._var_abs2meta # This only includes metadata for this process.
+        meta = self._var_abs2meta  # This only includes metadata for this process.
         states = self._list_states()
 
         # Go though the hierarchy. Printing Systems
@@ -2607,6 +2653,8 @@ class System(object):
         expl_outputs = []
         impl_outputs = []
         for name, val in iteritems(self._outputs._views):
+            if tol and np.linalg.norm(self._residuals._views[name]) < tol:
+                continue
             outs = {}
             if values:
                 outs['value'] = val
@@ -2624,15 +2672,17 @@ class System(object):
                 outs['ref0'] = meta['output'][name]['ref0']
                 outs['res_ref'] = meta['output'][name]['res_ref']
             if name in states:
-                impl_outputs.append((name,outs))
+                impl_outputs.append((name, outs))
             else:
-                expl_outputs.append((name,outs))
+                expl_outputs.append((name, outs))
 
         if out_stream:
             if explicit:
-                self._write_outputs('output', 'Explicit', expl_outputs, hierarchical, print_arrays, out_stream)
+                self._write_outputs('output', 'Explicit', expl_outputs, hierarchical, print_arrays,
+                                    out_stream)
             if implicit:
-                self._write_outputs('output', 'Implicit', impl_outputs, hierarchical, print_arrays, out_stream)
+                self._write_outputs('output', 'Implicit', impl_outputs, hierarchical, print_arrays,
+                                    out_stream)
 
         if explicit and implicit:
             return expl_outputs + impl_outputs
@@ -2643,10 +2693,11 @@ class System(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-
-    def _write_outputs(self, in_or_out, comp_type, outputs, hierarchical, print_arrays, out_stream='stdout'):
+    def _write_outputs(self, in_or_out, comp_type, outputs, hierarchical, print_arrays,
+                       out_stream='stdout'):
         """
         Write formatted output values and residuals to out_stream.
+
         The output values could actually represent input variables.
         In this context, outputs refers to the data that is being logged to an output stream.
 
@@ -2661,6 +2712,7 @@ class System(object):
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
+
         """
         if out_stream is None:
             return
@@ -2675,20 +2727,22 @@ class System(object):
 
         # If parallel, gather up the outputs. All procs must call this
         if MPI:
-            all_dict_of_outputs = self.comm.gather(dict_of_outputs, root=0) # returns a list, one per proc
+            # returns a list, one per proc
+            all_dict_of_outputs = self.comm.gather(dict_of_outputs, root=0)
 
         if MPI and MPI.COMM_WORLD.rank > 0:  # If MPI, only the root process should print
             return
 
         # If MPI, and on rank 0, need to gather up all the variables
-        if MPI: # rest of this only done on rank 0
-            dict_of_outputs = all_dict_of_outputs[0] # start with rank 0
-            for proc_outputs in all_dict_of_outputs[1:]: # in order of rank, go through the rest of the procs
+        if MPI:  # rest of this only done on rank 0
+            dict_of_outputs = all_dict_of_outputs[0]  # start with rank 0
+            for proc_outputs in all_dict_of_outputs[1:]:  # In rank order go thru rest of the procs
                 for name, vals in iteritems(proc_outputs):
-                    if name not in dict_of_outputs: # If not in the merged dict, add it
+                    if name not in dict_of_outputs:  # If not in the merged dict, add it
                         dict_of_outputs[name] = proc_outputs[name]
-                    else: # If in there already, only need to deal with it if it is a distributed array
-                        # Checking to see if it is distributed depends on if it is an input or output
+                    else:  # If in there already, only need to deal with it if it is a
+                        # distributed array.
+                        # Checking to see if  distributed depends on if it is an input or output
                         if in_or_out == 'input':
                             is_distributed = meta[name]['src_indices'] is not None
                         else:
@@ -2702,10 +2756,12 @@ class System(object):
                                               proc_outputs[name]['value'])
                             if 'shape' in dict_of_outputs[name]:
                                 # TODO might want to use allprocs_abs2meta_out[name]['global_shape']
-                                dict_of_outputs[name]['shape'] =  dict_of_outputs[name]['value'].shape
+                                dict_of_outputs[name]['shape'] = \
+                                    dict_of_outputs[name]['value'].shape
                             if 'resids' in dict_of_outputs[name]:
                                 dict_of_outputs[name]['resids'] = \
-                                    np.append(dict_of_outputs[name]['resids'], proc_outputs[name]['resids'])
+                                    np.append(dict_of_outputs[name]['resids'],
+                                              proc_outputs[name]['resids'])
 
         count = len(dict_of_outputs)
 
@@ -2729,7 +2785,8 @@ class System(object):
         if in_or_out == 'input':
             out_types = ('value', 'units',)
         else:
-            out_types = ('value', 'resids', 'units', 'shape', 'lower', 'upper', 'ref', 'ref0', 'res_ref')
+            out_types = ('value', 'resids', 'units', 'shape', 'lower', 'upper', 'ref',
+                         'ref0', 'res_ref')
         # Figure out which columns will be displayed
         # Look at any one of the outputs, they should all be the same
         outputs = dict_of_outputs[list(dict_of_outputs)[0]]
@@ -2750,14 +2807,16 @@ class System(object):
                     max_varname_len = max(max_varname_len, total_len)
         else:
             for name, outs in iteritems(dict_of_outputs):
-                max_varname_len = max(max_varname_len,len(name))
+                max_varname_len = max(max_varname_len, len(name))
 
         # Write out the column headers. Code is common to both hierarchical and non-hierarchical
-        column_header = '{:{align}{width}}'.format('varname', align=self._align, width=max_varname_len)
+        column_header = '{:{align}{width}}'.format('varname', align=self._align,
+                                                   width=max_varname_len)
         column_dashes = max_varname_len * '-'
         for column_name in column_names:
             column_header += self._column_spacing * ' '
-            column_header += '{:{align}{width}}'.format(column_name, align=self._align, width=self._column_widths[column_name])
+            column_header += '{:{align}{width}}'.format(column_name, align=self._align,
+                                                        width=self._column_widths[column_name])
             column_dashes += self._column_spacing * ' ' + self._column_widths[column_name] * '-'
         logger.info(column_header)
         logger.info(column_dashes)
@@ -2780,10 +2839,10 @@ class System(object):
                 existing_sys_names = []
                 varname_sys_names = varname.split('.')[:-1]
                 for i, sys_name in enumerate(varname_sys_names):
-                    if varname_sys_names[:i+1] != cur_sys_names[:i+1]:
+                    if varname_sys_names[:i + 1] != cur_sys_names[:i + 1]:
                         break
                     else:
-                        existing_sys_names = cur_sys_names[:i+1]
+                        existing_sys_names = cur_sys_names[:i + 1]
 
                 # What parts of the hierarchy for this varname need to be written that
                 #   were not already written above this
@@ -2798,13 +2857,16 @@ class System(object):
                 cur_sys_names = varname_sys_names
 
                 indent += self._indent_inc
-                row = '{:{align}{width}}'.format(indent * ' ' + varname.split('.')[-1], align=self._align, width=max_varname_len)
-                self._write_outputs_rows(logger, row, column_names, dict_of_outputs[varname], print_arrays)
+                row = '{:{align}{width}}'.format(indent * ' ' + varname.split('.')[-1],
+                                                 align=self._align, width=max_varname_len)
+                self._write_outputs_rows(logger, row, column_names, dict_of_outputs[varname],
+                                         print_arrays)
         else:
             for name in self._var_allprocs_abs_names[in_or_out]:
                 if name in dict_of_outputs:
                     row = '{:{align}{width}}'.format(name, align=self._align, width=max_varname_len)
-                    self._write_outputs_rows(logger, row, column_names, dict_of_outputs[name], print_arrays)
+                    self._write_outputs_rows(logger, row, column_names, dict_of_outputs[name],
+                                             print_arrays)
         logger.info('\n')
 
     def _write_outputs_rows(self, logger, row, column_names, outs, print_arrays):
@@ -2823,7 +2885,7 @@ class System(object):
 
         """
         left_column_width = len(row)
-        have_array_values = [] # keep track of which values are arrays
+        have_array_values = []  # keep track of which values are arrays
         for column_name in column_names:
             row += self._column_spacing * ' '
             if isinstance(outs[column_name], np.ndarray) and outs[column_name].size > 1:
@@ -2831,15 +2893,16 @@ class System(object):
                 out = '({})'.format(str(np.linalg.norm(outs[column_name])))
             else:
                 out = str(outs[column_name])
-            row += '{:{align}{width}}'.format(out, align=self._align, width=self._column_widths[column_name])
+            row += '{:{align}{width}}'.format(out, align=self._align,
+                                              width=self._column_widths[column_name])
         logger.info(row)
         if print_arrays:
             for column_name in have_array_values:
                 logger.info("{}  {}:".format(left_column_width * ' ', column_name))
                 out_str = str(outs[column_name])
-                indented_lines = [(left_column_width + self._indent_inc) * ' ' + s for s in out_str.splitlines()]
+                indented_lines = [(left_column_width + self._indent_inc) * ' ' +
+                                  s for s in out_str.splitlines()]
                 logger.info('\n'.join(indented_lines))
-
 
     def run_solve_nonlinear(self):
         """

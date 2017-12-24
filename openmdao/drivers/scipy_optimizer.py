@@ -31,6 +31,16 @@ _eq_constraint_optimizers = ['SLSQP']
 _unsupported_optimizers = ['dogleg', 'trust-ncg']
 
 
+CITATIONS = """
+@phdthesis{hwang_thesis_2015,
+  author       = {John T. Hwang},
+  title        = {A Modular Approach to Large-Scale Design Optimization of Aerospace Systems},
+  school       = {University of Michigan},
+  year         = 2015
+}
+"""
+
+
 class ScipyOptimizer(Driver):
     """
     Driver wrapper for the scipy.optimize.minimize family of local optimizers.
@@ -120,6 +130,8 @@ class ScipyOptimizer(Driver):
         self.fail = False
         self.iter_count = 0
         self._exc_info = None
+
+        self.cite = CITATIONS
 
     def _setup_driver(self, problem):
         """

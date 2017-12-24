@@ -1,7 +1,7 @@
 import numpy as np
 import unittest
 
-from openmdao.api import Group, Problem, MultiFiMetaModel, MultiFiSurrogateModel
+from openmdao.api import Group, Problem, MultiFiMetaModelUnStructured, MultiFiSurrogateModel
 
 
 class MockSurrogate(MultiFiSurrogateModel):
@@ -23,7 +23,7 @@ class MockSurrogate(MultiFiSurrogateModel):
 class MultiFiMetaModelTestCase(unittest.TestCase):
 
     def test_inputs_wrt_nfidelity(self):
-        mm = MultiFiMetaModel(nfi=3)
+        mm = MultiFiMetaModelUnStructured(nfi=3)
 
         mm.add_input('x', 0.)
         mm.add_output('y', 0.)
@@ -40,7 +40,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         self.assertEqual(mm.metadata['train:y_fi3'], None)
 
     def test_one_dim_one_fidelity_training(self):
-        mm = MultiFiMetaModel()
+        mm = MultiFiMetaModelUnStructured()
         surr = MockSurrogate()
 
         mm.add_input('x', 0.)
@@ -67,7 +67,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         np.testing.assert_array_equal(surr.xpredict, expected_xpredict)
 
     def test_one_dim_bi_fidelity_training(self):
-        mm = MultiFiMetaModel(nfi=2)
+        mm = MultiFiMetaModelUnStructured(nfi=2)
         surr = MockSurrogate()
 
         mm.add_input('x', 0.)
@@ -99,7 +99,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         np.testing.assert_array_equal(surr.ytrain[1], expected_ytrain[1])
 
     def test_two_dim_bi_fidelity_training(self):
-        mm = MultiFiMetaModel(nfi=2)
+        mm = MultiFiMetaModelUnStructured(nfi=2)
         surr_y1 = MockSurrogate()
         surr_y2 = MockSurrogate()
 
@@ -140,7 +140,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         np.testing.assert_array_equal(surr_y2.ytrain[1], expected_y2train[1])
 
     def test_multifidelity_warm_start(self):
-        mm = MultiFiMetaModel(nfi=2)
+        mm = MultiFiMetaModelUnStructured(nfi=2)
         surr = MockSurrogate()
 
         mm.add_input('x', 0.)
