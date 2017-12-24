@@ -85,7 +85,7 @@ class DistributedAdderTest(unittest.TestCase):
 
     N_PROCS = 2
 
-    def test_distributed_list_vars(self):
+    def test_distributed_array_list_vars(self):
 
         # import pydevd
         # from openmdao.utils.mpi import MPI
@@ -167,14 +167,14 @@ class DistributedAdderTest(unittest.TestCase):
 
 
 
-    def test_distributed_arrays_list_vars(self):
+    def test_distributed_list_vars(self):
         # import pydevd
         # from openmdao.utils.mpi import MPI
         # if MPI.COMM_WORLD.rank:
         #     pydevd.settrace('localhost', port=9876, stdoutToServer=True, stderrToServer=True)
         # else:
         #     pydevd.settrace('localhost', port=9877, stdoutToServer=True, stderrToServer=True)
-        #
+
         from openmdao.utils.general_utils import set_pyoptsparse_opt
         from openmdao.utils.mpi import MPI
 
@@ -220,22 +220,16 @@ class DistributedAdderTest(unittest.TestCase):
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
-        # prob.driver.recording_options['record_desvars'] = True
-        # prob.driver.recording_options['record_responses'] = True
-        # prob.driver.recording_options['record_objectives'] = True
-        # prob.driver.recording_options['record_constraints'] = True
-        # prob.driver.recording_options['includes'] = ['par.G1.Cy.y','par.G2.Cy.y']
-        #
-        # prob.driver.add_recorder(self.recorder)
-
         prob.setup(vector_class=PETScVector)
         prob.run_driver()
         prob.cleanup()
 
-        from six.moves import cStringIO
-
         stream = cStringIO()
 
+        # allsystems_pathnames = [s.pathname for s in list(prob.model.system_iter(local=False, recurse=True, include_self=True))]
+        # for s in prob.model.system_iter(local=False, recurse=True, include_self=True):
+        #     print(s)
+        #
         inputs = prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream)
         text = stream.getvalue()
         if prob.comm.rank: # Only rank 0 prints

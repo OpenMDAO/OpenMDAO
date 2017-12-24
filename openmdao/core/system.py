@@ -2734,6 +2734,7 @@ class System(object):
         """
         from openmdao.api import ImplicitComponent, ExplicitComponent
         from openmdao.core.component import Component
+
         if out_stream is None:
             return
 
@@ -2746,14 +2747,15 @@ class System(object):
         # Only local metadata but the most complete
         meta_in_or_out = self._var_abs2meta[in_or_out]
 
+        # Make a dict of outputs
+        dict_of_outputs = OrderedDict()
+        for name, vals in outputs:
+            dict_of_outputs[name] = vals
+
         # If parallel, gather up the outputs qqq TODO really need to change the name of outputs!
         if MPI:
-            # Make a dict of outputs
-            dict_of_outputs = OrderedDict()
-            for name, vals in outputs:
-                dict_of_outputs[name] = vals
             all_dict_of_outputs = self.comm.gather(dict_of_outputs, root=0) # returns a list, one per proc
-            all_meta = self.comm.gather(meta, root=0) # returns a list, one per proc qqq TODO Why ??
+            # all_meta = self.comm.gather(meta, root=0) # returns a list, one per proc qqq TODO Why ??
 
         if MPI and MPI.COMM_WORLD.rank > 0:  # only the root process should print
             return
@@ -2784,7 +2786,7 @@ class System(object):
                                 merged_dict_of_outputs[name]['value'] = np.append(merged_dict_of_outputs[name]['value'], d[name]['value'])
                             if 'shape' in merged_dict_of_outputs[name]:
                                 merged_dict_of_outputs[name]['shape'] =  merged_dict_of_outputs[name]['value'].shape
-                            if in_or_out == 'outputs':
+                            if in_or_out == 'output':
                                 if 'resids' in merged_dict_of_outputs[name]:
                                     merged_dict_of_outputs[name]['resids'] = np.append(merged_dict_of_outputs[name]['resids'], d[name]['resids'])
 
@@ -2870,6 +2872,8 @@ class System(object):
         name_to_idx_map = {}
         for idx, (name, outs) in enumerate(sorted(outputs)):
             name_to_idx_map[name] = idx
+
+
         if hierarchical:
             # Need to know how to get the output values from the passed in list of tuples
 
@@ -2891,6 +2895,9 @@ class System(object):
                 for name, val in iteritems(in_or_out_views):
                     vars_to_output.append(name)
 
+            # for s in self.system_iter(local=True, include_self=True, recurse=True):
+            # for s in self.system_iter(local=False, include_self=True, recurse=True):
+            #     print(s.pathname)
             for s in self.system_iter(local=True, include_self=True, recurse=True):
                 # is the path for this System a subset of the path for one of the variables to output?
                 output_this_system = False
@@ -2927,48 +2934,12 @@ class System(object):
                     idx = name_to_idx_map[name]
                     outs = outputs[idx][1]
 
-                    if in_or_out == 'input':
-                        in_or_out_dict = s._inputs
-                    else:
-                        in_or_out_dict = s._outputs
-
                     self._write_outputs_rows(logger, row, column_names, outs, print_arrays)
         else:
-            ### new stuff begin
-            # Make a dict of outputs
-            dict_of_outputs = OrderedDict()
-            for name, vals in outputs:
-                dict_of_outputs[name] = vals
             for name in self._var_allprocs_abs_names[in_or_out]:
                 if name in dict_of_outputs:
                     row = '{:{align}{width}}'.format(name, align=self._align, width=max_varname_len)
                     self._write_outputs_rows(logger, row, column_names, dict_of_outputs[name], print_arrays)
-
-            ### new stuff end
-
-
-            ### old stuff begin
-        #     for s in self.system_iter(local=True, include_self=True, recurse=True):
-        #         if s.pathname:
-        #             num_parts = len(s.pathname.split('.'))
-        #         else:
-        #             num_parts = 0
-        #         if in_or_out == 'input':
-        #             in_or_out_views = s._inputs._views
-        #         else:
-        #             in_or_out_views = s._outputs._views
-        #
-        #
-        #         for name, val in iteritems(in_or_out_views):
-        #             # Only do outputs at that system level
-        #             if len(name.split('.')) - num_parts > 1:
-        #                 continue
-        #             row = '{:{align}{width}}'.format(name, align=self._align, width=max_varname_len)
-        #             idx = name_to_idx_map[name]
-        #             outs = outputs[idx][1]
-        #             self._write_outputs_rows(logger, row, column_names, outs, print_arrays)
-        # ### old stuff end
-
         logger.info('\n')
 
 
