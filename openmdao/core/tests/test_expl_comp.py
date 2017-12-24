@@ -390,7 +390,6 @@ class ExplCompTestCase(unittest.TestCase):
 
         size = 100 # how many items in the array
 
-
         prob = Problem()
         prob.model = Group()
 
@@ -451,7 +450,7 @@ class ExplCompTestCase(unittest.TestCase):
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(8, num_non_empty_lines)
 
-        # Hierarchical
+        # Hierarchical - no print arrays
         stream = cStringIO()
         prob.model.list_outputs(values=True,
                                           units=True,
@@ -471,9 +470,15 @@ class ExplCompTestCase(unittest.TestCase):
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(num_non_empty_lines, 11)
 
-
+        # Need to explicitly set this to make sure all ways of running this test
+        #   result in the same format of the output. When running this test from the
+        #   top level via testflo, the format comes out different than if the test is
+        #   run individually
+        np.set_printoptions(edgeitems=3, infstr='inf',
+            linewidth = 75, nanstr = 'nan', precision = 8,
+            suppress = False, threshold = 1000, formatter = None)
         # logging outputs
-        # out_stream - not hierarchical - extras - no print_arrays
+        # out_stream - not hierarchical - extras - print_arrays
         stream = cStringIO()
         prob.model.list_outputs(values=True,
                                           units=True,

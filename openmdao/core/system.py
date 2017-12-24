@@ -261,7 +261,7 @@ class System(object):
     _column_widths : dict
         widths of the columns
     _align : str
-        The formatting alignment used when writing values into columns
+        The Python formatting alignment used when writing values into columns
     _column_spacing: int
         Number of spaces between columns
     _indent_inc: int
@@ -2534,21 +2534,35 @@ class System(object):
             self._apply_nonlinear()
 
     def list_inputs(self,
-                    hierarchical=True,
                     values=True,
                     units=False,
+                    hierarchical=True,
                     print_arrays=False,
                     out_stream='stdout'):
         """
-        List inputs.
+        Return and optionally log a list of input names and other optional information.
+
+        If the model is parallel, only the local variables are returned to the process.
+        Also optionally logs the information to a user defined output stream. If the model is
+        parallel, the rank 0 process logs information about all variables across all processes.
 
         Parameters
         ----------
         values : bool, optional
-            When True, display/return input values as well as names. Default is True.
+            When True, display/return input values. Default is True.
 
         units : bool, optional
             When True, display/return units. Default is False.
+
+        hierarchical : bool, optional
+            When True, human readable output shows variables in hierarchical format.
+
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+                        The norm is surrounded by parens to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format  is affected
+                        by the values set with numpy.set_printoptions
+            Default is False.
 
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
@@ -2557,7 +2571,7 @@ class System(object):
         Returns
         -------
         list
-            list of of input names and other optional information about those inputs
+            list of input names and other optional information about those inputs
         """
         if self._inputs is None:
             raise RuntimeError("Unable to list inputs until model has been run.")
@@ -2578,21 +2592,24 @@ class System(object):
 
         return inputs
 
-    def list_outputs(self, explicit=True, implicit=True,
-                     hierarchical=True,
+    def list_outputs(self,
+                     explicit=True, implicit=True,
                      values=True,
                      residuals=False,
+                     residuals_tol=None,
                      units=False,
                      shape=False,
                      bounds=False,
                      scaling=False,
+                     hierarchical=True,
                      print_arrays=False,
-                     tol=None,
                      out_stream='stdout'):
         """
-        Return a list outputs and optional metadata for the outputs. Names are always shown.
+        Return and optionally log a list of output names and other optional information.
 
-        Optionally write a human readable output to an output stream.
+        If the model is parallel, only the local variables are returned to the process.
+        Also optionally logs the information to a user defined output stream. If the model is
+        parallel, the rank 0 process logs information about all variables across all processes.
 
         Parameters
         ----------
@@ -2608,6 +2625,11 @@ class System(object):
         residuals : bool, optional
             When True, display/return residual values. Default is False.
 
+        residuals_tol : float, optional
+            If set, limits the output of list_residuals to only variables where
+            the norm of the resids array is greater than the given 'tol'.
+            Default is None.
+
         units : bool, optional
             When True, display/return units. Default is False.
 
@@ -2620,8 +2642,11 @@ class System(object):
         scaling : bool, optional
             When True, display/return scaling (ref, ref0, and res_ref). Default is False.
 
+        hierarchical : bool, optional
+            When True, human readable output shows variables in hierarchical format.
+
         print_arrays : bool, optional
-            When False, in the columnar display, just display  norm of any ndarrays with size > 1.
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
                         The norm is surrounded by parens to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format  is affected
                         by the values set with numpy.set_printoptions
@@ -2630,11 +2655,6 @@ class System(object):
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
-
-        tol : float, optional
-            If set, limits the output of list_residuals to only variables where
-            the norm of the resids array is greater than the given 'tol'.
-            Default is None.
 
         Returns
         -------
@@ -2653,7 +2673,7 @@ class System(object):
         expl_outputs = []
         impl_outputs = []
         for name, val in iteritems(self._outputs._views):
-            if tol and np.linalg.norm(self._residuals._views[name]) < tol:
+            if residuals_tol and np.linalg.norm(self._residuals._views[name]) < residuals_tol:
                 continue
             outs = {}
             if values:
@@ -2696,7 +2716,7 @@ class System(object):
     def _write_outputs(self, in_or_out, comp_type, outputs, hierarchical, print_arrays,
                        out_stream='stdout'):
         """
-        Write formatted output values and residuals to out_stream.
+        Write table of variable names, values, residuals, and metadata to out_stream.
 
         The output values could actually represent input variables.
         In this context, outputs refers to the data that is being logged to an output stream.
@@ -2871,7 +2891,7 @@ class System(object):
 
     def _write_outputs_rows(self, logger, row, column_names, outs, print_arrays):
         """
-        Return the list of vec_names and the vois dict.
+        For one variable, write name, values, residuals, and metadata to out_stream.
 
         Parameters
         ----------

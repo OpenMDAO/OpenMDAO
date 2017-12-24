@@ -716,7 +716,7 @@ class ListFeatureTestCase(unittest.TestCase):
 
         prob.run_model()
 
-        resids = model.list_outputs(tol=0.01, values=False)
+        resids = model.list_outputs(residuals_tol=0.01, values=False)
         self.assertEqual(sorted(resids), [('d2.y2', {})])
 
 
