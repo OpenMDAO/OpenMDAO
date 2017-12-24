@@ -331,31 +331,31 @@ class DepCompTestCase(unittest.TestCase):
 
         # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
-        self.assertEqual(sorted(inputs), [('comp.x', [0.5])])
+        self.assertEqual(sorted(inputs), [('comp.x', {'value':[0.5]})])
 
         # list explicit outputs
         outputs = sorted(prob.model.list_outputs(implicit=False, out_stream=None))
         self.assertEqual(len(outputs), 2)
         self.assertEqual(outputs[0][0], 'comp.y')
-        assert_rel_error(self, outputs[0][1], 5.8333333, 1e-6)
+        assert_rel_error(self, outputs[0][1]['value'], 5.8333333, 1e-6)
         self.assertEqual(outputs[1][0], 'p1.x')
-        assert_rel_error(self, outputs[1][1], 0.5, 1e-6)
+        assert_rel_error(self, outputs[1][1]['value'], 0.5, 1e-6)
 
         # list states
         states = prob.model.list_outputs(explicit=False, out_stream=None)
         self.assertEqual(len(states), 1)
         self.assertEqual(states[0][0], 'comp.z')
-        assert_rel_error(self, states[0][1], 2.6666667, 1e-6)
+        assert_rel_error(self, states[0][1]['value'], 2.6666667, 1e-6)
 
         # list residuals
-        resids = sorted(prob.model.list_residuals(out_stream=None))
+        resids = sorted(prob.model.list_outputs(residuals=True, out_stream=None))
         self.assertEqual(len(resids), 3)
         self.assertEqual(resids[0][0], 'comp.y')
-        assert_rel_error(self, resids[0][1], 0., 1e-6)
+        assert_rel_error(self, resids[0][1]['resids'], 0., 1e-6)
         self.assertEqual(resids[1][0], 'comp.z')
-        assert_rel_error(self, resids[1][1], 0., 1e-6)
+        assert_rel_error(self, resids[1][1]['resids'], 0., 1e-6)
         self.assertEqual(resids[2][0], 'p1.x')
-        assert_rel_error(self, resids[2][1], 0., 1e-6)
+        assert_rel_error(self, resids[2][1]['resids'], 0., 1e-6)
 
     def test_simple_implicit_self_solve(self):
 

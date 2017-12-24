@@ -172,7 +172,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
         prob.setup(vector_class=PETScVector, check=False)
 
-        prob['x'] = np.range(size)
+        prob['x'] = np.ones(size)
 
         t0, t1 = run_driver(prob)
         prob.cleanup()

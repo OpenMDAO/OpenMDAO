@@ -352,7 +352,7 @@ class TestConnectionsPromoted(unittest.TestCase):
         self.assertEqual(C4._inputs['x'], 999.)
 
     def test_unit_conv_message(self):
-        # raise unittest.SkipTest("no units yet")
+        raise unittest.SkipTest("no units yet")
         prob = Problem(model=Group())
         root = prob.model
 

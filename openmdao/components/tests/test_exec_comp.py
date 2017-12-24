@@ -620,11 +620,11 @@ class TestExecComp(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        outputs = prob.model.list_outputs(implicit=False, values=True, out_stream=None)
+        outputs = prob.model.list_outputs(implicit=False, values=True, units=True, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('comp.z', 'inch', [24.]),
-            ('p1.x', 'inch', [12.]),
-            ('p2.y', 'ft', [1.]),
+            ('comp.z', {'value':[24.], 'units': 'inch'}),
+            ('p1.x', {'value':[12.], 'units': 'inch'}),
+            ('p2.y', {'value':[1.], 'units': 'ft'}),
         ])
 
         assert_rel_error(self, prob['comp.z'], 24.0, 0.00001)
