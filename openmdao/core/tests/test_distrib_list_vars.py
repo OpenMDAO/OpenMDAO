@@ -87,13 +87,6 @@ class DistributedAdderTest(unittest.TestCase):
 
     def test_distributed_array_list_vars(self):
 
-        # import pydevd
-        # from openmdao.utils.mpi import MPI
-        # if MPI.COMM_WORLD.rank:
-        #     pydevd.settrace('localhost', port=9876, stdoutToServer=True, stderrToServer=True)
-        # else:
-        #     pydevd.settrace('localhost', port=9877, stdoutToServer=True, stderrToServer=True)
-
         size = 100 # how many items in the array
 
         prob = Problem()
@@ -168,12 +161,6 @@ class DistributedAdderTest(unittest.TestCase):
 
 
     def test_distributed_list_vars(self):
-        # import pydevd
-        # from openmdao.utils.mpi import MPI
-        # if MPI.COMM_WORLD.rank:
-        #     pydevd.settrace('localhost', port=9876, stdoutToServer=True, stderrToServer=True)
-        # else:
-        #     pydevd.settrace('localhost', port=9877, stdoutToServer=True, stderrToServer=True)
 
         from openmdao.utils.general_utils import set_pyoptsparse_opt
         from openmdao.utils.mpi import MPI

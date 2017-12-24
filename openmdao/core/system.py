@@ -375,6 +375,24 @@ class System(object):
         self._has_resid_scaling = False
         self._has_input_scaling = False
 
+        # Formatting parameters for _write_outputs and _write_output_row methods
+        #     that are used by list_inputs and list_outputs methods
+        self._column_widths = {
+            'value': 20,
+            'resids': 20,
+            'units': 10,
+            'shape': 10,
+            'lower': 20,
+            'upper': 20,
+            'ref': 20,
+            'ref0': 20,
+            'res_ref': 20,
+        }
+        self._align = ''
+        self._column_spacing = 2
+        self._indent_inc = 2
+
+
     def _check_reconf(self):
         """
         Check if this systems wants to reconfigure and if so, perform the reconfiguration.
@@ -2505,46 +2523,17 @@ class System(object):
         if self._inputs is None:
             raise RuntimeError("Unable to list inputs until model has been run.")
 
-
-        # meta = self._var_allprocs_abs2meta['output']
-        #
-        # # now set global sizes and shapes into metadata for distributed outputs
-        # sizes = self._var_sizes['nonlinear']['output']
-        # for idx, abs_name in enumerate(self._var_allprocs_abs_names['output']):
-        #     mymeta = meta[abs_name]
-        #     local_shape = mymeta['shape']
-        #     if not mymeta['distributed']:
-
-
-
-
-        # qqq the metadata is only local
-        #  _var_allprocs_abs2meta has all the variables but only units, shape, and size
         meta = self._var_abs2meta
         inputs = []
 
-
-        #
-        #
-        # if MPI:
-        #     all_vars = self.comm.gather(self._inputs._views, root=0)
-        #     print(all_vars)
-
-
-
-
-
         for name, val in iteritems(self._inputs._views): # This is only over the locals
-
             outs = {}
             if values:
                 outs['value'] = val
-                # out.append(val)
             if units:
                 outs['units'] = meta['input'][name]['units']
             inputs.append((name, outs))
 
-        # if MPI and MPI.COMM_WORLD.rank == 0: # only the root process should print
         if out_stream:
             self._write_outputs('input', None, inputs, hierarchical, print_arrays, out_stream)
 
@@ -2658,6 +2647,8 @@ class System(object):
     def _write_outputs(self, in_or_out, comp_type, outputs, hierarchical, print_arrays, out_stream='stdout'):
         """
         Write formatted output values and residuals to out_stream.
+        The output values could actually represent input variables.
+        In this context, outputs refers to the data that is being logged to an output stream.
 
         Parameters
         ----------
@@ -2665,7 +2656,7 @@ class System(object):
             the type of component with the output values.
 
         outputs : list
-            list of (name, dict of vals or metadata) tuples.
+            list of (name, dict of vals and metadata) tuples.
 
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
@@ -2682,8 +2673,6 @@ class System(object):
         for name, vals in outputs:
             dict_of_outputs[name] = vals
 
-        # qqq TODO really need to change the name of outputs!
-
         # If parallel, gather up the outputs. All procs must call this
         if MPI:
             all_dict_of_outputs = self.comm.gather(dict_of_outputs, root=0) # returns a list, one per proc
@@ -2693,11 +2682,11 @@ class System(object):
 
         # If MPI, and on rank 0, need to gather up all the variables
         if MPI: # rest of this only done on rank 0
-            merged_dict_of_outputs = all_dict_of_outputs[0] # start with rank 0
-            for dict_of_outputs in all_dict_of_outputs[1:]: # in order of rank, go through the rest of the procs
-                for name, vals in iteritems(dict_of_outputs):
-                    if name not in merged_dict_of_outputs: # If not in the merged dict, add it
-                        merged_dict_of_outputs[name] = dict_of_outputs[name]
+            dict_of_outputs = all_dict_of_outputs[0] # start with rank 0
+            for proc_outputs in all_dict_of_outputs[1:]: # in order of rank, go through the rest of the procs
+                for name, vals in iteritems(proc_outputs):
+                    if name not in dict_of_outputs: # If not in the merged dict, add it
+                        dict_of_outputs[name] = proc_outputs[name]
                     else: # If in there already, only need to deal with it if it is a distributed array
                         # Checking to see if it is distributed depends on if it is an input or output
                         if in_or_out == 'input':
@@ -2705,24 +2694,20 @@ class System(object):
                         else:
                             is_distributed = meta[name]['distributed']
                         if is_distributed:
-                            # qqq TODO no support for > 1D arrays
+                            # TODO no support for > 1D arrays
                             #   meta.src_indices has the info we need to piece together arrays
-                            if 'value' in merged_dict_of_outputs[name]:
-                                merged_dict_of_outputs[name]['value'] = \
-                                    np.append(merged_dict_of_outputs[name]['value'],
-                                                                                      dict_of_outputs[name]['value'])
-                            if 'shape' in merged_dict_of_outputs[name]:
+                            if 'value' in dict_of_outputs[name]:
+                                dict_of_outputs[name]['value'] = \
+                                    np.append(dict_of_outputs[name]['value'],
+                                              proc_outputs[name]['value'])
+                            if 'shape' in dict_of_outputs[name]:
                                 # TODO might want to use allprocs_abs2meta_out[name]['global_shape']
-                                merged_dict_of_outputs[name]['shape'] =  merged_dict_of_outputs[name]['value'].shape
-                            if 'resids' in merged_dict_of_outputs[name]:
-                                merged_dict_of_outputs[name]['resids'] = \
-                                    np.append(merged_dict_of_outputs[name]['resids'], dict_of_outputs[name]['resids'])
+                                dict_of_outputs[name]['shape'] =  dict_of_outputs[name]['value'].shape
+                            if 'resids' in dict_of_outputs[name]:
+                                dict_of_outputs[name]['resids'] = \
+                                    np.append(dict_of_outputs[name]['resids'], proc_outputs[name]['resids'])
 
-        else: # If not MPI
-            merged_dict_of_outputs = dict_of_outputs
-            # qqq TODO change this so that for the rest of the method, we use dict_of_outputs
-
-        count = len(merged_dict_of_outputs)
+        count = len(dict_of_outputs)
 
         # Write header
         logger_name = 'list_inputs' if in_or_out == 'input' else 'list_outputs'
@@ -2739,52 +2724,35 @@ class System(object):
         if not count:
             return
 
-        # Need an ordered list of possible values for the two cases: inputs and outputs
-        #  So that we do the column output correctly
+        # Need an ordered list of possible output values for the two cases: inputs and outputs
+        #  so that we do the column output in the correct order
         if in_or_out == 'input':
             out_types = ('value', 'units',)
         else:
             out_types = ('value', 'resids', 'units', 'shape', 'lower', 'upper', 'ref', 'ref0', 'res_ref')
         # Figure out which columns will be displayed
         # Look at any one of the outputs, they should all be the same
-        outs = merged_dict_of_outputs[list(merged_dict_of_outputs)[0]]
+        outputs = dict_of_outputs[list(dict_of_outputs)[0]]
         column_names = []
         for out_type in out_types:
-            if out_type in outs:
+            if out_type in outputs:
                 column_names.append(out_type)
 
-        # qqq TODO put these in a better spot?
-        # constants
-        self._column_widths = {
-            'value': 20,
-            'resids': 20,
-            'units': 10,
-            'shape': 10,
-            'lower': 20,
-            'upper': 20,
-            'ref': 20,
-            'ref0': 20,
-            'res_ref': 20,
-        }
-        self._align = ''
-        self._column_spacing = 2
-        self._indent_inc = 2
         top_level_system_name = 'top'
 
-        # Find longest first column
-        # qqq TODO need to update this using John's var list
+        # Find with width of the first column in the table
+        #    Need to look through all the possible varnames to find the max width
         max_varname_len = len(top_level_system_name)
         if hierarchical:
-            for name, outs in iteritems(merged_dict_of_outputs):
-                # This could be more efficient since there will be duplication here
+            for name, outs in iteritems(dict_of_outputs):
                 for i, name_part in enumerate(name.split('.')):
                     total_len = (i + 1) * self._indent_inc + len(name_part)
                     max_varname_len = max(max_varname_len, total_len)
         else:
-            for name, outs in iteritems(merged_dict_of_outputs):
+            for name, outs in iteritems(dict_of_outputs):
                 max_varname_len = max(max_varname_len,len(name))
 
-        # Common to both hierarchical and non-hierarchical
+        # Write out the column headers. Code is common to both hierarchical and non-hierarchical
         column_header = '{:{align}{width}}'.format('varname', align=self._align, width=max_varname_len)
         column_dashes = max_varname_len * '-'
         for column_name in column_names:
@@ -2794,15 +2762,21 @@ class System(object):
         logger.info(column_header)
         logger.info(column_dashes)
 
+        # Write out the variable names and optional values and metadata
         if hierarchical:
             logger.info(top_level_system_name)
 
             cur_sys_names = []
             # _var_allprocs_abs_names has all the vars across all procs in execution order
+            #   But not all the values need to be written since, at least for output vars,
+            #      the output var lists are divided into explicit and implicit
             for varname in self._var_allprocs_abs_names[in_or_out]:
-                if varname not in merged_dict_of_outputs:
+                if varname not in dict_of_outputs:
                     continue
 
+                # For hierarchical, need to display system levels in the rows above the
+                #   actual row containing the var name and values. Want to make use
+                #   of the hierarchies that have been written about this.
                 existing_sys_names = []
                 varname_sys_names = varname.split('.')[:-1]
                 for i, sys_name in enumerate(varname_sys_names):
@@ -2811,19 +2785,21 @@ class System(object):
                     else:
                         existing_sys_names = cur_sys_names[:i+1]
 
+                # What parts of the hierarchy for this varname need to be written that
+                #   were not already written above this
                 remaining_sys_path_parts = varname_sys_names[len(existing_sys_names):]
 
+                # Write the Systems in the var name path
                 indent = len(existing_sys_names) * self._indent_inc
                 for i, sys_name in enumerate(remaining_sys_path_parts):
                     num_parts = len(existing_sys_names) + i + 1
-                    system_indent = self._indent_inc * num_parts # qqq need this ? Todo
                     indent += self._indent_inc
                     logger.info(indent * ' ' + sys_name)
                 cur_sys_names = varname_sys_names
 
                 indent += self._indent_inc
                 row = '{:{align}{width}}'.format(indent * ' ' + varname.split('.')[-1], align=self._align, width=max_varname_len)
-                self._write_outputs_rows(logger, row, column_names, merged_dict_of_outputs[varname], print_arrays)
+                self._write_outputs_rows(logger, row, column_names, dict_of_outputs[varname], print_arrays)
         else:
             for name in self._var_allprocs_abs_names[in_or_out]:
                 if name in dict_of_outputs:
@@ -2833,7 +2809,7 @@ class System(object):
 
     def _write_outputs_rows(self, logger, row, column_names, outs, print_arrays):
         """
-        Return the list of vec_names and the vois dict. qqq TODO
+        Return the list of vec_names and the vois dict.
 
         Parameters
         ----------
@@ -2847,26 +2823,22 @@ class System(object):
 
         """
         left_column_width = len(row)
-        have_array_values = []
+        have_array_values = [] # keep track of which values are arrays
         for column_name in column_names:
             row += self._column_spacing * ' '
             if isinstance(outs[column_name], np.ndarray) and outs[column_name].size > 1:
-                if print_arrays:
-                    have_array_values.append(column_name)
+                have_array_values.append(column_name)
                 out = '({})'.format(str(np.linalg.norm(outs[column_name])))
             else:
                 out = str(outs[column_name])
             row += '{:{align}{width}}'.format(out, align=self._align, width=self._column_widths[column_name])
         logger.info(row)
-        for column_name in have_array_values:
-            logger.info("{}  {}:".format(left_column_width * ' ', column_name))
-            out_str = str(outs[column_name])
-            indented_lines = [(left_column_width + self._indent_inc) * ' ' + s for s in out_str.splitlines()]
-            logger.info('\n'.join(indented_lines))
-            # logger.info('{}{}'.format((left_column_width + self._indent_inc) * ' ', outs[column_name]))
-
-
-
+        if print_arrays:
+            for column_name in have_array_values:
+                logger.info("{}  {}:".format(left_column_width * ' ', column_name))
+                out_str = str(outs[column_name])
+                indented_lines = [(left_column_width + self._indent_inc) * ' ' + s for s in out_str.splitlines()]
+                logger.info('\n'.join(indented_lines))
 
 
     def run_solve_nonlinear(self):
