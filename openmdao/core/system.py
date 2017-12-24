@@ -2609,65 +2609,8 @@ class System(object):
         if self._outputs is None:
             raise RuntimeError("Unable to list outputs until model has been run.")
 
-        # Make use of _subsystems_myproc to get the execution order !!!!!
-        eo = self._subsystems_myproc
-
-        # FROM Bret TODO
-        # yeah.That will be missing data
-        # for remote vars when running under MPI, but _var_allprocs_abs2meta, which is the
-        # version that is allgathered across all procs, is missing certain metadata like src_indices
-        # ( and probably bounds and scaling), so I would go with _var_abs2meta.I guess you could do your
-        # own gathering in the MPI case if you needed to.
-
-        meta = self._var_abs2meta
-
-
-
-        # allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
-        # for abs_in, abs_out in iteritems(global_abs_in2out):
-        #     # First, check that this system owns both the input and output.
-        #     if abs_in[:len(pathname)] == pathname and abs_out[:len(pathname)] == pathname:
-        #         # Second, check that they are in different subsystems of this system.
-        #         out_subsys = abs_out[path_len:].split('.', 1)[0]
-        #         in_subsys = abs_in[path_len:].split('.', 1)[0]
-        #         if out_subsys != in_subsys:
-        #             abs_in2out[abs_in] = abs_out
-        #
-        #     # if connected output has scaling then we need input scaling
-        #     if not self._has_input_scaling:
-        #         out_units = allprocs_abs2meta_out[abs_out]['units']
-        #         in_units = allprocs_abs2meta_in[abs_in]['units']
-        #
-
-        #     _var_allprocs_abs2meta: {'input': dict, 'output': dict}
-        #     Dictionary
-        #     mapping
-        #     absolute
-        #     names
-        #     to
-        #     metadata
-        #     dictionaries
-        #     for allprocs variables.
-        #         The
-        #         keys
-        #         are
-        #     ('units', 'shape', 'var_set')
-        #     for inputs and
-        #         ('units', 'shape', 'var_set', 'ref', 'ref0')
-        #         for outputs.
-        #
-        # _var_abs2meta: {'input': dict, 'output': dict}
-        # Dictionary
-        # mapping
-        # absolute
-        # names
-        # to
-        # metadata
-        # dictionaries
-        # for myproc variables.
-
-        # hierarchical !
-
+        # Only gathering up values and metadata from this proc, if MPI
+        meta = self._var_abs2meta # This only includes metadata for this process.
         states = self._list_states()
 
         # Go though the hierarchy. Printing Systems
@@ -2696,10 +2639,6 @@ class System(object):
             else:
                 expl_outputs.append((name,outs))
 
-
-
-
-        # if MPI and MPI.COMM_WORLD.rank == 0: # only the root process should print
         if out_stream:
             if explicit:
                 self._write_outputs('output', 'Explicit', expl_outputs, hierarchical, print_arrays, out_stream)
@@ -2735,69 +2674,55 @@ class System(object):
         if out_stream is None:
             return
 
-        # If parallel, gather up vars and metadata
-        # If MPI, and on rank 0, need to gather up all the variables
-        #   even those not local to rank 0
-
         # Only local metadata but the most complete
-        meta_in_or_out = self._var_abs2meta[in_or_out]
+        meta = self._var_abs2meta[in_or_out]
 
         # Make a dict of outputs. Makes it easier to work with in this method
         dict_of_outputs = OrderedDict()
         for name, vals in outputs:
             dict_of_outputs[name] = vals
 
-        # If parallel, gather up the outputs qqq TODO really need to change the name of outputs!
+        # qqq TODO really need to change the name of outputs!
+
+        # If parallel, gather up the outputs. All procs must call this
         if MPI:
             all_dict_of_outputs = self.comm.gather(dict_of_outputs, root=0) # returns a list, one per proc
-            # all_meta = self.comm.gather(meta, root=0) # returns a list, one per proc qqq TODO Why ??
 
-        if MPI and MPI.COMM_WORLD.rank > 0:  # only the root process should print
+        if MPI and MPI.COMM_WORLD.rank > 0:  # If MPI, only the root process should print
             return
 
+        # If MPI, and on rank 0, need to gather up all the variables
         if MPI: # rest of this only done on rank 0
-            merged_dict_of_outputs = all_dict_of_outputs[0]
-            for d in all_dict_of_outputs[1:]: # in order of rank
-
-                # meta.src_indices has the info we need to decide how to piece together distributed arrays
-                # On rank 0, for the example, src_indices for plus.x is 0..49. On rank 1, it is 50..99
-                # each d is an OrderedDict of names and vals and meta
-
-                # should look at this
-                # if in_or_out == 'inputs':
-                #     out_shape = allprocs_abs2meta_out['plus.x']['global_shape']
-
-                for name, vals in iteritems(d):
-                    if name not in merged_dict_of_outputs:
-                        merged_dict_of_outputs[name] = d[name]
-                    else:
+            merged_dict_of_outputs = all_dict_of_outputs[0] # start with rank 0
+            for dict_of_outputs in all_dict_of_outputs[1:]: # in order of rank, go through the rest of the procs
+                for name, vals in iteritems(dict_of_outputs):
+                    if name not in merged_dict_of_outputs: # If not in the merged dict, add it
+                        merged_dict_of_outputs[name] = dict_of_outputs[name]
+                    else: # If in there already, only need to deal with it if it is a distributed array
+                        # Checking to see if it is distributed depends on if it is an input or output
                         if in_or_out == 'input':
-                            is_distributed = meta_in_or_out[name]['src_indices'] is not None
+                            is_distributed = meta[name]['src_indices'] is not None
                         else:
-                            is_distributed = meta_in_or_out[name]['distributed']
+                            is_distributed = meta[name]['distributed']
                         if is_distributed:
-                            # qqq TODO only do this if needed
+                            # qqq TODO no support for > 1D arrays
+                            #   meta.src_indices has the info we need to piece together arrays
                             if 'value' in merged_dict_of_outputs[name]:
-                                merged_dict_of_outputs[name]['value'] = np.append(merged_dict_of_outputs[name]['value'], d[name]['value'])
+                                merged_dict_of_outputs[name]['value'] = \
+                                    np.append(merged_dict_of_outputs[name]['value'],
+                                                                                      dict_of_outputs[name]['value'])
                             if 'shape' in merged_dict_of_outputs[name]:
+                                # TODO might want to use allprocs_abs2meta_out[name]['global_shape']
                                 merged_dict_of_outputs[name]['shape'] =  merged_dict_of_outputs[name]['value'].shape
-                            if in_or_out == 'output':
-                                if 'resids' in merged_dict_of_outputs[name]:
-                                    merged_dict_of_outputs[name]['resids'] = np.append(merged_dict_of_outputs[name]['resids'], d[name]['resids'])
+                            if 'resids' in merged_dict_of_outputs[name]:
+                                merged_dict_of_outputs[name]['resids'] = \
+                                    np.append(merged_dict_of_outputs[name]['resids'], dict_of_outputs[name]['resids'])
 
-            # make them back into a list of tuples
-            outputs = []
-            if in_or_out == 'input':
-                allprocs_abs_names = self._var_allprocs_abs_names['input']
-            else:
-                allprocs_abs_names = self._var_allprocs_abs_names['output']
-            for var_name in allprocs_abs_names:
-                if var_name in merged_dict_of_outputs:
-                    outputs.append((var_name, merged_dict_of_outputs[var_name]))
         else: # If not MPI
             merged_dict_of_outputs = dict_of_outputs
+            # qqq TODO change this so that for the rest of the method, we use dict_of_outputs
 
-        count = len(outputs)
+        count = len(merged_dict_of_outputs)
 
         # Write header
         logger_name = 'list_inputs' if in_or_out == 'input' else 'list_outputs'
@@ -2821,12 +2746,14 @@ class System(object):
         else:
             out_types = ('value', 'resids', 'units', 'shape', 'lower', 'upper', 'ref', 'ref0', 'res_ref')
         # Figure out which columns will be displayed
-        outs = outputs[0][1]
+        # Look at any one of the outputs, they should all be the same
+        outs = merged_dict_of_outputs[list(merged_dict_of_outputs)[0]]
         column_names = []
         for out_type in out_types:
             if out_type in outs:
                 column_names.append(out_type)
 
+        # qqq TODO put these in a better spot?
         # constants
         self._column_widths = {
             'value': 20,
@@ -2839,7 +2766,7 @@ class System(object):
             'ref0': 20,
             'res_ref': 20,
         }
-        self._align = '' # qqq move to init
+        self._align = ''
         self._column_spacing = 2
         self._indent_inc = 2
         top_level_system_name = 'top'
@@ -2848,13 +2775,13 @@ class System(object):
         # qqq TODO need to update this using John's var list
         max_varname_len = len(top_level_system_name)
         if hierarchical:
-            for name, outs in outputs:
+            for name, outs in iteritems(merged_dict_of_outputs):
                 # This could be more efficient since there will be duplication here
                 for i, name_part in enumerate(name.split('.')):
                     total_len = (i + 1) * self._indent_inc + len(name_part)
                     max_varname_len = max(max_varname_len, total_len)
         else:
-            for name, outs in outputs:
+            for name, outs in iteritems(merged_dict_of_outputs):
                 max_varname_len = max(max_varname_len,len(name))
 
         # Common to both hierarchical and non-hierarchical
@@ -2871,6 +2798,7 @@ class System(object):
             logger.info(top_level_system_name)
 
             cur_sys_names = []
+            # _var_allprocs_abs_names has all the vars across all procs in execution order
             for varname in self._var_allprocs_abs_names[in_or_out]:
                 if varname not in merged_dict_of_outputs:
                     continue
@@ -2888,7 +2816,7 @@ class System(object):
                 indent = len(existing_sys_names) * self._indent_inc
                 for i, sys_name in enumerate(remaining_sys_path_parts):
                     num_parts = len(existing_sys_names) + i + 1
-                    system_indent = self._indent_inc * num_parts
+                    system_indent = self._indent_inc * num_parts # qqq need this ? Todo
                     indent += self._indent_inc
                     logger.info(indent * ' ' + sys_name)
                 cur_sys_names = varname_sys_names
