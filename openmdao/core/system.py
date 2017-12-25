@@ -2723,11 +2723,24 @@ class System(object):
 
         Parameters
         ----------
+        in_or_out : str, 'input' or 'output'
+            indicates whether the values passed in are from inputs or output variables.
+
         comp_type : str, 'Explicit' or 'Implicit'
             the type of component with the output values.
 
         outputs : list
             list of (name, dict of vals and metadata) tuples.
+
+        hierarchical : bool
+            When True, human readable output shows variables in hierarchical format.
+
+        print_arrays : bool
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+                        The norm is surrounded by parens to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format  is affected
+                        by the values set with numpy.set_printoptions
+            Default is False.
 
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
@@ -2889,37 +2902,50 @@ class System(object):
                                              print_arrays)
         logger.info('\n')
 
-    def _write_outputs_rows(self, logger, row, column_names, outs, print_arrays):
+    def _write_outputs_rows(self, logger, row, column_names, dict_of_outputs, print_arrays):
         """
         For one variable, write name, values, residuals, and metadata to out_stream.
 
         Parameters
         ----------
-        logger : str
-            Derivative direction, either 'fwd' or 'rev'.
-        row : list of str or None
-            The list of names of vectors. Depends on the value of mode.
-        column_names : dict
-            Dictionary of either design vars or responses, depending on the value
-            of mode.
+        logger : Logger
+            Logger to which the output will be written.
+
+        row : str
+            The string containing the contents of the beginning of this row output.
+            Contains the name of the System or varname, possibley indented to show hierarchy.
+
+        column_names : list of str
+            Indicates which columns will be written in this row.
+
+        dict_of_outputs : dict
+            Contains the values to be written in this row. Keys are columns names.
+
+        print_arrays : bool
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+                        The norm is surrounded by parens to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format  is affected
+                        by the values set with numpy.set_printoptions
+            Default is False.
 
         """
         left_column_width = len(row)
         have_array_values = []  # keep track of which values are arrays
         for column_name in column_names:
             row += self._column_spacing * ' '
-            if isinstance(outs[column_name], np.ndarray) and outs[column_name].size > 1:
+            if isinstance(dict_of_outputs[column_name], np.ndarray) and \
+                    dict_of_outputs[column_name].size > 1:
                 have_array_values.append(column_name)
-                out = '({})'.format(str(np.linalg.norm(outs[column_name])))
+                out = '({})'.format(str(np.linalg.norm(dict_of_outputs[column_name])))
             else:
-                out = str(outs[column_name])
+                out = str(dict_of_outputs[column_name])
             row += '{:{align}{width}}'.format(out, align=self._align,
                                               width=self._column_widths[column_name])
         logger.info(row)
         if print_arrays:
             for column_name in have_array_values:
                 logger.info("{}  {}:".format(left_column_width * ' ', column_name))
-                out_str = str(outs[column_name])
+                out_str = str(dict_of_outputs[column_name])
                 indented_lines = [(left_column_width + self._indent_inc) * ' ' +
                                   s for s in out_str.splitlines()]
                 logger.info('\n'.join(indented_lines))
