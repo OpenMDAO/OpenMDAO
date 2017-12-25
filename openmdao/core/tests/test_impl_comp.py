@@ -552,7 +552,7 @@ class ListFeatureTestCase(unittest.TestCase):
     def test_list_return_value(self):
         # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(inputs, [
             ('sub.comp2.a', {'value': [1.]}),
             ('sub.comp2.b', {'value': [-4.]}),
             ('sub.comp2.c', {'value': [3.]}),
@@ -563,7 +563,7 @@ class ListFeatureTestCase(unittest.TestCase):
 
         # list explicit outputs
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(outputs, [
             ('comp1.a', {'value': [1.]}),
             ('comp1.b', {'value': [-4.]}),
             ('comp1.c', {'value': [3.]})
@@ -571,9 +571,8 @@ class ListFeatureTestCase(unittest.TestCase):
 
 
     def test_list_no_values(self):
-        # list inputs
         inputs = prob.model.list_inputs(values=False)
-        self.assertEqual(sorted([n[0] for n in inputs]), [
+        self.assertEqual([n[0] for n in inputs], [
             'sub.comp2.a',
             'sub.comp2.b',
             'sub.comp2.c',
@@ -582,9 +581,9 @@ class ListFeatureTestCase(unittest.TestCase):
             'sub.comp3.c'
         ])
 
-        # list explicit outputs
+        # list only explicit outputs
         outputs = prob.model.list_outputs(implicit=False, values=False)
-        self.assertEqual(sorted([n[0] for n in outputs]), [
+        self.assertEqual([n[0] for n in outputs], [
             'comp1.a',
             'comp1.b',
             'comp1.c'
@@ -716,8 +715,10 @@ class ListFeatureTestCase(unittest.TestCase):
 
         prob.run_model()
 
-        resids = model.list_outputs(residuals_tol=0.01, values=False)
-        self.assertEqual(sorted(resids), [('d2.y2', {})])
+        outputs = model.list_outputs(residuals_tol=0.01, residuals=True)
+        self.assertEqual(outputs[0][0], 'd2.y2')
+        assert_rel_error(self, outputs[0][1]['value'], 0.23238469, 1e-7)
+        assert_rel_error(self, outputs[0][1]['resids'], 0.01677863, 1e-7)
 
 
 if __name__ == '__main__':

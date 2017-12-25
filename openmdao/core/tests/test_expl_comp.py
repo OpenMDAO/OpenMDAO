@@ -178,7 +178,7 @@ class ExplCompTestCase(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        ###### list_inputs tests #####
+        # list_inputs tests
         # Cannot do exact equality here because the units cause comp.y to be slightly different than 12.0
         stream = cStringIO()
         inputs = prob.model.list_inputs(units=True, out_stream=stream)
@@ -203,7 +203,7 @@ class ExplCompTestCase(unittest.TestCase):
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(8,num_non_empty_lines)
 
-        ###### list_outputs tests #####
+        # list_outputs tests
 
         # list outputs for implicit comps - should get none
         outputs = prob.model.list_outputs(implicit=True, explicit=False, out_stream=None)
@@ -255,6 +255,65 @@ class ExplCompTestCase(unittest.TestCase):
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(9,num_non_empty_lines)
 
+    def test_for_feature_docs_list_vars_options(self):
+
+        from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+
+        prob = Problem()
+        prob.model = model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 12.0,
+                                               lower=1.0, upper=100.0,
+                                               ref = 1.1, ref0 = 2.1,
+                                               units='inch',
+                                               ))
+        model.add_subsystem('p2', IndepVarComp('y', 1.0,
+                                               lower=2.0, upper=200.0,
+                                               ref = 1.2, res_ref = 2.2,
+                                               units='ft',
+                                               ))
+        model.add_subsystem('comp', ExecComp('z=x+y',
+                                             x={'value': 0.0, 'units':'inch'},
+                                             y={'value': 0.0, 'units': 'inch'},
+                                             z={'value': 0.0, 'units': 'inch'}))
+        model.connect('p1.x', 'comp.x')
+        model.connect('p2.y', 'comp.y')
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        inputs = prob.model.list_inputs(units=True)
+        print(inputs[0])
+
+        outputs = prob.model.list_outputs(values=True,
+                                          units=True,
+                                          shape=True,
+                                          bounds=True,
+                                          residuals=True,
+                                          scaling=True,
+                                          hierarchical=False,
+                                          print_arrays=False
+                                          )
+        self.assertEqual(outputs, [
+            ('p1.x', {'value': [ 12.], 'resids': [ 0.], 'units': 'inch', 'shape': (1,),
+                      'lower': [ 1.], 'upper': [ 100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1} ),
+            ('p2.y', {'value': [ 1.], 'resids': [ 0.], 'units': 'ft', 'shape': (1,),
+                      'lower': [ 2.], 'upper': [ 200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
+            ('comp.z', {'value': [ 24.], 'resids': [ 0.], 'units': 'inch', 'shape': (1,),
+                        'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0} ),
+            ]
+            )
+
+        outputs = prob.model.list_outputs(values=True,
+                                          units=True,
+                                          shape=True,
+                                          bounds=True,
+                                          residuals=True,
+                                          scaling=True,
+                                          hierarchical=True,
+                                          print_arrays=False
+                                          )
 
     def test_hierarchy_list_vars_options(self):
 
@@ -522,6 +581,69 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('    y'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(num_non_empty_lines, 40)
+
+    def test_for_docs_array_list_vars_options(self):
+
+        import numpy as np
+        from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
+
+        class ArrayAdder(ExplicitComponent):
+            """
+            Just a simple component that has array inputs and outputs
+            """
+
+            def __init__(self, size):
+                super(ArrayAdder, self).__init__()
+                self.size = size
+
+            def setup(self):
+                self.add_input('x', val=np.zeros(self.size), units='inch')
+                self.add_output('y', val=np.zeros(self.size), units='ft')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x'] + 10.0
+
+        size = 30 # how many items in the array
+
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size), units='inch'),
+                                 promotes=['x'])
+        prob.model.add_subsystem('mult', ArrayAdder(size), promotes=['x', 'y'])
+        
+        prob.setup(check=False)
+        prob['x'] = np.ones(size)
+        prob.run_driver()
+
+        prob.model.list_inputs(values=True,
+                                          units=True,
+                                          hierarchical=True,
+                                          print_arrays=True
+                                          )
+
+        np.set_printoptions(edgeitems=3, infstr='inf',
+            linewidth = 75, nanstr = 'nan', precision = 8,
+            suppress = False, threshold = 1000, formatter = None)
+
+        prob.model.list_outputs(values=True,
+                                          units=True,
+                                          shape=True,
+                                          bounds=True,
+                                          residuals=True,
+                                          scaling=True,
+                                          hierarchical=False,
+                                          print_arrays=True
+                                          )
+
+        prob.model.list_outputs(values=True,
+                                          units=True,
+                                          shape=True,
+                                          bounds=True,
+                                          residuals=True,
+                                          scaling=True,
+                                          hierarchical=True,
+                                          print_arrays=True
+                                          )
 
 
 

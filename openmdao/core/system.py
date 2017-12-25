@@ -2559,8 +2559,8 @@ class System(object):
 
         print_arrays : bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
-                        The norm is surrounded by parens to indicate that it is a norm.
-            When True, also display full values of the ndarray below the row. Format  is affected
+                        The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
                         by the values set with numpy.set_printoptions
             Default is False.
 
@@ -2627,7 +2627,7 @@ class System(object):
 
         residuals_tol : float, optional
             If set, limits the output of list_residuals to only variables where
-            the norm of the resids array is greater than the given 'tol'.
+            the norm of the resids array is greater than the given 'residuals_tol'.
             Default is None.
 
         units : bool, optional
@@ -2647,7 +2647,7 @@ class System(object):
 
         print_arrays : bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
-                        The norm is surrounded by parens to indicate that it is a norm.
+                        The norm is surrounded by vertical bars to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format  is affected
                         by the values set with numpy.set_printoptions
             Default is False.
@@ -2737,7 +2737,7 @@ class System(object):
 
         print_arrays : bool
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
-                        The norm is surrounded by parens to indicate that it is a norm.
+                        The norm is surrounded by vertical bars to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format  is affected
                         by the values set with numpy.set_printoptions
             Default is False.
@@ -2923,7 +2923,7 @@ class System(object):
 
         print_arrays : bool
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
-                        The norm is surrounded by parens to indicate that it is a norm.
+                        The norm is surrounded by vertical bars to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format  is affected
                         by the values set with numpy.set_printoptions
             Default is False.
@@ -2936,7 +2936,7 @@ class System(object):
             if isinstance(dict_of_outputs[column_name], np.ndarray) and \
                     dict_of_outputs[column_name].size > 1:
                 have_array_values.append(column_name)
-                out = '({})'.format(str(np.linalg.norm(dict_of_outputs[column_name])))
+                out = '|{}|'.format(str(np.linalg.norm(dict_of_outputs[column_name])))
             else:
                 out = str(dict_of_outputs[column_name])
             row += '{:{align}{width}}'.format(out, align=self._align,

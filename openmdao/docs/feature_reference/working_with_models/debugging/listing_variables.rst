@@ -28,7 +28,9 @@ the `IndepVarComp`.
 ~~~~~~~~~~~~~
 
 The :code:`list_inputs()` method on a `System` will display all the inputs
-in alphabetical order with their values.
+in execution order with their values. By default, the variable name and variable value
+is displayed. Also by default, the variables are displayed as part of the System hierarchy.
+Finally, the default is to display this information to :code:`'stdout'`.
 
 .. embed-test::
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_inputs
@@ -71,7 +73,7 @@ to :code:`None` and then access the data instead via the return value.
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_return_value
 
 
-*Get Names Only*
+*List Names Only*
 ~~~~~~~~~~~~~~~~
 
 If you just need the names of the variables you can disable the
@@ -84,10 +86,33 @@ argument.
 *List Residuals Above a Tolerance*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In some cases, it might be convenient to only list residuals above a given tolerance. The
-:code:`System.list_residuals` method provides an optional argument, `tol` for this purpose.
+In some cases, it might be convenient to only list variables whose residuals above a given tolerance. The
+:code:`System.list_outputs` method provides an optional argument, :code:`residuals_tol` for this purpose.
 
 .. embed-test::
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_residuals_with_tol
 
+
+*List Additional Output Variable Metadata*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The :code:`list_outputs()` method has many options to also display units, shape, bounds (lower and upper), and
+scaling (res, res0, and res_ref) for the variables.
+
+
+.. embed-test::
+    openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_for_feature_docs_list_vars_options
+
+
+*Write Full Array Values*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The :code:`list_inputs()` and :code:`list_outputs()` methods both have a :code:`print_arrays` option. The default is
+False. When set to False, in the tablular display, only the value of the array norm will appear. The norm is
+surrounded by vertical bars to indicate that it is a norm. When the options is set to True, there will also be a display
+of full values of the array below the row. The format is affected by the values set with :code:`numpy.set_printoptions`.
+
+
+.. embed-test::
+    openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_for_docs_array_list_vars_options
 
