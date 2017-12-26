@@ -2832,7 +2832,7 @@ class System(object):
 
         # Find with width of the first column in the table
         #    Need to look through all the possible varnames to find the max width
-        max_varname_len = len(top_level_system_name)
+        max_varname_len = max(len(top_level_system_name), len('varname'))
         if hierarchical:
             for name, outs in iteritems(dict_of_outputs):
                 for i, name_part in enumerate(name.split('.')):
@@ -2842,7 +2842,21 @@ class System(object):
             for name, outs in iteritems(dict_of_outputs):
                 max_varname_len = max(max_varname_len, len(name))
 
-        # Write out the column headers. Code is common to both hierarchical and non-hierarchical
+        # Determine the column widths of the data fields by finding the max width for all rows
+        for column_name in column_names:
+            self._column_widths[column_name] = len(column_name)  # has to be able to display name!
+        for name in self._var_allprocs_abs_names[in_or_out]:
+            if name in dict_of_outputs:
+                for column_name in column_names:
+                    if isinstance(dict_of_outputs[name][column_name], np.ndarray) and \
+                            dict_of_outputs[name][column_name].size > 1:
+                        out = '|{}|'.format(str(np.linalg.norm(dict_of_outputs[name][column_name])))
+                    else:
+                        out = str(dict_of_outputs[name][column_name])
+                    self._column_widths[column_name] = max(self._column_widths[column_name],
+                                                           len(str(out)))
+
+        # Write out the column headers
         column_header = '{:{align}{width}}'.format('varname', align=self._align,
                                                    width=max_varname_len)
         column_dashes = max_varname_len * '-'

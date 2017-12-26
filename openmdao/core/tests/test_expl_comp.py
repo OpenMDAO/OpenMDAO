@@ -228,15 +228,15 @@ class ExplCompTestCase(unittest.TestCase):
                                           print_arrays=False,
                                           out_stream=stream)
 
-        self.assertEqual( [
-            ('p1.x', {'value': [ 12.], 'resids': [ 0.], 'units': 'inch', 'shape': (1,),
-                      'lower': [ 1.], 'upper': [ 100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1} ),
-            ('p2.y', {'value': [ 1.], 'resids': [ 0.], 'units': 'ft', 'shape': (1,),
-                      'lower': [ 2.], 'upper': [ 200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
-            ('comp.z', {'value': [ 24.], 'resids': [ 0.], 'units': 'inch', 'shape': (1,),
-                        'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0} ),
-            ],
-            outputs)
+        self.assertEqual([
+            ('p1.x', {'value': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
+                      'lower': [1.], 'upper': [100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1}),
+            ('p2.y', {'value': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,),
+                      'lower': [2.], 'upper': [200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
+            ('comp.z', {'value': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
+                        'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0}),
+                         ],
+                         outputs)
 
         text = stream.getvalue()
         self.assertEqual(1, text.count('varname'))
@@ -273,7 +273,7 @@ class ExplCompTestCase(unittest.TestCase):
                                                units='ft',
                                                ))
         model.add_subsystem('comp', ExecComp('z=x+y',
-                                             x={'value': 0.0, 'units':'inch'},
+                                             x={'value': 0.0, 'units': 'inch'},
                                              y={'value': 0.0, 'units': 'inch'},
                                              z={'value': 0.0, 'units': 'inch'}))
         model.connect('p1.x', 'comp.x')
@@ -307,8 +307,7 @@ class ExplCompTestCase(unittest.TestCase):
             ]
             )
 
-        outputs = prob.model.list_outputs(
-                                          implicit=False,
+        outputs = prob.model.list_outputs(implicit=False,
                                           values=True,
                                           units=True,
                                           shape=True,
@@ -316,8 +315,7 @@ class ExplCompTestCase(unittest.TestCase):
                                           residuals=True,
                                           scaling=True,
                                           hierarchical=True,
-                                          print_arrays=False
-                                          )
+                                          print_arrays=False)
 
     def test_hierarchy_list_vars_options(self):
 
@@ -355,15 +353,14 @@ class ExplCompTestCase(unittest.TestCase):
         # out_stream - not hierarchical - extras - no print_arrays
         stream = cStringIO()
         prob.model.list_inputs(values=True,
-                                          units=True,
-                                          hierarchical=False,
-                                          print_arrays=False,
-                                          out_stream=stream)
+                               units=True,
+                               hierarchical=False,
+                               print_arrays=False,
+                               out_stream=stream)
         text = stream.getvalue()
         self.assertEqual(1, text.count("10 Input(s) in 'model'"))
         # make sure they are in the correct order
-        self.assertTrue(
-                        text.find("sub1.sub2.g1.d1.z") <
+        self.assertTrue(text.find("sub1.sub2.g1.d1.z") <
                         text.find('sub1.sub2.g1.d1.x') <
                         text.find('sub1.sub2.g1.d1.y2') <
                         text.find('sub1.sub2.g1.d2.z') <
@@ -372,18 +369,17 @@ class ExplCompTestCase(unittest.TestCase):
                         text.find('g2.d1.x') <
                         text.find('g2.d1.y2') <
                         text.find('g2.d2.z') <
-                        text.find('g2.d2.y1')
-                        )
+                        text.find('g2.d2.y1'))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(14, num_non_empty_lines)
 
         # out_stream - hierarchical - extras - no print_arrays
         stream = cStringIO()
         prob.model.list_inputs(values=True,
-                                          units=True,
-                                          hierarchical=True,
-                                          print_arrays=False,
-                                          out_stream=stream)
+                               units=True,
+                               hierarchical=True,
+                               print_arrays=False,
+                               out_stream=stream)
         text = stream.getvalue()
         self.assertEqual(1, text.count("10 Input(s) in 'model'"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
@@ -399,14 +395,14 @@ class ExplCompTestCase(unittest.TestCase):
         # out_stream - not hierarchical - extras - no print_arrays
         stream = cStringIO()
         prob.model.list_outputs(values=True,
-                                          units=True,
-                                          shape=True,
-                                          bounds=True,
-                                          residuals=True,
-                                          scaling=True,
-                                          hierarchical=False,
-                                          print_arrays=False,
-                                          out_stream=stream)
+                                units=True,
+                                shape=True,
+                                bounds=True,
+                                residuals=True,
+                                scaling=True,
+                                hierarchical=False,
+                                print_arrays=False,
+                                out_stream=stream)
         text = stream.getvalue()
         self.assertEqual(text.count('5 Explicit Output'), 1)
         # make sure they are in the correct order
@@ -418,14 +414,14 @@ class ExplCompTestCase(unittest.TestCase):
         # Hierarchical
         stream = cStringIO()
         prob.model.list_outputs(values=True,
-                                          units=True,
-                                          shape=True,
-                                          bounds=True,
-                                          residuals=True,
-                                          scaling=True,
-                                          hierarchical=True,
-                                          print_arrays=False,
-                                          out_stream=stream)
+                                units=True,
+                                shape=True,
+                                bounds=True,
+                                residuals=True,
+                                scaling=True,
+                                hierarchical=True,
+                                print_arrays=False,
+                                out_stream=stream)
         text = stream.getvalue()
         self.assertEqual(text.count('top'), 1)
         self.assertEqual(text.count('          y1'), 1)
@@ -469,10 +465,10 @@ class ExplCompTestCase(unittest.TestCase):
         # out_stream - not hierarchical - extras - no print_arrays
         stream = cStringIO()
         prob.model.list_inputs(values=True,
-                                          units=True,
-                                          hierarchical=False,
-                                          print_arrays=False,
-                                          out_stream=stream)
+                               units=True,
+                               hierarchical=False,
+                               print_arrays=False,
+                               out_stream=stream)
         text = stream.getvalue()
         self.assertEqual(1, text.count("1 Input(s) in 'model'"))
         self.assertEqual(1, text.count('mult.x'))
@@ -482,10 +478,10 @@ class ExplCompTestCase(unittest.TestCase):
         # out_stream - hierarchical - extras - no print_arrays
         stream = cStringIO()
         prob.model.list_inputs(values=True,
-                                          units=True,
-                                          hierarchical=True,
-                                          print_arrays=False,
-                                          out_stream=stream)
+                               units=True,
+                               hierarchical=True,
+                               print_arrays=False,
+                               out_stream=stream)
         text = stream.getvalue()
         self.assertEqual(1, text.count("1 Input(s) in 'model'"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
@@ -498,14 +494,14 @@ class ExplCompTestCase(unittest.TestCase):
         # out_stream - not hierarchical - extras - no print_arrays
         stream = cStringIO()
         prob.model.list_outputs(values=True,
-                                          units=True,
-                                          shape=True,
-                                          bounds=True,
-                                          residuals=True,
-                                          scaling=True,
-                                          hierarchical=False,
-                                          print_arrays=False,
-                                          out_stream=stream)
+                                units=True,
+                                shape=True,
+                                bounds=True,
+                                residuals=True,
+                                scaling=True,
+                                hierarchical=False,
+                                print_arrays=False,
+                                out_stream=stream)
         text = stream.getvalue()
         self.assertEqual(text.count('2 Explicit Output'), 1)
         # make sure they are in the correct order
@@ -516,14 +512,14 @@ class ExplCompTestCase(unittest.TestCase):
         # Hierarchical - no print arrays
         stream = cStringIO()
         prob.model.list_outputs(values=True,
-                                          units=True,
-                                          shape=True,
-                                          bounds=True,
-                                          residuals=True,
-                                          scaling=True,
-                                          hierarchical=True,
-                                          print_arrays=False,
-                                          out_stream=stream)
+                                units=True,
+                                shape=True,
+                                bounds=True,
+                                residuals=True,
+                                scaling=True,
+                                hierarchical=True,
+                                print_arrays=False,
+                                out_stream=stream)
         text = stream.getvalue()
         self.assertEqual(text.count('top'), 1)
         self.assertEqual(text.count('  des_vars'), 1)
@@ -538,20 +534,20 @@ class ExplCompTestCase(unittest.TestCase):
         #   top level via testflo, the format comes out different than if the test is
         #   run individually
         np.set_printoptions(edgeitems=3, infstr='inf',
-            linewidth = 75, nanstr = 'nan', precision = 8,
-            suppress = False, threshold = 1000, formatter = None)
+                            linewidth = 75, nanstr = 'nan', precision = 8,
+                            suppress = False, threshold = 1000, formatter = None)
         # logging outputs
         # out_stream - not hierarchical - extras - print_arrays
         stream = cStringIO()
         prob.model.list_outputs(values=True,
-                                          units=True,
-                                          shape=True,
-                                          bounds=True,
-                                          residuals=True,
-                                          scaling=True,
-                                          hierarchical=False,
-                                          print_arrays=True,
-                                          out_stream=stream)
+                                units=True,
+                                shape=True,
+                                bounds=True,
+                                residuals=True,
+                                scaling=True,
+                                hierarchical=False,
+                                print_arrays=True,
+                                out_stream=stream)
         text = stream.getvalue()
         self.assertEqual(text.count('2 Explicit Output'), 1)
         self.assertEqual(text.count('value:'), 2)
@@ -565,14 +561,14 @@ class ExplCompTestCase(unittest.TestCase):
         # Hierarchical
         stream = cStringIO()
         prob.model.list_outputs(values=True,
-                                          units=True,
-                                          shape=True,
-                                          bounds=True,
-                                          residuals=True,
-                                          scaling=True,
-                                          hierarchical=True,
-                                          print_arrays=True,
-                                          out_stream=stream)
+                                units=True,
+                                shape=True,
+                                bounds=True,
+                                residuals=True,
+                                scaling=True,
+                                hierarchical=True,
+                                print_arrays=True,
+                                out_stream=stream)
         text = stream.getvalue()
         self.assertEqual(text.count('2 Explicit Output'), 1)
         self.assertEqual(text.count('value:'), 2)
@@ -620,37 +616,33 @@ class ExplCompTestCase(unittest.TestCase):
         prob.run_driver()
 
         prob.model.list_inputs(values=True,
-                                          units=True,
-                                          hierarchical=True,
-                                          print_arrays=True
-                                          )
+                               units=True,
+                               hierarchical=True,
+                               print_arrays=True)
 
         np.set_printoptions(edgeitems=3, infstr='inf',
-            linewidth = 75, nanstr = 'nan', precision = 8,
-            suppress = False, threshold = 1000, formatter = None)
+                            linewidth = 75, nanstr = 'nan', precision = 8,
+                            suppress = False, threshold = 1000, formatter = None)
 
         prob.model.list_outputs(values=True,
-                                          implicit=False,
-                                          units=True,
-                                          shape=True,
-                                          bounds=True,
-                                          residuals=True,
-                                          scaling=True,
-                                          hierarchical=False,
-                                          print_arrays=True
-                                          )
+                                implicit=False,
+                                units=True,
+                                shape=True,
+                                bounds=True,
+                                residuals=True,
+                                scaling=True,
+                                hierarchical=False,
+                                print_arrays=True)
 
         prob.model.list_outputs(values=True,
-                                          implicit=False,
-                                          units=True,
-                                          shape=True,
-                                          bounds=True,
-                                          residuals=True,
-                                          scaling=True,
-                                          hierarchical=True,
-                                          print_arrays=True
-                                          )
-
+                                implicit=False,
+                                units=True,
+                                shape=True,
+                                bounds=True,
+                                residuals=True,
+                                scaling=True,
+                                hierarchical=True,
+                                print_arrays=True)
 
 
 if __name__ == '__main__':
