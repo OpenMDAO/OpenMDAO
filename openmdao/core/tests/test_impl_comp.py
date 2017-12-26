@@ -550,7 +550,6 @@ class ListFeatureTestCase(unittest.TestCase):
         prob.model.list_outputs(residuals=True)
 
     def test_list_return_value(self):
-        # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
         self.assertEqual(inputs, [
             ('sub.comp2.a', {'value': [1.]}),

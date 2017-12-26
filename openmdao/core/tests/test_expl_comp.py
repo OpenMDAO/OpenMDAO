@@ -283,8 +283,7 @@ class ExplCompTestCase(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        inputs = prob.model.list_inputs(
-                                        units=True)
+        inputs = prob.model.list_inputs(units=True)
         print(inputs)
 
         outputs = prob.model.list_outputs(

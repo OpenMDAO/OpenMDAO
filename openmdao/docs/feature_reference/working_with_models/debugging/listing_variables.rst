@@ -92,8 +92,8 @@ In some cases, it might be convenient to only list variables whose residuals abo
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_residuals_with_tol
 
 
-*List Additional Output Variable Metadata*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*List Additional Variable Metadata*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The :code:`list_outputs()` method has many options to also display units, shape, bounds (lower and upper), and
 scaling (res, res0, and res_ref) for the variables.
