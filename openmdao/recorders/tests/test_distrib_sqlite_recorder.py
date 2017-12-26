@@ -151,7 +151,6 @@ class DistributedRecorderTest(unittest.TestCase):
     def test_distrib_record_driver(self):
 
         size = 100  # how many items in the array
-
         prob = Problem()
         prob.model = Group()
 

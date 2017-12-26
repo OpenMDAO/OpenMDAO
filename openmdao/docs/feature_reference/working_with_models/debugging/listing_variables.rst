@@ -42,7 +42,7 @@ Finally, the default is to display this information to :code:`'stdout'`.
 
 The :code:`list_outputs()` method will display all the outputs in execution order.
 There are many options to this method which we will explore below. For this example,
-we will only display the value in addition to the name of the output.
+we will only display the value in addition to the name of the output variable.
 
 .. embed-test::
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_outputs
@@ -76,9 +76,8 @@ to :code:`None` and then access the data instead via the return value.
 *List Names Only*
 ~~~~~~~~~~~~~~~~
 
-If you just need the names of the variables you can disable the
-display and return of the values and residual values via the :code:`values`
-argument.
+If you just need the names of the variables, you can disable the
+display of the values by setting the optional argument, :code:`values`, to `False`.
 
 .. embed-test::
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_no_values

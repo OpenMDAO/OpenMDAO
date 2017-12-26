@@ -124,7 +124,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(inputs, [
             ('comp2.length', { 'value' :[3.]}),
             ('comp2.width',  { 'value' :[2.]}),
             ('comp3.length', { 'value' :[3.]}),
@@ -133,7 +133,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # list explicit outputs
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(outputs, [
             ('comp1.length', { 'value' :[3.]}),
             ('comp1.width',  { 'value' :[2.]}),
             ('comp2.area',   { 'value' :[6.]}),
@@ -183,7 +183,7 @@ class ExplCompTestCase(unittest.TestCase):
         stream = cStringIO()
         inputs = prob.model.list_inputs(units=True, out_stream=stream)
         tol = 1e-7
-        for actual, expected in zip(sorted(inputs),
+        for actual, expected in zip(inputs,
                                     [
                                         ('comp.x', {'value': [12.], 'units':'inch'}),
                                         ('comp.y', {'value': [12.], 'units':'inch'}),
@@ -229,14 +229,14 @@ class ExplCompTestCase(unittest.TestCase):
                                           out_stream=stream)
 
         self.assertEqual( [
-            ('comp.z', {'value': [ 24.], 'resids': [ 0.], 'units': 'inch', 'shape': (1,),
-                        'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0} ),
             ('p1.x', {'value': [ 12.], 'resids': [ 0.], 'units': 'inch', 'shape': (1,),
                       'lower': [ 1.], 'upper': [ 100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1} ),
             ('p2.y', {'value': [ 1.], 'resids': [ 0.], 'units': 'ft', 'shape': (1,),
                       'lower': [ 2.], 'upper': [ 200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
+            ('comp.z', {'value': [ 24.], 'resids': [ 0.], 'units': 'inch', 'shape': (1,),
+                        'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0} ),
             ],
-            sorted(outputs))
+            outputs)
 
         text = stream.getvalue()
         self.assertEqual(1, text.count('varname'))
@@ -283,10 +283,13 @@ class ExplCompTestCase(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        inputs = prob.model.list_inputs(units=True)
-        print(inputs[0])
+        inputs = prob.model.list_inputs(
+                                        units=True)
+        print(inputs)
 
-        outputs = prob.model.list_outputs(values=True,
+        outputs = prob.model.list_outputs(
+                                          implicit=False,
+                                          values=True,
                                           units=True,
                                           shape=True,
                                           bounds=True,
@@ -305,7 +308,9 @@ class ExplCompTestCase(unittest.TestCase):
             ]
             )
 
-        outputs = prob.model.list_outputs(values=True,
+        outputs = prob.model.list_outputs(
+                                          implicit=False,
+                                          values=True,
                                           units=True,
                                           shape=True,
                                           bounds=True,
@@ -603,16 +608,16 @@ class ExplCompTestCase(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = inputs['x'] + 10.0
 
-        size = 30 # how many items in the array
+        size = 30
 
         prob = Problem()
         prob.model = Group()
         prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size), units='inch'),
                                  promotes=['x'])
         prob.model.add_subsystem('mult', ArrayAdder(size), promotes=['x', 'y'])
-        
+
         prob.setup(check=False)
-        prob['x'] = np.ones(size)
+        prob['x'] = np.arange(size)
         prob.run_driver()
 
         prob.model.list_inputs(values=True,
@@ -626,6 +631,7 @@ class ExplCompTestCase(unittest.TestCase):
             suppress = False, threshold = 1000, formatter = None)
 
         prob.model.list_outputs(values=True,
+                                          implicit=False,
                                           units=True,
                                           shape=True,
                                           bounds=True,
@@ -636,6 +642,7 @@ class ExplCompTestCase(unittest.TestCase):
                                           )
 
         prob.model.list_outputs(values=True,
+                                          implicit=False,
                                           units=True,
                                           shape=True,
                                           bounds=True,
