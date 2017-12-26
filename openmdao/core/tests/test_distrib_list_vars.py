@@ -103,7 +103,7 @@ class DistributedAdderTest(unittest.TestCase):
         prob.run_driver()
 
         stream = cStringIO()
-        inputs = prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream)
+        inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
         self.assertEqual(inputs[0][0], 'plus.x')
         self.assertEqual(inputs[1][0], 'summer.y')
         self.assertEqual(inputs[0][1]['value'].size, 50) # should only return the half that is local
@@ -125,7 +125,7 @@ class DistributedAdderTest(unittest.TestCase):
 
 
         stream = cStringIO()
-        outputs = prob.model.list_outputs(values=True,
+        outputs = sorted(prob.model.list_outputs(values=True,
                                           units=True,
                                           shape=True,
                                           bounds=True,
@@ -133,7 +133,7 @@ class DistributedAdderTest(unittest.TestCase):
                                           scaling=True,
                                           hierarchical=True,
                                           print_arrays=True,
-                                          out_stream=stream)
+                                          out_stream=stream))
         self.assertEqual(outputs[0][0], 'des_vars.x')
         self.assertEqual(outputs[1][0], 'plus.y')
         self.assertEqual(outputs[2][0], 'summer.sum')
@@ -212,15 +212,15 @@ class DistributedAdderTest(unittest.TestCase):
         prob.cleanup()
 
         stream = cStringIO()
-        inputs = prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream)
+        inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
+        self.assertEqual(inputs[0][0], 'Obj.y1')
+        self.assertEqual(inputs[1][0], 'Obj.y2')
         if prob.comm.rank: # Only rank 0 prints
-            self.assertEqual(inputs[0][0], 'par.G2.Cy.x')
-            self.assertEqual(inputs[1][0], 'par.G2.Cc.x')
+            self.assertEqual(inputs[2][0], 'par.G2.Cc.x')
+            self.assertEqual(inputs[3][0], 'par.G2.Cy.x')
         else:
-            self.assertEqual(inputs[0][0], 'par.G1.Cy.x')
-            self.assertEqual(inputs[1][0], 'par.G1.Cc.x')
-        self.assertEqual(inputs[2][0], 'Obj.y1')
-        self.assertEqual(inputs[3][0], 'Obj.y2')
+            self.assertEqual(inputs[2][0], 'par.G1.Cc.x')
+            self.assertEqual(inputs[3][0], 'par.G1.Cy.x')
         self.assertTrue('value' in inputs[0][1])
         self.assertEqual(4, len(inputs))
 
@@ -241,7 +241,7 @@ class DistributedAdderTest(unittest.TestCase):
             self.assertEqual(1, text.count('    y2'))
 
         stream = cStringIO()
-        outputs = prob.model.list_outputs(values=True,
+        outputs = sorted(prob.model.list_outputs(values=True,
                                           units=True,
                                           shape=True,
                                           bounds=True,
@@ -249,17 +249,17 @@ class DistributedAdderTest(unittest.TestCase):
                                           scaling=True,
                                           hierarchical=True,
                                           print_arrays=True,
-                                          out_stream=stream)
+                                          out_stream=stream))
+        self.assertEqual(outputs[0][0], 'Obj.obj')
         if prob.comm.rank: # outputs only return what is on their proc
-            self.assertEqual(outputs[0][0], 'par.G2.indep_var_comp.x')
-            self.assertEqual(outputs[1][0], 'par.G2.Cy.y')
-            self.assertEqual(outputs[2][0], 'par.G2.Cc.c')
+            self.assertEqual(outputs[1][0], 'par.G2.Cc.c')
+            self.assertEqual(outputs[2][0], 'par.G2.Cy.y')
+            self.assertEqual(outputs[3][0], 'par.G2.indep_var_comp.x')
         else:
-            self.assertEqual(outputs[0][0], 'par.G1.indep_var_comp.x')
-            self.assertEqual(outputs[1][0], 'par.G1.Cy.y')
-            self.assertEqual(outputs[2][0], 'par.G1.Cc.c')
+            self.assertEqual(outputs[1][0], 'par.G1.Cc.c')
+            self.assertEqual(outputs[2][0], 'par.G1.Cy.y')
+            self.assertEqual(outputs[3][0], 'par.G1.indep_var_comp.x')
         self.assertEqual(4, len(outputs))
-        self.assertEqual(outputs[3][0], 'Obj.obj')
         self.assertTrue('value' in outputs[0][1])
         self.assertTrue('units' in outputs[0][1])
 

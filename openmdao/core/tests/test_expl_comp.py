@@ -124,7 +124,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
-        self.assertEqual(inputs, [
+        self.assertEqual(sorted(inputs), [
             ('comp2.length', { 'value' :[3.]}),
             ('comp2.width',  { 'value' :[2.]}),
             ('comp3.length', { 'value' :[3.]}),
@@ -133,7 +133,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # list explicit outputs
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
-        self.assertEqual(outputs, [
+        self.assertEqual(sorted(outputs), [
             ('comp1.length', { 'value' :[3.]}),
             ('comp1.width',  { 'value' :[2.]}),
             ('comp2.area',   { 'value' :[6.]}),
@@ -183,7 +183,7 @@ class ExplCompTestCase(unittest.TestCase):
         stream = cStringIO()
         inputs = prob.model.list_inputs(units=True, out_stream=stream)
         tol = 1e-7
-        for actual, expected in zip(inputs,
+        for actual, expected in zip(sorted(inputs),
                                     [
                                         ('comp.x', {'value': [12.], 'units':'inch'}),
                                         ('comp.y', {'value': [12.], 'units':'inch'}),
@@ -229,14 +229,14 @@ class ExplCompTestCase(unittest.TestCase):
                                           out_stream=stream)
 
         self.assertEqual([
+            ('comp.z', {'value': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
+                        'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0}),
             ('p1.x', {'value': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
                       'lower': [1.], 'upper': [100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1}),
             ('p2.y', {'value': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,),
                       'lower': [2.], 'upper': [200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
-            ('comp.z', {'value': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
-                        'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0}),
                          ],
-                         outputs)
+            sorted(outputs))
 
         text = stream.getvalue()
         self.assertEqual(1, text.count('varname'))
@@ -297,13 +297,13 @@ class ExplCompTestCase(unittest.TestCase):
                                           hierarchical=False,
                                           print_arrays=False
                                           )
-        self.assertEqual(outputs, [
+        self.assertEqual(sorted(outputs), [
+            ('comp.z', {'value': [ 24.], 'resids': [ 0.], 'units': 'inch', 'shape': (1,),
+                        'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0} ),
             ('p1.x', {'value': [ 12.], 'resids': [ 0.], 'units': 'inch', 'shape': (1,),
                       'lower': [ 1.], 'upper': [ 100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1} ),
             ('p2.y', {'value': [ 1.], 'resids': [ 0.], 'units': 'ft', 'shape': (1,),
                       'lower': [ 2.], 'upper': [ 200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
-            ('comp.z', {'value': [ 24.], 'resids': [ 0.], 'units': 'inch', 'shape': (1,),
-                        'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0} ),
             ]
             )
 
