@@ -175,7 +175,7 @@ class ImplicitCompTestCase(unittest.TestCase):
 
         stream = cStringIO()
         inputs = self.prob.model.list_inputs(hierarchical=False, out_stream=stream)
-        self.assertEqual(inputs, [
+        self.assertEqual(sorted(inputs), [
             ('comp2.a', {'value': [1.]}),
             ('comp2.b', {'value': [-4.]}),
             ('comp2.c', {'value': [3.]}),
@@ -225,7 +225,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         stream = cStringIO()
         resids = self.prob.model.list_outputs(values=False, residuals=True, hierarchical=False,
                                               out_stream=stream)
-        self.assertEqual(resids, [
+        self.assertEqual(sorted(resids), [
             ('comp1.a', { 'resids':[0.]}),
             ('comp1.b', { 'resids':[0.]}),
             ('comp1.c', { 'resids':[0.]}),
