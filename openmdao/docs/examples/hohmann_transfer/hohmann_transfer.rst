@@ -33,7 +33,7 @@ launch vehicles do not put satellites in a low Earth parking orbit
 with the same inclination as geostationary orbit.  For instance, a due east launch
 from Kennedy Space Center will result in a parking orbit with an inclination of
 28.5 degrees.  We therefore need to change the inclination of our satellite during
-it's two impulsive burn maneuvers.  The question is, *what change in inclination
+its two impulsive burn maneuvers.  The question is, *what change in inclination
 at each burn will result in the minimum possible delta-V?*
 
 .. figure:: images/hohmann_transfer.png
@@ -102,7 +102,7 @@ The specific angular momentum can also be computed as:
     h = \sqrt{p \mu}
 
 Where :math:`p` is the semilatus rectum of the orbit and :math:`\mu` is
-the gravitational paramter of the central body.
+the gravitational parameter of the central body.
 
 The semilatus rectum is computed as:
 
