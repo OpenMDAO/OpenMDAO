@@ -2626,7 +2626,7 @@ class System(object):
             When True, display/return residual values. Default is False.
 
         residuals_tol : float, optional
-            If set, limits the output of list_residuals to only variables where
+            If set, limits the output of list_outputs to only variables where
             the norm of the resids array is greater than the given 'residuals_tol'.
             Default is None.
 

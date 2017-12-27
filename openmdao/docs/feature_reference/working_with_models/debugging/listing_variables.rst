@@ -74,13 +74,13 @@ to :code:`None` and then access the data instead via the return value.
 
 
 *List Names Only*
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
 
 If you just need the names of the variables, you can disable the
 display of the values by setting the optional argument, :code:`values`, to `False`.
 
 .. embed-test::
-    openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_no_values
+    openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_for_docs_list_no_values
 
 *List Residuals Above a Tolerance*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

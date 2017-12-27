@@ -193,7 +193,7 @@ class ImplicitCompTestCase(unittest.TestCase):
 
         stream = cStringIO()
         outputs = self.prob.model.list_outputs(implicit=False, hierarchical=False, out_stream=stream)
-        self.assertEqual(outputs, [
+        self.assertEqual(sorted(outputs), [
             ('comp1.a', {'value': [1.]}),
             ('comp1.b', {'value': [-4.]}),
             ('comp1.c', {'value': [3.]})
@@ -551,7 +551,7 @@ class ListFeatureTestCase(unittest.TestCase):
 
     def test_list_return_value(self):
         inputs = prob.model.list_inputs(out_stream=None)
-        self.assertEqual(inputs, [
+        self.assertEqual(sorted(inputs), [
             ('sub.comp2.a', {'value': [1.]}),
             ('sub.comp2.b', {'value': [-4.]}),
             ('sub.comp2.c', {'value': [3.]}),
@@ -562,16 +562,24 @@ class ListFeatureTestCase(unittest.TestCase):
 
         # list explicit outputs
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
-        self.assertEqual(outputs, [
+        self.assertEqual(sorted(outputs), [
             ('comp1.a', {'value': [1.]}),
             ('comp1.b', {'value': [-4.]}),
             ('comp1.c', {'value': [3.]})
         ])
 
 
+    def test_for_docs_list_no_values(self):
+        inputs = prob.model.list_inputs(values=False)
+        print(inputs)
+
+        # list only explicit outputs
+        outputs = prob.model.list_outputs(implicit=False, values=False)
+        print(outputs)
+
     def test_list_no_values(self):
         inputs = prob.model.list_inputs(values=False)
-        self.assertEqual([n[0] for n in inputs], [
+        self.assertEqual([n[0] for n in sorted(inputs)], [
             'sub.comp2.a',
             'sub.comp2.b',
             'sub.comp2.c',
@@ -582,7 +590,7 @@ class ListFeatureTestCase(unittest.TestCase):
 
         # list only explicit outputs
         outputs = prob.model.list_outputs(implicit=False, values=False)
-        self.assertEqual([n[0] for n in outputs], [
+        self.assertEqual([n[0] for n in sorted(outputs)], [
             'comp1.a',
             'comp1.b',
             'comp1.c'
@@ -657,7 +665,7 @@ class ListFeatureTestCase(unittest.TestCase):
         stream = cStringIO()
         inputs = prob.model.list_inputs(values=False, out_stream=stream)
         text = stream.getvalue()
-        self.assertEqual(inputs, [
+        self.assertEqual(sorted(inputs), [
             ('sub.comp2.a', {}),
             ('sub.comp2.b', {}),
             ('sub.comp2.c', {}),
@@ -677,14 +685,14 @@ class ListFeatureTestCase(unittest.TestCase):
         # list implicit outputs
         outputs = prob.model.list_outputs(explicit=False, out_stream=None)
         text = stream.getvalue()
-        self.assertEqual(outputs, [
+        self.assertEqual(sorted(outputs), [
             ('sub.comp2.x', {'value': [ 3.]} ),
             ('sub.comp3.x', {'value': [ 3.]})
         ])
         # list explicit outputs
         stream = cStringIO()
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
-        self.assertEqual(outputs, [
+        self.assertEqual(sorted(outputs), [
             ('comp1.a', {'value': [ 1.]} ),
             ('comp1.b', {'value': [-4.]}),
             ('comp1.c', {'value': [3.]}),

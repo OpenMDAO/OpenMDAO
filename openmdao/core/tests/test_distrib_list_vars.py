@@ -126,14 +126,14 @@ class DistributedAdderTest(unittest.TestCase):
 
         stream = cStringIO()
         outputs = sorted(prob.model.list_outputs(values=True,
-                                          units=True,
-                                          shape=True,
-                                          bounds=True,
-                                          residuals=True,
-                                          scaling=True,
-                                          hierarchical=True,
-                                          print_arrays=True,
-                                          out_stream=stream))
+                                                 units=True,
+                                                 shape=True,
+                                                 bounds=True,
+                                                 residuals=True,
+                                                 scaling=True,
+                                                 hierarchical=True,
+                                                 print_arrays=True,
+                                                 out_stream=stream))
         self.assertEqual(outputs[0][0], 'des_vars.x')
         self.assertEqual(outputs[1][0], 'plus.y')
         self.assertEqual(outputs[2][0], 'summer.sum')
