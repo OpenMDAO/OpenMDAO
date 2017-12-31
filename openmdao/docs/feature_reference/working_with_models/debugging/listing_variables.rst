@@ -91,7 +91,7 @@ option and access the data instead via the return value.
 *Get Names Only*
 ~~~~~~~~~~~~~~~~
 
-Finally, if you just need the names of the variables you can disable the
+Finally, if you just need the names of the variables, you can disable the
 display and return of the values and residual values via the :code:`values`
 argument.
 

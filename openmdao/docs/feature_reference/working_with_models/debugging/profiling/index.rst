@@ -10,7 +10,7 @@ Profiling and Tracing
     inst_call_tracing
 
 
-All of the tools mentioned above have a similar programatic interface, even though most of the
+All of the tools mentioned above have a similar programmatic interface, even though most of the
 time they will only be used in command line mode.  However, if you really want to customize the
 set of methods that are to be profiled or traced, see the following example.
 
