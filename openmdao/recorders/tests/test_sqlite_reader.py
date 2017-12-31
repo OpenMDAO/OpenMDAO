@@ -177,16 +177,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(cr.format_version, format_version,
                          msg='format version not read correctly')
 
-    def test_num_driver_cases_recorded(self):
-        self.setup_sellar_model()
-        self.prob.setup(check=False)
-        self.prob.run_driver()
-        self.prob.cleanup()
-
-        cr = CaseReader(self.filename)
-        self.assertEqual(cr.driver_cases.num_cases, 7,
-                         msg='case number not correct!')
-
     def test_reader_instantiates(self):
         """ Test that CaseReader returns an SqliteCaseReader. """
         self.setup_sellar_model()
