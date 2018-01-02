@@ -37,6 +37,7 @@ setup(
         'openmdao.core',
         'openmdao.devtools',
         'openmdao.devtools.problem_viewer',
+        'openmdao.devtools.iprofile_app',
         'openmdao.docs',
         'openmdao.drivers',
         'openmdao.error_checking',
@@ -95,6 +96,6 @@ setup(
     wingproj=openmdao.devtools.wingproj:run_wing
     webview=openmdao.devtools.webview:webview_argv
     run_test=openmdao.devtools.run_test:run_test
-    openmdao=openmdao.utils.om:openmdao_cmd
+    om=openmdao.utils.om:openmdao_cmd
     """
 )

@@ -136,7 +136,7 @@ The *color_info* data structure can be generated automatically using the followi
 
 .. code-block:: none
 
-    openmdao simul_coloring <your_script_name>
+    om simul_coloring <your_script_name>
 
 
 The data structure will be written to the console and can be cut and pasted into your script
@@ -161,7 +161,7 @@ of performance improvement you should see when computing your total derivatives.
 the output show above, the total number of linear solves to compute the total jacobian will drop
 from 21 down to 5.
 
-If you run *openmdao simul_coloring* and it turns out there is no simultaneous coloring available,
+If you run *om simul_coloring* and it turns out there is no simultaneous coloring available,
 don't be surprised.  Problems that have the necessary total jacobian sparsity to allow
 simultaneous derivatives are relatively uncommon.
 
@@ -185,4 +185,4 @@ is 1, but you can increment that to 2 or higher if needed.
 
 .. code-block:: none
 
-    openmdao simul_coloring -n 2 <your_script_name>
+    om simul_coloring -n 2 <your_script_name>

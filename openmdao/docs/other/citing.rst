@@ -23,5 +23,5 @@ For example:
 
 
 .. embed-shell-cmd::
-    :cmd: openmdao cite paraboloid.py
+    :cmd: om cite paraboloid.py
     :dir: ../test_suite/components

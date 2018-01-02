@@ -14,6 +14,7 @@ import subprocess
 import sphinx
 from sphinx.util.compat import Directive
 from sphinx.writers.html import HTMLTranslator
+from six import reraise
 
 
 if sys.version_info[0] == 2:
@@ -100,13 +101,12 @@ class EmbedShellCmdDirective(Directive):
         """
         Create a list of document nodes to return.
         """
-        success = True
-
         if 'cmd' in self.options:
             cmdstr = self.options['cmd']
             cmd = cmdstr.split()
         else:
-            raise RuntimeError("'cmd' is not defined for embed-shell-cmd.")
+            raise sphinx.errors.SphinxError("'cmd' is not defined for "
+                                            "embed-shell-cmd.")
 
         startdir = os.getcwd()
 
@@ -118,9 +118,10 @@ class EmbedShellCmdDirective(Directive):
         os.chdir(workdir)
         try:
             output = subprocess.check_output(cmd).decode('utf-8', 'ignore')
-        except subprocess.CalledProcessError as err:
-            output = str(err)
-            success = False
+        except Exception as err:
+            _, exc, tb = sys.exc_info()
+            new_exc = sphinx.errors.SphinxError(str(exc))
+            reraise(type(new_exc), new_exc, tb)
         finally:
             os.chdir(startdir)
 
@@ -134,14 +135,7 @@ class EmbedShellCmdDirective(Directive):
             input_node = nodes.literal_block(cmdstr, cmdstr)
             input_node['language'] = 'none'
 
-        if success:
-            output_node = cmd_node(text=output)
-        else:
-            if not show:
-                output = "Shell command '%s' failed:\n%s" % (cmdstr, output)
-            else:
-                output = "Shell command failed:\n" + output
-            output_node = failed_node(text=output)
+        output_node = cmd_node(text=output)
 
         if show:
             return [input_node, output_node]

@@ -1,6 +1,7 @@
 """
 A console script wrapper for multiple openmdao functions.
 """
+from __future__ import print_function
 
 import sys
 import os
@@ -430,4 +431,7 @@ def openmdao_cmd():
         _post_setup_exec(_Options(file=[args[0]], func=None))
     else:
         options = parser.parse_args()
-        options.executor(options)
+        if hasattr(options, 'executor'):
+            options.executor(options)
+        else:
+            print("\nNothing to do.")
