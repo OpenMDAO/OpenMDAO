@@ -110,8 +110,10 @@ look like this:
 
 
 
-You can more complete example of setting up an optimization with simultaneous derivatives in the
-:ref:`Simple Optimization using Simultaneous Derivatives <simul_deriv_example>` example.
+You can see a more complete example of setting up an optimization with
+simultaneous derivatives in the
+:ref:`Simple Optimization using Simultaneous Derivatives <simul_deriv_example>`
+example.
 
 
 Automatic Generation of Coloring

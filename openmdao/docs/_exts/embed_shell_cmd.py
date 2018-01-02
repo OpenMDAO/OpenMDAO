@@ -16,8 +16,6 @@ from sphinx.util.compat import Directive
 from sphinx.writers.html import HTMLTranslator
 from sphinx.errors import SphinxError
 
-from six import reraise
-
 
 if sys.version_info[0] == 2:
     import cgi as cgiesc
@@ -120,10 +118,6 @@ class EmbedShellCmdDirective(Directive):
         os.chdir(workdir)
         try:
             output = subprocess.check_output(cmd).decode('utf-8', 'ignore')
-        except Exception as err:
-            _, exc, tb = sys.exc_info()
-            new_exc = SphinxError(str(exc))
-            reraise(type(new_exc), new_exc, tb)
         finally:
             os.chdir(startdir)
 

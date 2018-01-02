@@ -961,13 +961,13 @@ class TestProblem(unittest.TestCase):
             model.add_subsystem('p1', IndepVarComp('x', 3.0))
             model.add_subsystem('p2', IndepVarComp('y', -4.0))
             model.add_subsystem('comp', ExecComp("f_xy=2.0*x+3.0*y"))
-    
+
             model.connect('p1.x', 'comp.x')
             model.connect('p2.y', 'comp.y')
-    
+
             prob.setup()
             prob.run_model()
-    
+
             assert_rel_error(self, prob['p2.y'], 5.0)
             assert_rel_error(self, prob['comp.f_xy'], 21.0)
         finally:

@@ -2,7 +2,7 @@
 import sys
 import importlib
 
-from six import iteritems, reraise
+from six import iteritems
 from docutils import nodes
 
 import sphinx
@@ -57,14 +57,9 @@ class EmbedBibtexDirective(Directive):
     has_content = True
 
     def run(self):
-        try:
-            module_path, class_name = self.arguments
-            mod = importlib.import_module(module_path)
-            obj = getattr(mod, class_name)()
-        except Exception as err:
-            _, exc, tb = sys.exc_info()
-            new_exc = SphinxError(str(exc))
-            reraise(type(new_exc), new_exc, tb)
+        module_path, class_name = self.arguments
+        mod = importlib.import_module(module_path)
+        obj = getattr(mod, class_name)()
 
         if not hasattr(obj, 'cite') or not obj.cite:
             raise SphinxError("Couldn't find 'cite' in class '%s'" % class_name)
