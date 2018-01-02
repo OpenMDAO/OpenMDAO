@@ -4,9 +4,9 @@ In the previous tutorial, we discussed the three basic kinds of Components in th
 This tutorial focuses on using one of those, :ref:`ExplicitComponent <comp-type-2-explicitcomp>`, to build a simple analysis of a paraboloid function.
 We'll explain the basic structure of a run file, show you how to set inputs, run the model, and check the output files.
 
-*************************************
-Paraboloid - A Monodisciplinary Model
-*************************************
+**************************************
+Paraboloid - A Single-Discipline Model
+**************************************
 
 Consider a paraboloid, defined by the explicit function
 
