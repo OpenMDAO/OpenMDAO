@@ -147,13 +147,52 @@ would look like this:
 
 .. code-block:: none
 
-    ({'indeps.y': [0, 1, 0, 1, 0, 1, 0, 1, 0, 1], 'indeps.x': [0, 1, 0, 1, 0, 1, 0, 1, 0, 1]}, {'delta_theta_con.g': {'indeps.y': {0: ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8]), 1: ([0, 1, 2, 3, 4], [1, 3, 5, 7, 9])}, 'indeps.x': {0: ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8]), 1: ([0, 1, 2, 3, 4], [1, 3, 5, 7, 9])}}, 'r_con.g': {'indeps.y': {0: ([0, 2, 4, 6, 8], [0, 2, 4, 6, 8]), 1: ([1, 3, 5, 7, 9], [1, 3, 5, 7, 9])}, 'indeps.x': {0: ([0, 2, 4, 6, 8], [0, 2, 4, 6, 8]), 1: ([1, 3, 5, 7, 9], [1, 3, 5, 7, 9])}}, 'l_conx.g': {'indeps.x': {0: ([0], [0])}}, 'theta_con.g': {'indeps.y': {0: ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8])}, 'indeps.x': {0: ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8])}}})
+    ({
+       'indeps.x': [0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+       'indeps.y': [0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+    },
+    {
+       'delta_theta_con.g': {
+          'indeps.x': {
+             0: ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8]),
+             1: ([0, 1, 2, 3, 4], [1, 3, 5, 7, 9]),
+          },
+          'indeps.y': {
+             0: ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8]),
+             1: ([0, 1, 2, 3, 4], [1, 3, 5, 7, 9]),
+          },
+       },
+       'r_con.g': {
+          'indeps.x': {
+             0: ([0, 2, 4, 6, 8], [0, 2, 4, 6, 8]),
+             1: ([1, 3, 5, 7, 9], [1, 3, 5, 7, 9]),
+          },
+          'indeps.y': {
+             0: ([0, 2, 4, 6, 8], [0, 2, 4, 6, 8]),
+             1: ([1, 3, 5, 7, 9], [1, 3, 5, 7, 9]),
+          },
+       },
+       'theta_con.g': {
+          'indeps.x': {
+             0: ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8]),
+          },
+          'indeps.y': {
+             0: ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8]),
+          },
+       },
+       'l_conx.g': {
+          'indeps.x': {
+             0: ([0], [0]),
+          },
+       },
+    })
 
     Coloring Summary
     indeps.x num colors: 2
     indeps.y num colors: 2
     indeps.r num colors: 1
     Total colors vs. total size: 5 vs 21
+
 
 Note that only the first part of the console output should be cut and pasted into your script.
 The Coloring Summary part is just for informational purposes to help give you an idea of what sort

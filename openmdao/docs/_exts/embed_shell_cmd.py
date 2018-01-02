@@ -14,6 +14,8 @@ import subprocess
 import sphinx
 from sphinx.util.compat import Directive
 from sphinx.writers.html import HTMLTranslator
+from sphinx.errors import SphinxError
+
 from six import reraise
 
 
@@ -105,7 +107,7 @@ class EmbedShellCmdDirective(Directive):
             cmdstr = self.options['cmd']
             cmd = cmdstr.split()
         else:
-            raise sphinx.errors.SphinxError("'cmd' is not defined for "
+            raise SphinxError("'cmd' is not defined for "
                                             "embed-shell-cmd.")
 
         startdir = os.getcwd()
@@ -120,7 +122,7 @@ class EmbedShellCmdDirective(Directive):
             output = subprocess.check_output(cmd).decode('utf-8', 'ignore')
         except Exception as err:
             _, exc, tb = sys.exc_info()
-            new_exc = sphinx.errors.SphinxError(str(exc))
+            new_exc = SphinxError(str(exc))
             reraise(type(new_exc), new_exc, tb)
         finally:
             os.chdir(startdir)

@@ -221,7 +221,8 @@ def get_simul_meta(problem, mode='fwd', repeats=1, stream=sys.stdout):
     for res in res_idxs:
         simul_map = {}
         for dv in res_idxs[res]:
-            simul_map[dv] = {c: v for c, v in iteritems(res_idxs[res][dv]) if c in all_colors}
+            simul_map[dv] = {c: v for c, v in iteritems(res_idxs[res][dv])
+                             if c in all_colors}
             if not simul_map[dv]:
                 del simul_map[dv]
 
@@ -236,9 +237,9 @@ def get_simul_meta(problem, mode='fwd', repeats=1, stream=sys.stdout):
 
         stream.write("\n{\n")
         for res, dvdict in iteritems(simul_maps):
-            stream.write("   %s: {\n" % res)
+            stream.write("   '%s': {\n" % res)
             for dv, coldict in iteritems(dvdict):
-                stream.write("      %s: {\n" % dv)
+                stream.write("      '%s': {\n" % dv)
                 for color, idxs in iteritems(coldict):
                     stream.write("         %s: %s,\n" % (color, idxs))
                 stream.write("      },\n")
@@ -266,7 +267,7 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
     desvars = problem.driver._designvars
     responses = problem.driver._responses
 
-    stream.write("\nColoring Summary\n")
+    stream.write("\n\nColoring Summary\n")
 
     tot_colors = 0
     tot_size = 0

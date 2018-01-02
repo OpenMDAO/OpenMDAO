@@ -8,6 +8,7 @@ from docutils import nodes
 import sphinx
 from sphinx.util.compat import Directive
 from sphinx.writers.html import HTMLTranslator
+from sphinx.errors import SphinxError
 
 
 class bibtex_node(nodes.Element):
@@ -62,11 +63,11 @@ class EmbedBibtexDirective(Directive):
             obj = getattr(mod, class_name)()
         except Exception as err:
             _, exc, tb = sys.exc_info()
-            new_exc = sphinx.errors.SphinxError(str(exc))
+            new_exc = SphinxError(str(exc))
             reraise(type(new_exc), new_exc, tb)
 
         if not hasattr(obj, 'cite') or not obj.cite:
-            raise sphinx.errors.SphinxError("Couldn't find 'cite' in class '%s'" % class_name)
+            raise SphinxError("Couldn't find 'cite' in class '%s'" % class_name)
 
         return [bibtex_node(text=obj.cite)]
 
