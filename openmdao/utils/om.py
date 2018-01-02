@@ -9,7 +9,7 @@ import argparse
 from six import iteritems
 
 from openmdao.core.problem import Problem
-from openmdao.utils.coloring import get_simul_meta, simul_coloring_summary
+from openmdao.utils.coloring import _simul_coloring_setup_parser, _simul_coloring_cmd
 from openmdao.devtools.problem_viewer.problem_viewer import view_model
 from openmdao.devtools.viewconns import view_connections
 from openmdao.devtools.debug import config_summary, tree, dump_dist_idxs
@@ -265,47 +265,6 @@ def _dump_dist_idxs_cmd(options):
         dump_dist_idxs(prob, vec_name=options.vecname, stream=out)
         exit()
     return _dumpdist
-
-
-def _simul_coloring_setup_parser(parser):
-    """
-    Set up the openmdao subparser for the 'openmdao simul_coloring' command.
-
-    Parameters
-    ----------
-    parser : argparse subparser
-        The parser we're adding options to.
-    """
-    parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-o', action='store', dest='outfile', help='output file.')
-    parser.add_argument('-n', action='store', dest='num_jacs', default=1, type=int,
-                        help='number of times to repeat total deriv computation.')
-
-
-def _simul_coloring_cmd(options):
-    """
-    Return the post_setup hook function for 'openmdao simul_coloring'.
-
-    Parameters
-    ----------
-    options : argparse Namespace
-        Command line options.
-
-    Returns
-    -------
-    function
-        The post-setup hook function.
-    """
-    def _simul_coloring(prob):
-        if options.outfile is None:
-            outfile = sys.stdout
-        else:
-            outfile = open(options.outfile, 'w')
-        Problem._post_setup_func = None  # avoid recursive loop
-        color_info = get_simul_meta(prob, repeats=options.num_jacs, stream=outfile)
-        simul_coloring_summary(prob, color_info, stream=outfile)
-        exit()
-    return _simul_coloring
 
 
 def _cite_setup_parser(parser):

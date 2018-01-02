@@ -43,7 +43,7 @@ def _wrapper_set_abs(jac, set_abs, key, subjac):
 
 def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     """
-    Find all sets of disjoint columns in the total jac and their corresponding rows.
+    Find sets of disjoint columns in the total jac and their corresponding rows.
 
     Parameters
     ----------
@@ -54,7 +54,8 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     repeats : int
         Number of times to repeat total jacobian computation.
     tol : float
-        Tolerance on values in jacobian.  Anything smaller in magnitude will be set to 0.0.
+        Tolerance on values in jacobian.  Anything smaller in magnitude will be
+        set to 0.0.
 
     Returns
     -------
@@ -292,3 +293,46 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
         stream.write("No simultaneous derivative solves are possible in this configuration.\n")
     else:
         stream.write("Total colors vs. total size: %d vs %d\n" % (tot_colors, tot_size))
+
+
+def _simul_coloring_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao simul_coloring' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-o', action='store', dest='outfile', help='output file.')
+    parser.add_argument('-n', action='store', dest='num_jacs', default=1, type=int,
+                        help='number of times to repeat total deriv computation.')
+
+
+def _simul_coloring_cmd(options):
+    """
+    Return the post_setup hook function for 'openmdao simul_coloring'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
+    from openmdao.core.problem import Problem
+
+    def _simul_coloring(prob):
+        if options.outfile is None:
+            outfile = sys.stdout
+        else:
+            outfile = open(options.outfile, 'w')
+        Problem._post_setup_func = None  # avoid recursive loop
+        color_info = get_simul_meta(prob, repeats=options.num_jacs, stream=outfile)
+        simul_coloring_summary(prob, color_info, stream=outfile)
+        exit()
+    return _simul_coloring

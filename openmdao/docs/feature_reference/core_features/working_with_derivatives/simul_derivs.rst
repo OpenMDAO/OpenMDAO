@@ -109,7 +109,6 @@ look like this:
     prob.driver.set_simul_deriv_color(color_info)
 
 
-
 You can see a more complete example of setting up an optimization with
 simultaneous derivatives in the
 :ref:`Simple Optimization using Simultaneous Derivatives <simul_deriv_example>`
