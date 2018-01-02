@@ -229,7 +229,21 @@ def get_simul_meta(problem, mode='fwd', repeats=1, stream=sys.stdout):
             simul_maps[res] = simul_map
 
     if stream is not None:
-        stream.write("\n%s\n" % ((simul_colorings, simul_maps),))
+        stream.write("\n({\n")
+        for n, coloring in iteritems(simul_colorings):
+            stream.write("   '%s': %s,\n" % (n, coloring))
+        stream.write("},")
+
+        stream.write("\n{\n")
+        for res, dvdict in iteritems(simul_maps):
+            stream.write("   %s: {\n" % res)
+            for dv, coldict in iteritems(dvdict):
+                stream.write("      %s: {\n" % dv)
+                for color, idxs in iteritems(coldict):
+                    stream.write("         %s: %s,\n" % (color, idxs))
+                stream.write("      },\n")
+            stream.write("   },\n")
+        stream.write("})")
 
     return simul_colorings, simul_maps
 

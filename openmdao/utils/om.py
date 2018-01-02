@@ -18,7 +18,7 @@ from openmdao.devtools.iprofile import _iprof_totals_exec, _iprof_totals_setup_p
 from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser
 from openmdao.devtools.iprof_utils import _Options
 
-from openmdao.utils.find_cite import find_citations
+from openmdao.utils.find_cite import print_citations
 
 
 def _view_model_setup_parser(parser):
@@ -319,6 +319,8 @@ def _cite_setup_parser(parser):
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', default=None, action='store', dest='outfile',
                         help='Name of output file.  By default, output goes to stdout.')
+    parser.add_argument('-c', '--class', action='append', default=[], dest='classes',
+                        help='Find citation for this class.')
 
 
 def _cite_cmd(options):
@@ -340,8 +342,11 @@ def _cite_cmd(options):
     else:
         out = open(options.outfile, 'w')
 
+    if not options.classes:
+        options.classes = None
+
     def _cite(prob):
-        find_citations(prob, out_stream=out)
+        print_citations(prob, classes=options.classes, out_stream=out)
         exit()
 
     return _cite

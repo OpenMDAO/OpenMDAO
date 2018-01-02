@@ -310,6 +310,7 @@ embed-options
 
         The output from the above syntax should result in a neatly-formatted table of options like this:
 
+
         .. embed-options::
             openmdao.solvers.linear.linear_block_jac
                 LinearBlockJac
@@ -321,7 +322,8 @@ embed-shell-cmd
 
     `embed-shell-cmd` is a custom directive that lets a developer insert a shell command and
     its corresponding console output into a doc.  The developer must supply the shell command
-    and optionally the directory where the command will run.
+    and optionally the directory where the command will run.  Also, setting the `show_cmd`
+    option to `false` will hide the shell command and show only the output resulting from it.
 
     .. code-block:: none
 
@@ -334,6 +336,28 @@ embed-shell-cmd
     .. embed-shell-cmd::
         :cmd: openmdao tree circuit.py
         :dir: ../test_suite/scripts
+
+
+embed-bibtex
++++++++++++++++
+
+    `embed-bibtex` is a custom directive that lets a developer insert a citation for a
+    particular class into a doc.  The arguments are the module path and the name of the
+    class (or the name of a function that returns an instance of the desired class when
+    called with no arguments).
+
+    .. code-block:: none
+
+        .. embed-bibtex::
+            openmdao.drivers.scipy_optimizer
+            ScipyOptimizer
+
+
+    The output from the above syntax should look like this:
+
+    .. embed-bibtex::
+        openmdao.drivers.scipy_optimizer
+        ScipyOptimizer
 
 
 Tagging
