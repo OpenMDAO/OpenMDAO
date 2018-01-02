@@ -1,5 +1,5 @@
 
-import sys
+import importlib
 
 from six import iteritems
 from docutils import nodes
@@ -37,8 +37,7 @@ class EmbedOptionsDirective(Directive):
     def run(self):
         module_path, class_name, attribute_name = self.arguments
 
-        __import__(module_path)
-        mod = sys.modules[module_path]
+        mod = importlib.import_module(module_path)
         klass = getattr(mod, class_name)
         options = getattr(klass(), attribute_name)
 
