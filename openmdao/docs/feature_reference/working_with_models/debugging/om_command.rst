@@ -21,7 +21,7 @@ to run.
 
 .. _om-command-view_model:
 
-om view_model
+openmdao view_model
 ###################
 
 The :code:`openmdao view_model` command will generate an :math:`N^2` diagram of the model that is
@@ -41,7 +41,7 @@ will generate an :math:`N^2` diagram like the one below.
 
 .. _om-command-view_connections:
 
-om view_connections
+openmdao view_connections
 #########################
 
 The :code:`openmdao view_connections` command generates a table of connection information for all input and
@@ -68,7 +68,7 @@ model obtained using the command:
 
 .. _om-command-tree:
 
-om tree
+openmdao tree
 #############
 
 The :code:`openmdao tree` command prints an indented list of all systems in the model tree.  Each system's
@@ -87,7 +87,7 @@ Here's an example of the tree output for a simple circuit model:
 
 .. _om-command-summary:
 
-om summary
+openmdao summary
 ################
 
 The :code:`openmdao summary` command prints a high level summary of the model.  For example:
@@ -99,7 +99,7 @@ The :code:`openmdao summary` command prints a high level summary of the model.  
 .. _om-command-cite:
 
 
-om cite
+openmdao cite
 #############
 
 The :code:`openmdao cite` command prints citations for any classes in the model that have them.
@@ -139,7 +139,7 @@ the function groups available at the time of this writing:
 
 .. _om-command-iprof:
 
-om iprof
+openmdao iprof
 ##############
 
 The :code:`openmdao iprof` command will display an icicle plot showing the time elapsed in all of the target
@@ -149,7 +149,7 @@ methods corresponding to each object instance that they were called on.  For mor
 
 .. _om-command-iprof-totals:
 
-om iprof_totals
+openmdao iprof_totals
 #####################
 
 The :code:`openmdao iprof_totals` command performs the same profiling as `openmdao iprof`, but it outputs a simple
@@ -158,7 +158,7 @@ section contains more details.
 
 .. _om-command-mem:
 
-om mem
+openmdao mem
 ############
 
 The :code:`openmdao mem` command profiles the memory usage of a specified set of functions.  For more detail,
@@ -166,7 +166,7 @@ see :ref:`Memory Profiling <instbasedmemory>`.
 
 .. _om-command-trace:
 
-om trace
+openmdao trace
 ##############
 
 The :code:`openmdao trace` command prints a call trace for a specified set of functions.  Optionally it can
