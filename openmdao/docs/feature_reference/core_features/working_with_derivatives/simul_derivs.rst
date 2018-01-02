@@ -136,7 +136,7 @@ The *color_info* data structure can be generated automatically using the followi
 
 .. code-block:: none
 
-    om simul_coloring <your_script_name>
+    openmdao simul_coloring <your_script_name>
 
 
 The data structure will be written to the console and can be cut and pasted into your script
@@ -185,4 +185,4 @@ is 1, but you can increment that to 2 or higher if needed.
 
 .. code-block:: none
 
-    om simul_coloring -n 2 <your_script_name>
+    openmdao simul_coloring -n 2 <your_script_name>

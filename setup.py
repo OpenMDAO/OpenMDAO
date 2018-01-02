@@ -96,6 +96,6 @@ setup(
     wingproj=openmdao.devtools.wingproj:run_wing
     webview=openmdao.devtools.webview:webview_argv
     run_test=openmdao.devtools.run_test:run_test
-    om=openmdao.utils.om:openmdao_cmd
+    openmdao=openmdao.utils.om:openmdao_cmd
     """
 )

@@ -328,13 +328,13 @@ embed-shell-cmd
     .. code-block:: none
 
         .. embed-shell-cmd::
-            :cmd: om tree circuit.py
+            :cmd: openmdao tree circuit.py
             :dir: ../test_suite/scripts
 
     The output from the above syntax should look like this:
 
     .. embed-shell-cmd::
-        :cmd: om tree circuit.py
+        :cmd: openmdao tree circuit.py
         :dir: ../test_suite/scripts
 
 

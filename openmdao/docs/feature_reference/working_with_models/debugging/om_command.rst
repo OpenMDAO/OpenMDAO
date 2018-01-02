@@ -24,13 +24,13 @@ to run.
 om view_model
 ###################
 
-The :code:`om view_model` command will generate an :math:`N^2` diagram of the model that is
+The :code:`openmdao view_model` command will generate an :math:`N^2` diagram of the model that is
 viewable in a browser, for example:
 
 
 .. code-block:: none
 
-    om view_model circuit_example.py
+    openmdao view_model circuit_example.py
 
 
 will generate an :math:`N^2` diagram like the one below.
@@ -44,7 +44,7 @@ will generate an :math:`N^2` diagram like the one below.
 om view_connections
 #########################
 
-The :code:`om view_connections` command generates a table of connection information for all input and
+The :code:`openmdao view_connections` command generates a table of connection information for all input and
 output variables in the model.  Units can be compared for each connection and unconnected inputs
 and outputs can be easily identified.  The displayed variables can be filtered by source system
 and/or target system.  They can also be filtered by NO CONNECTION, which will show all of the
@@ -57,7 +57,7 @@ model obtained using the command:
 
 .. code-block:: none
 
-    om view_connections propulsor.py
+    openmdao view_connections propulsor.py
 
 
 .. figure:: view_connections.png
@@ -71,7 +71,7 @@ model obtained using the command:
 om tree
 #############
 
-The :code:`om tree` command prints an indented list of all systems in the model tree.  Each system's
+The :code:`openmdao tree` command prints an indented list of all systems in the model tree.  Each system's
 type and name are shown, along with linear and nonlinear solvers if they differ from the defaults,
 which are LinearRunOnce and NonlinearRunOnce respectively.  If the `-c` option is used, the tree will print
 in color if the terminal supports it and the *colorama* package is installed.  The tree Command
@@ -82,7 +82,7 @@ Here's an example of the tree output for a simple circuit model:
 
 
 .. embed-shell-cmd::
-    :cmd: om tree circuit.py
+    :cmd: openmdao tree circuit.py
     :dir: ../test_suite/scripts
 
 .. _om-command-summary:
@@ -90,10 +90,10 @@ Here's an example of the tree output for a simple circuit model:
 om summary
 ################
 
-The :code:`om summary` command prints a high level summary of the model.  For example:
+The :code:`openmdao summary` command prints a high level summary of the model.  For example:
 
 .. embed-shell-cmd::
-    :cmd: om summary circuit.py
+    :cmd: openmdao summary circuit.py
     :dir: ../test_suite/scripts
 
 .. _om-command-cite:
@@ -102,13 +102,13 @@ The :code:`om summary` command prints a high level summary of the model.  For ex
 om cite
 #############
 
-The :code:`om cite` command prints citations for any classes in the model that have them.
+The :code:`openmdao cite` command prints citations for any classes in the model that have them.
 It supports optional `-c` arguments to allow you to limit displayed citations to
 only those belonging to a particular class or group of classes.  By default, all citations for
 any class used in the problem will be displayed. For example:
 
 .. embed-shell-cmd::
-    :cmd: om cite circuit.py
+    :cmd: openmdao cite circuit.py
     :dir: ../test_suite/scripts
 
 
@@ -118,12 +118,12 @@ Profiling and Tracing Commands
 
 The following commands perform profiling or tracing on a run script, filtering their target
 functions based on pre-defined groups of functions that can be displayed using the `-h` command
-line option.  For example, here's the usage output for the `om trace` command, which includes
+line option.  For example, here's the usage output for the `openmdao trace` command, which includes
 the function groups available at the time of this writing:
 
 .. code-block:: none
 
-    usage: om trace [-h] [-g METHODS] [-v] file
+    usage: openmdao trace [-h] [-g METHODS] [-v] file
 
     positional arguments:
       file                  Python file to be traced.
@@ -142,7 +142,7 @@ the function groups available at the time of this writing:
 om iprof
 ##############
 
-The :code:`om iprof` command will display an icicle plot showing the time elapsed in all of the target
+The :code:`openmdao iprof` command will display an icicle plot showing the time elapsed in all of the target
 methods corresponding to each object instance that they were called on.  For more details, see
 :ref:`Instance-based Profiling <instbasedprofile>`.
 
@@ -152,7 +152,7 @@ methods corresponding to each object instance that they were called on.  For mor
 om iprof_totals
 #####################
 
-The :code:`om iprof_totals` command performs the same profiling as `om iprof`, but it outputs a simple
+The :code:`openmdao iprof_totals` command performs the same profiling as `openmdao iprof`, but it outputs a simple
 text based summary of the total time spent in each method.  The :ref:`Instance-based Profiling <instbasedprofile>`
 section contains more details.
 
@@ -161,7 +161,7 @@ section contains more details.
 om mem
 ############
 
-The :code:`om mem` command profiles the memory usage of a specified set of functions.  For more detail,
+The :code:`openmdao mem` command profiles the memory usage of a specified set of functions.  For more detail,
 see :ref:`Memory Profiling <instbasedmemory>`.
 
 .. _om-command-trace:
@@ -169,6 +169,6 @@ see :ref:`Memory Profiling <instbasedmemory>`.
 om trace
 ##############
 
-The :code:`om trace` command prints a call trace for a specified set of functions.  Optionally it can
+The :code:`openmdao trace` command prints a call trace for a specified set of functions.  Optionally it can
 display values of function locals and return values.  For more detail, see
 :ref:`Instance-based Call Tracing <instbasedtrace>`.
