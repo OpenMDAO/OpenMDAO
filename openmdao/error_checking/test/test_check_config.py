@@ -30,7 +30,7 @@ class TestCheckConfig(unittest.TestCase):
         C4 = G4.add_subsystem("C4", ExecComp('y=x*2.0+v'))
 
         testlogger = TestLogger()
-        p.setup(logger=testlogger)
+        p.setup(check=True, logger=testlogger)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -45,7 +45,7 @@ class TestCheckConfig(unittest.TestCase):
             'G3.G4.C4.x'
         ]
 
-        actual = testlogger.get('warning')[0].split('[', 1)[1].split(']')[0].split(',')
+        actual = testlogger.get('warning')[0].splitlines()[1:]
         actual = [a.strip().strip("'") for a in actual]
 
         self.assertEqual(expected, actual)
@@ -73,7 +73,7 @@ class TestCheckConfig(unittest.TestCase):
         root.connect("indep.x", "C4.b")
 
         testlogger = TestLogger()
-        p.setup(logger=testlogger)
+        p.setup(check=True, logger=testlogger)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -111,7 +111,7 @@ class TestCheckConfig(unittest.TestCase):
         root.connect("indep.x", "C4.b")
 
         testlogger = TestLogger()
-        p.setup(logger=testlogger)
+        p.setup(check=True, logger=testlogger)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -142,7 +142,7 @@ class TestCheckConfig(unittest.TestCase):
         p.model.connect("indep.x", "C2.a")
 
         testlogger = TestLogger()
-        p.setup(logger=testlogger)
+        p.setup(check=True, logger=testlogger)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -190,7 +190,7 @@ class TestCheckConfig(unittest.TestCase):
         G1.connect("C11.z", "C3.b")
 
         testlogger = TestLogger()
-        p.setup(logger=testlogger)
+        p.setup(check=True, logger=testlogger)
 
         # Conclude setup but don't run model.
         p.final_setup()

@@ -17,6 +17,7 @@ from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
 from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setup_parser
 from openmdao.devtools.iprofile import _iprof_totals_exec, _iprof_totals_setup_parser
 from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser
+from openmdao.error_checking.check_config import _check_config_cmd, _check_config_setup_parser
 from openmdao.devtools.iprof_utils import _Options
 
 from openmdao.utils.find_cite import print_citations
@@ -356,6 +357,7 @@ _post_setup_map = {
     'dump_idxs': (_dump_dist_idxs_setup_parser, _dump_dist_idxs_cmd),
     'simul_coloring': (_simul_coloring_setup_parser, _simul_coloring_cmd),
     'cite': (_cite_setup_parser, _cite_cmd),
+    'check': (_check_config_setup_parser, _check_config_cmd),
 }
 
 # Other non-post-setup functions go here
