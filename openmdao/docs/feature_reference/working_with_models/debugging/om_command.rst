@@ -98,15 +98,19 @@ The :code:`openmdao summary` command prints a high level summary of the model.  
 
 .. _om-command-cite:
 
+
 openmdao cite
 #############
 
 The :code:`openmdao cite` command prints citations for any classes in the model that have them.
-For example:
+It supports optional `-c` arguments to allow you to limit displayed citations to
+only those belonging to a particular class or group of classes.  By default, all citations for
+any class used in the problem will be displayed. For example:
 
 .. embed-shell-cmd::
     :cmd: openmdao cite circuit.py
     :dir: ../test_suite/scripts
+
 
 
 Profiling and Tracing Commands

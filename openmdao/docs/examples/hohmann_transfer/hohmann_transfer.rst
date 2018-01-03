@@ -102,7 +102,7 @@ The specific angular momentum can also be computed as:
     h = \sqrt{p \mu}
 
 Where :math:`p` is the semilatus rectum of the orbit and :math:`\mu` is
-the gravitational paramter of the central body.
+the gravitational parameter of the central body.
 
 The semilatus rectum is computed as:
 

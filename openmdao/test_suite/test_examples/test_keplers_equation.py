@@ -15,7 +15,7 @@ class TestKeplersEquation(unittest.TestCase):
         from numpy.testing import assert_almost_equal
 
         from openmdao.api import Problem, Group, IndepVarComp, BalanceComp, \
-            ExecComp, DirectSolver, NewtonSolver, DenseJacobian
+            ExecComp, DirectSolver, NewtonSolver
 
         prob = Problem(model=Group())
 

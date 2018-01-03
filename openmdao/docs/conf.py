@@ -96,6 +96,7 @@ extensions = [
     'embed_test',
     'embed_compare',
     'embed_shell_cmd',
+    'embed_bibtex',
     'tags'
 ]
 

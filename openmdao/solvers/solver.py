@@ -167,7 +167,7 @@ class Solver(object):
         self.options.declare('iprint', types=int, default=1,
                              desc='whether to print output')
         self.options.declare('err_on_maxiter', types=bool, default=False,
-                             desc="When True, AnlysisError will be raised if we don't convege.")
+                             desc="When True, AnalysisError will be raised if we don't converge.")
         # Case recording options
         self.recording_options.declare('record_abs_error', types=bool, default=True,
                                        desc='Set to True to record absolute error at the \

@@ -210,10 +210,8 @@ class TestHohmannTransfer(unittest.TestCase):
 
         print('Delta-V (km/s):', prob['delta_v'][0])
         print('Inclination change split (deg):', prob['dinc1'][0], prob['dinc2'][0])
-        print()
 
         prob.run_driver()
 
-        print()
         print('Optimized Delta-V (km/s):', prob['delta_v'][0])
         print('Inclination change split (deg):', prob['dinc1'][0], prob['dinc2'][0])

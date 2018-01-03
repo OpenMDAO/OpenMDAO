@@ -43,7 +43,7 @@ def _wrapper_set_abs(jac, set_abs, key, subjac):
 
 def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     """
-    Find all sets of disjoint columns in the total jac and their corresponding rows.
+    Find sets of disjoint columns in the total jac and their corresponding rows.
 
     Parameters
     ----------
@@ -54,7 +54,8 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     repeats : int
         Number of times to repeat total jacobian computation.
     tol : float
-        Tolerance on values in jacobian.  Anything smaller in magnitude will be set to 0.0.
+        Tolerance on values in jacobian.  Anything smaller in magnitude will be
+        set to 0.0.
 
     Returns
     -------
@@ -221,7 +222,8 @@ def get_simul_meta(problem, mode='fwd', repeats=1, stream=sys.stdout):
     for res in res_idxs:
         simul_map = {}
         for dv in res_idxs[res]:
-            simul_map[dv] = {c: v for c, v in iteritems(res_idxs[res][dv]) if c in all_colors}
+            simul_map[dv] = {c: v for c, v in iteritems(res_idxs[res][dv])
+                             if c in all_colors}
             if not simul_map[dv]:
                 del simul_map[dv]
 
@@ -229,7 +231,21 @@ def get_simul_meta(problem, mode='fwd', repeats=1, stream=sys.stdout):
             simul_maps[res] = simul_map
 
     if stream is not None:
-        stream.write("\n%s\n" % ((simul_colorings, simul_maps),))
+        stream.write("\n({\n")
+        for n, coloring in iteritems(simul_colorings):
+            stream.write("   '%s': %s,\n" % (n, coloring))
+        stream.write("},")
+
+        stream.write("\n{\n")
+        for res, dvdict in iteritems(simul_maps):
+            stream.write("   '%s': {\n" % res)
+            for dv, coldict in iteritems(dvdict):
+                stream.write("      '%s': {\n" % dv)
+                for color, idxs in iteritems(coldict):
+                    stream.write("         %s: %s,\n" % (color, idxs))
+                stream.write("      },\n")
+            stream.write("   },\n")
+        stream.write("})")
 
     return simul_colorings, simul_maps
 
@@ -252,7 +268,7 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
     desvars = problem.driver._designvars
     responses = problem.driver._responses
 
-    stream.write("\nColoring Summary\n")
+    stream.write("\n\nColoring Summary\n")
 
     tot_colors = 0
     tot_size = 0
@@ -277,3 +293,46 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
         stream.write("No simultaneous derivative solves are possible in this configuration.\n")
     else:
         stream.write("Total colors vs. total size: %d vs %d\n" % (tot_colors, tot_size))
+
+
+def _simul_coloring_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao simul_coloring' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-o', action='store', dest='outfile', help='output file.')
+    parser.add_argument('-n', action='store', dest='num_jacs', default=1, type=int,
+                        help='number of times to repeat total deriv computation.')
+
+
+def _simul_coloring_cmd(options):
+    """
+    Return the post_setup hook function for 'openmdao simul_coloring'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
+    from openmdao.core.problem import Problem
+
+    def _simul_coloring(prob):
+        if options.outfile is None:
+            outfile = sys.stdout
+        else:
+            outfile = open(options.outfile, 'w')
+        Problem._post_setup_func = None  # avoid recursive loop
+        color_info = get_simul_meta(prob, repeats=options.num_jacs, stream=outfile)
+        simul_coloring_summary(prob, color_info, stream=outfile)
+        exit()
+    return _simul_coloring

@@ -540,44 +540,24 @@ class pyOptSparseDriver(Driver):
         mode : str
             Derivative direction, either 'fwd' or 'rev'.
         """
-        if mode == 'rev':
-            raise NotImplementedError("Simultaneous derivatives are currently not supported "
-                                      "in 'rev' mode")
+        super(pyOptSparseDriver, self)._setup_simul_coloring(mode)
 
-        prom2abs = self._problem.model._var_allprocs_prom2abs_list['output']
+        for res, meta in iteritems(self._responses):
+            if 'simul_map' in meta and meta['simul_map']:
+                dv_dict = meta['simul_map']
+                self._res_jacs[res] = {}
+                for dv, col_dict in iteritems(dv_dict):
+                    rows = []
+                    cols = []
+                    for color, (row_idxs, col_idxs) in iteritems(col_dict):
+                        rows.append(row_idxs)
+                        cols.append(col_idxs)
 
-        coloring, maps = self._simul_coloring_info
-        for dv, colors in iteritems(coloring):
-            if dv not in self._designvars:
-                # convert name from promoted to absolute
-                dv = prom2abs[dv][0]
-            self._designvars[dv]['simul_deriv_color'] = colors
-
-        for res, dvdict in iteritems(maps):
-            if res not in self._responses:
-                # convert name from promoted to absolute
-                res = prom2abs[res][0]
-            self._responses[res]['simul_map'] = dvdict
-            self._res_jacs[res] = {}
-
-            for dv, col_dict in dvdict.items():
-                if dv not in self._designvars:
-                    # convert name from promoted to absolute and replace dictionary key
-                    del dvdict[dv]
-                    dv = prom2abs[dv][0]
-                    dvdict[dv] = col_dict
-
-                rows = []
-                cols = []
-                for color, (row_idxs, col_idxs) in iteritems(col_dict):
-                    rows.append(row_idxs)
-                    cols.append(col_idxs)
-
-                row = np.hstack(rows)
-                col = np.hstack(cols)
-                # print("sparsity for %s, %s: %d of %s" % (res, dv, row.size,
-                #       (self._responses[res]['size'] * self._designvars[dv]['size'],)))
-                self._res_jacs[res][dv] = {
-                    'coo': [row, col, np.zeros(row.size)],
-                    'shape': [self._responses[res]['size'], self._designvars[dv]['size']]
-                }
+                    row = np.hstack(rows)
+                    col = np.hstack(cols)
+                    # print("sparsity for %s, %s: %d of %s" % (res, dv, row.size,
+                    #       (self._responses[res]['size'] * self._designvars[dv]['size'],)))
+                    self._res_jacs[res][dv] = {
+                        'coo': [row, col, np.zeros(row.size)],
+                        'shape': [self._responses[res]['size'], self._designvars[dv]['size']]
+                    }

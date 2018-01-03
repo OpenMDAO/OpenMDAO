@@ -26,7 +26,7 @@ to the balance, it solves the following equation:
 .. math::
      lhs(var) \cdot mult(var) = rhs(var)
 
-The *mult* term is an optional multiplier than can be applied to the
+The :math:`mult` term is an optional multiplier than can be applied to the
 left-hand side (LHS) of the equation.  For our example, we will assign the right-hand side
 (RHS) to the mean anomaly (:math:`M`), and the left-hand side to :math:`E - e \sin{E}`
 
@@ -40,8 +40,13 @@ equation, using :math:`M` as the initial guess for :math:`E` is a good starting 
 In summary, the recipe for solving Kepler's equation is as follows:
 
 - Define a problem with a `Group` as its model.
+<<<<<<< HEAD
 - To that Group, add components which provide, :math:`M`, :math:`e`, and the left-hand side of Kepler's equation.
 - Add a linear and nonlinear solver to the Group, since the default solvers do not iterate.
+=======
+- To that Group, add components which provide, `M`, `e`, and the left-hand-side of Kepler's equation.
+- Add a linear and nonlinear solver to the Group, since the default solver's do not iterate.
+>>>>>>> master
 - Setup the problem, set values for the inputs, and run the model.
 
 .. embed-test::
