@@ -257,6 +257,15 @@ class System(object):
         Dict of list of var names to record
     _norm0: float
         Normalization factor
+    # Constants used by list_inputs and list_outputs methods for formatting tables they write
+    _column_widths : dict
+        widths of the columns
+    _align : str
+        The Python formatting alignment used when writing values into columns
+    _column_spacing: int
+        Number of spaces between columns
+    _indent_inc: int
+        Number of spaces indented in levels of the hierarchy
     """
 
     def __init__(self, **kwargs):
@@ -381,6 +390,23 @@ class System(object):
         self._has_output_scaling = False
         self._has_resid_scaling = False
         self._has_input_scaling = False
+
+        # Formatting parameters for _write_outputs and _write_output_row methods
+        #     that are used by list_inputs and list_outputs methods
+        self._column_widths = {
+            'value': 20,
+            'resids': 20,
+            'units': 10,
+            'shape': 10,
+            'lower': 20,
+            'upper': 20,
+            'ref': 20,
+            'ref0': 20,
+            'res_ref': 20,
+        }
+        self._align = ''
+        self._column_spacing = 2
+        self._indent_inc = 2
 
     def _check_reconf(self):
         """
@@ -2507,14 +2533,36 @@ class System(object):
         with self._scaled_context_all():
             self._apply_nonlinear()
 
-    def list_inputs(self, values=True, out_stream='stdout'):
+    def list_inputs(self,
+                    values=True,
+                    units=False,
+                    hierarchical=True,
+                    print_arrays=False,
+                    out_stream='stdout'):
         """
-        List inputs.
+        Return and optionally log a list of input names and other optional information.
+
+        If the model is parallel, only the local variables are returned to the process.
+        Also optionally logs the information to a user defined output stream. If the model is
+        parallel, the rank 0 process logs information about all variables across all processes.
 
         Parameters
         ----------
         values : bool, optional
-            When True, display/return input values as well as names. Default is True.
+            When True, display/return input values. Default is True.
+
+        units : bool, optional
+            When True, display/return units. Default is False.
+
+        hierarchical : bool, optional
+            When True, human readable output shows variables in hierarchical format.
+
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+                        The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
+                        by the values set with numpy.set_printoptions
+            Default is False.
 
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
@@ -2523,41 +2571,45 @@ class System(object):
         Returns
         -------
         list
-            list of of input names, or (name, value) if values is True
+            list of input names and other optional information about those inputs
         """
         if self._inputs is None:
             raise RuntimeError("Unable to list inputs until model has been run.")
 
+        meta = self._var_abs2meta
         inputs = []
-        for name, val in iteritems(self._inputs._views):
-            inputs.append((name, val)) if values else inputs.append(name)
+
+        for name, val in iteritems(self._inputs._views):  # This is only over the locals
+            outs = {}
+            if values:
+                outs['value'] = val
+            if units:
+                outs['units'] = meta['input'][name]['units']
+            inputs.append((name, outs))
 
         if out_stream:
-            logger = get_logger('list_inputs', out_stream=out_stream)
-
-            count = len(inputs)
-
-            pathname = self.pathname if self.pathname else 'model'
-
-            header = "%d Input(s) to Components in '%s'\n" % (count, pathname)
-            logger.info(header)
-
-            if count:
-                logger.info("-" * len(header) + "\n")
-                if isinstance(inputs[0], tuple):
-                    for name, val in sorted(inputs):
-                        logger.info(name)
-                        logger.info("  value:    " + str(val) + "\n")
-                else:
-                    for name in sorted(inputs):
-                        logger.info(name)
-                logger.info('\n')
+            self._write_outputs('input', None, inputs, hierarchical, print_arrays, out_stream)
 
         return inputs
 
-    def list_outputs(self, explicit=True, implicit=True, values=True, out_stream='stdout'):
+    def list_outputs(self,
+                     explicit=True, implicit=True,
+                     values=True,
+                     residuals=False,
+                     residuals_tol=None,
+                     units=False,
+                     shape=False,
+                     bounds=False,
+                     scaling=False,
+                     hierarchical=True,
+                     print_arrays=False,
+                     out_stream='stdout'):
         """
-        List outputs.
+        Return and optionally log a list of output names and other optional information.
+
+        If the model is parallel, only the local variables are returned to the process.
+        Also optionally logs the information to a user defined output stream. If the model is
+        parallel, the rank 0 process logs information about all variables across all processes.
 
         Parameters
         ----------
@@ -2568,7 +2620,37 @@ class System(object):
             include outputs from implicit components. Default is True.
 
         values : bool, optional
-            When True, display/return output values as well as names. Default is True.
+            When True, display/return output values. Default is True.
+
+        residuals : bool, optional
+            When True, display/return residual values. Default is False.
+
+        residuals_tol : float, optional
+            If set, limits the output of list_outputs to only variables where
+            the norm of the resids array is greater than the given 'residuals_tol'.
+            Default is None.
+
+        units : bool, optional
+            When True, display/return units. Default is False.
+
+        shape : bool, optional
+            When True, display/return the shape of the value. Default is False.
+
+        bounds : bool, optional
+            When True, display/return bounds (lower and upper). Default is False.
+
+        scaling : bool, optional
+            When True, display/return scaling (ref, ref0, and res_ref). Default is False.
+
+        hierarchical : bool, optional
+            When True, human readable output shows variables in hierarchical format.
+
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+                        The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format  is affected
+                        by the values set with numpy.set_printoptions
+            Default is False.
 
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
@@ -2577,26 +2659,50 @@ class System(object):
         Returns
         -------
         list
-            list of of output names, or (name, value) if values is True
+            list of output names and other optional information about those outputs
         """
         if self._outputs is None:
             raise RuntimeError("Unable to list outputs until model has been run.")
 
+        # Only gathering up values and metadata from this proc, if MPI
+        meta = self._var_abs2meta  # This only includes metadata for this process.
         states = self._list_states()
 
+        # Go though the hierarchy. Printing Systems
+        # If the System owns an output directly, show its output
         expl_outputs = []
         impl_outputs = []
         for name, val in iteritems(self._outputs._views):
+            if residuals_tol and np.linalg.norm(self._residuals._views[name]) < residuals_tol:
+                continue
+            outs = {}
+            if values:
+                outs['value'] = val
+            if residuals:
+                outs['resids'] = self._residuals._views[name]
+            if units:
+                outs['units'] = meta['output'][name]['units']
+            if shape:
+                outs['shape'] = val.shape
+            if bounds:
+                outs['lower'] = meta['output'][name]['lower']
+                outs['upper'] = meta['output'][name]['upper']
+            if scaling:
+                outs['ref'] = meta['output'][name]['ref']
+                outs['ref0'] = meta['output'][name]['ref0']
+                outs['res_ref'] = meta['output'][name]['res_ref']
             if name in states:
-                impl_outputs.append((name, val)) if values else impl_outputs.append(name)
+                impl_outputs.append((name, outs))
             else:
-                expl_outputs.append((name, val)) if values else expl_outputs.append(name)
+                expl_outputs.append((name, outs))
 
         if out_stream:
             if explicit:
-                self._write_outputs('Explicit', expl_outputs, out_stream)
+                self._write_outputs('output', 'Explicit', expl_outputs, hierarchical, print_arrays,
+                                    out_stream)
             if implicit:
-                self._write_outputs('Implicit', impl_outputs, out_stream)
+                self._write_outputs('output', 'Implicit', impl_outputs, hierarchical, print_arrays,
+                                    out_stream)
 
         if explicit and implicit:
             return expl_outputs + impl_outputs
@@ -2607,106 +2713,256 @@ class System(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def list_residuals(self, explicit=True, implicit=True, values=True, out_stream='stdout',
-                       tol=None):
+    def _write_outputs(self, in_or_out, comp_type, outputs, hierarchical, print_arrays,
+                       out_stream='stdout'):
         """
-        List residuals.
+        Write table of variable names, values, residuals, and metadata to out_stream.
+
+        The output values could actually represent input variables.
+        In this context, outputs refers to the data that is being logged to an output stream.
 
         Parameters
         ----------
-        explicit : bool, optional
-            include outputs from explicit components. Default is True.
+        in_or_out : str, 'input' or 'output'
+            indicates whether the values passed in are from inputs or output variables.
 
-        implicit : bool, optional
-            include outputs from implicit components. Default is True.
-
-        values : bool, optional
-            When True, display/return residual values as well as names. Default is True.
-
-        out_stream : 'stdout', 'stderr' or file-like
-            Where to send human readable output. Default is 'stdout'.
-            Set to None to suppress.
-
-        tol : float, optional
-            If set, limits the output of list_residuals to only variables where
-            the norm of the resids array is greater than the given 'tol'.
-            Default is None.
-
-        Returns
-        -------
-        list
-            list of of residual names, or (name, value) if values is True
-        """
-        if self._residuals is None:
-            raise RuntimeError("Unable to list residuals until model has been run.")
-
-        states = self._list_states()
-
-        expl_resids = []
-        impl_resids = []
-        for name, val in iteritems(self._residuals._views):
-            if tol and np.linalg.norm(val) < tol:
-                continue
-            if name in states:
-                impl_resids.append((name, val)) if values else impl_resids.append(name)
-            else:
-                expl_resids.append((name, val)) if values else expl_resids.append(name)
-
-        if out_stream:
-            if explicit:
-                self._write_outputs('Explicit', expl_resids, out_stream)
-            if implicit:
-                self._write_outputs('Implicit', impl_resids, out_stream)
-
-        if explicit and implicit:
-            return expl_resids + impl_resids
-        elif explicit:
-            return expl_resids
-        elif implicit:
-            return impl_resids
-        else:
-            raise RuntimeError('You have excluded both Explicit and Implicit components.')
-
-    def _write_outputs(self, comp_type, outputs, out_stream='stdout'):
-        """
-        Write formatted output values and residuals to out_stream.
-
-        Parameters
-        ----------
         comp_type : str, 'Explicit' or 'Implicit'
             the type of component with the output values.
 
         outputs : list
-            list of (name, value) tuples.
+            list of (name, dict of vals and metadata) tuples.
+
+        hierarchical : bool
+            When True, human readable output shows variables in hierarchical format.
+
+        print_arrays : bool
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+                        The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format  is affected
+                        by the values set with numpy.set_printoptions
+            Default is False.
 
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
+
         """
         if out_stream is None:
             return
 
-        logger = get_logger('list_outputs', out_stream=out_stream)
+        # Only local metadata but the most complete
+        meta = self._var_abs2meta[in_or_out]
 
-        count = len(outputs)
+        # Make a dict of outputs. Makes it easier to work with in this method
+        dict_of_outputs = OrderedDict()
+        for name, vals in outputs:
+            dict_of_outputs[name] = vals
 
+        # If parallel, gather up the outputs. All procs must call this
+        if MPI:
+            # returns a list, one per proc
+            all_dict_of_outputs = self.comm.gather(dict_of_outputs, root=0)
+
+        if MPI and MPI.COMM_WORLD.rank > 0:  # If MPI, only the root process should print
+            return
+
+        # If MPI, and on rank 0, need to gather up all the variables
+        if MPI:  # rest of this only done on rank 0
+            dict_of_outputs = all_dict_of_outputs[0]  # start with rank 0
+            for proc_outputs in all_dict_of_outputs[1:]:  # In rank order go thru rest of the procs
+                for name, vals in iteritems(proc_outputs):
+                    if name not in dict_of_outputs:  # If not in the merged dict, add it
+                        dict_of_outputs[name] = proc_outputs[name]
+                    else:  # If in there already, only need to deal with it if it is a
+                        # distributed array.
+                        # Checking to see if  distributed depends on if it is an input or output
+                        if in_or_out == 'input':
+                            is_distributed = meta[name]['src_indices'] is not None
+                        else:
+                            is_distributed = meta[name]['distributed']
+                        if is_distributed:
+                            # TODO no support for > 1D arrays
+                            #   meta.src_indices has the info we need to piece together arrays
+                            if 'value' in dict_of_outputs[name]:
+                                dict_of_outputs[name]['value'] = \
+                                    np.append(dict_of_outputs[name]['value'],
+                                              proc_outputs[name]['value'])
+                            if 'shape' in dict_of_outputs[name]:
+                                # TODO might want to use allprocs_abs2meta_out[name]['global_shape']
+                                dict_of_outputs[name]['shape'] = \
+                                    dict_of_outputs[name]['value'].shape
+                            if 'resids' in dict_of_outputs[name]:
+                                dict_of_outputs[name]['resids'] = \
+                                    np.append(dict_of_outputs[name]['resids'],
+                                              proc_outputs[name]['resids'])
+
+        count = len(dict_of_outputs)
+
+        # Write header
+        logger_name = 'list_inputs' if in_or_out == 'input' else 'list_outputs'
+        logger = get_logger(logger_name, out_stream=out_stream)
         pathname = self.pathname if self.pathname else 'model'
-
-        header = "%d %s Output(s) in '%s'\n" % (count, comp_type, pathname)
+        header_name = 'Input' if in_or_out == 'input' else 'Output'
+        if in_or_out == 'input':
+            header = "%d %s(s) in '%s'" % (count, header_name, pathname)
+        else:
+            header = "%d %s %s(s) in '%s'" % (count, comp_type, header_name, pathname)
         logger.info(header)
+        logger.info("-" * len(header) + "\n")
 
-        if count:
-            logger.info("-" * len(header) + "\n")
-            if isinstance(outputs[0], tuple):
-                for name, _ in sorted(outputs):
-                    logger.info("%s" % name)
-                    logger.info("  value:    " + str(self._outputs._views[name]))
-                    logger.info("  residual: " + str(self._residuals._views[name]))
-                    logger.info('\n')
+        if not count:
+            return
+
+        # Need an ordered list of possible output values for the two cases: inputs and outputs
+        #  so that we do the column output in the correct order
+        if in_or_out == 'input':
+            out_types = ('value', 'units',)
+        else:
+            out_types = ('value', 'resids', 'units', 'shape', 'lower', 'upper', 'ref',
+                         'ref0', 'res_ref')
+        # Figure out which columns will be displayed
+        # Look at any one of the outputs, they should all be the same
+        outputs = dict_of_outputs[list(dict_of_outputs)[0]]
+        column_names = []
+        for out_type in out_types:
+            if out_type in outputs:
+                column_names.append(out_type)
+
+        top_level_system_name = 'top'
+
+        # Find with width of the first column in the table
+        #    Need to look through all the possible varnames to find the max width
+        max_varname_len = max(len(top_level_system_name), len('varname'))
+        if hierarchical:
+            for name, outs in iteritems(dict_of_outputs):
+                for i, name_part in enumerate(name.split('.')):
+                    total_len = (i + 1) * self._indent_inc + len(name_part)
+                    max_varname_len = max(max_varname_len, total_len)
+        else:
+            for name, outs in iteritems(dict_of_outputs):
+                max_varname_len = max(max_varname_len, len(name))
+
+        # Determine the column widths of the data fields by finding the max width for all rows
+        for column_name in column_names:
+            self._column_widths[column_name] = len(column_name)  # has to be able to display name!
+        for name in self._var_allprocs_abs_names[in_or_out]:
+            if name in dict_of_outputs:
+                for column_name in column_names:
+                    if isinstance(dict_of_outputs[name][column_name], np.ndarray) and \
+                            dict_of_outputs[name][column_name].size > 1:
+                        out = '|{}|'.format(str(np.linalg.norm(dict_of_outputs[name][column_name])))
+                    else:
+                        out = str(dict_of_outputs[name][column_name])
+                    self._column_widths[column_name] = max(self._column_widths[column_name],
+                                                           len(str(out)))
+
+        # Write out the column headers
+        column_header = '{:{align}{width}}'.format('varname', align=self._align,
+                                                   width=max_varname_len)
+        column_dashes = max_varname_len * '-'
+        for column_name in column_names:
+            column_header += self._column_spacing * ' '
+            column_header += '{:{align}{width}}'.format(column_name, align=self._align,
+                                                        width=self._column_widths[column_name])
+            column_dashes += self._column_spacing * ' ' + self._column_widths[column_name] * '-'
+        logger.info(column_header)
+        logger.info(column_dashes)
+
+        # Write out the variable names and optional values and metadata
+        if hierarchical:
+            logger.info(top_level_system_name)
+
+            cur_sys_names = []
+            # _var_allprocs_abs_names has all the vars across all procs in execution order
+            #   But not all the values need to be written since, at least for output vars,
+            #      the output var lists are divided into explicit and implicit
+            for varname in self._var_allprocs_abs_names[in_or_out]:
+                if varname not in dict_of_outputs:
+                    continue
+
+                # For hierarchical, need to display system levels in the rows above the
+                #   actual row containing the var name and values. Want to make use
+                #   of the hierarchies that have been written about this.
+                existing_sys_names = []
+                varname_sys_names = varname.split('.')[:-1]
+                for i, sys_name in enumerate(varname_sys_names):
+                    if varname_sys_names[:i + 1] != cur_sys_names[:i + 1]:
+                        break
+                    else:
+                        existing_sys_names = cur_sys_names[:i + 1]
+
+                # What parts of the hierarchy for this varname need to be written that
+                #   were not already written above this
+                remaining_sys_path_parts = varname_sys_names[len(existing_sys_names):]
+
+                # Write the Systems in the var name path
+                indent = len(existing_sys_names) * self._indent_inc
+                for i, sys_name in enumerate(remaining_sys_path_parts):
+                    num_parts = len(existing_sys_names) + i + 1
+                    indent += self._indent_inc
+                    logger.info(indent * ' ' + sys_name)
+                cur_sys_names = varname_sys_names
+
+                indent += self._indent_inc
+                row = '{:{align}{width}}'.format(indent * ' ' + varname.split('.')[-1],
+                                                 align=self._align, width=max_varname_len)
+                self._write_outputs_rows(logger, row, column_names, dict_of_outputs[varname],
+                                         print_arrays)
+        else:
+            for name in self._var_allprocs_abs_names[in_or_out]:
+                if name in dict_of_outputs:
+                    row = '{:{align}{width}}'.format(name, align=self._align, width=max_varname_len)
+                    self._write_outputs_rows(logger, row, column_names, dict_of_outputs[name],
+                                             print_arrays)
+        logger.info('\n')
+
+    def _write_outputs_rows(self, logger, row, column_names, dict_of_outputs, print_arrays):
+        """
+        For one variable, write name, values, residuals, and metadata to out_stream.
+
+        Parameters
+        ----------
+        logger : Logger
+            Logger to which the output will be written.
+
+        row : str
+            The string containing the contents of the beginning of this row output.
+            Contains the name of the System or varname, possibley indented to show hierarchy.
+
+        column_names : list of str
+            Indicates which columns will be written in this row.
+
+        dict_of_outputs : dict
+            Contains the values to be written in this row. Keys are columns names.
+
+        print_arrays : bool
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+                        The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format  is affected
+                        by the values set with numpy.set_printoptions
+            Default is False.
+
+        """
+        left_column_width = len(row)
+        have_array_values = []  # keep track of which values are arrays
+        for column_name in column_names:
+            row += self._column_spacing * ' '
+            if isinstance(dict_of_outputs[column_name], np.ndarray) and \
+                    dict_of_outputs[column_name].size > 1:
+                have_array_values.append(column_name)
+                out = '|{}|'.format(str(np.linalg.norm(dict_of_outputs[column_name])))
             else:
-                for name in sorted(outputs):
-                    logger.info(name)
-                logger.info('\n')
+                out = str(dict_of_outputs[column_name])
+            row += '{:{align}{width}}'.format(out, align=self._align,
+                                              width=self._column_widths[column_name])
+        logger.info(row)
+        if print_arrays:
+            for column_name in have_array_values:
+                logger.info("{}  {}:".format(left_column_width * ' ', column_name))
+                out_str = str(dict_of_outputs[column_name])
+                indented_lines = [(left_column_width + self._indent_inc) * ' ' +
+                                  s for s in out_str.splitlines()]
+                logger.info('\n'.join(indented_lines))
 
     def run_solve_nonlinear(self):
         """

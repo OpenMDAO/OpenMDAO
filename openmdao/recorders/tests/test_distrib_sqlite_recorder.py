@@ -149,8 +149,8 @@ class DistributedRecorderTest(unittest.TestCase):
             self.fail('RuntimeError expected.')
 
     def test_distrib_record_driver(self):
-        size = 100  # how many items in the array
 
+        size = 100  # how many items in the array
         prob = Problem()
         prob.model = Group()
 
