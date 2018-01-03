@@ -116,8 +116,12 @@ class EmbedShellCmdDirective(Directive):
             workdir = os.getcwd()
 
         os.chdir(workdir)
+
         try:
-            output = subprocess.check_output(cmd).decode('utf-8', 'ignore')
+            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode('utf-8', 'ignore')
+        except subprocess.CalledProcessError as err:
+            raise SphinxError("Running of embedded shell command '{}' in docs failed. "
+                              "Output was: \n{}".format(cmdstr, err.output.decode('utf-8')))
         finally:
             os.chdir(startdir)
 
