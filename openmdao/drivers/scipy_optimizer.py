@@ -165,7 +165,7 @@ class ScipyOptimizer(Driver):
                     dict['lower'] = lower
                     dict['upper'] = upper
                     dict['equals'] = None
-                    dict['indices'] = None  # qqq really needs to be figured out
+                    dict['indices'] = None
                     dict['adder'] = None
                     dict['scaler'] = None
                     dict['size'] = meta['size']

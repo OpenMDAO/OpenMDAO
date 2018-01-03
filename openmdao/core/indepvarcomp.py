@@ -89,8 +89,9 @@ class IndepVarComp(ExplicitComponent):
 
         if len(self._indep) == 0 and len(self._indep_external) == 0:
             raise RuntimeError("No outputs (independent variables) have been declared for "
-                               "this component. They must either be declared during "
-                               "instantiation or by calling add_output afterwards.")
+                               "component '{}'. They must either be declared during "
+                               "instantiation or by calling "
+                               "add_output afterwards.".format(self.pathname))
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0):
