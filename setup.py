@@ -37,6 +37,7 @@ setup(
         'openmdao.core',
         'openmdao.devtools',
         'openmdao.devtools.problem_viewer',
+        'openmdao.devtools.iprofile_app',
         'openmdao.docs',
         'openmdao.drivers',
         'openmdao.error_checking',

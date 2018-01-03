@@ -1,3 +1,6 @@
+
+import importlib
+
 from six import iteritems
 from docutils import nodes
 from docutils.statemachine import ViewList
@@ -6,6 +9,8 @@ import sphinx
 
 from sphinx.util.compat import Directive
 from sphinx.util.nodes import nested_parse_with_titles
+
+from openmdao.utils.options_dictionary import OptionsDictionary
 
 
 class EmbedOptionsDirective(Directive):
@@ -30,17 +35,14 @@ class EmbedOptionsDirective(Directive):
     has_content = True
 
     def run(self):
-        if self.arguments and self.arguments[0]:
-            module_path = self.arguments[0]
-        if self.arguments and self.arguments[1]:
-            class_name = self.arguments[1]
-        if self.arguments and self.arguments[2]:
-            attribute_name = self.arguments[2]
+        module_path, class_name, attribute_name = self.arguments
 
-        exec('from {} import {}'.format(module_path, class_name), globals())
-        exec('obj = {}()'.format(class_name), globals())
+        mod = importlib.import_module(module_path)
+        klass = getattr(mod, class_name)
+        options = getattr(klass(), attribute_name)
 
-        options = getattr(obj, attribute_name)
+        if not isinstance(options, OptionsDictionary):
+            raise TypeError("Object '%s' is not an OptionsDictionary." % attribute_name)
 
         outputs = []
         for option_name, option_data in sorted(iteritems(options._dict)):

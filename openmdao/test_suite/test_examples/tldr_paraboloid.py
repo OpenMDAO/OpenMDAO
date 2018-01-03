@@ -4,7 +4,7 @@ import unittest
 
 from openmdao.devtools.testutil import assert_rel_error
 
-from openmdao.api import Problem, ScipyOptimizer, ExecComp, IndepVarComp, find_citations
+from openmdao.api import Problem, ScipyOptimizer, ExecComp, IndepVarComp
 
 
 class TestParaboloidTLDR(unittest.TestCase):

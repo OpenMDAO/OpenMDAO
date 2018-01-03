@@ -55,11 +55,15 @@ test_script:
           $env:MSMPI_BIN = [System.Environment]::GetEnvironmentVariable("MSMPI_BIN","Machine")
           $env:Path = $env:Path + ";" + $env:MSMPI_BIN
           If ((Get-Command "mpiexec.exe" -ErrorAction SilentlyContinue) -eq $null) {throw "error: can't find mpiexec.exe after install"}
+          cd openmdao/docs
+          nmake /f Makefile.nmake clean
+          nmake /f Makefile.nmake all
+          cd ../..
         }
   - testflo . -n 1 -m "ptest*"
   - testflo . -n 1
 
 #after tests, need to cd down so that conf.py can be found for docbuild
-  - cd openmdao/docs
-  - nmake /f Makefile.nmake clean
-  - nmake /f Makefile.nmake all
+# - cd openmdao/docs
+# - nmake /f Makefile.nmake clean
+# - nmake /f Makefile.nmake all
