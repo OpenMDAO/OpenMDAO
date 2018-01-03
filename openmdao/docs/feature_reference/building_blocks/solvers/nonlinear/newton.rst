@@ -67,7 +67,7 @@ NewtonSolver Option Examples
   subsystems will already be in an internally solved state when the Newton solver goes to solve it.
 
   This example shows two instances of the Sellar model which we have connected together to form a larger cycle.
-  We specify a Newton solver in each Sellar sub-group as well as a top level Newton solver which we tell to solve
+  We specify a Newton solver in each Sellar subgroup as well as a top level Newton solver which we tell to solve
   its subsystems.
 
   .. embed-test::

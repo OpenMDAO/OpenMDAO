@@ -1,7 +1,7 @@
 .. _`betz_limit_tutorial`:
 
 Optimizing an Actuator Disk Model to Find Betz Limit for Wind Turbines
-=========================================================================
+======================================================================
 
 The Betz limit is the theoretical maximum amount of kinetic energy that a wind turbine can extract
 from the flow.

@@ -1,8 +1,8 @@
 .. _feature_building_components:
 
-**************************
+***********************
 Working with Components
-**************************
+***********************
 
 .. toctree::
     :maxdepth: 1

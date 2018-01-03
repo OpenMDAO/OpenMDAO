@@ -1,17 +1,17 @@
 .. _BasicUserGuide:
 
-******************
+****************
 Basic User Guide
-******************
+****************
 
 These tutorials serve to give an initial introduction to the OpenMDAO framework.
 They are intended to be read in order, and you should complete all of them to gain a basic understanding of the framework.
-After going through these tutorials you will know how to define components,
+After going through these tutorials, you will know how to define components,
 combine those components into larger models, and then run optimizations on those models.
 
-----------------------------------
-Single Disciplinary Optimization
-----------------------------------
+------------------------------
+Single-Discipline Optimization
+------------------------------
 
 .. toctree::
     :maxdepth: 1
@@ -20,9 +20,9 @@ Single Disciplinary Optimization
     first_analysis.rst
     first_optimization.rst
 
-----------------------------------
+------------------------------
 Multidisciplinary Optimization
-----------------------------------
+------------------------------
 
 .. toctree::
     :maxdepth: 1

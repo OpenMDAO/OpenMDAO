@@ -7,6 +7,18 @@ Listing Variables
 When working with a model, it may sometimes be helpful to examine the input and
 output variables. Several methods are provided for this purpose.
 
+.. automethod:: openmdao.core.system.System.list_inputs
+    :noindex:
+
+.. automethod:: openmdao.core.system.System.list_outputs
+    :noindex:
+
+.. automethod:: openmdao.core.system.System.list_residuals
+    :noindex:
+
+Example
+-------
+
 In the following example, we create a model consisting of two instances of
 `ImplicitComponent` and an `IndepVarComp`.
 
@@ -23,6 +35,8 @@ the `IndepVarComp`.
 .. embed-test::
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.setUp
 
+Usage
+-----
 
 *List Inputs*
 ~~~~~~~~~~~~~
