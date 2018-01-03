@@ -19,6 +19,24 @@ continuing to the end of the user's run script. This makes it convenient to view
 configuration of a model in any run script without having to wait around for the entire script
 to run.
 
+.. _om-command-check:
+
+openmdao check
+##############
+
+The :code:`openmdao check` command will perform a number of checks on a model and display
+errors, warnings, or informational messages describing what it finds. Some of the available
+checks are *hanging_inputs*, which lists any input variables that are not connected, and
+*ubcs*, which will display any component dependency cycles or out-of-order executing components.
+By default, all checks will be done, unless you supply individual checks on the command line
+using *-c* args.  For example:
+
+
+.. code-block:: none
+
+    openmdao check -c hanging_inputs -c ubcs my_model_file.py
+
+
 .. _om-command-view_model:
 
 openmdao view_model
