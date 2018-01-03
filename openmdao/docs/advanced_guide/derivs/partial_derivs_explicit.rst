@@ -32,7 +32,7 @@ You may declare all the partials in just one line as follows (see the :ref:`feat
     self.declare_partials('*', '*')
 
 Declaring the partials in this fashion, however, indicates to OpenMDAO that all the partials are nonzero.
-While you may save yourself a few lines of code using this method, the line savings could come at expense of performance.
+While you may save yourself a few lines of code using this method, the line savings could come at the expense of performance.
 Generally, it is better to be more specific, and declare only the nonzero partials.
 
 .. note::
