@@ -492,10 +492,15 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0)
 
         prob.setup(check=False, mode='fwd')
-        prob.run_driver()
+        failed = prob.run_driver()
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+
+        # test fails if we add this, but I don't know how to fix the failure, so
+        # I just put in a story to fix it (and to add a return of self.fail from
+        # ScipyOptimizer.run)
+        # self.assertTrue(not failed, "Optimization FAILED.")
 
     def test_simple_paraboloid_scaled_desvars_rev(self):
 

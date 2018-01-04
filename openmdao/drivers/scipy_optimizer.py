@@ -319,6 +319,8 @@ class ScipyOptimizer(Driver):
             print('Optimization Complete')
             print('-' * 35)
 
+        return self.fail
+
     def _objfunc(self, x_new):
         """
         Evaluate and return the objective function.
