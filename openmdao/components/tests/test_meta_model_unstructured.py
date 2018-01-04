@@ -21,7 +21,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         # check that missing surrogate is detected in check_config
         testlogger = TestLogger()
-        prob.setup(logger=testlogger)
+        prob.setup(check=True, logger=testlogger)
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -74,7 +74,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         # check that missing surrogate is detected in check_setup
         testlogger = TestLogger()
-        prob.setup(logger=testlogger)
+        prob.setup(check=True, logger=testlogger)
 
         # Conclude setup but don't run model.
         prob.final_setup()

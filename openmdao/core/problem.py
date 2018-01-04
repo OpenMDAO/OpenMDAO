@@ -359,7 +359,7 @@ class Problem(object):
         """
         self.driver.cleanup()
 
-    def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='rev',
+    def setup(self, vector_class=DefaultVector, check=False, logger=None, mode='rev',
               force_alloc_complex=False):
         """
         Set up the model hierarchy.
@@ -374,7 +374,7 @@ class Problem(object):
         vector_class : type
             reference to an actual <Vector> class; not an instance.
         check : boolean
-            whether to run error check after setup is complete.
+            whether to run config check after setup is complete.
         logger : object
             Object for logging config checks if check is True.
         mode : string
@@ -429,16 +429,14 @@ class Problem(object):
         started, and the rest of the framework is prepared for execution.
         """
         vector_class = self._vector_class
-        check = self._check
-        logger = self._logger
         force_alloc_complex = self._force_alloc_complex
 
-        model = self.model
         comm = self.comm
         mode = self._mode
 
         if self._setup_status < 2:
-            model._final_setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex)
+            self.model._final_setup(comm, vector_class, 'full',
+                                    force_alloc_complex=force_alloc_complex)
 
         self.driver._setup_driver(self)
 
@@ -446,8 +444,8 @@ class Problem(object):
         for items in self._solver_print_cache:
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
 
-        if check and comm.rank == 0:
-            check_config(self, logger)
+        if self._check and comm.rank == 0:
+            check_config(self, self._logger)
 
         if self._setup_status < 2:
             self._setup_status = 2

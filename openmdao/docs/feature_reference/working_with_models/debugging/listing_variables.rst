@@ -13,8 +13,6 @@ output variables. Several methods are provided for this purpose.
 .. automethod:: openmdao.core.system.System.list_outputs
     :noindex:
 
-.. automethod:: openmdao.core.system.System.list_residuals
-    :noindex:
 
 Example
 -------
@@ -128,4 +126,3 @@ of full values of the array below the row. The format is affected by the values 
 
 .. embed-test::
     openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_for_docs_array_list_vars_options
-
