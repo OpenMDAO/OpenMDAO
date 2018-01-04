@@ -1,6 +1,6 @@
-********************
-Recording Your Data
-********************
+**************
+Recording Data
+**************
 
 .. toctree::
     :maxdepth: 1

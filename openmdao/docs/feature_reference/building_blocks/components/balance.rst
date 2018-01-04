@@ -24,14 +24,14 @@ The following inputs and outputs are associated with each implicit state.
 Name        I/O     Description
 =========== ======= ====================================================
 {name}      output  implicit state variable
-lhs:{name}  input   left-hand-side of equation to be balanced
-rhs:{name}  input   right-hand-side of equation to be balanced
-mult:{name} input   left-hand-side multiplier of equation to be balanced
+lhs:{name}  input   left-hand side of equation to be balanced
+rhs:{name}  input   right-hand side of equation to be balanced
+mult:{name} input   left-hand side multiplier of equation to be balanced
 =========== ======= ====================================================
 
-The right-hand-side is optional and will default to zero if not connected.
+The right-hand side is optional and will default to zero if not connected.
 The multiplier is optional and will default to 1.0 if not connected. The
-left-hand-side should always be defined and should be dependent upon the value
+left-hand side should always be defined and should be dependent upon the value
 of the implicit state variable.
 
 The BalanceComp supports vectorized implicit states, simply provide a default
@@ -44,9 +44,9 @@ to ``add_balance`` during initialization):
 Name        Type                     Description
 =========== ======================== ==================================================================================
 eq_units    str or None              Units associated with LHS and RHS.  (mult is treated as unitless)
-lhs_name    str or None              Optional name associated with the left-hand-side of the balance.
-rhs_name    str or None              Optional name associated with the right-hand-side of the balance.
-mult_name   str or None              Optional name associated with the right-hand-side of the balance.
+lhs_name    str or None              Optional name associated with the left-hand side of the balance.
+rhs_name    str or None              Optional name associated with the right-hand side of the balance.
+mult_name   str or None              Optional name associated with the right-hand side of the balance.
 rhs_val     int, float, or np.array  Default value for the RHS.
 mult_val    int, float, or np.array  Default value for the multiplier.
 kwargs      dict or named arguments  Additional arguments to be passed for the creation of the implicit state variable.

@@ -1,11 +1,11 @@
 .. _`api_translation`:
 
-**************************
+*************************
 Upgrading from OpenMDAO 1
-**************************
+*************************
 
 This guide takes how you did things in OpenMDAO 1 and shows how to do them OpenMDAO 2.
-It is not a comprehensive guide to using OpenMDAO 2, but focus only on the things that have changed in the API.
+It is not a comprehensive guide to using OpenMDAO 2, but focuses only on the things that have changed in the API.
 
 
 Build a Model

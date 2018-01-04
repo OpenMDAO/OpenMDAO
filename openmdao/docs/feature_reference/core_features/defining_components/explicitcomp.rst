@@ -52,4 +52,4 @@ The implementation of each method will be illustrated using a simple explicit co
   .. embed-code::
       openmdao.core.tests.test_expl_comp.RectangleJacVec.compute_jacvec_product
 
-Note that the last two are optional because the class can implement one or the other, or neither if the user wants to use the finite-difference or complex-step method.
+Note that the last two are optional, because the class can implement one, the other, or neither if the user wants to use the finite difference or complex-step method.

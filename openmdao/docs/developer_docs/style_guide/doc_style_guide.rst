@@ -6,7 +6,7 @@ This document outlines OpenMDAO-v2 documentation conventions regarding
 both content and formatting.
 
 
-General docstring conventions
+General Docstring Conventions
 -----------------------------
 
 General docstring rules:
@@ -121,13 +121,13 @@ Detailed docstring rules:
          description ending with a period.
      """
 
-4. Auto-hyper-linking a class or a method:
+4. Auto-hyper-linking a class or a method to its source docs:
 
   ::
 
     """Summary line.
 
-    To auto-link to a <Class>, simply put its name in angle brackets,
+    To auto-link to the source docs of a <Class>, simply put its name in angle brackets,
     and the link to that page will be generated in the resulting docs.
     To auto-link to a method's docs, use <Class.method_name>.
     """
@@ -136,7 +136,7 @@ Detailed docstring rules:
 Embedding Autodocumentation Snippets into Documentation
 -------------------------------------------------------
 
-Sometimes in a Feature Doc, you want to highlight a particular method or class or module
+Sometimes in a feature doc, you want to reproduce a particular method or class or module
 right there within the text.  The syntax to do this is provided by the `sphinx.ext.autodoc`
 module, in three commands, `automodule`, `autoclass`, and `automethod`.  The syntax of these
 is detailed in the following example code:
@@ -201,62 +201,14 @@ which makes a link like this, that leads to the Direct solver's user docs:
     :ref:`Direct <openmdao.solvers.linear.direct.py>`
 
 
-Feature Docs and their Custom Directives for Including Code in Documentation
+Feature Docs and Their Custom Directives for Including Code in Documentation
 ----------------------------------------------------------------------------
-
-show-unittest-examples
-++++++++++++++++++++++
-
-      `show-unittest-examples` is an OpenMDAO custom Sphinx directive that allows unit
-      test examples to be directly incorporated into a feature document.
-      An example usage within a feature document would look like this:
-
-      ::
-
-        .. show-unittest-examples::
-            indepvarcomp
-
-
-      What the above will do is replace the directive and its args with indepvarcomp unit tests
-      and their subsequent output, as shown here:
-
-
-      Define two independent variables at once.
-
-      ::
-
-        comp = IndepVarComp((
-            ('indep_var_1', 1.0),
-            ('indep_var_2', 2.0),
-
-        ))
-
-        prob = Problem(comp).setup(check=False)
-        print(prob['indep_var_1'])
-        print(prob['indep_var_2'])
-
-      ::
-
-        1.0
-        2.0
-
-
-      But how does the directive know which test to go get?  The test or tests that are
-      to be shown will have a "Features" header in their docstring, that says which feature
-      the test is trying out.  It should look like this:
-
-      ::
-
-        Features
-        --------
-        indepvarcomp
-
 
 embed-code
 ++++++++++
 
         `embed-code` is a custom directive that lets a developer drop a class or a
-        class method directly into a feature doc by including that class or method's
+        class method directly into a document by including that class or method's
         full, dotted python path.  The syntax for invoking the directive looks like this:
 
         .. code-block:: python
@@ -266,13 +218,15 @@ embed-code
 
 
         What the above will do is replace the directive and its arg with the class
-        definition for `openmdao.core.tests.test_expl_comp.RectangleComp` and will look like this:
+        definition for `openmdao.core.tests.test_expl_comp.RectangleComp`.
+        The resulting output will look like this:
 
         .. embed-code::
           openmdao.core.tests.test_expl_comp.RectangleComp
 
-        This has the benefit of allowing you to drop entire code blocks into
-        a feature doc that illustrate a usage example.
+        Embedding in this fashion has the benefit of allowing you to drop entire code blocks into
+        a feature doc that may, for example, illustrate a usage example. Another great benefit of this
+        method is that now your embedded example changes along with the code, so the docs maintain themselves.
 
 
 embed-test
@@ -368,8 +322,8 @@ associate words or terms with a document, with the aim of grouping like document
 When a user clicks on a tag hyperlink, it takes her to a page that contains links to other documents that have been tagged
 similarly. This makes it easier for users to find supplementary materials on a topic.
 
-If you are writing a document, and you have a set of tags that you want to apply to a document, the syntax is easy,
-once in the document, you just need to invoke the `tags` directive, and then list any categories in which you'd
+If you are writing a document, and you have a set of tags that you want to apply to a document, the syntax is easy.
+One time, at the bottom of a document, you just need to invoke the `tags` directive, and then list any categories in which you'd
 like the current document to be included.
 
 ::
