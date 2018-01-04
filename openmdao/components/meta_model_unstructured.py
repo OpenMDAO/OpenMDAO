@@ -182,10 +182,12 @@ class MetaModelUnStructured(ExplicitComponent):
                 if surrogate is None:
                     no_sur.append(name)
             if len(no_sur) > 0:
-                logger.error("No default surrogate model is defined and the following"
-                             " outputs do not have a surrogate model:\n%s\n"
-                             "Either specify a default_surrogate, or specify a "
-                             "surrogate model for all outputs." % no_sur)
+                msg = ("No default surrogate model is defined and the following"
+                       " outputs do not have a surrogate model:\n%s\n"
+                       "Either specify a default_surrogate, or specify a "
+                       "surrogate model for all outputs."
+                       % no_sur)
+                logger.error(msg)
 
     def compute(self, inputs, outputs):
         """
