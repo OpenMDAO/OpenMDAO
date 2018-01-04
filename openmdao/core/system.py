@@ -97,8 +97,8 @@ class System(object):
     _var_allprocs_abs2meta : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to metadata dictionaries for allprocs variables.
         The keys are
-        ('units', 'shape', 'var_set') for inputs and
-        ('units', 'shape', 'var_set', 'ref', 'ref0') for outputs.
+        ('units', 'shape', 'size', 'var_set') for inputs and
+        ('units', 'shape', 'size', 'var_set', 'ref', 'ref0', 'res_ref', 'distributed') for outputs.
     _var_abs2meta : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to metadata dictionaries for myproc variables.
     #

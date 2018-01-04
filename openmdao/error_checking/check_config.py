@@ -178,6 +178,7 @@ def _check_system_configs(problem, logger):
 
 
 # Dict of all checks by name, mapped to the corresponding function that performs the check
+# Each function must be of the form  f(problem, logger).
 _checks = {
     'hanging_inputs': _check_hanging_inputs,
     'cycles': _check_dataflow_prob,
@@ -200,7 +201,7 @@ def _check_config_setup_parser(parser):
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', action='store', dest='outfile', help='output file.')
-    parser.add_argument('-c', '--check', action='append', dest='checks', default=[],
+    parser.add_argument('-c', action='append', dest='checks', default=[],
                         help='Only perform specific check(s). Available checks are: %s. '
                         'By default, will perform all checks.' % sorted(_checks.keys()))
 

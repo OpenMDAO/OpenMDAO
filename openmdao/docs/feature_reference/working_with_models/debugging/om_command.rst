@@ -9,6 +9,18 @@ command.  There are two types of commands available, those that perform some sor
 configuration checking on the Problem after its setup is complete, and those that are used to
 collect information about the entire run of the Problem, things like profilers and tracers.
 
+All available *openmdao* sub-commands can be shown using the following command:
+
+.. embed-shell-cmd::
+    :cmd: openmdao -h
+
+
+All sub-commands are shown under 'positional arguments'.  To get further info on any sub-command,
+for example, for :code:`tree`, follow the command with a *-h*.  For example:
+
+.. embed-shell-cmd::
+    :cmd: openmdao tree -h
+
 
 Post-setup Commands
 -------------------
@@ -103,7 +115,6 @@ also allows specific attributes and/or vector variables to be printed out along 
 corresponding system in the tree.
 
 Here's an example of the tree output for a simple circuit model:
-
 
 .. embed-shell-cmd::
     :cmd: openmdao tree circuit.py

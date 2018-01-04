@@ -204,48 +204,63 @@ def config_summary(problem, stream=sys.stdout):
     stream : File-like
         Where the output will be written.
     """
-    allsystems = list(problem.model.system_iter(recurse=True, include_self=True))
+    model = problem.model
+    allsystems = list(model.system_iter(recurse=True, include_self=True))
+    allgroups = [s for s in allsystems if isinstance(s, Group)]
     sysnames = [s.pathname for s in allsystems]
-    nsystems = len(allsystems)
-    ngroups = len([s for s in allsystems if isinstance(s, Group)])
-    ncomps = nsystems - ngroups
     maxdepth = max([len(name.split('.')) for name in sysnames])
+    setup_done = problem._setup_status == 2
+    meta_in = model._var_allprocs_abs2meta['input']
 
     print("============== Problem Summary ============", file=stream)
-    print("Groups:           %5d" % ngroups, file=stream)
-    print("Components:       %5d" % ncomps, file=stream)
+    print("Groups:           %5d" % len(allgroups), file=stream)
+    print("Components:       %5d" % (len(allsystems) - len(allgroups)), file=stream)
     print("Max tree depth:   %5d" % maxdepth, file=stream)
-    print()
+    print(file=stream)
 
-    if problem._setup_status == 2:
-        desvars = problem.model.get_design_vars()
+    if setup_done:
+        desvars = model.get_design_vars()
         print("Design variables: %5d   Total size: %8d" %
               (len(desvars), sum(d['size'] for d in desvars.values())), file=stream)
 
         # TODO: give separate info for linear, nonlinear constraints, equality, inequality
-        constraints = problem.model.get_constraints()
+        constraints = model.get_constraints()
         print("Constraints:      %5d   Total size: %8d" %
               (len(constraints), sum(d['size'] for d in constraints.values())), file=stream)
 
-        objs = problem.model.get_objectives()
+        objs = model.get_objectives()
         print("Objectives:       %5d   Total size: %8d" %
               (len(objs), sum(d['size'] for d in objs.values())), file=stream)
 
-    print()
+    print(file=stream)
 
-    ninputs = len(problem.model._var_allprocs_abs_names['input'])
-    if problem._setup_status == 2:
+    ninputs = len(model._var_allprocs_abs_names['input'])
+    if setup_done:
         print("Input variables:  %5d   Total size: %8d" %
-              (ninputs, sum(d.size for d in problem.model._inputs._data.values())), file=stream)
+              (ninputs, sum(d.size for d in model._inputs._data.values())), file=stream)
     else:
         print("Input variables: %5d" % ninputs, file=stream)
 
-    noutputs = len(problem.model._var_allprocs_abs_names['output'])
-    if problem._setup_status == 2:
+    noutputs = len(model._var_allprocs_abs_names['output'])
+    if setup_done:
         print("Output variables: %5d   Total size: %8d" %
-              (noutputs, sum(d.size for d in problem.model._outputs._data.values())), file=stream)
+              (noutputs, sum(d.size for d in model._outputs._data.values())), file=stream)
     else:
         print("Output variables: %5d" % noutputs, file=stream)
+
+    if setup_done:
+        print(file=stream)
+        conns = model._conn_global_abs_in2out
+        print("Total connections: %d   Total transfer data size: %d" %
+              (len(conns), sum(meta_in[n]['size'] for n in conns)), file=stream)
+
+    print(file=stream)
+    print("Driver type: %s" % problem.driver.__class__.__name__, file=stream)
+    print("Linear Solvers: %s" % sorted(set(type(s.linear_solver).__name__ for s in allgroups)),
+          file=stream)
+    print("Nonlinear Solvers: %s" % sorted(set(type(s.nonlinear_solver).__name__ for s in
+                                                         allgroups)),
+          file=stream)
 
 
 def max_mem_usage():

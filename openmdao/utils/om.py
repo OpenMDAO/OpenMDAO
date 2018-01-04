@@ -148,7 +148,8 @@ def _tree_setup_parser(parser):
     parser.add_argument('-o', default=None, action='store', dest='outfile',
                         help='Output file name. By default, output goes to stdout.')
     parser.add_argument('-c', '--colors', action='store_true', dest='show_colors',
-                        help="Display colors if the terminal supports it.")
+                        help="Display colors if the terminal supports it.  Requires 'colorama' "
+                             "python package.  Use 'pip install colorama' to install it.")
     parser.add_argument('-d', '--depth', action='store', type=int, dest='depth',
                         default=0, help="Max depth of tree to display.")
     parser.add_argument('-a', '--attr', action='append', default=[], dest='attrs',
