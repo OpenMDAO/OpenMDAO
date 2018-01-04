@@ -180,7 +180,7 @@ def _check_system_configs(problem, logger):
 # Dict of all checks by name, mapped to the corresponding function that performs the check
 _checks = {
     'hanging_inputs': _check_hanging_inputs,
-    'ubcs': _check_dataflow_prob,
+    'cycles': _check_dataflow_prob,
     'system': _check_system_configs,
 }
 
