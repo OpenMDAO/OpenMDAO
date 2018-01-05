@@ -92,7 +92,7 @@ class ScipyOptimizer(Driver):
         Contains all objective info.
     _exc_info : 3 item tuple
         Storage for exception and traceback information.
-    _quantities : list
+    _obj_and_nlcons : list
         List of objective + nonlinear constraints. Used to compute total derivatives
         for all except linear constraints.
     """
@@ -134,7 +134,7 @@ class ScipyOptimizer(Driver):
         self._lincon_grad_cache = None
         self._con_cache = None
         self._con_idx = {}
-        self._quantities = None
+        self._obj_and_nlcons = None
         self.objs = None
         self.fail = False
         self.iter_count = 0
@@ -246,7 +246,7 @@ class ScipyOptimizer(Driver):
         i = 1  # start at 1 since row 0 is the objective.  Constraints start at row 1.
         lin_i = 0  # counter for linear constraint jacobian
         lincons = []  # list of linear constraints
-        self._quantities = list(self._objs)
+        self._obj_and_nlcons = list(self._objs)
 
         if opt in _constraint_optimizers:
             for name, meta in iteritems(self._cons):
@@ -258,7 +258,7 @@ class ScipyOptimizer(Driver):
                     self._con_idx[name] = lin_i
                     lin_i += size
                 else:
-                    self._quantities.append(name)
+                    self._obj_and_nlcons.append(name)
                     self._con_idx[name] = i
                     i += size
 
@@ -462,7 +462,7 @@ class ScipyOptimizer(Driver):
             Gradient of objective with respect to parameter array.
         """
         try:
-            grad = self._compute_totals(of=self._quantities, wrt=list(self._designvars),
+            grad = self._compute_totals(of=self._obj_and_nlcons, wrt=list(self._designvars),
                                         return_format='array')
             self._grad_cache = grad
 
