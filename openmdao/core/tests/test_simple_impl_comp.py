@@ -5,7 +5,7 @@ import scipy.sparse.linalg
 
 from openmdao.api import Problem, ImplicitComponent, Group
 from openmdao.api import LinearBlockGS
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class CompA(ImplicitComponent):

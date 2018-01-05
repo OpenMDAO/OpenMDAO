@@ -6,7 +6,7 @@ import itertools
 import numpy as np
 
 from openmdao.api import KrigingSurrogate
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from six.moves import zip
 
 

@@ -2,7 +2,7 @@ from __future__ import print_function, division, absolute_import
 
 import unittest
 
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 from openmdao.api import Problem, ScipyOptimizer, ExecComp, IndepVarComp, DirectSolver
 

@@ -13,7 +13,7 @@ try:
 except ImportError:
     PETScVector = None
 
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class DistributedAdder(ExplicitComponent):

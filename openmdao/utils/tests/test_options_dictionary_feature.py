@@ -2,7 +2,7 @@ from openmdao.api import OptionsDictionary, ExplicitComponent
 import unittest
 from six import PY3, assertRegex
 import numpy as np
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestOptionsDictionaryFeature(unittest.TestCase):

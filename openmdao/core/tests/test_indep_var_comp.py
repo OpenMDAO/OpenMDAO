@@ -4,7 +4,7 @@ from __future__ import division
 import unittest
 
 from openmdao.api import Problem, IndepVarComp
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestIndepVarComp(unittest.TestCase):

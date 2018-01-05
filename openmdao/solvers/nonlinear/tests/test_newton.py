@@ -7,7 +7,7 @@ import numpy as np
 from openmdao.api import Group, Problem, IndepVarComp, LinearBlockGS, \
     NewtonSolver, ExecComp, ScipyKrylov, ImplicitComponent, \
     DirectSolver, DenseJacobian, AnalysisError
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.double_sellar import DoubleSellar, DoubleSellarImplicit, \
      SubSellar
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \

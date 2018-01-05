@@ -33,7 +33,7 @@ import unittest
 from six import iterkeys
 
 from openmdao.test_suite.parametric_suite import parametric_suite
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class ParameterizedTestCases(unittest.TestCase):

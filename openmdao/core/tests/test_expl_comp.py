@@ -10,7 +10,7 @@ import numpy as np
 
 from openmdao.api import Problem, ExplicitComponent, NewtonSolver, ScipyKrylov, Group, \
     IndepVarComp, LinearBlockGS
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.double_sellar import SubSellar
 
 

@@ -1,6 +1,6 @@
 import unittest
 
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 import numpy as np
 

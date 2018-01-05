@@ -3,7 +3,7 @@
 import unittest
 
 from openmdao.api import Problem
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 
 
