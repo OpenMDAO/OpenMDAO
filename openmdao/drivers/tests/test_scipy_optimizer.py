@@ -772,13 +772,15 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=15.0, linear=True)
 
         prob.setup(check=False)
-        prob.run_driver()
+        fail = prob.run_driver()
+
+        self.assertTrue(not fail, "Optimization failed!")
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
         assert_rel_error(self, prob['y'], -7.833334, 1e-6)
 
-        self.assertEqual(prob.driver._quantities, ['comp.f_xy'])
+        self.assertEqual(prob.driver._obj_and_nlcons, ['comp.f_xy'])
 
     def test_simple_paraboloid_equality_linear(self):
 
@@ -803,7 +805,9 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', equals=-15.0, linear=True)
 
         prob.setup(check=False)
-        prob.run_driver()
+        fail = prob.run_driver()
+
+        self.assertTrue(not fail, "Optimization failed!")
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
