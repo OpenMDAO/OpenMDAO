@@ -140,8 +140,8 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
                     name_with_fi, default=None, desc='Training data for %s' % name_with_fi)
                 self._input_sizes[fi] += input_size
 
-    def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0):
+    def add_output(self, name, val=1.0, surrogate=None, shape=None, units=None, res_units=None,
+                   desc='', lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0):
         """
         Add an output variable to the component.
 
@@ -151,6 +151,8 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
             name of the variable in this component's namespace.
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
+        surrogate : SurrogateModel
+            Surrogate model to use.
         shape : int or tuple or list or None
             Shape of this variable, only required if val is not an array.
             Default is None.
@@ -189,7 +191,7 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
                                                              res_units=res_units, desc=desc,
                                                              lower=lower, upper=upper, ref=ref,
                                                              ref0=ref0, res_ref=res_ref,
-                                                             var_set=var_set)
+                                                             var_set=var_set, surrogate=surrogate)
         self._training_output[name] = self._nfi * [np.zeros(0)]
 
         # Add train:<outvar>_fi<n>
