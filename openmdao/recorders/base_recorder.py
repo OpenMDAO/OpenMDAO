@@ -1,14 +1,12 @@
 """
 Class definition for BaseRecorder, the base class for all recorders.
 """
-from fnmatch import fnmatchcase
 from six import StringIO
 
 from openmdao.core.system import System
 from openmdao.core.driver import Driver
-from openmdao.solvers.solver import Solver, NonlinearSolver
-from openmdao.recorders.recording_iteration_stack import recording_iteration, \
-    get_formatted_iteration_coordinate
+from openmdao.solvers.solver import Solver
+from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate
 from openmdao.utils.mpi import MPI
 
 
@@ -87,7 +85,7 @@ class BaseRecorder(object):
 
     def __init__(self):
         """
-        initialize.
+        Initialize.
         """
         self.out = None
 
@@ -117,7 +115,7 @@ class BaseRecorder(object):
 
         Parameters
         ----------
-        recording_requester :
+        recording_requester : object
             Object to which this recorder is attached.
         """
         self._counter = 0
@@ -128,7 +126,7 @@ class BaseRecorder(object):
 
         Parameters
         ----------
-        recording_requester: <object>
+        recording_requester : object
             The object that would like to record its metadata.
         """
         if isinstance(recording_requester, Driver):
@@ -144,7 +142,7 @@ class BaseRecorder(object):
 
         Parameters
         ----------
-        recording_requester: <Driver>
+        recording_requester : Driver
             The Driver that would like to record its metadata.
         """
         raise NotImplementedError()
@@ -155,7 +153,7 @@ class BaseRecorder(object):
 
         Parameters
         ----------
-        recording_requester: <System>
+        recording_requester : System
             The System that would like to record its metadata.
         """
         raise NotImplementedError()
@@ -166,7 +164,7 @@ class BaseRecorder(object):
 
         Parameters
         ----------
-        recording_requester: <Solver>
+        recording_requester : Solver
             The Solver that would like to record its metadata.
         """
         raise NotImplementedError()
@@ -181,6 +179,8 @@ class BaseRecorder(object):
             System, Solver, Driver in need of recording.
         metadata : dict, optional
             Dictionary containing execution metadata.
+        data : dict
+            Dictionary containing desvars, objectives, constraints, responses, and System vars.
         **kwargs : keyword args
             Some implementations of record_iteration need additional args.
         """
@@ -207,7 +207,7 @@ class BaseRecorder(object):
 
         Parameters
         ----------
-        recording_requester : <Driver>
+        recording_requester : Driver
             Driver in need of recording.
         data : dict
             Dictionary containing desvars, objectives, constraints, responses, and System vars.
@@ -222,7 +222,7 @@ class BaseRecorder(object):
 
         Parameters
         ----------
-        recording_requester : <System>
+        recording_requester : System
             System in need of recording.
         data : dict
             Dictionary containing inputs, outputs, and residuals.
@@ -237,7 +237,7 @@ class BaseRecorder(object):
 
         Parameters
         ----------
-        recording_requester : <Solver>
+        recording_requester : Solver
             Solver in need of recording.
         data : dict
             Dictionary containing outputs, residuals, and errors.
@@ -248,6 +248,6 @@ class BaseRecorder(object):
 
     def close(self):
         """
-        Cleanup the recorder.
+        Clean up the recorder.
         """
         pass

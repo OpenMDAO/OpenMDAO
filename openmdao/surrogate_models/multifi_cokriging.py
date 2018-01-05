@@ -82,18 +82,18 @@ def squared_exponential_correlation(theta, d):
 
     Parameters
     ----------
-    theta: array_like
+    theta : array_like
         An array with shape 1 (isotropic) or n (anisotropic) giving the
         autocorrelation parameter(s).
 
-    dx: array_like
+    dx : array_like
         An array with shape (n_eval, n_features) giving the componentwise
         distances between locations x and x' at which the correlation model
         should be evaluated.
 
     Returns
     -------
-    r: array_like
+    r : array_like
         An array with shape (n_eval, ) containing the values of the
         autocorrelation model.
     """
@@ -119,10 +119,10 @@ def l1_cross_distances(X, Y=None):
 
     Parameters
     ----------
-    X: array_like
+    X : array_like
         An array with shape (n_samples_X, n_features)
 
-    Y: array_like
+    Y : array_like
         An array with shape (n_samples_Y, n_features)
 
     Returns
@@ -164,6 +164,62 @@ def l1_cross_distances(X, Y=None):
 class MultiFiCoKriging(object):
     """
     Integrate the Multi-Fidelity Co-Kriging method described in [LeGratiet2013].
+
+     Attributes
+    ----------
+    `theta`: list
+        Specified theta for each level OR the best set of autocorrelation parameters
+        (the sought maximizer of the reduced likelihood function).
+
+    `rlf_value`: list
+        The optimal negative concentrated reduced likelihood function value
+        for each level.
+
+
+    Examples
+    --------
+    >>> from openmdao.surrogate_models.multifi_cokriging import MultiFiCoKriging
+    >>> import numpy as np
+    >>> # Xe: DOE for expensive code (nested in Xc)
+    >>> # Xc: DOE for cheap code
+    >>> # ye: expensive response
+    >>> # yc: cheap response
+    >>> Xe = np.array([[0],[0.4],[1]])
+    >>> Xc = np.vstack((np.array([[0.1],[0.2],[0.3],[0.5],[0.6],[0.7],[0.8],[0.9]]),Xe))
+    >>> ye = ((Xe*6-2)**2)*np.sin((Xe*6-2)*2)
+    >>> yc = 0.5*((Xc*6-2)**2)*np.sin((Xc*6-2)*2)+(Xc-0.5)*10. - 5
+    >>> model = MultiFiCoKriging(theta0=1, thetaL=1e-5, thetaU=50.)
+    >>> model.fit([Xc, Xe], [yc, ye])
+    >>> # Prediction on x=0.05
+    >>> np.abs(float(model.predict([0.05])[0])- ((0.05*6-2)**2)*np.sin((0.05*6-2)*2)) < 0.05
+    True
+
+
+    Notes
+    -----
+    Implementation is based on the Package Scikit-Learn
+    (Author: Vincent Dubourg, vincent.dubourg@gmail.com) which translates
+    the DACE Matlab toolbox, see [NLNS2002]_.
+
+
+    References
+    ----------
+    .. [NLNS2002] H. B. Nielsen, S. N. Lophaven, and J. Sondergaard.
+       `DACE - A MATLAB Kriging Toolbox.` (2002)
+       http://www2.imm.dtu.dk/~hbn/dace/dace.pdf
+
+    .. [WBSWM1992] W. J. Welch, R. J. Buck, J. Sacks, H. P. Wynn, T. J. Mitchell,
+       and M. D. Morris (1992). "Screening, predicting, and computer experiments."
+       `Technometrics,` 34(1) 15--25.
+       http://www.jstor.org/pss/1269548
+
+    .. [LeGratiet2013] L. Le Gratiet (2013). "Multi-fidelity Gaussian process
+       regression for computer experiments."
+       PhD thesis, Universite Paris-Diderot-Paris VII.
+
+    .. [TBKH2011] Toal, D. J., Bressloff, N. W., Keane, A. J., & Holden, C. M. E. (2011).
+       "The development of a hybridized particle swarm for kriging hyperparameter
+       tuning." `Engineering optimization`, 43(6), 675-699.
     """
 
     _regression_types = {
@@ -229,63 +285,6 @@ class MultiFiCoKriging(object):
             if array_like: An array with shape matching theta0's. It is replicated
             for all levels of code.
             if list: a list of nlevel arrays specifying value for each level
-
-
-        Attributes
-        ----------
-        `theta`: list
-            Specified theta for each level OR the best set of autocorrelation parameters
-            (the sought maximizer of the reduced likelihood function).
-
-        `rlf_value`: list
-            The optimal negative concentrated reduced likelihood function value
-            for each level.
-
-
-        Examples
-        --------
-        >>> from openmdao.surrogate_models.multifi_cokriging import MultiFiCoKriging
-        >>> import numpy as np
-        >>> # Xe: DOE for expensive code (nested in Xc)
-        >>> # Xc: DOE for cheap code
-        >>> # ye: expensive response
-        >>> # yc: cheap response
-        >>> Xe = np.array([[0],[0.4],[1]])
-        >>> Xc = np.vstack((np.array([[0.1],[0.2],[0.3],[0.5],[0.6],[0.7],[0.8],[0.9]]),Xe))
-        >>> ye = ((Xe*6-2)**2)*np.sin((Xe*6-2)*2)
-        >>> yc = 0.5*((Xc*6-2)**2)*np.sin((Xc*6-2)*2)+(Xc-0.5)*10. - 5
-        >>> model = MultiFiCoKriging(theta0=1, thetaL=1e-5, thetaU=50.)
-        >>> model.fit([Xc, Xe], [yc, ye])
-        >>> # Prediction on x=0.05
-        >>> np.abs(float(model.predict([0.05])[0])- ((0.05*6-2)**2)*np.sin((0.05*6-2)*2)) < 0.05
-        True
-
-
-        Notes
-        -----
-        Implementation is based on the Package Scikit-Learn
-        (Author: Vincent Dubourg, vincent.dubourg@gmail.com) which translates
-        the DACE Matlab toolbox, see [NLNS2002]_.
-
-
-        References
-        ----------
-        .. [NLNS2002] H. B. Nielsen, S. N. Lophaven, and J. Sondergaard.
-           `DACE - A MATLAB Kriging Toolbox.` (2002)
-           http://www2.imm.dtu.dk/~hbn/dace/dace.pdf
-
-        .. [WBSWM1992] W. J. Welch, R. J. Buck, J. Sacks, H. P. Wynn, T. J. Mitchell,
-           and M. D. Morris (1992). "Screening, predicting, and computer experiments."
-           `Technometrics,` 34(1) 15--25.
-           http://www.jstor.org/pss/1269548
-
-        .. [LeGratiet2013] L. Le Gratiet (2013). "Multi-fidelity Gaussian process
-           regression for computer experiments."
-           PhD thesis, Universite Paris-Diderot-Paris VII.
-
-        .. [TBKH2011] Toal, D. J., Bressloff, N. W., Keane, A. J., & Holden, C. M. E. (2011).
-           "The development of a hybridized particle swarm for kriging hyperparameter
-           tuning." `Engineering optimization`, 43(6), 675-699.
         """
         self.corr = squared_exponential_correlation
         self.regr = regr
@@ -689,7 +688,7 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-        x : list
+        X : list
 
         y : list
         """
@@ -747,7 +746,8 @@ class MultiFiCoKriging(object):
         return
 
     def _check_params(self):
-
+        """
+        """
         # Check regression model
         if not callable(self.regr):
             if self.regr in self._regression_types:
@@ -846,6 +846,12 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
 
         where can be called as [[xval1],[xval2]] instead of [[[xval1],[xval2]]]
         we detect if shape(X[0]) is like (m,) instead of (m, n)
+
+        Parameters
+        ----------
+        X :
+
+        Y :
         """
         if len(np.shape(np.array(X[0]))) == 1:
             X = [X]

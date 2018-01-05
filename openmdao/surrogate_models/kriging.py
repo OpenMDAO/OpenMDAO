@@ -126,6 +126,10 @@ class KrigingSurrogate(SurrogateModel):
         thetas : ndarray, optional
             Given input correlation coefficients. If none given, uses self.thetas
             from training.
+
+        Returns
+        -------
+
         """
         if thetas is None:
             thetas = self.thetas

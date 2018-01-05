@@ -5,7 +5,6 @@ import unittest
 import os.path
 import importlib
 import inspect
-import re
 import textwrap
 import collections
 from six import PY3
@@ -13,11 +12,16 @@ from six import PY3
 from numpydoc.docscrape import NumpyDocString
 
 directories = [
+    'components',
     'core',
+    'drivers',
+    'error_checking',
     'jacobians',
     'matrices',
     'proc_allocators',
+    'recorders',
     'solvers',
+    'surrogate_models',
     'utils',
     'vectors',
 ]

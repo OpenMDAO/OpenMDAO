@@ -25,6 +25,13 @@ class MetaModelUnStructured(ExplicitComponent):
     def __init__(self, default_surrogate=None, vectorize=None):
         """
         Initialize all attributes.
+
+        Parameters
+        ----------
+        default_surrogate :
+
+        vectorize :
+
         """
         super(MetaModelUnStructured, self).__init__()
 
@@ -457,7 +464,9 @@ class MetaModelUnStructured(ExplicitComponent):
 
 
 class MetaModel(MetaModelUnStructured):
-    """Deprecated."""
+    """
+    Deprecated.
+    """
 
     def __init__(self, *args, **kwargs):
         """Capture Initialize to throw warning."""

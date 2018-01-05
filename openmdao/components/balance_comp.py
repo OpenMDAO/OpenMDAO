@@ -181,6 +181,15 @@ class BalanceComp(ImplicitComponent):
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
         Calculate the residual for each balance.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        residuals : Vector
+            unscaled, dimensional residuals written to via residuals[key]
         """
         for name, options in iteritems(self._state_vars):
             lhs_name = options['lhs_name']

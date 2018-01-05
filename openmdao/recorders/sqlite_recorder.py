@@ -23,9 +23,20 @@ def array_to_blob(array):
     Make numpy array in to BLOB type.
 
     Convert a numpy array to something that can be written
-    to a BLOB field in sqlite
+    to a BLOB field in sqlite.
 
     TODO: move this to a util file?
+
+    Parameters
+    ----------
+    array : array
+        The array that will be converted to a blob.
+
+    Returns
+    -------
+    blob :
+        The blob created from the array.
+
     """
     out = io.BytesIO()
     np.save(out, array)
@@ -38,6 +49,16 @@ def blob_to_array(blob):
     Convert sqlite BLOB to numpy array.
 
     TODO: move this to a util file?
+
+    Parameters
+    ----------
+    blob : blob
+        The blob that will be converted to an array.
+
+    Returns
+    -------
+    array :
+        The array created from the blob.
     """
     out = io.BytesIO(blob)
     out.seek(0)
@@ -55,9 +76,9 @@ class SqliteRecorder(BaseRecorder):
     ----------
     model_viewer_data : dict
         Dict that holds the data needed to generate N2 diagram.
-    con
+    con : sqlite connection object
         Connection to the sqlite3 database.
-    cursor
+    cursor : sqlite cursor object
         Sqlite3 system cursor via the con.
     _abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names.
@@ -71,7 +92,7 @@ class SqliteRecorder(BaseRecorder):
 
         Parameters
         ----------
-        filepath: str
+        filepath : str
             Path to the recorder file.
         append : bool
             Optional. If True, append to an existing case recorder file.
@@ -134,7 +155,7 @@ class SqliteRecorder(BaseRecorder):
 
         Parameters
         ----------
-        recording_requester :
+        recording_requester : object
             Object to which this recorder is attached.
         """
         super(SqliteRecorder, self).startup(recording_requester)
@@ -224,8 +245,8 @@ class SqliteRecorder(BaseRecorder):
 
         Parameters
         ----------
-        recording_requester : object
-            Driver in need of recording.
+        recording_requester : System
+            System in need of recording.
         data : dict
             Dictionary containing inputs, outputs, and residuals.
         metadata : dict
@@ -260,7 +281,7 @@ class SqliteRecorder(BaseRecorder):
 
         Parameters
         ----------
-        recording_requester : object
+        recording_requester : Solver
             Solver in need of recording.
         data : dict
             Dictionary containing outputs, residuals, and errors.
@@ -297,7 +318,7 @@ class SqliteRecorder(BaseRecorder):
 
         Parameters
         ----------
-        recording_requester: <Driver>
+        recording_requester : Driver
             The Driver that would like to record its metadata.
         """
         driver_class = type(recording_requester).__name__
@@ -313,7 +334,7 @@ class SqliteRecorder(BaseRecorder):
 
         Parameters
         ----------
-        recording_requester: <System>
+        recording_requester : System
             The System that would like to record its metadata.
         """
         # Cannot handle PETScVector yet
@@ -343,7 +364,7 @@ class SqliteRecorder(BaseRecorder):
 
         Parameters
         ----------
-        recording_requester: <Solver>
+        recording_requester : Solver
             The Solver that would like to record its metadata.
         """
         path = recording_requester._system.pathname

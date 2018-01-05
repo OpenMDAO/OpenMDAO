@@ -111,7 +111,7 @@ class ExecComp(ExplicitComponent):
             standard Python operators, a subset of numpy and scipy functions
             is supported.
 
-        \*\*kwargs : dict of named args
+        **kwargs : dict of named args
             Initial values of variables can be set by setting a named
             arg with the var name.  If the value is a dict it is assumed
             to contain metadata.  To set the initial value in addition to

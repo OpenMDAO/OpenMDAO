@@ -248,7 +248,26 @@ class _RegularGridInterp(object):
     def _evaluate_splines(self, data_values, xi, indices, interpolator, method,
                           ki, compute_gradients=True,
                           first_dim_gradient=False):
-        """Inner method for separable regular grid interpolation."""
+        """
+        Inner method for separable regular grid interpolation.
+
+        Parameters
+        ----------
+        data_values :
+        xi :
+        indices :
+        interpolator :
+        method :
+        ki :
+        compute_gradients : bool
+            True by default.
+        first_dim_gradient : bool
+            False by default.
+
+        Returns
+        -------
+
+        """
         # for spline based methods
 
         # requires floating point input
@@ -349,7 +368,26 @@ class _RegularGridInterp(object):
         return result
 
     def _do_spline_fit(self, interpolator, x, y, pt, k, compute_gradients):
-        """Do a single interpolant call, and compute a gradient if needed."""
+        """
+        Do a single interpolant call, and compute a gradient if needed.
+
+        Parameters
+        ----------
+        interpolator :
+
+        x :
+
+        y :
+
+        pt :
+
+        k :
+
+        compute_gradients :
+
+        Returns
+        -------
+        """
         interp_kwargs = {'k': k, 'axis': 0}
         local_interp = interpolator(x, y, **interp_kwargs)
         values = local_interp(pt)
@@ -359,7 +397,17 @@ class _RegularGridInterp(object):
         return values, local_derivs
 
     def _find_indices(self, xi):
-        """Find the correct search indices for table lookups."""
+        """
+        Find the correct search indices for table lookups.
+
+        Parameters
+        ----------
+        xi :
+
+        Returns
+        -------
+
+        """
         # find relevant edges between which xi are situated
         indices = []
         # compute distance to lower edge in unity units

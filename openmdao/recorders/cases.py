@@ -6,11 +6,6 @@ class BaseCases(object):
     """
     Abstract base class of all CaseReader implementations.
 
-    Parameters
-    ----------
-    filename : str
-        The name of the recording file from which to instantiate the case reader.
-
     Attributes
     ----------
     filename : str
@@ -26,6 +21,11 @@ class BaseCases(object):
     def __init__(self, filename):
         """
         Initialize.
+
+        Parameters
+        ----------
+        filename : str
+            The name of the recording file from which to instantiate the case reader.
         """
         self._case_keys = ()
         self.num_cases = 0
@@ -64,6 +64,11 @@ class BaseCases(object):
     def get_iteration_coordinate(self, case_id):
         """
         Return the iteration coordinate.
+
+        Parameters
+        ----------
+        case_id : int
+            The case number that we want the iteration coordinate for.
 
         Returns
         -------
