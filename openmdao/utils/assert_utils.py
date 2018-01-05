@@ -198,7 +198,7 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
     return error
 
 
-def assertEqualArrays(a1, a2):
+def assert_equal_arrays(a1, a2):
     """
     Check that two arrays are equal.
 

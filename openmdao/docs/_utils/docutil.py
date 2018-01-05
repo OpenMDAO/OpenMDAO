@@ -122,7 +122,7 @@ def replace_asserts_with_prints(source_code):
     rb = RedBaron(source_code)  # convert to RedBaron internal structure
 
     for assert_type in ['assertAlmostEqual', 'assertLess', 'assertGreater', 'assertEqual',
-                        'assertEqualArrays', 'assertTrue', 'assertFalse']:
+                        'assert_equal_arrays', 'assertTrue', 'assertFalse']:
         assert_nodes = rb.findAll("NameNode", value=assert_type)
         for assert_node in assert_nodes:
             assert_node = assert_node.parent
