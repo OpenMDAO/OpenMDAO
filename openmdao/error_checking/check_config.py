@@ -15,29 +15,6 @@ from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.logger_utils import get_logger
 
 
-def check_config(problem, logger=None):
-    """
-    Perform optional error checks on a Problem.
-
-    Parameters
-    ----------
-    problem : Problem
-        The Problem being checked.
-    logger : object
-        Logging object.
-    """
-    logger = logger if logger else get_logger('check_config', use_format=True)
-
-    _check_hanging_inputs(problem, logger)
-
-    for system in problem.model.system_iter(include_self=True, recurse=True):
-        # system specific check
-        system.check_config(logger)
-        # check dataflow within Group
-        if isinstance(system, Group):
-            _check_dataflow(system, logger)
-
-
 def _check_dataflow(group, logger):
     """
     Report any cycles and out of order Systems to the logger.
@@ -57,8 +34,7 @@ def _check_dataflow(group, logger):
     cycle_idxs = {}
 
     if cycles:
-        logger.warning("Group '%s' has the following cycles: %s" %
-                       (group.pathname, cycles))
+        logger.info("Group '%s' has the following cycles: %s" % (group.pathname, cycles))
         for i, cycle in enumerate(cycles):
             # keep track of cycles so we can detect when a system in
             # one cycle is out of order with a system in a different cycle.
@@ -140,7 +116,7 @@ def _get_out_of_order_subs(group, input_srcs):
 
 def _check_hanging_inputs(problem, logger):
     """
-    Issue a logger warning if any inputs are not connected.
+    Issue a logger warning if any promoted inputs are not connected.
 
     Parameters
     ----------
@@ -152,12 +128,21 @@ def _check_hanging_inputs(problem, logger):
     """
     input_srcs = problem.model._conn_global_abs_in2out
 
-    hanging = sorted([name for name in problem.model._var_allprocs_abs_names['input']
-                      if name not in input_srcs])
+    prom_ins = problem.model._var_allprocs_prom2abs_list['input']
+    unconns = []
+    for prom, abslist in iteritems(prom_ins):
+        unconn = [a for a in abslist if a not in input_srcs or len(input_srcs[a]) == 0]
+        if unconn:
+            unconns.append(prom)
 
-    if hanging:
+    if unconns:
         msg = ["The following inputs are not connected:\n"]
-        msg.extend("   %s\n" % h for h in hanging)
+        for prom in sorted(unconns):
+            absnames = prom_ins[prom]
+            if len(absnames) == 1 and prom == absnames[0]:  # not really promoted
+                msg.append("   %s\n" % prom)
+            else:  # promoted
+                msg.append("   %s: %s\n" % (prom, prom_ins[prom]))
         logger.warning(''.join(msg))
 
 
@@ -184,6 +169,23 @@ _checks = {
     'cycles': _check_dataflow_prob,
     'system': _check_system_configs,
 }
+
+
+def check_config(problem, logger=None):
+    """
+    Perform optional error checks on a Problem.
+
+    Parameters
+    ----------
+    problem : Problem
+        The Problem being checked.
+    logger : object
+        Logging object.
+    """
+    logger = logger if logger else get_logger('check_config', use_format=True)
+
+    for c in sorted(_checks.keys()):
+        _checks[c](problem, logger)
 
 #
 # Command line interface functions
@@ -222,17 +224,17 @@ def _check_config_cmd(options):
     """
     def _check_config(prob):
         if options.outfile is None:
-            outfile = sys.stdout
             logger = get_logger('check_config', use_format=True)
         else:
             outfile = open(options.outfile, 'w')
             logger = get_logger('check_config', out_stream=outfile, use_format=True)
 
         if not options.checks:
-            check_config(prob, logger)
-        else:
-            for c in options.checks:
-                _checks[c](prob, logger)
+            options.checks = sorted(_checks.keys())
+
+        for c in options.checks:
+            _checks[c](prob, logger)
+
         exit()
 
     return _check_config
