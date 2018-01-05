@@ -116,7 +116,9 @@ def _get_out_of_order_subs(group, input_srcs):
 
 def _check_hanging_inputs(problem, logger):
     """
-    Issue a logger warning if any promoted inputs are not connected.
+    Issue a logger warning if any inputs are not connected.
+
+    Promoted inputs are shown alongside their corresponding absolute names.
 
     Parameters
     ----------
