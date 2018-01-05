@@ -498,8 +498,7 @@ class TestScipyOptimizer(unittest.TestCase):
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
         # test fails if we add this, but I don't know how to fix the failure, so
-        # I just put in a story to fix it (and to add a return of self.fail from
-        # ScipyOptimizer.run)
+        # I just put in a story to fix it.
         # self.assertTrue(not failed, "Optimization FAILED.")
 
     def test_simple_paraboloid_scaled_desvars_rev(self):
