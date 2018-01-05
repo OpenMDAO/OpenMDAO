@@ -8,7 +8,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Group, IndepVarComp, Problem, DenseJacobian
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
      SellarStateConnection, SellarDerivatives

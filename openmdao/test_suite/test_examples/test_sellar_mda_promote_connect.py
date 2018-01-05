@@ -5,7 +5,7 @@ import numpy as np
 from openmdao.api import Group, IndepVarComp, ExecComp, NonlinearBlockGS
 from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
 
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 

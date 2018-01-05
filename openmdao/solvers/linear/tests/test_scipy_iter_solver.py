@@ -8,7 +8,7 @@ import warnings
 import numpy as np
 
 from openmdao.api import Group, IndepVarComp, Problem, ExecComp, NonlinearBlockGS
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov, ScipyIterativeSolver
 from openmdao.solvers.nonlinear.newton import NewtonSolver

@@ -7,7 +7,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, IndepVarComp, Group, ExplicitComponent
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
 

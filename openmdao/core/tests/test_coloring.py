@@ -8,7 +8,7 @@ from numpy.testing import assert_array_almost_equal, assert_almost_equal
 
 from openmdao.api import Problem, IndepVarComp, ExecComp, DenseJacobian, DirectSolver,\
     ExplicitComponent, LinearRunOnce
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 

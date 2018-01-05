@@ -15,7 +15,7 @@ from openmdao.api import IndepVarComp, Group, Problem, \
                          NewtonSolver, ScipyKrylov, \
                          DenseJacobian, CSRJacobian, CSCJacobian, COOJacobian, \
                          LinearBlockGS
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
      SellarDis2withDerivatives

@@ -11,7 +11,7 @@ from parameterized import parameterized
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, \
                          COOJacobian, ScipyKrylov, DirectSolver, DenseJacobian
 
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class SimpleComp(ExplicitComponent):

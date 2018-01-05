@@ -4,7 +4,7 @@ import unittest
 from six import assertRaisesRegex
 
 from openmdao.api import Problem, Group, ExecComp, IndepVarComp
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestGetSetVariables(unittest.TestCase):

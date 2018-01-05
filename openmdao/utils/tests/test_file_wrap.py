@@ -8,7 +8,7 @@ import shutil
 
 import unittest
 
-from openmdao.devtools.testutil import assert_rel_error, assertEqualArrays
+from openmdao.utils.assert_utils import assert_rel_error, assertEqualArrays
 
 import numpy
 from numpy import array, isnan, isinf

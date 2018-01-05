@@ -3,9 +3,9 @@ import unittest
 
 from openmdao.api import Group, Problem, MetaModelUnStructured, IndepVarComp, ResponseSurface, \
     FloatKrigingSurrogate, KrigingSurrogate, MultiFiCoKrigingSurrogate
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
-from openmdao.devtools.testutil import TestLogger
+from openmdao.utils.logger_utils import TestLogger
 
 
 class MetaModelTestCase(unittest.TestCase):

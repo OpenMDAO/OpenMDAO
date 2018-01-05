@@ -6,7 +6,7 @@ import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, \
                          ScipyOptimizer, DefaultVector, DenseJacobian, DirectSolver
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 def lgl(n, tol=np.finfo(float).eps):
     """

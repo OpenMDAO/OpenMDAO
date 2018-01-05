@@ -10,7 +10,7 @@ import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, AnalysisError, \
      ExplicitComponent, ImplicitComponent
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.solvers.linesearch.backtracking import ArmijoGoldsteinLS, BoundsEnforceLS
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov

@@ -8,7 +8,7 @@ import numpy as np
 
 from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, \
     NewtonSolver, ScipyKrylov
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 # Note: The following class definitions are used in feature docs

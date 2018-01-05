@@ -8,7 +8,7 @@ import random
 from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, \
     ExecComp, PETScVector
 from openmdao.utils.mpi import MPI
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 if MPI:
     from openmdao.api import PETScVector

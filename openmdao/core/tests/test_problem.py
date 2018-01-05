@@ -9,7 +9,7 @@ import numpy as np
 from openmdao.core.group import get_relevant_vars
 from openmdao.api import Problem, Group, IndepVarComp, PETScVector, NonlinearBlockGS, ScipyOptimizer, \
      ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesConnected

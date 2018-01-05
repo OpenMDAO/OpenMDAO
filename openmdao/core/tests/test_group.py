@@ -13,7 +13,7 @@ from parameterized import parameterized
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, \
     NonlinearRunOnce, NonLinearRunOnce
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDis2
 
 try:
