@@ -34,6 +34,11 @@ multi_obj_drivers = {'NSGA2'}
 def _check_imports():
     """
     Dynamically remove optimizers we don't have.
+
+    Returns
+    -------
+    list of str
+        List of valid optimizer strings.
     """
     optlist = ['ALPSO', 'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
                'NSGA2', 'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'NOMAD']

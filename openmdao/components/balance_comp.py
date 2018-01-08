@@ -125,7 +125,7 @@ class BalanceComp(ImplicitComponent):
         mult_val : int, float, or np.array
             Default value for the LHS multiplier of the given state.  Must be compatible
             with the shape (optionally) given by the val option in kwargs.
-        kwargs : dict
+        **kwargs : dict
             Additional arguments to be passed for the creation of the implicit state variable.
         """
         super(BalanceComp, self).__init__()
@@ -218,6 +218,15 @@ class BalanceComp(ImplicitComponent):
     def linearize(self, inputs, outputs, jacobian):
         """
         Calculate the partials of the residual for each balance.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        jacobian : Jacobian
+            sub-jac components written to jacobian[output_name, input_name]
         """
         for name, options in iteritems(self._state_vars):
             lhs_name = options['lhs_name']
@@ -256,6 +265,15 @@ class BalanceComp(ImplicitComponent):
     def guess_nonlinear(self, inputs, outputs, residuals):
         """
         Provide an "guess" for each output based on the values of the inputs and resids.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        residuals : Vector
+            unscaled, dimensional residuals written to via residuals[key]
         """
         for name, options in iteritems(self._state_vars):
             if options['guess_func'] is not None:
@@ -299,7 +317,7 @@ class BalanceComp(ImplicitComponent):
         mult_val : int, float, or np.array
             Default value for the LHS multiplier.  Must be compatible with the shape (optionally)
             given by the val option in kwargs.
-        kwargs : dict
+        **kwargs : dict
             Additional arguments to be passed for the creation of the implicit state variable.
         """
         if guess_func is not None and not callable(guess_func):

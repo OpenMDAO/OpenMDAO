@@ -108,6 +108,15 @@ class LinearSystemComp(ImplicitComponent):
     def linearize(self, inputs, outputs, J):
         """
         Compute the non-constant partial derivatives.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        J : Jacobian
+            sub-jac components written to jacobian[output_name, input_name]
         """
         partial_type = self.metadata['partial_type']
         if partial_type == "matrix_free":

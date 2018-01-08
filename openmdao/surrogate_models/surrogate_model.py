@@ -79,6 +79,9 @@ class MultiFiSurrogateModel(SurrogateModel):
         ----------
         x : array-like
             Point(s) at which the surrogate is evaluated.
+
+        y : array-like
+            Model responses at given inputs.
         """
         super(MultiFiSurrogateModel, self).train(x, y)
         self.train_multifi([x], [y])
@@ -87,9 +90,13 @@ class MultiFiSurrogateModel(SurrogateModel):
         """
         Train the surrogate model, based on the given multi-fidelity training data.
 
-        x: list of (m samples, n inputs) ndarrays
+        Parameters
+        ----------
+        x : list of (m samples, n inputs) ndarrays
             Values representing the multi-fidelity training case inputs.
-        y: list of ndarray
+
+        y : list of ndarray
             output training values which corresponds to the multi-fidelity
             training case input given by x.
         """
+        pass
