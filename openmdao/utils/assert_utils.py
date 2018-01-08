@@ -120,13 +120,10 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
     ----------
     test_case : :class:`unittest.TestCase`
         TestCase instance used for assertions.
-
     actual : float, array-like, dict
         The value from the test.
-
     desired : float, array-like, dict
         The value expected.
-
     tolerance : float
         Maximum relative error ``(actual - desired) / desired``.
 
@@ -210,7 +207,6 @@ def assert_equal_arrays(a1, a2):
     ----------
     a1 : array
         The first array to compare.
-
     a2 : array
         The second array to compare.
     """

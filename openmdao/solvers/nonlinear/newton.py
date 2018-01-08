@@ -15,14 +15,14 @@ class NewtonSolver(NonlinearSolver):
 
     Attributes
     ----------
-    linear_solver : <LinearSolver>
+    linear_solver : LinearSolver
         Linear solver to use to find the Newton search direction. The default
         is the parent system's linear solver.
-    linesearch : <NonlinearSolver>
+    linesearch : NonlinearSolver
         Line search algorithm. Default is None for no line search.
-    options : <OptionsDictionary>
+    options : OptionsDictionary
         options dictionary.
-    _system : <System>
+    _system : System
         pointer to the owning system.
     _depth : int
         how many subsolvers deep this solver is (0 means not a subsolver).
@@ -93,7 +93,7 @@ class NewtonSolver(NonlinearSolver):
 
         Parameters
         ----------
-        system : <System>
+        system : System
             pointer to the owning system.
         depth : int
             depth of the current system (already incremented).

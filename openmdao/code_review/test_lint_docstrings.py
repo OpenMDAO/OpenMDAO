@@ -5,19 +5,24 @@ import unittest
 import os.path
 import importlib
 import inspect
-import re
 import textwrap
 import collections
 from six import PY3
 
 from numpydoc.docscrape import NumpyDocString
 
+#TODO: make this more robust by implementing an excludes list, instead of this list, which must be kept up-to-date.
 directories = [
+    'components',
     'core',
+    'drivers',
+    'error_checking',
     'jacobians',
     'matrices',
     'proc_allocators',
+    'recorders',
     'solvers',
+    'surrogate_models',
     'utils',
     'vectors',
 ]
@@ -477,7 +482,7 @@ class LintTestCase(unittest.TestCase):
 
             # Loop over files
             for file_name in os.listdir(dirpath):
-                if file_name != '__init__.py' and file_name[-3:] == '.py':
+                if file_name != '__init__.py' and file_name[-3:] == '.py' and not os.path.isdir(file_name):
                     if print_info:
                         print(file_name)
 

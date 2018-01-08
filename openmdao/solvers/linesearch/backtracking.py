@@ -24,11 +24,11 @@ def _print_violations(unknowns, lower, upper):
 
     Parameters
     ----------
-    unknowns : <Vector>
+    unknowns : Vector
         Vector containing the unknowns.
-    lower : <Vector>
+    lower : Vector
         Vector containing the lower bounds.
-    upper : <Vector>
+    upper : Vector
         Vector containing the upper bounds.
     """
     for name, val in iteritems(unknowns._views_flat):

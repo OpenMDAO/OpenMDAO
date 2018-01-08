@@ -108,7 +108,6 @@ def _get_out_of_order_subs(group, input_srcs):
     ----------
     group : <Group>
         The Group where we're checking subsystem order.
-
     input_srcs : {}
         dict containing variable abs names for sources of the inputs.
         This describes all variable connections, either explicit or implicit,
@@ -146,7 +145,6 @@ def _check_hanging_inputs(problem, logger):
     ----------
     problem : <Problem>
         The problem being checked.
-
     logger : object
         The object that managers logging output.
     """
@@ -169,7 +167,6 @@ def _check_system_configs(problem, logger):
     ----------
     problem : <Problem>
         The problem being checked.
-
     logger : object
         The object that managers logging output.
     """

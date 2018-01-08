@@ -34,6 +34,11 @@ multi_obj_drivers = {'NSGA2'}
 def _check_imports():
     """
     Dynamically remove optimizers we don't have.
+
+    Returns
+    -------
+    list of str
+        List of valid optimizer strings.
     """
     optlist = ['ALPSO', 'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
                'NSGA2', 'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'NOMAD']
@@ -463,7 +468,6 @@ class pyOptSparseDriver(Driver):
         ----------
         dv_dict : dict
             Dictionary of design variable values.
-
         func_dict : dict
             Dictionary of all functional variables evaluated at design point.
 
@@ -528,6 +532,11 @@ class pyOptSparseDriver(Driver):
     def _get_name(self):
         """
         Get name of current driver.
+
+        Returns
+        -------
+        optimizer : str
+            The name of the current driver.
         """
         return self.options['optimizer']
 

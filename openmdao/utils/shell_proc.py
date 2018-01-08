@@ -200,7 +200,6 @@ class ShellProc(subprocess.Popen):
         poll_delay : float (seconds)
             Time to delay between polling for command completion.
             A value of zero uses an internal default.
-
         timeout : float (seconds)
             Maximum time to wait for command completion.
             A value of zero implies an infinite maximum wait.
