@@ -125,8 +125,8 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
         """
         item = MultiFiMetaModelUnStructured
         metadata = super(item, self).add_input(name, val, shape=shape, src_indices=src_indices,
-                                                 flat_src_indices=flat_src_indices, units=units,
-                                                 desc=desc, var_set=var_set)
+                                               flat_src_indices=flat_src_indices, units=units,
+                                               desc=desc, var_set=var_set)
         input_size = metadata['value'].size
 
         self._input_sizes[0] = self._input_size
