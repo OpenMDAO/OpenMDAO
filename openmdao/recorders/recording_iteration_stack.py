@@ -55,7 +55,7 @@ class Recording(object):
     But with properly-timed values for abs and rel,
     where solvers are concerned.
 
-     Attributes
+    Attributes
     ----------
     name : str
         Name of object getting recorded.

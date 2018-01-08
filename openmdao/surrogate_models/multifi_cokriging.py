@@ -185,7 +185,7 @@ class MultiFiCoKriging(object):
     """
     Integrate the Multi-Fidelity Co-Kriging method described in [LeGratiet2013].
 
-     Attributes
+    Attributes
     ----------
     `theta`: list
         Specified theta for each level OR the best set of autocorrelation parameters
