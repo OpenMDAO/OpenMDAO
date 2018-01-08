@@ -468,7 +468,6 @@ class pyOptSparseDriver(Driver):
         ----------
         dv_dict : dict
             Dictionary of design variable values.
-
         func_dict : dict
             Dictionary of all functional variables evaluated at design point.
 

@@ -235,7 +235,6 @@ class System(object):
         Dict of list of var names to record
     _norm0: float
         Normalization factor
-    # Constants used by list_inputs and list_outputs methods for formatting tables they write
     _column_widths : dict
         widths of the columns
     _align : str

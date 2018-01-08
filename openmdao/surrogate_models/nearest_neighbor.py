@@ -31,7 +31,6 @@ class NearestNeighbor(SurrogateModel):
         ----------
         interpolant_type : str
             must be one of 'linear', 'weighted', or 'rbf'.
-
         **kwargs : dict
             keyword arguments
         """
@@ -57,7 +56,6 @@ class NearestNeighbor(SurrogateModel):
         ----------
         x : array-like
             Training input locations
-
         y : array-like
             Model responses at given inputs.
         """
@@ -73,7 +71,6 @@ class NearestNeighbor(SurrogateModel):
         ----------
         x : array-like
             Point(s) at which the surrogate is evaluated.
-
         **kwargs : dict
             Additional keyword arguments passed to the interpolant.
 
@@ -93,7 +90,6 @@ class NearestNeighbor(SurrogateModel):
         ----------
         x : array-like
             Point at which the surrogate Jacobian is evaluated.
-
         **kwargs : dict
             Additional keyword arguments passed to the interpolant.
 

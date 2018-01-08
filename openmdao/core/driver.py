@@ -504,11 +504,9 @@ class Driver(object):
         ctype : string
             Default is 'all'. Optionally return just the inequality constraints
             with 'ineq' or the equality constraints with 'eq'.
-
         lintype : string
             Default is 'all'. Optionally return just the linear constraints
             with 'linear' or the nonlinear constraints with 'nonlinear'.
-
         filter : list
             List of constraint names used by recorders.
 

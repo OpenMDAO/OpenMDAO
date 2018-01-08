@@ -30,7 +30,6 @@ class MetaModelUnStructured(ExplicitComponent):
         ----------
         default_surrogate : SurrogateModel
             Default surrogate model to use.
-
         vectorize : None or int
             First dimension of all inputs and outputs for case where data is vectorized, optional.
         """
@@ -77,14 +76,11 @@ class MetaModelUnStructured(ExplicitComponent):
         ----------
         name : string
             Name of the input.
-
         val : float or ndarray
             Initial value for the input.
-
         training_data : float or ndarray
             training data for this variable. Optional, can be set
             by the problem later.
-
         **kwargs : dict
             Additional agruments for add_input.
 
@@ -121,17 +117,14 @@ class MetaModelUnStructured(ExplicitComponent):
         ----------
         name : string
             Name of the variable output.
-
         val : float or ndarray
             Initial value for the output. While the value is overwritten during
             execution, it is useful for inferring size.
-
         training_data : float or ndarray
             training data for this variable. Optional, can be set
             by the problem later.
-
         **kwargs : dict
-            Additional agruments for add_output.
+            Additional arguments for add_output.
 
         Returns
         -------
@@ -228,7 +221,6 @@ class MetaModelUnStructured(ExplicitComponent):
         ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """

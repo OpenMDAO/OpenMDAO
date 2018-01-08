@@ -68,22 +68,18 @@ class _RegularGridInterp(object):
         ----------
         points : tuple of ndarray of float, with shapes (m1, ), ..., (mn, )
             The points defining the regular grid in n dimensions.
-
         values : array_like, shape (m1, ..., mn, ...)
             The data on the regular grid in n dimensions.
-
         method : str, optional
             The method of interpolation to perform. Supported are 'slinear',
             'cubic',  and 'quintic'. This parameter will become
             the default for the object's
             ``__call__`` method. Default is "linear".
-
         bounds_error : bool, optional
             If True, when interpolated values are requested outside of the
             domain of the input data, a ValueError is raised.
             If False, then `fill_value` is used.
             Default is True (raise an exception).
-
         fill_value : number, optional
             If provided, the value to use for points outside of the
             interpolation domain. If None, values outside
@@ -91,7 +87,6 @@ class _RegularGridInterp(object):
             extrapolated rather than set to the fill_value if bounds_error=False
             for any points outside of the interpolation domain.
             Default is `np.nan`.
-
         spline_dim_error : bool, optional
             If spline_dim_error=True and an order `k` spline interpolation method
             is used, then if any dimension has fewer points than `k` + 1, an error
@@ -177,12 +172,10 @@ class _RegularGridInterp(object):
         ----------
         xi : ndarray of shape (..., ndim)
             The coordinates to sample the gridded data at
-
         method : str, optional
             The method of interpolation to perform. Supported are 'slinear', 'cubic', and
             'quintic'. Default is None, which will use the method defined at the construction
             of the interpolation object instance.
-
         compute_gradients : bool, optional
             If a spline interpolation method is chosen, this determines whether gradient
             calculations should be made and cached. Default is True.
@@ -266,28 +259,21 @@ class _RegularGridInterp(object):
         ----------
         data_values : array_like
             The data on the regular grid in n dimensions.
-
         xi : ndarray
             The coordinates to sample the gridded data at
-
         indices : list
             Indices for search lookup
-
         interpolator : <scipy.interpolate.BSpline>
             A BSpline object that is used for interpolation.
-
         method : str, optional
             The method of interpolation to perform. Supported are 'slinear', 'cubic', and
             'quintic'. Default is None, which will use the method defined at the construction
             of the interpolation object instance.
-
         ki : list
             List of spline interpolation orders.
-
         compute_gradients : bool, optional
             If a spline interpolation method is chosen, this determines whether gradient
             calculations should be made and cached. Default is True.
-
         first_dim_gradient : bool, optional
             Sset to True to calculate first dimension gradients. Default is False.
 
@@ -403,19 +389,14 @@ class _RegularGridInterp(object):
         ----------
         interpolator : <scipy.interpolate.BSpline>
             A BSpline object that is used for interpolation.
-
         x : array_like, shape (n,)
             Abscissas.
-
         y : array_like, shape (n, ...)
             Ordinates.
-
         pt : array_like
             Points to evaluate the spline at.
-
         k : float
             Spline interpolation order.
-
         compute_gradients : bool
             If a spline interpolation method is chosen, this determines whether gradient
             calculations should be made and cached.
@@ -487,7 +468,6 @@ class _RegularGridInterp(object):
         ----------
         xi : ndarray of shape (..., ndim)
             The coordinates to sample the gridded data at
-
         method : str, optional
             The method of interpolation to perform. Supported are 'slinear',
             'cubic', and 'quintic'. Default is None, which will use the method
@@ -567,13 +547,10 @@ class MetaModelStructured(ExplicitComponent):
         ----------
         name : string
             Name of the input.
-
         val : float or ndarray
             Initial value for the input.
-
         training_data : ndarray
             training data sample points for this input variable.
-
         **kwargs : dict
             Additional agruments for add_input.
         """
@@ -593,13 +570,10 @@ class MetaModelStructured(ExplicitComponent):
         ----------
         name : string
             Name of the output.
-
         val : float or ndarray
             Initial value for the output.
-
         training_data : ndarray
             training data sample points for this output variable.
-
         **kwargs : dict
             Additional agruments for add_output.
         """
@@ -634,7 +608,6 @@ class MetaModelStructured(ExplicitComponent):
         ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
@@ -662,12 +635,10 @@ class MetaModelStructured(ExplicitComponent):
         inputs vector. Refreshes the cache by re-computing the current point
         if necessary.
 
-
         Parameters
         ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """

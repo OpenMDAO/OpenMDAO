@@ -64,7 +64,6 @@ class KrigingSurrogate(SurrogateModel):
         ----------
         x : array-like
             Training input locations
-
         y : array-like
             Model responses at given inputs.
         """
@@ -131,7 +130,6 @@ class KrigingSurrogate(SurrogateModel):
         -------
         ndarray
             Calculated reduced_likelihood
-
         dict
             Dictionary containing the parameters.
         """
@@ -187,7 +185,6 @@ class KrigingSurrogate(SurrogateModel):
         -------
         ndarray
             Kriging prediction.
-
         ndarray, optional (if eval_rmse is True)
             Root mean square of the prediction error.
         """

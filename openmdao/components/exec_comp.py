@@ -366,7 +366,6 @@ class _TmpDict(object):
         ----------
         inner : dict-like
             The dictionary to be wrapped.
-
         return_complex : bool, optional
             If True, return a complex version of values from __getitem__
         """
@@ -448,7 +447,6 @@ def _import_functs(mod, dct, names=None):
         Module to check.
     dct : dict
         Dictionary that will contain the mapping
-
     names : iter of str, optional
         If supplied, only map attrs that match the given names
     """

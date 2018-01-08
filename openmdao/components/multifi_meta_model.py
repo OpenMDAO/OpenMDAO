@@ -16,7 +16,6 @@ def _get_name_fi(name, fi_index):
     ----------
     name : str
         base name
-
     fi_index : int
         fidelity level
 
@@ -124,8 +123,8 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
             For advanced users only. ID or color for this variable, relevant for
             reconfigurability. Default is 0.
         """
-        parent = MultiFiMetaModelUnStructured
-        metadata = super(parent, self).add_input(name, val, shape=shape, src_indices=src_indices,
+        item = MultiFiMetaModelUnStructured
+        metadata = super(item, self).add_input(name, val, shape=shape, src_indices=src_indices,
                                                  flat_src_indices=flat_src_indices, units=units,
                                                  desc=desc, var_set=var_set)
         input_size = metadata['value'].size

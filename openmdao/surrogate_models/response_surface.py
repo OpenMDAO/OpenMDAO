@@ -33,7 +33,6 @@ class ResponseSurface(SurrogateModel):
         ----------
         x : array-like
             Training input locations
-
         y : array-like
             Model responses at given inputs.
         """
