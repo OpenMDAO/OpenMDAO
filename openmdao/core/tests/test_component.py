@@ -15,7 +15,7 @@ from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray
 from openmdao.test_suite.components.simple_comps import TestExplCompDeprecated
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestExplicitComponent(unittest.TestCase):

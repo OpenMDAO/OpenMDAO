@@ -9,6 +9,18 @@ command.  There are two types of commands available, those that perform some sor
 configuration checking on the Problem after its setup is complete, and those that are used to
 collect information about the entire run of the Problem, things like profilers and tracers.
 
+All available *openmdao* sub-commands can be shown using the following command:
+
+.. embed-shell-cmd::
+    :cmd: openmdao -h
+
+
+All sub-commands are shown under 'positional arguments'.  To get further info on any sub-command,
+for example, for :code:`tree`, follow the command with a *-h*.  For example:
+
+.. embed-shell-cmd::
+    :cmd: openmdao tree -h
+
 
 Post-setup Commands
 -------------------
@@ -18,6 +30,30 @@ final_setup function.  After the registered function completes, the program will
 continuing to the end of the user's run script. This makes it convenient to view or check the
 configuration of a model in any run script without having to wait around for the entire script
 to run.
+
+.. _om-command-check:
+
+openmdao check
+##############
+
+The :code:`openmdao check` command will perform a number of checks on a model and display
+errors, warnings, or informational messages describing what it finds. Some of the available
+checks are *hanging_inputs*, which lists any input variables that are not connected, and
+*cycles*, which will display any component dependency cycles or out-of-order executing components.
+By default, all checks will be done, unless you supply individual checks on the command line
+using *-c* args.  For example:
+
+
+.. embed-shell-cmd::
+    :cmd: openmdao check -c cycles circuit.py
+    :dir: ../test_suite/scripts
+
+
+To see the available checks, run the following command:
+
+.. embed-shell-cmd::
+    :cmd: openmdao check -h
+
 
 .. _om-command-view_model:
 
@@ -79,7 +115,6 @@ also allows specific attributes and/or vector variables to be printed out along 
 corresponding system in the tree.
 
 Here's an example of the tree output for a simple circuit model:
-
 
 .. embed-shell-cmd::
     :cmd: openmdao tree circuit.py

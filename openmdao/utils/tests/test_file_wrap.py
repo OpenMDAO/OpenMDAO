@@ -8,7 +8,7 @@ import shutil
 
 import unittest
 
-from openmdao.devtools.testutil import assert_rel_error, assertEqualArrays
+from openmdao.utils.assert_utils import assert_rel_error, assert_equal_arrays
 
 import numpy
 from numpy import array, isnan, isinf
@@ -744,8 +744,8 @@ class FileParserFeature(unittest.TestCase):
             "DISPLACEMENT 1.0 2.0 3.0 4.0 5.0"
         ]
 
-    def assertEqualArrays(self, a1, a2):
-        assertEqualArrays(a1, a2)
+    def assert_equal_arrays(self, a1, a2):
+        assert_equal_arrays(a1, a2)
 
     def test_parse_output(self):
         parser.mark_anchor("LOAD CASE")
@@ -801,7 +801,7 @@ class FileParserFeature(unittest.TestCase):
         parser.mark_anchor("LOAD CASE")
         var = parser.transfer_array(1, 3, 2, 4)
 
-        self.assertEqualArrays(var, numpy.array([
+        self.assert_equal_arrays(var, numpy.array([
             '39342000.0', 'nan', '265400.0',
             'DISPLACEMENT', '2.1', '4.6', '3.1'
         ]))
@@ -825,15 +825,15 @@ class FileParser2dFeature(unittest.TestCase):
         parser._data.append(' 80.   1.0   42.8  47.6  49.1  48.9  47.4  44.8  41.2  36.7  31.3  25.0')
         parser._data.append('100.   1.0   48.4  53.1  54.7  54.5  53.0  50.4  46.8  42.3  36.9  30.6')
 
-    def assertEqualArrays(self, a1, a2):
-        assertEqualArrays(a1, a2)
+    def assert_equal_arrays(self, a1, a2):
+        assert_equal_arrays(a1, a2)
 
     def test_parse_array_2d(self):
         parser.reset_anchor()
         parser.mark_anchor("Hz")
         var = parser.transfer_2Darray(1, 3, 4, 12)
 
-        self.assertEqualArrays(var, numpy.array([
+        self.assert_equal_arrays(var, numpy.array([
             [30.0,  34.8,  36.3,  36.1,  34.6,  32.0,  28.4,  23.9,  18.5,  12.2],
             [36.5,  41.3,  42.8,  42.6,  41.1,  38.5,  34.9,  30.4,  25.0,  18.7],
             [42.8,  47.6,  49.1,  48.9,  47.4,  44.8,  41.2,  36.7,  31.3,  25.0],

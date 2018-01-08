@@ -7,7 +7,7 @@ from six import iteritems
 
 from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp, DenseJacobian, DirectSolver
 from openmdao.api import ExecComp
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.unit_conv import UnitConvGroup, SrcComp, TgtCompC, TgtCompF, \
     TgtCompK, SrcCompFD, TgtCompCFD, TgtCompFFD, TgtCompKFD, TgtCompFMulti
 

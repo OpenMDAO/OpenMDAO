@@ -19,7 +19,8 @@ except ImportError:
 from openmdao.test_suite.groups.parallel_groups import \
     FanOutGrouped, FanInGrouped2, Diamond, ConvergeDiverge
 
-from openmdao.devtools.testutil import assert_rel_error, TestLogger
+from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.logger_utils import TestLogger
 
 
 

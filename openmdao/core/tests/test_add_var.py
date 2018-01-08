@@ -5,7 +5,7 @@ import numpy as np
 import unittest
 
 from openmdao.api import Problem, ExplicitComponent
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class CompAddWithDefault(ExplicitComponent):

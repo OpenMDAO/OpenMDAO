@@ -4,7 +4,7 @@ import unittest
 from openmdao.api import Problem, Group, NewtonSolver, ScipyKrylov, NonlinearBlockGS, \
     LinearBlockGS, DirectSolver
 from openmdao.test_suite.parametric_suite import ParameterizedInstance
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 def _build(solver_class=NewtonSolver, linear_solver_class=ScipyKrylov,

@@ -3,7 +3,7 @@ from __future__ import division, print_function, absolute_import
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 import numpy as np
 import unittest
 

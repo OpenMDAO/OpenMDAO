@@ -9,7 +9,7 @@ import numpy as np
 from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp, ExecComp
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector

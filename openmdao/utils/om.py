@@ -17,6 +17,7 @@ from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
 from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setup_parser
 from openmdao.devtools.iprofile import _iprof_totals_exec, _iprof_totals_setup_parser
 from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser
+from openmdao.error_checking.check_config import _check_config_cmd, _check_config_setup_parser
 from openmdao.devtools.iprof_utils import _Options
 
 from openmdao.utils.find_cite import print_citations
@@ -147,7 +148,8 @@ def _tree_setup_parser(parser):
     parser.add_argument('-o', default=None, action='store', dest='outfile',
                         help='Output file name. By default, output goes to stdout.')
     parser.add_argument('-c', '--colors', action='store_true', dest='show_colors',
-                        help="Display colors if the terminal supports it.")
+                        help="Display colors if the terminal supports it.  Requires 'colorama' "
+                             "python package.  Use 'pip install colorama' to install it.")
     parser.add_argument('-d', '--depth', action='store', type=int, dest='depth',
                         default=0, help="Max depth of tree to display.")
     parser.add_argument('-a', '--attr', action='append', default=[], dest='attrs',
@@ -356,6 +358,7 @@ _post_setup_map = {
     'dump_idxs': (_dump_dist_idxs_setup_parser, _dump_dist_idxs_cmd),
     'simul_coloring': (_simul_coloring_setup_parser, _simul_coloring_cmd),
     'cite': (_cite_setup_parser, _cite_cmd),
+    'check': (_check_config_setup_parser, _check_config_cmd),
 }
 
 # Other non-post-setup functions go here

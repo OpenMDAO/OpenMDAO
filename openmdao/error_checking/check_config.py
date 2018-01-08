@@ -1,4 +1,7 @@
 """A module containing various configuration checks for an OpenMDAO Problem."""
+from __future__ import print_function
+
+import sys
 
 from collections import defaultdict
 from six import iteritems
@@ -81,6 +84,22 @@ def _check_dataflow(group, logger):
                            (tgt_system, sorted(keep_srcs)))
 
 
+def _check_dataflow_prob(prob, logger):
+    """
+    Report any cycles and out of order Systems.
+
+    Parameters
+    ----------
+    prob : <Problem>
+        The Problem being checked for dataflow issues.
+    logger : object
+        The object that manages logging output.
+
+    """
+    for group in prob.model.system_iter(include_self=True, recurse=True, typ=Group):
+        _check_dataflow(group, logger)
+
+
 def _get_out_of_order_subs(group, input_srcs):
     """
     Return Systems that are executed out of dataflow order.
@@ -133,11 +152,87 @@ def _check_hanging_inputs(problem, logger):
     """
     input_srcs = problem.model._conn_global_abs_in2out
 
-    hanging = sorted([
-        name
-        for name in problem.model._var_allprocs_abs_names['input']
-        if name not in input_srcs
-    ])
+    hanging = sorted([name for name in problem.model._var_allprocs_abs_names['input']
+                      if name not in input_srcs])
 
     if hanging:
-        logger.warning("The following inputs are not connected: %s." % hanging)
+        msg = ["The following inputs are not connected:\n"]
+        msg.extend("   %s\n" % h for h in hanging)
+        logger.warning(''.join(msg))
+
+
+def _check_system_configs(problem, logger):
+    """
+    Perform any system specific configuration checks.
+
+    Parameters
+    ----------
+    problem : <Problem>
+        The problem being checked.
+
+    logger : object
+        The object that managers logging output.
+    """
+    for system in problem.model.system_iter(include_self=True, recurse=True):
+        system.check_config(logger)
+
+
+# Dict of all checks by name, mapped to the corresponding function that performs the check
+# Each function must be of the form  f(problem, logger).
+_checks = {
+    'hanging_inputs': _check_hanging_inputs,
+    'cycles': _check_dataflow_prob,
+    'system': _check_system_configs,
+}
+
+#
+# Command line interface functions
+#
+
+
+def _check_config_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao check' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-o', action='store', dest='outfile', help='output file.')
+    parser.add_argument('-c', action='append', dest='checks', default=[],
+                        help='Only perform specific check(s). Available checks are: %s. '
+                        'By default, will perform all checks.' % sorted(_checks.keys()))
+
+
+def _check_config_cmd(options):
+    """
+    Return the post_setup hook function for 'openmdao check'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
+    def _check_config(prob):
+        if options.outfile is None:
+            outfile = sys.stdout
+            logger = get_logger('check_config', use_format=True)
+        else:
+            outfile = open(options.outfile, 'w')
+            logger = get_logger('check_config', out_stream=outfile, use_format=True)
+
+        if not options.checks:
+            check_config(prob, logger)
+        else:
+            for c in options.checks:
+                _checks[c](prob, logger)
+        exit()
+
+    return _check_config

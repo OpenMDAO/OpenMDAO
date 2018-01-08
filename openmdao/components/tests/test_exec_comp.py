@@ -12,7 +12,7 @@ from parameterized import parameterized
 
 from openmdao.api import IndepVarComp, Group, Problem, ExecComp
 from openmdao.components.exec_comp import _expr_dict
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 _ufunc_test_data = {'abs': {'str': 'f=abs(x)',
                             'check_func': np.abs,

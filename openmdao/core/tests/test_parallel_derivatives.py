@@ -12,7 +12,7 @@ from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBloc
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 if MPI:
     from openmdao.api import PETScVector

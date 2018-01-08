@@ -8,7 +8,7 @@ import warnings
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestSystem(unittest.TestCase):

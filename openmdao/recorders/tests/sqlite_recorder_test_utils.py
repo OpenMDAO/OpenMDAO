@@ -8,7 +8,7 @@ if PY3:
 import numpy as np
 
 from openmdao.utils.record_util import format_iteration_coordinate
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
 
 def assertDriverIterationDataRecorded(test, db_cur, expected, tolerance):

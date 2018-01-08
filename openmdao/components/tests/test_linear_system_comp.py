@@ -6,7 +6,7 @@ import numpy as np
 
 from openmdao.api import Group, Problem, IndepVarComp
 from openmdao.api import LinearSystemComp, ScipyKrylov, DirectSolver
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestLinearSystem(unittest.TestCase):
