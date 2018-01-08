@@ -73,6 +73,11 @@ class ResponseSurface(SurrogateModel):
         ----------
         x : array-like
             Point at which the surrogate is evaluated.
+
+        Returns
+        -------
+        float
+            Predicted response.
         """
         super(ResponseSurface, self).predict(x)
 
@@ -105,6 +110,11 @@ class ResponseSurface(SurrogateModel):
         ----------
         x : array-like
             Point at which the surrogate Jacobian is evaluated.
+
+        Returns
+        -------
+        ndarray
+            Jacobian of surrogate output wrt inputs.
         """
         n = self.n
         betas = self.betas

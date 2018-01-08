@@ -74,8 +74,13 @@ class NearestNeighbor(SurrogateModel):
         x : array-like
             Point(s) at which the surrogate is evaluated.
 
-        kwargs :
+        **kwargs : dict
             Additional keyword arguments passed to the interpolant.
+
+        Returns
+        -------
+        float
+            Predicted value.
         """
         super(NearestNeighbor, self).predict(x)
         return self.interpolant(x, **kwargs)
@@ -89,8 +94,13 @@ class NearestNeighbor(SurrogateModel):
         x : array-like
             Point at which the surrogate Jacobian is evaluated.
 
-        kwargs :
+        **kwargs : dict
             Additional keyword arguments passed to the interpolant.
+
+        Returns
+        -------
+        ndarray
+            Jacobian of surrogate output wrt inputs.
         """
         jac = self.interpolant.gradient(x, **kwargs)
         if jac.shape[0] == 1 and len(jac.shape) > 2:

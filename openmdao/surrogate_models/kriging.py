@@ -129,7 +129,11 @@ class KrigingSurrogate(SurrogateModel):
 
         Returns
         -------
+        ndarray
+            Calculated reduced_likelihood
 
+        dict
+            Dictionary containing the parameters.
         """
         if thetas is None:
             thetas = self.thetas
@@ -178,6 +182,14 @@ class KrigingSurrogate(SurrogateModel):
         ----------
         x : array-like
             Point at which the surrogate is evaluated.
+
+        Returns
+        -------
+        ndarray
+            Kriging prediction.
+
+        ndarray, optional (if eval_rmse is True)
+            Root mean square of the prediction error.
         """
         super(KrigingSurrogate, self).predict(x)
 
@@ -218,6 +230,11 @@ class KrigingSurrogate(SurrogateModel):
         ----------
         x : array-like
             Point at which the surrogate Jacobian is evaluated.
+
+        Returns
+        -------
+        ndarray
+            Jacobian of surrogate output wrt inputs.
         """
         thetas = self.thetas
 
@@ -250,6 +267,11 @@ class FloatKrigingSurrogate(KrigingSurrogate):
         ----------
         x : array-like
             Point at which the surrogate is evaluated.
+
+        Returns
+        -------
+        float
+            Mean value of kriging prediction.
         """
         dist = super(FloatKrigingSurrogate, self).predict(x)
         return dist[0]  # mean value
