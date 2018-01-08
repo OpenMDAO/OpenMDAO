@@ -174,11 +174,6 @@ class ScipyOptimizer(Driver):
     def run(self):
         """
         Optimize the problem using selected Scipy optimizer.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
         """
         opt = self.options['optimizer']
         model = self._problem.model

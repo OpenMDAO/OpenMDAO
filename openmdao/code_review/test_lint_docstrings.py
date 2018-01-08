@@ -11,6 +11,7 @@ from six import PY3
 
 from numpydoc.docscrape import NumpyDocString
 
+#TODO: make this more robust by implementing an excludes list, instead of this list, which must be kept up-to-date.
 directories = [
     'components',
     'core',
@@ -21,6 +22,7 @@ directories = [
     'proc_allocators',
     'recorders',
     'solvers',
+    'surrogate_models',
     'utils',
     'vectors',
 ]
