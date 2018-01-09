@@ -21,6 +21,15 @@ class SimpleGADriver(Driver):
     """
     Driver for a simple genetic algorithm.
 
+    Options
+    -------
+    options['elitism'] :  bool(True)
+        If True, replace worst performing point with best from previous generation each iteration.
+    options['max_gen'] :  int(300)
+        Number of generations before termination.
+    options['pop_size'] :  int(25)
+        Number of points in the GA.
+
     Attributes
     ----------
     problem : <Problem>
@@ -68,6 +77,7 @@ class SimpleGADriver(Driver):
 
         self.ga = GeneticAlgorithm(self.objective_callback)
 
+    def objective_callback
 
 class GeneticAlgorithm():
     """
@@ -107,7 +117,7 @@ class GeneticAlgorithm():
         vub : ndarray
             Upper bounds array.
         bits : ndarray
-        Number of bits to encode the design space for each element of the design vector.
+            Number of bits to encode the design space for each element of the design vector.
         pop_size : int
             Number of points in the population.
         max_gen : int
@@ -115,7 +125,7 @@ class GeneticAlgorithm():
 
         Returns
         -------
-        ndaray
+        ndarray
             Best design point
         float
             Objective value at best design point.
@@ -295,7 +305,7 @@ class GeneticAlgorithm():
             Lower bound array.
         vub : ndarray
             Upper bound array.
-        bits : int
+        bits : ndarray
             Number of bits for decoding.
 
         Returns
@@ -339,12 +349,3 @@ class GeneticAlgorithm():
         # TODO : We need this method if we ever start with user defined initial sampling points.
         pass
 
-    # def test_func(self, x):
-        # ''' Solution: xopt = [0.2857, -0.8571], fopt = 23.2933'''
-        # A = (2*x[0] - 3*x[1])**2;
-        # B = 18 - 32*x[0] + 12*x[0]**2 + 48*x[1] - 36*x[0]*x[1] + 27*x[1]**2;
-        # C = (x[0] + x[1] + 1)**2;
-        # D = 19 - 14*x[0] + 3*x[0]**2 - 14*x[1] + 6*x[0]*x[1] + 3*x[1]**2;
-
-        # f = (30 + A*B)*(1 + C*D);
-        # return f
