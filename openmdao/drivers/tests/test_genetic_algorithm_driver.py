@@ -61,5 +61,7 @@ class TestSimpleGA(unittest.TestCase):
         assert_rel_error(self, prob['px.x'][0], 0.2, 1e-4)
         assert_rel_error(self, prob['px.x'][1], -0.88705882, 1e-4)
 
+    def test_mixed_integer(self):
+
 if __name__ == "__main__":
     unittest.main()
