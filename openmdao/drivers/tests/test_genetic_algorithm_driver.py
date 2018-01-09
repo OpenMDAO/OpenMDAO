@@ -6,6 +6,7 @@ import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ExecComp
 from openmdao.drivers.genetic_algorithm_driver import SimpleGADriver
+from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 from openmdao.utils.assert_utils import assert_rel_error
 
 
@@ -62,6 +63,62 @@ class TestSimpleGA(unittest.TestCase):
         assert_rel_error(self, prob['px.x'][1], -0.88705882, 1e-4)
 
     def test_mixed_integer(self):
+
+        class ObjPenalty(ExplicitComponent):
+            """
+            Weight objective with penalty on stress constraint.
+            """
+            def setup(self):
+                self.add_input('obj', 0.0)
+                self.add_input('stress', val=np.zeros((3, )))
+
+                self.add_output('weighted', 0.0)
+
+            def compute(self, inputs, outputs):
+                obj = inputs['obj']
+                stress = inputs['stress']
+
+                pen = 0.0
+                for j in range(len(stress)):
+                    if stress[j] > 1.0:
+                        pen += 10.0*(stress[j] - 1.0)**2
+
+                outputs['weighted'] = obj + pen
+
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('xc_a1', IndepVarComp('area1', 5.0), promotes=['*'])
+        model.add_subsystem('xc_a2', IndepVarComp('area2', 5.0), promotes=['*'])
+        model.add_subsystem('xc_a3', IndepVarComp('area3', 5.0), promotes=['*'])
+        model.add_subsystem('xi_m1', IndepVarComp('mat1', 1), promotes=['*'])
+        model.add_subsystem('xi_m2', IndepVarComp('mat2', 1), promotes=['*'])
+        model.add_subsystem('xi_m3', IndepVarComp('mat3', 1), promotes=['*'])
+        model.add_subsystem('comp', ThreeBarTruss(), promotes=['*'])
+        model.add_subsystem('obj_with_penalty', ObjPenalty(), promotes=['*'])
+
+        model.add_design_var('area1', lower=0.0005, upper=10.0)
+        model.add_design_var('area2', lower=0.0005, upper=10.0)
+        model.add_design_var('area3', lower=0.0005, upper=10.0)
+        model.add_design_var('mat1', lower=1, upper=4)
+        model.add_design_var('mat2', lower=1, upper=4)
+        model.add_design_var('mat3', lower=1, upper=4)
+        model.add_objective('weighted')
+
+        prob.driver = SimpleGADriver()
+        prob.driver.options['bits'] = {'area1' : 8,
+                                       'area2' : 8,
+                                       'area3' : 8}
+
+        prob.setup(check=False)
+
+        prob.run_driver()
+
+        assert_rel_error(self, prob['mass'], 5.287, 1e-3)
+        assert_rel_error(self, prob['mat1'], 3, 1e-5)
+        assert_rel_error(self, prob['mat2'], 3, 1e-5)
+        #Material 3 can be anything
 
 if __name__ == "__main__":
     unittest.main()
