@@ -1,16 +1,71 @@
 """
-Genetic algorithm used to assist Branch and Bound.
+Driver for a simple genetic algorithm.
 
 This is the Simple Genetic Algorithm implementation based on 2009 AAE550: MDO Lecture notes of
 Prof. William A. Crossley.
+
+This basic GA algorithm is compartmentalized into the GeneticAlgorithm class so that it can be
+used in more complicated driver.
 """
 import copy
 
 from six.moves import range
 
 import numpy as np
-
 from pyDOE import lhs
+
+from openmdao.core.driver import Driver
+
+
+class SimpleGADriver(Driver):
+    """
+    Driver for a simple genetic algorithm.
+
+    Attributes
+    ----------
+    problem : <Problem>
+        Pointer to the containing problem.
+    supports : <OptionsDictionary>
+        Provides a consistant way for drivers to declare what features they support.
+    _cons : dict
+        Contains all constraint info.
+    _designvars : dict
+        Contains all design variable info.
+    _objs : dict
+        Contains all objective info.
+    _quantities : list
+        Contains the objectives plus nonlinear constraints.
+    _responses : dict
+        Contains all response info.
+    """
+
+    def __init__(self):
+        """
+        Initialize the SimpleGADriver driver.
+        """
+        super(SimpleGADriver, self).__init__()
+
+        # What we support
+        self.supports['integer_design_vars'] = True
+
+        # What we don't support yet
+        self.supports['inequality_constraints'] = False
+        self.supports['equality_constraints'] = False
+        self.supports['multiple_objectives'] = False
+        self.supports['two_sided_constraints'] = False
+        self.supports['linear_constraints'] = False
+        self.supports['simultaneous_derivatives'] = False
+        self.supports['active_set'] = False
+
+        # User Options
+        self.options.declare('elitism', default=True,
+                             desc='If True, replace worst performing point with best from previous'
+                             ' generation each iteration.')
+        self.options.declare('pop_size', default=True,
+                             desc='If True, replace worst performing point with best from previous'
+                             ' generation each iteration.')
+
+        self.ga = GeneticAlgorithm(self.objective_callback)
 
 
 class GeneticAlgorithm():
