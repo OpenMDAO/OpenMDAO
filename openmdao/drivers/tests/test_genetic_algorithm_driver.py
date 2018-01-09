@@ -125,23 +125,21 @@ class TestSimpleGA(unittest.TestCase):
         model.add_subsystem('comp', ThreeBarTruss(), promotes=['*'])
         model.add_subsystem('obj_with_penalty', ObjPenalty(), promotes=['*'])
 
-        model.add_design_var('area1', lower=0.0005, upper=10.0)
-        model.add_design_var('area2', lower=0.0005, upper=10.0)
-        model.add_design_var('area3', lower=0.0005, upper=10.0)
+        model.add_design_var('area1', lower=1.0, upper=2.0)
+        model.add_design_var('area2', lower=2.0, upper=2.5)
         model.add_design_var('mat1', lower=1, upper=4)
         model.add_design_var('mat2', lower=1, upper=4)
         model.add_design_var('mat3', lower=1, upper=4)
         model.add_objective('weighted')
 
         prob.driver = SimpleGADriver()
-        prob.driver.options['bits'] = {'area1' : 16,
-                                       'area2' : 16,
-                                       'area3' : 16}
-        prob.driver.options['max_gen'] = 3000
+        prob.driver.options['bits'] = {'area1' : 8,
+                                       'area2' : 8}
+        prob.driver.options['max_gen'] = 300
         prob.driver.options['pop_size'] = 25
 
         prob.setup(check=False)
-
+        prob['area3'] = 0.0005
         prob.run_driver()
 
         print(prob['mass'], prob['mat1'], prob['mat2'], prob['mat3'], prob['stress'])
