@@ -624,7 +624,11 @@ class MetaModelStructured(ExplicitComponent):
                                                             fill_value=None,
                                                             spline_dim_error=False)
 
-            val = self.interps[out_name](pt)
+            try:
+                val = self.interps[out_name](pt)
+            except ValueError as err:
+                raise ValueError("Error interpolating output '%s' in %s:\n%s" %
+                                 (out_name, self.pathname, str(err)))
             outputs[out_name] = val
 
     def compute_partials(self, inputs, partials):
