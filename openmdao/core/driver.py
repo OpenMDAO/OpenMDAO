@@ -804,3 +804,5 @@ class Driver(object):
                     del dvdict[dv]
                     dv = prom2abs[dv][0]
                     dvdict[dv] = col_dict
+                # if not self._designvars[dv]['simul_deriv_color']:
+                #     del dvdict[dv]

@@ -104,8 +104,8 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     J[J < tol] = 0.0
     J[J >= tol] = 1.0
 
-    # from openmdao.utils.array_utils import array_viz
-    # array_viz(J)
+    from openmdao.utils.array_utils import array_viz
+    array_viz(J)
 
     # find column and row ranges (inclusive) for dvs and responses respectively
     dv_offsets = []
