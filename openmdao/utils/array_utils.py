@@ -138,8 +138,8 @@ def array_viz(arr, prob=None, of=None, wrt=None, tol=1e-50, stream=sys.stdout):
                 stream.write(' %d  %s\n' % (r, res))
             row = r + 1
 
-    start = 0
-    for name in wrt:
-        tab = ' ' * start
-        stream.write('%s|%s\n' % (tab, name))
-        start += prob.driver._designvars[name]['size']
+        start = 0
+        for name in wrt:
+            tab = ' ' * start
+            stream.write('%s|%s\n' % (tab, name))
+            start += prob.driver._designvars[name]['size']
