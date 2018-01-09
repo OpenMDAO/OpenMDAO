@@ -148,7 +148,13 @@ class SimpleGADriver(Driver):
         # Bits of resolution
         bits = np.ceil(np.log2(upper_bound - lower_bound + 1)).astype(int)
         for name, val in iteritems(user_bits):
-            i, j = self._desvar_idx[name]
+
+            try:
+                i, j = self._desvar_idx[name]
+            except KeyError:
+                abs_name = prom2abs[name][0]
+                i, j = self._desvar_idx[abs_name]
+
             bits[i:j] = val
 
         desvar_new, obj, nfit = ga.execute_ga(lower_bound, upper_bound, bits, pop_size, max_gen)
