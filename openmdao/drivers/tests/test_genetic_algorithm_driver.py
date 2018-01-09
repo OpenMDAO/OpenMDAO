@@ -89,9 +89,9 @@ class TestSimpleGA(unittest.TestCase):
         prob = Problem()
         model = prob.model = Group()
 
-        model.add_subsystem('xc_a1', IndepVarComp('area1', 5.0), promotes=['*'])
-        model.add_subsystem('xc_a2', IndepVarComp('area2', 5.0), promotes=['*'])
-        model.add_subsystem('xc_a3', IndepVarComp('area3', 5.0), promotes=['*'])
+        model.add_subsystem('xc_a1', IndepVarComp('area1', 5.0, units='cm**2'), promotes=['*'])
+        model.add_subsystem('xc_a2', IndepVarComp('area2', 5.0, units='cm**2'), promotes=['*'])
+        model.add_subsystem('xc_a3', IndepVarComp('area3', 5.0, units='cm**2'), promotes=['*'])
         model.add_subsystem('xi_m1', IndepVarComp('mat1', 1), promotes=['*'])
         model.add_subsystem('xi_m2', IndepVarComp('mat2', 1), promotes=['*'])
         model.add_subsystem('xi_m3', IndepVarComp('mat3', 1), promotes=['*'])
@@ -107,14 +107,17 @@ class TestSimpleGA(unittest.TestCase):
         model.add_objective('weighted')
 
         prob.driver = SimpleGADriver()
-        prob.driver.options['bits'] = {'area1' : 8,
-                                       'area2' : 8,
-                                       'area3' : 8}
+        prob.driver.options['bits'] = {'area1' : 16,
+                                       'area2' : 16,
+                                       'area3' : 16}
+        prob.driver.options['max_gen'] = 3000
+        prob.driver.options['pop_size'] = 25
 
         prob.setup(check=False)
 
         prob.run_driver()
 
+        print(prob['mass'], prob['mat1'], prob['mat2'], prob['mat3'], prob['stress'])
         assert_rel_error(self, prob['mass'], 5.287, 1e-3)
         assert_rel_error(self, prob['mat1'], 3, 1e-5)
         assert_rel_error(self, prob['mat2'], 3, 1e-5)
