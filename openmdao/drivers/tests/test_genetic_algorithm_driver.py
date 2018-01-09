@@ -6,6 +6,7 @@ import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ExecComp
 from openmdao.drivers.genetic_algorithm_driver import SimpleGADriver
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestSimpleGA(unittest.TestCase):
@@ -50,7 +51,12 @@ class TestSimpleGA(unittest.TestCase):
         prob.driver = SimpleGADriver()
         prob.setup(check=False)
 
+        prob.run_driver()
+
         # Solution: xopt = [0.2857, -0.8571], fopt = 23.2933
+        assert_rel_error(self, prob['obj.f'], 23.2933, 1e-5)
+        assert_rel_error(self, prob['px.x'][0], 0.2857, 1e-5)
+        assert_rel_error(self, prob['px.x'][1], -0.8571, 1e-5)
 
 if __name__ == "__main__":
     unittest.main()
