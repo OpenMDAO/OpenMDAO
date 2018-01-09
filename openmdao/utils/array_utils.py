@@ -92,7 +92,7 @@ def convert_neg(arr, dim):
     return arr
 
 
-def array_viz(arr, stream=sys.stdout):
+def array_viz(arr, prob=None, of=None, wrt=None, tol=1e-50, stream=sys.stdout):
     """
     Display the structure of an array in a compact form.
 
@@ -100,16 +100,46 @@ def array_viz(arr, stream=sys.stdout):
     ----------
     arr : ndarray
         Array being visualized.
+    prob : Problem or None
+        Problem object.
+    of : list of str or None
+        Names of response variables used in derivative calculation.
+    wrt : list of str or None
+        Names of design variables used in derivative calculation.
+    tol : float
+        Tolerance used to determine 'zero' entries.
     stream : file-like
         Stream where output will be written.
     """
     if len(arr.shape) != 2:
         raise RuntimeError("array_viz only works for 2d arrays.")
 
-    for r in range(arr.shape[0]):
-        for c in range(arr.shape[1]):
-            if arr[r, c] == 0.0:
-                stream.write('.')
-            else:
-                stream.write('x')
-        stream.write(' %d\n' % r)
+    if prob is None or of is None or wrt is None:
+        for r in range(arr.shape[0]):
+            for c in range(arr.shape[1]):
+                if -tol <= arr[r, c] <= tol:
+                    stream.write('.')
+                else:
+                    stream.write('x')
+            stream.write(' %d\n' % r)
+    else:
+
+        row = 0
+        for res in of:
+            for r in range(row, row + prob.driver._responses[res]['size']):
+                col = 0
+                for dv in wrt:
+                    for c in range(col, col + prob.driver._designvars[dv]['size']):
+                        if -tol <= arr[r, c] <= tol:
+                            stream.write('.')
+                        else:
+                            stream.write('x')
+                    col = c + 1
+                stream.write(' %d  %s\n' % (r, res))
+            row = r + 1
+
+    start = 0
+    for name in wrt:
+        tab = ' ' * start
+        stream.write('%s|%s\n' % (tab, name))
+        start += prob.driver._designvars[name]['size']

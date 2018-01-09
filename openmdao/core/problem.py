@@ -1428,10 +1428,10 @@ class Problem(object):
 
                     if matmat:
                         loc_idx = loc_idxs
-                    elif simul and do_color_iter:
+                    elif simul is not None and do_color_iter:
                         loc_idx = loc_idxs[i - start]
                     else:
-                        if simul:
+                        if simul is None:
                             if i >= len(idxs):
                                 idx = idxs[-1]  # reuse the last index
                                 delta_loc_idx = 0  # don't increment local_idx
@@ -1508,7 +1508,7 @@ class Problem(object):
                                 if totals[key] is None:
                                     totals[key] = np.zeros((len_val, loc_size))
                                 if store:
-                                    if simul and do_color_iter:
+                                    if simul is not None and do_color_iter:
                                         smap = output_vois[output_name]['simul_map']
                                         if (smap is not None and input_name in smap and
                                                 color in smap[input_name]):
@@ -1536,7 +1536,7 @@ class Problem(object):
                                 if totals[okey][old_input_name] is None:
                                     totals[okey][old_input_name] = np.zeros((len_val, loc_size))
                                 if store:
-                                    if simul and do_color_iter:
+                                    if simul is not None and do_color_iter:
                                         smap = output_vois[output_name]['simul_map']
                                         if (smap is not None and input_name in smap and
                                                 color in smap[input_name]):
