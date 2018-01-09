@@ -129,7 +129,7 @@ class SimpleGADriver(Driver):
         count = 0
         for name, meta in iteritems(desvars):
             size = meta['size']
-            self._desvar_idx[name] = (count, count+size)
+            self._desvar_idx[name] = (count, count + size)
             count += size
 
         lower_bound = np.empty((count, ))
@@ -173,6 +173,8 @@ class SimpleGADriver(Driver):
             rec.abs = 0.0
             rec.rel = 0.0
         self.iter_count += 1
+
+        return False
 
     def objective_callback(self, x):
         """
@@ -494,4 +496,3 @@ class GeneticAlgorithm():
         """
         # TODO : We need this method if we ever start with user defined initial sampling points.
         pass
-
