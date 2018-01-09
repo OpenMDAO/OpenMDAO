@@ -74,6 +74,11 @@ class SimpleGADriver(Driver):
         self.supports['active_set'] = False
 
         # User Options
+        self.options.declare('bits', default={}, types=(dict),
+                             desc='Number of bits of resolution. Default is an empty dict, where '
+                             'every unspecified variable is assumed to be integer, and the number '
+                             'of bits is calculated automatically. If you have a continuous var, '
+                             'you should set a bits value as a key in this dictionary.')
         self.options.declare('elitism', default=True,
                              desc='If True, replace worst performing point with best from previous'
                              ' generation each iteration.')
@@ -138,10 +143,30 @@ class SimpleGADriver(Driver):
         ga.elite = self.options['elitism']
         pop_size = self.options['pop_size']
         max_gen = self.options['max_gen']
+        user_bits = self.options['bits']
+
+        # Bits of resolution
+        bits = np.ceil(np.log2(upper_bound - lower_bound + 1)).astype(int)
+        for name, val in iteritems(user_bits):
+            i, j = self._desvar_idx[name]
+            bits[i:j] = val
 
         desvar_new, obj, nfit = ga.execute_ga(lower_bound, upper_bound, bits, pop_size, max_gen)
 
-    def objective_callback(x):
+        # Pull optimal parameters back into framework and re-run, so that
+        # framework is left in the right final state
+        for name in desvars:
+            i, j = self._desvar_idx[name]
+            val = desvar_new[i:j]
+            self.set_design_var(name, val)
+
+        with Recording('SimpleGA', self.iter_count, self) as rec:
+            self._problem.model._solve_nonlinear()
+            rec.abs = 0.0
+            rec.rel = 0.0
+        self.iter_count += 1
+
+    def objective_callback(self, x):
         """
         Evaluate problem objective at the requested point.
 
@@ -160,7 +185,7 @@ class SimpleGADriver(Driver):
         model = self._problem.model
         success = 1
 
-        for name in iteritems(self._designvars):
+        for name in self._designvars:
             i, j = self._desvar_idx[name]
             self.set_design_var(name, x[i:j])
 
@@ -175,7 +200,9 @@ class SimpleGADriver(Driver):
                 model._clear_iprint()
                 success = 0
 
-            obj = self.get_objective_values()[0]
+            for name, val in iteritems(self.get_objective_values()):
+                obj = val
+                break
 
             # Record after getting obj to assure they have
             # been gathered in MPI.
@@ -184,6 +211,7 @@ class SimpleGADriver(Driver):
 
         # print("Functions calculated")
         # print(x)
+        # print(obj)
         return obj, success
 
 

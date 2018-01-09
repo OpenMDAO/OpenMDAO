@@ -26,16 +26,16 @@ class TestSimpleGA(unittest.TestCase):
             def compute(self, inputs, outputs):
                 x = inputs['x']
 
-                outputs['a'] = (2*x[0] - 3*x[1])**2
-                outputs['b'] = 18 - 32*x[0] + 12*x[0]**2 + 48*x[1] - 36*x[0]*x[1] + 27*x[1]**2
-                outputs['c'] = (x[0] + x[1] + 1)**2
-                outputs['d'] = 19 - 14*x[0] + 3*x[0]**2 - 14*x[1] + 6*x[0]*x[1] + 3*x[1]**2
+                outputs['a'] = (2.0*x[0] - 3.0*x[1])**2
+                outputs['b'] = 18.0 - 32.0*x[0] + 12.0*x[0]**2 + 48.0*x[1] - 36.0*x[0]*x[1] + 27.0*x[1]**2
+                outputs['c'] = (x[0] + x[1] + 1.0)**2
+                outputs['d'] = 19.0 - 14.0*x[0] + 3.0*x[0]**2 - 14.0*x[1] + 6.0*x[0]*x[1] + 3.0*x[1]**2
 
 
         prob = Problem()
         prob.model = model = Group()
 
-        model.add_subsystem('px', IndepVarComp('x', np.zeros((2, ))))
+        model.add_subsystem('px', IndepVarComp('x', np.array([0.2, -0.2])))
         model.add_subsystem('comp', MyComp())
         model.add_subsystem('obj', ExecComp('f=(30 + a*b)*(1 + c*d)'))
 
@@ -45,18 +45,21 @@ class TestSimpleGA(unittest.TestCase):
         model.connect('comp.c', 'obj.c')
         model.connect('comp.d', 'obj.d')
 
-        model.add_design_var('px.x', lower=0.0, upper=1.0)
+        # Played with bounds so we don't get subtractive cancellation of tiny numbers.
+        model.add_design_var('px.x', lower=np.array([0.2, -1.0]), upper=np.array([1.0, -0.2]))
         model.add_objective('obj.f')
 
         prob.driver = SimpleGADriver()
-        prob.setup(check=False)
+        prob.driver.options['bits'] = {'px.x' : 8}
 
+        prob.setup(check=False)
         prob.run_driver()
 
+        # TODO: Satadru listed this solution, but I get a way better one.
         # Solution: xopt = [0.2857, -0.8571], fopt = 23.2933
-        assert_rel_error(self, prob['obj.f'], 23.2933, 1e-5)
-        assert_rel_error(self, prob['px.x'][0], 0.2857, 1e-5)
-        assert_rel_error(self, prob['px.x'][1], -0.8571, 1e-5)
+        assert_rel_error(self, prob['obj.f'], 12.37341703, 1e-4)
+        assert_rel_error(self, prob['px.x'][0], 0.2, 1e-4)
+        assert_rel_error(self, prob['px.x'][1], -0.88705882, 1e-4)
 
 if __name__ == "__main__":
     unittest.main()
