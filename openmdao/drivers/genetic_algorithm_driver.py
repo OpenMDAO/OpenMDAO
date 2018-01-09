@@ -116,7 +116,7 @@ class SimpleGADriver(Driver):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        ga = self.ga
+        ga = self._ga
 
         # Size design variables.
         desvars = self._designvars
@@ -132,11 +132,14 @@ class SimpleGADriver(Driver):
         # Figure out bounds vectors.
         for name, meta in iteritems(desvars):
             i, j = self._desvar_idx[name]
-            lower_bound[i, j] = meta['lower']
-            upper_bound[i, j] = meta['upper']
+            lower_bound[i:j] = meta['lower']
+            upper_bound[i:j] = meta['upper']
 
-        ga.npop = self.options['npop']
         ga.elite = self.options['elitism']
+        pop_size = self.options['pop_size']
+        max_gen = self.options['max_gen']
+
+        desvar_new, obj, nfit = ga.execute_ga(lower_bound, upper_bound, bits, pop_size, max_gen)
 
     def objective_callback(x):
         """
@@ -157,31 +160,27 @@ class SimpleGADriver(Driver):
         model = self._problem.model
         success = 1
 
-        try:
-            for name in self._indep_list:
-                self.set_design_var(name, dv_dict[name])
+        for name in iteritems(self._designvars):
+            i, j = self._desvar_idx[name]
+            self.set_design_var(name, x[i:j])
 
-            # Execute the model
-            with Recording('SimpleGA', self.iter_count, self) as rec:
-                self.iter_count += 1
-                try:
-                    model._solve_nonlinear()
+        # Execute the model
+        with Recording('SimpleGA', self.iter_count, self) as rec:
+            self.iter_count += 1
+            try:
+                model._solve_nonlinear()
 
-                # Let the optimizer try to handle the error
-                except AnalysisError:
-                    model._clear_iprint()
-                    success = 0
+            # Tell the optimizer that this is a bad point.
+            except AnalysisError:
+                model._clear_iprint()
+                success = 0
 
-                obj = self.get_objective_values()[0]
+            obj = self.get_objective_values()[0]
 
-                # Record after getting obj to assure they have
-                # been gathered in MPI.
-                rec.abs = 0.0
-                rec.rel = 0.0
-
-        except Exception as msg:
-            success = 0
-            obj = np.inf
+            # Record after getting obj to assure they have
+            # been gathered in MPI.
+            rec.abs = 0.0
+            rec.rel = 0.0
 
         # print("Functions calculated")
         # print(x)
