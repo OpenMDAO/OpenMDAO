@@ -4,11 +4,12 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ExecComp
+from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ExecComp, PETScVector
 from openmdao.drivers.genetic_algorithm_driver import SimpleGADriver
 from openmdao.test_suite.components.branin import Branin
 from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.mpi import MPI
 
 
 class TestSimpleGA(unittest.TestCase):
@@ -152,6 +153,41 @@ class TestSimpleGA(unittest.TestCase):
         assert_rel_error(self, prob['mat1'], 3, 1e-5)
         assert_rel_error(self, prob['mat2'], 3, 1e-5)
         #Material 3 can be anything
+
+
+@unittest.skipUnless(PETScVector, "PETSc is required.")
+class MPITestSimpleGA(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_mixed_integer_branin(self):
+        np.random.seed(1)
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('xC', 7.5))
+        model.add_subsystem('p2', IndepVarComp('xI', 0.0))
+        model.add_subsystem('comp', Branin())
+
+        model.connect('p2.xI', 'comp.x0')
+        model.connect('p1.xC', 'comp.x1')
+
+        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
+        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_objective('comp.f')
+
+        prob.driver = SimpleGADriver()
+        prob.driver.options['bits'] = {'p1.xC' : 8}
+        prob.driver.options['max_gen'] = 400
+        prob.driver.options['run_parallel'] = True
+
+        prob.setup(vector_class=PETScVector, check=False)
+        prob.run_driver()
+
+        # Optimal solution
+        assert_rel_error(self, prob['comp.f'], 0.49398, 1e-4)
+        self.assertTrue(int(prob['p2.xI']) in [3, -3])
 
 if __name__ == "__main__":
     unittest.main()

@@ -257,7 +257,7 @@ class GeneticAlgorithm():
             The MPI communicator that will be used objective evaluation for each generation.
         """
         self.objfun = objfun
-        self.comm = None
+        self.comm = comm
 
         self.lchrom = 0
         self.npop = 0
@@ -315,17 +315,36 @@ class GeneticAlgorithm():
             # Evaluate points in this generation.
             if self.comm is not None:
                 # Parallel
+                cases = [((item, ), None) for item in x_pop]
+                print('x_pop', x_pop)
+                print('cases', cases)
 
-                cases = [(arg, None) for arg in args]
+                results = concurrent_eval(self.objfun, cases, self.comm, allgather=True)
 
-                results = concurrent_eval(self.objfun, cases, comm, allgather=True)
+                for ii, result in enumerate(results):
+
+                    if result[0]:
+                        fitness[ii], success = result[0]
+                        print('eval', fitness[ii], success)
+                    else:
+                        # Print the traceback if it fails
+                        print('A case failed:')
+                        print(result[1])
+                        success = False
+
+                    if success:
+                        nfit += 1
+                    else:
+                        fitness[ii] = np.inf
 
             else:
                 # Serial
+                print('x_pop', x_pop)
                 for ii in range(self.npop):
                     x = x_pop[ii]
 
                     fitness[ii], success = self.objfun(x)
+                    print('eval', fitness[ii], success)
 
                     if success:
                         nfit += 1
