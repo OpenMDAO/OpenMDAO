@@ -119,9 +119,15 @@ def prom_name2abs_name(system, prom_name, type_):
             src_name = system._conn_global_abs_in2out.get(abs_list[0])
             if src_name and src_name in system._var_abs2prom['output']:
                 src_name = system._var_abs2prom['output'][src_name]  # use promoted name
-            raise KeyError('The promoted name "{}" is invalid because it is non-unique. '
-                           'Access the value from the connected output variable{} instead.'
-                           .format(prom_name, ' "%s"' % src_name if src_name else ''))
+            if src_name:  # input is connected
+                raise RuntimeError("The promoted name {} is invalid because it refers to "
+                                   "multiple inputs: [{}]. "
+                                   "Access the value from the connected output variable {} instead."
+                                   .format(prom_name, ' ,'.join(abs_list), src_name))
+            else:
+                raise RuntimeError("The promoted name {} is invalid because it refers to "
+                                   "multiple inputs: [{}] that are not connected to an output "
+                                   "variable.".format(prom_name, ', '.join(abs_list)))
     else:
         return None
 
