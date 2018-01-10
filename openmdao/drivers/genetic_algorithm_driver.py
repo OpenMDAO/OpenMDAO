@@ -36,6 +36,8 @@ class SimpleGADriver(Driver):
     ----------
     problem : <Problem>
         Pointer to the containing problem.
+    run_parallel : bool
+        Set to True to execute the points in a generation in parallel.
     supports : <OptionsDictionary>
         Provides a consistant way for drivers to declare what features they support.
     _cons : dict
@@ -86,10 +88,11 @@ class SimpleGADriver(Driver):
                              desc='Number of generations before termination.')
         self.options.declare('pop_size', default=25,
                              desc='Number of points in the GA.')
-
-        self._ga = GeneticAlgorithm(self.objective_callback)
+        self.options.declare('run_parallel', default=False,
+                             desc='Set to True to execute the points in a generation in parallel.')
 
         self._desvar_idx = {}
+        self._ga = None
 
     def _setup_driver(self, problem):
         """
@@ -111,6 +114,13 @@ class SimpleGADriver(Driver):
         if len(self._cons) > 0:
             msg = 'SimpleGADriver currently does not support constraints.'
             raise RuntimeError(msg)
+
+        if self.options['run_parallel']:
+            comm = self._problem.comm
+        else:
+            comm = None
+
+        self._ga = GeneticAlgorithm(self.objective_callback, comm=comm)
 
     def run(self):
         """
@@ -304,7 +314,15 @@ class GeneticAlgorithm():
             # Evaluate points in this generation.
             for ii in range(self.npop):
                 x = x_pop[ii]
-                fitness[ii], success = self.objfun(x)
+
+                # Parallel
+                if self.comm is not None:
+                    pass
+
+                # Serial
+                else:
+                    fitness[ii], success = self.objfun(x)
+
                 if success:
                     nfit += 1
                 else:
