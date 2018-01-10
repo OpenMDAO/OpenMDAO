@@ -2114,7 +2114,6 @@ class System(object):
             Mapping of this response to each design variable where simultaneous derivs will
             be used.  Each design variable entry is another dict keyed on color, and the values
             in the color dict are tuples of the form (resp_idxs, color_idxs).
-
         """
         # Name must be a string
         if not isinstance(name, string_types):
@@ -2361,7 +2360,7 @@ class System(object):
         Parameters
         ----------
         recurse : bool
-            If True, recurse through the subsystems and return the path of\
+            If True, recurse through the subsystems and return the path of
             all design vars relative to the this system.
         get_sizes : bool, optional
             If True, compute the size of each response.
@@ -2413,7 +2412,7 @@ class System(object):
         Parameters
         ----------
         recurse : bool, optional
-            If True, recurse through the subsystems and return the path of\
+            If True, recurse through the subsystems and return the path of
             all responses relative to the this system.
         get_sizes : bool, optional
             If True, compute the size of each response.
@@ -2465,7 +2464,7 @@ class System(object):
         Parameters
         ----------
         recurse : bool, optional
-            If True, recurse through the subsystems and return the path of\
+            If True, recurse through the subsystems and return the path of
             all constraints relative to the this system.
 
         Returns
@@ -2532,10 +2531,10 @@ class System(object):
         hierarchical : bool, optional
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool, optional
-            When False, in the columnar display, just display norm of any ndarrays with size > 1. \
-                        The norm is surrounded by vertical bars to indicate that it is a norm.
-            When True, also display full values of the ndarray below the row. Format is affected \
-                        by the values set with numpy.set_printoptions\
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
+            by the values set with numpy.set_printoptions
             Default is False.
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
@@ -2609,10 +2608,10 @@ class System(object):
         hierarchical : bool, optional
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool, optional
-            When False, in the columnar display, just display norm of any ndarrays with size > 1. \
-                        The norm is surrounded by vertical bars to indicate that it is a norm.
-            When True, also display full values of the ndarray below the row. Format  is affected \
-                        by the values set with numpy.set_printoptions
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format  is affected
+            by the values set with numpy.set_printoptions
             Default is False.
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
@@ -2694,10 +2693,10 @@ class System(object):
         hierarchical : bool
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool
-            When False, in the columnar display, just display norm of any ndarrays with size > 1. \
-                        The norm is surrounded by vertical bars to indicate that it is a norm.
-            When True, also display full values of the ndarray below the row. Format  is affected \
-                        by the values set with numpy.set_printoptions
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format  is affected
+            by the values set with numpy.set_printoptions
             Default is False.
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
@@ -2892,10 +2891,10 @@ class System(object):
             Contains the values to be written in this row. Keys are columns names.
 
         print_arrays : bool
-            When False, in the columnar display, just display norm of any ndarrays with size > 1. \
-                        The norm is surrounded by vertical bars to indicate that it is a norm.
-            When True, also display full values of the ndarray below the row. Format  is affected \
-                        by the values set with numpy.set_printoptions
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format  is affected
+            by the values set with numpy.set_printoptions
             Default is False.
 
         """
