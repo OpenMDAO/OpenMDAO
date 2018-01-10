@@ -4,6 +4,7 @@ Routines to compute coloring for use with simultaneous derivatives.
 from __future__ import division, print_function
 
 import sys
+import json
 
 from collections import OrderedDict, defaultdict
 from itertools import combinations
@@ -28,15 +29,27 @@ def _find_var_from_range(idx, ranges):
             return name, idx - start
 
 
-def _wrapper_set_abs(jac, set_abs, key, subjac):
+def _wrapper_set_abs(jac, set_abs, key, subjac, tol):
     info, shape = jac._subjacs_info[key]
     if info['rows'] is not None:  # list form
-        subjac = rand(info['rows'].size)
+        spread = np.max(subjac) - np.min(subjac)
+        if spread < .01:
+            spread = 1.0
+        subjac = data = rand(info['rows'].size) * spread - spread / 2.0
     elif isinstance(info['value'], sparse_types):  # sparse
+        spread = np.max(subjac.data) - np.min(subjac.data)
+        if spread < .01:
+            spread = 1.0
         subjac = subjac.copy()
-        subjac.data = rand(subjac.data.size)
+        subjac.data = data = rand(subjac.data.size) * spread - spread / 2.0
     else:   # dense
-        subjac = rand(*(subjac.shape))
+        spread = np.max(subjac) - np.min(subjac)
+        if spread < .01:
+            spread = 1.0
+        subjac = data = rand(*(subjac.shape)) * spread - spread / 2.0
+
+    data[data < tol] += spread
+    data[data > -tol] -= spread
 
     return set_abs(key, subjac)
 
@@ -68,7 +81,7 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     set_abs = jac._set_abs
 
     # replace existing jacobian set_abs with ours that replaces all subjacs with random numbers
-    jac._set_abs = lambda key, subjac: _wrapper_set_abs(jac, set_abs, key, subjac)
+    jac._set_abs = lambda key, subjac: _wrapper_set_abs(jac, set_abs, key, subjac, tol)
 
     # clear out any old simul coloring info
     prob.driver._simul_coloring_info = None
@@ -94,15 +107,14 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     sumJ = None
     for i in range(repeats):
         J = prob.driver._compute_totals(return_format='array', of=of, wrt=wrt)
-        absJ = np.abs(J)
         if sumJ is None:
-            sumJ = absJ
+            sumJ = np.zeros(J.shape, dtype=bool)
+            sumJ[J < -tol] = True
+            sumJ[J > tol] = True
         else:
-            sumJ += absJ
+            sumJ |= np.logical_and(J < -tol, J > tol)
 
     J = sumJ
-    J[J < tol] = 0.0
-    J[J >= tol] = 1.0
 
     # from openmdao.utils.array_utils import array_viz
     # with open("arr_viz", 'w') as f:
@@ -127,7 +139,7 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
         start = end + 1
 
     total_dv_offsets = defaultdict(lambda: defaultdict(list))
-    total_res_offsets = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: ([], []))))
+    total_res_offsets = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [[], []])))
 
     # loop over each desvar and find disjoint column sets for all columns of that desvar
     for start, end, dv in dv_offsets:
@@ -137,7 +149,7 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
         disjoints = defaultdict(set)
         rows = {}
         for c1, c2 in combinations(range(start, end + 1), 2):  # loop over column pairs
-            result = J[:, c1] + J[:, c2]
+            result = J[:, c1] | J[:, c2]
             if np.max(result) <= 1.0:
                 disjoints[c1].add(c2)
                 disjoints[c2].add(c1)
@@ -179,7 +191,7 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     return total_dv_offsets, total_res_offsets
 
 
-def get_simul_meta(problem, mode='fwd', repeats=1, stream=sys.stdout):
+def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, stream=sys.stdout):
     """
     Compute simultaneous derivative colorings for the given problem.
 
@@ -191,6 +203,8 @@ def get_simul_meta(problem, mode='fwd', repeats=1, stream=sys.stdout):
         Derivative direction.
     repeats : int
         Number of times to repeat total jacobian computation.
+    tol : float
+        Tolerance used to determine if an array entry is nonzero.
     stream : file-like or None
         Stream where output coloring info will be written.
 
@@ -203,7 +217,7 @@ def get_simul_meta(problem, mode='fwd', repeats=1, stream=sys.stdout):
     """
     driver = problem.driver
 
-    dv_idxs, res_idxs = _find_disjoint(problem, mode=mode, repeats=repeats)
+    dv_idxs, res_idxs = _find_disjoint(problem, mode=mode, tol=tol, repeats=repeats)
     all_colors = set()
 
     simul_colorings = {}
@@ -233,21 +247,16 @@ def get_simul_meta(problem, mode='fwd', repeats=1, stream=sys.stdout):
             simul_maps[res] = simul_map
 
     if stream is not None:
-        stream.write("\n({\n")
-        for n, coloring in iteritems(simul_colorings):
-            stream.write("   '%s': %s,\n" % (n, coloring))
-        stream.write("},")
+        s = json.dumps((simul_colorings, simul_maps))
 
-        stream.write("\n{\n")
-        for res, dvdict in iteritems(simul_maps):
-            stream.write("   '%s': {\n" % res)
-            for dv, coldict in iteritems(dvdict):
-                stream.write("      '%s': {\n" % dv)
-                for color, idxs in iteritems(coldict):
-                    stream.write("         %s: %s,\n" % (color, idxs))
-                stream.write("      },\n")
-            stream.write("   },\n")
-        stream.write("})")
+        # do a little pretty printing since the built-in json pretty printing stretches
+        # the output vertically WAY too much.
+        s = s.replace(',"', ',\n    "')
+        s = s.replace(', "', ',\n    "')
+        s = s.replace('{"', '{\n    "')
+
+        stream.write(s)
+        stream.write("\n")
 
     return simul_colorings, simul_maps
 
@@ -285,7 +294,8 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
                     ncolors = len(colors)
             else:
                 ncolors = desvars[dv]['size']
-            stream.write("%s num colors: %d\n" % (dv, ncolors))
+
+            stream.write("%s num colors: %d   size: %d\n" % (dv, ncolors, desvars[dv]['size']))
             tot_colors += ncolors
             tot_size += desvars[dv]['size']
     else:  # rev
@@ -310,6 +320,8 @@ def _simul_coloring_setup_parser(parser):
     parser.add_argument('-o', action='store', dest='outfile', help='output file.')
     parser.add_argument('-n', action='store', dest='num_jacs', default=1, type=int,
                         help='number of times to repeat total deriv computation.')
+    parser.add_argument('-t', action='store', dest='tolerance', default=1.e-30, type=float,
+                        help='tolerance used to determine if an array entry is nonzero.')
 
 
 def _simul_coloring_cmd(options):
@@ -334,7 +346,10 @@ def _simul_coloring_cmd(options):
         else:
             outfile = open(options.outfile, 'w')
         Problem._post_setup_func = None  # avoid recursive loop
-        color_info = get_simul_meta(prob, repeats=options.num_jacs, stream=outfile)
-        simul_coloring_summary(prob, color_info, stream=outfile)
+        color_info = get_simul_meta(prob, repeats=options.num_jacs, tol=options.tolerance,
+                                    stream=outfile)
+        if sys.stdout.isatty():
+            simul_coloring_summary(prob, color_info, stream=sys.stdout)
+
         exit()
     return _simul_coloring

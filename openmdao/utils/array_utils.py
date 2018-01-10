@@ -92,9 +92,16 @@ def convert_neg(arr, dim):
     return arr
 
 
-def array_viz(arr, prob=None, of=None, wrt=None, tol=1e-50, stream=sys.stdout):
+def arr2bool(arr, tol=1e-50):
+    a = np.zeros(arr.shape, dtype=float)
+    a[arr < -tol] = True
+    a[arr > tol] = True
+    return a
+
+
+def array_viz(arr, prob=None, of=None, wrt=None, stream=sys.stdout):
     """
-    Display the structure of an array in a compact form.
+    Display the structure of a boolean array in a compact form.
 
     Parameters
     ----------
@@ -106,8 +113,6 @@ def array_viz(arr, prob=None, of=None, wrt=None, tol=1e-50, stream=sys.stdout):
         Names of response variables used in derivative calculation.
     wrt : list of str or None
         Names of design variables used in derivative calculation.
-    tol : float
-        Tolerance used to determine 'zero' entries.
     stream : file-like
         Stream where output will be written.
     """
@@ -117,10 +122,10 @@ def array_viz(arr, prob=None, of=None, wrt=None, tol=1e-50, stream=sys.stdout):
     if prob is None or of is None or wrt is None:
         for r in range(arr.shape[0]):
             for c in range(arr.shape[1]):
-                if -tol <= arr[r, c] <= tol:
-                    stream.write('.')
-                else:
+                if arr[r, c]:
                     stream.write('x')
+                else:
+                    stream.write('.')
             stream.write(' %d\n' % r)
     else:
 
@@ -130,10 +135,10 @@ def array_viz(arr, prob=None, of=None, wrt=None, tol=1e-50, stream=sys.stdout):
                 col = 0
                 for dv in wrt:
                     for c in range(col, col + prob.driver._designvars[dv]['size']):
-                        if -tol <= arr[r, c] <= tol:
-                            stream.write('.')
-                        else:
+                        if arr[r, c]:
                             stream.write('x')
+                        else:
+                            stream.write('.')
                     col = c + 1
                 stream.write(' %d  %s\n' % (r, res))
             row = r + 1

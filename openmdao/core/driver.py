@@ -1,9 +1,11 @@
 """Define a base class for all Drivers in OpenMDAO."""
 from __future__ import print_function
+
+import json
 from collections import OrderedDict
 import warnings
 
-from six import iteritems, itervalues
+from six import iteritems, itervalues, string_types
 
 import numpy as np
 
@@ -785,6 +787,10 @@ class Driver(object):
 
         prom2abs = self._problem.model._var_allprocs_prom2abs_list['output']
 
+        if isinstance(self._simul_coloring_info, string_types):
+            with open(self._simul_coloring_info, 'r') as f:
+                self._simul_coloring_info = json.load(f)
+
         coloring, maps = self._simul_coloring_info
         for dv, colors in iteritems(coloring):
             if dv not in self._designvars:
@@ -799,10 +805,12 @@ class Driver(object):
             self._responses[res]['simul_map'] = dvdict
 
             for dv, col_dict in dvdict.items():
+                col_dict = {int(k): v for k, v in iteritems(col_dict)}
                 if dv not in self._designvars:
                     # convert name from promoted to absolute and replace dictionary key
                     del dvdict[dv]
                     dv = prom2abs[dv][0]
-                    dvdict[dv] = col_dict
+                dvdict[dv] = col_dict
+
                 # if not self._designvars[dv]['simul_deriv_color']:
                 #     del dvdict[dv]
