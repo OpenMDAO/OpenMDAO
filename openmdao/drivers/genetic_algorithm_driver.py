@@ -17,6 +17,7 @@ from pyDOE import lhs
 
 from openmdao.core.driver import Driver
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.utils.concurrent import concurrent_eval
 
 
 class SimpleGADriver(Driver):
@@ -312,21 +313,24 @@ class GeneticAlgorithm():
             x_pop = self.decode(old_gen, vlb, vub, bits)
 
             # Evaluate points in this generation.
-            for ii in range(self.npop):
-                x = x_pop[ii]
-
+            if self.comm is not None:
                 # Parallel
-                if self.comm is not None:
-                    pass
 
+                cases = [(arg, None) for arg in args]
+
+                results = concurrent_eval(self.objfun, cases, comm, allgather=True)
+
+            else:
                 # Serial
-                else:
+                for ii in range(self.npop):
+                    x = x_pop[ii]
+
                     fitness[ii], success = self.objfun(x)
 
-                if success:
-                    nfit += 1
-                else:
-                    fitness[ii] = np.inf
+                    if success:
+                        nfit += 1
+                    else:
+                        fitness[ii] = np.inf
 
             # Elitism means replace worst performing point with best from previous generation.
             if elite and generation > 0:
