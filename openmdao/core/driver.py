@@ -60,8 +60,6 @@ class Driver(object):
         Dictionary with general pyoptsparse options.
     recording_options : <OptionsDictionary>
         Dictionary with driver recording options.
-    recording_options : <OptionsDictionary>
-        Dictionary with driver recording options.
     debug_print : <OptionsDictionary>
         Dictionary with debugging printing options.
     cite : str
@@ -839,7 +837,7 @@ class Driver(object):
 
     def _pre_run_model_debug_print(self):
         """
-        Set up metadata for simultaneous derivative solution.
+        Optionally print some debugging information before the model runs.
         """
         if self.debug_print['debug_print']:
             if not MPI or MPI.COMM_WORLD.rank == 0:
@@ -861,7 +859,7 @@ class Driver(object):
 
     def _post_run_model_debug_print(self):
         """
-        Set up metadata for simultaneous derivative solution.
+        Optionally print some debugging information after the model runs.
         """
         if self.debug_print['debug_print']:
             if self.debug_print['debug_print_nl_con']:
