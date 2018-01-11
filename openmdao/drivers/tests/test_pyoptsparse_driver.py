@@ -1323,11 +1323,7 @@ class TestPyoptSparse(unittest.TestCase):
             prob.driver.opt_settings['ACC'] = 1e-9
         prob.driver.options['print_results'] = False
 
-        prob.driver.debug_print['debug_print'] = True
-        prob.driver.debug_print['debug_print_desvars'] = True
-        prob.driver.debug_print['debug_print_nl_con'] = True
-        prob.driver.debug_print['debug_print_ln_con'] = True
-        prob.driver.debug_print['debug_print_objective'] = True
+        prob.driver.options['debug_print'] = ['desvars','ln_cons','nl_cons','objs']
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)

@@ -205,7 +205,7 @@ class TestDriver(unittest.TestCase):
 
         prob.setup(check=False)
 
-        # Make sure nothing prints if debug is not turned on
+        # Make sure nothing prints if debug_print is the default of empty list
         stdout = sys.stdout
         strout = StringIO()
         sys.stdout = strout
@@ -216,24 +216,8 @@ class TestDriver(unittest.TestCase):
         output = strout.getvalue().split('\n')
         self.assertEqual(output, [''])
 
-        # Make sure nothing prints even if debug print is turned on
-        #   but none of the individual options are turned on
-        prob.driver.debug_print['debug_print'] = True
-        stdout = sys.stdout
-        strout = StringIO()
-        sys.stdout = strout
-        try:
-            prob.run_driver()
-        finally:
-            sys.stdout = stdout
-        output = strout.getvalue().split('\n')
-        self.assertEqual(output[0], 'Driver debug print for iter coord: rank0:Driver|1')
-
         # Make sure everything prints when all options are on
-        prob.driver.debug_print['debug_print_desvars'] = True
-        prob.driver.debug_print['debug_print_nl_con'] = True
-        prob.driver.debug_print['debug_print_ln_con'] = True
-        prob.driver.debug_print['debug_print_objective'] = True
+        prob.driver.options['debug_print'] = ['desvars','ln_cons','nl_cons','objs']
         stdout = sys.stdout
         strout = StringIO()
         sys.stdout = strout
@@ -242,10 +226,17 @@ class TestDriver(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
+        self.assertEqual(output.count("Driver debug print for iter coord: rank0:Driver|1"), 1)
         self.assertEqual(output.count("Design Vars"), 1)
         self.assertEqual(output.count("Nonlinear constraints"), 1)
         self.assertEqual(output.count("Linear constraints"), 1)
         self.assertEqual(output.count("Objectives"), 1)
+
+        # Check to make sure an invalid debug_print option raises an exception
+        with self.assertRaises(ValueError) as context:
+            prob.driver.options['debug_print'] = ['bad_option']
+        self.assertEqual(str(context.exception),
+                         "Function is_valid returns False for debug_print.")
 
 
 if __name__ == "__main__":

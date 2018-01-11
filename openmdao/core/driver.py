@@ -14,6 +14,15 @@ from openmdao.utils.mpi import MPI
 from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate
 from openmdao.utils.options_dictionary import OptionsDictionary
 
+def is_debug_print_opts_valid(opts):
+    '''Check to see if the options passed in are valid'''
+    if not isinstance(opts,list):
+        return False
+    _valid_opts = ['desvars','nl_cons','ln_cons','objs']
+    for opt in opts:
+        if opt not in _valid_opts:
+            return False
+    return True
 
 class Driver(object):
     """
@@ -21,6 +30,9 @@ class Driver(object):
 
     Options
     -------
+    options['debug_print'] :  list of strings([])
+        Indicates what variables to print at each iteration. The valid options are:
+            'desvars','ln_cons','nl_cons',and 'objs'.
     recording_options['record_metadata'] :  bool(True)
         Tells recorder whether to record variable attribute metadata.
     recording_options['record_desvars'] :  bool(True)
@@ -36,17 +48,6 @@ class Driver(object):
     recording_options['excludes'] :  list of strings('')
         Patterns for variables to exclude in recording (processed after includes).
 
-    debug_print['debug_print'] :  bool(False)
-        If True, print debugging information every Driver iteration.
-    debug_print['debug_print_desvars'] :  bool(False)
-        If True and the option debug_print is True, print design variables every Driver iteration.
-    debug_print['debug_print_nl_con'] :  bool(False)
-        If True and the option debug_print is True, print nonlinear constraints every
-        Driver iteration.
-    debug_print['debug_print_ln_con'] :  bool(False)
-        If True and the option debug_print is True, print linear constraints every Driver iteration.
-    debug_print['debug_print_objective'] :  bool(False)
-        If True and the option debug_print is True, print objectives every Driver iteration.
 
     Attributes
     ----------
@@ -120,6 +121,12 @@ class Driver(object):
         self._responses = None
         self.options = OptionsDictionary()
         self.recording_options = OptionsDictionary()
+
+        ###########################
+        self.options.declare('debug_print', types=list, is_valid=is_debug_print_opts_valid,
+                             desc="List of what Driver variables to print at each iteration. "
+                                "Valid items in list are 'desvars','ln_cons','nl_cons','objs'",
+                             default=[])
 
         ###########################
         self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
@@ -839,58 +846,60 @@ class Driver(object):
         """
         Optionally print some debugging information before the model runs.
         """
-        if self.debug_print['debug_print']:
-            if not MPI or MPI.COMM_WORLD.rank == 0:
-                header = 'Driver debug print for iter coord: {}'.format(
-                    get_formatted_iteration_coordinate())
-                print(header)
-                print(len(header) * '-')
 
-            if self.debug_print['debug_print_desvars']:
-                desvar_vals = self.get_design_var_values()
-                if not MPI or MPI.COMM_WORLD.rank == 0:
-                    print("Design Vars")
-                    if desvar_vals:
-                        for name, value in iteritems(desvar_vals):
-                            print("{}: {}".format(name, value))
-                    else:
-                        print("None")
-                    print()
+        if not self.options['debug_print']:
+            return
+
+        if not MPI or MPI.COMM_WORLD.rank == 0:
+            header = 'Driver debug print for iter coord: {}'.format(
+                get_formatted_iteration_coordinate())
+            print(header)
+            print(len(header) * '-')
+
+        if 'desvars' in self.options['debug_print']:
+            desvar_vals = self.get_design_var_values()
+            if not MPI or MPI.COMM_WORLD.rank == 0:
+                print("Design Vars")
+                if desvar_vals:
+                    for name, value in iteritems(desvar_vals):
+                        print("{}: {}".format(name, value))
+                else:
+                    print("None")
+                print()
 
     def _post_run_model_debug_print(self):
         """
         Optionally print some debugging information after the model runs.
         """
-        if self.debug_print['debug_print']:
-            if self.debug_print['debug_print_nl_con']:
-                cons = self.get_constraint_values(lintype='nonlinear')
-                if not MPI or MPI.COMM_WORLD.rank == 0:
-                    print("Nonlinear constraints")
-                    if cons:
-                        for name, value in iteritems(cons):
-                            print("{}: {}".format(name, value))
-                    else:
-                        print("None")
-                    print()
+        if 'nl_cons' in self.options['debug_print']:
+            cons = self.get_constraint_values(lintype='nonlinear')
+            if not MPI or MPI.COMM_WORLD.rank == 0:
+                print("Nonlinear constraints")
+                if cons:
+                    for name, value in iteritems(cons):
+                        print("{}: {}".format(name, value))
+                else:
+                    print("None")
+                print()
 
-            if self.debug_print['debug_print_ln_con']:
-                cons = self.get_constraint_values(lintype='linear')
-                if not MPI or MPI.COMM_WORLD.rank == 0:
-                    print("Linear constraints")
-                    if cons:
-                        for name, value in iteritems(cons):
-                            print("{}: {}".format(name, value))
-                    else:
-                        print("None")
-                    print()
+        if 'ln_cons' in self.options['debug_print']:
+            cons = self.get_constraint_values(lintype='linear')
+            if not MPI or MPI.COMM_WORLD.rank == 0:
+                print("Linear constraints")
+                if cons:
+                    for name, value in iteritems(cons):
+                        print("{}: {}".format(name, value))
+                else:
+                    print("None")
+                print()
 
-            if self.debug_print['debug_print_objective']:
-                objs = self.get_objective_values()
-                if not MPI or MPI.COMM_WORLD.rank == 0:
-                    print("Objectives")
-                    if objs:
-                        for name, value in iteritems(objs):
-                            print("{}: {}".format(name, value))
-                    else:
-                        print("None")
-                    print()
+        if 'objs' in self.options['debug_print']:
+            objs = self.get_objective_values()
+            if not MPI or MPI.COMM_WORLD.rank == 0:
+                print("Objectives")
+                if objs:
+                    for name, value in iteritems(objs):
+                        print("{}: {}".format(name, value))
+                else:
+                    print("None")
+                print()

@@ -1,21 +1,16 @@
 import os
 import sys
 import unittest
-import numpy as np
-from six.moves import cStringIO
 from six import StringIO
 
-from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp
-
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ParallelGroup
+from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
-from openmdao.utils.array_utils import evenly_distrib_idxs
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
     PETScVector = None
-
-from openmdao.utils.assert_utils import assert_rel_error
 
 @unittest.skipIf(PETScVector is None or os.environ.get("TRAVIS"),
                  "PETSc is required." if PETScVector is None
@@ -26,23 +21,11 @@ class DistributedDriverDebugPrintOptionsTest(unittest.TestCase):
 
     def test_distributed_driver_debug_print_options(self):
 
-        from openmdao.utils.general_utils import set_pyoptsparse_opt
-        from openmdao.utils.mpi import MPI
-
-        if MPI:
-            from openmdao.api import PETScVector
-            vector_class = PETScVector
-        else:
-            PETScVector = None
-
         # check that pyoptsparse is installed. if it is, try to use SLSQP.
         OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 
         if OPTIMIZER:
             from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-
-        from openmdao.core.parallel_group import ParallelGroup
-        from openmdao.components.exec_comp import ExecComp
 
         class Mygroup(Group):
 
@@ -72,11 +55,7 @@ class DistributedDriverDebugPrintOptionsTest(unittest.TestCase):
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['print_results'] = False
 
-        prob.driver.debug_print['debug_print'] = True
-        prob.driver.debug_print['debug_print_desvars'] = True
-        prob.driver.debug_print['debug_print_nl_con'] = True
-        prob.driver.debug_print['debug_print_ln_con'] = True
-        prob.driver.debug_print['debug_print_objective'] = True
+        prob.driver.options['debug_print'] = ['desvars','ln_cons','nl_cons','objs']
 
         prob.setup(vector_class=PETScVector)
 
@@ -88,17 +67,6 @@ class DistributedDriverDebugPrintOptionsTest(unittest.TestCase):
             prob.run_driver()
         finally:
             sys.stdout = stdout
-
-        # prob.run_driver()
-        prob.cleanup()
-
-        # stdout = sys.stdout
-        # strout = StringIO()
-        # sys.stdout = strout
-        # try:
-        #     prob.run_driver()
-        # finally:
-        #     sys.stdout = stdout
 
         output = strout.getvalue().split('\n')
         if MPI.COMM_WORLD.rank == 0:
@@ -125,12 +93,6 @@ class DistributedDriverDebugPrintOptionsTest(unittest.TestCase):
                             "Should be more than one None printed")
             self.assertTrue(len([s for s in output if s.startswith('Obj.obj')]) > 1,
                             "Should be more than one Obj.obj printed")
-            # self.assertEqual(len([s for s in output if s.startswith('par.G1.indep_var_comp.x')]), 11)
-            # self.assertEqual(len([s for s in output if s.startswith('par.G2.indep_var_comp.x')]), 11)
-            # self.assertEqual(len([s for s in output if s.startswith('par.G1.Cc.c')]), 11)
-            # self.assertEqual(len([s for s in output if s.startswith('par.G2.Cc.c')]), 11)
-            # self.assertEqual(len([s for s in output if s.startswith('None')]), 11)
-            # self.assertEqual(len([s for s in output if s.startswith('Obj.obj')]), 11)
         else:
             self.assertEqual(output, [''])
 

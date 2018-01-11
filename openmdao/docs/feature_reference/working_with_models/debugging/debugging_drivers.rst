@@ -10,7 +10,8 @@ objectives as the `Driver` iterates. OpenMDAO provides options on the `Driver` t
 Usage
 -----
 
-This example shows how to use the `Driver` debug printing options.
+This example shows how to use the `Driver` debug printing options. The `debug_print` option is a list of strings.
+The only valid strings are 'desvars','ln_cons','nl_cons',and 'objs'.
 
 
   .. embed-test::
@@ -25,7 +26,7 @@ Here is a summary of the `Driver` `debug_print` options.
 .. embed-options::
     openmdao.core.driver
     Driver
-    debug_print
+    options
 
 
 
