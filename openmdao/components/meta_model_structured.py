@@ -1,6 +1,7 @@
 """Define the RegularGridInterpComp class."""
-
 from __future__ import division, print_function, absolute_import
+
+import warnings
 
 from scipy import __version__ as scipy_version
 try:
@@ -12,66 +13,29 @@ from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
-import warnings
 
 
 class _RegularGridInterp(object):
     """
     Interpolation on a regular grid in arbitrary dimensions.
 
-    The data must be defined on a regular grid; the grid spacing however may be
-    uneven. First, third and fifth order spline
-    interpolation are supported. After setting up the interpolator object, the
-    interpolation method (*slinear*, *cubic*, and
-    *quintic*) may be chosen at each evaluation. Additionally, gradients are
-    provided for the spline interpolation methods.
-
-    Parameters
-    ----------
-    points : tuple of ndarray of float, with shapes (m1, ), ..., (mn, )
-        The points defining the regular grid in n dimensions.
-
-    values : array_like, shape (m1, ..., mn, ...)
-        The data on the regular grid in n dimensions.
-
-    method : str, optional
-        The method of interpolation to perform. Supported are 'slinear',
-        'cubic',  and 'quintic'. This parameter will become
-        the default for the object's
-        ``__call__`` method. Default is "linear".
-
-    bounds_error : bool, optional
-        If True, when interpolated values are requested outside of the
-        domain of the input data, a ValueError is raised.
-        If False, then `fill_value` is used.
-        Default is True (raise an exception).
-
-    fill_value : number, optional
-        If provided, the value to use for points outside of the
-        interpolation domain. If None, values outside
-        the domain are extrapolated. Note that gradient values will always be
-        extrapolated rather than set to the fill_value if bounds_error=False
-        for any points outside of the interpolation domain.
-        Default is `np.nan`.
-
-    spline_dim_error : bool, optional
-        If spline_dim_error=True and an order `k` spline interpolation method
-        is used, then if any dimension has fewer points than `k` + 1, an error
-        will be raised. If spline_dim_error=False, then the spline interpolant
-        order will be reduced as needed on a per-dimension basis. Default
-        is True (raise an exception).
+    The data must be defined on a regular grid; the grid spacing however may be uneven. First,
+    third and fifth order spline interpolation are supported. After setting up the interpolator
+    object, the interpolation method (*slinear*, *cubic*, and *quintic*) may be chosen at each
+    evaluation. Additionally, gradients are provided for the spline interpolation methods.
 
     Methods
     -------
     __call__
     gradient
     methods
-
     """
 
     @staticmethod
     def _interp_methods():
-        """Method-specific settings for interpolation and for testing."""
+        """
+        Method-specific settings for interpolation and for testing.
+        """
         interpolator_configs = {
             "slinear": 1,
             "cubic": 3,
@@ -85,12 +49,51 @@ class _RegularGridInterp(object):
 
     @staticmethod
     def methods():
-        """Return a list of valid interpolation method names."""
+        """
+        Return a list of valid interpolation method names.
+
+        Returns
+        -------
+        list
+            Valid interpolation name strings.
+        """
         return ['slinear', 'cubic', 'quintic']
 
     def __init__(self, points, values, method="slinear", bounds_error=True,
                  fill_value=np.nan, spline_dim_error=True):
-        """Initialize instance of interpolation class."""
+        """
+        Initialize instance of interpolation class.
+
+        Parameters
+        ----------
+        points : tuple of ndarray of float, with shapes (m1, ), ..., (mn, )
+            The points defining the regular grid in n dimensions.
+        values : array_like, shape (m1, ..., mn, ...)
+            The data on the regular grid in n dimensions.
+        method : str, optional
+            The method of interpolation to perform. Supported are 'slinear',
+            'cubic',  and 'quintic'. This parameter will become
+            the default for the object's
+            ``__call__`` method. Default is "linear".
+        bounds_error : bool, optional
+            If True, when interpolated values are requested outside of the
+            domain of the input data, a ValueError is raised.
+            If False, then `fill_value` is used.
+            Default is True (raise an exception).
+        fill_value : number, optional
+            If provided, the value to use for points outside of the
+            interpolation domain. If None, values outside
+            the domain are extrapolated. Note that gradient values will always be
+            extrapolated rather than set to the fill_value if bounds_error=False
+            for any points outside of the interpolation domain.
+            Default is `np.nan`.
+        spline_dim_error : bool, optional
+            If spline_dim_error=True and an order `k` spline interpolation method
+            is used, then if any dimension has fewer points than `k` + 1, an error
+            will be raised. If spline_dim_error=False, then the spline interpolant
+            order will be reduced as needed on a per-dimension basis. Default
+            is True (raise an exception).
+        """
         if not make_interp_spline:
             msg = "'MetaModelStructured' requires scipy>=0.19, but the currently" \
                   " installed version is %s." % scipy_version
@@ -163,23 +166,24 @@ class _RegularGridInterp(object):
 
     def __call__(self, xi, method=None, compute_gradients=True):
         """
-        Interpolation at coordinates.
+        Interpolate at the sample coordinates.
 
         Parameters
         ----------
         xi : ndarray of shape (..., ndim)
             The coordinates to sample the gridded data at
-
         method : str, optional
-            The method of interpolation to perform. Supported are 'slinear',
-            'cubic', and 'quintic'. Default is None,
-            which will use the method defined at
-            the construction of the interpolation object instance.
-
+            The method of interpolation to perform. Supported are 'slinear', 'cubic', and
+            'quintic'. Default is None, which will use the method defined at the construction
+            of the interpolation object instance.
         compute_gradients : bool, optional
-            If a spline interpolation method is chosen, this determines
-            whether gradient calculations should be made and cached.
-            Default is True.
+            If a spline interpolation method is chosen, this determines whether gradient
+            calculations should be made and cached. Default is True.
+
+        Returns
+        -------
+        array_like
+            Value of interpolant at all sample points.
         """
         # cache latest evaluation point for gradient method's use later
         self._xi = xi
@@ -248,7 +252,36 @@ class _RegularGridInterp(object):
     def _evaluate_splines(self, data_values, xi, indices, interpolator, method,
                           ki, compute_gradients=True,
                           first_dim_gradient=False):
-        """Inner method for separable regular grid interpolation."""
+        """
+        Perform interpolation using the given interpolator.
+
+        Parameters
+        ----------
+        data_values : array_like
+            The data on the regular grid in n dimensions.
+        xi : ndarray
+            The coordinates to sample the gridded data at
+        indices : list
+            Indices for search lookup
+        interpolator : <scipy.interpolate.BSpline>
+            A BSpline object that is used for interpolation.
+        method : str, optional
+            The method of interpolation to perform. Supported are 'slinear', 'cubic', and
+            'quintic'. Default is None, which will use the method defined at the construction
+            of the interpolation object instance.
+        ki : list
+            List of spline interpolation orders.
+        compute_gradients : bool, optional
+            If a spline interpolation method is chosen, this determines whether gradient
+            calculations should be made and cached. Default is True.
+        first_dim_gradient : bool, optional
+            Sset to True to calculate first dimension gradients. Default is False.
+
+        Returns
+        -------
+        array_like
+            Value of interpolant at all sample points.
+        """
         # for spline based methods
 
         # requires floating point input
@@ -349,7 +382,32 @@ class _RegularGridInterp(object):
         return result
 
     def _do_spline_fit(self, interpolator, x, y, pt, k, compute_gradients):
-        """Do a single interpolant call, and compute a gradient if needed."""
+        """
+        Do a single interpolant call, and compute the gradient if needed.
+
+        Parameters
+        ----------
+        interpolator : <scipy.interpolate.BSpline>
+            A BSpline object that is used for interpolation.
+        x : array_like, shape (n,)
+            Abscissas.
+        y : array_like, shape (n, ...)
+            Ordinates.
+        pt : array_like
+            Points to evaluate the spline at.
+        k : float
+            Spline interpolation order.
+        compute_gradients : bool
+            If a spline interpolation method is chosen, this determines whether gradient
+            calculations should be made and cached.
+
+        Returns
+        -------
+        array_like
+            Value of interpolant at point of interest.
+        None or array_like, optional
+            Value of gradient of interpolant at point of interest.
+        """
         interp_kwargs = {'k': k, 'axis': 0}
         local_interp = interpolator(x, y, **interp_kwargs)
         values = local_interp(pt)
@@ -359,7 +417,23 @@ class _RegularGridInterp(object):
         return values, local_derivs
 
     def _find_indices(self, xi):
-        """Find the correct search indices for table lookups."""
+        """
+        Find the correct search indices for table lookups.
+
+        Parameters
+        ----------
+        xi : ndarray of shape (..., ndim)
+            The coordinates to sample the gridded data at.
+
+        Returns
+        -------
+        list of ndarray
+            Indices
+        list of ndarray
+            Norm of the distance to the lower edge
+        list of bool
+            Out of bounds flags.
+        """
         # find relevant edges between which xi are situated
         indices = []
         # compute distance to lower edge in unity units
@@ -394,7 +468,6 @@ class _RegularGridInterp(object):
         ----------
         xi : ndarray of shape (..., ndim)
             The coordinates to sample the gridded data at
-
         method : str, optional
             The method of interpolation to perform. Supported are 'slinear',
             'cubic', and 'quintic'. Default is None, which will use the method
@@ -443,7 +516,9 @@ class MetaModelStructured(ExplicitComponent):
     """
 
     def initialize(self):
-        """Initialize the component."""
+        """
+        Initialize the component.
+        """
         if not make_interp_spline:
             msg = "'MetaModelStructured' requires scipy>=0.19, but the currently" \
                   " installed version is %s." % scipy_version
@@ -472,12 +547,12 @@ class MetaModelStructured(ExplicitComponent):
         ----------
         name : string
             Name of the input.
-
         val : float or ndarray
             Initial value for the input.
-
         training_data : ndarray
             training data sample points for this input variable.
+        **kwargs : dict
+            Additional agruments for add_input.
         """
         n = self.metadata['num_nodes']
         super(MetaModelStructured, self).add_input(name, val * np.ones(n), **kwargs)
@@ -495,12 +570,12 @@ class MetaModelStructured(ExplicitComponent):
         ----------
         name : string
             Name of the output.
-
         val : float or ndarray
             Initial value for the output.
-
         training_data : ndarray
             training data sample points for this output variable.
+        **kwargs : dict
+            Additional agruments for add_output.
         """
         n = self.metadata['num_nodes']
         super(MetaModelStructured, self).add_output(name, val * np.ones(n), **kwargs)
@@ -520,10 +595,22 @@ class MetaModelStructured(ExplicitComponent):
             self.declare_partials(name, "%s_train" % name)
 
     def setup(self):
-        """Set up the interpolation component within its problem instance."""
+        """
+        Set up the interpolation component within its problem instance.
+        """
+        pass
 
     def compute(self, inputs, outputs):
-        """Perform the interpolation at run time."""
+        """
+        Perform the interpolation at run time.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
         for out_name in self.interps:
             if self.metadata['training_data_gradients']:
@@ -537,7 +624,11 @@ class MetaModelStructured(ExplicitComponent):
                                                             fill_value=None,
                                                             spline_dim_error=False)
 
-            val = self.interps[out_name](pt)
+            try:
+                val = self.interps[out_name](pt)
+            except ValueError as err:
+                raise ValueError("Error interpolating output '%s' in %s:\n%s" %
+                                 (out_name, self.pathname, str(err)))
             outputs[out_name] = val
 
     def compute_partials(self, inputs, partials):
@@ -547,6 +638,13 @@ class MetaModelStructured(ExplicitComponent):
         Checks if the needed derivatives are cached already based on the
         inputs vector. Refreshes the cache by re-computing the current point
         if necessary.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        partials : Jacobian
+            sub-jac components written to partials[output_name, input_name]
         """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
         if self.metadata['training_data_gradients']:

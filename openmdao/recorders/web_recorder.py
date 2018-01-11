@@ -39,16 +39,19 @@ class WebRecorder(BaseRecorder):
 
         Parameters
         ----------
-        token: <string>
+        token : string
             The token to be passed as a user's unique identifier. Register to get a token
             at the given endpoint
-        case_name: <string>
+        case_name : string
             The name this case should be stored under. Default: 'Case Recording'
-        endpoint: <string>
+        endpoint : string
             The URL (minus port, if not 80) where the server is hosted
-        port: <string>
+        port : string
             The port which the server is listening on. Default to empty string (port 80)
-        suppress_output: <bool>
+        case_id : int
+            Provided by the server to uniquely identify your new recording.
+            Provided by user to update an existing recording.
+        suppress_output : bool
             Indicates if all printing should be suppressed in this recorder
         """
         super(WebRecorder, self).__init__()
@@ -96,7 +99,7 @@ class WebRecorder(BaseRecorder):
 
         Parameters
         ----------
-        recording_requester :
+        recording_requester : object
             Object to which this recorder is attached.
         """
         super(WebRecorder, self).startup(recording_requester)
@@ -446,7 +449,7 @@ class WebRecorder(BaseRecorder):
 
         Parameters
         ----------
-        recording_requester: <Driver>
+        recording_requester : Driver
             The Driver that would like to record its metadata.
         """
         driver_class = type(recording_requester).__name__
@@ -479,7 +482,7 @@ class WebRecorder(BaseRecorder):
 
         Parameters
         ----------
-        recording_requester: <System>
+        recording_requester : System
             The System that would like to record its metadata.
         """
         pass
@@ -490,7 +493,7 @@ class WebRecorder(BaseRecorder):
 
         Parameters
         ----------
-        recording_requester: <Solver>
+        recording_requester : Solver
             The Solver that would like to record its metadata.
         """
         solver_class = type(recording_requester).__name__
@@ -503,10 +506,12 @@ class WebRecorder(BaseRecorder):
 
         Parameters
         ----------
-        encoded_opts : base64 encoding
-            The encoded solver options.
+        opts : OptionsDictionary
+            The unencoded solver options.
         solver_class : str
             The name of the solver class.
+        path : str
+            The path to the solver.
         """
         opts = pickle.dumps(opts,
                             pickle.HIGHEST_PROTOCOL)
@@ -533,8 +538,13 @@ class WebRecorder(BaseRecorder):
 
         Parameters
         ----------
-        obj <Object>
-            the object to be converted to a list
+        obj : object
+            The object to be converted to a list.
+
+        Returns
+        -------
+        list :
+            Object converted to a list.
         """
         if isinstance(obj, np.ndarray):
             return self.convert_to_list(obj.tolist())

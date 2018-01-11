@@ -287,7 +287,7 @@ class ScipyKrylov(LinearSolver):
 
         Returns
         -------
-        <LinearSolver>
+        LinearSolver
             reference to the 'precon' property.
         """
         warn_deprecation("The 'preconditioner' property provides backwards compatibility "
@@ -301,7 +301,7 @@ class ScipyKrylov(LinearSolver):
 
         Parameters
         ----------
-        precon : <LinearSolver>
+        precon : LinearSolver
             reference to a <LinearSolver> to be assigned to the 'precon' property.
         """
         warn_deprecation("The 'preconditioner' property provides backwards compatibility "

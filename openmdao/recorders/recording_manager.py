@@ -2,9 +2,6 @@
 RecordingManager class definition.
 """
 import time
-from six import iteritems
-
-import numpy as np
 
 try:
     from openmdao.utils.mpi import MPI
@@ -18,7 +15,7 @@ class RecordingManager(object):
 
     Attributes
     ----------
-    _recorders : list of <BaseRecorder>
+    _recorders : list of BaseRecorder
         All of the recorders attached to the current object.
     rank : int
         Rank of the iteration coordinate.
@@ -39,6 +36,16 @@ class RecordingManager(object):
     def __getitem__(self, index):
         """
         Get a particular recorder in the manager.
+
+        Parameters
+        ----------
+        index : int
+            an index into _recorders.
+
+        Returns
+        -------
+        recorder : BaseRecorder
+            a recorder from _recorders
         """
         return self._recorders[index]
 
@@ -48,8 +55,8 @@ class RecordingManager(object):
 
         Returns
         -------
-        iter: <BaseRecorder>
-            a recorder from _recorders
+        iter : BaseRecorder
+            a recorder from _recorders.
         """
         return iter(self._recorders)
 
@@ -59,7 +66,7 @@ class RecordingManager(object):
 
         Parameters
         ----------
-        recorder : <BaseRecorder>
+        recorder : BaseRecorder
            Recorder instance to be added to the manager.
         """
         self._recorders.append(recorder)
@@ -67,6 +74,11 @@ class RecordingManager(object):
     def startup(self, recording_requester):
         """
         Run startup on each recorder in the manager.
+
+        Parameters
+        ----------
+        recording_requester : object
+            The object that needs an iteration of itself recorded.
         """
         # Will only add parallel code for Drivers. Use the old method for System and Solver
         from openmdao.core.driver import Driver
@@ -106,12 +118,12 @@ class RecordingManager(object):
 
         Parameters
         ----------
-        recording_requester : <object>
+        recording_requester : object
             The object that needs an iteration of itself recorded.
+        data : dict
+            Dictionary containing desvars, objectives, constraints, responses, and System vars.
         metadata : dict
-            Metadata for iteration coordinate
-        **kwargs :
-            Keyword args needed for different versions of record_iteration
+            Metadata for iteration coordinate.
         """
         if not self._recorders:
             return
@@ -129,7 +141,7 @@ class RecordingManager(object):
 
         Parameters
         ----------
-        recording_requester : <object>
+        recording_requester : object
             The object that needs its metadata recorded.
 
         """
@@ -145,7 +157,7 @@ class RecordingManager(object):
 
         Returns
         -------
-        True/False: bool
+        True/False : bool
             True if RecordingManager is managing at least one recorder
         """
         return True if self._recorders else False

@@ -56,11 +56,9 @@ class System(object):
     iter_count : int
         Int that holds the number of times this system has iterated
         in a recording run.
-    #
     cite : str
         Listing of relevant citataions that should be referenced when
         publishing work that uses this class.
-    #
     _subsystems_allprocs : [<System>, ...]
         List of all subsystems (children of this system).
     _subsystems_myproc : [<System>, ...]
@@ -74,14 +72,12 @@ class System(object):
         List of ranges of each myproc subsystem's allprocs variables relative to this system.
     _subsystems_var_range_byset : {<vec_name>: {'input': list of dict, 'output': list of dict}, ...}
         Same as above, but by var_set name.
-    #
     _num_var : {<vec_name>: {'input': int, 'output': int}, ...}
         Number of allprocs variables owned by this system.
     _num_var_byset : {<vec_name>: {'input': dict of int, 'output': dict of int}, ...}
         Same as above, but by var_set name.
     _var_set2iset : {'input': dict, 'output': dict}
         Dictionary mapping the var_set name to the var_set index.
-    #
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
@@ -101,20 +97,17 @@ class System(object):
         ('units', 'shape', 'size', 'var_set', 'ref', 'ref0', 'res_ref', 'distributed') for outputs.
     _var_abs2meta : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to metadata dictionaries for myproc variables.
-    #
     _var_allprocs_abs2idx : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
     _var_allprocs_abs2idx_byset : {<vec_name>:{'input': dict of dict, 'output': dict of dict}, ...}
         Same as above, but by var_set name.
-    #
     _var_sizes : {'input': ndarray, 'output': ndarray}
         Array of local sizes of this system's allprocs variables.
         The array has size nproc x num_var where nproc is the number of processors
         owned by this system and num_var is the number of allprocs variables.
     _var_sizes_byset : {'input': dict of ndarray, 'output': dict of ndarray}
         Same as above, but by var_set name.
-    #
     _manual_connections : dict
         Dictionary of input_name: (output_name, src_indices) connections.
     _conn_global_abs_in2out : {'abs_in': 'abs_out'}
@@ -123,7 +116,6 @@ class System(object):
     _conn_abs_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections owned
         by this system only. The data is the same across all processors.
-    #
     _ext_num_vars : {'input': (int, int), 'output': (int, int)}
         Total number of allprocs variables in system before/after this one.
     _ext_num_vars_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
@@ -132,14 +124,12 @@ class System(object):
         Total size of allprocs variables in system before/after this one.
     _ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
         Same as above, but by var_set name.
-    #
     _vec_names : [str, ...]
         List of names of all vectors, including the nonlinear vector.
     _lin_vec_names : [str, ...]
         List of names of the linear vectors (i.e., the right-hand sides).
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         Dictionaries of vectors keyed by vec_name.
-    #
     _inputs : <Vector>
         The inputs vector; points to _vectors['input']['nonlinear'].
     _outputs : <Vector>
@@ -150,20 +140,16 @@ class System(object):
         First key is the vec_name, second key is (mode, isub) where
         mode is 'fwd' or 'rev' and isub is the subsystem index among allprocs subsystems
         or isub can be None for the full, simultaneous transfer.
-    #
     _lower_bounds : <Vector>
         Vector of lower bounds, scaled and dimensionless.
     _upper_bounds : <Vector>
         Vector of upper bounds, scaled and dimensionless.
-    #
     _scaling_vecs : dict of dict of Vectors
         First key indicates vector type and coefficient, second key is vec_name.
-    #
     _nonlinear_solver : <NonlinearSolver>
         Nonlinear solver to be used for solve_nonlinear.
     _linear_solver : <LinearSolver>
         Linear solver to be used for solve_linear; not the Newton system.
-    #
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
     _jacobian : <Jacobian>
@@ -197,14 +183,12 @@ class System(object):
     _subjacs_info : OrderedDict of dict
         Sub-jacobian metadata for each (output, input) pair added using
         declare_partials. Members of each pair may be glob patterns.
-    #
     _design_vars : dict of dict
         dict of all driver design vars added to the system.
     _responses : dict of dict
         dict of all driver responses added to the system.
     _rec_mgr : <RecordingManager>
         object that manages all recorders added to this system.
-    #
     _static_mode : bool
         If true, we are outside of setup.
         In this case, add_input, add_output, and add_subsystem all add to the
@@ -218,14 +202,11 @@ class System(object):
         Driver design variables added outside of setup.
     _static_responses : dict of dict
         Driver responses added outside of setup.
-    #
     _reconfigured : bool
         If True, this system has reconfigured, and the immediate parent should update.
-    #
     supports_multivecs : bool
         If True, this system overrides compute_multi_jacvec_product (if an ExplicitComponent),
         or solve_multi_linear/apply_multi_linear (if an ImplicitComponent).
-    #
     _relevant : dict
         Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
         and dependent systems.
@@ -236,7 +217,6 @@ class System(object):
         Indicates derivative direction for the model, either 'fwd' or 'rev'.
     _scope_cache : dict
         Cache for variables in the scope of various mat-vec products.
-    #
     _has_guess : bool
         True if this system has or contains a system with a `guess_nonlinear` method defined.
     _has_output_scaling : bool
@@ -245,10 +225,8 @@ class System(object):
         True if this system has resid scaling.
     _has_input_scaling : bool
         True if this system has input scaling.
-    #
     _owning_rank : {'input': {}, 'output': {}}
         Dict mapping var name to the lowest rank where that variable is local.
-    #
     options : OptionsDictionary
         options dictionary
     recording_options : OptionsDictionary
@@ -257,7 +235,6 @@ class System(object):
         Dict of list of var names to record
     _norm0: float
         Normalization factor
-    # Constants used by list_inputs and list_outputs methods for formatting tables they write
     _column_widths : dict
         widths of the columns
     _align : str
@@ -2137,7 +2114,6 @@ class System(object):
             Mapping of this response to each design variable where simultaneous derivs will
             be used.  Each design variable entry is another dict keyed on color, and the values
             in the color dict are tuples of the form (resp_idxs, color_idxs).
-
         """
         # Name must be a string
         if not isinstance(name, string_types):
@@ -2319,7 +2295,7 @@ class System(object):
         ref0 : float or ndarray, optional
             Value of response variable that scales to 0.0 in the driver.
         index : int, optional
-            If variable is an array, this indicates which entriy is of
+            If variable is an array, this indicates which entry is of
             interest for this particular response. This may be a positive
             or negative integer.
         adder : float or ndarray, optional
@@ -2550,20 +2526,16 @@ class System(object):
         ----------
         values : bool, optional
             When True, display/return input values. Default is True.
-
         units : bool, optional
             When True, display/return units. Default is False.
-
         hierarchical : bool, optional
             When True, human readable output shows variables in hierarchical format.
-
         print_arrays : bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
-                        The norm is surrounded by vertical bars to indicate that it is a norm.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format is affected
-                        by the values set with numpy.set_printoptions
+            by the values set with numpy.set_printoptions
             Default is False.
-
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
@@ -2615,43 +2587,32 @@ class System(object):
         ----------
         explicit : bool, optional
             include outputs from explicit components. Default is True.
-
         implicit : bool, optional
             include outputs from implicit components. Default is True.
-
         values : bool, optional
             When True, display/return output values. Default is True.
-
         residuals : bool, optional
             When True, display/return residual values. Default is False.
-
         residuals_tol : float, optional
             If set, limits the output of list_outputs to only variables where
             the norm of the resids array is greater than the given 'residuals_tol'.
             Default is None.
-
         units : bool, optional
             When True, display/return units. Default is False.
-
         shape : bool, optional
             When True, display/return the shape of the value. Default is False.
-
         bounds : bool, optional
             When True, display/return bounds (lower and upper). Default is False.
-
         scaling : bool, optional
             When True, display/return scaling (ref, ref0, and res_ref). Default is False.
-
         hierarchical : bool, optional
             When True, human readable output shows variables in hierarchical format.
-
         print_arrays : bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
-                        The norm is surrounded by vertical bars to indicate that it is a norm.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format  is affected
-                        by the values set with numpy.set_printoptions
+            by the values set with numpy.set_printoptions
             Default is False.
-
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
@@ -2725,27 +2686,21 @@ class System(object):
         ----------
         in_or_out : str, 'input' or 'output'
             indicates whether the values passed in are from inputs or output variables.
-
         comp_type : str, 'Explicit' or 'Implicit'
             the type of component with the output values.
-
         outputs : list
             list of (name, dict of vals and metadata) tuples.
-
         hierarchical : bool
             When True, human readable output shows variables in hierarchical format.
-
         print_arrays : bool
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
-                        The norm is surrounded by vertical bars to indicate that it is a norm.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format  is affected
-                        by the values set with numpy.set_printoptions
+            by the values set with numpy.set_printoptions
             Default is False.
-
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
-
         """
         if out_stream is None:
             return
@@ -2937,9 +2892,9 @@ class System(object):
 
         print_arrays : bool
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
-                        The norm is surrounded by vertical bars to indicate that it is a norm.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format  is affected
-                        by the values set with numpy.set_printoptions
+            by the values set with numpy.set_printoptions
             Default is False.
 
         """

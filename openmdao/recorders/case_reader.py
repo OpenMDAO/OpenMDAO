@@ -16,7 +16,8 @@ def CaseReader(filename):
 
     Returns
     -------
-    An instance of SqliteCaseReader.
+    reader : BaseCaseReader
+        An instance of a SqliteCaseReader that is reading filename.
     """
     try:
         reader = SqliteCaseReader(filename)

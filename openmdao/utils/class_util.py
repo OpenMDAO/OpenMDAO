@@ -9,10 +9,8 @@ def overrides_method(method_name, obj, base):
     ----------
     method_name : str
         Name of the method to search for.
-
     obj : object
         An object that is assumed to inherit from base.
-
     base : class
         The base class that contains the base version of the named
         method.

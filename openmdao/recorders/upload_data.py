@@ -1,8 +1,6 @@
 """
 Script for uploading data from a local sqlite file to the web server.
 """
-
-import sys
 import json
 import argparse
 from openmdao.recorders.web_recorder import WebRecorder
@@ -123,7 +121,7 @@ def _upload_system_iterations(new_list, recorder):
 
 def _upload_solver_iterations(new_list, recorder):
     """
-    Upload all slver iterations to the web server.
+    Upload all solver iterations to the web server.
 
     Parameters
     ----------

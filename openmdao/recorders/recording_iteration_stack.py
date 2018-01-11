@@ -27,6 +27,11 @@ def get_formatted_iteration_coordinate():
     Format the iteration coordinate into human-readable form.
 
     'rank0:pyoptsparsedriver|6|root._solve_nonlinear|6|mda._solve_nonlinear|6|mda.d1._solve_nonlinear|45'
+
+    Returns
+    -------
+    str :
+        the iteration coordinate formatted in our proprietary way.
     """
     separator = '|'
     iteration_coord_list = []
@@ -49,6 +54,23 @@ class Recording(object):
 
     But with properly-timed values for abs and rel,
     where solvers are concerned.
+
+    Attributes
+    ----------
+    name : str
+        Name of object getting recorded.
+    iter_count : int
+        Current counter of iterations completed.
+    recording_requester : object
+        The object that wants to be recorded.
+    abs : float
+        Absolute error.
+    rel : float
+        Relative error.
+    method : str
+        Current method.
+    _is_solver : bool
+        True if recording_requester is a Solver.
     """
 
     def __init__(self, name, iter_count, recording_requester):
@@ -63,23 +85,6 @@ class Recording(object):
             Current counter of iterations completed.
         recording_requester : object
             The object that wants to be recorded.
-
-        Attributes
-        ----------
-        name : str
-            Name of object getting recorded.
-        iter_count : int
-            Current counter of iterations completed.
-        recording_requester : object
-            The object that wants to be recorded.
-        abs : float
-            Absolute error.
-        rel : float
-            Relative error.
-        method : str
-            Current method.
-        _is_solver : bool
-            True if recording_requester is a Solver.
         """
         self.name = name
         self.iter_count = iter_count
@@ -93,6 +98,11 @@ class Recording(object):
     def __enter__(self):
         """
         Do things before the code inside the 'with Recording' block.
+
+        Returns
+        -------
+        self : object
+            self
         """
         recording_iteration.stack.append((self.name, self.iter_count))
         return self
@@ -100,6 +110,11 @@ class Recording(object):
     def __exit__(self, *args):
         """
         Do things after the code inside the 'with Recording' block.
+
+        Parameters
+        ----------
+        *args : array
+            Solver recording requires extra args.
         """
         # Determine if recording is justified.
         do_recording = True

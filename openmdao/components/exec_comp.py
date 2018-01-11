@@ -111,7 +111,7 @@ class ExecComp(ExplicitComponent):
             standard Python operators, a subset of numpy and scipy functions
             is supported.
 
-        \*\*kwargs : dict of named args
+        **kwargs : dict of named args
             Initial values of variables can be set by setting a named
             arg with the var name.  If the value is a dict it is assumed
             to contain metadata.  To set the initial value in addition to
@@ -251,6 +251,11 @@ class ExecComp(ExplicitComponent):
     def __getstate__(self):
         """
         Return state as a dict.
+
+        Returns
+        -------
+        dict
+            State to get.
         """
         state = self.__dict__.copy()
         del state['_codes']
@@ -259,6 +264,11 @@ class ExecComp(ExplicitComponent):
     def __setstate__(self, state):
         """
         Restore state from `state`.
+
+        Parameters
+        ----------
+        state : dict
+            State to restore.
         """
         self.__dict__.update(state)
         self._codes = self._compile_exprs(self._exprs)
@@ -356,7 +366,6 @@ class _TmpDict(object):
         ----------
         inner : dict-like
             The dictionary to be wrapped.
-
         return_complex : bool, optional
             If True, return a complex version of values from __getitem__
         """
@@ -434,9 +443,10 @@ def _import_functs(mod, dct, names=None):
 
     Parameters
     ----------
+    mod : object
+        Module to check.
     dct : dict
         Dictionary that will contain the mapping
-
     names : iter of str, optional
         If supplied, only map attrs that match the given names
     """

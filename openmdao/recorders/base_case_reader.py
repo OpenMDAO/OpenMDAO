@@ -1,5 +1,5 @@
 """
-Docstring.
+Base class for all CaseReaders.
 """
 from abc import ABCMeta
 
@@ -7,11 +7,6 @@ from abc import ABCMeta
 class BaseCaseReader(object):
     """
     Abstract base class of all CaseReader implementations.
-
-    Parameters
-    ----------
-    filename : str
-        The name of the file from which to instantiate the case reader.
 
     Attributes
     ----------
@@ -38,6 +33,11 @@ class BaseCaseReader(object):
     def __init__(self, filename):
         """
         Initialize.
+
+        Parameters
+        ----------
+        filename : str
+            The name of the file from which to instantiate the case reader.
         """
         self.format_version = None
         self.filename = filename

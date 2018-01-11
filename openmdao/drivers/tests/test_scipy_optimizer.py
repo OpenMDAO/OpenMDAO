@@ -495,10 +495,14 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0)
 
         prob.setup(check=False, mode='fwd')
-        prob.run_driver()
+        failed = prob.run_driver()
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+
+        # test fails if we add this, but I don't know how to fix the failure, so
+        # I just put in a story to fix it.
+        # self.assertTrue(not failed, "Optimization FAILED.")
 
     def test_simple_paraboloid_scaled_desvars_rev(self):
 
@@ -730,7 +734,6 @@ class TestScipyOptimizer(unittest.TestCase):
         model = prob.model = SellarDerivativesGrouped()
 
         prob.driver = ScipyOptimizer()
-        prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['optimizer'] = 'COBYLA'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -747,6 +750,70 @@ class TestScipyOptimizer(unittest.TestCase):
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
         assert_rel_error(self, prob['x'], 0.0, 1e-3)
+
+    def test_simple_paraboloid_lower_linear(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizer()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=15.0, linear=True)
+
+        prob.setup(check=False)
+        fail = prob.run_driver()
+
+        self.assertTrue(not fail, "Optimization failed!")
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
+        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+
+        self.assertEqual(prob.driver._obj_and_nlcons, ['comp.f_xy'])
+
+    def test_simple_paraboloid_equality_linear(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizer()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', equals=-15.0, linear=True)
+
+        prob.setup(check=False)
+        fail = prob.run_driver()
+
+        self.assertTrue(not fail, "Optimization failed!")
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
+        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
 
     def test_debug_print_option(self):
 
@@ -795,7 +862,6 @@ class TestScipyOptimizer(unittest.TestCase):
                         "Should be more than one linear constraint header printed")
         self.assertTrue(output.count("Objectives") > 1,
                         "Should be more than one objective header printed")
-
         self.assertTrue(len([s for s in output if s.startswith('p1.x')]) > 1,
                         "Should be more than one p1.x printed")
         self.assertTrue(len([s for s in output if s.startswith('p2.y')]) > 1,
