@@ -209,12 +209,16 @@ class pyOptSparseDriver(Driver):
         # Metadata Setup
         self.metadata = create_local_meta(self.options['optimizer'])
 
+
         with Recording(self.options['optimizer'], self.iter_count, self) as rec:
             # Initial Run
+            self._pre_run_model_debug_print()
             model._solve_nonlinear()
+            self._post_run_model_debug_print()
             rec.abs = 0.0
             rec.rel = 0.0
         self.iter_count += 1
+
 
         opt_prob = Optimization(self.options['title'], self._objfunc)
 
@@ -365,11 +369,15 @@ class pyOptSparseDriver(Driver):
             val = dv_dict[name]
             self.set_design_var(name, val)
 
+
         with Recording(self.options['optimizer'], self.iter_count, self) as rec:
+            self._pre_run_model_debug_print()
             model._solve_nonlinear()
+            self._post_run_model_debug_print()
             rec.abs = 0.0
             rec.rel = 0.0
         self.iter_count += 1
+
 
         # Save the most recent solution.
         self.pyopt_solution = sol
@@ -418,9 +426,11 @@ class pyOptSparseDriver(Driver):
             # print("Setting DV")
             # print(dv_dict)
 
+
             # Execute the model
             with Recording(self.options['optimizer'], self.iter_count, self) as rec:
                 self.iter_count += 1
+                self._pre_run_model_debug_print()
                 try:
                     model._solve_nonlinear()
 
@@ -429,6 +439,8 @@ class pyOptSparseDriver(Driver):
                     model._clear_iprint()
                     fail = 1
 
+                self._post_run_model_debug_print()
+
                 func_dict = self.get_objective_values()
                 func_dict.update(self.get_constraint_values(lintype='nonlinear'))
 
@@ -436,6 +448,7 @@ class pyOptSparseDriver(Driver):
                 # been gathered in MPI.
                 rec.abs = 0.0
                 rec.rel = 0.0
+
 
         except Exception as msg:
             tb = traceback.format_exc()

@@ -1305,6 +1305,56 @@ class TestPyoptSparse(unittest.TestCase):
         # pyopt's failure message differs by platform and is not informative anyway
         del prob
 
+    def test_debug_print_option(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.options['print_results'] = False
+
+        prob.driver.debug_print['debug_print'] = True
+        prob.driver.debug_print['debug_print_desvars'] = True
+        prob.driver.debug_print['debug_print_nl_con'] = True
+        prob.driver.debug_print['debug_print_ln_con'] = True
+        prob.driver.debug_print['debug_print_objective'] = True
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.run_driver()
+        finally:
+            sys.stdout = stdout
+
+        output = strout.getvalue().split('\n')
+        self.assertEqual(output.count("Design Vars"), 11)
+        self.assertEqual(output.count("Nonlinear constraints"), 11)
+        self.assertEqual(output.count("Linear constraints"), 0)
+        self.assertEqual(output.count("Objectives"), 11)
+
+        self.assertEqual(len([s for s in output if s.startswith('p1.x')]), 11)
+        self.assertEqual(len([s for s in output if s.startswith('p2.y')]), 11)
+        self.assertEqual(len([s for s in output if s.startswith('con.c')]), 11)
+        self.assertEqual(len([s for s in output if s.startswith('comp.f_xy')]), 11)
+
 
 class TestPyoptSparseFeature(unittest.TestCase):
 

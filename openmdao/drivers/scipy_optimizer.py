@@ -346,9 +346,13 @@ class ScipyOptimizer(Driver):
                 self.set_design_var(name, x_new[i:i + size])
                 i += size
 
+            self._pre_run_model_debug_print()
+
             with Recording(self.options['optimizer'], self.iter_count, self) as rec:
                 self.iter_count += 1
                 model._solve_nonlinear()
+
+            self._post_run_model_debug_print()
 
             # Get the objective function evaluations
             for name, obj in iteritems(self.get_objective_values()):

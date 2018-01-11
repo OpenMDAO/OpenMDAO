@@ -1,6 +1,9 @@
 """ Unit tests for the ScipyOptimizer Driver."""
 
 import unittest
+import sys
+
+from six import StringIO
 
 import numpy as np
 
@@ -745,6 +748,54 @@ class TestScipyOptimizer(unittest.TestCase):
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
         assert_rel_error(self, prob['x'], 0.0, 1e-3)
 
+    def test_debug_print_option(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizer()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        prob.driver.debug_print['debug_print'] = True
+        prob.driver.debug_print['debug_print_desvars'] = True
+        prob.driver.debug_print['debug_print_nl_con'] = True
+        prob.driver.debug_print['debug_print_ln_con'] = True
+        prob.driver.debug_print['debug_print_objective'] = True
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.run_driver()
+        finally:
+            sys.stdout = stdout
+
+        output = strout.getvalue().split('\n')
+        self.assertEqual(output.count("Design Vars"), 4)
+        self.assertEqual(output.count("Nonlinear constraints"), 4)
+        self.assertEqual(output.count("Linear constraints"), 0)
+        self.assertEqual(output.count("Objectives"), 4)
+
+        self.assertEqual(len([s for s in output if s.startswith('p1.x')]), 4)
+        self.assertEqual(len([s for s in output if s.startswith('p2.y')]), 4)
+        self.assertEqual(len([s for s in output if s.startswith('con.c')]), 4)
+        self.assertEqual(len([s for s in output if s.startswith('comp.f_xy')]), 4)
 
 
 class TestScipyOptimizerFeatures(unittest.TestCase):
@@ -847,6 +898,41 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
+
+    def test_debug_print_option(self):
+
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer, ExecComp
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizer()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        prob.driver.debug_print['debug_print'] = True
+        prob.driver.debug_print['debug_print_desvars'] = True
+        prob.driver.debug_print['debug_print_nl_con'] = True
+        prob.driver.debug_print['debug_print_ln_con'] = True
+        prob.driver.debug_print['debug_print_objective'] = True
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+
+        prob.run_driver()
 
 
 if __name__ == "__main__":

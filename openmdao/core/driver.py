@@ -11,6 +11,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.mpi import MPI
+from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate
 from openmdao.utils.options_dictionary import OptionsDictionary
 
 
@@ -34,6 +35,12 @@ class Driver(object):
         Patterns for variables to include in recording.
     recording_options['excludes'] :  list of strings('')
         Patterns for variables to exclude in recording (processed after includes).
+
+    debug_print
+    debug_print_desvars
+    debug_print_nl_con
+    debug_print_ln_con
+    debug_print_objective
 
     Attributes
     ----------
@@ -141,6 +148,14 @@ class Driver(object):
         self.supports.declare('gradients', types=bool, default=False)
         self.supports.declare('active_set', types=bool, default=False)
         self.supports.declare('simultaneous_derivatives', types=bool, default=False)
+
+        # Debug printing.
+        self.debug_print = OptionsDictionary()
+        self.debug_print.declare('debug_print', types=bool, default=False)
+        self.debug_print.declare('debug_print_desvars', types=bool, default=False)
+        self.debug_print.declare('debug_print_nl_con', types=bool, default=False)
+        self.debug_print.declare('debug_print_ln_con', types=bool, default=False)
+        self.debug_print.declare('debug_print_objective', types=bool, default=False)
 
         self.iter_count = 0
         self.metadata = None
@@ -554,8 +569,13 @@ class Driver(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
+
+        self._pre_run_model_debug_print()
+
         with Recording(self._get_name(), self.iter_count, self) as rec:
             failure_flag = self._problem.model._solve_nonlinear()
+
+        self._post_run_model_debug_print()
 
         self.iter_count += 1
         return failure_flag
@@ -806,3 +826,64 @@ class Driver(object):
                     del dvdict[dv]
                     dv = prom2abs[dv][0]
                     dvdict[dv] = col_dict
+
+    def _pre_run_model_debug_print(self):
+        """
+        Set up metadata for simultaneous derivative solution.
+        """
+        if self.debug_print['debug_print']:
+            if not MPI or MPI.COMM_WORLD.rank == 0:
+                header = 'Driver debug print for iter coord: {}'.format(
+                    get_formatted_iteration_coordinate())
+                print(header)
+                print(len(header)*'-')
+
+            if self.debug_print['debug_print_desvars']:
+                desvar_vals = self.get_design_var_values()
+                if not MPI or MPI.COMM_WORLD.rank == 0:
+                    print("Design Vars")
+                    if desvar_vals:
+                        for name, value in iteritems(desvar_vals):
+                            print("{}: {}".format(name,value))
+                    else:
+                        print("None")
+                    print()
+
+    def _post_run_model_debug_print(self):
+        """
+        Set up metadata for simultaneous derivative solution.
+        """
+        if self.debug_print['debug_print']:
+            if self.debug_print['debug_print_nl_con']:
+                cons = self.get_constraint_values(lintype='nonlinear')
+                if not MPI or MPI.COMM_WORLD.rank == 0:
+                    print("Nonlinear constraints")
+                    if cons:
+                        for name, value in iteritems(cons):
+                            print("{}: {}".format(name, value))
+                    else:
+                        print("None")
+                    print()
+
+            if self.debug_print['debug_print_ln_con']:
+                cons = self.get_constraint_values(lintype='linear')
+                if not MPI or MPI.COMM_WORLD.rank == 0:
+                    print("Linear constraints")
+                    if cons:
+                        for name, value in iteritems(cons):
+                            print("{}: {}".format(name, value))
+                    else:
+                        print("None")
+                    print()
+
+            if self.debug_print['debug_print_objective']:
+                objs = self.get_objective_values()
+                if not MPI or MPI.COMM_WORLD.rank == 0:
+                    print("Objectives")
+                    if objs:
+                        for name, value in iteritems(objs):
+                            print("{}: {}".format(name, value))
+                    else:
+                        print("None")
+                    print()
+
