@@ -235,6 +235,8 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, stream=sys.stdout
 
         simul_colorings[dv] = list(coloring)
 
+    simul_colorings = OrderedDict(sorted(simul_colorings.items()))
+
     for res in res_idxs:
         simul_map = {}
         for dv in res_idxs[res]:
@@ -244,18 +246,40 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, stream=sys.stdout
                 del simul_map[dv]
 
         if simul_map:
-            simul_maps[res] = simul_map
+            simul_maps[res] = OrderedDict(sorted(simul_map.items()))
+
+    simul_maps = OrderedDict(sorted(simul_maps.items()))
 
     if stream is not None:
         s = json.dumps((simul_colorings, simul_maps))
 
         # do a little pretty printing since the built-in json pretty printing stretches
         # the output vertically WAY too much.
-        s = s.replace(',"', ',\n    "')
-        s = s.replace(', "', ',\n    "')
-        s = s.replace('{"', '{\n    "')
+        s = s.replace(',"', ',\n"')
+        s = s.replace(', "', ',\n"')
+        s = s.replace('{"', '{\n"')
+        s = s.replace(', {', ',\n{')
+        s = s.replace(']}', ']\n}')
+        s = s.replace('}}', '}\n}')
+        s = s.replace('[{', '[\n{')
+        s = s.replace(' {', '\n{')
 
-        stream.write(s)
+        lines = []
+        indent = 0
+        for line in s.split('\n'):
+            start = line[0] if len(line) > 0 else ''
+            if start in ('{', '['):
+                tab = ' ' * indent
+                indent += 3
+            elif start in ('}', ']'):
+                indent -= 3
+                tab = ' ' * indent
+            else:
+                tab = ' ' * indent
+
+            lines.append("%s%s" % (tab, line))
+
+        stream.write('\n'.join(lines))
         stream.write("\n")
 
     return simul_colorings, simul_maps
