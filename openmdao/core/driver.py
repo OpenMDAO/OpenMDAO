@@ -36,6 +36,18 @@ class Driver(object):
     recording_options['excludes'] :  list of strings('')
         Patterns for variables to exclude in recording (processed after includes).
 
+    debug_print['debug_print'] :  bool(False)
+        If True, print debugging information every Driver iteration.
+    debug_print['debug_print_desvars'] :  bool(False)
+        If True and the option debug_print is True, print design variables every Driver iteration.
+    debug_print['debug_print_nl_con'] :  bool(False)
+        If True and the option debug_print is True, print nonlinear constraints every
+        Driver iteration.
+    debug_print['debug_print_ln_con'] :  bool(False)
+        If True and the option debug_print is True, print linear constraints every Driver iteration.
+    debug_print['debug_print_objective'] :  bool(False)
+        If True and the option debug_print is True, print objectives every Driver iteration.
+
     Attributes
     ----------
     fail : bool
@@ -149,11 +161,16 @@ class Driver(object):
 
         # Debug printing.
         self.debug_print = OptionsDictionary()
-        self.debug_print.declare('debug_print', types=bool, default=False)
-        self.debug_print.declare('debug_print_desvars', types=bool, default=False)
-        self.debug_print.declare('debug_print_nl_con', types=bool, default=False)
-        self.debug_print.declare('debug_print_ln_con', types=bool, default=False)
-        self.debug_print.declare('debug_print_objective', types=bool, default=False)
+        self.debug_print.declare('debug_print', types=bool, default=False,
+                                 desc='Overall option to turn on Driver debug printing')
+        self.debug_print.declare('debug_print_desvars', types=bool, default=False,
+                                 desc='Print design variables')
+        self.debug_print.declare('debug_print_nl_con', types=bool, default=False,
+                                 desc='Print nonlinear constraints')
+        self.debug_print.declare('debug_print_ln_con', types=bool, default=False,
+                                 desc='Print linear constraints')
+        self.debug_print.declare('debug_print_objective', types=bool, default=False,
+                                 desc='Print objectives')
 
         self.iter_count = 0
         self.metadata = None
