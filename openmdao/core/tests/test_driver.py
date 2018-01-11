@@ -227,7 +227,7 @@ class TestDriver(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        self.assertEqual(output[0], 'Driver debug print for iter coord: rank0:')
+        self.assertEqual(output[0], 'Driver debug print for iter coord: rank0:Driver|1')
 
         # Make sure everything prints when all options are on
         prob.driver.debug_print['debug_print_desvars'] = True

@@ -787,15 +787,23 @@ class TestScipyOptimizer(unittest.TestCase):
             sys.stdout = stdout
 
         output = strout.getvalue().split('\n')
-        self.assertEqual(output.count("Design Vars"), 4)
-        self.assertEqual(output.count("Nonlinear constraints"), 4)
-        self.assertEqual(output.count("Linear constraints"), 0)
-        self.assertEqual(output.count("Objectives"), 4)
+        self.assertTrue(output.count("Design Vars") > 1,
+                        "Should be more than one design vars header printed")
+        self.assertTrue(output.count("Nonlinear constraints") > 1,
+                        "Should be more than one nonlinear constraint header printed")
+        self.assertTrue(output.count("Linear constraints") > 1,
+                        "Should be more than one linear constraint header printed")
+        self.assertTrue(output.count("Objectives") > 1,
+                        "Should be more than one objective header printed")
 
-        self.assertEqual(len([s for s in output if s.startswith('p1.x')]), 4)
-        self.assertEqual(len([s for s in output if s.startswith('p2.y')]), 4)
-        self.assertEqual(len([s for s in output if s.startswith('con.c')]), 4)
-        self.assertEqual(len([s for s in output if s.startswith('comp.f_xy')]), 4)
+        self.assertTrue(len([s for s in output if s.startswith('p1.x')]) > 1,
+                        "Should be more than one p1.x printed")
+        self.assertTrue(len([s for s in output if s.startswith('p2.y')]) > 1,
+                        "Should be more than one p2.y printed")
+        self.assertTrue(len([s for s in output if s.startswith('con.c')]) > 1,
+                        "Should be more than one con.c printed")
+        self.assertTrue(len([s for s in output if s.startswith('comp.f_xy')]) > 1,
+                        "Should be more than one comp.f_xy printed")
 
 
 class TestScipyOptimizerFeatures(unittest.TestCase):

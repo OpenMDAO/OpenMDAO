@@ -36,12 +36,6 @@ class Driver(object):
     recording_options['excludes'] :  list of strings('')
         Patterns for variables to exclude in recording (processed after includes).
 
-    debug_print
-    debug_print_desvars
-    debug_print_nl_con
-    debug_print_ln_con
-    debug_print_objective
-
     Attributes
     ----------
     fail : bool
@@ -54,6 +48,10 @@ class Driver(object):
         Dictionary with general pyoptsparse options.
     recording_options : <OptionsDictionary>
         Dictionary with driver recording options.
+    recording_options : <OptionsDictionary>
+        Dictionary with driver recording options.
+    debug_print : <OptionsDictionary>
+        Dictionary with debugging printing options.
     cite : str
         Listing of relevant citataions that should be referenced when
         publishing work that uses this class.
@@ -569,13 +567,10 @@ class Driver(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-
-        self._pre_run_model_debug_print()
-
         with Recording(self._get_name(), self.iter_count, self) as rec:
+            self._pre_run_model_debug_print()
             failure_flag = self._problem.model._solve_nonlinear()
-
-        self._post_run_model_debug_print()
+            self._post_run_model_debug_print()
 
         self.iter_count += 1
         return failure_flag
@@ -836,7 +831,7 @@ class Driver(object):
                 header = 'Driver debug print for iter coord: {}'.format(
                     get_formatted_iteration_coordinate())
                 print(header)
-                print(len(header)*'-')
+                print(len(header) * '-')
 
             if self.debug_print['debug_print_desvars']:
                 desvar_vals = self.get_design_var_values()
@@ -844,7 +839,7 @@ class Driver(object):
                     print("Design Vars")
                     if desvar_vals:
                         for name, value in iteritems(desvar_vals):
-                            print("{}: {}".format(name,value))
+                            print("{}: {}".format(name, value))
                     else:
                         print("None")
                     print()
@@ -886,4 +881,3 @@ class Driver(object):
                     else:
                         print("None")
                     print()
-
