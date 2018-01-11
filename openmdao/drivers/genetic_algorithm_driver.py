@@ -187,7 +187,7 @@ class SimpleGADriver(Driver):
 
         return False
 
-    def objective_callback(self, x):
+    def objective_callback(self, x, icase):
         """
         Evaluate problem objective at the requested point.
 
@@ -195,6 +195,8 @@ class SimpleGADriver(Driver):
         ----------
         x : ndarray
             Value of design variables.
+        icase : int
+            Case number, used for identification when run in parallel.
 
         Returns
         -------
@@ -202,6 +204,8 @@ class SimpleGADriver(Driver):
             Objective value
         bool
             Success flag, True if successful
+        int
+            Case number, used for identification when run in parallel.
         """
         model = self._problem.model
         success = 1
@@ -233,7 +237,7 @@ class SimpleGADriver(Driver):
         # print("Functions calculated")
         # print(x)
         # print(obj)
-        return obj, success
+        return obj, success, icase
 
 
 class GeneticAlgorithm():
@@ -315,27 +319,26 @@ class GeneticAlgorithm():
             # Evaluate points in this generation.
             if self.comm is not None:
                 # Parallel
-                cases = [((item, ), None) for item in x_pop]
+                cases = [((item, ii), None) for ii, item in enumerate(x_pop)]
                 print('x_pop', x_pop)
                 print('cases', cases)
 
                 results = concurrent_eval(self.objfun, cases, self.comm, allgather=True)
 
-                for ii, result in enumerate(results):
+                fitness[:] = np.inf
+                for result in results:
+                    returns, traceback = result
 
-                    if result[0]:
-                        fitness[ii], success = result[0]
-                        print('eval', fitness[ii], success)
+                    if returns:
+                        val, success, ii = returns
+                        if success:
+                            fitness[ii] = val
+                            nfit += 1
+
                     else:
                         # Print the traceback if it fails
                         print('A case failed:')
-                        print(result[1])
-                        success = False
-
-                    if success:
-                        nfit += 1
-                    else:
-                        fitness[ii] = np.inf
+                        print(traceback)
 
             else:
                 # Serial
@@ -343,7 +346,7 @@ class GeneticAlgorithm():
                 for ii in range(self.npop):
                     x = x_pop[ii]
 
-                    fitness[ii], success = self.objfun(x)
+                    fitness[ii], success, _ = self.objfun(x, 0)
                     print('eval', fitness[ii], success)
 
                     if success:
