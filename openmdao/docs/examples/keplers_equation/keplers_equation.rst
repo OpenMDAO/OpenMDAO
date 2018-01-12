@@ -40,13 +40,8 @@ equation, using :math:`M` as the initial guess for :math:`E` is a good starting 
 In summary, the recipe for solving Kepler's equation is as follows:
 
 - Define a problem with a `Group` as its model.
-<<<<<<< HEAD
 - To that Group, add components which provide, :math:`M`, :math:`e`, and the left-hand side of Kepler's equation.
 - Add a linear and nonlinear solver to the Group, since the default solvers do not iterate.
-=======
-- To that Group, add components which provide, `M`, `e`, and the left-hand-side of Kepler's equation.
-- Add a linear and nonlinear solver to the Group, since the default solver's do not iterate.
->>>>>>> master
 - Setup the problem, set values for the inputs, and run the model.
 
 .. embed-test::
