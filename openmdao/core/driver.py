@@ -602,10 +602,8 @@ class Driver(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        with Recording(self._get_name(), self.iter_count, self) as rec:
-            self._pre_run_model_debug_print()
+        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             failure_flag = self._problem.model._solve_nonlinear()
-            self._post_run_model_debug_print()
 
         self.iter_count += 1
         return failure_flag
@@ -917,3 +915,52 @@ class Driver(object):
                 else:
                     print("None")
                 print()
+
+
+class RecordingDebugging(Recording):
+    """
+    A class that acts as a context manager.
+
+    Handles doing the case recording and also the Driver
+    debugging printing.
+    """
+
+    def __init__(self, name, iter_count, recording_requester):
+        """
+        Initialize RecordingDebugging.
+
+        Parameters
+        ----------
+        name : str
+            Name of object getting recorded.
+        iter_count : int
+            Current counter of iterations completed.
+        recording_requester : object
+            The object that wants to be recorded.
+        """
+        super(RecordingDebugging, self).__init__(name, iter_count, recording_requester)
+
+    def __enter__(self):
+        """
+        Do things before the code inside the 'with RecordingDebugging' block.
+
+        Returns
+        -------
+        self : object
+            self
+        """
+        super(RecordingDebugging, self).__enter__()
+        self.recording_requester._pre_run_model_debug_print()
+        return self
+
+    def __exit__(self, *args):
+        """
+        Do things after the code inside the 'with RecordingDebugging' block.
+
+        Parameters
+        ----------
+        *args : array
+            Solver recording requires extra args.
+        """
+        self.recording_requester._post_run_model_debug_print()
+        super(RecordingDebugging, self).__exit__()

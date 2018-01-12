@@ -4,7 +4,6 @@ OpenMDAO Wrapper for the scipy.optimize.minimize family of local optimizers.
 
 from __future__ import print_function
 from collections import OrderedDict
-import traceback
 import sys
 
 from six import itervalues, iteritems, reraise
@@ -13,8 +12,7 @@ from six.moves import range
 import numpy as np
 from scipy.optimize import minimize
 
-from openmdao.core.driver import Driver
-from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.core.driver import Driver, RecordingDebugging
 
 
 _optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -373,13 +371,9 @@ class ScipyOptimizer(Driver):
                 self.set_design_var(name, x_new[i:i + size])
                 i += size
 
-            self._pre_run_model_debug_print()
-
-            with Recording(self.options['optimizer'], self.iter_count, self) as rec:
+            with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
                 self.iter_count += 1
                 model._solve_nonlinear()
-
-            self._post_run_model_debug_print()
 
             # Get the objective function evaluations
             for name, obj in iteritems(self.get_objective_values()):
