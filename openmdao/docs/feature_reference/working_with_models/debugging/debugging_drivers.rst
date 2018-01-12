@@ -18,16 +18,3 @@ The only valid strings are 'desvars','ln_cons','nl_cons',and 'objs'.
       openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizerFeatures.test_debug_print_option
 
 
-Driver Debug Printing Options
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Here is a summary of the `Driver` `debug_print` options.
-
-.. embed-options::
-    openmdao.core.driver
-    Driver
-    options
-
-
-
-
