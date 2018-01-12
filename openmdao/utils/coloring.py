@@ -75,13 +75,18 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     tuple
         Tuple of dicts total_dv_offsets and total_res_offsets.
     """
+    from openmdao.core.group import Group
+
     # TODO: fix this to work in rev mode as well
 
-    jac = prob.model._jacobian
-    set_abs = jac._set_abs
-
-    # replace existing jacobian set_abs with ours that replaces all subjacs with random numbers
-    jac._set_abs = lambda key, subjac: _wrapper_set_abs(jac, set_abs, key, subjac, tol)
+    seen = set()
+    for group in prob.model.system_iter(recurse=True, include_self=True, typ=Group):
+        jac = group._jacobian
+        if jac not in seen:
+            set_abs = jac._set_abs
+            # replace existing jacobian set_abs with ours that replaces all subjacs with random numbers
+            jac._set_abs = lambda key, subjac: _wrapper_set_abs(jac, set_abs, key, subjac, tol)
+            seen.add(jac)
 
     # clear out any old simul coloring info
     prob.driver._simul_coloring_info = None
@@ -92,29 +97,30 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
 
     desvars = prob.driver._designvars
     responses = prob.driver._responses
-    of = list(prob.driver._objs)
+
     wrt = list(desvars)
+
+    # remove linear constraints from consideration
+    of = list(prob.driver._objs)
+    for n, meta in iteritems(prob.driver._cons):
+        if not ('linear' in meta and meta['linear']):
+            of.append(n)
 
     if not of or not wrt:
         raise RuntimeError("Sparsity structure cannot be computed without declaration of design "
                            "variables and responses.")
 
-    # remove linear constraints from consideration
-    for n, meta in iteritems(prob.driver._cons):
-        if not ('linear' in meta and meta['linear']):
-            of.append(n)
-
-    sumJ = None
+    fullJ = None
     for i in range(repeats):
         J = prob.driver._compute_totals(return_format='array', of=of, wrt=wrt)
-        if sumJ is None:
-            sumJ = np.zeros(J.shape, dtype=bool)
-            sumJ[J < -tol] = True
-            sumJ[J > tol] = True
+        if fullJ is None:
+            fullJ = np.zeros(J.shape, dtype=bool)
+            fullJ[J < -tol] = True
+            fullJ[J > tol] = True
         else:
-            sumJ |= np.logical_and(J < -tol, J > tol)
+            fullJ |= np.logical_and(J < -tol, J > tol)
 
-    J = sumJ
+    J = fullJ
 
     # from openmdao.utils.array_utils import array_viz
     # with open("arr_viz", 'w') as f:
@@ -138,52 +144,60 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
         res_offsets.append((start, end, name))
         start = end + 1
 
-    total_dv_offsets = defaultdict(lambda: defaultdict(list))
+    total_dv_offsets = OrderedDict()  # defaultdict(lambda: defaultdict(list))
     total_res_offsets = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [[], []])))
 
     # loop over each desvar and find disjoint column sets for all columns of that desvar
     for start, end, dv in dv_offsets:
-        if (end + 1 - start) < 2:
+        # skip desvars of size 1 since simul derivs will give no improvement
+        if (end - start) == 0:
             continue
 
         disjoints = defaultdict(set)
         rows = {}
         for c1, c2 in combinations(range(start, end + 1), 2):  # loop over column pairs
-            result = J[:, c1] | J[:, c2]
-            if np.max(result) <= 1.0:
+            # 'and' two columns together. If we get all False, then columns have disjoint row sets
+            if not np.any(J[:, c1] & J[:, c2]):
                 disjoints[c1].add(c2)
                 disjoints[c2].add(c1)
                 if c1 not in rows:
-                    rows[c1] = set(np.nonzero(J[:, c1])[0])
+                    rows[c1] = np.nonzero(J[:, c1])[0]
                 if c2 not in rows:
-                    rows[c2] = set(np.nonzero(J[:, c2])[0])
+                    rows[c2] = np.nonzero(J[:, c2])[0]
 
-        full_disjoint = {}
+        full_disjoint = OrderedDict()
         seen = set()
         allrows = {}
+
+        # sort largest to smallest disjoint column sets
         discols = sorted(disjoints.items(), key=lambda x: len(x[1]), reverse=True)
 
-        for col, s in discols:
-            if col in seen or col in full_disjoint:
+        for col, colset in discols:
+            if col in seen:
                 continue
             seen.add(col)
-            allrows[col] = set(rows[col])
-            full_disjoint[col] = set([col])
-            for other_col in s:
-                if other_col not in seen and not allrows[col].intersection(rows[other_col]):
+            allrows[col] = J[:, col]
+            full_disjoint[col] = [col]
+            for other_col in colset:
+                if other_col not in seen and not np.any(allrows[col] & J[:, other_col]):
                     seen.add(other_col)
-                    full_disjoint[col].add(other_col)
-                    allrows[col].update(rows[other_col])
+                    full_disjoint[col].append(other_col)
+                    allrows[col] |= J[:, other_col]
+
+        total_dv_offsets[dv] = tot_dv = OrderedDict()
 
         for color, cols in enumerate(full_disjoint.values()):
+            tot_dv[color] = tot_dv_colors = []
             for c in sorted(cols):
                 dvoffset = c - start
-                total_dv_offsets[dv][color].append(dvoffset)
+                tot_dv_colors.append(dvoffset)
                 for crow in rows[c]:
                     res, resoffset = _find_var_from_range(crow, res_offsets)
                     dct = total_res_offsets[res][dv][color]
                     dct[0].append(resoffset)
                     dct[1].append(dvoffset)
+
+    for res in total_res_offsets:
 
     prob.driver._simul_coloring_info = None
     prob.driver._res_jacs = {}
@@ -344,7 +358,7 @@ def _simul_coloring_setup_parser(parser):
     parser.add_argument('-o', action='store', dest='outfile', help='output file.')
     parser.add_argument('-n', action='store', dest='num_jacs', default=1, type=int,
                         help='number of times to repeat total deriv computation.')
-    parser.add_argument('-t', action='store', dest='tolerance', default=1.e-30, type=float,
+    parser.add_argument('-t', action='store', dest='tolerance', default=1.e-15, type=float,
                         help='tolerance used to determine if an array entry is nonzero.')
 
 
