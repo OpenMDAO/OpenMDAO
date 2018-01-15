@@ -320,8 +320,6 @@ class GeneticAlgorithm():
             if self.comm is not None:
                 # Parallel
                 cases = [((item, ii), None) for ii, item in enumerate(x_pop)]
-                print('x_pop', x_pop)
-                print('cases', cases)
 
                 results = concurrent_eval(self.objfun, cases, self.comm, allgather=True)
 
@@ -342,12 +340,10 @@ class GeneticAlgorithm():
 
             else:
                 # Serial
-                print('x_pop', x_pop)
                 for ii in range(self.npop):
                     x = x_pop[ii]
 
                     fitness[ii], success, _ = self.objfun(x, 0)
-                    print('eval', fitness[ii], success)
 
                     if success:
                         nfit += 1
