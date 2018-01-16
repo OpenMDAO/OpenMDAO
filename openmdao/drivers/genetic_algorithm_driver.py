@@ -35,27 +35,11 @@ class SimpleGADriver(Driver):
 
     Attributes
     ----------
-    problem : <Problem>
-        Pointer to the containing problem.
-    run_parallel : bool
-        Set to True to execute the points in a generation in parallel.
-    supports : <OptionsDictionary>
-        Provides a consistant way for drivers to declare what features they support.
-    _cons : dict
-        Contains all constraint info.
-    _designvars : dict
-        Contains all design variable info.
     _desvar_idx : dict
         Keeps track of the indices for each desvar, since GeneticAlgorithm seess an array of
         design variables.
     _ga : <GeneticAlgorithm>
         Main genetic algorithm lies here.
-    _objs : dict
-        Contains all objective info.
-    _quantities : list
-        Contains the objectives plus nonlinear constraints.
-    _responses : dict
-        Contains all response info.
     """
 
     def __init__(self):
@@ -246,6 +230,20 @@ class GeneticAlgorithm():
 
     This is the Simple Genetic Algorithm implementation based on 2009 AAE550: MDO Lecture notes of
     Prof. William A. Crossley. It can be used standalone or as part of the OpenMDAO Driver.
+
+
+    Attributes
+    ----------
+    comm : MPI communicator or None
+        The MPI communicator that will be used objective evaluation for each generation.
+    elite : bool
+        Elitism flag.
+    lchrom : int
+        Chromosome length.
+    npop : int
+        Population size.
+    objfun : function
+        Objective function callback.
     """
 
     def __init__(self, objfun, comm=None):
@@ -256,7 +254,6 @@ class GeneticAlgorithm():
         ----------
         objfun : function
             Objective callback function.
-
         comm : MPI communicator or None
             The MPI communicator that will be used objective evaluation for each generation.
         """
