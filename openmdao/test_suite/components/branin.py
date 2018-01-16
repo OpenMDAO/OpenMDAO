@@ -42,7 +42,7 @@ class Branin(ExplicitComponent):
         """
         Define the function f(xI, xC).
 
-        Here x0 is integer and x1 is continuous.
+        When Branin is used in a mixed integer problem, x0 is integer and x1 is continuous.
         """
         x0 = inputs['x0']
         x1 = inputs['x1']
