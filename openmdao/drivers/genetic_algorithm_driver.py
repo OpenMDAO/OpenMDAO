@@ -455,8 +455,7 @@ class GeneticAlgorithm():
         """
         temp = np.random.rand(self.npop, self.lchrom)
         idx, idy = np.where(temp < Pm)
-        for ii, jj in zip(idx, idy):
-            current_gen[ii][jj] = 1 - current_gen[ii][jj]
+        current_gen[idx, idy] = 1 - current_gen[idx, idy]
         return current_gen
 
     def shuffle(self, old_gen):

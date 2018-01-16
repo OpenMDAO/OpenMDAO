@@ -146,7 +146,7 @@ class TestSimpleGA(unittest.TestCase):
         prob['area3'] = 0.0005
         prob.run_driver()
 
-        # Note, GA doesn't do so well with the contiunous vars, naturally, so we reduce the space
+        # Note, GA doesn't do so well with the continunous vars, naturally, so we reduce the space
         # as much as we can. Objective is stll rather random, but it is close. GA does a great job
         # of picking the correct values for the integer desvars though.
         self.assertLess(prob['mass'], 6.0)

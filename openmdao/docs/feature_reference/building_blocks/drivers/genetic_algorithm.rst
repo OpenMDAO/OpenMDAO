@@ -7,7 +7,7 @@ The SimpleGADriver is a driver based on a simple genetic algorithm implementatio
 notes for the class 2009 AAE550 taught by Prof. William A. Crossley. The implementation is pure Python.
 
 The SimpleGADriver supports integer design variables, but it is not limited to them. You can use a genetic
-algorithm with contiuous design variables, but they must be discretized before being encoded into a binary string.
+algorithm with continuous design variables, but they must be discretized before being encoded into a binary string.
 The SimpleGADriver will encode a continuous variable for you, but you must specify the number of bits for
 the discretization via the 'bits' option. This number is the base-2 logarithm of the number of points you
 want between the min and max value.  A higher value means more accuracy for this variable, but it also increases
