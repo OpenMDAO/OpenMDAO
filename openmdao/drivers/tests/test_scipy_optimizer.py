@@ -30,7 +30,10 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         of = ['comp.f_xy']
         wrt = ['p1.x', 'p2.y']
@@ -40,7 +43,10 @@ class TestScipyOptimizer(unittest.TestCase):
         assert_rel_error(self, derivs[0, 1], 8.0, 1e-6)
 
         prob.setup(check=False, mode='rev')
-        prob.run_model()
+
+        failed, rel_err, abs_err = prob.run_model()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         of = ['comp.f_xy']
         wrt = ['p1.x', 'p2.y']
@@ -64,7 +70,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('comp.y2')
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'],
                                                    return_format='array')
@@ -92,7 +101,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_objective('px.x')
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         # Support for a name to be in 'of' and 'wrt'
 
@@ -122,7 +134,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
@@ -147,7 +162,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
@@ -175,7 +193,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', upper=-15.0)
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -205,7 +226,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=15.0)
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -234,7 +258,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', equals=-15.0)
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         # Minimum should be at (7.166667, -7.833334)
         # (Note, loose tol because of appveyor py3.4 machine.)
@@ -266,7 +293,7 @@ class TestScipyOptimizer(unittest.TestCase):
         prob.setup(check=False)
 
         with self.assertRaises(Exception) as raises_cm:
-            prob.run_driver()
+            failed = prob.run_driver()
 
         exception = raises_cm.exception
 
@@ -297,7 +324,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=-11.0, upper=-10.0)
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['y'] - prob['x'], -11.0, 1e-6)
@@ -325,7 +355,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0)
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -354,7 +387,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', equals=0.0)
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         obj = prob['o']
         assert_rel_error(self, obj, 20.0, 1e-6)
@@ -381,7 +417,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('areas', equals=np.array([24.0, 21.0, 3.5, 17.5]))
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         obj = prob['o']
         assert_rel_error(self, obj, 41.5, 1e-6)
@@ -408,7 +447,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('areas', lower=np.array([24.0, 21.0, 3.5, 17.5]), upper=np.array([24.0, 21.0, 3.5, 17.5]))
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         con = prob['areas']
         assert_rel_error(self, con, np.array([[24.0, 21.0], [3.5, 17.5]]), 1e-6)
@@ -435,7 +477,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('areas', lower=20.0, upper=20.0)
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         obj = prob['o']
         assert_rel_error(self, obj, 20.0, 1e-6)
@@ -464,7 +509,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', equals=0.0)
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         obj = prob['o']
         assert_rel_error(self, obj, 20.0, 1e-6)
@@ -492,14 +540,18 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0)
 
         prob.setup(check=False, mode='fwd')
+
         failed = prob.run_driver()
+        print('failed:', failed)
+        print("prob['x']:", prob['x'])
+        print("prob['y']:", prob['y'])
+
+        # test fails if we add this, but I don't know how to fix the failedure, so
+        # I just put in a story to fix it.
+        self.assertFalse(failed, "Optimization FAILED.")
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
-
-        # test fails if we add this, but I don't know how to fix the failure, so
-        # I just put in a story to fix it.
-        # self.assertTrue(not failed, "Optimization FAILED.")
 
     def test_simple_paraboloid_scaled_desvars_rev(self):
 
@@ -524,7 +576,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0)
 
         prob.setup(check=False, mode='rev')
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -552,7 +607,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0, ref=10.)
 
         prob.setup(check=False, mode='fwd')
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -580,7 +638,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0)
 
         prob.setup(check=False, mode='fwd')
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -608,7 +669,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0)
 
         prob.setup(check=False, mode='rev')
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -630,7 +694,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('con2', upper=0.0)
 
         prob.setup(check=False, mode='rev')
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
@@ -691,7 +758,7 @@ class TestScipyOptimizer(unittest.TestCase):
         prob.setup()
 
         with self.assertRaises(KeyError) as context:
-            prob.run_driver()
+            failed = prob.run_driver()
 
         msg = 'Variable name pair ("Vd", "a") must first be declared.'
         self.assertTrue(msg in str(context.exception))
@@ -719,7 +786,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', upper=-15.0)
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -742,7 +812,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('con2', upper=0.0)
 
         prob.setup(check=False, mode='rev')
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
@@ -771,9 +844,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=15.0, linear=True)
 
         prob.setup(check=False)
-        fail = prob.run_driver()
 
-        self.assertTrue(not fail, "Optimization failed!")
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -804,9 +878,10 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', equals=-15.0, linear=True)
 
         prob.setup(check=False)
-        fail = prob.run_driver()
 
-        self.assertTrue(not fail, "Optimization failed!")
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -836,7 +911,10 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.setup()
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
@@ -861,7 +939,10 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
@@ -885,7 +966,10 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
@@ -909,7 +993,10 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed!")
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
