@@ -80,11 +80,11 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     # TODO: fix this to work in rev mode as well
 
     seen = set()
-    for group in prob.model.system_iter(recurse=True, include_self=True, typ=Group):
+    for group in prob.model.system_iter(recurse=True, include_self=True):
         jac = group._jacobian
         if jac not in seen:
             set_abs = jac._set_abs
-            # replace existing jacobian set_abs with ours that replaces all subjacs with random numbers
+            # replace jacobian set_abs with one that replaces all subjacs with random numbers
             jac._set_abs = lambda key, subjac: _wrapper_set_abs(jac, set_abs, key, subjac, tol)
             seen.add(jac)
 
@@ -114,13 +114,20 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     for i in range(repeats):
         J = prob.driver._compute_totals(return_format='array', of=of, wrt=wrt)
         if fullJ is None:
-            fullJ = np.zeros(J.shape, dtype=bool)
-            fullJ[J < -tol] = True
-            fullJ[J > tol] = True
+            fullJ = np.abs(J)
         else:
-            fullJ |= np.logical_and(J < -tol, J > tol)
+            fullJ += np.abs(J)
 
-    J = fullJ
+    # normalize the full J
+    J = fullJ / np.linalg.norm(fullJ)
+
+    boolJ = np.zeros(J.shape, dtype=bool)
+    boolJ[J > tol] = True
+
+    J = boolJ
+
+    from openmdao.utils.array_utils import array_viz
+    array_viz(J)
 
     # from openmdao.utils.array_utils import array_viz
     # with open("arr_viz", 'w') as f:
@@ -176,6 +183,8 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
             if col in seen:
                 continue
             seen.add(col)
+            # this actually modifies the contents of J[:, col], but that's ok because
+            # we don't revisit this column again.
             allrows[col] = J[:, col]
             full_disjoint[col] = [col]
             for other_col in colset:
@@ -196,8 +205,6 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
                     dct = total_res_offsets[res][dv][color]
                     dct[0].append(resoffset)
                     dct[1].append(dvoffset)
-
-    for res in total_res_offsets:
 
     prob.driver._simul_coloring_info = None
     prob.driver._res_jacs = {}
@@ -243,10 +250,17 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, stream=sys.stdout
         # over as a group.
         coloring = np.full(driver._designvars[dv]['size'], -1)
 
+        max_color = -1
         for color in dv_idxs[dv]:
             coloring[np.array(dv_idxs[dv][color], dtype=int)] = color
             all_colors.add(color)
+            if color > max_color:
+                max_color = color
 
+        neg_idxs = np.where(coloring == -1)[0]
+        single_colors = np.arange(max_color + 1, max_color + neg_idxs.size + 1)
+        coloring[neg_idxs] = single_colors
+        all_colors.update(single_colors)
         simul_colorings[dv] = list(coloring)
 
     simul_colorings = OrderedDict(sorted(simul_colorings.items()))
