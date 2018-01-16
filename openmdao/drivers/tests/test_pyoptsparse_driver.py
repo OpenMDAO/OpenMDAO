@@ -539,8 +539,8 @@ class TestPyoptSparse(unittest.TestCase):
 
         class ParaboloidApplyLinear(Paraboloid):
             def apply_linear(params, unknowns, resids):
-                raise Exception("OpenMDAO's finite difference has been called. pyopt_fd\
-                                \ option has faileded.")
+                raise Exception("OpenMDAO's finite difference has been called. "
+                                "pyopt_fd option has failed.")
 
         prob = Problem()
         model = prob.model = Group()
@@ -672,8 +672,6 @@ class TestPyoptSparse(unittest.TestCase):
 
         with self.assertRaises(Exception) as raises_cm:
             failed = prob.run_driver()
-
-        self.assertFalse(failed, "Optimization failed!")
 
         exception = raises_cm.exception
 
@@ -1136,10 +1134,13 @@ class TestPyoptSparse(unittest.TestCase):
                 indeps.add_output('z', np.array([5.0, 2.0]))
 
                 cycle = self.add_subsystem('cycle', Group(), promotes=['*'])
-                cycle.add_subsystem('d1', SellarDis1AE(), promotes_inputs=['x', 'z', 'y2'],
-                                          promotes_outputs=['y1'])
-                cycle.add_subsystem('d2', SellarDis2AE(), promotes_inputs=['z', 'y1'],
-                                          promotes_outputs=['y2'])
+
+                cycle.add_subsystem('d1', SellarDis1AE(),
+                                    promotes_inputs=['x', 'z', 'y2'],
+                                    promotes_outputs=['y1'])
+                cycle.add_subsystem('d2', SellarDis2AE(),
+                                    promotes_inputs=['z', 'y1'],
+                                    promotes_outputs=['y2'])
 
                 self.linear_solver = LinearBlockGS()
                 cycle.linear_solver = ScipyKrylov()
@@ -1187,7 +1188,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         self.assertEqual(model.cycle.d1.failed, 2)
 
-        # Checing that iprint stack gets routinely cleaned.
+        # Checking that iprint stack gets routinely cleaned.
         output = strout.getvalue().split('\n')
         self.assertEqual(output[-2], ('NL: NLBGS Converged'))
 
@@ -1269,9 +1270,7 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
 
         with self.assertRaises(Exception) as err:
-            failed = prob.run_driver()
-
-        self.assertFalse(failed, "Optimization failed!")
+            prob.run_driver()
 
         # pyopt's failure message differs by platform and is not informative anyway
 
@@ -1361,12 +1360,9 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
 
         with self.assertRaises(Exception) as err:
-            failed = prob.run_driver()
-
-        self.assertFalse(failed, "Optimization failed!")
+            prob.run_driver()
 
         # pyopt's failure message differs by platform and is not informative anyway
-        del prob
 
 
 class TestPyoptSparseFeature(unittest.TestCase):
@@ -1399,9 +1395,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='rev')
-        failed = prob.run_driver()
-
-        self.assertFalse(failed, "Optimization failed!")
+        prob.run_driver()
 
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
 
@@ -1428,9 +1422,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='rev')
-        failed = prob.run_driver()
-
-        self.assertFalse(failed, "Optimization failed!")
+        prob.run_driver()
 
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
 
@@ -1457,9 +1449,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='rev')
-        failed = prob.run_driver()
-
-        self.assertFalse(failed, "Optimization failed!")
+        prob.run_driver()
 
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
 
@@ -1486,9 +1476,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='rev')
-        failed = prob.run_driver()
-
-        self.assertFalse(failed, "Optimization failed!")
+        prob.run_driver()
 
         assert_rel_error(self, prob['z'][0], 1.98337708, 1e-3)
 
@@ -1516,9 +1504,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='rev')
-        failed = prob.run_driver()
-
-        self.assertFalse(failed, "Optimization failed!")
+        prob.run_driver()
 
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
 
@@ -1547,11 +1533,10 @@ class TestPyoptSparseFeature(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed = prob.run_driver()
-
-        self.assertFalse(failed, "Optimization failed!")
+        prob.run_driver()
 
         assert_rel_error(self, prob['z'][0], 1.9780247, 1e-3)
+
 
 if __name__ == "__main__":
     unittest.main()

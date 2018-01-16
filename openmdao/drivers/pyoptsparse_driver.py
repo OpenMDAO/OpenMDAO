@@ -387,8 +387,8 @@ class pyOptSparseDriver(Driver):
                 self.fail = True
 
         except KeyError:
-            # Nothing is here, so something bad happened!
-            self.fail = True
+            # optimizers other than pySNOPT may not populate this dict
+            pass
 
         return self.fail
 
