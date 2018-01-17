@@ -545,21 +545,15 @@ class TestScipyOptimizer(unittest.TestCase):
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
 
-        model.add_design_var('x', lower=-50.0, upper=50.0, ref=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0, ref=50.0)
+        model.add_design_var('x', lower=-50.0, upper=50.0, ref=.02)
+        model.add_design_var('y', lower=-50.0, upper=50.0, ref=.02)
         model.add_objective('f_xy')
         model.add_constraint('c', lower=10.0, upper=11.0)
 
         prob.setup(check=False, mode='fwd')
 
         failed = prob.run_driver()
-        print('failed:', failed)
-        print("prob['x']:", prob['x'])
-        print("prob['y']:", prob['y'])
-        print("prob['f_xy']:", prob['f_xy'])
 
-        # test fails if we add this, but I don't know how to fix the failure, so
-        # I just put in a story to fix it.
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
@@ -582,8 +576,8 @@ class TestScipyOptimizer(unittest.TestCase):
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
 
-        model.add_design_var('x', lower=-50.0, upper=50.0, ref=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0, ref=50.0)
+        model.add_design_var('x', lower=-50.0, upper=50.0, ref=.02)
+        model.add_design_var('y', lower=-50.0, upper=50.0, ref=.02)
         model.add_objective('f_xy')
         model.add_constraint('c', lower=10.0, upper=11.0)
 
