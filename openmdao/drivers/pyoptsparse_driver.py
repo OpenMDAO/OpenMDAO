@@ -31,9 +31,6 @@ grad_drivers = {'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
 multi_obj_drivers = {'NSGA2'}
 
 
-arr_viz_count = 0
-
-
 def _check_imports():
     """
     Dynamically remove optimizers we don't have.
@@ -517,12 +514,6 @@ class pyOptSparseDriver(Driver):
                         row, col, data = coo['coo']
                         coo['coo'][2] = arr[row, col].flatten()
                         sens_dict[name][dv] = coo
-
-                # from openmdao.utils.array_utils import array_viz, arr2bool
-                # global arr_viz_count
-                # with open("arr_viz_%d" % arr_viz_count, 'w') as f:
-                #     array_viz(arr2bool(self._dict2array_jac(sens_dict), tol=1e-15), stream=f)
-                #     arr_viz_count += 1
 
         except Exception as msg:
             tb = traceback.format_exc()

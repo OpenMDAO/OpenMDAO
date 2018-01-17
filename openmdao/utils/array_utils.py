@@ -92,28 +92,6 @@ def convert_neg(arr, dim):
     return arr
 
 
-def arr2bool(arr, tol=1e-50):
-    """
-    Convert an array into a bool array, with nonzero entries determined by tol.
-
-    Parameters
-    ----------
-    arr : ndarray
-        The array to be represented as a bool array.
-    tol : float
-        The tolerance used to determine when an entry is nonzero (True) or zero (False).
-
-    Returns
-    -------
-    ndarray
-        The boolean version of the given array.
-    """
-    a = np.zeros(arr.shape, dtype=float)
-    a[arr < -tol] = True
-    a[arr > tol] = True
-    return a
-
-
 def array_viz(arr, prob=None, of=None, wrt=None, stream=sys.stdout):
     """
     Display the structure of a boolean array in a compact form.

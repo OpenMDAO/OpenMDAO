@@ -126,11 +126,8 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     seen = set()
     for system in prob.model.system_iter(recurse=True, include_self=True):
         if system._jacobian not in seen:
+            # replace jacobian set_abs with one that replaces all subjacs with random numbers
             system._jacobian._set_abs = Randomizer(system._jacobian, tol)
-
-            # set_abs = jac._set_abs
-            # # replace jacobian set_abs with one that replaces all subjacs with random numbers
-            # jac._set_abs = lambda key, subjac: _wrapper_set_abs(jac, set_abs, key, subjac, tol)
             seen.add(system._jacobian)
 
     if prob._setup_status < 1:
@@ -171,7 +168,6 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
 
     # from openmdao.utils.array_utils import array_viz
     # with open("arr_viz", 'w') as f:
-    #     #array_viz(J, stream=f)
     #     array_viz(J, prob=prob, of=of, wrt=wrt, stream=f)
 
     # find column and row ranges (inclusive) for dvs and responses respectively
