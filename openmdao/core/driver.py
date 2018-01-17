@@ -874,7 +874,7 @@ class Driver(object):
                 print("Design Vars")
                 if desvar_vals:
                     for name, value in iteritems(desvar_vals):
-                        print("{}: {}".format(name, value))
+                        print("{}: {}".format(name, repr(value)))
                 else:
                     print("None")
                 print()
@@ -889,7 +889,7 @@ class Driver(object):
                 print("Nonlinear constraints")
                 if cons:
                     for name, value in iteritems(cons):
-                        print("{}: {}".format(name, value))
+                        print("{}: {}".format(name, repr(value)))
                 else:
                     print("None")
                 print()
@@ -900,7 +900,7 @@ class Driver(object):
                 print("Linear constraints")
                 if cons:
                     for name, value in iteritems(cons):
-                        print("{}: {}".format(name, value))
+                        print("{}: {}".format(name, repr(value)))
                 else:
                     print("None")
                 print()
@@ -911,7 +911,7 @@ class Driver(object):
                 print("Objectives")
                 if objs:
                     for name, value in iteritems(objs):
-                        print("{}: {}".format(name, value))
+                        print("{}: {}".format(name, repr(value)))
                 else:
                     print("None")
                 print()
