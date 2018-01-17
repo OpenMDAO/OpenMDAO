@@ -2114,7 +2114,6 @@ class System(object):
             Mapping of this response to each design variable where simultaneous derivs will
             be used.  Each design variable entry is another dict keyed on color, and the values
             in the color dict are tuples of the form (resp_idxs, color_idxs).
-
         """
         # Name must be a string
         if not isinstance(name, string_types):
@@ -2296,7 +2295,7 @@ class System(object):
         ref0 : float or ndarray, optional
             Value of response variable that scales to 0.0 in the driver.
         index : int, optional
-            If variable is an array, this indicates which entriy is of
+            If variable is an array, this indicates which entry is of
             interest for this particular response. This may be a positive
             or negative integer.
         adder : float or ndarray, optional
@@ -2533,9 +2532,9 @@ class System(object):
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
-                        The norm is surrounded by vertical bars to indicate that it is a norm.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format is affected
-                        by the values set with numpy.set_printoptions
+            by the values set with numpy.set_printoptions
             Default is False.
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
@@ -2588,43 +2587,32 @@ class System(object):
         ----------
         explicit : bool, optional
             include outputs from explicit components. Default is True.
-
         implicit : bool, optional
             include outputs from implicit components. Default is True.
-
         values : bool, optional
             When True, display/return output values. Default is True.
-
         residuals : bool, optional
             When True, display/return residual values. Default is False.
-
         residuals_tol : float, optional
             If set, limits the output of list_outputs to only variables where
             the norm of the resids array is greater than the given 'residuals_tol'.
             Default is None.
-
         units : bool, optional
             When True, display/return units. Default is False.
-
         shape : bool, optional
             When True, display/return the shape of the value. Default is False.
-
         bounds : bool, optional
             When True, display/return bounds (lower and upper). Default is False.
-
         scaling : bool, optional
             When True, display/return scaling (ref, ref0, and res_ref). Default is False.
-
         hierarchical : bool, optional
             When True, human readable output shows variables in hierarchical format.
-
         print_arrays : bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
-                        The norm is surrounded by vertical bars to indicate that it is a norm.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format  is affected
-                        by the values set with numpy.set_printoptions
+            by the values set with numpy.set_printoptions
             Default is False.
-
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
@@ -2698,27 +2686,21 @@ class System(object):
         ----------
         in_or_out : str, 'input' or 'output'
             indicates whether the values passed in are from inputs or output variables.
-
         comp_type : str, 'Explicit' or 'Implicit'
             the type of component with the output values.
-
         outputs : list
             list of (name, dict of vals and metadata) tuples.
-
         hierarchical : bool
             When True, human readable output shows variables in hierarchical format.
-
         print_arrays : bool
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
-                        The norm is surrounded by vertical bars to indicate that it is a norm.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format  is affected
-                        by the values set with numpy.set_printoptions
+            by the values set with numpy.set_printoptions
             Default is False.
-
         out_stream : 'stdout', 'stderr' or file-like
             Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
-
         """
         if out_stream is None:
             return
@@ -2910,9 +2892,9 @@ class System(object):
 
         print_arrays : bool
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
-                        The norm is surrounded by vertical bars to indicate that it is a norm.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format  is affected
-                        by the values set with numpy.set_printoptions
+            by the values set with numpy.set_printoptions
             Default is False.
 
         """

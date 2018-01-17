@@ -755,11 +755,9 @@ class TestRegularGridMap(unittest.TestCase):
         x, y, z = params
         outs = mapdata.output_data
         z = outs[0]
-        ivc.add_output('x', x[
-                       'default'], units=x['units'])
+        ivc.add_output('x', x['default'], units=x['units'])
         ivc.add_output('y', y['default'], units=y['units'])
-        ivc.add_output('z', z[
-                       'default'], units=z['units'])
+        ivc.add_output('z', z['default'], units=z['units'])
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
@@ -770,7 +768,7 @@ class TestRegularGridMap(unittest.TestCase):
 
         for out in outs:
             comp.add_output(out['name'], out['default'], out['values'])
-        
+
         model.add_subsystem('comp', comp, promotes=["*"])
         self.prob = Problem(model)
         self.prob.setup()
@@ -806,6 +804,19 @@ class TestRegularGridMap(unittest.TestCase):
         self.prob['y'] = 0.951
         self.prob['z'] = 2.5
         self.run_and_check_derivs(self.prob)
+
+    def test_raise_interp_error(self):
+        # muck with the grid to trigger an error in the interp call
+        self.prob.model.comp.interps['f'].grid = []
+
+        # verify that the error is raised by the meta model comp with
+        # information to help locate the error
+        with self.assertRaises(Exception) as context:
+            self.run_and_check_derivs(self.prob)
+        self.assertEqual(str(context.exception),
+                         "Error interpolating output 'f' in comp:\n"
+                         "The requested sample points xi have dimension 3, "
+                         "but this RegularGridInterp has dimension 0")
 
     def test_training_gradient(self):
         model = Group()
