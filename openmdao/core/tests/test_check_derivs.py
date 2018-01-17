@@ -6,12 +6,21 @@ from six import iteritems
 import numpy as np
 
 from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NonlinearRunOnce, \
-                         ImplicitComponent, NonlinearBlockGS
+                         ImplicitComponent, NonlinearBlockGS, LinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.logger_utils import TestLogger
+from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 from openmdao.test_suite.components.sellar import SellarDerivatives
+from openmdao.test_suite.groups.parallel_groups import FanOutGrouped
+
+if MPI:
+    from openmdao.api import PETScVector
+    vector_class = PETScVector
+else:
+    from openmdao.api import DefaultVector
+    vector_class = DefaultVector
 
 
 class ParaboloidTricky(ExplicitComponent):
@@ -1461,6 +1470,28 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[0.0, 1.0]], 1e-5)
         assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0, 1.0]], 1e-5)
 
+
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
+class TestProblemCheckTotalsMPI(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_fan_out(self):
+
+        prob = Problem()
+        prob.model = FanOutGrouped()
+        prob.model.linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
+
+        prob.model.add_design_var('iv.x')
+        prob.model.add_constraint('c2.y', upper=0.0)
+        prob.model.add_constraint('c3.y', upper=0.0)
+
+        prob.setup(vector_class=vector_class, check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        prob.check_totals()
 
 if __name__ == "__main__":
     unittest.main()
