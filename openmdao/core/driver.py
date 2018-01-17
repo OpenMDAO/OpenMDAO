@@ -553,7 +553,7 @@ class Driver(object):
             Failure flag; True if failed to converge, False is successful.
         """
         with Recording(self._get_name(), self.iter_count, self) as rec:
-            failure_flag = self._problem.model._solve_nonlinear()
+            failure_flag, _, _ = self._problem.model._solve_nonlinear()
 
         self.iter_count += 1
         return failure_flag

@@ -119,7 +119,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, info = " +
+                                 str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -161,7 +162,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['p1.x'], np.array([50., 7.16667, 50.]), 1e-6)
@@ -194,7 +196,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -226,7 +229,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -260,7 +264,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -292,7 +297,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -322,7 +328,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['y'] - prob['x'], -11.0, 1e-6)
@@ -351,7 +358,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -381,7 +389,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         obj = prob['o']
         assert_rel_error(self, obj, 20.0, 1e-6)
@@ -411,7 +420,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         obj = prob['o']
         assert_rel_error(self, obj, 20.0, 1e-6)
@@ -456,7 +466,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         obj = prob['obj.o']
         assert_rel_error(self, obj, 30.0, 1e-6)
@@ -496,7 +507,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, info = " +
+                                 str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -529,7 +541,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-4)
@@ -539,8 +552,8 @@ class TestPyoptSparse(unittest.TestCase):
 
         class ParaboloidApplyLinear(Paraboloid):
             def apply_linear(params, unknowns, resids):
-                raise Exception("OpenMDAO's finite difference has been called. "
-                                "pyopt_fd option has failed.")
+                raise Exception("OpenMDAO's finite difference has been called."
+                                " pyopt_fd option has failed.")
 
         prob = Problem()
         model = prob.model = Group()
@@ -568,7 +581,8 @@ class TestPyoptSparse(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, info = " +
+                                 str(prob.driver.pyopt_solution.optInform))
 
     def test_snopt_fd_solution(self):
 
@@ -600,7 +614,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -613,8 +628,8 @@ class TestPyoptSparse(unittest.TestCase):
 
         class ParaboloidApplyLinear(Paraboloid):
             def apply_linear(params, unknowns, resids):
-                raise Exception("OpenMDAO's finite difference has been called. snopt_fd\
-                                \ option has faileded.")
+                raise Exception("OpenMDAO's finite difference has been called."
+                                " snopt_fd option has failed.")
 
         prob = Problem()
         model = prob.model = Group()
@@ -642,7 +657,8 @@ class TestPyoptSparse(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, info = " +
+                                 str(prob.driver.pyopt_solution.optInform))
 
     def test_snopt_fd_option_error(self):
 
@@ -741,7 +757,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -773,7 +790,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -805,7 +823,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -836,7 +855,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -867,7 +887,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -899,7 +920,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -931,7 +953,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -962,7 +985,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -993,7 +1017,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -1024,7 +1049,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -1051,7 +1077,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
@@ -1076,7 +1103,7 @@ class TestPyoptSparse(unittest.TestCase):
 
                 self.failed_deriv = [2, 4]
                 self.count_iter = 0
-                self.faileded = 0
+                self.failed = 0
 
             def compute(self, inputs, outputs):
 
@@ -1091,7 +1118,7 @@ class TestPyoptSparse(unittest.TestCase):
 
                 self.count_iter += 1
                 if self.count_iter in self.failed_deriv:
-                    self.faileded += 1
+                    self.failed += 1
                     raise AnalysisError('Try again.')
 
                 partials['y1', 'y2'] = -0.2
@@ -1180,7 +1207,8 @@ class TestPyoptSparse(unittest.TestCase):
         finally:
             sys.stdout = stdout
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
@@ -1223,7 +1251,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -1308,7 +1337,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False)
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed with exit status: %d" %
+                                 prob.driver.pyopt_solution.optInform['value'])
 
         # SLSQP does a bad job recovering from gradient failures
         if OPTIMIZER == 'SLSQP':

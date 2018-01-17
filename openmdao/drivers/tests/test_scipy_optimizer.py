@@ -33,7 +33,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed.")
 
         of = ['comp.f_xy']
         wrt = ['p1.x', 'p2.y']
@@ -46,7 +46,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed, rel_err, abs_err = prob.run_model()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed.")
 
         of = ['comp.f_xy']
         wrt = ['p1.x', 'p2.y']
@@ -73,18 +73,19 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed.")
 
         derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'],
-                                                   return_format='array')
+                                             return_format='array')
 
         J = comp.JJ[0:3, 0:2]
         assert_rel_error(self, J, derivs, 1.0e-3)
 
         # Support for a name to be in 'of' and 'wrt'
 
-        derivs = prob.driver._compute_totals(of=['comp.y2', 'px.x', 'comp.y1'], wrt=['px.x'],
-                                                   return_format='array')
+        derivs = prob.driver._compute_totals(of=['comp.y2', 'px.x', 'comp.y1'],
+                                             wrt=['px.x'],
+                                             return_format='array')
 
         assert_rel_error(self, J, derivs[3:, :], 1.0e-3)
         assert_rel_error(self, comp.JJ[3:4, 0:2], derivs[0:1, :], 1.0e-3)
@@ -104,12 +105,12 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed.")
 
         # Support for a name to be in 'of' and 'wrt'
 
         J = prob.driver._compute_totals(of=['px.x'], wrt=['px.x'],
-                                                   return_format='array')
+                                        return_format='array')
 
         assert_rel_error(self, J, np.eye(2), 1.0e-3)
 
@@ -137,7 +138,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
@@ -165,7 +167,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
@@ -196,7 +199,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -229,7 +233,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -261,7 +266,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         # (Note, loose tol because of appveyor py3.4 machine.)
@@ -327,7 +333,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['y'] - prob['x'], -11.0, 1e-6)
@@ -358,7 +365,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -390,7 +398,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         obj = prob['o']
         assert_rel_error(self, obj, 20.0, 1e-6)
@@ -420,7 +429,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         obj = prob['o']
         assert_rel_error(self, obj, 41.5, 1e-6)
@@ -450,7 +460,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         con = prob['areas']
         assert_rel_error(self, con, np.array([[24.0, 21.0], [3.5, 17.5]]), 1e-6)
@@ -480,7 +491,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         obj = prob['o']
         assert_rel_error(self, obj, 20.0, 1e-6)
@@ -512,7 +524,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         obj = prob['o']
         assert_rel_error(self, obj, 20.0, 1e-6)
@@ -545,10 +558,12 @@ class TestScipyOptimizer(unittest.TestCase):
         print('failed:', failed)
         print("prob['x']:", prob['x'])
         print("prob['y']:", prob['y'])
+        print("prob['f_xy']:", prob['f_xy'])
 
-        # test fails if we add this, but I don't know how to fix the failedure, so
+        # test fails if we add this, but I don't know how to fix the failure, so
         # I just put in a story to fix it.
-        self.assertFalse(failed, "Optimization FAILED.")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -579,7 +594,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -610,7 +626,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -641,7 +658,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -672,7 +690,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
@@ -697,7 +716,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
@@ -789,7 +809,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -815,7 +836,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
@@ -847,7 +869,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -881,7 +904,8 @@ class TestScipyOptimizer(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -914,7 +938,8 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
@@ -942,7 +967,8 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
@@ -969,7 +995,8 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
@@ -996,7 +1023,8 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed!")
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
