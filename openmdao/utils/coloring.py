@@ -133,7 +133,8 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
             # jac._set_abs = lambda key, subjac: _wrapper_set_abs(jac, set_abs, key, subjac, tol)
             seen.add(system._jacobian)
 
-    prob.setup(mode=mode)
+    if prob._setup_status < 1:
+        prob.setup(mode=mode)
 
     prob.run_model()
 
