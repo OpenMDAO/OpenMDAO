@@ -925,21 +925,6 @@ class RecordingDebugging(Recording):
     debugging printing.
     """
 
-    def __init__(self, name, iter_count, recording_requester):
-        """
-        Initialize RecordingDebugging.
-
-        Parameters
-        ----------
-        name : str
-            Name of object getting recorded.
-        iter_count : int
-            Current counter of iterations completed.
-        recording_requester : object
-            The object that wants to be recorded.
-        """
-        super(RecordingDebugging, self).__init__(name, iter_count, recording_requester)
-
     def __enter__(self):
         """
         Do things before the code inside the 'with RecordingDebugging' block.
