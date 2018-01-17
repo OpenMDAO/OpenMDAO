@@ -763,8 +763,10 @@ class Driver(object):
 
         Parameters
         ----------
-        simul_info : ({dv1: colors, ...}, {resp1: {dv1: {0: [res_idxs, dv_idxs]} ...} ...})
-            Information about simultaneous coloring for design vars and responses.
+        simul_info : str or ({dv1: colors, ...}, {resp1: {dv1: {0: [res_idxs, dv_idxs]} ...} ...})
+            Information about simultaneous coloring for design vars and responses.  If a string,
+            then simul_info is assumed to be the name of a file that contains the coloring
+            information in JSON format.
         """
         if self.supports['simultaneous_derivatives']:
             self._simul_coloring_info = simul_info
@@ -811,6 +813,3 @@ class Driver(object):
                     del dvdict[dv]
                     dv = prom2abs[dv][0]
                 dvdict[dv] = col_dict
-
-                # if not self._designvars[dv]['simul_deriv_color']:
-                #     del dvdict[dv]

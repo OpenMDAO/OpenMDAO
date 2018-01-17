@@ -260,4 +260,5 @@ class SimulColoringTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
 
 if __name__ == '__main__':
-    unittest.main()
+    #unittest.main()
+    run_opt()

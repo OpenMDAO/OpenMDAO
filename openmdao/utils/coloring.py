@@ -30,12 +30,45 @@ def _find_var_from_range(idx, ranges):
 
 
 class Randomizer(object):
+    """
+    A replacement for Jacobian._set_abs that replaces subjac with random numbers.
+
+    Attributes
+    ----------
+    _orig_set_abs : bound function
+        Original _set_abs function for the given Jacobian.
+    _jac : Jacobian
+        The jacobian having its _set_abs replaced.
+    _tol : float
+        Tolerance used to shift random numbers away from 0.
+    """
+
     def __init__(self, jac, tol):
+        """
+        Initialize the function replacement.
+
+        Parameters
+        ----------
+        jac : Jacobian
+            The Jacobian having its _set_abs method replaced.
+        tol : float
+            Values between -tol and tol will be shifted away from 0.
+        """
         self._orig_set_abs = jac._set_abs
         self._jac = jac
         self._tol = tol
 
     def __call__(self, key, subjac):
+        """
+        Call this function replacement.
+
+        Parameters
+        ----------
+        key : (str, str)
+            Tuple of (response_name, dv_name)
+        subjac : array-like
+            Value of the subjacobian being assigned to key.
+        """
         jac = self._jac
         tol = self._tol
 
@@ -46,26 +79,14 @@ class Randomizer(object):
             rows = None
 
         if rows is not None:  # list form
-            spread = np.max(subjac) - np.min(subjac)
-            if spread < .01:
-                spread = 1.0
-            subjac = data = rand(rows.size) * spread - spread / 2.0
+            subjac = rand(rows.size) + 1.0
         elif isinstance(subjac, sparse_types):  # sparse
-            spread = np.max(subjac.data) - np.min(subjac.data)
-            if spread < .01:
-                spread = 1.0
             subjac = subjac.copy()
-            subjac.data = data = rand(subjac.data.size) * spread - spread / 2.0
+            subjac.data = rand(subjac.data.size) + 1.0
         else:   # dense
-            spread = np.max(subjac) - np.min(subjac)
-            if spread < .01:
-                spread = 1.0
-            subjac = data = rand(*(subjac.shape)) * spread - spread / 2.0
+            subjac = rand(*(subjac.shape)) + 1.0
 
-        data[data < tol] += spread
-        data[data > -tol] -= spread
-
-        return self._orig_set_abs(key, subjac)
+        self._orig_set_abs(key, subjac)
 
 
 def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
@@ -102,8 +123,6 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
         if 'simul_map' in meta:
             del meta['simul_map']
 
-    prob.setup(mode=mode)
-
     seen = set()
     for system in prob.model.system_iter(recurse=True, include_self=True):
         if system._jacobian not in seen:
@@ -113,6 +132,8 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
             # # replace jacobian set_abs with one that replaces all subjacs with random numbers
             # jac._set_abs = lambda key, subjac: _wrapper_set_abs(jac, set_abs, key, subjac, tol)
             seen.add(system._jacobian)
+
+    prob.setup(mode=mode)
 
     prob.run_model()
 
@@ -268,17 +289,10 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, stream=sys.stdout
         # over as a group.
         coloring = np.full(driver._designvars[dv]['size'], -1)
 
-        max_color = -1
         for color in dv_idxs[dv]:
             coloring[np.array(dv_idxs[dv][color], dtype=int)] = color
             all_colors.add(color)
-            if color > max_color:
-                max_color = color
 
-        neg_idxs = np.where(coloring == -1)[0]
-        single_colors = np.arange(max_color + 1, max_color + neg_idxs.size + 1)
-        coloring[neg_idxs] = single_colors
-        all_colors.update(single_colors)
         simul_colorings[dv] = list(coloring)
 
     simul_colorings = OrderedDict(sorted(simul_colorings.items()))
@@ -297,36 +311,53 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, stream=sys.stdout
     simul_maps = OrderedDict(sorted(simul_maps.items()))
 
     if stream is not None:
-        s = json.dumps((simul_colorings, simul_maps))
+        if stream.isatty():
+            stream.write("\n({\n")
+            for n, coloring in iteritems(simul_colorings):
+                stream.write("   '%s': %s,\n" % (n, coloring))
+            stream.write("},")
 
-        # do a little pretty printing since the built-in json pretty printing stretches
-        # the output vertically WAY too much.
-        s = s.replace(',"', ',\n"')
-        s = s.replace(', "', ',\n"')
-        s = s.replace('{"', '{\n"')
-        s = s.replace(', {', ',\n{')
-        s = s.replace(']}', ']\n}')
-        s = s.replace('}}', '}\n}')
-        s = s.replace('[{', '[\n{')
-        s = s.replace(' {', '\n{')
+            stream.write("\n{\n")
+            for res, dvdict in iteritems(simul_maps):
+                stream.write("   '%s': {\n" % res)
+                for dv, coldict in iteritems(dvdict):
+                    stream.write("      '%s': {\n" % dv)
+                    for color, idxs in iteritems(coldict):
+                        stream.write("         %s: %s,\n" % (color, idxs))
+                    stream.write("      },\n")
+                stream.write("   },\n")
+            stream.write("})")
+        else:  # output json format to a file
+            s = json.dumps((simul_colorings, simul_maps))
 
-        lines = []
-        indent = 0
-        for line in s.split('\n'):
-            start = line[0] if len(line) > 0 else ''
-            if start in ('{', '['):
-                tab = ' ' * indent
-                indent += 3
-            elif start in ('}', ']'):
-                indent -= 3
-                tab = ' ' * indent
-            else:
-                tab = ' ' * indent
+            # do a little pretty printing since the built-in json pretty printing stretches
+            # the output vertically WAY too much.
+            s = s.replace(',"', ',\n"')
+            s = s.replace(', "', ',\n"')
+            s = s.replace('{"', '{\n"')
+            s = s.replace(', {', ',\n{')
+            s = s.replace(']}', ']\n}')
+            s = s.replace('}}', '}\n}')
+            s = s.replace('[{', '[\n{')
+            s = s.replace(' {', '\n{')
 
-            lines.append("%s%s" % (tab, line))
+            lines = []
+            indent = 0
+            for line in s.split('\n'):
+                start = line[0] if len(line) > 0 else ''
+                if start in ('{', '['):
+                    tab = ' ' * indent
+                    indent += 3
+                elif start in ('}', ']'):
+                    indent -= 3
+                    tab = ' ' * indent
+                else:
+                    tab = ' ' * indent
 
-        stream.write('\n'.join(lines))
-        stream.write("\n")
+                lines.append("%s%s" % (tab, line))
+
+            stream.write('\n'.join(lines))
+            stream.write("\n")
 
     return simul_colorings, simul_maps
 

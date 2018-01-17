@@ -1359,11 +1359,16 @@ class Problem(object):
 
                 def idx_iter():
                     for c in colors:
-                        nzs = np.nonzero(simul_coloring == c)[0]
-                        if nzs.size == 1:
-                            yield (c, nzs[0])
+                        # iterate over negative colors individually
+                        if c < 0:
+                            for i in np.nonzero(simul_coloring == c)[0]:
+                                yield (c, i)
                         else:
-                            yield (c, nzs)
+                            nzs = np.nonzero(simul_coloring == c)[0]
+                            if nzs.size == 1:
+                                yield (c, nzs[0])
+                            else:
+                                yield (c, nzs)
                 idx_iter = idx_iter()
             else:
                 loc_idx_dict = defaultdict(lambda: -1)
