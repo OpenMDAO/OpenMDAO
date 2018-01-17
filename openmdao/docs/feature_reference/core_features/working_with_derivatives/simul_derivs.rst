@@ -220,7 +220,19 @@ The coloring will be written in json format to the given file and can be loaded 
 
 If you run *openmdao simul_coloring* and it turns out there is no simultaneous coloring available,
 don't be surprised.  Problems that have the necessary total jacobian sparsity to allow
-simultaneous derivatives are relatively uncommon.
+simultaneous derivatives are relatively uncommon.  If you think that your total jacobian is sparse
+enough that openmdao should be computing a smaller coloring than it gave you, then you can run
+the coloring algorigthm with a tolerance so that very small entries in the jacobian will be treated
+as zeros.  You can set this tolerance using the *-t* command line option as follows:
+
+
+.. code-block:: none
+
+    openmdao simul_coloring <your_script_name> -o my_coloring.json -t 1e-15
+
+
+Be careful when setting the tolerance however, because if you make it too large then you will be
+zeroing out jacobian entries that should not be ignored and your optimization may not converge.
 
 
 Checking that it works

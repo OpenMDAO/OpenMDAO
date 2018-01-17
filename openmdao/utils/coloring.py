@@ -418,11 +418,11 @@ def _simul_coloring_setup_parser(parser):
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-o', action='store', dest='outfile', help='output file.')
+    parser.add_argument('-o', action='store', dest='outfile', help='output file (json format)')
     parser.add_argument('-n', action='store', dest='num_jacs', default=1, type=int,
-                        help='number of times to repeat total deriv computation.')
+                        help='number of times to repeat total derivative computation')
     parser.add_argument('-t', action='store', dest='tolerance', default=1.e-30, type=float,
-                        help='tolerance used to determine if an array entry is nonzero.')
+                        help='tolerance used to determine if a total jacobian entry is nonzero')
 
 
 def _simul_coloring_cmd(options):
