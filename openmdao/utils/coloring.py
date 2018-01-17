@@ -29,29 +29,43 @@ def _find_var_from_range(idx, ranges):
             return name, idx - start
 
 
-def _wrapper_set_abs(jac, set_abs, key, subjac, tol):
-    info, shape = jac._subjacs_info[key]
-    if info['rows'] is not None:  # list form
-        spread = np.max(subjac) - np.min(subjac)
-        if spread < .01:
-            spread = 1.0
-        subjac = data = rand(info['rows'].size) * spread - spread / 2.0
-    elif isinstance(info['value'], sparse_types):  # sparse
-        spread = np.max(subjac.data) - np.min(subjac.data)
-        if spread < .01:
-            spread = 1.0
-        subjac = subjac.copy()
-        subjac.data = data = rand(subjac.data.size) * spread - spread / 2.0
-    else:   # dense
-        spread = np.max(subjac) - np.min(subjac)
-        if spread < .01:
-            spread = 1.0
-        subjac = data = rand(*(subjac.shape)) * spread - spread / 2.0
+class Randomizer(object):
+    def __init__(self, jac, tol):
+        self._orig_set_abs = jac._set_abs
+        self._jac = jac
+        self._tol = tol
 
-    data[data < tol] += spread
-    data[data > -tol] -= spread
+    def __call__(self, key, subjac):
+        jac = self._jac
+        tol = self._tol
 
-    return set_abs(key, subjac)
+        if key in jac._subjacs_info:
+            info, shape = jac._subjacs_info[key]
+            rows = info['rows']
+        else:
+            rows = None
+
+        if rows is not None:  # list form
+            spread = np.max(subjac) - np.min(subjac)
+            if spread < .01:
+                spread = 1.0
+            subjac = data = rand(rows.size) * spread - spread / 2.0
+        elif isinstance(subjac, sparse_types):  # sparse
+            spread = np.max(subjac.data) - np.min(subjac.data)
+            if spread < .01:
+                spread = 1.0
+            subjac = subjac.copy()
+            subjac.data = data = rand(subjac.data.size) * spread - spread / 2.0
+        else:   # dense
+            spread = np.max(subjac) - np.min(subjac)
+            if spread < .01:
+                spread = 1.0
+            subjac = data = rand(*(subjac.shape)) * spread - spread / 2.0
+
+        data[data < tol] += spread
+        data[data > -tol] -= spread
+
+        return self._orig_set_abs(key, subjac)
 
 
 def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
@@ -75,24 +89,24 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     tuple
         Tuple of dicts total_dv_offsets and total_res_offsets.
     """
-    from openmdao.core.group import Group
-
     # TODO: fix this to work in rev mode as well
-
-    seen = set()
-    for group in prob.model.system_iter(recurse=True, include_self=True):
-        jac = group._jacobian
-        if jac not in seen:
-            set_abs = jac._set_abs
-            # replace jacobian set_abs with one that replaces all subjacs with random numbers
-            jac._set_abs = lambda key, subjac: _wrapper_set_abs(jac, set_abs, key, subjac, tol)
-            seen.add(jac)
 
     # clear out any old simul coloring info
     prob.driver._simul_coloring_info = None
     prob.driver._res_jacs = {}
 
     prob.setup(mode=mode)
+
+    seen = set()
+    for system in prob.model.system_iter(recurse=True, include_self=True):
+        if system._jacobian not in seen:
+            system._jacobian._set_abs = Randomizer(system._jacobian, tol)
+
+            # set_abs = jac._set_abs
+            # # replace jacobian set_abs with one that replaces all subjacs with random numbers
+            # jac._set_abs = lambda key, subjac: _wrapper_set_abs(jac, set_abs, key, subjac, tol)
+            seen.add(system._jacobian)
+
     prob.run_model()
 
     desvars = prob.driver._designvars
@@ -372,7 +386,7 @@ def _simul_coloring_setup_parser(parser):
     parser.add_argument('-o', action='store', dest='outfile', help='output file.')
     parser.add_argument('-n', action='store', dest='num_jacs', default=1, type=int,
                         help='number of times to repeat total deriv computation.')
-    parser.add_argument('-t', action='store', dest='tolerance', default=1.e-15, type=float,
+    parser.add_argument('-t', action='store', dest='tolerance', default=1.e-30, type=float,
                         help='tolerance used to determine if an array entry is nonzero.')
 
 
