@@ -7,10 +7,10 @@ import sys
 import json
 
 from collections import OrderedDict, defaultdict
-from itertools import combinations
+from itertools import combinations, chain
 from numbers import Integral
 
-from six import iteritems
+from six import iteritems, itervalues
 from six.moves import range
 
 import numpy as np
@@ -94,6 +94,13 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     # clear out any old simul coloring info
     prob.driver._simul_coloring_info = None
     prob.driver._res_jacs = {}
+
+    # remove any existing coloring metadata from dvs and responses
+    for meta in chain(itervalues(prob.driver._designvars), itervalues(prob.driver._responses)):
+        if 'simul_coloring' in meta:
+            del meta['simul_coloring']
+        if 'simul_map' in meta:
+            del meta['simul_map']
 
     prob.setup(mode=mode)
 

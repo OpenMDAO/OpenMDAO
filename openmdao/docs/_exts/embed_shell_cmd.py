@@ -92,9 +92,10 @@ class EmbedShellCmdDirective(Directive):
     has_content = False
 
     option_spec = {
-        'cmd': unchanged,
-        'dir': unchanged,
-        'show_cmd': unchanged
+        'cmd': unchanged,        # shell command to execute
+        'dir': unchanged,        # working dir
+        'show_cmd': unchanged,   # set this to make the shell command visible
+        'stderr': unchanged      # set this to include stderr contents with the output
     }
 
     def run(self):
@@ -115,10 +116,15 @@ class EmbedShellCmdDirective(Directive):
         else:
             workdir = os.getcwd()
 
+        if 'stderr' in self.options:
+            stderr = subprocess.STDOUT
+        else:
+            stderr = None
+
         os.chdir(workdir)
 
         try:
-            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode('utf-8', 'ignore')
+            output = subprocess.check_output(cmd, stderr=stderr).decode('utf-8', 'ignore')
         except subprocess.CalledProcessError as err:
             raise SphinxError("Running of embedded shell command '{}' in docs failed. "
                               "Output was: \n{}".format(cmdstr, err.output.decode('utf-8')))
