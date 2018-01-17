@@ -67,6 +67,7 @@ try:
 except ImportError:
     pass
 from openmdao.drivers.scipy_optimizer import ScipyOptimizer
+from openmdao.drivers.genetic_algorithm_driver import SimpleGADriver
 
 # System-Building Tools
 from openmdao.utils.options_dictionary import OptionsDictionary
