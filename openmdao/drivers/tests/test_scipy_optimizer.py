@@ -336,7 +336,6 @@ class TestScipyOptimizer(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['y'] - prob['x'], -11.0, 1e-6)
 
     def test_simple_paraboloid_double_sided_high(self):
@@ -368,7 +367,6 @@ class TestScipyOptimizer(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_array_comp2D(self):
@@ -565,7 +563,6 @@ class TestScipyOptimizer(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_desvars_rev(self):
@@ -597,7 +594,6 @@ class TestScipyOptimizer(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_constraint_fwd(self):
@@ -629,7 +625,6 @@ class TestScipyOptimizer(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_objective_fwd(self):
@@ -661,7 +656,6 @@ class TestScipyOptimizer(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_objective_rev(self):
@@ -693,7 +687,6 @@ class TestScipyOptimizer(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_sellar_mdf(self):
