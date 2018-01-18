@@ -289,7 +289,8 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, stream=sys.stdout
             coloring[np.array(dv_idxs[dv][color], dtype=int)] = color
             all_colors.add(color)
 
-        simul_colorings[dv] = list(coloring)
+        if np.any(coloring != -1):
+            simul_colorings[dv] = list(coloring)
 
     simul_colorings = OrderedDict(sorted(simul_colorings.items()))
 
@@ -376,10 +377,20 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
     desvars = problem.driver._designvars
     responses = problem.driver._responses
 
-    stream.write("\n\nColoring Summary\n")
-
     tot_colors = 0
     tot_size = 0
+
+    dvwid = np.max([len(dv) for dv in desvars])
+    dvtitle = "Variable"
+
+    if len(dvtitle) > dvwid:
+        dvwid = len(dvtitle)
+
+    template = "{:<{w0}s}  {:>6d}  {:>6d}\n"
+
+    stream.write("\n\n{:^{w0}s}  {:>6}  {:>6}\n".format(dvtitle, "Size", "Colors", w0=dvwid))
+    stream.write("{:^{w0}s}  {:>6}  {:>6}\n".format('-'*dvwid, "----", "------", w0=dvwid))
+
     if problem._mode == 'fwd':
         for dv in desvars:
             if dv in simul_colorings:
@@ -392,7 +403,8 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
             else:
                 ncolors = desvars[dv]['size']
 
-            stream.write("%s num colors: %d   size: %d\n" % (dv, ncolors, desvars[dv]['size']))
+            size = desvars[dv]['size']
+            stream.write(template.format(dv, size, ncolors, w0=dvwid))
             tot_colors += ncolors
             tot_size += desvars[dv]['size']
     else:  # rev
@@ -401,7 +413,8 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
     if not simul_colorings:
         stream.write("No simultaneous derivative solves are possible in this configuration.\n")
     else:
-        stream.write("Total colors vs. total size: %d vs %d\n" % (tot_colors, tot_size))
+        stream.write("\nTotal colors vs. total size: %d vs %d  (%.1f%% improvement)\n" %
+                     (tot_colors, tot_size, ((tot_size - tot_colors) / tot_size * 100)))
 
 
 def _simul_coloring_setup_parser(parser):

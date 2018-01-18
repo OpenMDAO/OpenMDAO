@@ -96,10 +96,10 @@ look like this:
                 # dictionary for our design variable x
                 'x': {
                     # first color: (rows of y, columns of x)
-                    0: ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8]),
+                    0: [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8]],
 
                     # second color: (rows of y, columns of x)
-                    1: ([0, 1, 2, 3, 4], [1, 3, 5, 7, 9])
+                    1: [[0, 1, 2, 3, 4], [1, 3, 5, 7, 9]]
                 }
             }
         }
