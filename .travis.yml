@@ -15,7 +15,7 @@ language: generic
 env:
   global:
     #set the SNOPT_LOCATION env variable in a secure manner.
-    - secure: GSek1lxjYTigwi/76x4HdEoSsyota7Vv+fOeJcf88QM3MTioiBwLC5SFzzIVN8Semv4vb7CbMXnjpbYn6FTb5S4evM5zS/Cl1ia9LXGW4zHOFAMxqhx5fcVTc6rfYwzH62fHenAAsLFqF09TPwno6yRTgNQzT6k7U92MGaX2Tx/uL/jEvd5/MMM8+TqFrTwJKo+Cv7EX7Z03UH3+Df2/q6VKvKx/cRWw2vyO9FkMbMXdZGM11Z5R0UFubPzQhtgTPu3mZIgkl92pmHPkH2Qtnat5WkKzRVN2Zx2bXzjDDMOEPdBIY9sFoQpXkl5TmLYZMVFtkEpBMeoplh4Gg3VePK+mVF9x+C+u3mAVUu3HijuJonjwsMAHvoZjkSxo3jtjW4Zr3t43a/JoQf7nYAJAJhkswSKgrzhN6C7VVfoUx5nmgAdSDX/hXJYdAm1BbMTrzoiogAorOFBm3PjEgnQhIopA84rmDcYeIr4K/mq4UlQuViD5wH4g2FI3EX5xYHVfzSowNnhj+HCNW/iDtjMm1gb0tjrybl+EOuE8921H8ed5WemHPpvFYoJQx6MMHIGmmjX8rohxs1GOOCz5VhZhVao/5+amo5AwVWRHxW33AQkmuXG2XsIWd60sblI+A7Ns/JV+pB3I+esTFiFQUIpT7wOEe/KrCm/Md3MZUUA9gAg=
+    - secure: ppg4MtT1xhVihl4r7U8uB9s7fGrM9BKbcQyq/lyp5sSnZyjpI1ouNB1WErq0HGEt1FNI/81mXtWfJ8D+nMLxbzGv3zJzHh9vzVFQ8a/O5R7YiTMWBcpzN5+UQVGRS4h8SiKBQgeHPn2voeVF1ZqTiotLb7zZL48RhR2GUiRL08oE9PoxU6HZifcsczrZs/3Aoat7fbUyCQe3Uskgl38qyrJNZlDSQzdiN5/eLxvPhy0Uhp3v1v3WeyJ7AaK+zYGV7vf20Vbt2OqEZvSWkMhBNrgkT7FUba30+0PKRNP0/qCNmOZbvTfOEhPNUgJCYUjQ32elBUWvR7d0fGB4dZLhQ9XTMaN4dDRxLHA70HaFaXXFf4YqiNUZMXVoMl51l/otSZo83xptypMlQB0Zh+tZwKpPbtsVo+xaGsqfTUyTgs6S5QBL8Mxkda1dGXq0G4xMMPbQg20+FVR/GmouLMvSRHHk6xE7vHtJ6pB5TwwyiQ7WshjtdfU3h8njYMtBpOG/MqxkhBWZ+8OsAKJzbM5X8QuN6X1oQISJu1VfharwTqSVPrAChxNkhAYY0r6IkgslL5o7FNlnfChOxepF9nc8JAHf+mFPWHjakZqHUJGJ2tQc+cMuazfoiRnbOxSIPNJ7C5rBTi5zT94n3s2UEVUxyintnmi+tvyi8tJ5aCo+/JI=
 
   matrix:
     - PY=2.7 MPI=1
@@ -89,11 +89,13 @@ install:
 - wget https://bitbucket.org/mdolab/pyoptsparse/get/tip.zip;
 - unzip tip.zip;
 - cd mdolab-pyoptsparse*;
-# get SNOPT source, securely
-- cd pyoptsparse/pySNOPT/source;
-- scp -r "$SNOPT_LOCATION" .;
+# get SNOPT source, securely, if SNOPT_LOCATION is set.
+- if ["$SNOPT_LOCATION"]; then
+    cd pyoptsparse/pySNOPT/source;
+    scp -r "$SNOPT_LOCATION" .;
+    cd ../../..;
+  fi
 # return to building pyoptsparse
-- cd ../../..;
 - python setup.py install;
 - cd ..;
 
