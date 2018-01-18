@@ -88,7 +88,8 @@ setup(
         'redbaron',
         'mock',
         'requests_mock',
-        'tornado'
+        'tornado',
+        'pyDOE'
     ],
     # scripts=['bin/om-pylint.sh']
     entry_points="""
