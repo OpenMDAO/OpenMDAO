@@ -86,14 +86,13 @@ install:
 - pip install --upgrade pip
 
 # install pyoptsparse
-- wget https://bitbucket.org/mdolab/pyoptsparse/get/tip.zip;
-- unzip tip.zip;
-- cd mdolab-pyoptsparse*;
+- git clone https://github.com/mdolab/pyoptsparse.git;
+- cd pyoptsparse;
 # get SNOPT source, securely, if SNOPT_LOCATION is set.
 - if ["$SNOPT_LOCATION"]; then
-    cd pyoptsparse/pySNOPT/source;
+    cd pySNOPT/source;
     scp -r "$SNOPT_LOCATION" .;
-    cd ../../..;
+    cd ../..;
   fi
 # return to building pyoptsparse
 - python setup.py install;
