@@ -29,7 +29,7 @@ def _find_var_from_range(idx, ranges):
             return name, idx - start
 
 
-class Randomizer(object):
+class _SubjacRandomizer(object):
     """
     A replacement for Jacobian._set_abs that replaces subjac with random numbers.
 
@@ -119,19 +119,18 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     # remove any existing coloring metadata from dvs and responses
     for meta in chain(itervalues(prob.driver._designvars), itervalues(prob.driver._responses)):
         if 'simul_coloring' in meta:
-            del meta['simul_coloring']
+            meta['simul_coloring'] = None
         if 'simul_map' in meta:
-            del meta['simul_map']
+            meta['simul_map'] = None
+
+    prob.setup(mode=mode)
 
     seen = set()
     for system in prob.model.system_iter(recurse=True, include_self=True):
         if system._jacobian not in seen:
             # replace jacobian set_abs with one that replaces all subjacs with random numbers
-            system._jacobian._set_abs = Randomizer(system._jacobian, tol)
+            system._jacobian._set_abs = _SubjacRandomizer(system._jacobian, tol)
             seen.add(system._jacobian)
-
-    if prob._setup_status < 1:
-        prob.setup(mode=mode)
 
     prob.run_model()
 

@@ -96,6 +96,10 @@ def array_viz(arr, prob=None, of=None, wrt=None, stream=sys.stdout):
     """
     Display the structure of a boolean array in a compact form.
 
+    If prob, of, and wrt are supplied, print the name of the response alongside
+    each row and print the names of the design vars, aligned with each column, at
+    the bottom.
+
     Parameters
     ----------
     arr : ndarray
