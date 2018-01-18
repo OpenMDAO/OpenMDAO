@@ -90,9 +90,9 @@ install:
 - cd pyoptsparse;
 # get SNOPT source, securely, if SNOPT_LOCATION is set.
 - if [ "$SNOPT_LOCATION" ]; then
-    cd pySNOPT/source;
+    cd pyoptsparse/pySNOPT/source;
     scp -r "$SNOPT_LOCATION" .;
-    cd ../..;
+    cd ../../..;
   fi
 # return to building pyoptsparse
 - python setup.py install;
