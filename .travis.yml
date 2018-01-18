@@ -89,7 +89,7 @@ install:
 - git clone https://github.com/mdolab/pyoptsparse.git;
 - cd pyoptsparse;
 # get SNOPT source, securely, if SNOPT_LOCATION is set.
-- if ["$SNOPT_LOCATION"]; then
+- if [ "$SNOPT_LOCATION" ]; then
     cd pySNOPT/source;
     scp -r "$SNOPT_LOCATION" .;
     cd ../..;
