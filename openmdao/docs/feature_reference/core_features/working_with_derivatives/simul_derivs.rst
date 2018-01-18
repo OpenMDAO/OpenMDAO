@@ -222,7 +222,7 @@ If you run *openmdao simul_coloring* and it turns out there is no simultaneous c
 don't be surprised.  Problems that have the necessary total jacobian sparsity to allow
 simultaneous derivatives are relatively uncommon.  If you think that your total jacobian is sparse
 enough that openmdao should be computing a smaller coloring than it gave you, then you can run
-the coloring algorigthm with a tolerance so that very small entries in the jacobian will be treated
+the coloring algorithm with a tolerance so that very small entries in the jacobian will be treated
 as zeros.  You can set this tolerance using the *-t* command line option as follows:
 
 

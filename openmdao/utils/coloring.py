@@ -20,6 +20,7 @@ from openmdao.jacobians.jacobian import Jacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.matrix import sparse_types
+from openmdao.utils.array_utils import array_viz
 
 
 def _find_var_from_range(idx, ranges):
@@ -108,7 +109,7 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     Returns
     -------
     tuple
-        Tuple of dicts total_dv_offsets and total_res_offsets.
+        Tuple of the form (total_dv_offsets, total_res_offsets, final_jac)
     """
     # TODO: fix this to work in rev mode as well
 
@@ -186,7 +187,7 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
         res_offsets.append((start, end, name))
         start = end + 1
 
-    total_dv_offsets = OrderedDict()  # defaultdict(lambda: defaultdict(list))
+    total_dv_offsets = OrderedDict()
     total_res_offsets = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [[], []])))
 
     # loop over each desvar and find disjoint column sets for all columns of that desvar
@@ -218,9 +219,7 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
             if col in seen:
                 continue
             seen.add(col)
-            # this actually modifies the contents of J[:, col], but that's ok because
-            # we don't revisit this column again.
-            allrows[col] = J[:, col]
+            allrows[col] = J[:, col].copy()
             full_disjoint[col] = [col]
             for other_col in colset:
                 if other_col not in seen and not np.any(allrows[col] & J[:, other_col]):
@@ -244,10 +243,10 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     prob.driver._simul_coloring_info = None
     prob.driver._res_jacs = {}
 
-    return total_dv_offsets, total_res_offsets
+    return total_dv_offsets, total_res_offsets, J
 
 
-def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, stream=sys.stdout):
+def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, show_jac=False, stream=sys.stdout):
     """
     Compute simultaneous derivative colorings for the given problem.
 
@@ -261,6 +260,8 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, stream=sys.stdout
         Number of times to repeat total jacobian computation.
     tol : float
         Tolerance used to determine if an array entry is nonzero.
+    show_jac : bool
+        If True, display a visualiation of the final total jacobian used to compute the coloring.
     stream : file-like or None
         Stream where output coloring info will be written.
 
@@ -273,7 +274,7 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, stream=sys.stdout
     """
     driver = problem.driver
 
-    dv_idxs, res_idxs = _find_disjoint(problem, mode=mode, tol=tol, repeats=repeats)
+    dv_idxs, res_idxs, J = _find_disjoint(problem, mode=mode, tol=tol, repeats=repeats)
     all_colors = set()
 
     simul_colorings = {}
@@ -356,6 +357,15 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, stream=sys.stdout
             stream.write('\n'.join(lines))
             stream.write("\n")
 
+    if show_jac:
+        of = list(driver._objs)
+        of.extend([c for c, meta in iteritems(driver._cons)
+                   if not ('linear' in meta and meta['linear'])])
+        wrt = list(driver._designvars)
+
+        stream.write("\n\n")
+        array_viz(J, problem, of, wrt, stream)
+
     return simul_colorings, simul_maps
 
 
@@ -375,6 +385,7 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
     simul_colorings, simul_maps = color_info
 
     desvars = problem.driver._designvars
+    constraints = problem.driver._cons
     responses = problem.driver._responses
 
     tot_colors = 0
@@ -389,7 +400,7 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
     template = "{:<{w0}s}  {:>6d}  {:>6d}\n"
 
     stream.write("\n\n{:^{w0}s}  {:>6}  {:>6}\n".format(dvtitle, "Size", "Colors", w0=dvwid))
-    stream.write("{:^{w0}s}  {:>6}  {:>6}\n".format('-'*dvwid, "----", "------", w0=dvwid))
+    stream.write("{:^{w0}s}  {:>6}  {:>6}\n".format('-' * dvwid, "----", "------", w0=dvwid))
 
     if problem._mode == 'fwd':
         for dv in desvars:
@@ -432,6 +443,9 @@ def _simul_coloring_setup_parser(parser):
                         help='number of times to repeat total derivative computation')
     parser.add_argument('-t', action='store', dest='tolerance', default=1.e-30, type=float,
                         help='tolerance used to determine if a total jacobian entry is nonzero')
+    parser.add_argument('-j', '--jac', action='store_true', dest='show_jac',
+                        help="Display a visualization of the final total jacobian used to "
+                        "compute the coloring.")
 
 
 def _simul_coloring_cmd(options):
@@ -457,7 +471,7 @@ def _simul_coloring_cmd(options):
             outfile = open(options.outfile, 'w')
         Problem._post_setup_func = None  # avoid recursive loop
         color_info = get_simul_meta(prob, repeats=options.num_jacs, tol=options.tolerance,
-                                    stream=outfile)
+                                    show_jac=options.show_jac, stream=outfile)
         if sys.stdout.isatty():
             simul_coloring_summary(prob, color_info, stream=sys.stdout)
 
