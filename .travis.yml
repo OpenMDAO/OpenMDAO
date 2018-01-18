@@ -13,10 +13,15 @@ os:
 language: generic
 
 env:
-- PY=2.7 MPI=1
-- PY=3.6 MPI=1
-- PY=2.7 MPI=
-- PY=3.6 MPI=
+  global:
+    #set the SNOPT_LOCATION env variable in a secure manner.
+    - secure: GSek1lxjYTigwi/76x4HdEoSsyota7Vv+fOeJcf88QM3MTioiBwLC5SFzzIVN8Semv4vb7CbMXnjpbYn6FTb5S4evM5zS/Cl1ia9LXGW4zHOFAMxqhx5fcVTc6rfYwzH62fHenAAsLFqF09TPwno6yRTgNQzT6k7U92MGaX2Tx/uL/jEvd5/MMM8+TqFrTwJKo+Cv7EX7Z03UH3+Df2/q6VKvKx/cRWw2vyO9FkMbMXdZGM11Z5R0UFubPzQhtgTPu3mZIgkl92pmHPkH2Qtnat5WkKzRVN2Zx2bXzjDDMOEPdBIY9sFoQpXkl5TmLYZMVFtkEpBMeoplh4Gg3VePK+mVF9x+C+u3mAVUu3HijuJonjwsMAHvoZjkSxo3jtjW4Zr3t43a/JoQf7nYAJAJhkswSKgrzhN6C7VVfoUx5nmgAdSDX/hXJYdAm1BbMTrzoiogAorOFBm3PjEgnQhIopA84rmDcYeIr4K/mq4UlQuViD5wH4g2FI3EX5xYHVfzSowNnhj+HCNW/iDtjMm1gb0tjrybl+EOuE8921H8ed5WemHPpvFYoJQx6MMHIGmmjX8rohxs1GOOCz5VhZhVao/5+amo5AwVWRHxW33AQkmuXG2XsIWd60sblI+A7Ns/JV+pB3I+esTFiFQUIpT7wOEe/KrCm/Md3MZUUA9gAg=
+
+  matrix:
+    - PY=2.7 MPI=1
+    - PY=3.6 MPI=1
+    - PY=2.7 MPI=
+    - PY=3.6 MPI=
 
 git:
   depth: 99999
@@ -84,6 +89,11 @@ install:
 - wget https://bitbucket.org/mdolab/pyoptsparse/get/tip.zip;
 - unzip tip.zip;
 - cd mdolab-pyoptsparse*;
+# get SNOPT source, securely
+- cd pyoptsparse/pySNOPT/source;
+- scp -r "$SNOPT_LOCATION" .;
+# return to building pyoptsparse
+- cd ../../..;
 - python setup.py install;
 - cd ..;
 
@@ -107,7 +117,7 @@ script:
 
 # run the tests from down here to see if it can work without being at top level
 - testflo -n 1 openmdao  -m "ptest*"
-- testflo -n 1 openmdao  --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*
+- testflo -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*
 
 after_success:
 - coveralls --rcfile=../../.coveragerc --output=coveralls.json
