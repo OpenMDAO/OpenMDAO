@@ -1,6 +1,6 @@
-branches:
-  only:
-  - master
+#branches:
+#  only:
+#  - master
 
 group: deprecated-2017Q4
 
@@ -89,11 +89,9 @@ install:
 - git clone https://github.com/mdolab/pyoptsparse.git;
 - cd pyoptsparse;
 # get SNOPT source, securely, if SNOPT_LOCATION is set.
-- if [ "$SNOPT_LOCATION" ]; then
-    cd pyoptsparse/pySNOPT/source;
-    scp -r "$SNOPT_LOCATION" .;
-    cd ../../..;
-  fi
+- cd pyoptsparse/pySNOPT/source;
+- scp -r "$SNOPT_LOCATION" .;
+- cd ../../..;
 # return to building pyoptsparse
 - python setup.py install;
 - cd ..;
