@@ -836,7 +836,7 @@ class TestRegularGridMap(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        # Need to make sure extrapolate if False for bounds to be checked
+        # Need to make sure extrapolate is False for bounds to be checked
         comp = MetaModelStructured(method='slinear', extrapolate=False)
 
         for param in params:
@@ -851,7 +851,7 @@ class TestRegularGridMap(unittest.TestCase):
 
         self.prob['x'] = 1.0
         self.prob['y'] = 0.75
-        self.prob['z'] = 9.0 # out of bounds
+        self.prob['z'] = 9.0 # intentionally set to be out of bounds
 
         msg = "Error interpolating output 'f' in 'comp' " + "because input 'comp.z' was " \
                 "out of bounds \('.*', '.*'\) with value '9.0'"

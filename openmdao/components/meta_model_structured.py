@@ -231,7 +231,6 @@ class _RegularGridInterp(object):
         xi = xi.reshape(-1, xi_shape[-1])
 
         if self.bounds_error:
-            #  xi.T is the input vector
             for i, p in enumerate(xi.T):
                 if not np.logical_and(np.all(self.grid[i][0] <= p),
                                       np.all(p <= self.grid[i][-1])):
@@ -649,6 +648,7 @@ class MetaModelStructured(ExplicitComponent):
                                                             bounds_error=bounds_error,
                                                             fill_value=None,
                                                             spline_dim_error=False)
+
             try:
                 val = self.interps[out_name](pt)
             except OutOfBoundsError as err:
@@ -658,7 +658,6 @@ class MetaModelStructured(ExplicitComponent):
                     "value '{}'".format(out_name, self.pathname, varname_causing_error,
                                         err.lower, err.upper, err.value)
                 raise_from(ValueError(errmsg), None)
-
             except ValueError as err:
                 raise ValueError("Error interpolating output '%s' in %s:\n%s" %
                                  (out_name, self.pathname, str(err)))
