@@ -7,10 +7,10 @@ additional MPI capability.
 """
 
 from __future__ import print_function
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict
 import traceback
 
-from six import iteritems, itervalues
+from six import iteritems
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -18,10 +18,9 @@ from scipy.sparse import coo_matrix
 from pyoptsparse import Optimization
 
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.core.driver import Driver
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian
-from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.record_util import create_local_meta
+
 
 # names of optimizers that use gradients
 grad_drivers = {'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
@@ -214,7 +213,7 @@ class pyOptSparseDriver(Driver):
         # Metadata Setup
         self.metadata = create_local_meta(self.options['optimizer'])
 
-        with Recording(self.options['optimizer'], self.iter_count, self) as rec:
+        with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
             # Initial Run
             model._solve_nonlinear()
             rec.abs = 0.0
@@ -370,7 +369,7 @@ class pyOptSparseDriver(Driver):
             val = dv_dict[name]
             self.set_design_var(name, val)
 
-        with Recording(self.options['optimizer'], self.iter_count, self) as rec:
+        with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
             model._solve_nonlinear()
             rec.abs = 0.0
             rec.rel = 0.0
@@ -424,7 +423,7 @@ class pyOptSparseDriver(Driver):
             # print(dv_dict)
 
             # Execute the model
-            with Recording(self.options['optimizer'], self.iter_count, self) as rec:
+            with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
                 self.iter_count += 1
                 try:
                     model._solve_nonlinear()

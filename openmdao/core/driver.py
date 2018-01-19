@@ -13,7 +13,31 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.mpi import MPI
+from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate
 from openmdao.utils.options_dictionary import OptionsDictionary
+
+
+def _is_debug_print_opts_valid(opts):
+    """
+    Check validity of debug_print option for Driver.
+
+    Parameters
+    ----------
+    opts : list
+        The value of the debug_print option set by the user.
+
+    Returns
+    -------
+    bool
+        True if the option is valid. Otherwise, False.
+    """
+    if not isinstance(opts, list):
+        return False
+    _valid_opts = ['desvars', 'nl_cons', 'ln_cons', 'objs']
+    for opt in opts:
+        if opt not in _valid_opts:
+            return False
+    return True
 
 
 class Driver(object):
@@ -22,6 +46,9 @@ class Driver(object):
 
     Options
     -------
+    options['debug_print'] :  list of strings([])
+        Indicates what variables to print at each iteration. The valid options are:
+            'desvars','ln_cons','nl_cons',and 'objs'.
     recording_options['record_metadata'] :  bool(True)
         Tells recorder whether to record variable attribute metadata.
     recording_options['record_desvars'] :  bool(True)
@@ -37,6 +64,7 @@ class Driver(object):
     recording_options['excludes'] :  list of strings('')
         Patterns for variables to exclude in recording (processed after includes).
 
+
     Attributes
     ----------
     fail : bool
@@ -49,6 +77,8 @@ class Driver(object):
         Dictionary with general pyoptsparse options.
     recording_options : <OptionsDictionary>
         Dictionary with driver recording options.
+    debug_print : <OptionsDictionary>
+        Dictionary with debugging printing options.
     cite : str
         Listing of relevant citataions that should be referenced when
         publishing work that uses this class.
@@ -109,6 +139,13 @@ class Driver(object):
         self.recording_options = OptionsDictionary()
 
         ###########################
+        self.options.declare('debug_print', types=list, is_valid=_is_debug_print_opts_valid,
+                             desc="List of what type of Driver variables to print at each "
+                             "iteration. Valid items in list are 'desvars','ln_cons',"
+                             "'nl_cons','objs'",
+                             default=[])
+
+        ###########################
         self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
                                        default=True)
         self.recording_options.declare('record_desvars', types=bool, default=True,
@@ -143,6 +180,19 @@ class Driver(object):
         self.supports.declare('gradients', types=bool, default=False)
         self.supports.declare('active_set', types=bool, default=False)
         self.supports.declare('simultaneous_derivatives', types=bool, default=False)
+
+        # Debug printing.
+        self.debug_print = OptionsDictionary()
+        self.debug_print.declare('debug_print', types=bool, default=False,
+                                 desc='Overall option to turn on Driver debug printing')
+        self.debug_print.declare('debug_print_desvars', types=bool, default=False,
+                                 desc='Print design variables')
+        self.debug_print.declare('debug_print_nl_con', types=bool, default=False,
+                                 desc='Print nonlinear constraints')
+        self.debug_print.declare('debug_print_ln_con', types=bool, default=False,
+                                 desc='Print linear constraints')
+        self.debug_print.declare('debug_print_objective', types=bool, default=False,
+                                 desc='Print objectives')
 
         self.iter_count = 0
         self.metadata = None
@@ -554,7 +604,7 @@ class Driver(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        with Recording(self._get_name(), self.iter_count, self) as rec:
+        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             failure_flag = self._problem.model._solve_nonlinear()
 
         self.iter_count += 1
@@ -812,4 +862,99 @@ class Driver(object):
                     # convert name from promoted to absolute and replace dictionary key
                     del dvdict[dv]
                     dv = prom2abs[dv][0]
-                dvdict[dv] = col_dict
+                    dvdict[dv] = col_dict
+
+    def _pre_run_model_debug_print(self):
+        """
+        Optionally print some debugging information before the model runs.
+        """
+        if not self.options['debug_print']:
+            return
+
+        if not MPI or MPI.COMM_WORLD.rank == 0:
+            header = 'Driver debug print for iter coord: {}'.format(
+                get_formatted_iteration_coordinate())
+            print(header)
+            print(len(header) * '-')
+
+        if 'desvars' in self.options['debug_print']:
+            desvar_vals = self.get_design_var_values()
+            if not MPI or MPI.COMM_WORLD.rank == 0:
+                print("Design Vars")
+                if desvar_vals:
+                    for name, value in iteritems(desvar_vals):
+                        print("{}: {}".format(name, repr(value)))
+                else:
+                    print("None")
+                print()
+
+    def _post_run_model_debug_print(self):
+        """
+        Optionally print some debugging information after the model runs.
+        """
+        if 'nl_cons' in self.options['debug_print']:
+            cons = self.get_constraint_values(lintype='nonlinear')
+            if not MPI or MPI.COMM_WORLD.rank == 0:
+                print("Nonlinear constraints")
+                if cons:
+                    for name, value in iteritems(cons):
+                        print("{}: {}".format(name, repr(value)))
+                else:
+                    print("None")
+                print()
+
+        if 'ln_cons' in self.options['debug_print']:
+            cons = self.get_constraint_values(lintype='linear')
+            if not MPI or MPI.COMM_WORLD.rank == 0:
+                print("Linear constraints")
+                if cons:
+                    for name, value in iteritems(cons):
+                        print("{}: {}".format(name, repr(value)))
+                else:
+                    print("None")
+                print()
+
+        if 'objs' in self.options['debug_print']:
+            objs = self.get_objective_values()
+            if not MPI or MPI.COMM_WORLD.rank == 0:
+                print("Objectives")
+                if objs:
+                    for name, value in iteritems(objs):
+                        print("{}: {}".format(name, repr(value)))
+                else:
+                    print("None")
+                print()
+
+
+class RecordingDebugging(Recording):
+    """
+    A class that acts as a context manager.
+
+    Handles doing the case recording and also the Driver
+    debugging printing.
+    """
+
+    def __enter__(self):
+        """
+        Do things before the code inside the 'with RecordingDebugging' block.
+
+        Returns
+        -------
+        self : object
+            self
+        """
+        super(RecordingDebugging, self).__enter__()
+        self.recording_requester._pre_run_model_debug_print()
+        return self
+
+    def __exit__(self, *args):
+        """
+        Do things after the code inside the 'with RecordingDebugging' block.
+
+        Parameters
+        ----------
+        *args : array
+            Solver recording requires extra args.
+        """
+        self.recording_requester._post_run_model_debug_print()
+        super(RecordingDebugging, self).__exit__()
