@@ -109,7 +109,7 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     Returns
     -------
     tuple
-        Tuple of the form (total_dv_offsets, total_res_offsets, final_jac)
+        Tuple of the form (total_dv_offsets, total_res_offsets, final_jac, jac_max, jac_min)
     """
     # TODO: fix this to work in rev mode as well
 
@@ -159,9 +159,10 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
             fullJ += np.abs(J)
 
     # normalize the full J
-    J = fullJ / np.linalg.norm(fullJ)
+    # fullJ /= np.linalg.norm(fullJ)
+    fullJ /= np.max(fullJ)
 
-    boolJ = np.zeros(J.shape, dtype=bool)
+    boolJ = np.zeros(fullJ.shape, dtype=bool)
     boolJ[J > tol] = True
 
     J = boolJ
@@ -230,20 +231,34 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
         total_dv_offsets[dv] = tot_dv = OrderedDict()
 
         for color, cols in enumerate(full_disjoint.values()):
-            tot_dv[color] = tot_dv_colors = []
+            tot_dv[color] = tot_dv_columns = []
             for c in sorted(cols):
                 dvoffset = c - start
-                tot_dv_colors.append(dvoffset)
+                tot_dv_columns.append(dvoffset)
                 for crow in rows[c]:
                     res, resoffset = _find_var_from_range(crow, res_offsets)
                     dct = total_res_offsets[res][dv][color]
                     dct[0].append(resoffset)
                     dct[1].append(dvoffset)
 
+    # # look for any var combos that are irrelevant
+    # relevant = defaultdict(set)
+    # for dvstart, dvend, dv in dv_offsets:
+    #     for rstart, rend, res in res_offsets:
+    #         if np.any(J[rstart:rend + 1, dvstart:dvend + 1]):
+    #             relevant[dv].add(res)
+    #             relevant[res].add(dv)
+
+    # set full sparsity for any subjacs that have irrelevant var combos
+    for _, _, dv in dv_offsets:
+        for _, _, res in res_offsets:
+            if dv not in total_res_offsets[res]:
+                total_res_offsets[res][dv] = {}
+
     prob.driver._simul_coloring_info = None
     prob.driver._res_jacs = {}
 
-    return total_dv_offsets, total_res_offsets, J
+    return total_dv_offsets, total_res_offsets, J, np.max(fullJ), np.min(fullJ[fullJ > 0.0])
 
 
 def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, show_jac=False, stream=sys.stdout):
@@ -274,7 +289,7 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, show_jac=False, s
     """
     driver = problem.driver
 
-    dv_idxs, res_idxs, J = _find_disjoint(problem, mode=mode, tol=tol, repeats=repeats)
+    dv_idxs, res_idxs, J, jmax, jmin = _find_disjoint(problem, mode=mode, tol=tol, repeats=repeats)
     all_colors = set()
 
     simul_colorings = {}
@@ -290,8 +305,7 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, show_jac=False, s
             coloring[np.array(dv_idxs[dv][color], dtype=int)] = color
             all_colors.add(color)
 
-        if np.any(coloring != -1):
-            simul_colorings[dv] = list(coloring)
+        simul_colorings[dv] = list(coloring)
 
     simul_colorings = OrderedDict(sorted(simul_colorings.items()))
 
@@ -300,8 +314,8 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, show_jac=False, s
         for dv in res_idxs[res]:
             simul_map[dv] = {c: v for c, v in iteritems(res_idxs[res][dv])
                              if c in all_colors}
-            if not simul_map[dv]:
-                del simul_map[dv]
+            # if not simul_map[dv]:
+            #     del simul_map[dv]
 
         if simul_map:
             simul_maps[res] = OrderedDict(sorted(simul_map.items()))
@@ -335,6 +349,7 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, show_jac=False, s
             s = s.replace('{"', '{\n"')
             s = s.replace(', {', ',\n{')
             s = s.replace(']}', ']\n}')
+            s = s.replace('{}', '{\n}')
             s = s.replace('}}', '}\n}')
             s = s.replace('[{', '[\n{')
             s = s.replace(' {', '\n{')
@@ -357,7 +372,7 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, show_jac=False, s
             stream.write('\n'.join(lines))
             stream.write("\n")
 
-    if show_jac:
+    if show_jac and stream is not None:
         of = list(driver._objs)
         of.extend([c for c, meta in iteritems(driver._cons)
                    if not ('linear' in meta and meta['linear'])])
@@ -365,6 +380,8 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, show_jac=False, s
 
         stream.write("\n\n")
         array_viz(J, problem, of, wrt, stream)
+
+        stream.write("\n\nMax entry: %g   Min (nonzero) entry:  %g\n\n" % (jmax, jmin))
 
     return simul_colorings, simul_maps
 
