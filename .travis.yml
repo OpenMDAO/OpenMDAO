@@ -81,9 +81,8 @@ install:
 - pip install --upgrade pip
 
 # install pyoptsparse
-- wget https://bitbucket.org/mdolab/pyoptsparse/get/tip.zip;
-- unzip tip.zip;
-- cd mdolab-pyoptsparse*;
+- git clone https://github.com/mdolab/pyoptsparse.git;
+- cd pyoptsparse;
 - python setup.py install;
 - cd ..;
 
