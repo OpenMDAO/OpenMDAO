@@ -2,6 +2,8 @@
 
 from __future__ import print_function
 
+from six import StringIO
+import sys
 import unittest
 
 import numpy as np
@@ -189,6 +191,53 @@ class TestDriver(unittest.TestCase):
         con = prob.driver.get_constraint_values()
         con_base = np.array([ (prob['comp.y2'][0]-1.2)/(2.0-1.2)])
         assert_rel_error(self, con['comp.y2'], con_base, 1.0e-3)
+
+    def test_debug_print_option(self):
+
+        prob = Problem()
+        prob.model = model = SellarDerivatives()
+
+        model.add_design_var('z')
+        model.add_objective('obj')
+        model.add_constraint('con1', lower=0)
+        model.add_constraint('con2', lower=0, linear=True)
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False)
+
+        # Make sure nothing prints if debug_print is the default of empty list
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.run_driver()
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+        self.assertEqual(output, [''])
+
+        # Make sure everything prints when all options are on
+        prob.driver.options['debug_print'] = ['desvars','ln_cons','nl_cons','objs']
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.run_driver()
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+        self.assertEqual(output.count("Driver debug print for iter coord: rank0:Driver|1"), 1)
+        self.assertEqual(output.count("Design Vars"), 1)
+        self.assertEqual(output.count("Nonlinear constraints"), 1)
+        self.assertEqual(output.count("Linear constraints"), 1)
+        self.assertEqual(output.count("Objectives"), 1)
+
+        # Check to make sure an invalid debug_print option raises an exception
+        with self.assertRaises(ValueError) as context:
+            prob.driver.options['debug_print'] = ['bad_option']
+        self.assertEqual(str(context.exception),
+                         "Function is_valid returns False for debug_print.")
+
 
 if __name__ == "__main__":
     unittest.main()
