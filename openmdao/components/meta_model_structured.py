@@ -16,13 +16,16 @@ import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 
+
 class OutOfBoundsError(Exception):
     """
-    Handles error when interpolated values are requested outside of the
-    domain of the input data
+    Handles error when interpolated values are requested outside of the domain of the input data.
     """
+
     def __init__(self, message, idx, value, lower, upper):
         """
+        Initialize instance of OutOfBoundsError class.
+
         Parameters
         ----------
         idx : index of the variable that is out of bounds.
@@ -35,6 +38,7 @@ class OutOfBoundsError(Exception):
         self.value = value
         self.lower = lower
         self.upper = upper
+
 
 class _RegularGridInterp(object):
     """
@@ -231,7 +235,8 @@ class _RegularGridInterp(object):
             for i, p in enumerate(xi.T):
                 if not np.logical_and(np.all(self.grid[i][0] <= p),
                                       np.all(p <= self.grid[i][-1])):
-                    raise OutOfBoundsError("One of the requested xi is out of bounds", i, p[0], self.grid[i][0], self.grid[i][-1])
+                    raise OutOfBoundsError("One of the requested xi is out of bounds",
+                                           i, p[0], self.grid[i][0], self.grid[i][-1])
 
         indices, norm_distances, out_of_bounds = self._find_indices(xi.T)
 
@@ -639,19 +644,19 @@ class MetaModelStructured(ExplicitComponent):
                 method = self.metadata['method']
                 bounds_error = not self.metadata['extrapolate']
                 self.interps[out_name] = _RegularGridInterp(self.params,
-                                                                values,
-                                                                method=method,
-                                                                bounds_error=bounds_error,
-                                                                fill_value=None,
-                                                                spline_dim_error=False)
+                                                            values,
+                                                            method=method,
+                                                            bounds_error=bounds_error,
+                                                            fill_value=None,
+                                                            spline_dim_error=False)
             try:
                 val = self.interps[out_name](pt)
             except OutOfBoundsError as err:
                 varname_causing_error = '.'.join((self.pathname, self.pnames[err.idx]))
                 errmsg = "Error interpolating output '{}' in '{}' because input '{}' " \
-                        "was out of bounds ('{}', '{}') with " \
-                        "value '{}'".format(out_name, self.pathname, varname_causing_error, err.lower,
-                                        err.upper, err.value)
+                    "was out of bounds ('{}', '{}') with " \
+                    "value '{}'".format(out_name, self.pathname, varname_causing_error,
+                                        err.lower, err.upper, err.value)
                 raise_from(ValueError(errmsg), None)
 
             except ValueError as err:
