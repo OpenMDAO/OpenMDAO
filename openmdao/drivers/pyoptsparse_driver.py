@@ -555,17 +555,19 @@ class pyOptSparseDriver(Driver):
                 dv_dict = meta['simul_map']
                 self._res_jacs[res] = {}
                 for dv, col_dict in iteritems(dv_dict):
-                    rows = []
-                    cols = []
-                    for color, (row_idxs, col_idxs) in iteritems(col_dict):
-                        rows.append(row_idxs)
-                        cols.append(col_idxs)
+                    # don't set the sparsity unless the corresponding desvar coloring is set
+                    if self._designvars[dv]['simul_deriv_color']:
+                        rows = []
+                        cols = []
+                        for color, (row_idxs, col_idxs) in iteritems(col_dict):
+                            rows.append(row_idxs)
+                            cols.append(col_idxs)
 
-                    row = np.hstack(rows)
-                    col = np.hstack(cols)
-                    # print("sparsity for %s, %s: %d of %s" % (res, dv, row.size,
-                    #       (self._responses[res]['size'] * self._designvars[dv]['size'],)))
-                    self._res_jacs[res][dv] = {
-                        'coo': [row, col, np.zeros(row.size)],
-                        'shape': [self._responses[res]['size'], self._designvars[dv]['size']]
-                    }
+                        row = np.hstack(rows)
+                        col = np.hstack(cols)
+                        # print("sparsity for %s, %s: %d of %s" % (res, dv, row.size,
+                        #       (self._responses[res]['size'] * self._designvars[dv]['size'],)))
+                        self._res_jacs[res][dv] = {
+                            'coo': [row, col, np.zeros(row.size)],
+                            'shape': [self._responses[res]['size'], self._designvars[dv]['size']]
+                        }

@@ -96,10 +96,10 @@ look like this:
                 # dictionary for our design variable x
                 'x': {
                     # first color: (rows of y, columns of x)
-                    0: ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8]),
+                    0: [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8]],
 
                     # second color: (rows of y, columns of x)
-                    1: ([0, 1, 2, 3, 4], [1, 3, 5, 7, 9])
+                    1: [[0, 1, 2, 3, 4], [1, 3, 5, 7, 9]]
                 }
             }
         }
@@ -155,43 +155,43 @@ would look like this:
     {
        'delta_theta_con.g': {
           'indeps.x': {
-             0: ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8]),
-             1: ([0, 1, 2, 3, 4], [1, 3, 5, 7, 9]),
+             0: [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8]],
+             1: [[0, 1, 2, 3, 4], [1, 3, 5, 7, 9]],
           },
           'indeps.y': {
-             0: ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8]),
-             1: ([0, 1, 2, 3, 4], [1, 3, 5, 7, 9]),
-          },
-       },
-       'r_con.g': {
-          'indeps.x': {
-             0: ([0, 2, 4, 6, 8], [0, 2, 4, 6, 8]),
-             1: ([1, 3, 5, 7, 9], [1, 3, 5, 7, 9]),
-          },
-          'indeps.y': {
-             0: ([0, 2, 4, 6, 8], [0, 2, 4, 6, 8]),
-             1: ([1, 3, 5, 7, 9], [1, 3, 5, 7, 9]),
-          },
-       },
-       'theta_con.g': {
-          'indeps.x': {
-             0: ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8]),
-          },
-          'indeps.y': {
-             0: ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8]),
+             0: [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8]],
+             1: [[0, 1, 2, 3, 4], [1, 3, 5, 7, 9]],
           },
        },
        'l_conx.g': {
           'indeps.x': {
-             0: ([0], [0]),
+             0: [[0], [0]],
+          },
+       },
+       'r_con.g': {
+          'indeps.x': {
+             0: [[0, 2, 4, 6, 8], [0, 2, 4, 6, 8]],
+             1: [[1, 3, 5, 7, 9], [1, 3, 5, 7, 9]],
+          },
+          'indeps.y': {
+             0: [[0, 2, 4, 6, 8], [0, 2, 4, 6, 8]],
+             1: [[1, 3, 5, 7, 9], [1, 3, 5, 7, 9]],
+          },
+       },
+       'theta_con.g': {
+          'indeps.x': {
+             0: [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8]],
+          },
+          'indeps.y': {
+             0: [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8]],
           },
        },
     })
 
     Coloring Summary
-    indeps.x num colors: 2
-    indeps.y num colors: 2
-    indeps.r num colors: 1
+    indeps.x num colors: 2   size: 10
+    indeps.y num colors: 2   size: 10
+    indeps.r num colors: 1   size: 1
     Total colors vs. total size: 5 vs 21
 
 
@@ -201,9 +201,38 @@ of performance improvement you should see when computing your total derivatives.
 the output show above, the total number of linear solves to compute the total jacobian will drop
 from 21 down to 5.
 
+It may be more convenient, especially for larger colorings, to use the `-o` command line option
+to output the coloring to a file as follows:
+
+.. code-block:: none
+
+    openmdao simul_coloring <your_script_name> -o my_coloring.json
+
+
+The coloring will be written in json format to the given file and can be loaded using the
+*set_simul_deriv_color* function like this:
+
+
+.. code-block:: python
+
+    prob.driver.set_simul_deriv_color('my_coloring.json')
+
+
 If you run *openmdao simul_coloring* and it turns out there is no simultaneous coloring available,
 don't be surprised.  Problems that have the necessary total jacobian sparsity to allow
-simultaneous derivatives are relatively uncommon.
+simultaneous derivatives are relatively uncommon.  If you think that your total jacobian is sparse
+enough that openmdao should be computing a smaller coloring than it gave you, then you can run
+the coloring algorithm with a tolerance so that very small entries in the jacobian will be treated
+as zeros.  You can set this tolerance using the *-t* command line option as follows:
+
+
+.. code-block:: none
+
+    openmdao simul_coloring <your_script_name> -o my_coloring.json -t 1e-15
+
+
+Be careful when setting the tolerance however, because if you make it too large then you will be
+zeroing out jacobian entries that should not be ignored and your optimization may not converge.
 
 
 Checking that it works

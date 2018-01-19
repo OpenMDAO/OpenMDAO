@@ -1,9 +1,11 @@
 """Define a base class for all Drivers in OpenMDAO."""
 from __future__ import print_function
+
+import json
 from collections import OrderedDict
 import warnings
 
-from six import iteritems, itervalues
+from six import iteritems, itervalues, string_types
 
 import numpy as np
 
@@ -811,8 +813,10 @@ class Driver(object):
 
         Parameters
         ----------
-        simul_info : ({dv1: colors, ...}, {resp1: {dv1: {0: [res_idxs, dv_idxs]} ...} ...})
-            Information about simultaneous coloring for design vars and responses.
+        simul_info : str or ({dv1: colors, ...}, {resp1: {dv1: {0: [res_idxs, dv_idxs]} ...} ...})
+            Information about simultaneous coloring for design vars and responses.  If a string,
+            then simul_info is assumed to be the name of a file that contains the coloring
+            information in JSON format.
         """
         if self.supports['simultaneous_derivatives']:
             self._simul_coloring_info = simul_info
@@ -835,6 +839,10 @@ class Driver(object):
 
         prom2abs = self._problem.model._var_allprocs_prom2abs_list['output']
 
+        if isinstance(self._simul_coloring_info, string_types):
+            with open(self._simul_coloring_info, 'r') as f:
+                self._simul_coloring_info = json.load(f)
+
         coloring, maps = self._simul_coloring_info
         for dv, colors in iteritems(coloring):
             if dv not in self._designvars:
@@ -849,6 +857,7 @@ class Driver(object):
             self._responses[res]['simul_map'] = dvdict
 
             for dv, col_dict in dvdict.items():
+                col_dict = {int(k): v for k, v in iteritems(col_dict)}
                 if dv not in self._designvars:
                     # convert name from promoted to absolute and replace dictionary key
                     del dvdict[dv]
