@@ -28,6 +28,7 @@ class OutOfBoundsError(Exception):
 
         Parameters
         ----------
+        message : description of error.
         idx : index of the variable that is out of bounds.
         value : value of the variable that is out of bounds.
         lower : lower bounds of the variable that is out of bounds.

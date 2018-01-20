@@ -853,7 +853,10 @@ class TestRegularGridMap(unittest.TestCase):
         self.prob['y'] = 0.75
         self.prob['z'] = 9.0 # intentionally set to be out of bounds
 
-        msg = "Error interpolating output 'f' in 'comp' " + "because input 'comp.z' was " \
+        # The interpolating output name is given as a regexp because the exception could
+        #   happen with f or g first. The order those are evaluated comes from the keys of
+        #   dict so no guarantee on the order except for Python 3.6 !
+        msg = "Error interpolating output '[f|g]' in 'comp' " + "because input 'comp.z' was " \
                 "out of bounds \('.*', '.*'\) with value '9.0'"
         with assertRaisesRegex(self, ValueError, msg):
            self.run_and_check_derivs(self.prob)
