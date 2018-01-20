@@ -1,6 +1,9 @@
 """ Unit tests for the ScipyOptimizer Driver."""
 
 import unittest
+import sys
+
+from six import StringIO
 
 import numpy as np
 
@@ -812,6 +815,58 @@ class TestScipyOptimizer(unittest.TestCase):
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
         assert_rel_error(self, prob['y'], -7.833334, 1e-6)
 
+    def test_debug_print_option(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizer()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        prob.driver.options['debug_print'] = ['desvars','ln_cons','nl_cons','objs']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.run_driver()
+        finally:
+            sys.stdout = stdout
+
+        output = strout.getvalue().split('\n')
+        self.assertTrue(output.count("Design Vars") > 1,
+                        "Should be more than one design vars header printed")
+        self.assertTrue(output.count("Nonlinear constraints") > 1,
+                        "Should be more than one nonlinear constraint header printed")
+        self.assertTrue(output.count("Linear constraints") > 1,
+                        "Should be more than one linear constraint header printed")
+        self.assertTrue(output.count("Objectives") > 1,
+                        "Should be more than one objective header printed")
+        self.assertTrue(len([s for s in output if s.startswith('p1.x')]) > 1,
+                        "Should be more than one p1.x printed")
+        self.assertTrue(len([s for s in output if s.startswith('p2.y')]) > 1,
+                        "Should be more than one p2.y printed")
+        self.assertTrue(len([s for s in output if s.startswith('con.c')]) > 1,
+                        "Should be more than one con.c printed")
+        self.assertTrue(len([s for s in output if s.startswith('comp.f_xy')]) > 1,
+                        "Should be more than one comp.f_xy printed")
+
 
 class TestScipyOptimizerFeatures(unittest.TestCase):
 
@@ -913,6 +968,37 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
+
+    def test_debug_print_option(self):
+
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer, ExecComp
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizer()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        prob.driver.options['debug_print'] = ['desvars','ln_cons','nl_cons','objs']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+
+        prob.run_driver()
 
 
 if __name__ == "__main__":

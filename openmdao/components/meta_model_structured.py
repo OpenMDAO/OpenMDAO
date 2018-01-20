@@ -614,7 +614,8 @@ class MetaModelStructured(ExplicitComponent):
                                                 spline_dim_error=False)
 
         self._ki = self.interps[name]._ki
-        self.declare_partials(name, self.pnames)
+        arange = np.arange(n)
+        self.declare_partials(name, self.pnames, rows=arange, cols=arange)
         if self.metadata['training_data_gradients']:
             super(MetaModelStructured, self).add_input("%s_train" % name,
                                                        val=training_data, **kwargs)
@@ -698,7 +699,7 @@ class MetaModelStructured(ExplicitComponent):
         for out_name in self.interps:
             dval = self.interps[out_name].gradient(pt).T
             for i, p in enumerate(self.pnames):
-                partials[out_name, p] = np.diag(dval[i])
+                partials[out_name, p] = dval[i]
 
             if self.metadata['training_data_gradients']:
                 partials[out_name, "%s_train" % out_name] = dy_ddata
