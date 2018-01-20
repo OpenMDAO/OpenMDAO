@@ -28,11 +28,16 @@ class OutOfBoundsError(Exception):
 
         Parameters
         ----------
-        message : description of error.
-        idx : index of the variable that is out of bounds.
-        value : value of the variable that is out of bounds.
-        lower : lower bounds of the variable that is out of bounds.
-        upper : upper bounds of the variable that is out of bounds.
+        message : str
+            description of error.
+        idx : int
+            index of the variable that is out of bounds.
+        value : double
+            value of the variable that is out of bounds.
+        lower : double
+            lower bounds of the variable that is out of bounds.
+        upper : double
+            upper bounds of the variable that is out of bounds.
         """
         super(OutOfBoundsError, self).__init__(message)
         self.idx = idx
