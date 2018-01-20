@@ -862,7 +862,7 @@ class Driver(object):
                     # convert name from promoted to absolute and replace dictionary key
                     del dvdict[dv]
                     dv = prom2abs[dv][0]
-                    dvdict[dv] = col_dict
+                dvdict[dv] = col_dict
 
     def _pre_run_model_debug_print(self):
         """
