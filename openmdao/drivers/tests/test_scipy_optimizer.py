@@ -299,7 +299,7 @@ class TestScipyOptimizer(unittest.TestCase):
         prob.setup(check=False)
 
         with self.assertRaises(Exception) as raises_cm:
-            failed = prob.run_driver()
+            prob.run_driver()
 
         exception = raises_cm.exception
 
@@ -765,7 +765,7 @@ class TestScipyOptimizer(unittest.TestCase):
         prob.setup()
 
         with self.assertRaises(KeyError) as context:
-            failed = prob.run_driver()
+            prob.run_driver()
 
         msg = 'Variable name pair ("Vd", "a") must first be declared.'
         self.assertTrue(msg in str(context.exception))

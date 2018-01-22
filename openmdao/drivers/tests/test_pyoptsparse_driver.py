@@ -117,6 +117,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', upper=-15.0)
 
         prob.setup(check=False)
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -160,6 +161,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('con.c', indices=[1], upper=-15.0)
 
         prob.setup(check=False)
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -194,6 +196,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', lower=15.0)
 
         prob.setup(check=False)
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -227,6 +230,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', lower=15.0, linear=True)
 
         prob.setup(check=False)
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -262,6 +266,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', equals=-15.0)
 
         prob.setup(check=False)
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -295,6 +300,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', equals=-15.0, linear=True)
 
         prob.setup(check=False)
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -326,6 +332,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', lower=-11.0, upper=-10.0)
 
         prob.setup(check=False)
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -356,6 +363,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0)
 
         prob.setup(check=False, mode='rev')
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -387,6 +395,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', equals=0.0)
 
         prob.setup(check=False)
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -418,6 +427,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', equals=0.0)
 
         prob.setup(check=False)
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -464,6 +474,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('con2.c', equals=0.0)
 
         prob.setup(check=False)
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -505,6 +516,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', upper=-15.0)
 
         prob.setup(check=False)
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -617,6 +629,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', upper=-15.0)
 
         prob.setup(check=False)
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -764,6 +777,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0)
 
         prob.setup(check=False, mode='fwd')
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -797,6 +811,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.approx_totals(method='fd')
 
         prob.setup(check=False)
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -830,6 +845,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.approx_totals(method='cs')
 
         prob.setup(check=False)
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -862,6 +878,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0)
 
         prob.setup(check=False, mode='rev')
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -894,6 +911,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0, ref=10.)
 
         prob.setup(check=False, mode='fwd')
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -927,6 +945,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.approx_totals(method='fd')
 
         prob.setup(check=False)
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -960,6 +979,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.approx_totals(method='cs')
 
         prob.setup(check=False)
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -992,6 +1012,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0, ref=10.)
 
         prob.setup(check=False, mode='rev')
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -1024,6 +1045,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0)
 
         prob.setup(check=False, mode='fwd')
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -1056,6 +1078,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0)
 
         prob.setup(check=False, mode='rev')
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -1084,6 +1107,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('con2', upper=0.0)
 
         prob.setup(check=False, mode='rev')
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -1110,7 +1134,7 @@ class TestPyoptSparse(unittest.TestCase):
 
                 self.declare_partials('*', '*')
 
-                self.failed_deriv = [2, 4]
+                self.fail_deriv = [2, 4]
                 self.count_iter = 0
                 self.failed = 0
 
@@ -1126,7 +1150,7 @@ class TestPyoptSparse(unittest.TestCase):
             def compute_partials(self, inputs, partials):
 
                 self.count_iter += 1
-                if self.count_iter in self.failed_deriv:
+                if self.count_iter in self.fail_deriv:
                     self.failed += 1
                     raise AnalysisError('Try again.')
 
@@ -1258,6 +1282,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', upper=-15.0)
 
         prob.setup(check=False)
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -1344,6 +1369,7 @@ class TestPyoptSparse(unittest.TestCase):
         comp.eval_fail_at = 100
 
         prob.setup(check=False)
+
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
