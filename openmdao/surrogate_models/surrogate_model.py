@@ -6,6 +6,11 @@ Class definition for SurrogateModel, the base class for all surrogate models.
 class SurrogateModel(object):
     """
     Base class for surrogate models.
+
+    Attributes
+    ----------
+    trained : bool
+        True when surrogate has been trained.
     """
 
     def __init__(self):

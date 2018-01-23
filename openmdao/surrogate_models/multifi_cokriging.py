@@ -185,14 +185,56 @@ class MultiFiCoKriging(object):
 
     Attributes
     ----------
-    `theta`: list
-        Specified theta for each level OR the best set of autocorrelation parameters
-        (the sought maximizer of the reduced likelihood function).
-
-    `rlf_value`: list
-        The optimal negative concentrated reduced likelihood function value
-        for each level.
-
+    corr : Object
+        Correlation function to use, default is squared_exponential_correlation.
+    regr : string or callable
+        A regression function returning an array of outputs of the linear
+        regression functional basis for Universal Kriging purpose.
+        regr is assumed to be the same for all levels of code.
+        Default assumes a simple constant regression trend.
+        Available built-in regression models are:
+        'constant', 'linear'
+    rho_regr : string or callable or None
+        A regression function returning an array of outputs of the linear
+        regression functional basis. Defines the regression function for the
+        autoregressive parameter rho.
+        rho_regr is assumed to be the same for all levels of code.
+        Default assumes a simple constant regression trend.
+        Available built-in regression models are:
+        'constant', 'linear'
+    theta : double, array_like or list or None
+        Value of correlation parameters if they are known; no optimization is run.
+        Default is None, so that optimization is run.
+        if double: value is replicated for all features and all levels.
+        if array_like: an array with shape (n_features, ) for
+        isotropic calculation. It is replicated for all levels.
+        if list: a list of nlevel arrays specifying value for each level
+    theta0 : double, array_like or list or None
+        Starting point for the maximum likelihood estimation of the
+        best set of parameters.
+        Default is None and meaning use of the default 0.5*np.ones(n_features)
+        if double: value is replicated for all features and all levels.
+        if array_like: an array with shape (n_features, ) for
+        isotropic calculation. It is replicated for all levels.
+        if list: a list of nlevel arrays specifying value for each level
+    thetaL : double, array_like or list or None
+        Lower bound on the autocorrelation parameters for maximum
+        likelihood estimation.
+        Default is None meaning use of the default 1e-5*np.ones(n_features).
+        if double: value is replicated for all features and all levels.
+        if array_like: An array with shape matching theta0's. It is replicated
+        for all levels of code.
+        if list: a list of nlevel arrays specifying value for each level
+    thetaU : double, array_like or list or None
+        Upper bound on the autocorrelation parameters for maximum
+        likelihood estimation.
+        Default is None meaning use of default value 50*np.ones(n_features).
+        if double: value is replicated for all features and all levels.
+        if array_like: An array with shape matching theta0's. It is replicated
+        for all levels of code.
+        if list: a list of nlevel arrays specifying value for each level
+    _nfev : int
+        Number of function evaluations.
 
     Examples
     --------
@@ -829,6 +871,15 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
     OpenMDAO adapter of multi-fidelity recursive cokriging method described in [LeGratiet2013].
 
     See MultiFiCoKriging class.
+
+    Attributes
+    ----------
+    initial_range : float
+        Initial range for the optimizer.
+    model : MultiFiCoKriging
+        Contains MultiFiCoKriging surrogate.
+    tolerance : float
+        Optimizer terminates when the tolerance tol is reached.
     """
 
     def __init__(self, regr='constant', rho_regr='constant',
