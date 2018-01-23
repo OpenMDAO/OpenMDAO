@@ -250,10 +250,10 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     #             relevant[res].add(dv)
 
     # set full sparsity for any subjacs that have irrelevant var combos
-    for _, _, dv in dv_offsets:
-        for _, _, res in res_offsets:
-            if dv not in total_res_offsets[res]:
-                total_res_offsets[res][dv] = {}
+    # for _, _, dv in dv_offsets:
+    #     for _, _, res in res_offsets:
+    #         if dv not in total_res_offsets[res]:
+    #             total_res_offsets[res][dv] = {}
 
     prob.driver._simul_coloring_info = None
     prob.driver._res_jacs = {}
