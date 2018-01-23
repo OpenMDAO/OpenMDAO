@@ -1135,7 +1135,7 @@ class Problem(object):
                 if in_idxs is not None:
                     neg = in_idxs[in_idxs < 0]
                     irange = in_idxs
-                    if neg:
+                    if np.any(neg):
                         irange[neg] += end
                     max_i = np.max(in_idxs)
                     min_i = np.min(in_idxs)
