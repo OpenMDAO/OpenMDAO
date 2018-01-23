@@ -55,6 +55,10 @@ CITATION = """@inproceedings{2014_openmdao_derivs,
 
 
 class _DictTotals(object):
+    """
+    Wrapper class to allow uniform access to total jacobian in compute_totals.
+    """
+
     def __init__(self, problem, of, wrt):
         self.totals = totals = OrderedDict()
         for okey in of:
@@ -70,6 +74,10 @@ class _DictTotals(object):
 
 
 class _FlatDictTotals(object):
+    """
+    Wrapper class to allow uniform access to total jacobian in compute_totals.
+    """
+
     def __init__(self, problem, of, wrt):
         self.totals = totals = OrderedDict()
         for okey in of:
@@ -1302,6 +1310,8 @@ class Problem(object):
         # in the model)
         use_rel_reduction = True
 
+        lin_vec_names = []
+
         for i, name in enumerate(input_list):
             if name in input_vois:
                 meta = input_vois[name]
@@ -1329,16 +1339,18 @@ class Problem(object):
                     # store the absolute name along with the original name, which
                     # can be either promoted or absolute depending on the value
                     # of the 'global_names' flag.
+                    lin_vec_names.append(name if matmat else 'linear')
                     voi_lists[name] = [(name, old_input_list[i], parallel_deriv_color, matmat,
-                                        simul_coloring, name if matmat else 'linear')]
+                                        simul_coloring, lin_vec_names[-1])]
             else:
                 if parallel_deriv_color not in voi_lists:
                     voi_lists[parallel_deriv_color] = []
+                lin_vec_names.append(name)
                 voi_lists[parallel_deriv_color].append((name, old_input_list[i],
                                                         parallel_deriv_color, matmat,
                                                         simul_coloring, name))
 
-        lin_vec_names = sorted(set(tup[5] for tup in itervalues(voi_lists)))
+        lin_vec_names = sorted(set(lin_vec_names))
 
         voi_info = self._get_voi_info(voi_lists, input_vec, output_vec, input_vois)
 
