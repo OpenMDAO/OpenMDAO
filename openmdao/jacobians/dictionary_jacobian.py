@@ -85,17 +85,24 @@ class DictionaryJacobian(Jacobian):
 
         fwd = mode == 'fwd'
         system = self._system
-        with system._unscaled_context(
-                outputs=[d_outputs], residuals=[d_residuals]):
+        d_res_names = d_residuals._names
+        d_out_names = d_outputs._names
+        d_inp_names = d_inputs._names
+        res_flat_views = d_residuals._views_flat
+        out_flat_views = d_outputs._views_flat
+        inp_flat_views = d_inputs._views_flat
+        np_add_at = np.add.at
+
+        with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             ncol = d_residuals._ncol
             for abs_key in self._iter_abs_keys(d_residuals._name):
                 subjac = self._subjacs[abs_key]
                 res_name, other_name = abs_key
-                if d_residuals._contains_abs(res_name):
+                if res_name in d_res_names:
                     if isinstance(subjac, list):
-                        if d_outputs._contains_abs(other_name):
-                            re = d_residuals._views_flat[res_name]
-                            op = d_outputs._views_flat[other_name]
+                        if other_name in d_out_names:
+                            re = res_flat_views[res_name]
+                            op = out_flat_views[other_name]
                             # skip the matvec mult completely for identity subjacs
                             if res_name is other_name and isinstance(system, ExplicitComponent):
                                 if fwd:
@@ -103,48 +110,48 @@ class DictionaryJacobian(Jacobian):
                                 else:
                                     op += re
                             elif fwd:
-                                if len(re.shape) > 1:
+                                if ncol > 1:
                                     for i in range(ncol):
-                                        np.add.at(re[:, i], subjac[1],
+                                        np_add_at(re[:, i], subjac[1],
                                                   op[:, i][subjac[2]] * subjac[0])
                                 else:
-                                    np.add.at(re, subjac[1], op[subjac[2]] * subjac[0])
+                                    np_add_at(re, subjac[1], op[subjac[2]] * subjac[0])
                             else:  # rev
-                                if len(re.shape) > 1:
+                                if ncol > 1:
                                     for i in range(ncol):
-                                        np.add.at(op[:, i], subjac[2],
+                                        np_add_at(op[:, i], subjac[2],
                                                   re[:, i][subjac[1]] * subjac[0])
                                 else:
-                                    np.add.at(op, subjac[2], re[subjac[1]] * subjac[0])
-                        elif d_inputs._contains_abs(other_name):
-                            re = d_residuals._views_flat[res_name]
-                            ip = d_inputs._views_flat[other_name]
+                                    np_add_at(op, subjac[2], re[subjac[1]] * subjac[0])
+                        elif other_name in d_inp_names:
+                            re = res_flat_views[res_name]
+                            ip = inp_flat_views[other_name]
                             if fwd:
-                                if len(re.shape) > 1:
+                                if ncol > 1:
                                     for i in range(ncol):
-                                        np.add.at(re[:, i], subjac[1],
+                                        np_add_at(re[:, i], subjac[1],
                                                   ip[:, i][subjac[2]] * subjac[0])
                                 else:
-                                    np.add.at(re, subjac[1], ip[subjac[2]] * subjac[0])
+                                    np_add_at(re, subjac[1], ip[subjac[2]] * subjac[0])
                             else:  # rev
-                                if len(re.shape) > 1:
+                                if ncol > 1:
                                     for i in range(ncol):
-                                        np.add.at(ip[:, i], subjac[2],
+                                        np_add_at(ip[:, i], subjac[2],
                                                   re[:, i][subjac[1]] * subjac[0])
                                 else:
-                                    np.add.at(ip, subjac[2], re[subjac[1]] * subjac[0])
+                                    np_add_at(ip, subjac[2], re[subjac[1]] * subjac[0])
                     else:  # ndarray or sparse
-                        if d_outputs._contains_abs(other_name):
-                            re = d_residuals._views_flat[res_name]
-                            op = d_outputs._views_flat[other_name]
+                        if other_name in d_out_names:
+                            re = res_flat_views[res_name]
+                            op = out_flat_views[other_name]
                             if fwd:
                                 re += subjac.dot(op)
                             else:  # rev
                                 op += subjac.T.dot(re)
 
-                        elif d_inputs._contains_abs(other_name):
-                            re = d_residuals._views_flat[res_name]
-                            ip = d_inputs._views_flat[other_name]
+                        elif other_name in d_inp_names:
+                            re = res_flat_views[res_name]
+                            ip = inp_flat_views[other_name]
                             if fwd:
                                 re += subjac.dot(ip)
                             else:  # rev
