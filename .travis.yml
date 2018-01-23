@@ -1,6 +1,6 @@
-#branches:
-#  only:
-#  - master
+branches:
+  only:
+  - master
 
 group: deprecated-2017Q4
 
@@ -15,7 +15,7 @@ language: generic
 env:
   global:
     #set the SNOPT_LOCATION env variable in a secure manner.
-    - secure: ppg4MtT1xhVihl4r7U8uB9s7fGrM9BKbcQyq/lyp5sSnZyjpI1ouNB1WErq0HGEt1FNI/81mXtWfJ8D+nMLxbzGv3zJzHh9vzVFQ8a/O5R7YiTMWBcpzN5+UQVGRS4h8SiKBQgeHPn2voeVF1ZqTiotLb7zZL48RhR2GUiRL08oE9PoxU6HZifcsczrZs/3Aoat7fbUyCQe3Uskgl38qyrJNZlDSQzdiN5/eLxvPhy0Uhp3v1v3WeyJ7AaK+zYGV7vf20Vbt2OqEZvSWkMhBNrgkT7FUba30+0PKRNP0/qCNmOZbvTfOEhPNUgJCYUjQ32elBUWvR7d0fGB4dZLhQ9XTMaN4dDRxLHA70HaFaXXFf4YqiNUZMXVoMl51l/otSZo83xptypMlQB0Zh+tZwKpPbtsVo+xaGsqfTUyTgs6S5QBL8Mxkda1dGXq0G4xMMPbQg20+FVR/GmouLMvSRHHk6xE7vHtJ6pB5TwwyiQ7WshjtdfU3h8njYMtBpOG/MqxkhBWZ+8OsAKJzbM5X8QuN6X1oQISJu1VfharwTqSVPrAChxNkhAYY0r6IkgslL5o7FNlnfChOxepF9nc8JAHf+mFPWHjakZqHUJGJ2tQc+cMuazfoiRnbOxSIPNJ7C5rBTi5zT94n3s2UEVUxyintnmi+tvyi8tJ5aCo+/JI=
+    - secure: s1HHpMP47rJTDsocRsd6vBopfAx+Axp4gte+N5UxK/g8DyBkzjZcLFPwrxb9RRngX1S3Gya0xnW0qeisG65+vFvKSgDo9cd2y8f+QHYJaDPXHEKb9wn2RxWC/ezGKFDM3rikrmK8CV/LsnkxjjVwFKE1e25iHA5dSPDF4zcrS8irIJ/5vrhFlHlFATPSsz3minOtBOO2C9GlIWe/TQJdOJvm/SyXX5jtq2wNOkU75XP1YLZ/x8ImqdkuSbKsdTFo6cWCCNZ6B3wBd2seGFz4YizWpc4jBNBX+UPKZjW7hU4fwbWmnkbY2ez+5j/ZocG3HqjFxjgCbO94Pf33ePhA+CAMaZ+ZfPbIm/3dg2QDNJH72aZlgw45olBwtSbPIa6KL5zqw0Eud/f1Jlea7l5cyV/tRqWOuUgFNP1GRwEwzIt7BPHTc7FcDUV8+acmCEp5jQTn7NNunw1YfD/4OWsueHb6YRvW+pGFpxpLnl55b+OfvSO525ZzoSc9UE9KI/As1IHsCQtAFoY8Z+t3vVS8/JHL8Nt3X1MblRVC1oAYbRCoaRxMgeOSNFCoOZojEHm+hxbpT10SqGjzAAQDyDer1qifL4vx1U8BqNITrkFgvKKjzvPQesLyfzZSCPtpHBy4FaHGUIV/QGlmFDHpd5mPrCpL34ELHRczsjly4oSP8QA=
 
   matrix:
     - PY=2.7 MPI=1
