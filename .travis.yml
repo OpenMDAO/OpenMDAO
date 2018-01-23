@@ -13,10 +13,6 @@ os:
 language: generic
 
 env:
-  global:
-    #set the SNOPT_LOCATION env variable in a secure manner.
-    - secure: Xxjfap1pbrsxYqnLHqlLwUE100harEyB8goWSXZLG1T6sfCq4DbEWBE9yuOCgrAunA2hZ97QXg8Iqm32xcz5ZDED/ny6zJ6xIA0wv7hRHt509W1JVE812IV3LaKkTIyexNaxOx9V+VCoalYjEeHQo9m2smYim3KFXML7VkWpPw+xP2wM1a7/d7V0shb1hCW90yKqbzpklb/eySRKlpJV73vSDIdc3RXZZZpEosEjhK30Jw7KrFtqklQ/KMqF+d/3ALptW/cKp3Q+ygtiwSbiGiS8F3uRwEyVO0WCP6e+mUcQBn0ZkDZQyixHCPI8rUKprj1eIPHNHbNWqMZ2bk0U3OZtD2+Cb3qqHU4scp8Jr1+YJeXFHs70Qm5rfgJSWSSgkw5VTkfepJ9VRgTYjvHzoNj7YaBqq+QRdD48flbirvP0Ch8NcMrHkoQNmjDfLQlWjFaDLbaUvlZSID+N1octrNBOphTV/XTidolSOHQ45qtbyvzEBalTlIiyFX5b/tV9VQV6WB3rfsDTyWIUTLYq01kWPBiY9yPhEzfKumsZgAmm42p79MzFXymxJA5sP7yd3x+iMAST7hpbeDFdt9HSGePTNw+3fFQLXwcFqXItIdotTtYta23ajrnPWaEtVxbF16f5WPXL0NfNnvillYtAWQ2XveQFLLjWk1tFEj105lg=
-
   matrix:
     - PY=2.7 MPI=1
     - PY=3.6 MPI=1
