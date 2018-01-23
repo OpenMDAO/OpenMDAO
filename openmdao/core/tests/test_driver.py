@@ -2,12 +2,14 @@
 
 from __future__ import print_function
 
+from six import StringIO
+import sys
 import unittest
 
 import numpy as np
 
 from openmdao.api import Problem, IndepVarComp, Group, ExplicitComponent
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
 
@@ -106,9 +108,9 @@ class TestDriver(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        base = prob.compute_total_derivs(of=['obj', 'con1'], wrt=['z'])
-        derivs = prob.driver._compute_total_derivs(of=['obj_cmp.obj', 'con_cmp1.con1'], wrt=['pz.z'],
-                                                   return_format='dict')
+        base = prob.compute_totals(of=['obj', 'con1'], wrt=['z'])
+        derivs = prob.driver._compute_totals(of=['obj_cmp.obj', 'con_cmp1.con1'], wrt=['pz.z'],
+                                             return_format='dict')
         assert_rel_error(self, base[('con1', 'z')][0], derivs['con_cmp1.con1']['pz.z'][0], 1e-5)
         assert_rel_error(self, base[('obj', 'z')][0]*2.0, derivs['obj_cmp.obj']['pz.z'][0], 1e-5)
 
@@ -128,8 +130,8 @@ class TestDriver(unittest.TestCase):
         prob.setup(check=False)
         prob.run_driver()
 
-        derivs = prob.driver._compute_total_derivs(of=['comp.y1'], wrt=['px.x'],
-                                                   return_format='dict')
+        derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'],
+                                             return_format='dict')
 
         oscale = np.array([1.0/(7.0-5.2), 1.0/(11.0-6.3)])
         iscale = np.array([2.0-0.5, 3.0-1.5])
@@ -166,7 +168,7 @@ class TestDriver(unittest.TestCase):
         prob.setup(check=False)
         prob.run_driver()
 
-        derivs = prob.driver._compute_total_derivs(of=['comp.y1'], wrt=['px.x'],
+        derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'],
                                                    return_format='dict')
 
         oscale = np.array([1.0/(7.0-5.2), 1.0/(11.0-6.3), 1.0/(2.0-1.2)])
@@ -189,6 +191,53 @@ class TestDriver(unittest.TestCase):
         con = prob.driver.get_constraint_values()
         con_base = np.array([ (prob['comp.y2'][0]-1.2)/(2.0-1.2)])
         assert_rel_error(self, con['comp.y2'], con_base, 1.0e-3)
+
+    def test_debug_print_option(self):
+
+        prob = Problem()
+        prob.model = model = SellarDerivatives()
+
+        model.add_design_var('z')
+        model.add_objective('obj')
+        model.add_constraint('con1', lower=0)
+        model.add_constraint('con2', lower=0, linear=True)
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False)
+
+        # Make sure nothing prints if debug_print is the default of empty list
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.run_driver()
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+        self.assertEqual(output, [''])
+
+        # Make sure everything prints when all options are on
+        prob.driver.options['debug_print'] = ['desvars','ln_cons','nl_cons','objs']
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.run_driver()
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+        self.assertEqual(output.count("Driver debug print for iter coord: rank0:Driver|1"), 1)
+        self.assertEqual(output.count("Design Vars"), 1)
+        self.assertEqual(output.count("Nonlinear constraints"), 1)
+        self.assertEqual(output.count("Linear constraints"), 1)
+        self.assertEqual(output.count("Objectives"), 1)
+
+        # Check to make sure an invalid debug_print option raises an exception
+        with self.assertRaises(ValueError) as context:
+            prob.driver.options['debug_print'] = ['bad_option']
+        self.assertEqual(str(context.exception),
+                         "Function is_valid returns False for debug_print.")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,115 @@
+################################################################################################
+Release Notes for OpenMDAO 2.1.0
+
+December 7, 2017
+
+New Features:
+-------------
+- Configure setup hook allowing changing of solver settings after hierarchy tree is instantiated
+- Component metadata system for specifying init_args with error checking
+- Parallel Groups
+- Units Reference added to the Docs
+- Case recording now records all variables by default
+- `openmdao` console script that can activate useful debugging features
+  (e.g. view_model) without editing the run script
+- Scipy COBYLA optimizer converts des var bounds to constraints (the algorithm doesn't natively handle bounds)
+- StructuredMetaModel component offers a simple spline interpolation routine for structured data
+
+Backwards Compatible API Changes:
+-----------------------------------
+- `NonlinearRunOnce` changed `NonLinearRunOnce` for consistency (old class deprecated)
+- `types_` argument to `self.metadata.declare` changed to `types`. (old argument deprecated)
+- `types` and `values` arguments to `self.metadata.declare`
+-  `BalanceComp` has a `use_mult` argument to control if it has a `mult` input, defaulting to false
+   (the mult input isn't used most of the time)
+- Renamed `MetaModel` to `UnstructuredMetaModel` and `MultiFiMetaModel` to `UnStructuredMultiFiMetaModel`
+
+
+Backwards Incompatible API changes:
+-----------------------------------
+- Case Recording options API updated with `.recording_options` attribute on Driver, Solver, and System classes
+- `get_subsystem` changed to a private method, removed from public API of System
+- `check_partials` now has a `method` argument that controls which type of check
+
+Bug Fixes:
+-----------
+- Improved error msg on a corner case for when user doesn't declare a partial derivative
+- Fixed docs embedding bug when `<>` included in the output text
+
+
+################################################################################################
+Release Notes for OpenMDAO 2.0.2
+October 19, 2017
+
+- Fixing further packaging errors by updating packaging information.
+- Added tutorials for derivatives of explicit and implicit components.
+
+
+################################################################################################
+Release Notes for OpenMDAO 2.0.1
+October 19, 2017
+
+- Attempting to fix test errors that were happening by updating the packaging information.
+
+
+################################################################################################
+Release Notes for OpenMDAO 2.0.0
+October 19, 2017
+
+First public release of 2.0.0.
+
+
+New Features:
+--------------
+(first release... so EVERYTHING!)
+- Drivers:
+    - ScipyOptimizer
+    - PyoptSparseOptimizer
+- Solvers:
+    - Nonlinear:
+        - NonlinearBlockGS
+        - NonlinearBlockJac
+        - NonlinearRunOnce
+        - NewtonSolver
+    - Linear:
+        - LinearBlockGS
+        - LinearBlockJac
+        - LinearRunOnce
+        - DirectSolver
+        - PetscKSP
+        - ScipyIterativeSolver
+        - LinearUserDefined
+    - LineSearch
+        - AmijoGoldsetinLS
+        - BoundsEnforceLS
+- Components:
+    - MetaModel
+    - ExecComp
+    - BalanceComp
+    - LinearSystemComp
+
+- General Capability:
+    - Implicit and Explicit Components
+    - Serial and Parallel Groups
+    - Parallel distributed components (components that need an MPI comm)
+    - Unit conversions
+    - Variable scaling
+    - Specifying component metadata
+    - Analytic derivatives
+
+
+Currently Missing Features that existed in 1.7.3:
+-------------------------------------------------
+- Pass-by-object variables (anything that is not a float)
+- File Variables
+- automatic ordering of groups/components based on connections
+- Design of Experiments Driver (DOE)
+- Parallel Finite Difference
+- File-Wrapping utility library & External Code Component
+- Approximate active set constraint calculation skipping
+- Brent Solver
+- CaseRecorders for CSV, HDF5, and Dump formats
+
+Bug Fixes
+----------
+N/A

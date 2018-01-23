@@ -3,7 +3,7 @@ import unittest
 from six.moves import range
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
-from openmdao.devtools.testutil import TestLogger
+from openmdao.utils.logger_utils import TestLogger
 from openmdao.utils.graph_utils import all_connected_edges
 from openmdao.error_checking.check_config import get_sccs_topo
 
@@ -30,7 +30,7 @@ class TestCheckConfig(unittest.TestCase):
         C4 = G4.add_subsystem("C4", ExecComp('y=x*2.0+v'))
 
         testlogger = TestLogger()
-        p.setup(logger=testlogger)
+        p.setup(check=True, logger=testlogger)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -38,15 +38,15 @@ class TestCheckConfig(unittest.TestCase):
         self.assertEqual(len(testlogger.get('warning')), 1)
 
         expected = [
-            'G1.G2.C1.w',
-            'G3.G4.C3.u',
-            'G3.G4.C3.x',
             'G3.G4.C4.v',
-            'G3.G4.C4.x'
+            'G3.G4.C4.x',
+            'G3.G4.u',
+            'G3.G4.x',
+            'w',
         ]
 
-        actual = testlogger.get('warning')[0].split('[', 1)[1].split(']')[0].split(',')
-        actual = [a.strip().strip("'") for a in actual]
+        actual = testlogger.get('warning')[0].splitlines()[1:]
+        actual = [a.split(':', 1)[0].strip().strip("'") for a in actual]
 
         self.assertEqual(expected, actual)
 
@@ -73,16 +73,18 @@ class TestCheckConfig(unittest.TestCase):
         root.connect("indep.x", "C4.b")
 
         testlogger = TestLogger()
-        p.setup(logger=testlogger)
+        p.setup(check=True, logger=testlogger)
 
         # Conclude setup but don't run model.
         p.final_setup()
 
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 2)
+        info = testlogger.get('info')
+        self.assertEqual(len(warnings), 1)
+        self.assertEqual(len(info), 1)
 
-        self.assertEqual(warnings[0], "Group '' has the following cycles: [['C1', 'C2', 'C4']]")
-        self.assertEqual(warnings[1], "System 'C3' executes out-of-order with respect to its source systems ['C4']")
+        self.assertEqual(info[0], "Group '' has the following cycles: [['C1', 'C2', 'C4']]")
+        self.assertEqual(warnings[0], "System 'C3' executes out-of-order with respect to its source systems ['C4']")
 
     def test_dataflow_multi_level(self):
 
@@ -111,17 +113,18 @@ class TestCheckConfig(unittest.TestCase):
         root.connect("indep.x", "C4.b")
 
         testlogger = TestLogger()
-        p.setup(logger=testlogger)
+        p.setup(check=True, logger=testlogger)
 
         # Conclude setup but don't run model.
         p.final_setup()
 
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 3)
+        self.assertEqual(len(warnings), 2)
+        info = testlogger.get('info')
 
-        self.assertEqual(warnings[0], "Group '' has the following cycles: [['C4', 'G1']]")
-        self.assertEqual(warnings[1], "System 'C3' executes out-of-order with respect to its source systems ['C4']")
-        self.assertEqual(warnings[2], "System 'G1.C1' executes out-of-order with respect to its source systems ['G1.C2']")
+        self.assertEqual(info[0], "Group '' has the following cycles: [['G1', 'C4']]")
+        self.assertEqual(warnings[0], "System 'C3' executes out-of-order with respect to its source systems ['C4']")
+        self.assertEqual(warnings[1], "System 'G1.C1' executes out-of-order with respect to its source systems ['G1.C2']")
 
         # test comps_only cycle check
         graph = root.compute_sys_graph(comps_only=True)
@@ -142,7 +145,7 @@ class TestCheckConfig(unittest.TestCase):
         p.model.connect("indep.x", "C2.a")
 
         testlogger = TestLogger()
-        p.setup(logger=testlogger)
+        p.setup(check=True, logger=testlogger)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -168,38 +171,43 @@ class TestCheckConfig(unittest.TestCase):
                 root.connect("C%d.y" % i, "C%d.a" % (i+1))
             root.connect("C%d.y" % end, "C%d.a" % start)
 
-        make_cycle(root, 1, 3)
+        G1 = root.add_subsystem('G1', Group())
 
-        root.add_subsystem("N1", MyComp())
+        make_cycle(G1, 1, 3)
 
-        make_cycle(root, 11, 13)
+        G1.add_subsystem("N1", MyComp())
 
-        root.add_subsystem("N2", MyComp())
+        make_cycle(G1, 11, 13)
 
-        make_cycle(root, 21, 23)
+        G1.add_subsystem("N2", MyComp())
 
-        root.add_subsystem("N3", MyComp())
+        make_cycle(G1, 21, 23)
 
-        root.connect("N1.z", "C12.b")
-        root.connect("C13.z", "N2.b")
-        root.connect("N2.z", "C21.b")
-        root.connect("C23.z", "N3.b")
-        root.connect("N3.z", "C2.b")
-        root.connect("C11.z", "C3.b")
+        G1.add_subsystem("N3", MyComp())
+
+        G1.connect("N1.z", "C12.b")
+        G1.connect("C13.z", "N2.b")
+        G1.connect("N2.z", "C21.b")
+        G1.connect("C23.z", "N3.b")
+        G1.connect("N3.z", "C2.b")
+        G1.connect("C11.z", "C3.b")
 
         testlogger = TestLogger()
-        p.setup(logger=testlogger)
+        p.setup(check=True, logger=testlogger)
 
         # Conclude setup but don't run model.
         p.final_setup()
 
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 4)
+        self.assertEqual(len(warnings), 3)
+        
+        info = testlogger.get('info')
+        self.assertEqual(len(info), 1)
 
-        self.assertTrue("The following inputs are not connected:" in warnings[0])
-        self.assertEqual(warnings[1], "Group '' has the following cycles: [['C11', 'C12', 'C13'], ['C21', 'C22', 'C23'], ['C1', 'C2', 'C3']]")
-        self.assertEqual(warnings[2], "System 'C2' executes out-of-order with respect to its source systems ['N3']")
-        self.assertEqual(warnings[3], "System 'C3' executes out-of-order with respect to its source systems ['C11']")
+        self.assertEqual(info[0], "Group 'G1' has the following cycles: [['C13', 'C12', 'C11'], ['C23', 'C22', 'C21'], ['C3', 'C2', 'C1']]")
+        self.assertEqual(warnings[0], "System 'G1.C2' executes out-of-order with respect to its source systems ['G1.N3']")
+        self.assertEqual(warnings[1], "System 'G1.C3' executes out-of-order with respect to its source systems ['G1.C11']")
+        self.assertTrue("The following inputs are not connected:" in warnings[2])
 
 
 if __name__ == "__main__":

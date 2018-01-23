@@ -1,20 +1,28 @@
 branches:
   only:
-    - master
+  - master
 
-sudo: false
+group: deprecated-2017Q4
+
+#sudo: false
+filter_secrets: false
 
 os:
-  - linux
+- linux
 
 language: generic
 
 env:
-- PY=2.7 MPI=1
-- PY=3.4 MPI=1
-- PY=2.7 MPI=
-- PY=3.4 MPI=
+  global:
+    - secure: Rx/uHnF0j1Cp/Ume9lQE5Wu2oM6aA41oFI22+oXmw798vmyeqHAocL6hqva0navjqx9FWLdPHn1LTAjLsHop+tavpMR1Qzu3P/5FEcvr/qDi68osWZq3oCs2WRJLo0BFaG8jQvmMd+RxkczVxWj+D2K+ywgkNb1KABP5Xv6lnTtwfTH0lteCMkFcnTnC4jcan1VGdvLyxewzMbdbuvTNVukAdrVxbwZMJrDyPPf7aEZ+t50C/pkRYSVf/2/YyFq5hgywqZZe2RInO7UeyHWhP+giyQsVkL0nWpA5zcgKjvYKnZbAt95uzTmwabs4e6BpipvbcX2M7aMyqMaz6OD36cDScMeOFn/FIQC3UalkvwEH0yvzI3CDncTjWy4xkxnfort7XKeQbrSqrX0AcDu462ke95JHZsIfL402lgtcW4aLcPUPs2MPrin1ENLBK29Jm+5LIM+22ISWd4anhpjE70SgOhsXrHrzL4n4kfxb4rsm483aeXEszlxWu56QNQ5EYCHpLY+aF9XOkFdAMM/FBRwlxhTySscPOANfd4GiZxSPxDOEHoEHKoy/CPo4jkUlFrqZIe+VnHmNPgGH/eU2nCNMhVeH/zJ5kOx7wns0SdorUSuQIywg07BBJtizzSUtzofd8kYRdVMyH4RTAfoBeGPUeFV45N5i07N6ucagL3s=
+  matrix:
+    - PY=2.7 MPI=1
+    - PY=3.6 MPI=1
+    - PY=2.7 MPI=
+    - PY=3.6 MPI=
 
+git:
+  depth: 99999
 
 addons:
   apt:
@@ -26,61 +34,104 @@ addons:
     - liblapack-dev
     - libopenmpi-dev
     - openmpi-bin
+    ssh_known_hosts:
+    - web543.webfaction.com
 
 notifications:
-  email: false
   slack:
-    on_success: never
-    secure: lwAjQyviKvouLSTm2xO+AqjY3B8/5jkr/1dreeUz60T4E00llatrgZTXX6m04D2PusKvWudYPl8KLqhqawTVpM0CSOJODmbRyrn9MUxV/UlOeFTVwtl6c1EgWxoHTLh47XMnGhUh2z9Otz/2GLfMQteXXmxguX0KgNy+s++hHP8ycPDWjZ7BUVkNT+kJn6l5JYLsIW5dR/06W3Wg32cEzo7kP5tAWY4yH3YAF1tyBe1BSmMLP38IwtQKTBef6QUAaXwBgVBqFBF/h0sWgjKdwzqSMUCA1J6yrpeYHEC6Wvmwl7Yj3Lqgs6y3BNZ6v1dV1NUqPa+PC35QL043Btvv/hOAyCx24Srt1YnNT7bJg+rverIBoKKd6U2cFeBWCDSaKtpMXQyA61D/MReEGND3mtnH1mq7DcvF7cDchMAU5UH9qAHP02wbX7FLdfqs2P+X8+pA+m0ip5xRKFu3AdBUkPG6Eaoyln3a0O9SDep3gF+pgBoemGwawSazHafJjqh/tmFsQARnI8UsAIBNyWT3iK0518r4sGFmRH57csNzICBCn9fPDtQ+MRJk9mu/zLBTNI8ms/2l7mMe74hewtTWaSPvCTZd4Woq1A5Bexd4JlvFOfkyiQZgBNI97qhly9OjqW7M3UiIDlugAR4UZw396DhQ4WVq3xPC5lFD9jAwjfk=
+    secure: Dd+tpZkz48Q47Y+PtdL4b+KAs55PsvWjt9ybhip6xljhA5kVsba9oZS+KsAC8RLWSzVJLOSjz3Cu3MsRym4sTd/g4Pbqyh0ldK2Xnl+n2JOgpPFSXtFuH4Ln3uWB6kYtUK6+aGIC8qhbvEt8tukTBT0RduEmdRyVIZ3oN7YjETPSZXvujeiUFLssfpZW2mqoA/tIgJHFSlySAp6J5694t2Z/p8sHOrK8G/Nm+qlk4xqXHvJ3xablcSBG4BZCrpqmMMdTLXBt2E2K9Rc1P2ZBIrSHVWfSLx+4n79U2385+og7miN1Zuf3gY3YuGKIwnBTtEzTu20905idkr4QdKELCBEcU4azdznwjvUkXWkiFAJII9UELTluSQmZX602zWk4AgJNeHxhN3EbBSMezfYVZjprhlAlwnZZv6t4qAkvuzb7KOA4s679xWzWOBOn1wkynfIF8A66APqssveyz/PvZHSjnHQoLgMU+kwzoX759o0Z/HuRlhCcjv0W9DWxU2bFNi/zVh9YyvR8fG15biGthzOyuf+CHjxohw+J6M+YdR1RIf1g/60nGUPHx4j4SN3kEFPmEDxzZT/f349gvaZGOmKXBi0wH8iY/i9RinM9LJB4t6chj2MkKwUA26bYaVaIO6FYPfE7r+tTG6OXdck4voCs/s4aa9VKEX97yhh0i9g=
 
 before_install:
+#- python -c "import fcntl; fcntl.fcntl(1, fcntl.F_SETFL, 0)"
+- pip install --upgrade pip;
+
 - OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux"; fi)
-- if [ "$OS" = "MacOSX" ] && [ "$MPI" ]; then brew install openmpi; fi
+
+- if [ "$OS" = "MacOSX" ] && [ "$MPI" ]; then
+    brew install openmpi;
+  fi
+
 - wget "https://repo.continuum.io/miniconda/Miniconda-latest-$OS-x86_64.sh" -O miniconda.sh
 - chmod +x miniconda.sh
+
 - if [ "$OS" = "Linux" ]; then
     ./miniconda.sh -b  -p /home/travis/miniconda;
   fi
+
 - if [ "$OS" = "MacOSX" ]; then
     ./miniconda.sh -b  -p /Users/travis/miniconda;
   fi
-- PATHPREFIX=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "/Users/travis/miniconda/bin"; else echo "/home/travis/miniconda/bin"; fi)
+
+- PATHPREFIX=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "/Users/travis/miniconda/bin";
+  else echo "/home/travis/miniconda/bin"; fi)
 - export PATH=$PATHPREFIX:$PATH
 - export OPENMDAO_TEST_DOCS=1
 
 install:
-- conda install --yes python=$PY numpy==1.11.2 scipy nose sphinx mock swig
-- if [ "$OS" = "Linux" ]; then
-    if [ "$PY" = "2.7" ]; then
-        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp27-none-linux_x86_64.whl;
-    elif [ "$PY" = "3.4" ]; then
-        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py3-none-linux_x86_64.whl;
-    fi
+# get key decrypted, placed, chmodded, and added for passwordless access to WebFaction
+- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+    openssl aes-256-cbc -K $encrypted_74d70a284b7d_key -iv $encrypted_74d70a284b7d_iv -in travis_deploy_rsa.enc -out /tmp/travis_deploy_rsa -d;
+    eval "$(ssh-agent -s)";
+    chmod 600 /tmp/travis_deploy_rsa;
+    ssh-add /tmp/travis_deploy_rsa;
+    echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
   fi
-- if [ "$OS" = "MacOSX" ]; then
-    if [ "$PY" = "2.7" ]; then
-        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py2-none-macosx_10_5_x86_64.whl;
-    elif [ "$PY" = "3.4" ]; then
-        pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp34-none-macosx_10_5_x86_64.whl;
-    fi
+
+# keeping numpy pinned at 1.12 because pySNOPT dies with 1.13 because numpy broke callback
+#- conda install --yes nomkl
+- conda install --yes python=$PY
+- conda install --yes numpy==1.12 scipy=0.19.1 nose sphinx mock swig pip
+- pip install --upgrade pip
+
+# install pyoptsparse
+- git clone https://github.com/mdolab/pyoptsparse.git;
+- cd pyoptsparse;
+# get SNOPT source, securely, if SNOPT_LOCATION is set.
+- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+    cd pyoptsparse/pySNOPT/source;
+    scp -r "$SNOPT_LOCATION" .;
+    cd ../../..;
   fi
+# return to building pyoptsparse
+- python setup.py install;
+- cd ..;
+
 - if [ "$MPI" ]; then
     pip install mpi4py;
     pip install git+https://bitbucket.org/petsc/petsc4py@3.7.0;
   fi
+
 - pip install redbaron
 - pip install git+https://github.com/OpenMDAO/testflo.git
 - pip install coverage
-- pip install coveralls
-- pip install -e .
+- pip install git+https://github.com/swryan/coveralls-python@work
+- pip install .  # Not using -e on purpose here, to catch pkging errors
 
 script:
 # make docs first
-- cd openmdao/docs
-- make all
-# run all openmdao tests
-- testflo -n 1 openmdao -m "ptest*"
-- testflo -n 1 openmdao --coverage --coverpkg openmdao
+- cd openmdao/docs;
+- if [ "$MPI" ]; then
+    make all;
+  fi
+
+# run the tests from down here to see if it can work without being at top level
+- testflo -n 1 openmdao  -m "ptest*"
+- testflo -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*
 
 after_success:
-  coveralls
+- coveralls --rcfile=../../.coveragerc --output=coveralls.json
+- sed 's/\/home\/travis\/miniconda\/lib\/python'"$PY"'\/site-packages\///g' < coveralls.json > coveralls-upd.json
+- coveralls --upload=coveralls-upd.json
+
+deploy:
+  provider: script
+  skip_cleanup: true
+  script:
+  # only deploy docs in a build after a PR or merge is accepted
+  - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+      if [ "$MPI" ] && [ "$PY" = "3.6" ]; then
+        python _utils/upload_doc_version.py;
+      fi
+    fi
+  on:
+    branch: master

@@ -16,6 +16,8 @@ class Paraboloid(ExplicitComponent):
 
         self.add_output('f_xy', val=0.0)
 
+        self.declare_partials('*', '*')
+
     def compute(self, inputs, outputs):
         """
         f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
@@ -39,9 +41,7 @@ class Paraboloid(ExplicitComponent):
 
 
 if __name__ == "__main__":
-    from openmdao.core.problem import Problem
-    from openmdao.core.group import Group
-    from openmdao.core.indepvarcomp import IndepVarComp
+    from openmdao.api import Problem, Group, ScipyOptimizer, ExecComp, IndepVarComp
 
     model = Group()
     ivc = IndepVarComp()
@@ -54,6 +54,7 @@ if __name__ == "__main__":
     model.connect('des_vars.y', 'parab_comp.y')
 
     prob = Problem(model)
+    prob.driver = ScipyOptimizer()  # so 'openmdao cite' will report it for cite docs
     prob.setup()
     prob.run_model()
     print(prob['parab_comp.f_xy'])

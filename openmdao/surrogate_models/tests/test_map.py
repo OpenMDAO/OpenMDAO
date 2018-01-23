@@ -1,11 +1,11 @@
-from openmdao.api import Group, Problem, MetaModel, NearestNeighbor
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.api import Group, Problem, MetaModelUnStructured, NearestNeighbor
+from openmdao.utils.assert_utils import assert_rel_error
 
 import numpy as np
 import unittest
 
 
-class CompressorMap(MetaModel):
+class CompressorMap(MetaModelUnStructured):
 
     def __init__(self):
         super(CompressorMap, self).__init__()

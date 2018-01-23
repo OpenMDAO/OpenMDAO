@@ -7,14 +7,18 @@ import ast
 from inspect import getmembers
 from fnmatch import fnmatchcase
 from collections import defaultdict
+from six import string_types
 
-from openmdao.core.system import System
-from openmdao.core.problem import Problem
-from openmdao.core.driver import Driver
-from openmdao.solvers.solver import Solver
-from openmdao.jacobians.jacobian import Jacobian
-from openmdao.matrices.matrix import Matrix
-from openmdao.vectors.vector import Vector, Transfer
+
+class _Options(object):
+    """
+    A fake options class for use when there is no parser.
+    """
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+    def __getattr__(self, name):
+        return None
 
 
 class FunctionFinder(ast.NodeVisitor):
@@ -87,36 +91,54 @@ def find_qualified_name(filename, line, cache, full=True):
 
 # This maps a simple identifier to a group of classes and corresponding
 # glob patterns for each class.
-func_group = {
-    'openmdao': [
-        ("*", (System, Jacobian, Matrix, Solver, Driver, Problem)),
-    ],
-    'openmdao_all': [
-        ("*", (System, Vector, Transfer, Jacobian, Matrix, Solver, Driver, Problem)),
-    ],
-    'setup': [
-        ("*setup*", (System, Solver, Driver, Problem)),
-    ],
-    'dataflow': [
-        ('*compute*', (System,)),
-        ('*linear*', (System,)),
-        ('*', (Transfer,)),
-    ]
-}
+func_group = {}
 
-try:
-    from mpi4py import MPI
-    from petsc4py import PETSc
-    from openmdao.vectors.petsc_vector import PETScVector, PETScTransfer
 
-    #TODO: this needs work.  Still lots of MPI calls not covered here...
-    func_group['mpi'] = [
-        ('*', (PETScTransfer,)),
-        ('get_norm', (PETScVector,)),
-        ('_initialize_data', (PETScVector,))
-    ]
-except ImportError:
-    pass
+def _setup_func_group():
+    global func_group
+
+    from openmdao.core.system import System
+    from openmdao.core.problem import Problem
+    from openmdao.core.driver import Driver
+    from openmdao.solvers.solver import Solver
+    from openmdao.jacobians.jacobian import Jacobian
+    from openmdao.matrices.matrix import Matrix
+    from openmdao.vectors.vector import Vector, Transfer
+
+    func_group.update({
+        'openmdao': [
+            ("*", (System, Jacobian, Matrix, Solver, Driver, Problem)),
+        ],
+        'openmdao_all': [
+            ("*", (System, Vector, Transfer, Jacobian, Matrix, Solver, Driver, Problem)),
+        ],
+        'setup': [
+            ("*setup*", (System, Solver, Driver, Problem)),
+        ],
+        'dataflow': [
+            ('*compute*', (System,)),
+            ('*linear*', (System,)),
+            ('*', (Transfer,)),
+        ],
+        'linear': [
+            ('*linear*', (System,)),
+            ('*solve*', (Solver,)),
+        ]
+    })
+
+    try:
+        from mpi4py import MPI
+        from petsc4py import PETSc
+        from openmdao.vectors.petsc_vector import PETScVector, PETScTransfer
+
+        #TODO: this needs work.  Still lots of MPI calls not covered here...
+        func_group['mpi'] = [
+            ('*', (PETScTransfer,)),
+            ('get_norm', (PETScVector,)),
+            ('_initialize_data', (PETScVector,))
+        ]
+    except ImportError:
+        pass
 
 
 def _collect_methods(method_patterns):
@@ -175,3 +197,17 @@ def _create_profile_callback(stack, matches, do_call=None, do_ret=None, context=
                 stack.pop()
 
     return _wrapped
+
+
+def _get_methods(options, default):
+    if options.methods is None:
+        methods = func_group[default]
+    elif isinstance(options.methods, string_types):
+        try:
+            methods = func_group[options.methods]
+        except KeyError:
+            raise KeyError("Unknown function group '%s'." % options.methods)
+    else:
+        methods = options.methods
+
+    return methods

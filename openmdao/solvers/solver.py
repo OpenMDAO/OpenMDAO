@@ -9,10 +9,11 @@ import numpy as np
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
-from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration_stack
+from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.utils.record_util import create_local_meta
+from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.record_util import create_local_meta, check_path
 
 
 class SolverInfo(object):
@@ -21,7 +22,7 @@ class SolverInfo(object):
 
     Attributes
     ----------
-    prefix : <System>
+    prefix : str
         Prefix to prepend during this iprint.
     stack : List
         List of strings; strings are popped and appended as needed.
@@ -30,6 +31,13 @@ class SolverInfo(object):
     def __init__(self):
         """
         Initialize.
+        """
+        self.prefix = ""
+        self.stack = []
+
+    def clear(self):
+        """
+        Clear out the iprint stack, in case something is left over from a handled exception.
         """
         self.prefix = ""
         self.stack = []
@@ -66,6 +74,28 @@ class SolverInfo(object):
         self.prefix += new_str
         self.stack.append(new_str)
 
+    def save_cache(self):
+        """
+        Save prefix and stack so that they can be restored later in event of an exception recovery.
+
+        Returns
+        -------
+        tuple(str, list)
+            cache of current stack
+        """
+        return (self.prefix, self.stack)
+
+    def restore_cache(self, cache):
+        """
+        Restore previously saved iprint stack names.
+
+        Parameters
+        ----------
+        cache : tuple(str, list)
+            cache of current stack
+        """
+        self.prefix, self.stack = cache
+
 
 class Solver(object):
     """
@@ -90,13 +120,22 @@ class Solver(object):
         object that manages all recorders added to this solver
     _solver_info : <SolverInfo>
         Object to store some formatting for iprint that is shared across all solvers.
+    cite : str
+        Listing of relevant citataions that should be referenced when
+        publishing work that uses this class.
     options : <OptionsDictionary>
         Options dictionary.
+    recording_options : <OptionsDictionary>
+        Recording options dictionary.
     metadata : dict
         Dictionary holding data about this solver.
     supports : <OptionsDictionary>
         Options dictionary describing what features are supported by this
         solver.
+    _filtered_vars_to_record: Dict
+        Dict of list of var names to record
+    _norm0: float
+        Normalization factor
     """
 
     SOLVER = 'base_solver'
@@ -118,26 +157,48 @@ class Solver(object):
         self._iter_count = 0
 
         self.options = OptionsDictionary()
-        self.options.declare('maxiter', type_=int, default=10,
+        self.recording_options = OptionsDictionary()
+        self.options.declare('maxiter', types=int, default=10,
                              desc='maximum number of iterations')
         self.options.declare('atol', default=1e-10,
                              desc='absolute error tolerance')
         self.options.declare('rtol', default=1e-10,
                              desc='relative error tolerance')
-        self.options.declare('iprint', type_=int, default=1,
+        self.options.declare('iprint', types=int, default=1,
                              desc='whether to print output')
-        self.options.declare('err_on_maxiter', type_=bool, default=False,
-                             desc="When True, AnlysisError will be raised if we don't convege.")
+        self.options.declare('err_on_maxiter', types=bool, default=False,
+                             desc="When True, AnalysisError will be raised if we don't converge.")
+        # Case recording options
+        self.recording_options.declare('record_abs_error', types=bool, default=True,
+                                       desc='Set to True to record absolute error at the \
+                                       solver level')
+        self.recording_options.declare('record_rel_error', types=bool, default=True,
+                                       desc='Set to True to record relative error at the \
+                                       solver level')
+        self.recording_options.declare('record_solver_residuals', types=bool, default=False,
+                                       desc='Set to True to record residuals at the solver level')
+        self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
+                                       default=True)
+        self.recording_options.declare('includes', types=list, default=['*'],
+                                       desc='Patterns for variables to include in recording')
+        self.recording_options.declare('excludes', types=list, default=[],
+                                       desc='Patterns for vars to exclude in recording '
+                                       '(processed post-includes)')
+        # Case recording related
+        self._filtered_vars_to_record = {}
+        self._norm0 = 0.0
 
         # What the solver supports.
         self.supports = OptionsDictionary()
-        self.supports.declare('gradients', type_=bool, default=False)
+        self.supports.declare('gradients', types=bool, default=False)
 
         self._declare_options()
         self.options.update(kwargs)
 
         self.metadata = {}
         self._rec_mgr = RecordingManager()
+
+        self.cite = ""
 
     def add_recorder(self, recorder):
         """
@@ -148,6 +209,9 @@ class Solver(object):
         recorder : <BaseRecorder>
            A recorder instance to be added to RecManager.
         """
+        if MPI:
+            raise RuntimeError(
+                "Recording of Solvers when running parallel code is not supported yet")
         self._rec_mgr.append(recorder)
 
     def _declare_options(self):
@@ -173,6 +237,32 @@ class Solver(object):
         self._depth = depth
         self._rec_mgr.startup(self)
         self._rec_mgr.record_metadata(self)
+
+        myoutputs = myresiduals = set()
+        incl = self.recording_options['includes']
+        excl = self.recording_options['excludes']
+
+        if self.recording_options['record_solver_residuals']:
+            if isinstance(self, NonlinearSolver):
+                residuals = self._system._residuals
+            else:  # it's a LinearSolver
+                residuals = self._system._vectors['residual']['linear']
+
+            myresiduals = {n for n in residuals._names
+                           if check_path(n, incl, excl)}
+
+        if isinstance(self, NonlinearSolver):
+            outputs = self._system._outputs
+        else:  # it's a LinearSolver
+            outputs = self._system._vectors['output']['linear']
+
+        myoutputs = {n for n in outputs._names
+                     if check_path(n, incl, excl)}
+
+        self._filtered_vars_to_record = {
+            'out': myoutputs,
+            'res': myresiduals
+        }
 
     def _set_solver_print(self, level=2, type_='all'):
         """
@@ -242,6 +332,9 @@ class Solver(object):
 
         self._iter_count = 0
         norm0, norm = self._iter_initialize()
+
+        self._norm0 = norm0
+
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
         while self._iter_count < maxiter and \
@@ -371,8 +464,59 @@ class Solver(object):
         **kwargs : dict
             Keyword arguments (used for abs and rel error).
         """
+        if not self._rec_mgr._recorders:
+            return
+
         metadata = create_local_meta(self.SOLVER)
-        self._rec_mgr.record_iteration(self, metadata, **kwargs)
+
+        # Get the data
+        data = {}
+        # if self.options['record_abs_error'] or self.options['record_rel_error']:
+        #     norm = self._iter_get_norm()
+
+        if self.recording_options['record_abs_error']:
+            # data['abs'] = norm
+            data['abs'] = kwargs.get('abs')
+        else:
+            data['abs'] = None
+
+        if self.recording_options['record_rel_error']:
+            # data['rel'] = norm / self._norm0
+            data['rel'] = kwargs.get('rel')
+        else:
+            data['rel'] = None
+
+        if isinstance(self, NonlinearSolver):
+            outputs = self._system._outputs
+        else:  # it's a LinearSolver
+            outputs = self._system._vectors['output']['linear']
+
+        data['o'] = {}
+        if 'out' in self._filtered_vars_to_record:
+            for out in self._filtered_vars_to_record['out']:
+                if out in outputs._names:
+                    data['o'][out] = outputs._names[out]
+        else:
+            data['o'] = outputs
+
+        if self.recording_options['record_solver_residuals']:
+
+            if isinstance(self, NonlinearSolver):
+                residuals = self._system._residuals
+            else:  # it's a LinearSolver
+                residuals = self._system._vectors['residual']['linear']
+
+            data['r'] = {}
+            if 'res' in self._filtered_vars_to_record:
+                for res in self._filtered_vars_to_record['res']:
+                    if res in residuals._names:
+                        data['r'][res] = residuals._names[res]
+            else:
+                data['r'] = residuals
+        else:
+            data['r'] = None
+
+        self._rec_mgr.record_iteration(self, data, metadata)
 
 
 class NonlinearSolver(Solver):
@@ -418,9 +562,9 @@ class NonlinearSolver(Solver):
         """
         Run the the apply_nonlinear method on the system.
         """
-        recording_iteration_stack.append(('_run_apply', 0))
+        recording_iteration.stack.append(('_run_apply', 0))
         self._system._apply_nonlinear()
-        recording_iteration_stack.pop()
+        recording_iteration.stack.pop()
 
     def _iter_get_norm(self):
         """
@@ -437,9 +581,26 @@ class NonlinearSolver(Solver):
 class LinearSolver(Solver):
     """
     Base class for linear solvers.
+
+    Attributes
+    ----------
+    _rel_systems : set of str
+        Names of systems relevant to the current solve.
     """
 
-    def solve(self, vec_names, mode):
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
+        """
+        super(LinearSolver, self).__init__(**kwargs)
+        self._rel_systems = None
+
+    def solve(self, vec_names, mode, rel_systems=None):
         """
         Run the solver.
 
@@ -449,6 +610,8 @@ class LinearSolver(Solver):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
 
         Returns
         -------
@@ -460,6 +623,7 @@ class LinearSolver(Solver):
             error at the first iteration.
         """
         self._vec_names = vec_names
+        self._rel_systems = rel_systems
         self._mode = mode
         return self._run_iterator()
 
@@ -497,13 +661,13 @@ class LinearSolver(Solver):
         """
         Run the the apply_linear method on the system.
         """
-        recording_iteration_stack.append(('_run_apply', 0))
+        recording_iteration.stack.append(('_run_apply', 0))
 
         system = self._system
         scope_out, scope_in = system._get_scope()
-        system._apply_linear(self._vec_names, self._mode, scope_out, scope_in)
+        system._apply_linear(self._vec_names, self._rel_systems, self._mode, scope_out, scope_in)
 
-        recording_iteration_stack.pop()
+        recording_iteration.stack.pop()
 
     def _iter_get_norm(self):
         """
@@ -523,9 +687,10 @@ class LinearSolver(Solver):
 
         norm = 0
         for vec_name in self._vec_names:
-            b_vec = b_vecs[vec_name]
-            b_vec -= self._rhs_vecs[vec_name]
-            norm += b_vec.get_norm()**2
+            if vec_name in system._rel_vec_names:
+                b_vec = b_vecs[vec_name]
+                b_vec -= self._rhs_vecs[vec_name]
+                norm += b_vec.get_norm()**2
 
         return norm ** 0.5
 

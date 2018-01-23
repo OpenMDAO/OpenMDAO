@@ -7,8 +7,9 @@ from six import iteritems
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, NewtonSolver
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, NewtonSolver, ExecComp, \
+     NewtonSolver, BalanceComp, DenseJacobian
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
@@ -47,7 +48,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         d_residuals.set_const(1.0)
         d_outputs.set_const(0.0)
         g1._linearize()
-        g1._solve_linear(['linear'], 'fwd')
+        g1.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
         # The empty first entry in _data is due to the dummy
@@ -61,7 +62,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         d_outputs.set_const(1.0)
         d_residuals.set_const(0.0)
         g1.linear_solver._linearize()
-        g1._solve_linear(['linear'], 'rev')
+        g1.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
         assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
@@ -90,7 +91,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         Jbase['obj', 'x'] = [[2.98061392]]
         Jbase['obj', 'z'] = np.array([[9.61001155, 1.78448534]])
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         for key, val in iteritems(Jbase):
             assert_rel_error(self, J[key], val, .00001)
 
@@ -101,10 +102,122 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
+    def test_raise_error_on_singular(self):
+        prob = Problem()
+        prob.model = model = Group()
+
+        comp = IndepVarComp()
+        comp.add_output('dXdt:TAS', val=1.0)
+        comp.add_output('accel_target', val=2.0)
+        model.add_subsystem('des_vars', comp, promotes=['*'])
+
+        teg = model.add_subsystem('thrust_equilibrium_group', subsys=Group())
+        teg.add_subsystem('dynamics', ExecComp('z = 2.0*thrust'), promotes=['*'])
+
+        thrust_bal = BalanceComp()
+        thrust_bal.add_balance(name='thrust', val=1207.1, lhs_name='dXdt:TAS',
+                               rhs_name='accel_target', eq_units='m/s**2', lower=-10.0, upper=10000.0)
+
+        teg.add_subsystem(name='thrust_bal', subsys=thrust_bal,
+                          promotes_inputs=['dXdt:TAS', 'accel_target'],
+                          promotes_outputs=['thrust'])
+
+        teg.linear_solver = DirectSolver()
+
+        teg.nonlinear_solver = NewtonSolver()
+        teg.nonlinear_solver.options['solve_subsystems'] = True
+        teg.nonlinear_solver.options['max_sub_solves'] = 1
+        teg.nonlinear_solver.options['atol'] = 1e-4
+
+        prob.setup(check=False)
+        prob.set_solver_print(level=0)
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_model()
+
+        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for row associated with state/residual 'thrust'."
+
+        self.assertEqual(expected_msg, str(cm.exception))
+
+    def test_raise_error_on_singular_with_densejac(self):
+        prob = Problem()
+        prob.model = model = Group()
+
+        comp = IndepVarComp()
+        comp.add_output('dXdt:TAS', val=1.0)
+        comp.add_output('accel_target', val=2.0)
+        model.add_subsystem('des_vars', comp, promotes=['*'])
+
+        teg = model.add_subsystem('thrust_equilibrium_group', subsys=Group())
+        teg.add_subsystem('dynamics', ExecComp('z = 2.0*thrust'), promotes=['*'])
+
+        thrust_bal = BalanceComp()
+        thrust_bal.add_balance(name='thrust', val=1207.1, lhs_name='dXdt:TAS',
+                               rhs_name='accel_target', eq_units='m/s**2', lower=-10.0, upper=10000.0)
+
+        teg.add_subsystem(name='thrust_bal', subsys=thrust_bal,
+                          promotes_inputs=['dXdt:TAS', 'accel_target'],
+                          promotes_outputs=['thrust'])
+
+        teg.linear_solver = DirectSolver()
+        teg.jacobian = DenseJacobian()
+
+        teg.nonlinear_solver = NewtonSolver()
+        teg.nonlinear_solver.options['solve_subsystems'] = True
+        teg.nonlinear_solver.options['max_sub_solves'] = 1
+        teg.nonlinear_solver.options['atol'] = 1e-4
+
+        prob.setup(check=False)
+        prob.set_solver_print(level=0)
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_model()
+
+        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for row associated with state/residual 'thrust'."
+
+        self.assertEqual(expected_msg, str(cm.exception))
+
+    def test_raise_no_error_on_singular(self):
+        prob = Problem()
+        prob.model = model = Group()
+
+        comp = IndepVarComp()
+        comp.add_output('dXdt:TAS', val=1.0)
+        comp.add_output('accel_target', val=2.0)
+        model.add_subsystem('des_vars', comp, promotes=['*'])
+
+        teg = model.add_subsystem('thrust_equilibrium_group', subsys=Group())
+        teg.add_subsystem('dynamics', ExecComp('z = 2.0*thrust'), promotes=['*'])
+
+        thrust_bal = BalanceComp()
+        thrust_bal.add_balance(name='thrust', val=1207.1, lhs_name='dXdt:TAS',
+                               rhs_name='accel_target', eq_units='m/s**2', lower=-10.0, upper=10000.0)
+
+        teg.add_subsystem(name='thrust_bal', subsys=thrust_bal,
+                          promotes_inputs=['dXdt:TAS', 'accel_target'],
+                          promotes_outputs=['thrust'])
+
+        teg.linear_solver = DirectSolver()
+
+        teg.nonlinear_solver = NewtonSolver()
+        teg.nonlinear_solver.options['solve_subsystems'] = True
+        teg.nonlinear_solver.options['max_sub_solves'] = 1
+        teg.nonlinear_solver.options['atol'] = 1e-4
+
+        prob.setup(check=False)
+        prob.set_solver_print(level=0)
+
+        teg.linear_solver.options['err_on_singular'] = False
+        prob.run_model()
+
 
 class TestDirectSolverFeature(unittest.TestCase):
 
     def test_specify_solver(self):
+
+        from openmdao.api import Problem, DirectSolver
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
         prob = Problem()
         model = prob.model = SellarDerivatives()
 
@@ -116,7 +229,7 @@ class TestDirectSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 

@@ -16,8 +16,6 @@ All Parametric Groups
 
 CycleGroup ('group_type': 'cycle')
 ----------------------------------
-'component_class': One of ['explicit', 'deprecated']. Controls the class of Component to use to
-                   build the group. ('explicit')
 'connection_type': One of ['implicit', 'explicit']. If connections are done explicitly or through
                    promotions ('implicit').
 'partial_type': One of ['array', 'sparse', 'aij']. How the component partial derivatives are
@@ -35,7 +33,7 @@ import unittest
 from six import iterkeys
 
 from openmdao.test_suite.parametric_suite import parametric_suite
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class ParameterizedTestCases(unittest.TestCase):
@@ -72,8 +70,7 @@ class ParameterizedTestCasesSubset(unittest.TestCase):
     @parametric_suite(jacobian_type='*',
                       num_comp=[2, 5, 10],
                       partial_type='aij',
-                      run_by_default=True,
-                      component_class='*')
+                      run_by_default=True)
     def test_subset(self, param_instance):
         param_instance.setup()
         problem = param_instance.problem
@@ -86,6 +83,10 @@ class ParameterizedTestCasesSubset(unittest.TestCase):
 
         expected_totals = model.expected_totals
         if expected_totals:
+            # Reverse Derivatives Check
+            totals = param_instance.compute_totals('rev')
+            assert_rel_error(self, totals, expected_totals, 1e-8)
+
             # Forward Derivatives Check
             totals = param_instance.compute_totals('fwd')
             assert_rel_error(self, totals, expected_totals, 1e-8)

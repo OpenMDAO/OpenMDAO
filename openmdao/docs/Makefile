@@ -41,7 +41,6 @@ clean:
 	rm -rf _srcdocs/*
 	rm -rf tags
 	rm -rf tmp
-	rm -f feature_docs_unit_test_db.sqlite
 
 mock:
 	@(python -c "import mock" >/dev/null 2>&1) || (echo "The 'mock' package \
@@ -57,15 +56,8 @@ all: mock redbaron
 
 	# Running things before docbuild
 	python _utils/preprocess_tags.py
-	python _utils/create_feature_docs_unit_test_db.py
 
-	# Doing the first command in the background does two builds in parallel
-	#       dev docs get built into tmp/moved into _build later
-	#       to avoid race to create dirs.
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
-
-	# post-game clean-up
-	rm feature_docs_unit_test_db.sqlite
 
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."

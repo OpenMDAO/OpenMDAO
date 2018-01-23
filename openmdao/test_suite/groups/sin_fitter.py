@@ -5,6 +5,7 @@
 from __future__ import print_function, division, absolute_import
 
 import numpy as np
+from six.moves import range
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
 
@@ -160,7 +161,7 @@ class LGLFit(ExplicitComponent):
     an approximation of arclength.
     """
     def initialize(self):
-        self.metadata.declare(name='num_nodes', required=True, type_=int)
+        self.metadata.declare(name='num_nodes', types=int)
 
     def setup(self):
         n = self.metadata['num_nodes']
@@ -189,7 +190,7 @@ class LGLFit(ExplicitComponent):
 class DefectComp(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare(name='num_nodes', required=True, type_=int)
+        self.metadata.declare(name='num_nodes', types=int)
 
     def setup(self):
         n = self.metadata['num_nodes']
@@ -209,7 +210,7 @@ class DefectComp(ExplicitComponent):
 class ArcLengthFunction(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare(name='num_nodes', required=True, type_=int)
+        self.metadata.declare(name='num_nodes', types=int)
 
     def setup(self):
         n = self.metadata['num_nodes']
@@ -233,7 +234,7 @@ class ArcLengthQuadrature(ExplicitComponent):
     Computes the arclength of a polynomial segment whose values are given at the LGL nodes.
     """
     def initialize(self):
-        self.metadata.declare(name='num_nodes', required=True, type_=int)
+        self.metadata.declare(name='num_nodes', types=int)
 
     def setup(self):
         n = self.metadata['num_nodes']

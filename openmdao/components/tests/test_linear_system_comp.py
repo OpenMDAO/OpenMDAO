@@ -5,8 +5,8 @@ import unittest
 import numpy as np
 
 from openmdao.api import Group, Problem, IndepVarComp
-from openmdao.api import LinearSystemComp, ScipyIterativeSolver, DirectSolver
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.api import LinearSystemComp, ScipyKrylov, DirectSolver
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestLinearSystem(unittest.TestCase):
@@ -33,8 +33,7 @@ class TestLinearSystem(unittest.TestCase):
         prob = Problem(model)
         prob.setup()
 
-        lingrp = prob.model.get_subsystem('lingrp')
-        lingrp.linear_solver = ScipyIterativeSolver()
+        lingrp.linear_solver = ScipyKrylov()
 
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -94,7 +93,7 @@ class TestLinearSystem(unittest.TestCase):
             sol = d_residuals['lin.x']
             assert_rel_error(self, sol, x, .0001)
 
-            J = prob.compute_total_derivs(['lin.x'], ['p1.A', 'p2.b'], return_format='flat_dict')
+            J = prob.compute_totals(['lin.x'], ['p1.A', 'p2.b'], return_format='flat_dict')
             assert_rel_error(self, J['lin.x', 'p1.A'], dx_dA, .0001)
             assert_rel_error(self, J['lin.x', 'p2.b'], dx_db, .0001)
 

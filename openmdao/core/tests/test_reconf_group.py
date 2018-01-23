@@ -2,7 +2,7 @@ from __future__ import division
 import unittest
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -40,7 +40,7 @@ class Test(unittest.TestCase):
         print(prob['y0'])
 
         # Now reconfigure ReconfGroup and re-run, ensuring the value of x is preserved.
-        prob.model.get_subsystem('g').resetup('reconf')
+        prob.model.g.resetup('reconf')
         prob.model.resetup('update')
         prob.run_model()
         assert_rel_error(self, prob['y0'], 1.0)

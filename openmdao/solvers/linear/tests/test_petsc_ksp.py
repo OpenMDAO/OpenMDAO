@@ -7,8 +7,8 @@ import warnings
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, PetscKSP, LinearBlockGS, DirectSolver, \
-     ExecComp, NewtonSolver, NonlinearBlockGS
+from openmdao.api import Problem, Group, IndepVarComp, PETScKrylov, LinearBlockGS, DirectSolver, \
+     ExecComp, NewtonSolver, NonlinearBlockGS, PetscKSP
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
@@ -19,24 +19,31 @@ except ImportError:
 
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
-class TestPetscKSP(unittest.TestCase):
+class TestPETScKrylov(unittest.TestCase):
 
     def test_options(self):
-        """Verify that the PetscKSP specific options are declared."""
+        """Verify that the PETScKrylov specific options are declared."""
 
         group = Group()
-        group.linear_solver = PetscKSP()
+        group.linear_solver = PETScKrylov()
 
         assert(group.linear_solver.options['ksp_type'] == 'fgmres')
 
     def test_solve_linear_ksp_default(self):
-        """Solve implicit system with PetscKSP using default method."""
+        """Solve implicit system with PETScKrylov using default method."""
 
-        group = TestImplicitGroup(lnSolverClass=PetscKSP)
+        # use PetscKSP here to check for deprecation warning and verify that the deprecated
+        # class still gets the right answer without duplicating this test.
+        with warnings.catch_warnings(record=True) as w:
+            group = TestImplicitGroup(lnSolverClass=PetscKSP)
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), "PetscKSP is deprecated.  Use PETScKrylov instead.")
 
         p = Problem(group)
         p.setup(vector_class=PETScVector, check=False)
@@ -66,9 +73,9 @@ class TestPetscKSP(unittest.TestCase):
         assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
 
     def test_solve_linear_ksp_gmres(self):
-        """Solve implicit system with PetscKSP using 'gmres' method."""
+        """Solve implicit system with PETScKrylov using 'gmres' method."""
 
-        group = TestImplicitGroup(lnSolverClass=PetscKSP, use_varsets=False)
+        group = TestImplicitGroup(lnSolverClass=PETScKrylov, use_varsets=False)
         group.linear_solver.options['ksp_type'] = 'gmres'
 
         p = Problem(group)
@@ -97,9 +104,9 @@ class TestPetscKSP(unittest.TestCase):
         assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
 
     def test_solve_linear_ksp_maxiter(self):
-        """Verify that PetscKSP abides by the 'maxiter' option."""
+        """Verify that PETScKrylov abides by the 'maxiter' option."""
 
-        group = TestImplicitGroup(lnSolverClass=PetscKSP)
+        group = TestImplicitGroup(lnSolverClass=PETScKrylov)
         group.linear_solver.options['maxiter'] = 2
 
         p = Problem(group)
@@ -126,9 +133,9 @@ class TestPetscKSP(unittest.TestCase):
         self.assertTrue(group.linear_solver._iter_count == 3)
 
     def test_solve_linear_ksp_precon(self):
-        """Solve implicit system with PetscKSP using a preconditioner."""
+        """Solve implicit system with PETScKrylov using a preconditioner."""
 
-        group = TestImplicitGroup(lnSolverClass=PetscKSP)
+        group = TestImplicitGroup(lnSolverClass=PETScKrylov)
         precon = group.linear_solver.precon = LinearBlockGS()
 
         p = Problem(group)
@@ -192,9 +199,9 @@ class TestPetscKSP(unittest.TestCase):
         assert_rel_error(self, output[5], group.expected_solution[1], 3e-15)
 
     def test_solve_linear_ksp_precon_left(self):
-        """Solve implicit system with PetscKSP using a preconditioner."""
+        """Solve implicit system with PETScKrylov using a preconditioner."""
 
-        group = TestImplicitGroup(lnSolverClass=PetscKSP)
+        group = TestImplicitGroup(lnSolverClass=PETScKrylov)
         precon = group.linear_solver.precon = DirectSolver()
         group.linear_solver.options['precon_side'] = 'left'
         group.linear_solver.options['ksp_type'] = 'richardson'
@@ -262,7 +269,7 @@ class TestPetscKSP(unittest.TestCase):
 
     def test_preconditioner_deprecation(self):
 
-        group = TestImplicitGroup(lnSolverClass=PetscKSP)
+        group = TestImplicitGroup(lnSolverClass=PETScKrylov)
 
         msg = "The 'preconditioner' property provides backwards compatibility " \
             + "with OpenMDAO <= 1.x ; use 'precon' instead."
@@ -292,7 +299,7 @@ class TestPetscKSP(unittest.TestCase):
         # just need a dummy variable so the sizes don't match between root and g1
         dv.add_output('dummy', val=1.0, shape=10)
 
-        g1 = model.add_subsystem('g1', TestImplicitGroup(lnSolverClass=PetscKSP))
+        g1 = model.add_subsystem('g1', TestImplicitGroup(lnSolverClass=PETScKrylov))
 
         p.model.linear_solver.options['maxiter'] = 1
         p.setup(vector_class=PETScVector, check=False)
@@ -306,7 +313,7 @@ class TestPetscKSP(unittest.TestCase):
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
         d_residuals.set_const(1.0)
         d_outputs.set_const(0.0)
-        g1._solve_linear(['linear'], 'fwd')
+        g1.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
         # The empty first entry in _data is due to the dummy
@@ -320,7 +327,7 @@ class TestPetscKSP(unittest.TestCase):
         d_outputs.set_const(1.0)
         d_residuals.set_const(0.0)
         g1.linear_solver._linearize()
-        g1._solve_linear(['linear'], 'rev')
+        g1.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
         assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
@@ -328,9 +335,14 @@ class TestPetscKSP(unittest.TestCase):
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
-class TestPetscKSPSolverFeature(unittest.TestCase):
+class TestPETScKrylovSolverFeature(unittest.TestCase):
 
     def test_specify_solver(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NonlinearBlockGS, PETScKrylov, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -349,7 +361,7 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
 
         model.nonlinear_solver = NonlinearBlockGS()
 
-        model.linear_solver = PetscKSP()
+        model.linear_solver = PETScKrylov()
 
         prob.setup()
         prob.run_model()
@@ -357,11 +369,18 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
     def test_specify_ksp_type(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NonlinearBlockGS, PETScKrylov, \
+             ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -380,7 +399,7 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
 
         model.nonlinear_solver = NonlinearBlockGS()
 
-        model.linear_solver = PetscKSP()
+        model.linear_solver = PETScKrylov()
         model.linear_solver.options['ksp_type'] = 'gmres'
 
         prob.setup()
@@ -389,11 +408,16 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
     def test_feature_maxiter(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NonlinearBlockGS, PETScKrylov, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -412,7 +436,7 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
 
         model.nonlinear_solver = NonlinearBlockGS()
 
-        model.linear_solver = PetscKSP()
+        model.linear_solver = PETScKrylov()
         model.linear_solver.options['maxiter'] = 3
 
         prob.setup()
@@ -421,11 +445,16 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.2654054431, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.87246623559, .00001)
 
     def test_feature_atol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NonlinearBlockGS, PETScKrylov, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -444,7 +473,7 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
 
         model.nonlinear_solver = NonlinearBlockGS()
 
-        model.linear_solver = PetscKSP()
+        model.linear_solver = PETScKrylov()
         model.linear_solver.options['atol'] = 1.0e-20
 
         prob.setup()
@@ -453,11 +482,16 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001055699, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448533563, .00001)
 
     def test_feature_rtol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NonlinearBlockGS, PETScKrylov, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -476,7 +510,7 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
 
         model.nonlinear_solver = NonlinearBlockGS()
 
-        model.linear_solver = PetscKSP()
+        model.linear_solver = PETScKrylov()
         model.linear_solver.options['rtol'] = 1.0e-20
 
         prob.setup()
@@ -485,11 +519,17 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001055699, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448533563, .00001)
 
     def test_specify_precon(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, LinearBlockGS, PETScKrylov, \
+             NewtonSolver, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -508,7 +548,7 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = PetscKSP()
+        model.linear_solver = PETScKrylov()
 
         model.linear_solver.precon = LinearBlockGS()
         model.linear_solver.precon.options['maxiter'] = 2
@@ -520,6 +560,12 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_specify_precon_left(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, PETScKrylov, \
+             NewtonSolver, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
 
         prob = Problem()
         model = prob.model = Group()
@@ -538,7 +584,7 @@ class TestPetscKSPSolverFeature(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = PetscKSP()
+        model.linear_solver = PETScKrylov()
 
         model.linear_solver.precon = DirectSolver()
         model.linear_solver.options['precon_side'] = 'left'

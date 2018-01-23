@@ -179,8 +179,9 @@ body {
 @font-face {
     /* Subset of fonts from Font Awesome v4.6.3 created using http://fontello.com/ */
     font-family: 'fontello';
-    src: url('fontello.woff') format('woff');
-}
+    src: url('data:application/font-woff;charset=utf-8;base64,{{fontello}}') format('woff');
+}            
+
 [class^="icon-"]:before, [class*=" icon-"]:before {
     display: inline-block;
     font: normal normal normal 14px/1 fontello;

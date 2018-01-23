@@ -3,7 +3,7 @@
 from __future__ import print_function
 
 from openmdao.solvers.solver import NonlinearSolver
-from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration_stack
+from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration
 from openmdao.utils.general_utils import warn_deprecation
 
 
@@ -15,14 +15,14 @@ class NewtonSolver(NonlinearSolver):
 
     Attributes
     ----------
-    linear_solver : <LinearSolver>
+    linear_solver : LinearSolver
         Linear solver to use to find the Newton search direction. The default
         is the parent system's linear solver.
-    linesearch : <NonlinearSolver>
+    linesearch : NonlinearSolver
         Line search algorithm. Default is None for no line search.
-    options : <OptionsDictionary>
+    options : OptionsDictionary
         options dictionary.
-    _system : <System>
+    _system : System
         pointer to the owning system.
     _depth : int
         how many subsolvers deep this solver is (0 means not a subsolver).
@@ -81,9 +81,9 @@ class NewtonSolver(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('solve_subsystems', type_=bool, default=False,
+        self.options.declare('solve_subsystems', types=bool, default=False,
                              desc='Set to True to turn on sub-solvers (Hybrid Newton).')
-        self.options.declare('max_sub_solves', type_=int, default=10,
+        self.options.declare('max_sub_solves', types=int, default=10,
                              desc='Maximum number of subsystem solves.')
         self.supports['gradients'] = True
 
@@ -93,7 +93,7 @@ class NewtonSolver(NonlinearSolver):
 
         Parameters
         ----------
-        system : <System>
+        system : System
             pointer to the owning system.
         depth : int
             depth of the current system (already incremented).
@@ -134,7 +134,7 @@ class NewtonSolver(NonlinearSolver):
         """
         Run the the apply_nonlinear method on the system.
         """
-        recording_iteration_stack.append(('_run_apply', 0))
+        recording_iteration.stack.append(('_run_apply', 0))
 
         system = self._system
 
@@ -144,7 +144,7 @@ class NewtonSolver(NonlinearSolver):
 
         system._apply_nonlinear()
 
-        recording_iteration_stack.pop()
+        recording_iteration.stack.pop()
 
         # Enable local fd
         system._owns_approx_jac = approx_status
@@ -184,6 +184,9 @@ class NewtonSolver(NonlinearSolver):
         """
         system = self._system
 
+        # Execute guess_nonlinear if specified.
+        system._guess_nonlinear()
+
         with Recording('Newton_subsolve', 0, self):
             if self.options['solve_subsystems'] and \
                (self._iter_count <= self.options['max_sub_solves']):
@@ -201,15 +204,9 @@ class NewtonSolver(NonlinearSolver):
 
                 self._solver_info.pop()
 
-        if self.options['maxiter'] > 0:
+        self._run_apply()
+        norm = self._iter_get_norm()
 
-            # Execute guess_nonlinear if specified.
-            system._guess_nonlinear()
-
-            self._run_apply()
-            norm = self._iter_get_norm()
-        else:
-            norm = 1.0
         norm0 = norm if norm != 0.0 else 1.0
         return norm0, norm
 

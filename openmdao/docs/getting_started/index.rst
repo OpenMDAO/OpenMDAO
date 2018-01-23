@@ -1,3 +1,5 @@
+.. _GettingStarted:
+
 ***************
 Getting Started
 ***************
@@ -6,20 +8,24 @@ Installation Instructions:
 
 Use :code:`git` to clone the repository:
 
-:code:`git clone http://github.com/OpenMDAO/blue`
+:code:`git clone http://github.com/OpenMDAO/OpenMDAO`
 
 Use :code:`pip` to install openmdao locally:
 
-:code:`cd blue`
+:code:`cd OpenMDAO`
 
 :code:`pip install .`
 
-Documentation Building Instructions:
+Hello, World!
+*************
+Here is a really short run file to get you started running your first optimization.
+Copy the code into a file named `hello_world.py` and run it by typing:
 
-:code:`cd openmdao/docs`
+.. code::
 
-:code:`make all`
+    python hello_world.py
 
-This will build the docs in :code:`openmdao/docs/_build/html.`
+.. embed-test::
+    openmdao.test_suite.test_examples.tldr_paraboloid.TestParaboloidTLDR.test_tldr
+    :no-split:
 
-Then, just :code:`open openmdao/docs/_build/html/index.html` in a browser to begin.

@@ -5,9 +5,9 @@ import warnings
 import numpy as np
 
 from openmdao.api import Group, Problem, IndepVarComp, LinearBlockGS, \
-    NewtonSolver, ExecComp, ScipyIterativeSolver, ImplicitComponent, \
+    NewtonSolver, ExecComp, ScipyKrylov, ImplicitComponent, \
     DirectSolver, DenseJacobian, AnalysisError
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.double_sellar import DoubleSellar, DoubleSellarImplicit, \
      SubSellar
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
@@ -21,16 +21,15 @@ from openmdao.test_suite.components.implicit_newton_linesearch \
 class TestNewton(unittest.TestCase):
 
     def test_specify_newton_linear_solver_in_system(self):
-        prob = Problem()
 
         my_newton = NewtonSolver()
         my_newton.linear_solver = DirectSolver()
 
-        model = prob.model = SellarDerivatives(nonlinear_solver=my_newton)
+        prob = Problem(model=SellarDerivatives(nonlinear_solver=my_newton))
 
         prob.setup()
 
-        self.assertIsInstance(model.nonlinear_solver.linear_solver, DirectSolver)
+        self.assertIsInstance(prob.model.nonlinear_solver.linear_solver, DirectSolver)
 
         prob.run_model()
 
@@ -41,8 +40,10 @@ class TestNewton(unittest.TestCase):
         """ Feature test for slotting a Newton solver and using it to solve
         Sellar.
         """
-        prob = Problem()
-        prob.model = SellarDerivatives(nonlinear_solver=NewtonSolver())
+        from openmdao.api import Problem, NewtonSolver
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        prob = Problem(model=SellarDerivatives(nonlinear_solver=NewtonSolver()))
 
         prob.setup(check=False)
         prob.run_model()
@@ -53,8 +54,7 @@ class TestNewton(unittest.TestCase):
     def test_sellar_grouped(self):
         # Tests basic Newton solution on Sellar in a subgroup
 
-        prob = Problem()
-        prob.model = SellarDerivativesGrouped(nonlinear_solver=NewtonSolver())
+        prob = Problem(model=SellarDerivativesGrouped(nonlinear_solver=NewtonSolver()))
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -69,8 +69,7 @@ class TestNewton(unittest.TestCase):
     def test_sellar(self):
         # Just tests Newton on Sellar with FD derivs.
 
-        prob = Problem()
-        prob.model = SellarNoDerivatives(nonlinear_solver=NewtonSolver())
+        prob = Problem(model=SellarNoDerivatives(nonlinear_solver=NewtonSolver()))
 
         prob.setup(check=False)
         prob.run_model()
@@ -83,14 +82,13 @@ class TestNewton(unittest.TestCase):
 
     def test_line_search_deprecated(self):
         top = Problem()
-        top.model = Group()
         top.model.add_subsystem('px', IndepVarComp('x', 1.0))
         top.model.add_subsystem('comp', ImplCompTwoStates())
         top.model.connect('px.x', 'comp.x')
 
         top.model.nonlinear_solver = NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyIterativeSolver()
+        top.model.linear_solver = ScipyKrylov()
 
         msg = "The 'line_search' attribute provides backwards compatibility with OpenMDAO 1.x ; use 'linesearch' instead."
         with warnings.catch_warnings(record=True) as w:
@@ -150,8 +148,7 @@ class TestNewton(unittest.TestCase):
 
     def test_sellar_derivs_with_Lin_GS(self):
 
-        prob = Problem()
-        prob.model = SellarDerivatives(nonlinear_solver=NewtonSolver())
+        prob = Problem(model=SellarDerivatives(nonlinear_solver=NewtonSolver()))
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -166,8 +163,7 @@ class TestNewton(unittest.TestCase):
     def test_sellar_state_connection(self):
         # Sellar model closes loop with state connection instead of a cycle.
 
-        prob = Problem()
-        prob.model = SellarStateConnection(nonlinear_solver=NewtonSolver())
+        prob = Problem(model=SellarStateConnection(nonlinear_solver=NewtonSolver()))
 
         prob.set_solver_print(level=0)
         prob.setup(check=False)
@@ -182,10 +178,9 @@ class TestNewton(unittest.TestCase):
     def test_sellar_state_connection_fd_system(self):
         # Sellar model closes loop with state connection instead of a cycle.
         # This test is just fd.
-        prob = Problem()
-        prob.model = SellarStateConnection(nonlinear_solver=NewtonSolver())
+        prob = Problem(model=SellarStateConnection(nonlinear_solver=NewtonSolver()))
 
-        prob.model.approx_total_derivs(method='fd')
+        prob.model.approx_totals(method='fd')
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -200,7 +195,7 @@ class TestNewton(unittest.TestCase):
     def test_sellar_specify_linear_solver(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -210,7 +205,7 @@ class TestNewton(unittest.TestCase):
 
         subgrp = sub.add_subsystem('state_eq_group', Group(),
                                    promotes=['state_eq.y2_actual', 'state_eq.y2_command'])
-        subgrp.linear_solver = ScipyIterativeSolver()
+        subgrp.linear_solver = ScipyKrylov()
         subgrp.add_subsystem('state_eq', StateConnection())
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1'])
@@ -233,11 +228,11 @@ class TestNewton(unittest.TestCase):
         # Use bad settings for this one so that problem doesn't converge.
         # That way, we test that we are really using Newton's Lin Solver
         # instead.
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
         model.linear_solver.options['maxiter'] = 1
 
         # The good solver
-        model.nonlinear_solver.linear_solver = ScipyIterativeSolver()
+        model.nonlinear_solver.linear_solver = ScipyKrylov()
 
         prob.set_solver_print(level=0)
         prob.setup(check=False)
@@ -254,7 +249,7 @@ class TestNewton(unittest.TestCase):
     def test_sellar_specify_linear_direct_solver(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -264,7 +259,7 @@ class TestNewton(unittest.TestCase):
 
         subgrp = sub.add_subsystem('state_eq_group', Group(),
                                    promotes=['state_eq.y2_actual', 'state_eq.y2_command'])
-        subgrp.linear_solver = ScipyIterativeSolver()
+        subgrp.linear_solver = ScipyKrylov()
         subgrp.add_subsystem('state_eq', StateConnection())
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1'])
@@ -287,7 +282,7 @@ class TestNewton(unittest.TestCase):
         # Use bad settings for this one so that problem doesn't converge.
         # That way, we test that we are really using Newton's Lin Solver
         # instead.
-        sub.linear_solver = ScipyIterativeSolver()
+        sub.linear_solver = ScipyKrylov()
         model.linear_solver.options['maxiter'] = 1
 
         # The good solver
@@ -304,81 +299,22 @@ class TestNewton(unittest.TestCase):
         self.assertLess(model.nonlinear_solver._iter_count, 8)
         self.assertEqual(model.linear_solver._iter_count, 0)
 
-    def test_implicit_utol(self):
-        # We are setup for reach utol termination condition quite quickly.
-
-        raise unittest.SkipTest("solver utol not implemented yet")
-
-        class CubicImplicit(ImplicitComponent):
-            """ A Simple Implicit Component.
-            f(x) = x**3 + 3x**2 -6x +18
-            """
-
-            def __init__(self):
-                super(CubicImplicit, self).__init__()
-
-                # Params
-                self.add_input('x', 0.0)
-
-                # States
-                self.add_output('z', 0.0)
-
-            def compute(self, inputs, outputs):
-                pass
-
-            def apply_nonlinear(self, inputs, outputs, resids):
-                """ Don't solve; just calculate the residual."""
-
-                x = inputs['x']
-                z = outputs['z']
-
-                resids['z'] = (z**3 + 3.0*z**2 - 6.0*z + x)*1e15
-
-            def linearize(self, inputs, outputs, partials):
-                """Analytical derivatives."""
-
-                # x = inputs['x']
-                z = outputs['z']
-
-                # State equation
-                partials[('z', 'z')] = (3.0*z**2 + 6.0*z - 6.0)*1e15
-                partials[('z', 'x')] = 1.0*1e15
-
-        prob = Problem()
-        root = prob.model = Group()
-        root.add_subsystem('p1', IndepVarComp('x', 17.4))
-        root.add_subsystem('comp', CubicImplicit())
-        root.connect('p1.x', 'comp.x')
-
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.linear_solver = ScipyIterativeSolver()
-
-        prob.setup(check=False)
-        prob['comp.z'] = -4.93191510182
-
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        assert_rel_error(self, prob['comp.z'], -4.93191510182, .00001)
-        self.assertLessEqual(prob.model.nonlinear_solver._iter_count, 4,
-                             msg='Should get there pretty quick because of utol.')
-
     def test_solve_subsystems_basic(self):
-        prob = Problem()
-        model = prob.model = DoubleSellar()
+        prob = Problem(model=DoubleSellar())
+        model = prob.model
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
         model.nonlinear_solver.options['solve_subsystems'] = True
 
@@ -391,22 +327,22 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_basic_dense_jac(self):
-        prob = Problem()
-        model = prob.model = DoubleSellar()
+        prob = Problem(model=DoubleSellar())
+        model = prob.model
         model.jacobian = DenseJacobian()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
         model.nonlinear_solver.options['solve_subsystems'] = True
 
@@ -419,22 +355,22 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_basic_dense_jac_scaling(self):
-        prob = Problem()
-        model = prob.model = DoubleSellar(units=None, scaling=True)
+        prob = Problem(model=DoubleSellar(units=None, scaling=True))
+        model = prob.model
         model.jacobian = DenseJacobian()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
         model.nonlinear_solver.options['solve_subsystems'] = True
 
@@ -447,22 +383,22 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_basic_dense_jac_units_scaling(self):
-        prob = Problem()
-        model = prob.model = DoubleSellar(units=True, scaling=True)
+        prob = Problem(model=DoubleSellar(units=True, scaling=True))
+        model = prob.model
         model.jacobian = DenseJacobian()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
         model.nonlinear_solver.options['solve_subsystems'] = True
 
@@ -475,19 +411,19 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_assembled_jac_top(self):
-        prob = Problem()
-        model = prob.model = DoubleSellar()
+        prob = Problem(model=DoubleSellar())
+        model = prob.model
         model.jacobian = DenseJacobian()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
-        g1.linear_solver = ScipyIterativeSolver()
+        g1.linear_solver = ScipyKrylov()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
-        g2.linear_solver = ScipyIterativeSolver()
+        g2.linear_solver = ScipyKrylov()
 
         model.nonlinear_solver = NewtonSolver()
         model.linear_solver = DirectSolver()
@@ -502,22 +438,22 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_assembled_jac_top_implicit(self):
-        prob = Problem()
-        model = prob.model = DoubleSellarImplicit()
+        prob = Problem(model=DoubleSellarImplicit())
+        model = prob.model
         model.jacobian = DenseJacobian()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
         model.nonlinear_solver.options['solve_subsystems'] = True
 
         prob.setup()
@@ -529,22 +465,22 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_assembled_jac_top_implicit_scaling(self):
-        prob = Problem()
-        model = prob.model = DoubleSellarImplicit(scaling=True)
+        prob = Problem(model=DoubleSellarImplicit(scaling=True))
+        model = prob.model
         model.jacobian = DenseJacobian()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
         model.nonlinear_solver.options['solve_subsystems'] = True
 
         prob.setup()
@@ -556,22 +492,22 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_assembled_jac_top_implicit_scaling_units(self):
-        prob = Problem()
-        model = prob.model = DoubleSellarImplicit(units=True, scaling=True)
+        prob = Problem(model=DoubleSellarImplicit(units=True, scaling=True))
+        model = prob.model
         model.jacobian = DenseJacobian()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
         model.nonlinear_solver.options['solve_subsystems'] = True
 
         prob.setup()
@@ -583,22 +519,22 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_assembled_jac_subgroup(self):
-        prob = Problem()
-        model = prob.model = DoubleSellar()
+        prob = Problem(model=DoubleSellar())
+        model = prob.model
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
         g1.jacobian = DenseJacobian()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
         prob.setup()
         prob.run_model()
@@ -634,23 +570,23 @@ class TestNewton(unittest.TestCase):
                 super(CountDS, self)._linearize()
                 self.lin_count += 1
 
-        prob = Problem()
-        model = prob.model = DoubleSellar()
+        prob = Problem(model=DoubleSellar())
+        model = prob.model
 
         # each SubSellar group converges itself
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = CountNewton()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = CountDS()  # used for derivatives
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = CountNewton()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
         # Enfore behavior: max_sub_solves = 0 means we run once during init
 
@@ -667,23 +603,23 @@ class TestNewton(unittest.TestCase):
         self.assertEqual(g2.nonlinear_solver.total_count, 2)
         self.assertEqual(g1.linear_solver.lin_count, 2)
 
-        prob = Problem()
-        model = prob.model = DoubleSellar()
+        prob = Problem(model=DoubleSellar())
+        model = prob.model
 
         # each SubSellar group converges itself
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = CountNewton()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = CountDS()  # used for derivatives
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = CountNewton()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
         # Enforce Behavior: baseline
 
@@ -700,23 +636,23 @@ class TestNewton(unittest.TestCase):
         self.assertEqual(g2.nonlinear_solver.total_count, 5)
         self.assertEqual(g1.linear_solver.lin_count, 5)
 
-        prob = Problem()
-        model = prob.model = DoubleSellar()
+        prob = Problem(model=DoubleSellar())
+        model = prob.model
 
         # each SubSellar group converges itself
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = CountNewton()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = CountDS()  # used for derivatives
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = CountNewton()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
         # Enfore behavior: max_sub_solves = 1 means we run during init and first iteration of iter_execute
 
@@ -744,6 +680,8 @@ class TestNewton(unittest.TestCase):
                 self.add_output('x', val=0.)
                 self.applied = False
 
+                self.declare_partials(of='*', wrt='*')
+
             def apply_nonlinear(self, inputs, outputs, residuals):
                 residuals['x'] = np.exp(outputs['x']) - \
                     inputs['a']**2 * outputs['x']**2
@@ -761,7 +699,7 @@ class TestNewton(unittest.TestCase):
                     raise RuntimeError("Bug! Linearize called before Apply!")
 
         prob = Problem()
-        root = prob.model = Group()
+        root = prob.model
         root.add_subsystem('p1', IndepVarComp('a', 1.0))
         root.add_subsystem('comp', ImpComp())
         root.connect('p1.a', 'comp.a')
@@ -792,13 +730,60 @@ class TestNewton(unittest.TestCase):
         msg = "Solver 'NL: Newton' on system '' failed to converge."
         self.assertEqual(str(context.exception), msg)
 
+    def test_relevancy_for_newton(self):
+
+        class TestImplCompSimple(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('a', val=1.)
+                self.add_output('x', val=0.)
+
+                self.declare_partials(of='*', wrt='*')
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['x'] = np.exp(outputs['x']) - \
+                    inputs['a']**2 * outputs['x']**2
+
+            def linearize(self, inputs, outputs, jacobian):
+                jacobian['x', 'x'] = np.exp(outputs['x']) - \
+                    2 * inputs['a']**2 * outputs['x']
+                jacobian['x', 'a'] = -2 * inputs['a'] * outputs['x']**2
+
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        model.add_subsystem('icomp', TestImplCompSimple())
+        model.add_subsystem('ecomp', ExecComp('y = x*p', p=1.0))
+
+        model.connect('p1.x', 'ecomp.x')
+        model.connect('icomp.x', 'ecomp.p')
+
+        model.add_design_var('p1.x', 3.0)
+        model.add_objective('ecomp.y')
+
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyKrylov()
+
+        prob.setup(check=False)
+
+        prob.run_model()
+
+        J = prob.compute_totals()
+        assert_rel_error(self, J['ecomp.y', 'p1.x'][0][0], -0.703467422498, 1e-6)
+
 
 class TestNewtonFeatures(unittest.TestCase):
 
     def test_feature_basic(self):
+        import numpy as np
+
+        from openmdao.api import Problem, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -815,7 +800,7 @@ class TestNewtonFeatures(unittest.TestCase):
 
         model.linear_solver = LinearBlockGS()
 
-        nlgbs = model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver = NewtonSolver()
 
         prob.setup()
 
@@ -825,9 +810,13 @@ class TestNewtonFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_maxiter(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -855,9 +844,13 @@ class TestNewtonFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.0607416105, .00001)
 
     def test_feature_rtol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -885,9 +878,13 @@ class TestNewtonFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.0607416105, .00001)
 
     def test_feature_atol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -915,9 +912,15 @@ class TestNewtonFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_linear_solver(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, \
+             ExecComp, DirectSolver
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+             SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -946,8 +949,13 @@ class TestNewtonFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_max_sub_solves(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp, DirectSolver, ScipyKrylov
+        from openmdao.test_suite.components.double_sellar import SubSellar
+
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('g1', SubSellar())
         model.add_subsystem('g2', SubSellar())
@@ -959,18 +967,18 @@ class TestNewtonFeatures(unittest.TestCase):
         model.nonlinear_solver = NewtonSolver()
         model.linear_solver = DirectSolver()
 
-        g1 = model.get_subsystem('g1')
+        g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
-        g2 = model.get_subsystem('g2')
+        g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 0
@@ -979,9 +987,13 @@ class TestNewtonFeatures(unittest.TestCase):
         prob.run_model()
 
     def test_feature_err_on_maxiter(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp, AnalysisError
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -1008,6 +1020,37 @@ class TestNewtonFeatures(unittest.TestCase):
             prob.run_model()
         except AnalysisError:
             pass
+
+    def test_solve_subsystems_basic(self):
+        from openmdao.api import Problem, NewtonSolver, DirectSolver, ScipyKrylov
+        from openmdao.test_suite.components.double_sellar import DoubleSellar
+
+        prob = Problem(model=DoubleSellar())
+        model = prob.model
+
+        g1 = model.g1
+        g1.nonlinear_solver = NewtonSolver()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = DirectSolver()
+
+        g2 = model.g2
+        g2.nonlinear_solver = NewtonSolver()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = DirectSolver()
+
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyKrylov()
+
+        model.nonlinear_solver.options['solve_subsystems'] = True
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
+        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+
 
 if __name__ == "__main__":
     unittest.main()

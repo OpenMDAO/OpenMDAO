@@ -6,9 +6,9 @@ import unittest
 from six.moves import cStringIO
 import numpy as np
 
-from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, NewtonSolver, \
-                         ScipyIterativeSolver
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, \
+    NewtonSolver, ScipyKrylov
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 # Note: The following class definitions are used in feature docs
@@ -22,12 +22,13 @@ class QuadraticComp(ImplicitComponent):
     Solution via Quadratic Formula:
     x = (-b + sqrt(b^2 - 4ac)) / 2a
     """
-
     def setup(self):
         self.add_input('a', val=1.)
         self.add_input('b', val=1.)
         self.add_input('c', val=1.)
         self.add_output('x', val=0.)
+
+        self.declare_partials(of='*', wrt='*')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         a = inputs['a']
@@ -123,6 +124,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         group.connect('comp1.a', 'comp2.a')
         group.connect('comp1.b', 'comp2.b')
         group.connect('comp1.c', 'comp2.c')
+
         group.connect('comp1.a', 'comp3.a')
         group.connect('comp1.b', 'comp3.b')
         group.connect('comp1.c', 'comp3.c')
@@ -139,7 +141,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp2.x'], 3.)
         assert_rel_error(self, prob['comp2.x'], 3.)
 
-        total_derivs = prob.compute_total_derivs(
+        total_derivs = prob.compute_totals(
             wrt=['comp1.a', 'comp1.b', 'comp1.c'],
             of=['comp2.x', 'comp3.x']
         )
@@ -168,81 +170,75 @@ class ImplicitCompTestCase(unittest.TestCase):
         else:
             self.fail("Exception expected")
 
-    def test_list_residuals_before_run(self):
-        msg = "Unable to list residuals until model has been run."
-        try:
-            self.prob.model.list_residuals()
-        except Exception as err:
-            self.assertTrue(msg == str(err))
-        else:
-            self.fail("Exception expected")
-
     def test_list_inputs(self):
         self.prob.run_model()
 
         stream = cStringIO()
-        inputs = self.prob.model.list_inputs(out_stream=stream)
+        inputs = self.prob.model.list_inputs(hierarchical=False, out_stream=stream)
         self.assertEqual(sorted(inputs), [
-            ('comp2.a', [1.]),
-            ('comp2.b', [-4.]),
-            ('comp2.c', [3.]),
-            ('comp3.a', [1.]),
-            ('comp3.b', [-4.]),
-            ('comp3.c', [3.])
+            ('comp2.a', {'value': [1.]}),
+            ('comp2.b', {'value': [-4.]}),
+            ('comp2.c', {'value': [3.]}),
+            ('comp3.a', {'value': [1.]}),
+            ('comp3.b', {'value': [-4.]}),
+            ('comp3.c', {'value': [3.]})
         ])
         text = stream.getvalue()
         self.assertEqual(text.count('comp2.'), 3)
         self.assertEqual(text.count('comp3.'), 3)
-        self.assertEqual(text.count('value:'), 6)
+        self.assertEqual(text.count('value'), 1)
 
     def test_list_explicit_outputs(self):
         self.prob.run_model()
 
         stream = cStringIO()
-        outputs = self.prob.model.list_outputs(implicit=False, out_stream=stream)
+        outputs = self.prob.model.list_outputs(implicit=False, hierarchical=False, out_stream=stream)
         self.assertEqual(sorted(outputs), [
-            ('comp1.a', [1.]),
-            ('comp1.b', [-4.]),
-            ('comp1.c', [3.])
+            ('comp1.a', {'value': [1.]}),
+            ('comp1.b', {'value': [-4.]}),
+            ('comp1.c', {'value': [3.]})
         ])
         text = stream.getvalue()
         self.assertEqual(text.count('comp1.'), 3)
-        self.assertEqual(text.count('value:'), 3)
-        self.assertEqual(text.count('residual:'), 3)
+        self.assertEqual(text.count('varname'), 1)
+        self.assertEqual(text.count('value'), 1)
 
     def test_list_implicit_outputs(self):
         self.prob.run_model()
 
         stream = cStringIO()
-        states = self.prob.model.list_outputs(explicit=False, out_stream=stream)
-        self.assertEqual(sorted(states), [
-            ('comp2.x', [3.]),
-            ('comp3.x', [3.])
+        states = self.prob.model.list_outputs(explicit=False, residuals=True,
+                                              hierarchical=False, out_stream=stream)
+        self.assertEqual(states, [
+            ('comp2.x', {'value': [3.], 'resids': [0.]}),
+            ('comp3.x', {'value': [3.], 'resids': [0.]}),
         ])
         text = stream.getvalue()
-        self.assertEqual(text.count('comp2.x'), 1)
-        self.assertEqual(text.count('comp3.x'), 1)
-        self.assertEqual(text.count('value:'), 2)
-        self.assertEqual(text.count('residual:'), 2)
+        self.assertEqual(1, text.count('comp2.x'))
+        self.assertEqual(1, text.count('comp3.x'))
+        self.assertEqual(1, text.count('value'))
+        self.assertEqual(1, text.count('resids'))
 
     def test_list_residuals(self):
         self.prob.run_model()
 
         stream = cStringIO()
-        resids = self.prob.model.list_residuals(out_stream=stream)
+        resids = self.prob.model.list_outputs(values=False, residuals=True, hierarchical=False,
+                                              out_stream=stream)
         self.assertEqual(sorted(resids), [
-            ('comp1.a', [0.]),
-            ('comp1.b', [0.]),
-            ('comp1.c', [0.]),
-            ('comp2.x', [0.]),
-            ('comp3.x', [0.])
+            ('comp1.a', { 'resids':[0.]}),
+            ('comp1.b', { 'resids':[0.]}),
+            ('comp1.c', { 'resids':[0.]}),
+            ('comp2.x', { 'resids':[0.]}),
+            ('comp3.x', { 'resids':[0.]})
         ])
         text = stream.getvalue()
         self.assertEqual(text.count('comp1.'), 3)
         self.assertEqual(text.count('comp2.x'), 1)
         self.assertEqual(text.count('comp3.x'), 1)
-        self.assertEqual(text.count('value:'), 5)
-        self.assertEqual(text.count('residual:'), 5)
+        self.assertEqual(text.count('varname'), 2)
+        self.assertEqual(text.count('value'), 0)
+        self.assertEqual(text.count('resids'), 2)
 
     def test_guess_nonlinear(self):
 
@@ -256,7 +252,6 @@ class ImplicitCompTestCase(unittest.TestCase):
                 # Solution at x=1 and x=3. Default value takes us to the x=1 solution. Here
                 # we set it to a value that will take us to the x=3 solution.
                 outputs['x'] = 5.0
-
 
         group = Group()
 
@@ -272,7 +267,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         group.nonlinear_solver = NewtonSolver()
         group.nonlinear_solver.options['solve_subsystems'] = True
         group.nonlinear_solver.options['max_sub_solves'] = 1
-        group.linear_solver = ScipyIterativeSolver()
+        group.linear_solver = ScipyKrylov()
 
         prob.setup(check=False)
 
@@ -306,7 +301,6 @@ class ImplicitCompTestCase(unittest.TestCase):
             def guess_nonlinear(self, inputs, outputs, resids):
                 # Passthrough
                 outputs['y'] = inputs['x']
-
 
         group = Group()
 
@@ -347,7 +341,6 @@ class ImplicitCompTestCase(unittest.TestCase):
             def guess_nonlinear(self, inputs, outputs, resids):
                 # Passthrough
                 outputs['y'] = inputs['x']
-
 
         group = Group()
         sub = Group()
@@ -392,7 +385,6 @@ class ImplicitCompTestCase(unittest.TestCase):
                 # Passthrough
                 outputs['y'] = inputs['x']
 
-
         group = Group()
         sub = Group()
 
@@ -415,6 +407,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['sub.comp2.y'], 77., 1e-5)
 
     def test_guess_nonlinear_feature(self):
+        from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, NewtonSolver, ScipyKrylov
 
         class ImpWithInitial(ImplicitComponent):
 
@@ -423,6 +416,8 @@ class ImplicitCompTestCase(unittest.TestCase):
                 self.add_input('b', val=1.)
                 self.add_input('c', val=1.)
                 self.add_output('x', val=0.)
+
+                self.declare_partials(of='*', wrt='*')
 
             def apply_nonlinear(self, inputs, outputs, residuals):
                 a = inputs['a']
@@ -459,7 +454,6 @@ class ImplicitCompTestCase(unittest.TestCase):
                 # we set it to a value that will tke us to the 3 solution.
                 outputs['x'] = 5.0
 
-
         prob = Problem()
         model = prob.model = Group()
 
@@ -474,7 +468,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         model.nonlinear_solver = NewtonSolver()
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 1
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
         prob.setup(check=False)
 
@@ -487,9 +481,31 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp2.x'], 3.)
 
 
+class QuadGroup(Group):
+    def setup(self):
+        comp1 = self.add_subsystem('comp1', IndepVarComp())
+        comp1.add_output('a', 1.0)
+        comp1.add_output('b', 1.0)
+        comp1.add_output('c', 1.0)
+
+        sub = self.add_subsystem('sub', Group())
+        sub.add_subsystem('comp2', QuadraticComp())
+        sub.add_subsystem('comp3', QuadraticComp())
+
+        self.connect('comp1.a', 'sub.comp2.a')
+        self.connect('comp1.b', 'sub.comp2.b')
+        self.connect('comp1.c', 'sub.comp2.c')
+        self.connect('comp1.a', 'sub.comp3.a')
+        self.connect('comp1.b', 'sub.comp3.b')
+        self.connect('comp1.c', 'sub.comp3.c')
+
+
 class ListFeatureTestCase(unittest.TestCase):
 
     def setUp(self):
+        from openmdao.api import Group, Problem, IndepVarComp
+        from openmdao.core.tests.test_impl_comp import QuadraticComp
+
         group = Group()
 
         comp1 = group.add_subsystem('comp1', IndepVarComp())
@@ -504,11 +520,12 @@ class ListFeatureTestCase(unittest.TestCase):
         group.connect('comp1.a', 'sub.comp2.a')
         group.connect('comp1.b', 'sub.comp2.b')
         group.connect('comp1.c', 'sub.comp2.c')
+
         group.connect('comp1.a', 'sub.comp3.a')
         group.connect('comp1.b', 'sub.comp3.b')
         group.connect('comp1.c', 'sub.comp3.c')
 
-        global prob  # so we don't need `self.` in feature doc
+        global prob
         prob = Problem(model=group)
         prob.setup()
 
@@ -530,42 +547,39 @@ class ListFeatureTestCase(unittest.TestCase):
         prob.model.list_outputs(explicit=False)
 
     def test_list_residuals(self):
-        prob.model.list_residuals()
+        prob.model.list_outputs(residuals=True)
 
     def test_list_return_value(self):
-        # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('sub.comp2.a', [1.]),
-            ('sub.comp2.b', [-4.]),
-            ('sub.comp2.c', [3.]),
-            ('sub.comp3.a', [1.]),
-            ('sub.comp3.b', [-4.]),
-            ('sub.comp3.c', [3.])
+            ('sub.comp2.a', {'value': [1.]}),
+            ('sub.comp2.b', {'value': [-4.]}),
+            ('sub.comp2.c', {'value': [3.]}),
+            ('sub.comp3.a', {'value': [1.]}),
+            ('sub.comp3.b', {'value': [-4.]}),
+            ('sub.comp3.c', {'value': [3.]})
         ])
 
         # list explicit outputs
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('comp1.a', [1.]),
-            ('comp1.b', [-4.]),
-            ('comp1.c', [3.])
+            ('comp1.a', {'value': [1.]}),
+            ('comp1.b', {'value': [-4.]}),
+            ('comp1.c', {'value': [3.]})
         ])
 
-        # list residuals
-        resids = prob.model.list_residuals(out_stream=None)
-        self.assertEqual(sorted(resids), [
-            ('comp1.a', [0.]),
-            ('comp1.b', [0.]),
-            ('comp1.c', [0.]),
-            ('sub.comp2.x', [0.]),
-            ('sub.comp3.x', [0.])
-        ])
+
+    def test_for_docs_list_no_values(self):
+        inputs = prob.model.list_inputs(values=False)
+        print(inputs)
+
+        # list only explicit outputs
+        outputs = prob.model.list_outputs(implicit=False, values=False)
+        print(outputs)
 
     def test_list_no_values(self):
-        # list inputs
         inputs = prob.model.list_inputs(values=False)
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual([n[0] for n in sorted(inputs)], [
             'sub.comp2.a',
             'sub.comp2.b',
             'sub.comp2.c',
@@ -574,23 +588,140 @@ class ListFeatureTestCase(unittest.TestCase):
             'sub.comp3.c'
         ])
 
-        # list explicit outputs
+        # list only explicit outputs
         outputs = prob.model.list_outputs(implicit=False, values=False)
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual([n[0] for n in sorted(outputs)], [
             'comp1.a',
             'comp1.b',
             'comp1.c'
         ])
 
-        # list residuals
-        resids = prob.model.list_residuals(values=False)
-        self.assertEqual(sorted(resids), [
-            'comp1.a',
-            'comp1.b',
-            'comp1.c',
-            'sub.comp2.x',
-            'sub.comp3.x'
+    def test_simple_list_vars_options(self):
+        from openmdao.api import Group, Problem, IndepVarComp
+
+        class QuadraticComp(ImplicitComponent):
+            """
+            A Simple Implicit Component representing a Quadratic Equation.
+
+            R(a, b, c, x) = ax^2 + bx + c
+
+            Solution via Quadratic Formula:
+            x = (-b + sqrt(b^2 - 4ac)) / 2a
+            """
+
+            def setup(self):
+                self.add_input('a', val=1., units='ft')
+                self.add_input('b', val=1., units='inch')
+                self.add_input('c', val=1., units='ft')
+                self.add_output('x', val=0.,
+                                lower=1.0, upper=100.0,
+                                ref=1.1, ref0=2.1,
+                                units='inch')
+
+                self.declare_partials(of='*', wrt='*')
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                a = inputs['a']
+                b = inputs['b']
+                c = inputs['c']
+                x = outputs['x']
+                residuals['x'] = a * x ** 2 + b * x + c
+
+            def solve_nonlinear(self, inputs, outputs):
+                a = inputs['a']
+                b = inputs['b']
+                c = inputs['c']
+                outputs['x'] = (-b + (b ** 2 - 4 * a * c) ** 0.5) / (2 * a)
+
+        group = Group()
+
+        comp1 = group.add_subsystem('comp1', IndepVarComp())
+        comp1.add_output('a', 1.0, units='ft')
+        comp1.add_output('b', 1.0, units='inch')
+        comp1.add_output('c', 1.0, units='ft')
+
+        sub = group.add_subsystem('sub', Group())
+        sub.add_subsystem('comp2', QuadraticComp())
+        sub.add_subsystem('comp3', QuadraticComp())
+
+        group.connect('comp1.a', 'sub.comp2.a')
+        group.connect('comp1.b', 'sub.comp2.b')
+        group.connect('comp1.c', 'sub.comp2.c')
+
+        group.connect('comp1.a', 'sub.comp3.a')
+        group.connect('comp1.b', 'sub.comp3.b')
+        group.connect('comp1.c', 'sub.comp3.c')
+
+        global prob
+        prob = Problem(model=group)
+        prob.setup()
+
+        prob['comp1.a'] = 1.
+        prob['comp1.b'] = -4.
+        prob['comp1.c'] = 3.
+        prob.run_model()
+
+        # list_inputs test
+        stream = cStringIO()
+        inputs = prob.model.list_inputs(values=False, out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(sorted(inputs), [
+            ('sub.comp2.a', {}),
+            ('sub.comp2.b', {}),
+            ('sub.comp2.c', {}),
+            ('sub.comp3.a', {}),
+            ('sub.comp3.b', {}),
+            ('sub.comp3.c', {}),
         ])
+        self.assertEqual(1, text.count("6 Input(s) in 'model'"))
+        self.assertEqual(1, text.count("top"))
+        self.assertEqual(1, text.count("  sub"))
+        self.assertEqual(1, text.count("    comp2"))
+        self.assertEqual(2, text.count("      a"))
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(num_non_empty_lines, 14)
+
+        # list_outputs tests
+        # list implicit outputs
+        outputs = prob.model.list_outputs(explicit=False, out_stream=None)
+        text = stream.getvalue()
+        self.assertEqual(sorted(outputs), [
+            ('sub.comp2.x', {'value': [ 3.]} ),
+            ('sub.comp3.x', {'value': [ 3.]})
+        ])
+        # list explicit outputs
+        stream = cStringIO()
+        outputs = prob.model.list_outputs(implicit=False, out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('comp1.a', {'value': [ 1.]} ),
+            ('comp1.b', {'value': [-4.]}),
+            ('comp1.c', {'value': [3.]}),
+        ])
+
+    def test_list_residuals_with_tol(self):
+        from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, LinearBlockGS
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 1.0))
+        model.add_subsystem('d1', SellarImplicitDis1())
+        model.add_subsystem('d2', SellarImplicitDis2())
+        model.connect('d1.y1', 'd2.y1')
+        model.connect('d2.y2', 'd1.y2')
+
+        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver.options['maxiter'] = 5
+        model.linear_solver = ScipyKrylov()
+        model.linear_solver.precon = LinearBlockGS()
+
+        prob.setup(check=False)
+        prob.set_solver_print(level=-1)
+
+        prob.run_model()
+
+        outputs = model.list_outputs(residuals_tol=0.01, residuals=True)
+        print(outputs)
 
 
 if __name__ == '__main__':

@@ -1,17 +1,18 @@
 """IndepVarComp tests used in the IndepVarComp feature doc."""
 from __future__ import division
 
-import numpy as np
 import unittest
 
 from openmdao.api import Problem, IndepVarComp
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestIndepVarComp(unittest.TestCase):
 
     def test_simple(self):
         """Define one independent variable and set its value."""
+        from openmdao.api import Problem, IndepVarComp
+
         comp = IndepVarComp('indep_var')
         prob = Problem(comp).setup(check=False)
 
@@ -22,6 +23,8 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_simple_default(self):
         """Define one independent variable with a default value."""
+        from openmdao.api import Problem, IndepVarComp
+
         comp = IndepVarComp('indep_var', val=2.0)
         prob = Problem(comp).setup(check=False)
 
@@ -29,6 +32,8 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_simple_kwargs(self):
         """Define one independent variable with a default value and additional options."""
+        from openmdao.api import Problem, IndepVarComp
+
         comp = IndepVarComp('indep_var', val=2.0, units='m', lower=0, upper=10)
         prob = Problem(comp).setup(check=False)
 
@@ -36,6 +41,10 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_simple_array(self):
         """Define one independent array variable."""
+        import numpy as np
+
+        from openmdao.api import Problem, IndepVarComp
+
         array = np.array([
             [1., 2.],
             [3., 4.],
@@ -48,6 +57,8 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_multiple_default(self):
         """Define two independent variables at once."""
+        from openmdao.api import Problem, IndepVarComp
+
         comp = IndepVarComp((
             ('indep_var_1', 1.0),
             ('indep_var_2', 2.0),
@@ -60,6 +71,8 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_multiple_kwargs(self):
         """Define two independent variables at once and additional options."""
+        from openmdao.api import Problem, IndepVarComp
+
         comp = IndepVarComp((
             ('indep_var_1', 1.0, {'lower': 0, 'upper': 10}),
             ('indep_var_2', 2.0, {'lower': 1., 'upper': 20}),
@@ -72,6 +85,8 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_add_output(self):
         """Define two independent variables using the add_output method."""
+        from openmdao.api import Problem, IndepVarComp
+
         comp = IndepVarComp()
         comp.add_output('indep_var_1', val=1.0, lower=0, upper=10)
         comp.add_output('indep_var_2', val=2.0, lower=1, upper=20)
@@ -87,7 +102,7 @@ class TestIndepVarComp(unittest.TestCase):
         except Exception as err:
             self.assertEqual(str(err),
                 "No outputs (independent variables) have been declared for "
-                "this component. They must either be declared during "
+                "component ''. They must either be declared during "
                 "instantiation or by calling add_output afterwards.")
         else:
             self.fail('Exception expected.')

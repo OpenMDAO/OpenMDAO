@@ -61,6 +61,11 @@ h1, h2, h3, h4, h5, h6 {
   border-bottom: 1px solid #ccc;
 }
 
+/*default h3 is kind of screwy with negative border. Fix it.*/
+h3 {
+    margin: 1em 0 0.3em 0;
+}
+
 /*in the source docs, the header color block for "Args"*/
 th {
   /*background-color: #BFD1D4;*/
@@ -137,7 +142,44 @@ div.output_area pre {
     margin-bottom: 0px;
 }
 
-div.highlight-python pre{
+div.rosetta_left {
+    background-color: rgba(255, 238, 238, 1.0);
+    border-radius: 2px;
+    display: table-cell;
+    width: 50%;
+    border-top: 2px solid #c9a;
+    border-bottom: 2px solid #c9a;
+    border-left: 1px solid #c9a;
+    border-right: 2px solid #c9a;
+  }
+
+div.rosetta_right {
+    background-color: rgba(238, 255, 238, 1.0);
+    border-radius: 2px;
+    display: table-cell;
+    width: 50%;
+    border-top: 2px solid #ac9;
+    border-bottom: 2px solid #ac9;
+    border-left: 1px solid #ac9;
+    border-right: 2px solid #ac9;
+}
+
+div.rosetta_left pre {
+    background-color: rgba(255, 238, 238, 1.0);
+    border: none;
+}
+
+div.rosetta_right pre {
+    background-color: rgba(238, 255, 238, 1.0);
+    border: none;
+}
+
+div.rosetta_outer {
+    display: table;
+    width: 100%
+}
+
+div.highlight-python {
   margin-top: 0px;
   margin-bottom: 0px;
 }

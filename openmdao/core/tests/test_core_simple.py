@@ -3,7 +3,7 @@ import numpy as np
 import unittest
 
 from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, DefaultVector
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -55,13 +55,12 @@ class Test(unittest.TestCase):
 
     def test_prom_names(self):
         root = self.p.model
-        compA = root.get_subsystem('A')
-        self.assertEqual(list(compA._var_allprocs_prom2abs_list['output'].keys()), ['x'])
+        self.assertEqual(list(root.A._var_allprocs_prom2abs_list['output'].keys()), ['x'])
 
     def test_var_indices(self):
         def get_inds(p, sname, type_):
-            system = p.model.get_subsystem(sname) if sname else p.model
-            idxs = p.model._var_allprocs_abs2idx[type_]
+            system = p.model._get_subsystem(sname) if sname else p.model
+            idxs = p.model._var_allprocs_abs2idx['linear'][type_]
             return np.array([
                 idxs[name] for name in system._var_abs_names[type_]
             ])
@@ -78,18 +77,18 @@ class Test(unittest.TestCase):
     def test_var_allprocs_idx_range(self):
         rng = self.p.model._subsystems_var_range
 
-        assert_rel_error(self, rng['input'][0], np.array([0,0]))
-        assert_rel_error(self, rng['input'][1], np.array([0,1]))
+        assert_rel_error(self, rng['nonlinear']['input']['A'], np.array([0,0]))
+        assert_rel_error(self, rng['nonlinear']['input']['B'], np.array([0,1]))
 
-        assert_rel_error(self, rng['output'][0], np.array([0,1]))
-        assert_rel_error(self, rng['output'][1], np.array([1,2]))
+        assert_rel_error(self, rng['nonlinear']['output']['A'], np.array([0,1]))
+        assert_rel_error(self, rng['nonlinear']['output']['B'], np.array([1,2]))
 
     def test_GS(self):
         root = self.p.model
 
         if root.comm.size == 1:
-            compA = root.get_subsystem('A')
-            compB = root.get_subsystem('B')
+            compA = root.A
+            compB = root.B
 
             if root.comm.rank == 0:
                 assert_rel_error(self, root._outputs['A.x'], 0)

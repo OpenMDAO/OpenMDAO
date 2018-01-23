@@ -16,7 +16,8 @@ class BalanceComp(ImplicitComponent):
     """
 
     def __init__(self, name=None, eq_units=None, lhs_name=None,
-                 rhs_name=None, rhs_val=0.0, mult_name=None, mult_val=1.0, **kwargs):
+                 rhs_name=None, rhs_val=0.0, guess_func=None,
+                 use_mult=False, mult_name=None, mult_val=1.0, **kwargs):
         r"""
         Initialize a BalanceComp, optionally creating a new implicit state variable.
 
@@ -31,8 +32,8 @@ class BalanceComp(ImplicitComponent):
         Where :math:`f_{lhs}` represents the left-hand-side of the equation,
         :math:`f_{rhs}` represents the right-hand-side, and :math:`f_{mult}`
         is an optional multiplier on the left hand side.  At least one of these
-        quantities should be a function of the associated state variable.  If left
-        unconnected the multiplier is simply 1.0.
+        quantities should be a function of the associated state variable.  If
+        use_mult is True the default value of the multiplier is 1.
 
         New state variables, and their associated residuals are created by
         calling `add_balance`.  As an example, solving the equation
@@ -67,7 +68,7 @@ class BalanceComp(ImplicitComponent):
             prob.run_model()
 
         The arguments to add_balance can be provided on initialization to provide a balance
-        with a one state/residual without the need to call `add_output`:
+        with a one state/residual without the need to call `add_balance`:
 
         ::
             prob = Problem(model=Group())
@@ -95,7 +96,6 @@ class BalanceComp(ImplicitComponent):
 
             prob.run_model()
 
-
         Parameters
         ----------
         name : str
@@ -111,20 +111,27 @@ class BalanceComp(ImplicitComponent):
         rhs_val : int, float, or np.array
             Default value for the RHS of the given state.  Must be compatible
             with the shape (optionally) given by the val option in kwargs.
+        guess_func : callable or None
+            A callable function in the form f(inputs, resids) that returns an initial "guess" value
+            of the state variable based on the inputs to the BalanceComp.  Note you may have to
+            add additional inputs to the BalanceComp in order to evaluate this function.
+        use_mult : bool
+            Specifies whether the LHS multiplier is to be used.  If True, adds the input specified
+            by mult_name with the default value given by mult_val.  Default is False.
         mult_name : str or None
             Optional name for the LHS multiplier variable associated with the implicit state
             variable. If None, the default will be used: 'mult:{name}'.
         mult_val : int, float, or np.array
             Default value for the LHS multiplier of the given state.  Must be compatible
             with the shape (optionally) given by the val option in kwargs.
-        kwargs : dict
+        **kwargs : dict
             Additional arguments to be passed for the creation of the implicit state variable.
         """
         super(BalanceComp, self).__init__()
         self._state_vars = {}
         if name is not None:
-            self.add_balance(name, eq_units, lhs_name, rhs_name, rhs_val,
-                             mult_name, mult_val, **kwargs)
+            self.add_balance(name, eq_units, lhs_name, rhs_name, rhs_val, guess_func,
+                             use_mult, mult_name, mult_val, **kwargs)
 
     def setup(self):
         """
@@ -155,9 +162,10 @@ class BalanceComp(ImplicitComponent):
                            val=options['rhs_val'] * np.ones(n),
                            units=options['eq_units'])
 
-            self.add_input(options['mult_name'],
-                           val=options['mult_val'] * np.ones(n),
-                           units=None)
+            if options['use_mult']:
+                self.add_input(options['mult_name'],
+                               val=options['mult_val'] * np.ones(n),
+                               units=None)
 
             self._scale_factor = np.ones(n)
             self._dscale_drhs = np.ones(n)
@@ -165,20 +173,35 @@ class BalanceComp(ImplicitComponent):
             ar = np.arange(n)
             self.declare_partials(of=name, wrt=options['lhs_name'], rows=ar, cols=ar, val=1.0)
             self.declare_partials(of=name, wrt=options['rhs_name'], rows=ar, cols=ar, val=1.0)
-            self.declare_partials(of=name, wrt=options['mult_name'], rows=ar, cols=ar, val=1.0)
+
+            if options['use_mult']:
+                self.declare_partials(of=name, wrt=options['mult_name'], rows=ar, cols=ar, val=1.0)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
         Calculate the residual for each balance.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        residuals : Vector
+            unscaled, dimensional residuals written to via residuals[key]
         """
         for name, options in iteritems(self._state_vars):
             lhs_name = options['lhs_name']
             rhs_name = options['rhs_name']
-            mult_name = options['mult_name']
 
             lhs = inputs[lhs_name]
             rhs = inputs[rhs_name]
-            mult = inputs[mult_name]
+
+            if options['use_mult']:
+                mult_name = options['mult_name']
+                mult = inputs[mult_name]
+            else:
+                mult = 1.0
 
             # Indices where the rhs is near zero or not near zero
             idxs_nz = np.where(np.abs(rhs) < 2)[0]
@@ -194,15 +217,28 @@ class BalanceComp(ImplicitComponent):
     def linearize(self, inputs, outputs, jacobian):
         """
         Calculate the partials of the residual for each balance.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        jacobian : Jacobian
+            sub-jac components written to jacobian[output_name, input_name]
         """
         for name, options in iteritems(self._state_vars):
             lhs_name = options['lhs_name']
             rhs_name = options['rhs_name']
-            mult_name = options['mult_name']
 
             lhs = inputs[lhs_name]
             rhs = inputs[rhs_name]
-            mult = inputs[mult_name]
+
+            if options['use_mult']:
+                mult_name = options['mult_name']
+                mult = inputs[mult_name]
+            else:
+                mult = 1.0
 
             # Indices where the rhs is near zero or not near zero
             idxs_nz = np.where(np.abs(rhs) < 2)[0]
@@ -222,10 +258,29 @@ class BalanceComp(ImplicitComponent):
             jacobian[name, lhs_name] = mult * self._scale_factor
 
             # Partials of residual wrt mult
-            jacobian[name, mult_name] = lhs * self._scale_factor
+            if options['use_mult']:
+                jacobian[name, mult_name] = lhs * self._scale_factor
+
+    def guess_nonlinear(self, inputs, outputs, residuals):
+        """
+        Provide an "guess" for each output based on the values of the inputs and resids.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        residuals : Vector
+            unscaled, dimensional residuals written to via residuals[key]
+        """
+        for name, options in iteritems(self._state_vars):
+            if options['guess_func'] is not None:
+                outputs[name] = options['guess_func'](inputs, residuals)
 
     def add_balance(self, name, eq_units=None, lhs_name=None,
-                    rhs_name=None, rhs_val=0.0, mult_name=None, mult_val=1.0, **kwargs):
+                    rhs_name=None, rhs_val=0.0, guess_func=None,
+                    use_mult=False, mult_name=None, mult_val=1.0, **kwargs):
         """
         Add a new state variable and associated equation to be balanced.
 
@@ -248,19 +303,32 @@ class BalanceComp(ImplicitComponent):
         rhs_val : int, float, or np.array
             Default value for the RHS.  Must be compatible with the shape (optionally)
             given by the val option in kwargs.
+        guess_func : callable or None
+            A callable function in the form f(inputs, resids) that returns an initial "guess" value
+            of the state variable based on the inputs to the BalanceComp.  Note you may have to
+            add additional inputs to the BalanceComp in order to evaluate this function.
+        use_mult : bool
+            Specifies whether the LHS multiplier is to be used.  If True, adds the input specified
+            by mult_name with the default value given by mult_val.  Default is False.
         mult_name : str or None
             Optional name for the LHS multiplier variable associated with the implicit state
             variable. If None, the default will be used: 'mult:{name}'.
         mult_val : int, float, or np.array
             Default value for the LHS multiplier.  Must be compatible with the shape (optionally)
             given by the val option in kwargs.
-        kwargs : dict
+        **kwargs : dict
             Additional arguments to be passed for the creation of the implicit state variable.
         """
+        if guess_func is not None and not callable(guess_func):
+            print(guess_func)
+            raise ValueError("Argument 'guess_func' must be a callable if specified")
+
         self._state_vars[name] = {'kwargs': kwargs,
                                   'eq_units': eq_units,
                                   'lhs_name': lhs_name,
                                   'rhs_name': rhs_name,
                                   'rhs_val': rhs_val,
+                                  'guess_func': guess_func,
+                                  'use_mult': use_mult,
                                   'mult_name': mult_name,
                                   'mult_val': mult_val}

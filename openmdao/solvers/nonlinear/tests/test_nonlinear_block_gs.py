@@ -4,9 +4,9 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, NonlinearBlockGS, Group, ScipyIterativeSolver, IndepVarComp, \
+from openmdao.api import Problem, NonlinearBlockGS, Group, ScipyKrylov, IndepVarComp, \
      ExecComp, AnalysisError
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
@@ -15,9 +15,13 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, \
 class TestNLBGaussSeidel(unittest.TestCase):
 
     def test_feature_set_options(self):
+        import numpy as np
+
+        from openmdao.api import Problem, IndepVarComp, ExecComp, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -32,7 +36,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = prob.model.nonlinear_solver = NonlinearBlockGS()
+        nlgbs = model.nonlinear_solver = NonlinearBlockGS()
 
         nlgbs.options['maxiter'] = 20
         nlgbs.options['atol'] = 1e-6
@@ -46,9 +50,13 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_basic(self):
+        import numpy as np
+
+        from openmdao.api import Problem, IndepVarComp, ExecComp, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -63,7 +71,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = prob.model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()
 
@@ -73,9 +81,13 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_maxiter(self):
+        import numpy as np
+
+        from openmdao.api import Problem, IndepVarComp, ExecComp, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -90,7 +102,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = prob.model.nonlinear_solver = NonlinearBlockGS()
+        nlgbs = model.nonlinear_solver = NonlinearBlockGS()
         nlgbs.options['maxiter'] = 2
 
         prob.setup()
@@ -101,10 +113,13 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.0542542372, .00001)
 
     def test_feature_rtol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, IndepVarComp, ExecComp, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives, SellarDerivatives
 
         prob = Problem()
-        prob.model = SellarDerivatives()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -119,7 +134,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = prob.model.nonlinear_solver = NonlinearBlockGS()
+        nlgbs = model.nonlinear_solver = NonlinearBlockGS()
         nlgbs.options['rtol'] = 1e-3
 
         prob.setup()
@@ -130,9 +145,13 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_atol(self):
+        import numpy as np
+
+        from openmdao.api import Problem, IndepVarComp, ExecComp, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -147,7 +166,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = prob.model.nonlinear_solver = NonlinearBlockGS()
+        nlgbs = model.nonlinear_solver = NonlinearBlockGS()
         nlgbs.options['atol'] = 1e-4
 
         prob.setup()
@@ -161,7 +180,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         # Basic sellar test.
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -176,7 +195,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = prob.model.nonlinear_solver = NonlinearBlockGS()
+        nlgbs = model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -186,12 +205,12 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
+        self.assertLess(model.nonlinear_solver._iter_count, 8)
 
         # Make sure we only call apply_linear on 'heads'
-        #nd1 = prob.model.cycle.d1.execution_count
-        #nd2 = prob.model.cycle.d2.execution_count
-        #if prob.model.cycle.d1._run_apply == True:
+        #nd1 = model.cycle.d1.execution_count
+        #nd2 = model.cycle.d2.execution_count
+        #if model.cycle.d1._run_apply == True:
             #self.assertEqual(nd1, 2*nd2)
         #else:
             #self.assertEqual(2*nd1, nd2)
@@ -200,7 +219,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         # Tests Sellar behavior when AnalysisError is raised.
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -215,7 +234,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = prob.model.nonlinear_solver = NonlinearBlockGS()
+        nlgbs = model.nonlinear_solver = NonlinearBlockGS()
         nlgbs.options['maxiter'] = 2
         nlgbs.options['err_on_maxiter'] = True
 
@@ -245,10 +264,10 @@ class TestNLBGaussSeidel(unittest.TestCase):
                 self.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
                 self.nonlinear_solver = NonlinearBlockGS()
-                self.linear_solver = ScipyIterativeSolver()
+                self.linear_solver = ScipyKrylov()
 
         prob = Problem()
-        root = prob.model = Group()
+        root = prob.model
         root.nonlinear_solver = NonlinearBlockGS()
         root.nonlinear_solver.options['maxiter'] = 20
         root.add_subsystem('g1', SellarModified())
@@ -267,50 +286,10 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
-    def test_run_apply(self):
-        # This test makes sure that we correctly apply the "run_apply" flag
-        # to all targets in the "broken" connection, even when they are
-        # nested in Groups.
-        # Note, this is a rather implementation-specific bug. It is not
-        # certain that a new implementation will need this test.
-
-        raise unittest.SkipTest("Test specific to implementation of double-run prevention.")
-
-        prob = Problem()
-        root = prob.model = Group()
-
-        sub1 = root.add_subsystem('sub1', Group())
-        sub2 = root.add_subsystem('sub2', Group())
-
-        s1p1 = sub1.add_subsystem('p1', Paraboloid())
-        s1p2 = sub1.add_subsystem('p2', Paraboloid())
-        s2p1 = sub2.add_subsystem('p1', Paraboloid())
-        s2p2 = sub2.add_subsystem('p2', Paraboloid())
-
-        root.connect('sub1.p1.f_xy', 'sub2.p1.x')
-        root.connect('sub1.p2.f_xy', 'sub2.p1.y')
-        root.connect('sub1.p1.f_xy', 'sub2.p2.x')
-        root.connect('sub1.p2.f_xy', 'sub2.p2.y')
-        root.connect('sub2.p1.f_xy', 'sub1.p1.x')
-        root.connect('sub2.p2.f_xy', 'sub1.p1.y')
-        root.connect('sub2.p1.f_xy', 'sub1.p2.x')
-        root.connect('sub2.p2.f_xy', 'sub1.p2.y')
-
-        root.nonlinear_solver = NonlinearBlockGS()
-        root.linear_solver = ScipyIterativeSolver()
-
-        prob.setup(check=False)
-        prob.set_solver_print(level=0)
-
-        # Will be True in one group and False in the other, depending on
-        # where it cuts.
-        self.assertTrue(s1p1._run_apply != s2p1._run_apply)
-        self.assertTrue(s1p2._run_apply != s2p2._run_apply)
-
     def test_NLBGS_Aitken(self):
 
-        prob = Problem()
-        model = prob.model = SellarDerivatives()
+        prob = Problem(model=SellarDerivatives())
+        model = prob.model
         model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()

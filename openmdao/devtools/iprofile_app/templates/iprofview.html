@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  margin: auto;
+  position: relative;
+}
+
+rect {
+  stroke: #fff;
+}
+
+button {
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 12px;
+}
+
+#tooltip {
+  position: absolute;
+  text-align: left;
+  padding: 4px;
+  font: 14px sans-serif;
+  background: lightgray;
+  border: 3px;
+  border-radius: 8px;
+  pointer-events: none;
+  -webkit-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+  -moz-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+  box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+  display: none;
+}
+
+.funcpath {
+    font-weight: bold;
+}
+
+.tottime {
+    font-weight: bold;
+}
+
+.totcalls {
+    font-weight: bold;
+}
+
+.loctime {
+    font-weight: bold;
+}
+
+.loccalls {
+    font-weight: bold;
+}
+
+p {
+    line-height: .2em;
+}
+
+td {
+    text-align: left;
+}
+
+h1 {
+    text-align: center;
+}
+
+</style>
+</head>
+<body>
+    <header><h1>{{title}}</h1></header>
+    <button onclick="reset()">Reset</button>
+<svg>
+</svg>
+<div id="tooltip">
+    <table>
+        <tr><td>Function:</td><td class=funcpath></td></tr>
+    </table>
+    <table>
+        <tr><td>Local time:</td><td class=loctime></td><td>Local calls:</td> <td class=loccalls></td></tr>
+        <tr><td>Total time:</td><td class=tottime></td> <td>Total calls:</td> <td class=totcalls></td></tr>
+    </table>
+</div>
+<script type="text/javascript" src="http://d3js.org/d3.v4.js"></script>
+<script>
+
+var width = 960,
+    height = 800;
+
+var x = d3.scaleLinear()
+    .range([0, width]);
+
+var y = d3.scaleLinear()
+    .range([0, height]);
+
+var color;
+
+var svg;
+
+var prec = d3.precisionFixed(0.05);
+var formatTime = d3.format(".3g");
+var formatPct = d3.format("." + prec + "%");
+var formatCalls = d3.format(",d");
+
+var last_d = null;
+var rect;
+var tooltip;
+
+window.onresize = function() {
+    resize();
+}
+
+function reset() {
+    last_d = null;
+    reload(0, resize);
+}
+
+
+function resize() {
+    width = window.innerWidth;
+    svg.attr("width", width);
+    x = d3.scaleLinear()
+        .range([0, width]);
+    y = d3.scaleLinear()
+        .range([0, height]);
+
+    if (last_d !== null) {
+        x.domain([last_d.x0, last_d.x1]);
+        y.domain([last_d.y0, 1]).range([last_d.y0 ? 20 : 0, height]);
+    }
+    else {
+        y.domain([0, 1]).range([0, height]);
+    }
+
+    rect.attr("x", function(d) { return x(d.x0); })
+        .attr("y", function(d) { return y(d.y0); })
+        .attr("width", function(d) { return x(d.x1) - x(d.x0); })
+        .attr("height", function(d) { return y(d.y1) - y(d.y0); });
+}
+
+
+function click(d) {
+  reload(d.idx, function() {
+      last_d = d;
+      width = window.innerWidth;
+      svg.attr("width", width);
+      x = d3.scaleLinear()
+            .range([0, width]);
+
+      x.domain([d.x0, d.x1]);
+      y.domain([d.y0, 1]).range([d.y0 ? 20 : 0, height]);
+
+      rect.transition()
+          .duration(750)
+          .attr("x", function(d) { return x(d.x0); })
+          .attr("y", function(d) { return y(d.y0); })
+          .attr("width", function(d) { return x(d.x1) - x(d.x0); })
+          .attr("height", function(d) { return y(d.y1) - y(d.y0); });
+  });
+}
+
+
+function reload(idx, callback) {
+    d3.json("/func/"+idx.toString(),  function(data) {
+        tooltip = d3.selectAll("#tooltip")
+            .style("display", "none");
+
+        x = d3.scaleLinear()
+            .range([0, width]);
+        y = d3.scaleLinear()
+            .range([0, height]);
+
+        var funcpath = d3.select(".funcpath");
+        var loctime = d3.select(".loctime");
+        var loccalls = d3.select(".loccalls");
+        var tottime = d3.select(".tottime");
+        var totcalls = d3.select(".totcalls");
+
+        rect = d3.select("svg").selectAll("rect")
+              .data(data);
+
+        rect.exit().remove();
+
+        rect.enter().append("rect")
+            .attr("fill", function(d) {
+                return color(d.id);
+            })
+            .on("mouseover", function(d) {
+                d3.select(this).attr("fill", "magenta");
+                 funcpath.text(d.id.split("-").slice(-1));
+                 loctime.text(formatTime(d.time));
+                 tottime.text(formatTime(d.tot_time));
+                 loccalls.text(formatCalls(d.count));
+                 totcalls.text(formatCalls(d.tot_count));
+                 return tooltip.style("display", "inline");
+             })
+            .on("mouseout", function(d) {
+                d3.select(this).attr("fill", color(d.id));
+                return tooltip.style("display", "none");
+            })
+            .on("click", click)
+            .on("mousemove", function(d) {
+                var newx;
+                var clientWidthO2 = tooltip.nodes()[0].clientWidth/2;
+                if (d3.event.layerX < clientWidthO2) {
+                    newx = 0;
+                }
+                else if (d3.event.layerX > window.innerWidth-clientWidthO2) {
+                    newx = window.innerWidth-tooltip.nodes()[0].clientWidth;
+                }
+                else {
+                    newx = d3.event.layerX-clientWidthO2;
+                }
+                return tooltip
+                    .style("left", (newx) + "px")
+                    .style("top", (d3.event.pageY + 20) + "px");
+            })
+            .merge(rect)
+            .attr("x", function(d) { return x(d.x0); })
+            .attr("y", function(d) { return y(d.y0); })
+            .attr("width", function(d) { return x(d.x1) - x(d.x0); })
+            .attr("height", function(d) { return y(d.y1) - y(d.y0); });
+
+        callback();
+    });
+};
+
+
+window.onload = function() {
+    color = d3.scaleOrdinal()
+            .range(d3.schemeCategory20c);
+    width = window.innerWidth;
+    svg = d3.select("svg")
+        .attr("width", width)
+        .attr("height", height);
+    reload(0, resize);
+    // FIXME: this second call to reload is a hack to get the rect highlighting to work after
+    // the initial load.  Without it, the highlighting doesn't start working until after
+    // reset is hit or a rect is clicked on.  Possibly some sort of D3 magic is happening
+    // that I don't understand, but this fixes it for now.
+    reload(0, resize);
+};
+
+</script>
+</body>
+</html>

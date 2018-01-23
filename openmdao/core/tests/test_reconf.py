@@ -3,7 +3,7 @@ import numpy as np
 import unittest
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, DefaultVector
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -23,6 +23,8 @@ class ReconfComp(ExplicitComponent):
         self.add_input('x', val=1.0)
         self.add_output('y', val=np.zeros(self.size))
 
+        self.declare_partials(of='*', wrt='*')
+
     def compute(self, inputs, outputs):
         outputs['y'] = 2 * inputs['x']
 
@@ -35,6 +37,8 @@ class Comp(ExplicitComponent):
     def setup(self):
         self.add_input('x', val=1.0)
         self.add_output('z', val=1.0)
+
+        self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
         outputs['z'] = 3 * inputs['x']
@@ -57,7 +61,7 @@ class Test(unittest.TestCase):
         p.setup()
         p['x'] = 2
         p.run_model()
-        totals = p.compute_total_derivs(wrt=['x'], of=['y'])
+        totals = p.compute_totals(wrt=['x'], of=['y'])
         assert_rel_error(self, p['x'], 2.0)
         assert_rel_error(self, p['y'], 4.0)
         assert_rel_error(self, p['z'], 6.0)
@@ -67,27 +71,27 @@ class Test(unittest.TestCase):
         p.model.resetup()
         p['x'] = 3
         p.run_model()
-        totals = p.compute_total_derivs(wrt=['x'], of=['y'])
+        totals = p.compute_totals(wrt=['x'], of=['y'])
         assert_rel_error(self, p['x'], 3.0)
         assert_rel_error(self, p['y'], 6.0 * np.ones(2))
         assert_rel_error(self, p['z'], 9.0)
         assert_rel_error(self, totals['y', 'x'], 2.0 * np.ones((2, 1)))
 
         # Now reconfigure from c2 and update in root; size of y = 3; the value of x is preserved
-        p.model.get_subsystem('c2').resetup('reconf')
+        p.model.c2.resetup('reconf')
         p.model.resetup('update')
         p.run_model()
-        totals = p.compute_total_derivs(wrt=['x'], of=['y'])
+        totals = p.compute_totals(wrt=['x'], of=['y'])
         assert_rel_error(self, p['x'], 3.0)
         assert_rel_error(self, p['y'], 6.0 * np.ones(3))
         assert_rel_error(self, p['z'], 9.0)
         assert_rel_error(self, totals['y', 'x'], 2.0 * np.ones((3, 1)))
 
         # Now reconfigure from c3 and update in root; size of y = 3; the value of x is preserved
-        p.model.get_subsystem('c3').resetup('reconf')
+        p.model.c3.resetup('reconf')
         p.model.resetup('update')
         p.run_model()
-        totals = p.compute_total_derivs(wrt=['x'], of=['y'])
+        totals = p.compute_totals(wrt=['x'], of=['y'])
         assert_rel_error(self, p['x'], 3.0)
         assert_rel_error(self, p['y'], 6.0 * np.ones(3))
         assert_rel_error(self, p['z'], 9.0)
@@ -99,7 +103,7 @@ class Test(unittest.TestCase):
         p.model.resetup('reconf')
         p['x'] = 3
         p.run_model()
-        totals = p.compute_total_derivs(wrt=['x'], of=['y'])
+        totals = p.compute_totals(wrt=['x'], of=['y'])
         assert_rel_error(self, p['x'], 3.0)
         assert_rel_error(self, p['y'], 6.0 * np.ones(4))
         assert_rel_error(self, p['z'], 9.0)

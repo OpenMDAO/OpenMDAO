@@ -1,5 +1,7 @@
+.. _feature_specify_partials:
+
 ******************************
-Specifying Partial Derivatives
+Declaring Partial Derivatives
 ******************************
 
 If you know additional information about the structure of partial derivatives in your component,
@@ -14,32 +16,31 @@ should be delcared in the `setup` method of your component.
 Usage
 -----
 
-1. Specifying that a variable does not depend on another.
+1. Specifying that a variable does not depend on another. Note that this is not typically required, because by default OpenMDAO assumes that all variables are independent.
+However, in some cases it might be needed if a previous glob pattern matched a large set of variables and some sub-set of that needs to be marked as independent.
 
 .. embed-code::
     openmdao.jacobians.tests.test_jacobian_features.SimpleCompDependence.setup
 
-2. Specifying variables using glob patterns (see https://docs.python.org/3.6/library/fnmatch.html).
+2. Declaring multiple derivatives using glob patterns (see https://docs.python.org/3.6/library/fnmatch.html).
 
 .. embed-code::
     openmdao.jacobians.tests.test_jacobian_features.SimpleCompGlob.setup
 
-3. Using the :code:`val` argument to set a constant partial derivative. Note that if the :code:`val` arugment is used,
-then the partial derivative does not need to be calculated in :code:`compute_partials`.
+3. Using the :code:`val` argument to set a constant partial derivative. Note that this is intended for cases when the derivative value is constant,
+and hence the derivatives do not ever need to be recomputed in :code:`compute_partials`.
+Here are several examples of how you can specify derivative values for different shaped partial derivative sub-Jacobians.
 
 * Scalar [see :math:`\displaystyle\frac{\partial f}{\partial x}`]
 * Dense Array [see :math:`\displaystyle\frac{\partial f}{\partial z}`]
 * Nested List [see :math:`\displaystyle\frac{\partial g}{\partial y_1}` and
   :math:`\displaystyle\frac{\partial g}{\partial y_3}`]
-* Sparse Matrix (we will discuss these in more detail later)
+* Sparse Matrix (see :ref:`this doc <feature_sparse_partials>` for more details)
   [see :math:`\displaystyle\frac{\partial g}{\partial y_2}` and
   :math:`\displaystyle\frac{\partial g}{\partial x}`]
 
 .. embed-code::
     openmdao.jacobians.tests.test_jacobian_features.SimpleCompConst
 
-.. embed-test::
-    openmdao.jacobians.tests.test_jacobian_features.TestJacobianForDocs.test_const_jacobian
 
-.. tags:: Partial Derivatives
-
+.. tags:: PartialDerivatives

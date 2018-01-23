@@ -4,8 +4,9 @@ from __future__ import division
 import os
 import sys
 import warnings
+from fnmatch import fnmatchcase
 from six import string_types
-
+from six.moves import range
 from collections import Iterable
 import numbers
 
@@ -248,7 +249,6 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
     """
     # Convert adder to ndarray/float as necessary
     if isinstance(values, np.ndarray):
-        values = values
         if flatten:
             values = values.flatten()
     elif not isinstance(values, string_types) \
@@ -269,3 +269,65 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
                         'numeric values, or a scalar numeric value. '
                         'Got {1} instead.'.format(name, values))
     return values
+
+
+class ContainsAll(object):
+    """
+    A fake dictionary that always reports __contains__(name) to be True.
+    """
+
+    def __contains__(self, name):
+        """
+        Return if the named object is contained.
+
+        Parameters
+        ----------
+        name : str
+            Name of the object being looked up.
+
+        Returns
+        -------
+        bool
+            Always returns True.
+        """
+        return True
+
+
+def all_ancestors(pathname, delim='.'):
+    """
+    Return a generator of pathnames of the starting object and all of its parents.
+
+    Parameters
+    ----------
+    pathname : str
+        Pathname of starting object.
+    delim : str
+        Delimiter used to split the name
+    """
+    parts = pathname.split(delim)
+    yield parts[0]
+    for i in range(2, len(parts) + 1):
+        yield delim.join(parts[:i])
+
+
+def find_matches(pattern, var_list):
+    """
+    Return list of variable names that match given pattern.
+
+    Parameters
+    ----------
+    pattern : str
+        String pattern
+    var_list : list of str
+        List of variable names to search for pattern.
+
+    Returns
+    -------
+    list
+        Variable names that match pattern.
+    """
+    if pattern == '*':
+        return var_list
+    elif pattern in var_list:
+        return [pattern]
+    return [name for name in var_list if fnmatchcase(name, pattern)]

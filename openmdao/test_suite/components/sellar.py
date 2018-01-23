@@ -16,7 +16,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.group import Group
 from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
-from openmdao.solvers.linear.scipy_iter_solver import ScipyIterativeSolver
+from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 
 
@@ -29,7 +29,7 @@ class SellarDis1(ExplicitComponent):
         super(SellarDis1, self).__init__()
         self.execution_count = 0
         self._units = units
-        self._scaling = scaling
+        self._do_scaling = scaling
 
     def setup(self):
 
@@ -38,7 +38,7 @@ class SellarDis1(ExplicitComponent):
         else:
             units = None
 
-        if self._scaling:
+        if self._do_scaling:
             ref = .1
         else:
             ref = 1.
@@ -55,11 +55,11 @@ class SellarDis1(ExplicitComponent):
         # Coupling output
         self.add_output('y1', val=1.0, units=units, ref=ref)
 
-        self._turn_on_fd()
+        self._do_declares()
 
-    def _turn_on_fd(self):
+    def _do_declares(self):
         # Finite difference everything
-        self.approx_partials('*', '*')
+        self.declare_partials('*', '*', method='fd')
 
     def compute(self, inputs, outputs):
         """
@@ -82,9 +82,9 @@ class SellarDis1withDerivatives(SellarDis1):
     Component containing Discipline 1 -- derivatives version.
     """
 
-    def _turn_on_fd(self):
-        # Finite difference nothing
-        pass
+    def _do_declares(self):
+        # Analytic Derivs
+        self.declare_partials(of='*', wrt='*')
 
     def compute_partials(self, inputs, partials):
         """
@@ -104,7 +104,7 @@ class SellarDis2(ExplicitComponent):
         super(SellarDis2, self).__init__()
         self.execution_count = 0
         self._units = units
-        self._scaling = scaling
+        self._do_scaling = scaling
 
     def setup(self):
         if self._units:
@@ -112,7 +112,7 @@ class SellarDis2(ExplicitComponent):
         else:
             units = None
 
-        if self._scaling:
+        if self._do_scaling:
             ref = .18
         else:
             ref = 1.
@@ -126,11 +126,11 @@ class SellarDis2(ExplicitComponent):
         # Coupling output
         self.add_output('y2', val=1.0, units=units, ref=ref)
 
-        self._turn_on_fd()
+        self._do_declares()
 
-    def _turn_on_fd(self):
+    def _do_declares(self):
         # Finite difference everything
-        self.approx_partials('*', '*')
+        self.declare_partials('*', '*', method='fd')
 
     def compute(self, inputs, outputs):
         """
@@ -158,9 +158,9 @@ class SellarDis2withDerivatives(SellarDis2):
     Component containing Discipline 2 -- derivatives version.
     """
 
-    def _turn_on_fd(self):
-        # Finite difference nothing
-        pass
+    def _do_declares(self):
+        # Analytic Derivs
+        self.declare_partials(of='*', wrt='*')
 
     def compute_partials(self, inputs, J):
         """
@@ -186,7 +186,7 @@ class SellarNoDerivatives(Group):
                               desc='User-specified atol for nonlinear solver.')
         self.metadata.declare('nl_maxiter', default=None,
                               desc='Iteration limit for nonlinear solver.')
-        self.metadata.declare('linear_solver', default=ScipyIterativeSolver(),
+        self.metadata.declare('linear_solver', default=ScipyKrylov(),
                               desc='Linear solver')
         self.metadata.declare('ln_atol', default=None,
                               desc='User-specified atol for linear solver.')
@@ -236,7 +236,7 @@ class SellarDerivatives(Group):
                               desc='User-specified atol for nonlinear solver.')
         self.metadata.declare('nl_maxiter', default=None,
                               desc='Iteration limit for nonlinear solver.')
-        self.metadata.declare('linear_solver', default=ScipyIterativeSolver(),
+        self.metadata.declare('linear_solver', default=ScipyKrylov(),
                               desc='Linear solver')
         self.metadata.declare('ln_atol', default=None,
                               desc='User-specified atol for linear solver.')
@@ -294,7 +294,7 @@ class SellarDerivativesConnected(Group):
         self.connect('d2.y2', ['d1.y2', 'obj_cmp.y2', 'con_cmp2.y2'])
 
         self.nonlinear_solver = NonlinearBlockGS()
-        self.linear_solver = ScipyIterativeSolver()
+        self.linear_solver = ScipyKrylov()
 
 
 class SellarDerivativesGrouped(Group):
@@ -309,7 +309,7 @@ class SellarDerivativesGrouped(Group):
                               desc='User-specified atol for nonlinear solver.')
         self.metadata.declare('nl_maxiter', default=None,
                               desc='Iteration limit for nonlinear solver.')
-        self.metadata.declare('linear_solver', default=ScipyIterativeSolver(),
+        self.metadata.declare('linear_solver', default=ScipyKrylov(),
                               desc='Linear solver')
         self.metadata.declare('ln_atol', default=None,
                               desc='User-specified atol for linear solver.')
@@ -320,7 +320,7 @@ class SellarDerivativesGrouped(Group):
         self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
-        mda = self.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
+        self.mda = mda = self.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
         mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -331,7 +331,7 @@ class SellarDerivativesGrouped(Group):
         self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        self.linear_solver = ScipyIterativeSolver()
+        self.linear_solver = ScipyKrylov()
 
         self.nonlinear_solver = self.metadata['nonlinear_solver']
         if self.metadata['nl_atol']:
@@ -346,7 +346,7 @@ class SellarDerivativesGrouped(Group):
             self.linear_solver.options['maxiter'] = self.metadata['ln_maxiter']
 
     def configure(self):
-        self.mda.linear_solver = ScipyIterativeSolver()
+        self.mda.linear_solver = ScipyKrylov()
         self.mda.nonlinear_solver = NonlinearBlockGS()
 
 
@@ -362,11 +362,13 @@ class StateConnection(ImplicitComponent):
         # States
         self.add_output('y2_command', val=1.0)
 
+        # Declare derivatives
+        self.declare_partials(of='*', wrt='*')
+
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
         Don't solve; just calculate the residual.
         """
-
         y2_actual = inputs['y2_actual']
         y2_command = outputs['y2_command']
 
@@ -400,7 +402,7 @@ class SellarStateConnection(Group):
                               desc='User-specified atol for nonlinear solver.')
         self.metadata.declare('nl_maxiter', default=None,
                               desc='Iteration limit for nonlinear solver.')
-        self.metadata.declare('linear_solver', default=ScipyIterativeSolver(),
+        self.metadata.declare('linear_solver', default=ScipyKrylov(),
                               desc='Linear solver')
         self.metadata.declare('ln_atol', default=None,
                               desc='User-specified atol for linear solver.')
@@ -448,8 +450,8 @@ class SellarStateConnection(Group):
             self.linear_solver.options['maxiter'] = self.metadata['ln_maxiter']
 
     def configure(self):
-        self.sub.linear_solver = ScipyIterativeSolver()
-        self.sub.state_eq_group.linear_solver = ScipyIterativeSolver()
+        self.sub.linear_solver = ScipyKrylov()
+        self.sub.state_eq_group.linear_solver = ScipyKrylov()
 
 
 class SellarImplicitDis1(ImplicitComponent):
@@ -461,7 +463,7 @@ class SellarImplicitDis1(ImplicitComponent):
         super(SellarImplicitDis1, self).__init__()
         self.execution_count = 0
         self._units = units
-        self._scaling = scaling
+        self._do_scaling = scaling
 
     def setup(self):
         if self._units:
@@ -469,7 +471,7 @@ class SellarImplicitDis1(ImplicitComponent):
         else:
             units = None
 
-        if self._scaling is None:
+        if self._do_scaling is None:
             ref = 1.
         else:
             ref = .1
@@ -485,6 +487,9 @@ class SellarImplicitDis1(ImplicitComponent):
 
         # Coupling output
         self.add_output('y1', val=1.0, units=units, ref=ref)
+
+        # Derivatives
+        self.declare_partials('*', '*')
 
     def apply_nonlinear(self, inputs, outputs, resids):
         """
@@ -520,7 +525,7 @@ class SellarImplicitDis2(ImplicitComponent):
         super(SellarImplicitDis2, self).__init__()
         self.execution_count = 0
         self._units = units
-        self._scaling = scaling
+        self._do_scaling = scaling
 
     def setup(self):
         if self._units:
@@ -528,7 +533,7 @@ class SellarImplicitDis2(ImplicitComponent):
         else:
             units = None
 
-        if self._scaling is None:
+        if self._do_scaling is None:
             ref = 1.0
         else:
             ref = .18
@@ -541,6 +546,9 @@ class SellarImplicitDis2(ImplicitComponent):
 
         # Coupling output
         self.add_output('y2', val=1.0, units=units, ref=ref)
+
+        # Derivatives
+        self.declare_partials('*', '*')
 
     def apply_nonlinear(self, inputs, outputs, resids):
         """

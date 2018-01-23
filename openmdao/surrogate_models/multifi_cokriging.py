@@ -12,6 +12,7 @@ from scikit-learn package here to avoid scikit-learn dependency.
 
 ISAE/DMSM - ONERA/DCPS
 """
+from six.moves import range
 
 import numpy as np
 from numpy import atleast_2d as array2d
@@ -50,6 +51,16 @@ def constant_regression(x):
     Zero order polynomial (constant, p = 1) regression model.
 
     x --> f(x) = 1
+
+    Parameters
+    ----------
+    x : array_like
+        Input data.
+
+    Returns
+    -------
+    array_like
+        Constant regression output.
     """
     x = np.asarray(x, dtype=np.float)
     n_eval = x.shape[0]
@@ -62,6 +73,16 @@ def linear_regression(x):
     First order polynomial (linear, p = n+1) regression model.
 
     x --> f(x) = [ 1, x_1, ..., x_n ].T
+
+    Parameters
+    ----------
+    x : array_like
+        Input data.
+
+    Returns
+    -------
+    array_like
+        Linear regression output.
     """
     x = np.asarray(x, dtype=np.float)
     n_eval = x.shape[0]
@@ -81,18 +102,17 @@ def squared_exponential_correlation(theta, d):
 
     Parameters
     ----------
-    theta: array_like
+    theta : array_like
         An array with shape 1 (isotropic) or n (anisotropic) giving the
         autocorrelation parameter(s).
-
-    dx: array_like
+    d : array_like
         An array with shape (n_eval, n_features) giving the componentwise
         distances between locations x and x' at which the correlation model
         should be evaluated.
 
     Returns
     -------
-    r: array_like
+    r : array_like
         An array with shape (n_eval, ) containing the values of the
         autocorrelation model.
     """
@@ -118,15 +138,14 @@ def l1_cross_distances(X, Y=None):
 
     Parameters
     ----------
-    X: array_like
+    X : array_like
         An array with shape (n_samples_X, n_features)
-
-    Y: array_like
+    Y : array_like
         An array with shape (n_samples_Y, n_features)
 
     Returns
     -------
-    D: array with shape (n_samples * (n_samples - 1) / 2, n_features)
+    array with shape (n_samples * (n_samples - 1) / 2, n_features)
         The array of componentwise L1 cross-distances.
 
     """
@@ -163,6 +182,62 @@ def l1_cross_distances(X, Y=None):
 class MultiFiCoKriging(object):
     """
     Integrate the Multi-Fidelity Co-Kriging method described in [LeGratiet2013].
+
+    Attributes
+    ----------
+    `theta`: list
+        Specified theta for each level OR the best set of autocorrelation parameters
+        (the sought maximizer of the reduced likelihood function).
+
+    `rlf_value`: list
+        The optimal negative concentrated reduced likelihood function value
+        for each level.
+
+
+    Examples
+    --------
+    >>> from openmdao.surrogate_models.multifi_cokriging import MultiFiCoKriging
+    >>> import numpy as np
+    >>> # Xe: DOE for expensive code (nested in Xc)
+    >>> # Xc: DOE for cheap code
+    >>> # ye: expensive response
+    >>> # yc: cheap response
+    >>> Xe = np.array([[0],[0.4],[1]])
+    >>> Xc = np.vstack((np.array([[0.1],[0.2],[0.3],[0.5],[0.6],[0.7],[0.8],[0.9]]),Xe))
+    >>> ye = ((Xe*6-2)**2)*np.sin((Xe*6-2)*2)
+    >>> yc = 0.5*((Xc*6-2)**2)*np.sin((Xc*6-2)*2)+(Xc-0.5)*10. - 5
+    >>> model = MultiFiCoKriging(theta0=1, thetaL=1e-5, thetaU=50.)
+    >>> model.fit([Xc, Xe], [yc, ye])
+    >>> # Prediction on x=0.05
+    >>> np.abs(float(model.predict([0.05])[0])- ((0.05*6-2)**2)*np.sin((0.05*6-2)*2)) < 0.05
+    True
+
+
+    Notes
+    -----
+    Implementation is based on the Package Scikit-Learn
+    (Author: Vincent Dubourg, vincent.dubourg@gmail.com) which translates
+    the DACE Matlab toolbox, see [NLNS2002]_.
+
+
+    References
+    ----------
+    .. [NLNS2002] H. B. Nielsen, S. N. Lophaven, and J. Sondergaard.
+       `DACE - A MATLAB Kriging Toolbox.` (2002)
+       http://www2.imm.dtu.dk/~hbn/dace/dace.pdf
+
+    .. [WBSWM1992] W. J. Welch, R. J. Buck, J. Sacks, H. P. Wynn, T. J. Mitchell,
+       and M. D. Morris (1992). "Screening, predicting, and computer experiments."
+       `Technometrics,` 34(1) 15--25.
+       http://www.jstor.org/pss/1269548
+
+    .. [LeGratiet2013] L. Le Gratiet (2013). "Multi-fidelity Gaussian process
+       regression for computer experiments."
+       PhD thesis, Universite Paris-Diderot-Paris VII.
+
+    .. [TBKH2011] Toal, D. J., Bressloff, N. W., Keane, A. J., & Holden, C. M. E. (2011).
+       "The development of a hybridized particle swarm for kriging hyperparameter
+       tuning." `Engineering optimization`, 43(6), 675-699.
     """
 
     _regression_types = {
@@ -177,15 +252,14 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-        regr: string or callable, optional
+        regr : string or callable, optional
             A regression function returning an array of outputs of the linear
             regression functional basis for Universal Kriging purpose.
             regr is assumed to be the same for all levels of code.
             Default assumes a simple constant regression trend.
             Available built-in regression models are:
             'constant', 'linear'
-
-        rho_regr: string or callable, optional
+        rho_regr : string or callable, optional
             A regression function returning an array of outputs of the linear
             regression functional basis. Defines the regression function for the
             autoregressive parameter rho.
@@ -193,16 +267,14 @@ class MultiFiCoKriging(object):
             Default assumes a simple constant regression trend.
             Available built-in regression models are:
             'constant', 'linear'
-
-        theta: double, array_like or list, optional
+        theta : double, array_like or list, optional
             Value of correlation parameters if they are known; no optimization is run.
             Default is None, so that optimization is run.
             if double: value is replicated for all features and all levels.
             if array_like: an array with shape (n_features, ) for
             isotropic calculation. It is replicated for all levels.
             if list: a list of nlevel arrays specifying value for each level
-
-        theta0: double, array_like or list, optional
+        theta0 : double, array_like or list, optional
             Starting point for the maximum likelihood estimation of the
             best set of parameters.
             Default is None and meaning use of the default 0.5*np.ones(n_features)
@@ -210,8 +282,7 @@ class MultiFiCoKriging(object):
             if array_like: an array with shape (n_features, ) for
             isotropic calculation. It is replicated for all levels.
             if list: a list of nlevel arrays specifying value for each level
-
-        thetaL: double, array_like or list, optional
+        thetaL : double, array_like or list, optional
             Lower bound on the autocorrelation parameters for maximum
             likelihood estimation.
             Default is None meaning use of the default 1e-5*np.ones(n_features).
@@ -219,8 +290,7 @@ class MultiFiCoKriging(object):
             if array_like: An array with shape matching theta0's. It is replicated
             for all levels of code.
             if list: a list of nlevel arrays specifying value for each level
-
-        thetaU: double, array_like or list, optional
+        thetaU : double, array_like or list, optional
             Upper bound on the autocorrelation parameters for maximum
             likelihood estimation.
             Default is None meaning use of default value 50*np.ones(n_features).
@@ -228,63 +298,6 @@ class MultiFiCoKriging(object):
             if array_like: An array with shape matching theta0's. It is replicated
             for all levels of code.
             if list: a list of nlevel arrays specifying value for each level
-
-
-        Attributes
-        ----------
-        `theta`: list
-            Specified theta for each level OR the best set of autocorrelation parameters
-            (the sought maximizer of the reduced likelihood function).
-
-        `rlf_value`: list
-            The optimal negative concentrated reduced likelihood function value
-            for each level.
-
-
-        Examples
-        --------
-        >>> from openmdao.surrogate_models.multifi_cokriging import MultiFiCoKriging
-        >>> import numpy as np
-        >>> # Xe: DOE for expensive code (nested in Xc)
-        >>> # Xc: DOE for cheap code
-        >>> # ye: expensive response
-        >>> # yc: cheap response
-        >>> Xe = np.array([[0],[0.4],[1]])
-        >>> Xc = np.vstack((np.array([[0.1],[0.2],[0.3],[0.5],[0.6],[0.7],[0.8],[0.9]]),Xe))
-        >>> ye = ((Xe*6-2)**2)*np.sin((Xe*6-2)*2)
-        >>> yc = 0.5*((Xc*6-2)**2)*np.sin((Xc*6-2)*2)+(Xc-0.5)*10. - 5
-        >>> model = MultiFiCoKriging(theta0=1, thetaL=1e-5, thetaU=50.)
-        >>> model.fit([Xc, Xe], [yc, ye])
-        >>> # Prediction on x=0.05
-        >>> np.abs(float(model.predict([0.05])[0])- ((0.05*6-2)**2)*np.sin((0.05*6-2)*2)) < 0.05
-        True
-
-
-        Notes
-        -----
-        Implementation is based on the Package Scikit-Learn
-        (Author: Vincent Dubourg, vincent.dubourg@gmail.com) which translates
-        the DACE Matlab toolbox, see [NLNS2002]_.
-
-
-        References
-        ----------
-        .. [NLNS2002] H. B. Nielsen, S. N. Lophaven, and J. Sondergaard.
-           `DACE - A MATLAB Kriging Toolbox.` (2002)
-           http://www2.imm.dtu.dk/~hbn/dace/dace.pdf
-
-        .. [WBSWM1992] W. J. Welch, R. J. Buck, J. Sacks, H. P. Wynn, T. J. Mitchell,
-           and M. D. Morris (1992). "Screening, predicting, and computer experiments."
-           `Technometrics,` 34(1) 15--25.
-           http://www.jstor.org/pss/1269548
-
-        .. [LeGratiet2013] L. Le Gratiet (2013). "Multi-fidelity Gaussian process
-           regression for computer experiments."
-           PhD thesis, Universite Paris-Diderot-Paris VII.
-
-        .. [TBKH2011] Toal, D. J., Bressloff, N. W., Keane, A. J., & Holden, C. M. E. (2011).
-           "The development of a hybridized particle swarm for kriging hyperparameter
-           tuning." `Engineering optimization`, 43(6), 675-699.
         """
         self.corr = squared_exponential_correlation
         self.regr = regr
@@ -299,6 +312,21 @@ class MultiFiCoKriging(object):
     def _build_R(self, lvl, theta):
         """
         Build the correlation matrix with given theta for the specified level.
+
+        Parameters
+        ----------
+        lvl : Integer
+            Level of fidelity
+        theta : array_like
+            An array containing the autocorrelation parameters at which the
+            Gaussian Process model parameters should be determined.
+            Default uses the built-in autocorrelation parameters
+            (ie ``theta = self.theta``).
+
+        Returns
+        -------
+        ndarray
+            Correlatioin matrix.
         """
         D = self.D[lvl]
         n_samples = self.n_samples[lvl]
@@ -310,28 +338,23 @@ class MultiFiCoKriging(object):
 
         return R
 
-    def fit(self, X, y,
-            initial_range=INITIAL_RANGE_DEFAULT, tol=TOLERANCE_DEFAULT):
+    def fit(self, X, y, initial_range=INITIAL_RANGE_DEFAULT, tol=TOLERANCE_DEFAULT):
         """
         Implement the Multi-Fidelity co-kriging model fitting method.
 
         Parameters
         ----------
-        X: list of double array_like elements
+        X : list of double array_like elements
             A list of arrays with the input at which observations were made, from lowest
             fidelity to highest fidelity. Designs must be nested
             with X[i] = np.vstack([..., X[i+1])
-
-        y: list of double array_like elements
+        y : list of double array_like elements
             A list of arrays with the observations of the scalar output to be predicted,
             from lowest fidelity to highest fidelity.
-
-        initial_range: float
+        initial_range : float
             Initial range for the optimizer.
-
-        tol: float
+        tol : float
             Optimizer terminates when the tolerance tol is reached.
-
         """
         # Run input checks
         # Transforms floats and arrays in lists to have a multifidelity
@@ -359,7 +382,7 @@ class MultiFiCoKriging(object):
         self._R_adj = nlevel * [None]
 
         y_best = y[nlevel - 1]
-        for i in range(nlevel - 1)[::-1]:
+        for i in range(nlevel - 2, -1, -1):
             y_best = np.concatenate((y[i][:-n_samples[i + 1]], y_best))
         self.y_best = y_best
 
@@ -438,12 +461,9 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-        self: Multi-Fidelity Co-Kriging object
-
-        lvl: Integer
+        lvl : Integer
             Level of fidelity
-
-        theta: array_like, optional
+        theta : array_like, optional
             An array containing the autocorrelation parameters at which the
             Gaussian Process model parameters should be determined.
             Default uses the built-in autocorrelation parameters
@@ -451,7 +471,7 @@ class MultiFiCoKriging(object):
 
         Returns
         -------
-        rlf_value: double
+        double
             The value of the negative concentrated reduced likelihood function
             associated to the given autocorrelation parameters theta.
         """
@@ -519,24 +539,20 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-        self: Most parameters are stored in the Gaussian Process model object.
-
-        lvl: integer
+        lvl : integer
             Level of fidelity
-
-        initial_range: float
+        initial_range : float
             Initial range of the optimizer
-
-        tol: float
+        tol : float
             Optimizer terminates when the tolerance tol is reached.
 
         Returns
         -------
-        optimal_theta: array_like
-        optimal_rlf_value: double
+        array_like
+            The optimal hyperparameters.
+        double
             The optimal negative reduced likelihood function value.
-
-        res: dict
+        dict
             res['theta']: optimal theta
             res['rlf_value']: optimal value for likelihood
         """
@@ -582,22 +598,20 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-        X: array_like
+        X : array_like
             An array with shape (n_eval, n_features) giving the point(s) at
             which the prediction(s) should be made.
-
-        eval_MSE: boolean, optional
+        eval_MSE : boolean, optional
             A boolean specifying whether the Mean Squared Error should be
             evaluated or not. Default assumes evalMSE is True.
 
         Returns
         -------
-        y: array_like
+        array_like
             An array with shape (n_eval, ) with the Best Linear Unbiased
             Prediction at X. If all_levels is set to True, an array
             with shape (n_eval, nlevel) giving the BLUP for all levels.
-
-        MSE: array_like, optional (if eval_MSE is True)
+        array_like, optional (if eval_MSE is True)
             An array with shape (n_eval, ) with the Mean Squared Error at X.
             If all_levels is set to True, an array with shape (n_eval, nlevel)
             giving the MSE for all levels.
@@ -684,13 +698,17 @@ class MultiFiCoKriging(object):
 
     def _check_list_structure(self, X, y):
         """
-        Check list structure.
+        Transform floats and arrays in the training data lists to have a multifidelity structure.
 
         Parameters
         ----------
-        x : list
-
-        y : list
+        X : list of double array_like elements
+            A list of arrays with the input at which observations were made, from lowest
+            fidelity to highest fidelity. Designs must be nested
+            with X[i] = np.vstack([..., X[i+1])
+        y : list of double array_like elements
+            A list of arrays with the observations of the scalar output to be predicted,
+            from lowest fidelity to highest fidelity.
         """
         if type(X) is not list:
             nlevel = 1
@@ -746,7 +764,9 @@ class MultiFiCoKriging(object):
         return
 
     def _check_params(self):
-
+        """
+        Perform sanity checks on all parameters.
+        """
         # Check regression model
         if not callable(self.regr):
             if self.regr in self._regression_types:
@@ -816,6 +836,59 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
                  tolerance=TOLERANCE_DEFAULT, initial_range=INITIAL_RANGE_DEFAULT):
         """
         Initialize all attributes.
+
+        Parameters
+        ----------
+        regr : string or callable, optional
+            A regression function returning an array of outputs of the linear
+            regression functional basis for Universal Kriging purpose.
+            regr is assumed to be the same for all levels of code.
+            Default assumes a simple constant regression trend.
+            Available built-in regression models are:
+            'constant', 'linear'
+        rho_regr : string or callable, optional
+            A regression function returning an array of outputs of the linear
+            regression functional basis. Defines the regression function for the
+            autoregressive parameter rho.
+            rho_regr is assumed to be the same for all levels of code.
+            Default assumes a simple constant regression trend.
+            Available built-in regression models are:
+            'constant', 'linear'
+        theta : double, array_like or list, optional
+            Value of correlation parameters if they are known; no optimization is run.
+            Default is None, so that optimization is run.
+            if double: value is replicated for all features and all levels.
+            if array_like: an array with shape (n_features, ) for
+            isotropic calculation. It is replicated for all levels.
+            if list: a list of nlevel arrays specifying value for each level
+        theta0 : double, array_like or list, optional
+            Starting point for the maximum likelihood estimation of the
+            best set of parameters.
+            Default is None and meaning use of the default 0.5*np.ones(n_features)
+            if double: value is replicated for all features and all levels.
+            if array_like: an array with shape (n_features, ) for
+            isotropic calculation. It is replicated for all levels.
+            if list: a list of nlevel arrays specifying value for each level
+        thetaL : double, array_like or list, optional
+            Lower bound on the autocorrelation parameters for maximum
+            likelihood estimation.
+            Default is None meaning use of the default 1e-5*np.ones(n_features).
+            if double: value is replicated for all features and all levels.
+            if array_like: An array with shape matching theta0's. It is replicated
+            for all levels of code.
+            if list: a list of nlevel arrays specifying value for each level
+        thetaU : double, array_like or list, optional
+            Upper bound on the autocorrelation parameters for maximum
+            likelihood estimation.
+            Default is None meaning use of default value 50*np.ones(n_features).
+            if double: value is replicated for all features and all levels.
+            if array_like: An array with shape matching theta0's. It is replicated
+            for all levels of code.
+            if list: a list of nlevel arrays specifying value for each level
+        tolerance : float
+            Optimizer terminates when the tolerance tol is reached.
+        initial_range : float
+            Initial range for the optimizer.
         """
         super(MultiFiCoKrigingSurrogate, self).__init__()
 
@@ -827,6 +900,22 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
     def predict(self, new_x):
         """
         Calculate a predicted value of the response based on the current trained model.
+
+        Parameters
+        ----------
+        new_x : array_like
+            An array with shape (n_eval, n_features) giving the point(s) at
+            which the prediction(s) should be made.
+
+        Returns
+        -------
+        array_like
+            An array with shape (n_eval, ) with the Best Linear Unbiased
+            Prediction at X. If all_levels is set to True, an array
+            with shape (n_eval, nlevel) giving the BLUP for all levels.
+
+        array_like
+            An array with shape (n_eval, ) with the square root of the Mean Squared Error at X.
         """
         Y_pred, MSE = self.model.predict([new_x])
         return Y_pred, np.sqrt(np.abs(MSE))
@@ -834,6 +923,15 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
     def train_multifi(self, X, Y):
         """
         Train the surrogate model with the given set of inputs and outputs.
+
+        Parameters
+        ----------
+        X : array_like
+            An array with shape (n_samples_X, n_features) with the input at which observations
+            were made.
+        Y : array_like
+            An array with shape (n_samples_X, n_features) with the observations of the scalar
+            output to be predicted.
         """
         X, Y = self._fit_adapter(X, Y)
         self.model.fit(X, Y, tol=self.tolerance,
@@ -845,6 +943,23 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
 
         where can be called as [[xval1],[xval2]] instead of [[[xval1],[xval2]]]
         we detect if shape(X[0]) is like (m,) instead of (m, n)
+
+        Parameters
+        ----------
+        X : array_like
+            An array with shape (n_samples_X, n_features)
+        Y : array_like
+            An array with shape (n_samples_Y, n_features)
+
+        Returns
+        -------
+        list of double array_like elements
+            A list of arrays with the input at which observations were made, from lowest
+            fidelity to highest fidelity. Designs must be nested
+            with X[i] = np.vstack([..., X[i+1])
+        list of double array_like elements
+            A list of arrays with the observations of the scalar output to be predicted,
+            from lowest fidelity to highest fidelity.
         """
         if len(np.shape(np.array(X[0]))) == 1:
             X = [X]
@@ -866,8 +981,14 @@ class FloatMultiFiCoKrigingSurrogate(MultiFiCoKrigingSurrogate):
 
         Parameters
         ----------
-        new_x : array-like
-            Point(s) at which the surrogate is evaluated.
+        new_x : array_like
+            An array with shape (n_eval, n_features) giving the point(s) at
+            which the prediction(s) should be made.
+
+        Returns
+        -------
+        float
+            New predicted value.
         """
         dist = super(FloatMultiFiCoKrigingSurrogate, self).predict(new_x)
         return dist.mu

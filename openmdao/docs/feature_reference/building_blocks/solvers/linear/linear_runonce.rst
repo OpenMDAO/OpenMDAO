@@ -13,12 +13,21 @@ used in systems where the following conditions are satisfied:
 2. System does not contain any implicit states, though subsystems may.
 
 However, subsystems can contain cycles or implicit states provided that they are using the appropriate
-solver such as :ref:`ScipyIterativeSolver <openmdao.solvers.linear.scipy_iter_solver.py>`
+solver such as :ref:`ScipyKrylov <openmdao.solvers.linear.scipy_iter_solver.py>`
 
 Here is an example of using an LinearRunOnce solver to calculate the derivatives across a simple model with
 the <Paraboloid> component.
 
 .. embed-test::
     openmdao.solvers.linear.tests.test_linear_runonce.TestLinearRunOnceSolver.test_feature_solver
+
+
+LinearRunOnce Options
+----------------------
+
+.. embed-options::
+    openmdao.solvers.linear.linear_runonce
+    LinearRunOnce
+    options
 
 .. tags:: Solver, LinearSolver

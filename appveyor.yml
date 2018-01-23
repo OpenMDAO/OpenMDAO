@@ -8,12 +8,14 @@ platform:
 environment:
   matrix:
     - PYTHON: 2.7
-    - PYTHON: 3.4
+    - PYTHON: 3.6
 
 init:
   #Uncomment the following line to gain RDP access to an appveyor machine.
   #Login info will appear in the console
   #- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+
+install:
   - set CONDA=Miniconda
   - if "%PYTHON%" == "3.4" (set CONDA=%CONDA%3)
   - if "%PLATFORM%" == "x64" (set CONDA=%CONDA%-x64)
@@ -22,9 +24,7 @@ init:
   - conda config --set always_yes yes
   # We need to do this first as other commands may not work with older versions of conda.
   - conda update conda
-  - conda install numpy==1.11.2 scipy nose hdf5 h5py sphinx mock pip --quiet
-
-install:
+  - conda install numpy=1.11.2 scipy nose hdf5 h5py sphinx mock pip --quiet
   #Grab testflo for running tests, to ensure examples are run
   - pip install redbaron
   - pip install git+https://github.com/OpenMDAO/testflo.git
@@ -55,11 +55,15 @@ test_script:
           $env:MSMPI_BIN = [System.Environment]::GetEnvironmentVariable("MSMPI_BIN","Machine")
           $env:Path = $env:Path + ";" + $env:MSMPI_BIN
           If ((Get-Command "mpiexec.exe" -ErrorAction SilentlyContinue) -eq $null) {throw "error: can't find mpiexec.exe after install"}
+          cd openmdao/docs
+          nmake /f Makefile.nmake clean
+          nmake /f Makefile.nmake all
+          cd ../..
         }
   - testflo . -n 1 -m "ptest*"
   - testflo . -n 1
 
 #after tests, need to cd down so that conf.py can be found for docbuild
-  - cd openmdao/docs
-  - nmake /f Makefile.nmake clean
-  - nmake /f Makefile.nmake all
+# - cd openmdao/docs
+# - nmake /f Makefile.nmake clean
+# - nmake /f Makefile.nmake all

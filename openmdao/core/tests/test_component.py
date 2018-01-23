@@ -15,7 +15,7 @@ from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray
 from openmdao.test_suite.components.simple_comps import TestExplCompDeprecated
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestExplicitComponent(unittest.TestCase):
@@ -89,23 +89,6 @@ class TestExplicitComponent(unittest.TestCase):
         comp.add_output('aro', shape=shapes[0])
         comp.add_input('ari', shape=shapes[0])
 
-    def test_deprecated_vars_in_init(self):
-        """test that deprecation warning is issued if vars are declared in __init__."""
-        with warnings.catch_warnings(record=True) as w:
-            TestExplCompDeprecated()
-
-        self.assertEqual(len(w), 2)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertTrue(issubclass(w[1].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message),
-                         "In the future, the 'add_input' method must be "
-                         "called from 'setup' rather than "
-                         "in the '__init__' function.")
-        self.assertEqual(str(w[1].message),
-                         "In the future, the 'add_output' method must be "
-                         "called from 'setup' rather than "
-                         "in the '__init__' function.")
-
     def test_setup_bug1(self):
         # This tests a bug where, if you run setup more than once on a derived component class,
         # the list of var names continually gets prepended with the component global path.
@@ -123,10 +106,9 @@ class TestExplicitComponent(unittest.TestCase):
 
         prob = Problem()
         model = prob.model = Group()
-        model.add_subsystem('comp', MyComp())
+        comp = model.add_subsystem('comp', MyComp())
 
         prob.setup(check=False)
-        comp = model.get_subsystem('comp')
         self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
         self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
 

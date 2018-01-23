@@ -4,15 +4,12 @@ import unittest
 import warnings
 
 from six import iteritems
-from six.moves import cStringIO, range
 
-import numpy as np
-
-from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, IndepVarComp, DenseJacobian, DirectSolver
+from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp, DenseJacobian, DirectSolver
 from openmdao.api import ExecComp
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.unit_conv import UnitConvGroup, SrcComp, TgtCompC, TgtCompF, \
-     TgtCompK, SrcCompFD, TgtCompCFD, TgtCompFFD, TgtCompKFD, TgtCompFMulti
+    TgtCompK, SrcCompFD, TgtCompCFD, TgtCompFFD, TgtCompKFD, TgtCompFMulti
 
 
 class SpeedComp(ExplicitComponent):
@@ -48,7 +45,7 @@ class TestUnitConversion(unittest.TestCase):
         # Check the total derivatives in forward mode
         wrt = ['px1.x1']
         of = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
@@ -57,7 +54,7 @@ class TestUnitConversion(unittest.TestCase):
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
@@ -71,6 +68,9 @@ class TestUnitConversion(unittest.TestCase):
         # this test passes as long as it doesn't raise an exception
 
     def test_speed(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp
+        from openmdao.core.tests.test_units import SpeedComp
+
         comp = IndepVarComp()
         comp.add_output('distance', val=1., units='m')
         comp.add_output('time', val=1., units='s')
@@ -111,7 +111,7 @@ class TestUnitConversion(unittest.TestCase):
         # Check the total derivatives in forward mode
         wrt = ['px1.x1']
         of = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
@@ -120,7 +120,7 @@ class TestUnitConversion(unittest.TestCase):
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
@@ -152,14 +152,13 @@ class TestUnitConversion(unittest.TestCase):
                 """ Pass through."""
                 outputs['x2'] = inputs['x1']
 
-            def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
                 """ Derivative is 1.0"""
 
                 if mode == 'fwd':
                     d_outputs['x2'] += d_inputs['x1']
                 else:
                     d_inputs['x1'] += d_outputs['x2']
-
 
         class TgtCompFa(ExplicitComponent):
             """Target expressed in degrees F."""
@@ -172,14 +171,13 @@ class TestUnitConversion(unittest.TestCase):
                 """ Pass through."""
                 outputs['x3'] = inputs['x2']
 
-            def compute_jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
                 """ Derivative is 1.0"""
 
                 if mode == 'fwd':
                     d_outputs['x3'] += d_inputs['x2']
                 else:
                     d_inputs['x2'] += d_outputs['x3']
-
 
         prob = Problem()
         model = prob.model = Group()
@@ -201,14 +199,14 @@ class TestUnitConversion(unittest.TestCase):
         # Check the total derivatives in forward mode
         wrt = ['px1.x1']
         of = ['tgtF.x3']
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
 
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
 
@@ -236,7 +234,7 @@ class TestUnitConversion(unittest.TestCase):
 
         indep_list = ['x1']
         unknown_list = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
-        J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list, return_format='dict')
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list, return_format='dict')
 
         assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
@@ -244,16 +242,16 @@ class TestUnitConversion(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
-        J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list, return_format='dict')
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list, return_format='dict')
 
         assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
         assert_rel_error(self, J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
-        prob.model.approx_total_derivs(method='fd')
+        prob.model.approx_totals(method='fd')
         prob.setup(check=False, mode='rev')
         prob.run_model()
-        J = prob.compute_total_derivs(of=unknown_list, wrt=indep_list, return_format='dict')
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list, return_format='dict')
 
         assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
@@ -354,7 +352,7 @@ class TestUnitConversion(unittest.TestCase):
         # Check the total derivatives in forward mode
         wrt = ['x1']
         of = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         assert_rel_error(self, J['tgtF.x3', 'x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3', 'x1'][0][0], 1.0, 1e-6)
@@ -363,7 +361,7 @@ class TestUnitConversion(unittest.TestCase):
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='flat_dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         assert_rel_error(self, J['tgtF.x3', 'x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3', 'x1'][0][0], 1.0, 1e-6)
@@ -397,7 +395,7 @@ class TestUnitConversion(unittest.TestCase):
 
         wrt = ['x1']
         of = ['sub2.tgtF.x3', 'sub2.tgtC.x3', 'sub2.tgtK.x3']
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
         assert_rel_error(self, J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
@@ -406,7 +404,7 @@ class TestUnitConversion(unittest.TestCase):
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
         assert_rel_error(self, J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
@@ -419,7 +417,7 @@ class TestUnitConversion(unittest.TestCase):
 
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
         sub1 = prob.model.add_subsystem('sub1', Group(), promotes=['x2'])
-        sub1.add_subsystem('src', SrcComp(), promotes = ['x2'])
+        sub1.add_subsystem('src', SrcComp(), promotes=['x2'])
         root.add_subsystem('tgtF', TgtCompFMulti())
         root.add_subsystem('tgtC', TgtCompC())
         root.add_subsystem('tgtK', TgtCompK())
@@ -439,7 +437,7 @@ class TestUnitConversion(unittest.TestCase):
 
         wrt = ['x1']
         of = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
         assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
@@ -448,7 +446,7 @@ class TestUnitConversion(unittest.TestCase):
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
-        J = prob.compute_total_derivs(of=of, wrt=wrt, return_format='dict')
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
         assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
         assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
@@ -663,7 +661,7 @@ class TestUnitConversion(unittest.TestCase):
         #root.connect('sub.cc2.y', 'sub.cc1.x2')
 
         #root.nonlinear_solver = Newton()
-        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver = ScipyKrylov()
 
         #sub.nonlinear_solver = Newton()
         #sub.linear_solver = DirectSolver()
@@ -711,7 +709,7 @@ class TestUnitConversion(unittest.TestCase):
 
         #root.nonlinear_solver = Newton()
         #root.nonlinear_solver.options['maxiter'] = 1
-        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver = ScipyKrylov()
         #root.linear_solver.options['maxiter'] = 1
 
         #sub.nonlinear_solver = Newton()
@@ -749,7 +747,7 @@ class TestUnitConversion(unittest.TestCase):
 
         #root.nonlinear_solver = Newton()
         #root.nonlinear_solver.options['maxiter'] = 1
-        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver = ScipyKrylov()
         #root.linear_solver.options['maxiter'] = 1
         #root.linear_solver.options['mode'] = 'rev'
 
@@ -829,7 +827,7 @@ class TestUnitConversion(unittest.TestCase):
 
         #root.nonlinear_solver = Newton()
         #root.nonlinear_solver.options['maxiter'] = 1
-        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver = ScipyKrylov()
         #root.linear_solver.options['maxiter'] = 1
         #root.linear_solver.options['mode'] = 'rev'
 
@@ -870,11 +868,11 @@ class TestUnitConversion(unittest.TestCase):
 
         #root.nonlinear_solver = Newton()
         #root.nonlinear_solver.options['maxiter'] = 1
-        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver = ScipyKrylov()
         #root.linear_solver.options['maxiter'] = 1
 
         #sub.nonlinear_solver = Newton()
-        #sub.linear_solver = ScipyGMRES()
+        #sub.linear_solver = ScipyKrylov()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('sub.cc2.y')
@@ -912,11 +910,11 @@ class TestUnitConversion(unittest.TestCase):
 
         #root.nonlinear_solver = Newton()
         #root.nonlinear_solver.options['maxiter'] = 1
-        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver = ScipyKrylov()
         #root.linear_solver.options['maxiter'] = 1
 
         #sub.nonlinear_solver = Newton()
-        #sub.linear_solver = ScipyGMRES()
+        #sub.linear_solver = ScipyKrylov()
         #sub.linear_solver.precon = DirectSolver()
 
         #prob.driver.add_desvar('p1.xx')

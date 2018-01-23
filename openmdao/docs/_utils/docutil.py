@@ -1,7 +1,7 @@
 """
-A collection of functions for modifying the source code
+A collection of functions for modifying source code that is embeded into the Sphinx documentation.
 """
-
+import sys
 import os
 import re
 import tokenize
@@ -11,8 +11,12 @@ import sqlite3
 import subprocess
 import tempfile
 
-from six import StringIO, PY3
+import numpy as np
 
+from six import StringIO, PY3
+from six.moves import range, cStringIO as cStringIO
+
+from sphinx.errors import SphinxError
 from redbaron import RedBaron
 
 sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
@@ -21,7 +25,17 @@ table_name = 'feature_unit_tests'   # name of the table to be queried
 
 def remove_docstrings(source):
     """
-    Returns 'source' minus docstrings.
+    Return 'source' minus docstrings.
+
+    Parameters
+    ----------
+    source : str
+        Original source code.
+
+    Returns
+    -------
+    str
+        Source with docstrings removed.
     """
     io_obj = StringIO(source)
     out = ""
@@ -74,7 +88,8 @@ def remove_docstrings(source):
 
 
 def remove_redbaron_node(node, index):
-    '''Utility function for removing a node using RedBaron.
+    """
+    Utility function for removing a node using RedBaron.
 
     RedBaron has some problems with modifying code lines that run across
     multiple lines. ( It is mentioned somewhere online but cannot seem to
@@ -82,7 +97,7 @@ def remove_redbaron_node(node, index):
 
     RedBaron throws an Exception but when you check, it seems like it does
     what you asked it to do. So, for now, we ignore the Exception.
-    '''
+    """
 
     try:
         node.value.remove(node.value[index])
@@ -94,16 +109,20 @@ def remove_redbaron_node(node, index):
 
 
 def replace_asserts_with_prints(source_code):
-    '''Using RedBaron, replace some assert calls with
-    print statements that print the actual value given in the asserts.
+    """
+    Replace asserts with print statements.
+
+    Using RedBaron, replace some assert calls with print statements that print the actual
+    value given in the asserts.
 
     Depending on the calls, the actual value can be the first or second
-    argument.'''
+    argument.
+    """
 
     rb = RedBaron(source_code)  # convert to RedBaron internal structure
 
     for assert_type in ['assertAlmostEqual', 'assertLess', 'assertGreater', 'assertEqual',
-                        'assertEqualArrays', 'assertTrue', 'assertFalse']:
+                        'assert_equal_arrays', 'assertTrue', 'assertFalse']:
         assert_nodes = rb.findAll("NameNode", value=assert_type)
         for assert_node in assert_nodes:
             assert_node = assert_node.parent
@@ -121,6 +140,15 @@ def replace_asserts_with_prints(source_code):
         remove_redbaron_node(assert_node.value[1], -1)  # remove the expected value
         remove_redbaron_node(assert_node.value[1], 0)  # remove the first argument which is
         #                                                  the TestCase
+        assert_node.value[0].replace("print")
+
+    assert_nodes = rb.findAll("NameNode", value='assert_almost_equal')
+    for assert_node in assert_nodes:
+        assert_node = assert_node.parent
+        # If relative error tolerance is specified, there are 3 arguments
+        if len(assert_node.value[1]) == 3:
+            remove_redbaron_node(assert_node.value[1], -1)  # remove the relative error tolerance
+        remove_redbaron_node(assert_node.value[1], -1)  # remove the expected value
         assert_node.value[0].replace("print")
 
     source_code_with_prints = rb.dumps()  # get back the string representation of the code
@@ -141,83 +169,60 @@ def get_method_body(method_code):
     return def_node.value.dumps()
 
 
-def get_lines_before_test_cases(code):
-    '''Only get the top part of the test file including imports and other class definitions
-
-    Need this so the unit test has everything it needs to run
-    '''
-
-    top_code = ''
-    rb = RedBaron(code)
-    # Keep looping through the lines of code until encountering
-    #   the start of a definition of a unittest.TestCase
-    for r in rb:
-        if r.type == 'string':
-            continue
-        if r.type == 'class':
-            # check to see if any of the inherited classes are unittest.TestCase
-            #   We do not want to stop if we hit a class definition that is not
-            #   the definition of a TestCase, since that class might be needed in
-            #   a test
-            if 'unittest.TestCase' in r.inherit_from.dumps():
-                break
-        top_code += r.dumps() + '\n'
-    return top_code
-
-
-def remove_initial_empty_lines_from_source(source):
-    '''Some initial empty lines were added to keep RedBaron happy.
+def remove_initial_empty_lines(source):
+    """
+    Some initial empty lines were added to keep RedBaron happy.
     Need to strip these out before we pass the source code to the
-    directive for including source code into feature doc files'''
+    directive for including source code into feature doc files.
+    """
 
     idx = re.search(r'\S', source, re.MULTILINE).start()
     return source[idx:]
 
 
-"""
-Function that returns the source code of a method or class.
-The docstrings are stripped from the code
-"""
+def get_source_code_of_class_or_method(class_or_method_path, remove_docstring=True):
+    """
+    Return source code as a text string.
 
-# pylint: disable=C0103
+    Parameters
+    ----------
+    class_or_method_path : str
+        Package path to the class or function.
+    remove_docstring : bool
+        Set to False to keep docstrings in the text.
+    """
 
-
-def get_source_code_of_class_or_method(class_or_method_path):
-    '''The function to be called a the custom Sphinx directive code
-    that includes the source code of a class or method.
-    '''
-
-    # the class_or_method_path could be either to a class or method
-
-    # first assume class and see if it works
+    # First, assume module path since we want to support loading a full module as well.
     try:
-        module_path = '.'.join(class_or_method_path.split('.')[:-1])
-        module_with_class = importlib.import_module(module_path)
-        class_name = class_or_method_path.split('.')[-1]
-        cls = getattr(module_with_class, class_name)
-        source = inspect.getsource(cls)
+        module = importlib.import_module(class_or_method_path)
+        source = inspect.getsource(module)
+
     except ImportError:
-        # else assume it is a path to a method
-        module_path = '.'.join(class_or_method_path.split('.')[:-2])
-        module_with_method = importlib.import_module(module_path)
-        class_name = class_or_method_path.split('.')[-2]
-        method_name = class_or_method_path.split('.')[-1]
-        cls = getattr(module_with_method, class_name)
-        meth = getattr(cls, method_name)
-        source = inspect.getsource(meth)
+
+        # Second, assume class and see if it works
+        try:
+            module_path = '.'.join(class_or_method_path.split('.')[:-1])
+            module_with_class = importlib.import_module(module_path)
+            class_name = class_or_method_path.split('.')[-1]
+            cls = getattr(module_with_class, class_name)
+            source = inspect.getsource(cls)
+
+        except ImportError:
+
+            # else assume it is a path to a method
+            module_path = '.'.join(class_or_method_path.split('.')[:-2])
+            module_with_method = importlib.import_module(module_path)
+            class_name = class_or_method_path.split('.')[-2]
+            method_name = class_or_method_path.split('.')[-1]
+            cls = getattr(module_with_method, class_name)
+            meth = getattr(cls, method_name)
+            source = inspect.getsource(meth)
 
     # Remove docstring from source code
-    source_minus_docstrings = remove_docstrings(source)
+    if remove_docstring:
+        source = remove_docstrings(source)
 
-    return source_minus_docstrings
-
-
-"""
-Definition of function to be called by the showunittestexamples directive
-"""
-
-sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
-table_name = 'feature_unit_tests'   # name of the table to be queried
+    return source
 
 
 def get_test_source_code_for_feature(feature_name):
@@ -254,33 +259,12 @@ def get_test_source_code_for_feature(feature_name):
     return test_source_code_for_feature
 
 
-def get_skip_predicate_and_message(source, method_name):
-    '''
-    Look to see if the method has a unittest.skipUnless or unittest.skip
-    decorator.
-
-    If it has a unittest.skipUnless decorator, return the predicate and the message
-    If it has a unittest.skip decorator, return just the message ( set predicate to None )
-    '''
-
-    rb = RedBaron(source)
-    def_nodes = rb.findAll("DefNode", name=method_name)
-    if def_nodes:
-        if def_nodes[0].decorators:
-            if def_nodes[0].decorators[0].value.dumps() == 'unittest.skipUnless':
-                return (def_nodes[0].decorators[0].call.value[0].dumps(),
-                        def_nodes[0].decorators[0].call.value[1].value.to_python())
-            elif def_nodes[0].decorators[0].value.dumps() == 'unittest.skip':
-                return (None, def_nodes[0].decorators[0].call.value[0].value.to_python())
-    return None
-
-
-def remove_raise_skip_tests(source):
-    '''
-       Remove from the code any raise unittest.SkipTest lines since we don't want those in
-       what the user sees
-    '''
-    rb = RedBaron(source)
+def remove_raise_skip_tests(src):
+    """
+    Remove from the code any raise unittest.SkipTest lines since we don't want those in
+    what the user sees.
+    """
+    rb = RedBaron(src)
     raise_nodes = rb.findAll("RaiseNode")
     for rn in raise_nodes:
         # only the raise for SkipTest
@@ -289,137 +273,24 @@ def remove_raise_skip_tests(source):
     return rb.dumps()
 
 
-def get_unit_test_source_and_run_outputs(method_path):
-    '''
-    Get the source code for a unit test method, run the test,
-    and capture the output of the run
-    '''
-
-    module_path = '.'.join(method_path.split('.')[:-2])
-    class_name = method_path.split('.')[-2]
-    method_name = method_path.split('.')[-1]
-    test_module = importlib.import_module(module_path)
-    cls = getattr(test_module, class_name)
-    try:
-        import mpi4py
-    except ImportError:
-        use_mpi = False
-    else:
-        N_PROCS = getattr(cls, 'N_PROCS', 1)
-        use_mpi =  N_PROCS > 1
-    meth = getattr(cls, method_name)
-    class_source_code = inspect.getsource(cls)
-
-    rb = RedBaron(class_source_code)
-    def_nodes = rb.findAll("DefNode", name=method_name)
-    def_nodes[0].value.decrease_indentation(8)
-    method_source = def_nodes[0].value.dumps()
-
-    # Remove docstring from source code
-    source_minus_docstrings = remove_docstrings(method_source)
-
-    # We are using the RedBaron module in the next two function calls
-    #    to get the code in the way we want it.
-
-    # Only want the method body. Do not want the 'def' line
-    # method_body_source = get_method_body(source_minus_docstrings)
-    method_body_source = source_minus_docstrings
-
-    # Replace some of the asserts with prints of the actual values
-    source_minus_docstrings_with_prints = replace_asserts_with_prints(method_body_source)
-
-    # remove raise SkipTest lines
-    # We decided to leave them in for now
-    # source_minus_docstrings_with_prints = remove_raise_skip_tests(source_minus_docstrings_with_prints)
-
-    # Remove the initial empty lines
-    source_minus_docstrings_with_prints_cleaned = remove_initial_empty_lines_from_source(
-        source_minus_docstrings_with_prints)
-
-    # Get all the pieces of code needed to run the unit test method
-    module_source_code = inspect.getsource(test_module)
-    lines_before_test_cases = get_lines_before_test_cases(module_source_code)
-    setup_source_code = get_method_body(inspect.getsource(getattr(cls, 'setUp')))
-    teardown_source_code = get_method_body(inspect.getsource(getattr(cls, 'tearDown')))
-
-    # If the test method has a skipUnless or skip decorator, we need to convert it to a
-    #   raise call
-    skip_predicate_and_message = get_skip_predicate_and_message(class_source_code, method_name)
-    if skip_predicate_and_message:
-        # predicate, message = skip_unless_predicate_and_message
-        predicate, message = skip_predicate_and_message
-        if predicate:
-            raise_skip_test_source_code = 'import unittest\nif not {}: raise unittest.SkipTest("{}")'.format(predicate, message)
-        else:
-            raise_skip_test_source_code = 'import unittest\nraise unittest.SkipTest("{}")'.format(message)
-    else:
-        raise_skip_test_source_code = ""
-
-    code_to_run = '\n'.join([lines_before_test_cases,
-                            setup_source_code,
-                            raise_skip_test_source_code,
-                            source_minus_docstrings_with_prints_cleaned,
-                            teardown_source_code])
-
-    # Write it to a file so we can run it. Tried using exec but ran into problems with that
-    fd, code_to_run_path = tempfile.mkstemp()
-    skipped = False
-    failed = False
-    try:
-        with os.fdopen(fd, 'w') as tmp:
-            tmp.write(code_to_run)
-            tmp.close()
-        if use_mpi:
-            env = os.environ.copy()
-            env['USE_PROC_FILES'] = '1'
-            p = subprocess.Popen(['mpirun', '-n', str(N_PROCS), 'python', code_to_run_path],
-                                 env=env)
-            p.wait()
-            multi_out_blocks = []
-            for i in range(N_PROCS):
-                with open('%d.out' % i) as f:
-                    multi_out_blocks.append(extract_output_blocks(f.read()))
-                os.remove('%d.out' % i)
-            output_blocks = []
-            for i in range(len(multi_out_blocks[0])):
-                output_blocks.append('\n'.join(["(rank %d) %s" % (j, m[i]) for j, m in enumerate(multi_out_blocks) if m[i]]))
-        else:
-            run_outputs = subprocess.check_output(['python', code_to_run_path], stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as e:
-        # Get a traceback like this:
-        # Traceback (most recent call last):
-        #     File "/Applications/PyCharm CE.app/Contents/helpers/pydev/pydevd.py", line 1556, in <module>
-        #         globals = debugger.run(setup['file'], None, None, is_module)
-        #     File "/Applications/PyCharm CE.app/Contents/helpers/pydev/pydevd.py", line 940, in run
-        #         pydev_imports.execfile(file, globals, locals)  # execute the script
-        #     File "/var/folders/l3/9j86k5gn6cx0_p25kdplxgpw1l9vkk/T/tmp215aM1", line 23, in <module>
-        #         raise unittest.SkipTest("check_total_derivatives not implemented yet")
-        # unittest.case.SkipTest: check_total_derivatives not implemented yet
-        if 'raise unittest.SkipTest' in e.output.decode('utf-8'):
-            reason_for_skip = e.output.splitlines()[-1][len('unittest.case.SkipTest: '):]
-            run_outputs = reason_for_skip
-            skipped = True
-        else:
-            run_outputs = "Running of embedded test {} in docs failed due to: \n\n{}".format(method_path, e.output.decode('utf-8'))
-            failed = True
-            # print("Running of embedded test " + method_path + " in docs failed due to: " + e.output.decode('utf-8'))
-            # raise
-    except Exception as err:
-        run_outputs = "Running of embedded test {} in docs failed due to: \n\n{}".format(method_path,
-                                                                                         str(err))
-        failed = True
-    finally:
-        os.remove(code_to_run_path)
-
-    if PY3:
-        run_outputs = "".join(map(chr, run_outputs))  # in Python 3, run_outputs is of type bytes!
-    return source_minus_docstrings_with_prints_cleaned, run_outputs, skipped, failed
-
 def remove_leading_trailing_whitespace_lines(src):
+    """
+    Remove any trailing whitespace lines.
+
+    Parameters
+    ----------
+    src : str
+        Input code.
+
+    Returns
+    -------
+    str
+        Code with trailing whitespace lines removed.
+    """
     lines = src.splitlines()
 
     non_whitespace_lines = []
-    for i, l in enumerate( lines ):
+    for i, l in enumerate(lines):
         if l and not l.isspace():
             non_whitespace_lines.append(i)
     imin = min(non_whitespace_lines)
@@ -427,75 +298,147 @@ def remove_leading_trailing_whitespace_lines(src):
 
     return '\n'.join(lines[imin: imax+1])
 
+
+def is_output_node(node):
+    """
+    Determine whether a RedBaron node may be expected to generate output.
+
+    Parameters
+    ----------
+    node : <Node>
+        a RedBaron Node.
+
+    Returns
+    -------
+    bool
+        True if node may be expected to generate output, otherwise False.
+    """
+    if node.type == 'print':
+        return True
+
+    # lines with the following signatures and function names may generate output
+    output_signatures = [
+        ('name', 'name', 'call'),
+        ('name', 'name', 'name', 'call')
+    ]
+    output_functions = [
+        'setup', 'run_model', 'run_driver',
+        'check_partials', 'check_totals',
+        'list_inputs', 'list_outputs',
+    ]
+
+    if node.type == 'atomtrailers' and len(node.value) in (3, 4):
+        sig = []
+        for val in node.value:
+            sig.append(val.type)
+        func_name = node.value[-2].value
+        if tuple(sig) in output_signatures and func_name in output_functions:
+            return True
+
+    return False
+
+
 def split_source_into_input_blocks(src):
-    '''
-    '''
-    rb = RedBaron(src)
-    in_code_blocks = []
-    in_code_block = []
-    # group code until the first print, then repeat
-    for r in rb:
-        line = r.dumps()
-        if not line.endswith('\n'):
-            line += '\n'
-        in_code_block.append(line)
-        if r.type == 'print' or \
-            ( len(r.value) == 3 and \
-            (r.type, r.value[0].type, r.value[1].type, r.value[2].type) == \
-                ('atomtrailers', 'name', 'name', 'call') and \
-                r.value[1].value in ['run_model', 'run_driver', 'setup'] ):
-            # stop and make an input code block
-            in_code_block = ''.join(in_code_block)
-            in_code_block = remove_leading_trailing_whitespace_lines(in_code_block)
-            in_code_blocks.append(in_code_block)
-            in_code_block = []
+    """
+    Split source into blocks; the splits occur at inserted prints.
 
-    if in_code_block: # If anything left over
-        in_code_blocks.append(''.join(in_code_block))
+    Parameters
+    ----------
+    src : str
+        Input code.
 
-    return in_code_blocks
+    Returns
+    -------
+    list
+        List of input code sections.
+    """
+    input_blocks = []
+
+    current_block = ""
+
+    for line in src.split('\n'):
+        if 'print(">>>>>' in line:
+            input_blocks.append(current_block)
+            current_block = ""
+        else:
+            current_block += line + '\n'
+
+    if current_block.strip():
+        input_blocks.append(current_block)
+
+    return input_blocks
 
 
 def insert_output_start_stop_indicators(src):
-    '''
-    '''
+    """
+    Insert identifier strings so that output can be segregated from input.
+
+    Parameters
+    ----------
+    src : str
+        String containing input and output lines.
+
+    Returns
+    -------
+    str
+        String with output demarked.
+    """
     rb = RedBaron(src)
 
-    src_with_out_start_stop_indicators = []
+    # find lines with trailing comments so we can preserve them properly
+    lines_with_comments = {}
+    comments = rb.findAll('comment')
+    for c in comments:
+        if c.previous and c.previous.type != 'endl':
+            lines_with_comments[c.previous] = c
+
     input_block_number = 0
-    for r in rb:
-        line = r.dumps()
-        # not sure why some lines from RedBaron do not have newlines
-        if not line.endswith('\n'):
-            line += '\n'
-        if r.type == 'print':
-            # src_with_out_start_stop_indicators += 'print("<<<<<{}")'.format(input_block_number) + '\n'
-            src_with_out_start_stop_indicators.append(line)
-            src_with_out_start_stop_indicators.append('print(">>>>>{}")\n'.format(input_block_number))
-        elif len(r.value) == 3 and \
-            (r.type, r.value[0].type, r.value[1].type, r.value[2].type) == \
-                ('atomtrailers', 'name', 'name', 'call') and \
-                r.value[1].value in ['run_model', 'run_driver', 'setup']:
-            src_with_out_start_stop_indicators.append(line)
-            src_with_out_start_stop_indicators.append('print(">>>>>{}")\n'.format(input_block_number))
-        else:
-            src_with_out_start_stop_indicators.append(line)
-        input_block_number += 1
-    return ''.join(src_with_out_start_stop_indicators)
+
+    # find all nodes that might produce output
+    nodes = rb.findAll(lambda identifier: identifier in ['print', 'atomtrailers'])
+    for r in nodes:
+        # Output within if/else statements is not a good idea for docs, because
+        # we don't know which branch execution will follow and thus where to put
+        # the output block. Regardless of which branch is taken, though, the
+        # output blocks must start with the same block number.
+        if hasattr(r.parent, 'type') and r.parent.type == 'if':
+            if_block_number = input_block_number
+        if hasattr(r.parent, 'type') and r.parent.type in ['elif', 'else']:
+            input_block_number = if_block_number
+
+        if is_output_node(r):
+            # if there was a trailing comment on this line, output goes after it
+            if r in lines_with_comments:
+                r = lines_with_comments[r]  # r is now the comment
+                if r.previous.value == '\n':
+                    r.previous.value = ''   # don't want endl before comment
+
+            # find the correct node to 'insert_after'
+            while hasattr(r, 'parent') and not hasattr(r.parent, 'insert'):
+                r = r.parent
+
+            r.insert_after('print(">>>>>%d")\n' % input_block_number)
+            input_block_number += 1
+
+    return rb.dumps()
+
 
 def clean_up_empty_output_blocks(input_blocks, output_blocks):
-    '''Some of the blocks do not generate output. We only want to have
-            input blocks that have outputs
-    '''
+    """Some of the blocks do not generate output. We only want to have
+    input blocks that have outputs.
+    """
 
     new_input_blocks = []
     new_output_blocks = []
     current_in_block = ''
+
     for in_block, out_block in zip(input_blocks, output_blocks):
         if current_in_block and not current_in_block.endswith('\n'):
             current_in_block += '\n'
         current_in_block += in_block
         if out_block:
+            current_in_block = remove_leading_trailing_whitespace_lines(current_in_block)
+            out_block = remove_leading_trailing_whitespace_lines(out_block)
             new_input_blocks.append(current_in_block)
             new_output_blocks.append(out_block)
             current_in_block = ''
@@ -507,62 +450,104 @@ def clean_up_empty_output_blocks(input_blocks, output_blocks):
 
     return new_input_blocks, new_output_blocks
 
-def extract_output_blocks(run_output):
-    '''
-    '''
 
-    output_blocks = []
+def extract_output_blocks(run_output):
+    """
+    Identify and extract outputs from source.
+
+    Parameters
+    ----------
+    run_output : str
+        Source code with outputs.
+
+    Returns
+    -------
+    list of str
+        List containing output text blocks.
+    """
+
     # Look for start and end lines that look like this:
     #  <<<<<4
     #  >>>>>4
-    output_block = []
+
+    output_blocks = []
+    output_block = None
+
     for line in run_output.splitlines():
+        if output_block is None:
+            output_block = []
         if line.startswith('>>>>>'):
             output_blocks.append('\n'.join(output_block))
-            output_block = []
+            output_block = None
         else:
             output_block.append(line)
 
-    if output_block:
+    if output_block is not None:
         output_blocks.append('\n'.join(output_block))
+
     return output_blocks
 
-def get_unit_test_source_and_run_outputs_in_out(method_path):
-    '''
-    1. Get the source code for a unit test method
-    2. Replace the asserts with prints -> source_minus_docstrings_with_prints_cleaned
-    3. Split source_minus_docstrings_with_prints_cleaned up into groups of "In" blocks -> input_blocks
-    4. Insert extra print statements into source_minus_docstrings_with_prints_cleaned
-            to indicate start and end of print Out blocks -> source_with_output_start_stop_indicators
-    5. Run the test using source_with_out_start_stop_indicators -> run_outputs
-    6. Extract from run_outputs, the Out blocks -> output_blocks
-    7. Return source_minus_docstrings_with_prints_cleaned, input_blocks, output_blocks, skipped, failed
-    '''
 
-    #####################
-    ### 1. Get the source code for a unit test method ###
-    #####################
-    module_path = '.'.join(method_path.split('.')[:-2])
-    class_name = method_path.split('.')[-2]
-    method_name = method_path.split('.')[-1]
-    if method_name == 'test_feature_promoted_sellar_set_get_inputs':
-        pass
-    test_module = importlib.import_module(module_path)
-    cls = getattr(test_module, class_name)
-    try:
-        import mpi4py
-    except ImportError:
-        use_mpi = False
-    else:
-        N_PROCS = getattr(cls, 'N_PROCS', 1)
-        use_mpi =  N_PROCS > 1
-    meth = getattr(cls, method_name)
-    class_source_code = inspect.getsource(cls)
+def globals_for_imports(src):
+    """
+    Generate text that creates a global for each imported class, method, or module.
 
-    # Directly manipulating function text to strip header and remove leading whitespace.
-    # Should be faster than redbaron
-    method_source_code = inspect.getsource(meth)
-    meth_lines = method_source_code.split('\n')
+    It appears that sphinx royally screws up something in python, so that when exec-ing
+    code with imports, they aren't always available inside of classes or methods. This
+    can be solved by issuing a global for each class, method, or module.
+
+    Parameters
+    ----------
+    src : str
+        Source code to be tested.
+
+    Returns
+    -------
+    str
+        New code string with global statements
+    """
+    # HACK: A test had problems loading this specific user-defined class under exec+sphinx, so
+    # hacking it in.
+    new_txt = ['from __future__ import print_function',
+               'global Sub',
+               'global ImplSimple']
+
+    continuation = False
+    for line in src.split('\n'):
+        if continuation or 'import ' in line:
+
+            if continuation:
+                tail = line
+            elif ' as ' in line:
+                tail = line.split(' as ')[1]
+            else:
+                tail = line.split('import ')[1]
+
+            if ', \\' in tail:
+                continuation = True
+                tail = tail.replace(', \\', '')
+            else:
+                continuation = False
+
+            modules = tail.split(',')
+            for module in modules:
+                new_txt.append('global %s' % module.strip())
+
+    return '\n'.join(new_txt)
+
+
+def strip_header(src):
+    """
+    Directly manipulating function text to strip header and remove leading whitespace.
+
+    Should be faster than redbaron.
+
+    Parameters
+    ----------
+    src : str
+        sourec code for method
+    """
+    meth_lines = src.split('\n')
     counter = 0
     past_header = False
     new_lines = []
@@ -583,110 +568,170 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
                 past_header = True
         else:
             newline = line[tab:]
+
         # exclude 'global' directives, not needed the way we are running things
         if not newline.startswith("global "):
             new_lines.append(newline)
 
-    method_source = '\n'.join(new_lines[counter:])
+    return '\n'.join(new_lines[counter:])
 
-    #rb = RedBaron(class_source_code)
-    #def_nodes = rb.find("DefNode", name=method_name)
-    #def_nodes.value.decrease_indentation(8)
-    #method_source = def_nodes.value.dumps()
 
-    # Remove docstring from source code
-    source_minus_docstrings = remove_docstrings(method_source)
+def get_and_run_test(method_path):
+    """
+    Return desired source code for a single feature after testing it.
 
-    # We are using the RedBaron module in the next two function calls
-    #    to get the code in the way we want it.
+    Used by embed_test.
 
-    # Only want the method body. Do not want the 'def' line
-    # method_body_source = get_method_body(source_minus_docstrings)
-    # method_body_source = source_minus_docstrings
+    1. Get the source code for a unit test method
+    2. Replace the asserts with prints
+    3. Insert extra print statements to indicate start and end of print Out blocks
+    4. Run the test using source_with_out_start_stop_indicators -> run_outputs
+    5. Split method_source up into groups of "In" blocks -> input_blocks
+    6. Extract from run_outputs, the Out blocks -> output_blocks
+    7. Return method_source, input_blocks, output_blocks, skipped
 
-    #####################
-    ### 2. Replace the asserts with prints -> source_minus_docstrings_with_prints_cleaned ###
-    #####################
-    # Replace some of the asserts with prints of the actual values
-    source_minus_docstrings_with_prints = replace_asserts_with_prints(source_minus_docstrings)
+    Parameters
+    ----------
+    method_path : str
+        Module hiearchy path to the test.
 
-    # remove raise SkipTest lines
-    # We decided to leave them in for now
-    # source_minus_docstrings_with_prints = remove_raise_skip_tests(source_minus_docstrings_with_prints)
+    Returns
+    -------
+    str
+        Cleaned source code, ready for inclusion in doc.
+    str
+        Reason that the test failed or was skipped.
+    list of str
+        List of input code blocks
+    list of str
+        List of Python output blocks
+    bool
+        True if test was skipped
+    """
 
-    # Remove the initial empty lines
-    source_minus_docstrings_with_prints_cleaned = remove_initial_empty_lines_from_source(
-        source_minus_docstrings_with_prints)
+    #----------------------------------------------------------
+    # 1. Get the source code for a unit test method.
+    #----------------------------------------------------------
 
-    #####################
-    ### 4. Insert extra print statements into source_minus_docstrings_with_prints_cleaned ###
-    ###        to indicate start and end of print Out blocks -> source_with_output_start_stop_indicators ###
-    #####################
-    source_with_output_start_stop_indicators = insert_output_start_stop_indicators( source_minus_docstrings_with_prints_cleaned )
+    module_path = '.'.join(method_path.split('.')[:-2])
+    class_name = method_path.split('.')[-2]
+    method_name = method_path.split('.')[-1]
 
-    #####################
-    ### 5. Run the test using source_with_out_start_stop_indicators -> run_outputs
-    #####################
+    test_module = importlib.import_module(module_path)
+    cls = getattr(test_module, class_name)
+
+    try:
+        import mpi4py
+    except ImportError:
+        use_mpi = False
+    else:
+        N_PROCS = getattr(cls, 'N_PROCS', 1)
+        use_mpi =  N_PROCS > 1
+
+    method = getattr(cls, method_name)
+    method_source = inspect.getsource(method)
+    method_source = strip_header(method_source)
+    method_source = remove_docstrings(method_source)
+    method_source = replace_asserts_with_prints(method_source)
+    method_source = remove_initial_empty_lines(method_source)
+
+    #-----------------------------------------------------------------------------------
+    # 3. Insert extra print statements to indicate start and end of print Out blocks
+    #-----------------------------------------------------------------------------------
+    source_with_output_start_stop_indicators = insert_output_start_stop_indicators(method_source)
+
+    #------------------------------------------------------------------------------------
     # Get all the pieces of code needed to run the unit test method
-    module_source_code = inspect.getsource(test_module)
-    lines_before_test_cases = module_source_code.split('if __name__')[0]
-    setup_source_code = get_method_body(inspect.getsource(getattr(cls, 'setUp')))
-    teardown_source_code = get_method_body(inspect.getsource(getattr(cls, 'tearDown')))
+    #-----------------------------------------------------------------------------------
 
-    # If the test method has a skipUnless or skip decorator, we need to convert it to a
-    #   raise call
-    raise_skip_test_source_code = ""
-    if '@unittest.skip' in class_source_code:
-        skip_predicate_and_message = get_skip_predicate_and_message(class_source_code, method_name)
-        if skip_predicate_and_message:
-            # predicate, message = skip_unless_predicate_and_message
-            predicate, message = skip_predicate_and_message
-            if predicate:
-                raise_skip_test_source_code = 'import unittest\nif not {}: raise unittest.SkipTest("{}")'.format(predicate, message)
-            else:
-                raise_skip_test_source_code = 'import unittest\nraise unittest.SkipTest("{}")'.format(message)
+    global_imports = globals_for_imports(method_source)
 
+    # make 'self' available to test code (as an instance of the test case)
+    self_code = "from %s import %s\nself = %s('%s')\n" % \
+                (module_path, class_name, class_name, method_name)
 
-    code_to_run = '\n'.join([lines_before_test_cases,
-                            setup_source_code,
-                            raise_skip_test_source_code,
-                            source_with_output_start_stop_indicators,
-                            teardown_source_code])
+    # get setUp and tearDown but don't duplicate if it is the method being tested
+    setup_code = '' if method_name == 'setUp' else \
+        get_method_body(inspect.getsource(getattr(cls, 'setUp')))
 
-    # Write it to a file so we can run it. Tried using exec but ran into problems with that
-    fd, code_to_run_path = tempfile.mkstemp()
+    teardown_code = '' if method_name == 'tearDown' else \
+        get_method_body(inspect.getsource(getattr(cls, 'tearDown')))
+
+    code_to_run = '\n'.join([global_imports,
+                             self_code,
+                             setup_code,
+                             source_with_output_start_stop_indicators,
+                             teardown_code])
+
+    #-----------------------------------------------------------------------------------
+    # 4. Run the test using source_with_out_start_stop_indicators -> run_outputs
+    #-----------------------------------------------------------------------------------
+
     skipped = False
     failed = False
+
     try:
-        with os.fdopen(fd, 'w') as tmp:
-            tmp.write(code_to_run)
-            tmp.close()
         if use_mpi:
+            # use subprocess to run test with `mpirun`
+
+            # write code to a file so we can run it.
+            fd, code_to_run_path = tempfile.mkstemp()
+            with os.fdopen(fd, 'w') as tmp:
+                tmp.write(code_to_run)
+                tmp.close()
+
+            # output will be written to one file per process
             env = os.environ.copy()
             env['USE_PROC_FILES'] = '1'
+
             p = subprocess.Popen(['mpirun', '-n', str(N_PROCS), 'python', code_to_run_path],
                                  env=env)
             p.wait()
+
+            # extract output blocks from all output files & merge them
             multi_out_blocks = []
             for i in range(N_PROCS):
                 with open('%d.out' % i) as f:
                     multi_out_blocks.append(extract_output_blocks(f.read()))
                 os.remove('%d.out' % i)
+
             output_blocks = []
             for i in range(len(multi_out_blocks[0])):
-                output_blocks.append('\n'.join(["(rank %d) %s" % (j, m[i]) for j, m in enumerate(multi_out_blocks) if m[i]]))
+                output_blocks.append('\n'.join(["(rank %d) %s" %
+                                     (j, m[i]) for j, m in enumerate(multi_out_blocks) if m[i]]))
         else:
-            run_outputs = subprocess.check_output(['python', code_to_run_path], stderr=subprocess.STDOUT)
+            # just exec() the code for serial tests.
+
+            # capture all output
+            stdout = sys.stdout
+            stderr = sys.stderr
+            strout = cStringIO()
+            sys.stdout = strout
+            sys.stderr = strout
+
+            # set all the loggers to write to our captured stream
+            from openmdao.utils.logger_utils import _loggers
+            for name in _loggers:
+                _loggers[name]['logger'].handlers[0].stream = strout
+
+            # We need more precision from numpy
+            save_opts = np.get_printoptions()
+            np.set_printoptions(precision=8)
+
+            # Move to the test directory in case there are files to read.
+            save_dir = os.getcwd()
+            os.chdir('/'.join(test_module.__file__.split('/')[:-1]))
+
+            try:
+                exec(code_to_run, {})
+            finally:
+                os.chdir(save_dir)
+
+            np.set_printoptions(precision=save_opts['precision'])
+            run_outputs = strout.getvalue()
+
     except subprocess.CalledProcessError as e:
-        # Get a traceback like this:
-        # Traceback (most recent call last):
-        #     File "/Applications/PyCharm CE.app/Contents/helpers/pydev/pydevd.py", line 1556, in <module>
-        #         globals = debugger.run(setup['file'], None, None, is_module)
-        #     File "/Applications/PyCharm CE.app/Contents/helpers/pydev/pydevd.py", line 940, in run
-        #         pydev_imports.execfile(file, globals, locals)  # execute the script
-        #     File "/var/folders/l3/9j86k5gn6cx0_p25kdplxgpw1l9vkk/T/tmp215aM1", line 23, in <module>
-        #         raise unittest.SkipTest("check_total_derivatives not implemented yet")
-        # unittest.case.SkipTest: check_total_derivatives not implemented yet
+        # Get a traceback.
         if 'raise unittest.SkipTest' in e.output.decode('utf-8'):
             reason_for_skip = e.output.splitlines()[-1][len('unittest.case.SkipTest: '):]
             run_outputs = reason_for_skip
@@ -694,23 +739,37 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
         else:
             run_outputs = "Running of embedded test {} in docs failed due to: \n\n{}".format(method_path, e.output.decode('utf-8'))
             failed = True
-            # print("Running of embedded test " + method_path + " in docs failed due to: " + e.output.decode('utf-8'))
-            # raise
+
     except Exception as err:
-        run_outputs = "Running of embedded test {} in docs failed due to: \n\n{}".format(method_path,
-                                                                                         str(err))
-        failed = True
+        if 'SkipTest' in code_to_run:
+            txt1 = code_to_run.split('SkipTest(')[1]
+            run_outputs = txt1.split(')')[0]
+            skipped = True
+        else:
+            msg = "Running of embedded test {} in docs failed due to: \n\n{}"
+            run_outputs = msg.format(method_path, str(err))
+            failed = True
+
     finally:
-        os.remove(code_to_run_path)
+        if use_mpi:
+            os.remove(code_to_run_path)
+        else:
+            sys.stdout = stdout
+            sys.stderr = stderr
 
     if PY3 and not use_mpi and not isinstance(run_outputs, str):
         run_outputs = "".join(map(chr, run_outputs))  # in Python 3, run_outputs is of type bytes!
 
-    if not skipped and not failed:
+    if skipped:
+        input_blocks = output_blocks = None
+        skipped_output = run_outputs
+    elif failed:
+        raise SphinxError(run_outputs)
+    else:
         #####################
-        ### 3. Split source_minus_docstrings_with_prints_cleaned up into groups of "In" blocks -> input_blocks ###
+        ### 5. Split method_source up into groups of "In" blocks -> input_blocks ###
         #####################
-        input_blocks = split_source_into_input_blocks(source_minus_docstrings_with_prints_cleaned)
+        input_blocks = split_source_into_input_blocks(source_with_output_start_stop_indicators)
 
         #####################
         ### 6. Extract from run_outputs, the Out blocks -> output_blocks ###
@@ -718,12 +777,14 @@ def get_unit_test_source_and_run_outputs_in_out(method_path):
         if not use_mpi:
             output_blocks = extract_output_blocks(run_outputs)
 
-        # Need to deal with the cases when there is no outputblock for a given input block
+        # the last input block may not produce any output
+        if len(output_blocks) == len(input_blocks) - 1:
+            output_blocks.append('')
+
+        # Need to deal with the cases when there is no output for a given input block
         # Merge an input block with the previous block and throw away the output block
         input_blocks, output_blocks = clean_up_empty_output_blocks(input_blocks, output_blocks)
-        skipped_failed_output = None
-    else:
-        input_blocks = output_blocks = None
-        skipped_failed_output = run_outputs
 
-    return source_minus_docstrings_with_prints_cleaned, skipped_failed_output, input_blocks, output_blocks, skipped, failed
+        skipped_output = None
+
+    return method_source, skipped_output, input_blocks, output_blocks, skipped

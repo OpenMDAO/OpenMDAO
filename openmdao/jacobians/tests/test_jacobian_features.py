@@ -9,9 +9,9 @@ from six import iteritems
 from parameterized import parameterized
 
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, \
-                         COOJacobian, ScipyIterativeSolver, DirectSolver, DenseJacobian
+                         COOJacobian, ScipyKrylov, DirectSolver, DenseJacobian
 
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class SimpleComp(ExplicitComponent):
@@ -103,6 +103,7 @@ class SimpleCompConst(ExplicitComponent):
         outputs['g'] = np.outer(inputs['y1'] + inputs['y3'], inputs['y2']) + inputs['x'] * np.eye(2)
 
     def compute_partials(self, inputs, partials):
+        # note: all the partial derivatives are constant, so no calculations happen here.
         pass
 
 
@@ -114,10 +115,7 @@ class SimpleCompFD(SimpleComp):
     def setup(self):
         super(SimpleCompFD, self).setup()
 
-        self.declare_partials('f', ['y1', 'y2', 'y3'], dependent=False)
-        self.declare_partials('g', 'z', dependent=False)
-
-        self.approx_partials('*', '*', **self.kwargs)
+        self.declare_partials('*', '*', method='fd', **self.kwargs)
 
     def compute_partials(self, inputs, partials):
         pass
@@ -131,11 +129,11 @@ class SimpleCompMixedFD(SimpleComp):
     def setup(self):
         super(SimpleCompMixedFD, self).setup()
 
-        self.declare_partials('f', ['y1', 'y2', 'y3'], dependent=False)
-        self.declare_partials('g', 'z', dependent=False)
+        self.declare_partials('f', ['x', 'z'])
+        self.declare_partials('g', ['y1', 'y3'])
 
-        self.approx_partials('g', 'x', **self.kwargs)
-        self.approx_partials('g', 'y2', **self.kwargs)
+        self.declare_partials('g', 'x', method='fd', **self.kwargs)
+        self.declare_partials('g', 'y2', method='fd', **self.kwargs)
 
     def compute_partials(self, inputs, partials):
         partials['f', 'x'] = 1.
@@ -179,7 +177,7 @@ class TestJacobianFeatures(unittest.TestCase):
 
         self.problem = Problem(model=model)
         self.problem.set_solver_print(level=0)
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
         model.jacobian = COOJacobian()
 
     def test_dependence(self):
@@ -268,13 +266,13 @@ class TestJacobianFeatures(unittest.TestCase):
 
         problem = Problem(model=model)
         problem.set_solver_print(level=0)
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
         model.jacobian = COOJacobian()
         model.add_subsystem('simple', SimpleCompConst(),
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
         problem.setup(check=False)
         problem.run_model()
-        totals = problem.compute_total_derivs(['f', 'g'],
+        totals = problem.compute_totals(['f', 'g'],
                                               ['x', 'y1', 'y2', 'y3', 'z'])
 
         jacobian = {}
@@ -307,7 +305,7 @@ class TestJacobianFeatures(unittest.TestCase):
 
         problem.setup(check=True)
         problem.run_model()
-        totals = problem.compute_total_derivs(['f', 'g'],
+        totals = problem.compute_totals(['f', 'g'],
                                               ['x', 'y1', 'y2', 'y3', 'z'])
         jacobian = {}
         jacobian['f', 'x'] = [[1.]]
@@ -333,7 +331,7 @@ class TestJacobianFeatures(unittest.TestCase):
 
         problem.setup(check=True)
         problem.run_model()
-        totals = problem.compute_total_derivs(['f', 'g'],
+        totals = problem.compute_totals(['f', 'g'],
                                               ['x', 'y1', 'y2', 'y3', 'z'])
         jacobian = {}
         jacobian['f', 'x'] = [[1.]]
@@ -360,7 +358,7 @@ class TestJacobianFeatures(unittest.TestCase):
                 self.add_output('flow:T', val=284., units="degR", desc="Temperature")
                 self.add_output('flow:P', val=1., units='lbf/inch**2', desc="Pressure")
 
-                self.approx_partials(of='*', wrt='*')
+                self.declare_partials(of='*', wrt='*', method='fd')
 
             def compute(self, inputs, outputs):
                 outputs['flow:T'] = inputs['T']
@@ -377,7 +375,7 @@ class TestJacobianFeatures(unittest.TestCase):
 
         p.setup()
         p.run_model()
-        totals = p.compute_total_derivs(['flow:T', 'flow:P'], ['T', 'P'])
+        totals = p.compute_totals(['flow:T', 'flow:P'], ['T', 'P'])
         expected_totals = {
             ('flow:T', 'T'): [[9/5]],
             ('flow:P', 'T'): [[0.]],
@@ -408,6 +406,8 @@ class TestJacobianFeatures(unittest.TestCase):
                 self.add_output('z', shape=(3,))
                 self.add_input('x', shape=(3,), units='degF')
 
+                self.declare_partials(of='*', wrt='*')
+
             def compute_partials(self, inputs, partials):
                 partials['y', 'x'] = self.A
                 partials['z', 'x'] = self.A
@@ -422,7 +422,7 @@ class TestJacobianFeatures(unittest.TestCase):
 
         p.setup()
         p.run_model()
-        totals = p.compute_total_derivs(['y', 'z'], ['x'])
+        totals = p.compute_totals(['y', 'z'], ['x'])
         expected_totals = {
             ('y', 'x'): 9/5 * np.ones((3, 3)),
             ('z', 'x'): 9/5 * np.ones((3, 3)),
@@ -432,6 +432,11 @@ class TestJacobianFeatures(unittest.TestCase):
 
 class TestJacobianForDocs(unittest.TestCase):
     def test_const_jacobian(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, DenseJacobian
+        from openmdao.jacobians.tests.test_jacobian_features import SimpleCompConst
+
         model = Group()
         comp = IndepVarComp()
         for name, val in (('x', 1.), ('y1', np.ones(2)), ('y2', np.ones(2)),
@@ -447,7 +452,7 @@ class TestJacobianForDocs(unittest.TestCase):
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
         problem.setup(check=False)
         problem.run_model()
-        totals = problem.compute_total_derivs(['f', 'g'],
+        totals = problem.compute_totals(['f', 'g'],
                                               ['x', 'y1', 'y2', 'y3', 'z'])
 
         assert_rel_error(self, totals['f', 'x'], [[1.]])
@@ -462,6 +467,10 @@ class TestJacobianForDocs(unittest.TestCase):
         assert_rel_error(self, totals['g', 'y3'], [[1, 0], [1, 0], [0, 1], [0, 1]])
 
     def test_sparse_jacobian_in_place(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
+
         class SparsePartialComp(ExplicitComponent):
             def setup(self):
                 self.add_input('x', shape=(4,))
@@ -484,6 +493,7 @@ class TestJacobianForDocs(unittest.TestCase):
                 # (1, 3) entry
                 pd[3] = 4
 
+
         model = Group()
         comp = IndepVarComp()
         comp.add_output('x', np.ones(4))
@@ -496,11 +506,15 @@ class TestJacobianForDocs(unittest.TestCase):
         problem = Problem(model=model)
         problem.setup(check=False)
         problem.run_model()
-        totals = problem.compute_total_derivs(['example.f'], ['input.x'])
+        totals = problem.compute_totals(['example.f'], ['input.x'])
 
         assert_rel_error(self, totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
 
     def test_sparse_jacobian(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
+
         class SparsePartialComp(ExplicitComponent):
             def setup(self):
                 self.add_input('x', shape=(4,))
@@ -524,11 +538,16 @@ class TestJacobianForDocs(unittest.TestCase):
         problem = Problem(model=model)
         problem.setup(check=False)
         problem.run_model()
-        totals = problem.compute_total_derivs(['example.f'], ['input.x'])
+        totals = problem.compute_totals(['example.f'], ['input.x'])
 
         assert_rel_error(self, totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
 
     def test_sparse_jacobian_const(self):
+        import numpy as np
+        import scipy as sp
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
+
         class SparsePartialComp(ExplicitComponent):
             def setup(self):
                 self.add_input('x', shape=(4,))
@@ -556,12 +575,16 @@ class TestJacobianForDocs(unittest.TestCase):
         problem = Problem(model=model)
         problem.setup(check=False)
         problem.run_model()
-        totals = problem.compute_total_derivs(['example.f'], ['input.x', 'input.y'])
+        totals = problem.compute_totals(['example.f'], ['input.x', 'input.y'])
 
         assert_rel_error(self, totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
         assert_rel_error(self, totals['example.f', 'input.y'], [[1., 0.], [0., 1.]])
 
     def test_fd_glob(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
+
         class FDPartialComp(ExplicitComponent):
             def setup(self):
                 self.add_input('x', shape=(4,))
@@ -569,8 +592,8 @@ class TestJacobianForDocs(unittest.TestCase):
                 self.add_input('y2', shape=(2,))
                 self.add_output('f', shape=(2,))
 
-                self.approx_partials('f', 'y*')
-                self.approx_partials('f', 'x')
+                self.declare_partials('f', 'y*', method='fd')
+                self.declare_partials('f', 'x', method='fd')
 
             def compute(self, inputs, outputs):
                 f = outputs['f']
@@ -595,13 +618,17 @@ class TestJacobianForDocs(unittest.TestCase):
         problem = Problem(model=model)
         problem.setup(check=False)
         problem.run_model()
-        totals = problem.compute_total_derivs(['example.f'], ['input.x', 'input.y'])
+        totals = problem.compute_totals(['example.f'], ['input.x', 'input.y'])
 
         assert_rel_error(self, totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]],
                          tolerance=1e-8)
         assert_rel_error(self, totals['example.f', 'input.y'], [[1., 0.], [0., 1.]], tolerance=1e-8)
 
     def test_fd_options(self):
+        import numpy as np
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
+
         class FDPartialComp(ExplicitComponent):
 
             def setup(self):
@@ -610,8 +637,8 @@ class TestJacobianForDocs(unittest.TestCase):
                 self.add_input('y2', shape=(2,))
                 self.add_output('f', shape=(2,))
 
-                self.approx_partials('f', 'y*', method='fd', form='backward', step=1e-6)
-                self.approx_partials('f', 'x', method='fd', form='central', step=1e-4)
+                self.declare_partials('f', 'y*', method='fd', form='backward', step=1e-6)
+                self.declare_partials('f', 'x', method='fd', form='central', step=1e-4)
 
             def compute(self, inputs, outputs):
                 f = outputs['f']
@@ -636,7 +663,7 @@ class TestJacobianForDocs(unittest.TestCase):
         problem = Problem(model=model)
         problem.setup(check=False)
         problem.run_model()
-        totals = problem.compute_total_derivs(['example.f'], ['input.x', 'input.y'])
+        totals = problem.compute_totals(['example.f'], ['input.x', 'input.y'])
 
         assert_rel_error(self, totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]],
                          tolerance=1e-8)

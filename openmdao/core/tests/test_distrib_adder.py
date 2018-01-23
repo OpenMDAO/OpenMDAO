@@ -13,7 +13,7 @@ try:
 except ImportError:
     PETScVector = None
 
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class DistributedAdder(ExplicitComponent):
@@ -26,12 +26,6 @@ class DistributedAdder(ExplicitComponent):
         self.distributed = True
 
         self.local_size = self.size = size
-
-    def get_req_procs(self):
-        """
-        min/max number of procs that this component can use
-        """
-        return (1, self.size)
 
     def setup(self):
         """

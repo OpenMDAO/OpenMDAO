@@ -3,7 +3,7 @@ import numpy as np
 import unittest
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ExecComp
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class ReconfComp(ExplicitComponent):
@@ -24,6 +24,8 @@ class ReconfComp(ExplicitComponent):
     def setup(self):
         self.add_input('x', val=1.0)
         self.add_output('y', val=np.zeros(self.size))
+        # All derivatives are defined.
+        self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
         outputs['y'] = 2 * inputs['x']
@@ -66,7 +68,7 @@ class Test(unittest.TestCase):
 
         # First run the model once; counter = 1, size of y = 1
         p.run_model()
-        totals = p.compute_total_derivs(wrt=['x'], of=['y'])
+        totals = p.compute_totals(wrt=['x'], of=['y'])
         assert_rel_error(self, p['x'], 3.0)
         assert_rel_error(self, p['y'], 6.0)
         assert_rel_error(self, p['z'], 9.0)
@@ -75,7 +77,7 @@ class Test(unittest.TestCase):
 
         # Run the model again, which will trigger reconfiguration; counter = 2, size of y = 2
         p.run_model()
-        totals = p.compute_total_derivs(wrt=['x'], of=['y'])
+        totals = p.compute_totals(wrt=['x'], of=['y'])
         assert_rel_error(self, p['x'], 3.0)
         assert_rel_error(self, p['y'], 6.0 * np.ones(2))
         assert_rel_error(self, p['z'], 9.0)
@@ -86,15 +88,15 @@ class Test(unittest.TestCase):
 
         p.model = Group()
         p.model.add_subsystem('s1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
-        p.model.add_subsystem('s2', ReconfGroup(), promotes=['*'])
+        s2 = p.model.add_subsystem('s2', ReconfGroup(), promotes=['*'])
         p.model.add_subsystem('s3', ExecComp('z=3*x'), promotes=['*'])
-        p.model.get_subsystem('s2').add_subsystem('comp', ExecComp('y=2*x'), promotes=['*'])
+        s2.add_subsystem('comp', ReconfComp(), promotes=['*'])
 
         p.setup()
         p['x'] = 3.
 
         p.run_model()
-        totals = p.compute_total_derivs(wrt=['x'], of=['y'])
+        totals = p.compute_totals(wrt=['x'], of=['y'])
         assert_rel_error(self, p['x'], 3.0)
         assert_rel_error(self, p['y'], 6.0)
         assert_rel_error(self, p['z'], 9.0)
@@ -104,7 +106,7 @@ class Test(unittest.TestCase):
         # are zero-ed out during the execution following the reconfiguration (prior to updates)
         # because the scaling vectors for those external-source inputs are all zero.
         # The solution is to initialize the multiplier in the scaling vector to 1.
-        assert_rel_error(self, p.model.get_subsystem('s2')._inputs['x'], 3.0)
+        assert_rel_error(self, s2._inputs['x'], 3.0)
 
 
 if __name__ == '__main__':

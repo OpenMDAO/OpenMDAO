@@ -84,19 +84,19 @@ class ExplicitCycleComp(ExplicitComponent):
         self.metadata.declare('partial_type', default='array',
                               values=['array', 'sparse', 'aij'],
                               desc='type of partial derivatives')
-        self.metadata.declare('num_var', type_=int, default=1,
+        self.metadata.declare('num_var', types=int, default=1,
                               desc='Number of variables per component')
-        self.metadata.declare('var_shape', type_=tuple, default=(3,),
+        self.metadata.declare('var_shape', types=tuple, default=(3,),
                               desc='Shape of each variable')
-        self.metadata.declare('index', type_=int,
+        self.metadata.declare('index', types=int,
                               desc='Index of the component. Used for testing implicit connections')
-        self.metadata.declare('connection_type', type_=str, default='explicit',
+        self.metadata.declare('connection_type', default='explicit',
                               values=['explicit', 'implicit'],
                               desc='How to connect variables.')
         self.metadata.declare('finite_difference', default=False,
-                              type_=bool,
+                              types=bool,
                               desc='If the derivatives should be finite differenced.')
-        self.metadata.declare('num_comp', type_=int, default=2,
+        self.metadata.declare('num_comp', types=int, default=2,
                               desc='Total number of components')
 
         self.angle_param = 'theta'
@@ -146,7 +146,7 @@ class ExplicitCycleComp(ExplicitComponent):
                 raise unittest.SkipTest('not testing FD and matvec')
             if pd_type != 'array':
                 raise unittest.SkipTest('only dense FD supported')
-            self.approx_partials('*', '*')
+            self.declare_partials('*', '*', method='fd')
 
         elif self.metadata['jacobian_type'] != 'matvec' and pd_type != 'array':
             num_var = self.num_var
@@ -176,6 +176,10 @@ class ExplicitCycleComp(ExplicitComponent):
             self.declare_partials(self._cycle_names['theta_out'], self._cycle_names['theta'],
                                   **self._array2kwargs(dtheta, pd_type))
 
+        else:
+            # Declare everything
+            self.declare_partials(of='*', wrt='*')
+
     def compute(self, inputs, outputs):
         theta = inputs[self._cycle_names['theta']]
         A = _compute_A(self.size, theta)
@@ -184,7 +188,7 @@ class ExplicitCycleComp(ExplicitComponent):
         self._vector_to_outputs(y, outputs)
         outputs[self._cycle_names['theta_out']] = theta
 
-    def jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
+    def jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         angle_param = self._cycle_names[self.angle_param]
         x = self._inputs_to_vector(inputs)
         angle = inputs[angle_param]
@@ -376,7 +380,7 @@ class ExplicitLastComp(ExplicitFirstComp):
             partials[theta_out, self._cycle_names['psi']] = \
                 self.make_jacobian_entry(np.array([-1/(2*k-2)]), pd_type)
 
-    def jacvec_product(self, inputs, outputs, d_inputs, d_outputs, mode):
+    def jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         if self.metadata['jacobian_type'] == 'matvec':
             k = self.metadata['num_comp']
             num_var = self.metadata['num_var']

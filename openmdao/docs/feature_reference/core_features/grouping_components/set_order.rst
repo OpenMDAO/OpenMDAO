@@ -1,3 +1,5 @@
+.. _feature_set_order:
+
 ******************************************
 Setting the Order of Subsystems in a Group
 ******************************************
@@ -16,7 +18,7 @@ been added to the Group.
     Use caution when setting the order of execution of your subsystems, whether
     by just calling *add_subsystem* in a specific order or by later changing
     the order using *set_order*.  If you choose an order that doesn't follow
-    the natural data flow order of your subsystems, you model may take longer
+    the natural data flow order of your subsystems, your model may take longer
     to converge.
 
 Usage

@@ -3,14 +3,22 @@
 from __future__ import division, print_function
 
 import numpy as np
-from scipy.sparse.linalg import LinearOperator, gmres
+from scipy.sparse.linalg import LinearOperator, gmres, bicg, bicgstab, cg, cgs
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.recorders.recording_iteration_stack import Recording
 
+_SOLVER_TYPES = {
+    # 'bicg': bicg,
+    # 'bicgstab': bicgstab,
+    # 'cg': cg,
+    # 'cgs': cgs,
+    'gmres': gmres,
+}
 
-class ScipyIterativeSolver(LinearSolver):
+
+class ScipyKrylov(LinearSolver):
     """
     The Krylov iterative solvers in scipy.sparse.linalg.
 
@@ -31,7 +39,7 @@ class ScipyIterativeSolver(LinearSolver):
         **kwargs : {}
             dictionary of options set by the instantiating class/script.
         """
-        super(ScipyIterativeSolver, self).__init__(**kwargs)
+        super(ScipyKrylov, self).__init__(**kwargs)
 
         # initialize preconditioner to None
         self.precon = None
@@ -40,12 +48,13 @@ class ScipyIterativeSolver(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('solver', type_=object, default=gmres,
+        self.options.declare('solver', default='gmres', values=tuple(_SOLVER_TYPES.keys()),
                              desc='function handle for actual solver')
 
-        self.options.declare('restart', default=20, type_=int,
+        self.options.declare('restart', default=20, types=int,
                              desc='Number of iterations between restarts. Larger values increase '
-                                  'iteration cost, but may be necessary for convergence')
+                                  'iteration cost, but may be necessary for convergence. This '
+                                  'option applies only to gmres.')
 
         # changing the default maxiter from the base class
         self.options['maxiter'] = 1000
@@ -62,7 +71,7 @@ class ScipyIterativeSolver(LinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(ScipyIterativeSolver, self)._setup_solvers(system, depth)
+        super(ScipyKrylov, self)._setup_solvers(system, depth)
 
         if self.precon is not None:
             self.precon._setup_solvers(self._system, self._depth + 1)
@@ -80,7 +89,7 @@ class ScipyIterativeSolver(LinearSolver):
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        super(ScipyIterativeSolver, self)._set_solver_print(level=level, type_=type_)
+        super(ScipyKrylov, self)._set_solver_print(level=level, type_=type_)
 
         if self.precon is not None and type_ != 'NL':
             self.precon._set_solver_print(level=level, type_=type_)
@@ -124,13 +133,13 @@ class ScipyIterativeSolver(LinearSolver):
         if self._mode == 'fwd':
             x_vec = system._vectors['output'][vec_name]
             b_vec = system._vectors['residual'][vec_name]
-        elif self._mode == 'rev':
+        else:  # rev
             x_vec = system._vectors['residual'][vec_name]
             b_vec = system._vectors['output'][vec_name]
 
         x_vec.set_data(in_vec)
         scope_out, scope_in = system._get_scope()
-        system._apply_linear([vec_name], self._mode, scope_out, scope_in)
+        system._apply_linear([vec_name], self._rel_systems, self._mode, scope_out, scope_in)
 
         # print('in', in_vec)
         # print('out', b_vec.get_data())
@@ -146,7 +155,7 @@ class ScipyIterativeSolver(LinearSolver):
             the current residual vector.
         """
         norm = np.linalg.norm(res)
-        with Recording('ScipyIterativeSolver', self._iter_count, self):
+        with Recording('ScipyKrylov', self._iter_count, self):
             if self._iter_count == 0:
                 if norm != 0.0:
                     self._norm0 = norm
@@ -156,7 +165,7 @@ class ScipyIterativeSolver(LinearSolver):
         self._mpi_print(self._iter_count, norm, norm / self._norm0)
         self._iter_count += 1
 
-    def solve(self, vec_names, mode):
+    def solve(self, vec_names, mode, rel_systems=None):
         """
         Run the solver.
 
@@ -177,23 +186,27 @@ class ScipyIterativeSolver(LinearSolver):
             relative error.
         """
         self._vec_names = vec_names
+        self._rel_systems = rel_systems
         self._mode = mode
 
         system = self._system
-        solver = self.options['solver']
+        solver = _SOLVER_TYPES[self.options['solver']]
+        if solver is gmres:
+            restart = self.options['restart']
 
         maxiter = self.options['maxiter']
         atol = self.options['atol']
-        rtol = self.options['rtol']
-        restart = self.options['restart']
+
+        fail = False
 
         for vec_name in self._vec_names:
+
             self._vec_name = vec_name
 
             if self._mode == 'fwd':
                 x_vec = system._vectors['output'][vec_name]
                 b_vec = system._vectors['residual'][vec_name]
-            elif self._mode == 'rev':
+            else:  # rev
                 x_vec = system._vectors['residual'][vec_name]
                 b_vec = system._vectors['output'][vec_name]
 
@@ -211,14 +224,21 @@ class ScipyIterativeSolver(LinearSolver):
                 M = None
 
             self._iter_count = 0
-            x_vec.set_data(
-                solver(linop, b_vec.get_data(), M=M, restart=restart,
-                       x0=x_vec_combined, maxiter=maxiter, tol=atol,
-                       callback=self._monitor)[0])
+            if solver is gmres:
+                x, info = solver(linop, b_vec.get_data(), M=M, restart=restart,
+                                 x0=x_vec_combined, maxiter=maxiter, tol=atol,
+                                 callback=self._monitor)
+            else:
+                x, info = solver(linop, b_vec.get_data(), M=M,
+                                 x0=x_vec_combined, maxiter=maxiter, tol=atol,
+                                 callback=self._monitor)
+
+            fail |= (info != 0)
+            x_vec.set_data(x)
 
         # TODO: implement this properly
 
-        return False, 0., 0.
+        return fail, 0., 0.
 
     def _apply_precon(self, in_vec):
         """
@@ -245,7 +265,7 @@ class ScipyIterativeSolver(LinearSolver):
         if mode == 'fwd':
             x_vec = system._vectors['output'][vec_name]
             b_vec = system._vectors['residual'][vec_name]
-        elif mode == 'rev':
+        else:  # rev
             x_vec = system._vectors['residual'][vec_name]
             b_vec = system._vectors['output'][vec_name]
 
@@ -267,7 +287,7 @@ class ScipyIterativeSolver(LinearSolver):
 
         Returns
         -------
-        <LinearSolver>
+        LinearSolver
             reference to the 'precon' property.
         """
         warn_deprecation("The 'preconditioner' property provides backwards compatibility "
@@ -281,9 +301,29 @@ class ScipyIterativeSolver(LinearSolver):
 
         Parameters
         ----------
-        precon : <LinearSolver>
+        precon : LinearSolver
             reference to a <LinearSolver> to be assigned to the 'precon' property.
         """
         warn_deprecation("The 'preconditioner' property provides backwards compatibility "
                          "with OpenMDAO <= 1.x ; use 'precon' instead.")
         self.precon = precon
+
+
+class ScipyIterativeSolver(ScipyKrylov):
+    """
+    Deprecated.  See ScipyKrylov.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Deprecated.
+
+        Parameters
+        ----------
+        *args : list of object
+            Positional args.
+        **kwargs : dict
+            Named args.
+        """
+        super(ScipyIterativeSolver, self).__init__(*args, **kwargs)
+        warn_deprecation('ScipyIterativeSolver is deprecated.  Use ScipyKrylov instead.')

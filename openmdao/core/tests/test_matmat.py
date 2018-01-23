@@ -5,9 +5,8 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, \
-                         ScipyOptimizer, DefaultMultiVector, DefaultVector, \
-                         DenseJacobian, DirectSolver
-from openmdao.devtools.testutil import assert_rel_error
+                         ScipyOptimizer, DefaultVector, DenseJacobian, DirectSolver
+from openmdao.utils.assert_utils import assert_rel_error
 
 def lgl(n, tol=np.finfo(float).eps):
     """
@@ -160,7 +159,7 @@ class LGLFit(ExplicitComponent):
     an approximation of arclength.
     """
     def initialize(self):
-        self.metadata.declare(name='num_nodes', required=True, type_=int)
+        self.metadata.declare(name='num_nodes', types=int)
 
     def setup(self):
         n = self.metadata['num_nodes']
@@ -189,7 +188,7 @@ class LGLFit(ExplicitComponent):
 class DefectComp(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare(name='num_nodes', required=True, type_=int)
+        self.metadata.declare(name='num_nodes', types=int)
 
     def setup(self):
         n = self.metadata['num_nodes']
@@ -209,7 +208,7 @@ class DefectComp(ExplicitComponent):
 class ArcLengthFunction(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare(name='num_nodes', required=True, type_=int)
+        self.metadata.declare(name='num_nodes', types=int)
 
     def setup(self):
         n = self.metadata['num_nodes']
@@ -233,7 +232,7 @@ class ArcLengthQuadrature(ExplicitComponent):
     Computes the arclength of a polynomial segment whose values are given at the LGL nodes.
     """
     def initialize(self):
-        self.metadata.declare(name='num_nodes', required=True, type_=int)
+        self.metadata.declare(name='num_nodes', types=int)
 
     def setup(self):
         n = self.metadata['num_nodes']
@@ -264,7 +263,7 @@ class ArcLengthQuadrature(ExplicitComponent):
 class Phase(Group):
 
     def initialize(self):
-        self.metadata.declare('order', type_=int, default=10)
+        self.metadata.declare('order', types=int, default=10)
 
     def setup(self):
         order = self.metadata['order']
@@ -304,7 +303,7 @@ class Phase(Group):
 class Summer(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare('n_phases', type_=int, required=True)
+        self.metadata.declare('n_phases', types=int)
 
     def setup(self):
         self.add_output('total_arc_length')
@@ -319,7 +318,7 @@ class Summer(ExplicitComponent):
         for i in range(self.metadata['n_phases']):
             outputs['total_arc_length'] += inputs['arc_length:p%d' % i]
 
-def simple_model(order, dvgroup='pardv', congroup='parc'):
+def simple_model(order, dvgroup='pardv', congroup='parc', vectorize=False):
     n = order + 1
 
     p = Problem(model=Group())
@@ -353,13 +352,13 @@ def simple_model(order, dvgroup='pardv', congroup='parc'):
     p.model.connect('lgl_fit.yp_lgl', 'arclength_func.yp_lgl')
     p.model.connect('arclength_func.f_arclength', 'arclength_quad.f_arclength')
 
-    p.model.add_design_var('y_lgl', lower=-1000.0, upper=1000.0, rhs_group=dvgroup)
-    p.model.add_constraint('defect.defect', lower=-1e-6, upper=1e-6, rhs_group=congroup)
+    p.model.add_design_var('y_lgl', lower=-1000.0, upper=1000.0, parallel_deriv_color=dvgroup, vectorize_derivs=vectorize)
+    p.model.add_constraint('defect.defect', lower=-1e-6, upper=1e-6, parallel_deriv_color=congroup, vectorize_derivs=vectorize)
     p.model.add_objective('arclength_quad.arclength')
     p.driver = ScipyOptimizer()
     return p, np.sin(x_lgl)
 
-def phase_model(order, nphases, dvgroup='pardv', congroup='parc'):
+def phase_model(order, nphases, dvgroup='pardv', congroup='parc', vectorize=False):
     N_PHASES = nphases
     PHASE_ORDER = order
 
@@ -373,8 +372,8 @@ def phase_model(order, nphases, dvgroup='pardv', congroup='parc'):
         p.model.add_subsystem(p_name, Phase(order=PHASE_ORDER))
         p.model.connect('%s.arclength_quad.arclength' % p_name, 'sum.arc_length:%s' % p_name)
 
-        p.model.add_design_var('%s.y_lgl' % p_name, lower=-1000.0, upper=1000.0, rhs_group=dvgroup)
-        p.model.add_constraint('%s.defect.defect' % p_name, lower=-1e-6, upper=1e-6, rhs_group=congroup)
+        p.model.add_design_var('%s.y_lgl' % p_name, lower=-1000.0, upper=1000.0, parallel_deriv_color=dvgroup, vectorize_derivs=vectorize)
+        p.model.add_constraint('%s.defect.defect' % p_name, lower=-1e-6, upper=1e-6, parallel_deriv_color=congroup, vectorize_derivs=vectorize)
 
     p.model.add_subsystem('sum', Summer(n_phases=N_PHASES))
 
@@ -392,25 +391,25 @@ def phase_model(order, nphases, dvgroup='pardv', congroup='parc'):
 class MatMatTestCase(unittest.TestCase):
 
     def test_simple_multi_fwd(self):
-        p, expected = simple_model(order=20)
+        p, expected = simple_model(order=20, vectorize=True)
 
-        p.setup(check=False, mode='fwd', multi_vector_class=DefaultMultiVector)
+        p.setup(check=False, mode='fwd')
 
         p.run_driver()
 
         #import matplotlib.pyplot as plt
 
-        #plt.plot(x_mid, p['truth.y_mid'], 'ro')
-        #plt.plot(x_lgl, p['y_lgl'], 'bo')
+        #plt.plot(p['y_lgl'], 'bo')
+        #plt.plot(expected, 'go')
         #plt.show()
 
         y_lgl = p['y_lgl']
         assert_rel_error(self, expected, y_lgl, 1.e-5)
 
     def test_simple_multi_rev(self):
-        p, expected = simple_model(order=20)
+        p, expected = simple_model(order=20, vectorize=True)
 
-        p.setup(check=False, mode='rev', multi_vector_class=DefaultMultiVector)
+        p.setup(check=False, mode='rev')
 
         p.run_driver()
 
@@ -419,9 +418,9 @@ class MatMatTestCase(unittest.TestCase):
 
     def test_phases_multi_fwd(self):
         N_PHASES = 4
-        p, expected = phase_model(order=20, nphases=N_PHASES)
+        p, expected = phase_model(order=20, nphases=N_PHASES, vectorize=True)
 
-        p.setup(check=False, mode='fwd', multi_vector_class=DefaultMultiVector)
+        p.setup(check=False, mode='fwd')
 
         p.run_driver()
 
@@ -439,42 +438,134 @@ class MatMatTestCase(unittest.TestCase):
 
     def test_phases_multi_rev(self):
         N_PHASES = 4
-        p, expected = phase_model(order=20, nphases=N_PHASES)
+        p, expected = phase_model(order=20, nphases=N_PHASES, vectorize=True)
 
-        p.setup(check=False, mode='rev', multi_vector_class=DefaultMultiVector)
-
-        p.run_driver()
-
-        for i in range(N_PHASES):
-            assert_rel_error(self, expected, p['p%d.y_lgl' % i], 1.e-5)
-
-    def test_phases_multi_dense_fwd(self):
-        N_PHASES = 4
-        p, expected = phase_model(order=20, nphases=N_PHASES)
-
-        p.model.jacobian = DenseJacobian()
-        p.model.linear_solver = DirectSolver()
-
-        p.setup(check=False, mode='fwd', multi_vector_class=DefaultMultiVector)
+        p.setup(check=False, mode='rev')
 
         p.run_driver()
 
         for i in range(N_PHASES):
             assert_rel_error(self, expected, p['p%d.y_lgl' % i], 1.e-5)
 
-    def test_phases_multi_dense_rev(self):
-        N_PHASES = 4
-        p, expected = phase_model(order=20, nphases=N_PHASES)
 
-        p.model.jacobian = DenseJacobian()
-        p.model.linear_solver = DirectSolver()
+class JacVec(ExplicitComponent):
 
-        p.setup(check=False, mode='rev', multi_vector_class=DefaultMultiVector)
+    def __init__(self, size):
+        super(JacVec, self).__init__()
+        self.size = size
 
-        p.run_driver()
+    def setup(self):
+        size = self.size
+        self.add_input('x', val=np.zeros(size))
+        self.add_input('y', val=np.zeros(size))
+        self.add_output('f_xy', val=np.zeros(size))
 
-        for i in range(N_PHASES):
-            assert_rel_error(self, expected, p['p%d.y_lgl' % i], 1.e-5)
+    def compute(self, inputs, outputs):
+        outputs['f_xy'] = inputs['x'] * inputs['y']
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        if mode == 'fwd':
+            if 'x' in d_inputs:
+                d_outputs['f_xy'] += d_inputs['x'] * inputs['y']
+            if 'y' in d_inputs:
+                d_outputs['f_xy'] += d_inputs['y'] * inputs['x']
+        else:
+            d_fxy = d_outputs['f_xy']
+            if 'x' in d_inputs:
+                d_inputs['x'] += d_fxy * inputs['y']
+            if 'y' in d_inputs:
+                d_inputs['y'] += d_fxy * inputs['x']
+
+class MultiJacVec(JacVec):
+    def compute_multi_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        # same as compute_jacvec_product in this case
+        self.compute_jacvec_product(inputs, d_inputs, d_outputs, mode)
+
+
+class ComputeMultiJacVecTestCase(unittest.TestCase):
+    def setup_model(self, size, multi, vectorize, mode):
+        comp_class = MultiJacVec if multi else JacVec
+        p = Problem()
+        model = p.model
+        model.add_subsystem('px', IndepVarComp('x', val=(np.arange(5, dtype=float) + 1.) * 3.0))
+        model.add_subsystem('py', IndepVarComp('y', val=(np.arange(5, dtype=float) + 1.) * 2.0))
+        model.add_subsystem('comp', comp_class(size))
+
+        model.connect('px.x', 'comp.x')
+        model.connect('py.y', 'comp.y')
+
+        model.add_design_var('px.x', vectorize_derivs=vectorize)
+        model.add_design_var('py.y', vectorize_derivs=vectorize)
+        model.add_constraint('comp.f_xy', vectorize_derivs=vectorize)
+
+        p.setup(check=False, mode=mode)
+        p.run_model()
+        return p
+
+    def test_compute_multi_jacvec_prod_fwd(self):
+        p = self.setup_model(size=5, multi=False, vectorize=False, mode='fwd')
+
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+
+        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+
+    def test_compute_multi_jacvec_prod_rev(self):
+        p = self.setup_model(size=5, multi=False, vectorize=False, mode='rev')
+
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+
+        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+
+    def test_compute_multi_jacvec_prod_fwd_vectorize(self):
+        p = self.setup_model(size=5, multi=False, vectorize=True, mode='fwd')
+
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+
+        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+
+    def test_compute_multi_jacvec_prod_rev_vectorize(self):
+        p = self.setup_model(size=5, multi=False, vectorize=True, mode='rev')
+
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+
+        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+
+    def test_compute_multi_jacvec_prod_fwd_multi(self):
+        p = self.setup_model(size=5, multi=True, vectorize=False, mode='fwd')
+
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+
+        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+
+    def test_compute_multi_jacvec_prod_rev_multi(self):
+        p = self.setup_model(size=5, multi=True, vectorize=False, mode='rev')
+
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+
+        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+
+    def test_compute_multi_jacvec_prod_fwd_vectorize_multi(self):
+        p = self.setup_model(size=5, multi=True, vectorize=True, mode='fwd')
+
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+
+        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+
+    def test_compute_multi_jacvec_prod_rev_vectorize_multi(self):
+        p = self.setup_model(size=5, multi=True, vectorize=True, mode='rev')
+
+        J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
+
+        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+
 
 if __name__ == '__main__':
     unittest.main()

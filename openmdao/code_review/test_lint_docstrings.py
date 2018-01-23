@@ -5,18 +5,24 @@ import unittest
 import os.path
 import importlib
 import inspect
-import re
 import textwrap
+import collections
 from six import PY3
 
 from numpydoc.docscrape import NumpyDocString
 
+#TODO: make this more robust by implementing an excludes list, instead of this list, which must be kept up-to-date.
 directories = [
+    'components',
     'core',
+    'drivers',
+    'error_checking',
     'jacobians',
     'matrices',
     'proc_allocators',
+    'recorders',
     'solvers',
+    'surrogate_models',
     'utils',
     'vectors',
 ]
@@ -87,7 +93,7 @@ class ReturnFinder(ast.NodeVisitor):
             if node.value is not None:
                 self.has_return = True
 
-        if hasattr(node, 'body'):
+        if hasattr(node, 'body') and isinstance(node.body, collections.Iterable):
             # If the top level function does nothing but pass, note it.
             if is_func_def and self._depth == 2 and len(node.body) <= 2 \
                      and isinstance(node.body[-1], ast.Pass):
@@ -476,7 +482,7 @@ class LintTestCase(unittest.TestCase):
 
             # Loop over files
             for file_name in os.listdir(dirpath):
-                if file_name != '__init__.py' and file_name[-3:] == '.py':
+                if file_name != '__init__.py' and file_name[-3:] == '.py' and not os.path.isdir(file_name):
                     if print_info:
                         print(file_name)
 

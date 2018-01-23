@@ -146,11 +146,9 @@ class FiniteDifference(ApproximationScheme):
         ----------
         system : System
             System on which the execution is run.
-
         jac : None or dict-like
             If None, update system with the approximated sub-Jacobians. Otherwise, store the
             approximations in the given dict-like object.
-
         deriv_type : str
             One of 'total' or 'partial', indicating if total or partial derivatives are
             being approximated.
@@ -164,6 +162,11 @@ class FiniteDifference(ApproximationScheme):
             current_vec = system._residuals
         else:
             raise ValueError('deriv_type must be one of "total" or "partial"')
+
+        result = system._outputs._clone(True)
+        result_array = result.get_data()
+        out_tmp = current_vec.get_data()
+        in_tmp = system._inputs.get_data()
 
         for key, approximations in groupby(self._exec_list, self._key_fun):
             # groupby (along with this key function) will group all 'of's that have the same wrt and
@@ -196,13 +199,13 @@ class FiniteDifference(ApproximationScheme):
                 in_size = len(in_idx)
             else:
                 if wrt in system._var_abs2meta['input']:
-                    in_size = np.prod(system._var_abs2meta['input'][wrt]['shape'])
+                    in_size = system._var_abs2meta['input'][wrt]['size']
                 elif wrt in system._var_abs2meta['output']:
-                    in_size = np.prod(system._var_abs2meta['output'][wrt]['shape'])
+                    in_size = system._var_abs2meta['output'][wrt]['size']
 
                 in_idx = range(in_size)
 
-            result = system._outputs._clone(True)
+            result.set_vec(system._outputs)
 
             outputs = []
 
@@ -215,7 +218,7 @@ class FiniteDifference(ApproximationScheme):
                     out_idx = system._owns_approx_of_idx[of]
                     out_size = len(out_idx)
                 else:
-                    out_size = np.prod(system._var_abs2meta['output'][of]['shape'])
+                    out_size = system._var_abs2meta['output'][of]['size']
                 outputs.append((of, np.zeros((out_size, in_size))))
 
             for i_count, idx in enumerate(in_idx):
@@ -228,7 +231,9 @@ class FiniteDifference(ApproximationScheme):
                 # Run the Finite Difference
                 for delta, coeff in zip(deltas, coeffs):
                     input_delta = [(wrt, idx, delta)]
-                    result.add_scal_vec(coeff, self._run_point(system, input_delta, deriv_type))
+                    self._run_point(system, input_delta, out_tmp, in_tmp, result_array, deriv_type)
+                    result_array *= coeff
+                    result.iadd_data(result_array)
 
                 if deriv_type == 'total':
                     # Sign difference between output and resids. This arises from the definitions
