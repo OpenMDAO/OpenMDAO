@@ -80,37 +80,29 @@ class DictionaryJacobian(Jacobian):
         mode : str
             'fwd' or 'rev'.
         """
+        # avoid circular import
+        from openmdao.core.explicitcomponent import ExplicitComponent
+
         fwd = mode == 'fwd'
-        with self._system._unscaled_context(
+        system = self._system
+        with system._unscaled_context(
                 outputs=[d_outputs], residuals=[d_residuals]):
             ncol = d_residuals._ncol
             for abs_key in self._iter_abs_keys(d_residuals._name):
                 subjac = self._subjacs[abs_key]
                 res_name, other_name = abs_key
-                if type(subjac) is np.ndarray or scipy.sparse.issparse(subjac):
-                    if d_residuals._contains_abs(res_name):
+                if d_residuals._contains_abs(res_name):
+                    if isinstance(subjac, list):
                         if d_outputs._contains_abs(other_name):
                             re = d_residuals._views_flat[res_name]
                             op = d_outputs._views_flat[other_name]
-                            if fwd:
-                                re += subjac.dot(op)
-                            else:  # rev
-                                op += subjac.T.dot(re)
-
-                        elif d_inputs._contains_abs(other_name):
-                            re = d_residuals._views_flat[res_name]
-                            ip = d_inputs._views_flat[other_name]
-                            if fwd:
-                                re += subjac.dot(ip)
-                            else:  # rev
-                                ip += subjac.T.dot(re)
-
-                elif type(subjac) is list:
-                    if d_residuals._contains_abs(res_name):
-                        if d_outputs._contains_abs(other_name):
-                            re = d_residuals._views_flat[res_name]
-                            op = d_outputs._views_flat[other_name]
-                            if fwd:
+                            # skip the matvec mult completely for identity subjacs
+                            if res_name is other_name and isinstance(system, ExplicitComponent):
+                                if fwd:
+                                    re += op
+                                else:
+                                    op += re
+                            elif fwd:
                                 if len(re.shape) > 1:
                                     for i in range(ncol):
                                         np.add.at(re[:, i], subjac[1],
@@ -141,3 +133,19 @@ class DictionaryJacobian(Jacobian):
                                                   re[:, i][subjac[1]] * subjac[0])
                                 else:
                                     np.add.at(ip, subjac[2], re[subjac[1]] * subjac[0])
+                    else:  # ndarray or sparse
+                        if d_outputs._contains_abs(other_name):
+                            re = d_residuals._views_flat[res_name]
+                            op = d_outputs._views_flat[other_name]
+                            if fwd:
+                                re += subjac.dot(op)
+                            else:  # rev
+                                op += subjac.T.dot(re)
+
+                        elif d_inputs._contains_abs(other_name):
+                            re = d_residuals._views_flat[res_name]
+                            ip = d_inputs._views_flat[other_name]
+                            if fwd:
+                                re += subjac.dot(ip)
+                            else:  # rev
+                                ip += subjac.T.dot(re)
