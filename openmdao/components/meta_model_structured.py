@@ -3,6 +3,8 @@ from __future__ import division, print_function, absolute_import
 
 import warnings
 
+from six import raise_from
+
 from scipy import __version__ as scipy_version
 try:
     from scipy.interpolate._bsplines import make_interp_spline
@@ -13,6 +15,35 @@ from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+
+
+class OutOfBoundsError(Exception):
+    """
+    Handles error when interpolated values are requested outside of the domain of the input data.
+    """
+
+    def __init__(self, message, idx, value, lower, upper):
+        """
+        Initialize instance of OutOfBoundsError class.
+
+        Parameters
+        ----------
+        message : str
+            description of error.
+        idx : int
+            index of the variable that is out of bounds.
+        value : double
+            value of the variable that is out of bounds.
+        lower : double
+            lower bounds of the variable that is out of bounds.
+        upper : double
+            upper bounds of the variable that is out of bounds.
+        """
+        super(OutOfBoundsError, self).__init__(message)
+        self.idx = idx
+        self.value = value
+        self.lower = lower
+        self.upper = upper
 
 
 class _RegularGridInterp(object):
@@ -209,8 +240,8 @@ class _RegularGridInterp(object):
             for i, p in enumerate(xi.T):
                 if not np.logical_and(np.all(self.grid[i][0] <= p),
                                       np.all(p <= self.grid[i][-1])):
-                    raise ValueError("One of the requested xi is out of bounds"
-                                     " in dimension %d" % i)
+                    raise OutOfBoundsError("One of the requested xi is out of bounds",
+                                           i, p[0], self.grid[i][0], self.grid[i][-1])
 
         indices, norm_distances, out_of_bounds = self._find_indices(xi.T)
 
@@ -627,6 +658,13 @@ class MetaModelStructured(ExplicitComponent):
 
             try:
                 val = self.interps[out_name](pt)
+            except OutOfBoundsError as err:
+                varname_causing_error = '.'.join((self.pathname, self.pnames[err.idx]))
+                errmsg = "Error interpolating output '{}' in '{}' because input '{}' " \
+                    "was out of bounds ('{}', '{}') with " \
+                    "value '{}'".format(out_name, self.pathname, varname_causing_error,
+                                        err.lower, err.upper, err.value)
+                raise_from(ValueError(errmsg), None)
             except ValueError as err:
                 raise ValueError("Error interpolating output '%s' in %s:\n%s" %
                                  (out_name, self.pathname, str(err)))
