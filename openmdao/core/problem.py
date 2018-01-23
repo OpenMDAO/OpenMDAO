@@ -54,6 +54,35 @@ CITATION = """@inproceedings{2014_openmdao_derivs,
 }"""
 
 
+class _DictTotals(object):
+    def __init__(self, problem, of, wrt):
+        self.totals = totals = OrderedDict()
+        for okey in of:
+            totals[okey] = OrderedDict()
+            for ikey in wrt:
+                totals[okey][ikey] = None
+
+    def __getitem__(self, key):
+        return self.totals[key[0]][key[1]]
+
+    def __setitem__(self, key, val):
+        self.totals[key[0]][key[1]] = val
+
+
+class _FlatDictTotals(object):
+    def __init__(self, problem, of, wrt):
+        self.totals = totals = OrderedDict()
+        for okey in of:
+            for ikey in wrt:
+                totals[(okey, ikey)] = None
+
+    def __getitem__(self, key):
+        return self.totals[key]
+
+    def __setitem__(self, key, val):
+        self.totals[key] = val
+
+
 class Problem(object):
     """
     Top-level container for the systems and drivers.
@@ -1044,54 +1073,37 @@ class Problem(object):
 
         # Create data structures (and possibly allocate space) for the total
         # derivatives that we will return.
-        totals = OrderedDict()
+        totals = self._alloc_total_jac(of, wrt, return_format)
 
-        if return_format == 'flat_dict':
-            for ocount, output_name in enumerate(output_list):
-                okey = old_output_list[ocount]
-                for icount, input_name in enumerate(input_list):
-                    ikey = old_input_list[icount]
-                    jac = approx_jac[output_name, input_name]
-                    if isinstance(jac, list):
-                        # This is a design variable that was declared as an obj/con.
-                        totals[okey, ikey] = np.eye(len(jac[0]))
-                        odx = model._owns_approx_of_idx.get(okey)
-                        idx = model._owns_approx_wrt_idx.get(ikey)
-                        if odx is not None:
-                            totals[okey, ikey] = totals[okey, ikey][odx, :]
-                        if idx is not None:
-                            totals[okey, ikey] = totals[okey, ikey][:, idx]
-                    else:
-                        totals[okey, ikey] = -jac
-
-        elif return_format == 'dict':
-            for ocount, output_name in enumerate(output_list):
-                okey = old_output_list[ocount]
-                totals[okey] = tot = OrderedDict()
-                for icount, input_name in enumerate(input_list):
-                    ikey = old_input_list[icount]
-                    jac = approx_jac[output_name, input_name]
-                    if isinstance(jac, list):
-                        # This is a design variable that was declared as an obj/con.
-                        tot[ikey] = np.eye(len(jac[0]))
-                    else:
-                        tot[ikey] = -jac
-        else:
-            msg = "Unsupported return format '%s." % return_format
-            raise NotImplementedError(msg)
+        for ocount, output_name in enumerate(output_list):
+            okey = old_output_list[ocount]
+            for icount, input_name in enumerate(input_list):
+                ikey = old_input_list[icount]
+                key = (okey, ikey)
+                jac = approx_jac[output_name, input_name]
+                if isinstance(jac, list):
+                    # This is a design variable that was declared as an obj/con.
+                    totals[key] = np.eye(len(jac[0]))
+                    odx = model._owns_approx_of_idx.get(okey)
+                    idx = model._owns_approx_wrt_idx.get(ikey)
+                    if odx is not None:
+                        totals[key] = totals[key][odx, :]
+                    if idx is not None:
+                        totals[key] = totals[key][:, idx]
+                else:
+                    totals[key] = -jac
 
         recording_iteration.stack.pop()
-        return totals
+        return totals.totals
 
-    def _get_voi_info(self, voi_lists, inp2rhs_name, input_vec, output_vec, input_vois):
+    def _get_voi_info(self, voi_lists, input_vec, output_vec, input_vois):
         voi_info = {}
         model = self.model
         nproc = self.comm.size
         iproc = model.comm.rank
 
         for vois in itervalues(voi_lists):
-            for input_name, old_input_name, _, _, _ in vois:
-                vecname = inp2rhs_name[input_name]
+            for input_name, old_input_name, _, _, _, vecname in vois:
                 if vecname not in input_vec:
                     continue
                 sizes = model._var_sizes[vecname]['output']
@@ -1151,6 +1163,34 @@ class Problem(object):
 
         return voi_info
 
+    def _alloc_total_jac(self, of, wrt, return_format):
+        """
+        Allocate a total jacobian of the appropriate format.
+
+        Parameters
+        ----------
+        of : list of variable name strings or None
+            Variables whose derivatives will be computed. Default is None, which
+            uses the driver's objectives and constraints.
+        wrt : list of variable name strings or None
+            Variables with respect to which the derivatives will be computed.
+            Default is None, which uses the driver's desvars.
+        return_format : str
+            Indicates which format to return.
+
+        Returns
+        -------
+        OrderedDict or ndarray
+            An empty total jacobian.
+        """
+        if return_format == 'flat_dict':
+            return _FlatDictTotals(self, of, wrt)
+        elif return_format == 'dict':
+            return _DictTotals(self, of, wrt)
+
+        msg = "Unsupported return format '%s." % return_format
+        raise NotImplementedError(msg)
+
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
@@ -1187,6 +1227,7 @@ class Problem(object):
         fwd = (mode == 'fwd')
         prom2abs = model._var_allprocs_prom2abs_list['output']
         abs2idx_out = model._var_allprocs_abs2idx['linear']['output']
+        owning_ranks = model._owning_rank['output']
 
         if wrt is None:
             wrt = list(self.driver._designvars)
@@ -1204,7 +1245,6 @@ class Problem(object):
 
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
-        matmat = False
         for vec_name in model._lin_vec_names:
             vec_dinput[vec_name].set_const(0.0)
             vec_doutput[vec_name].set_const(0.0)
@@ -1215,29 +1255,13 @@ class Problem(object):
 
         # Create data structures (and possibly allocate space) for the total
         # derivatives that we will return.
-        totals = OrderedDict()
+        totals = self._alloc_total_jac(of, wrt, return_format)
 
-        if return_format == 'flat_dict':
-            for okey in of:
-                for ikey in wrt:
-                    totals[(okey, ikey)] = None
-        elif return_format == 'dict':
-            for okey in of:
-                totals[okey] = OrderedDict()
-                for ikey in wrt:
-                    totals[okey][ikey] = None
-        else:
-            msg = "Unsupported return format '%s." % return_format
-            raise NotImplementedError(msg)
-
-        # Convert of and wrt names from promoted to unpromoted
-        # (which is absolute path since we're at the top)
+        # Convert of and wrt names from promoted to  absolute path
         oldwrt, oldof = wrt, of
         if not global_names:
             of = [prom2abs[name][0] for name in oldof]
             wrt = [prom2abs[name][0] for name in oldwrt]
-
-        owning_ranks = self.model._owning_rank['output']
 
         # we don't do simultaneous derivatives when compute_totals is called for linear constaints
         has_lin_constraints = False
@@ -1263,19 +1287,13 @@ class Problem(object):
 
         # Solve for derivs using linear solver.
 
-        # this maps either an parallel_deriv_color to a list of tuples of (absname, oldname)
+        # this maps either a parallel_deriv_color to a list of tuples of (absname, oldname)
         # of variables in that group, or, for variables that aren't in an
         # parallel_deriv_color, it maps the variable name to a one entry list containing
         # the tuple (absname, oldname) for that variable.  oldname will be
         # the promoted name if the 'global_names' arg is False, else it will
         # be the same as absname (the absolute variable name).
         voi_lists = OrderedDict()
-
-        # this maps the names from input_list to the corresponding names
-        # of the RHS vectors.  For any variables that are not part of an
-        # parallel_deriv_color, they will map to 'linear'.  All parallel_deriv_color'ed variables
-        # will just map to their own name.
-        inp2rhs_name = {}
 
         # if not all inputs are VOIs, then this is a test where most likely
         # design vars, constraints, and objectives were not specified, so
@@ -1285,7 +1303,6 @@ class Problem(object):
         use_rel_reduction = True
 
         for i, name in enumerate(input_list):
-            matmat = False
             if name in input_vois:
                 meta = input_vois[name]
                 parallel_deriv_color = meta['parallel_deriv_color']
@@ -1294,6 +1311,7 @@ class Problem(object):
             else:
                 parallel_deriv_color = simul_coloring = None
                 use_rel_reduction = False
+                matmat = False
 
             if simul_coloring is not None:
                 if parallel_deriv_color:
@@ -1303,7 +1321,7 @@ class Problem(object):
                     raise RuntimeError("Using both simul_coloring and vectorize_derivs with "
                                        "variable '%s' is not supported." % name)
 
-            if parallel_deriv_color is None:  # variable is not in an parallel_deriv_color
+            if parallel_deriv_color is None:  # variable is not in a parallel_deriv_color
                 if name in voi_lists:
                     raise RuntimeError("Variable name '%s' matches a parallel_deriv_color name." %
                                        name)
@@ -1312,25 +1330,23 @@ class Problem(object):
                     # can be either promoted or absolute depending on the value
                     # of the 'global_names' flag.
                     voi_lists[name] = [(name, old_input_list[i], parallel_deriv_color, matmat,
-                                        simul_coloring)]
-                    inp2rhs_name[name] = name if matmat else 'linear'
+                                        simul_coloring, name if matmat else 'linear')]
             else:
                 if parallel_deriv_color not in voi_lists:
                     voi_lists[parallel_deriv_color] = []
                 voi_lists[parallel_deriv_color].append((name, old_input_list[i],
                                                         parallel_deriv_color, matmat,
-                                                        simul_coloring))
-                inp2rhs_name[name] = name
+                                                        simul_coloring, name))
 
-        lin_vec_names = sorted(set(inp2rhs_name.values()))
+        lin_vec_names = sorted(set(tup[5] for tup in itervalues(voi_lists)))
 
-        voi_info = self._get_voi_info(voi_lists, inp2rhs_name, input_vec, output_vec, input_vois)
+        voi_info = self._get_voi_info(voi_lists, input_vec, output_vec, input_vois)
 
         for vois in itervalues(voi_lists):
             # If Forward mode, solve linear system for each 'wrt'
             # If Adjoint mode, solve linear system for each 'of'
 
-            matmats = [m for _, _, _, m, _ in vois]
+            matmats = [m for _, _, _, m, _, _ in vois]
             matmat = matmats[0]
             if any(matmats) and not all(matmats):
                 raise RuntimeError("Mixing of vectorized and non-vectorized derivs in the same "
@@ -1340,7 +1356,7 @@ class Problem(object):
 
             if use_rel_reduction:
                 rel_systems = set()
-                for voi, _, _, _, _ in vois:
+                for voi, _, _, _, _, _ in vois:
                     rel_systems.update(relevant[voi]['@all'][1])
             else:
                 rel_systems = _contains_all
@@ -1349,10 +1365,6 @@ class Problem(object):
                 idx_iter = range(1)
             elif simul_coloring is not None:
                 loc_idx_dict = defaultdict(lambda: -1)
-                # here we're guaranteed that there is only one voi
-                input_name = vois[0][0]
-                info = voi_info[input_name]
-                dinputs = info[0]
                 colors = set(simul_coloring)
                 if not isinstance(simul_coloring, np.ndarray):
                     simul_coloring = np.array(simul_coloring, dtype=int)
@@ -1372,7 +1384,7 @@ class Problem(object):
                 idx_iter = idx_iter()
             else:
                 loc_idx_dict = defaultdict(lambda: -1)
-                max_len = max(len(voi_info[name][2]) for name, _, _, _, _ in vois)
+                max_len = max(len(voi_info[name][2]) for name, _, _, _, _, _ in vois)
                 idx_iter = range(max_len)
 
             for i in idx_iter:
@@ -1393,7 +1405,7 @@ class Problem(object):
                     if use_rel_reduction:
                         vec_dinput['linear'].set_const(0.0)
 
-                for input_name, old_input_name, pd_color, matmat, simul in vois:
+                for input_name, old_input_name, pd_color, matmat, simul, _ in vois:
                     dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
                         voi_info[input_name]
 
@@ -1421,7 +1433,7 @@ class Problem(object):
 
                 model._solve_linear(lin_vec_names, mode, rel_systems)
 
-                for input_name, old_input_name, _, matmat, simul in vois:
+                for input_name, old_input_name, _, matmat, simul, _ in vois:
                     dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
                         dup, store = voi_info[input_name]
                     ncol = dinputs._ncol
@@ -1501,67 +1513,36 @@ class Problem(object):
                         if store and ncol > 1 and len(deriv_val.shape) == 1:
                             deriv_val = np.atleast_2d(deriv_val).T
 
-                        if return_format == 'flat_dict':
-                            if fwd:
-                                key = (old_output_list[ocount], old_input_name)
+                        if fwd:
+                            key = (old_output_list[ocount], old_input_name)
 
-                                if totals[key] is None:
-                                    totals[key] = np.zeros((len_val, loc_size))
-                                if store:
-                                    if simul is not None and do_color_iter:
-                                        smap = output_vois[output_name]['simul_map']
-                                        if (smap is not None and input_name in smap and
-                                                color in smap[input_name]):
-                                            col_idxs = smap[input_name][color][1]
-                                            if col_idxs:
-                                                row_idxs = smap[input_name][color][0]
-                                                mat = totals[key]
-                                                for idx, col in enumerate(col_idxs):
-                                                    mat[row_idxs[idx], col] = \
-                                                        deriv_val[row_idxs[idx]]
-                                    else:
-                                        totals[key][:, loc_idx] = deriv_val
-                            else:
-                                key = (old_input_name, old_output_list[ocount])
+                            if totals[key] is None:
+                                totals[key] = np.zeros((len_val, loc_size))
+                            if store:
+                                if simul is not None and do_color_iter:
+                                    smap = output_vois[output_name]['simul_map']
+                                    if (smap is not None and input_name in smap and
+                                            color in smap[input_name]):
+                                        col_idxs = smap[input_name][color][1]
+                                        if col_idxs:
+                                            row_idxs = smap[input_name][color][0]
+                                            mat = totals[key]
+                                            for idx, col in enumerate(col_idxs):
+                                                mat[row_idxs[idx], col] = \
+                                                    deriv_val[row_idxs[idx]]
+                                else:
+                                    totals[key][:, loc_idx] = deriv_val
+                        else:  # rev
+                            key = (old_input_name, old_output_list[ocount])
 
-                                if totals[key] is None:
-                                    totals[key] = np.zeros((loc_size, len_val))
-                                if store:
-                                    totals[key][loc_idx, :] = deriv_val.T
-
-                        elif return_format == 'dict':
-                            if fwd:
-                                okey = old_output_list[ocount]
-
-                                if totals[okey][old_input_name] is None:
-                                    totals[okey][old_input_name] = np.zeros((len_val, loc_size))
-                                if store:
-                                    if simul is not None and do_color_iter:
-                                        smap = output_vois[output_name]['simul_map']
-                                        if (smap is not None and input_name in smap and
-                                                color in smap[input_name]):
-                                            col_idxs = smap[input_name][color][1]
-                                            if col_idxs:
-                                                row_idxs = smap[input_name][color][0]
-                                                mat = totals[okey][old_input_name]
-                                                for idx, col in enumerate(col_idxs):
-                                                    mat[row_idxs[idx], col] = \
-                                                        deriv_val[row_idxs[idx]]
-                                    else:
-                                        totals[okey][old_input_name][:, loc_idx] = deriv_val
-                            else:
-                                ikey = old_output_list[ocount]
-
-                                if totals[old_input_name][ikey] is None:
-                                    totals[old_input_name][ikey] = np.zeros((loc_size, len_val))
-                                if store:
-                                    totals[old_input_name][ikey][loc_idx, :] = deriv_val.T
-                        else:
-                            raise RuntimeError("unsupported return format")
+                            if totals[key] is None:
+                                totals[key] = np.zeros((loc_size, len_val))
+                            if store:
+                                totals[key][loc_idx, :] = deriv_val.T
 
         recording_iteration.stack.pop()
 
-        return totals
+        return totals.totals
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
