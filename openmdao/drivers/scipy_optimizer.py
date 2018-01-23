@@ -39,7 +39,7 @@ CITATIONS = """
 """
 
 
-class ScipyOptimizer(Driver):
+class ScipyOptimizerDriver(Driver):
     """
     Driver wrapper for the scipy.optimize.minimize family of local optimizers.
 
@@ -99,7 +99,7 @@ class ScipyOptimizer(Driver):
         """
         Initialize the ScipyOptimizer.
         """
-        super(ScipyOptimizer, self).__init__()
+        super(ScipyOptimizerDriver, self).__init__()
 
         # What we support
         self.supports['inequality_constraints'] = True
@@ -151,7 +151,7 @@ class ScipyOptimizer(Driver):
         problem : <Problem>
             Pointer
         """
-        super(ScipyOptimizer, self)._setup_driver(problem)
+        super(ScipyOptimizerDriver, self)._setup_driver(problem)
         opt = self.options['optimizer']
 
         self.supports['gradients'] = opt in _gradient_optimizers
@@ -534,3 +534,21 @@ class ScipyOptimizer(Driver):
         exc = self._exc_info
         self._exc_info = None
         reraise(*exc)
+
+
+class ScipyOptimizer(ScipyOptimizerDriver):
+    """
+    Deprecated.  Use PETScKrylov.
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize attributes.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Named args.
+        """
+        super(PetscKSP, self).__init__(**kwargs)
+        warn_deprecation('ScipyOptimizer is deprecated.  Use ScipyOptimizerDriver instead.')

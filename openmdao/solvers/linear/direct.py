@@ -91,7 +91,7 @@ class DirectSolver(LinearSolver):
             if isinstance(mtx, DenseMatrix):
                 ranges = system._jacobian._view_ranges[system.pathname]
                 matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
-                np.set_printoptions(precision=3)
+                # np.set_printoptions(precision=3)
 
                 # During LU decomposition, detect singularities and warn user.
                 with warnings.catch_warnings():
