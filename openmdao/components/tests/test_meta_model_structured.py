@@ -1,5 +1,7 @@
 from __future__ import division, print_function, absolute_import
 
+from six import assertRaisesRegex
+
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
@@ -817,6 +819,47 @@ class TestRegularGridMap(unittest.TestCase):
                          "Error interpolating output 'f' in comp:\n"
                          "The requested sample points xi have dimension 3, "
                          "but this RegularGridInterp has dimension 0")
+
+    def test_raise_out_of_bounds_error(self):
+        model = Group()
+        ivc = IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        x, y, z = params
+        outs = mapdata.output_data
+        z = outs[0]
+        ivc.add_output('x', x['default'], units=x['units'])
+        ivc.add_output('y', y['default'], units=y['units'])
+        ivc.add_output('z', z['default'], units=z['units'])
+
+        model.add_subsystem('des_vars', ivc, promotes=["*"])
+
+        # Need to make sure extrapolate is False for bounds to be checked
+        comp = MetaModelStructured(method='slinear', extrapolate=False)
+
+        for param in params:
+            comp.add_input(param['name'], param['default'], param['values'])
+
+        for out in outs:
+            comp.add_output(out['name'], out['default'], out['values'])
+
+        model.add_subsystem('comp', comp, promotes=["*"])
+        self.prob = Problem(model)
+        self.prob.setup()
+
+        self.prob['x'] = 1.0
+        self.prob['y'] = 0.75
+        self.prob['z'] = 9.0 # intentionally set to be out of bounds
+
+        # The interpolating output name is given as a regexp because the exception could
+        #   happen with f or g first. The order those are evaluated comes from the keys of
+        #   dict so no guarantee on the order except for Python 3.6 !
+        msg = "Error interpolating output '[f|g]' in 'comp' " + "because input 'comp.z' was " \
+                "out of bounds \('.*', '.*'\) with value '9.0'"
+        with assertRaisesRegex(self, ValueError, msg):
+           self.run_and_check_derivs(self.prob)
 
     def test_training_gradient(self):
         model = Group()
