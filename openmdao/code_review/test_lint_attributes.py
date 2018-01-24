@@ -6,17 +6,30 @@ import importlib
 import inspect
 import re
 
-directories = [
-    'surrogate_models',
-    'drivers',
-    'core',
-    'jacobians',
-    'matrices',
-    'proc_allocators',
-    'solvers',
-    'utils',
-    'vectors',
+# directories in which we do not wish to lint for attributes.
+exclude = [
+    'code_review',
+    'devtools',
+    'docs',
+    'test_suite',
+    'tests',
+    'test',
 ]
+
+directories = []
+
+# the top dir, "openmdao", is up one level in the current dir structure.
+top = ".."
+
+for root, dirs, files in os.walk(top, topdown=True):
+    # do not bother looking further down in excluded dirs
+    dirs[:] = [d for d in dirs if d not in exclude]
+    for di in dirs:
+        if root is "..":
+            directories.append(di)
+        else:
+            # don't want ../ in dir name of subdirs
+            directories.append(os.path.join(root, di)[3:])
 
 
 class LintAttributesTestCase(unittest.TestCase):
@@ -64,7 +77,7 @@ class LintAttributesTestCase(unittest.TestCase):
                 if file_name != '__init__.py' and file_name[-3:] == '.py':
                     if print_info:
                         print('File: {}'.format(file_name))
-
+                    dir_name = dir_name.replace('/', '.')
                     module_name = 'openmdao.{}.{}'.format(dir_name,
                                                           file_name[:-3]).replace('/', '.')
                     if print_info:
@@ -93,6 +106,7 @@ class LintAttributesTestCase(unittest.TestCase):
                             )
                         class_doc = inspect.getdoc(class_)
                         classdoc_matches = classdoc_re.findall(class_doc)
+
                         if len(classdoc_matches) > 1:
                             new_failures.append('multiple Attributes section in docstring')
                         classdoc_varnames_matches = classdoc_varnames_re.findall(classdoc_matches[0]) if(len(classdoc_matches) == 1) else []

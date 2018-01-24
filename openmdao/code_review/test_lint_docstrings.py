@@ -11,22 +11,26 @@ from six import PY3
 
 from numpydoc.docscrape import NumpyDocString
 
-#TODO: make this more robust by implementing an excludes list, instead of this list, which must be kept up-to-date.
-directories = [
-    'components',
-    'core',
-    'drivers',
-    'error_checking',
-    'jacobians',
-    'matrices',
-    'proc_allocators',
-    'recorders',
-    'solvers',
-    'surrogate_models',
-    'utils',
-    'vectors',
+# directories in which we do not wish to lint for attributes.
+exclude = [
+    'code_review',
+    'devtools',
+    'docs',
+    'test_suite',
+    'tests',
+    'test',
 ]
 
+directories = []
+top = ".."  # the top dir is up one level in the current dir structure.
+
+for root, dirs, files in os.walk(top, topdown=True):
+    dirs[:] = [d for d in dirs if d not in exclude]
+    for di in dirs:
+        if root is "..":
+            directories.append(di)
+        else:
+            directories.append(os.path.join(root, di)[3:])  # don't want ../ in dir name
 
 def _is_context_manager(func):
     """
