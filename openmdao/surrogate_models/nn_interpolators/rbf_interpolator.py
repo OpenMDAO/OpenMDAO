@@ -316,7 +316,8 @@ class RBFInterpolator(NNBase):
 
         return grad.reshape((prediction_points.shape[0], self._dep_dims, self._indep_dims))
 
-    def __init__(self, training_points, training_values, num_leaves=2, num_neighbors=5, rbf_family=2):
+    def __init__(self, training_points, training_values, num_leaves=2, num_neighbors=5,
+                 rbf_family=2):
         """
         Initialize all attributes.
 

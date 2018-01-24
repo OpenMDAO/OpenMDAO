@@ -13,24 +13,30 @@ class NNBase(object):
     Attributes
     ----------
     _tpm : ndarray
-        ndarray of shape (1 x independent dims) containing the minimum in each dimension of the training input locations.
+        ndarray of shape (1 x independent dims) containing the minimum in each dimension of
+         the training input locations.
     _tpr : ndarray
-        ndarray of shape (1x independent dims) containing the range of each dimension of the training input locations.
+        ndarray of shape (1x independent dims) containing the range of each dimension of
+        the training input locations.
     _tvm : ndarray
-        ndarray of shape (1 x independent dims) containing the minimum in each dimension of the training output values.
+        ndarray of shape (1 x independent dims) containing the minimum in each dimension of
+        the training output values.
     _tvr : ndarray
-        ndarray of shape (1x independent dims) containing the range of each dimension of the training output values.
+        ndarray of shape (1x independent dims) containing the range of each dimension of
+        the training output values.
     _tp : ndarray
-        ndarray of shape (num_points x independent dims) containing normalized training input locations.
+        ndarray of shape (num_points x independent dims) containing normalized training
+        input locations.
     _tv : ndarray
-        ndarray of shape (num_points x independent dims) containing normalized training output values.
+        ndarray of shape (num_points x independent dims) containing normalized training
+        output values.
     _indep_dims : int
         Number of independent dims
     _dep_dims : int
         Number of dependent dims
     _ntpts : int
         Number of training points
-    _KData : <scipy.spatial.cKDTree>
+    _KData : scipy.spatial.cKDTree
         KDTree used for finding the nearest neighbors.
     _pt_cache : tuple(ndarray, ndarray, ndarray)
         Internal cache of the last found neighbors.
