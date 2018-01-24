@@ -1,6 +1,7 @@
 """Define a base class for all Drivers in OpenMDAO."""
 from __future__ import print_function
 
+import os
 import json
 from collections import OrderedDict
 import warnings
@@ -836,6 +837,10 @@ class Driver(object):
         if mode == 'rev':
             raise NotImplementedError("Simultaneous derivatives are currently not supported "
                                       "in 'rev' mode")
+
+        # command line simul_coloring uses this env var to turn pre-existing coloring off
+        if os.environ.get("SIMUL_NO_COLOR"):
+            return
 
         prom2abs = self._problem.model._var_allprocs_prom2abs_list['output']
 

@@ -361,6 +361,13 @@ _post_setup_map = {
     'check': (_check_config_setup_parser, _check_config_cmd),
 }
 
+# environment variables to be set before executing the script
+_env_map = {
+    'simul_coloring': {
+        'SIMUL_NO_COLOR': "1",
+    }
+}
+
 # Other non-post-setup functions go here
 _iprof_map = {
     'trace': (_itrace_setup_parser, _itrace_exec),
@@ -380,12 +387,12 @@ def openmdao_cmd():
     for p, (parser_setup_func, cmd) in iteritems(_post_setup_map):
         subp = subs.add_parser(p)
         parser_setup_func(subp)
-        subp.set_defaults(func=cmd, executor=_post_setup_exec)
+        subp.set_defaults(func=cmd, executor=_post_setup_exec, env=_env_map.get(p))
 
     for p, (parser_setup_func, cmd) in iteritems(_iprof_map):
         subp = subs.add_parser(p)
         parser_setup_func(subp)
-        subp.set_defaults(executor=cmd)
+        subp.set_defaults(executor=cmd, env=_env_map.get(p))
 
     # handle case where someone just runs `openmdao <script>`
     args = [a for a in sys.argv[1:] if not a.startswith('-')]
@@ -393,6 +400,8 @@ def openmdao_cmd():
         _post_setup_exec(_Options(file=[args[0]], func=None))
     else:
         options = parser.parse_args()
+        if options.env is not None:
+            os.environ.update(options.env)
         if hasattr(options, 'executor'):
             options.executor(options)
         else:

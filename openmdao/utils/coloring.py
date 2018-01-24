@@ -3,6 +3,7 @@ Routines to compute coloring for use with simultaneous derivatives.
 """
 from __future__ import division, print_function
 
+import os
 import sys
 import json
 
@@ -117,14 +118,7 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     prob.driver._simul_coloring_info = None
     prob.driver._res_jacs = {}
 
-    # remove any existing coloring metadata from dvs and responses
-    for meta in chain(itervalues(prob.driver._designvars), itervalues(prob.driver._responses)):
-        if 'simul_coloring' in meta:
-            meta['simul_coloring'] = None
-        if 'simul_map' in meta:
-            meta['simul_map'] = None
-
-    prob.setup(mode=mode)
+    #prob.setup(mode=mode)
 
     seen = set()
     for system in prob.model.system_iter(recurse=True, include_self=True):
