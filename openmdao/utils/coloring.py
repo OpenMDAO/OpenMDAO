@@ -118,7 +118,7 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     prob.driver._simul_coloring_info = None
     prob.driver._res_jacs = {}
 
-    #prob.setup(mode=mode)
+    prob.setup(mode=mode)
 
     seen = set()
     for system in prob.model.system_iter(recurse=True, include_self=True):
@@ -127,7 +127,8 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
             system._jacobian._set_abs = _SubjacRandomizer(system._jacobian, tol)
             seen.add(system._jacobian)
 
-    prob.run_model()
+    prob.final_setup()
+    #prob.run_model()
 
     desvars = prob.driver._designvars
     responses = prob.driver._responses
