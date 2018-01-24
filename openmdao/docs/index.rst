@@ -8,6 +8,8 @@ It enables you to decompose your models, making them easier to build and maintai
 The OpenMDAO project is primarily focused on supporting gradient based optimization with analytic derivatives to allow you to explore large design spaces with 100's or 1000's of design variables,
 but the framework also has a number of parallel computing features that can work with gradient free optimization, mixed integer nonlinear programming, and traditional design space exploration.
 
+If you are using OpenMDAO, please :ref:`cite us <citing>`!
+
 User Guide
 ***************************
 
@@ -21,7 +23,6 @@ They explain important secondary concepts that you will run into when working wi
 
 .. toctree::
     :maxdepth: 1
-    :caption: User Guide
     :name: userguide
 
     getting_started/index.rst
@@ -37,7 +38,6 @@ documentation of the arguments/options/settings for a specific method, Component
 
 .. toctree::
     :maxdepth: 1
-    :caption: Reference Guide
     :name: referenceguide
 
     feature_reference/index.rst
@@ -50,9 +50,9 @@ Other Useful Docs
 
 .. toctree::
     :maxdepth: 1
-    :caption: Other Docs
     :name: otherdocs
 
+    other/citing.rst
     other/api_translation.rst
     other/file_wrap.rst
     _srcdocs/index.rst

@@ -6,6 +6,7 @@ import sys
 import warnings
 from fnmatch import fnmatchcase
 from six import string_types
+from six.moves import range
 from collections import Iterable
 import numbers
 

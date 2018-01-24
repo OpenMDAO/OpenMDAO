@@ -10,7 +10,7 @@ from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, I
 from openmdao.api import NewtonSolver, ScipyKrylov, NonlinearBlockGS, DirectSolver
 from openmdao.api import AssembledJacobian
 
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayDense
 

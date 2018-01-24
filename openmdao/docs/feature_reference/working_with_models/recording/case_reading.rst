@@ -1,11 +1,10 @@
-***************************
+**************************
 Working with Recorded Data
-***************************
+**************************
 
-A class, `CaseReader`, is provided to read the data from a case recorder file. It will work for any kind of case
-recorder file in OpenMDAO. Currently, OpenMDAO only has a Sqlite case recorder file, but in the future will also have
-an HDF5 case recorder file. `CaseReader` should work for either kind of file as it abstracts away the underlying file
-format.
+A `CaseReader` class is provided to read the data from a case recorder file. Currently, OpenMDAO only has a
+single format of `CaseRecorder`, `SqliteRecorder`.  In the future, we will implement an `HDF5Recorder`, but `CaseReader`
+will work for any kind of recorded file, as it abstracts away the underlying file format.
 
 Here is some simple code showing how to use the `CaseReader` class.
 
@@ -25,7 +24,7 @@ any of the following:
     #. System iterations
     #. Solver iterations
 
-Assume that a recorder was attached to the `Driver` for the `Problem`. Then, to find out how many cases were recorded:
+Assume that a recorder was attached to the `Driver` for the `Problem`. To find out how many cases were recorded:
 
 .. code-block:: console
 
@@ -41,18 +40,26 @@ You can get a list of the case IDs using the `list_cases` method:
 
 Finally, the `get_case` method provides a way to get at individual cases. The argument to this method can either be:
 
-    #. integer - in which case the argument is an index into the cases. Negative numbers can be used as indices just
-            as is normally done in Python
-    #. string - in which case the argument is one of the case keys
+    #. Integer - in which case the argument is an index into the cases. Negative numbers can be used as indices just
+            as is normally done in Python.
+    #. String - in which case the argument is one of the case keys.
 
 For example, in the common situation where the user wants to see the last case, they can do
 
 .. code-block:: console
 
     last_case = cr.driver_cases.get_case(-1)
-    print('Last value of pz.z =', last_case.desvars['pz.z'])
+    print('Last value of pz.z =', last_case.desvars['z'])
 
 Or, if the case key is known:
+
+.. code-block:: console
+
+    seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|6')
+    print('Value of pz.z after 7th iteration of SLSQP =', seventh_slsqp_iteration_case.desvars['z'])
+
+Note that we access variables in the case reader through the promoted names instead of the absolute variable name.
+If we had not promoted `pz.z`, we would use:
 
 .. code-block:: console
 

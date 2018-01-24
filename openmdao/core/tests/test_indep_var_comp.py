@@ -1,11 +1,10 @@
 """IndepVarComp tests used in the IndepVarComp feature doc."""
 from __future__ import division
 
-import numpy as np
 import unittest
 
 from openmdao.api import Problem, IndepVarComp
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestIndepVarComp(unittest.TestCase):
@@ -103,7 +102,7 @@ class TestIndepVarComp(unittest.TestCase):
         except Exception as err:
             self.assertEqual(str(err),
                 "No outputs (independent variables) have been declared for "
-                "this component. They must either be declared during "
+                "component ''. They must either be declared during "
                 "instantiation or by calling add_output afterwards.")
         else:
             self.fail('Exception expected.')

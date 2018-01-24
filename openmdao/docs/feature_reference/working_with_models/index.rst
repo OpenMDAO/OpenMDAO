@@ -1,10 +1,9 @@
-*********************************
-Working With Your Models
-*********************************
+*******************
+Working With Models
+*******************
 
 .. toctree::
     :maxdepth: 1
 
     recording/index.rst
     debugging/index.rst
-    profiling/index.rst

@@ -120,6 +120,9 @@ class Solver(object):
         object that manages all recorders added to this solver
     _solver_info : <SolverInfo>
         Object to store some formatting for iprint that is shared across all solvers.
+    cite : str
+        Listing of relevant citataions that should be referenced when
+        publishing work that uses this class.
     options : <OptionsDictionary>
         Options dictionary.
     recording_options : <OptionsDictionary>
@@ -164,7 +167,7 @@ class Solver(object):
         self.options.declare('iprint', types=int, default=1,
                              desc='whether to print output')
         self.options.declare('err_on_maxiter', types=bool, default=False,
-                             desc="When True, AnlysisError will be raised if we don't convege.")
+                             desc="When True, AnalysisError will be raised if we don't converge.")
         # Case recording options
         self.recording_options.declare('record_abs_error', types=bool, default=True,
                                        desc='Set to True to record absolute error at the \
@@ -194,6 +197,8 @@ class Solver(object):
 
         self.metadata = {}
         self._rec_mgr = RecordingManager()
+
+        self.cite = ""
 
     def add_recorder(self, recorder):
         """

@@ -21,7 +21,7 @@ If we connect :code:`TimeComp.time1` to :code:`SpeedComp.time2` with hours/secon
 
 2. The user always gets/sets the variable in the specified units.
 Declaring an input, output, or residual to have certain units means that any value 'set' into the variable is assumed to be in the given units and any time the user asks to 'get' the variable, the value is return in the given units.
-This is the case not only in <Component> methods such as :code:`compute`, :code:`apply_nonlinear`, and :code:`apply_linear`, but everywhere, including the user's run-script.
+This is the case not only in <Component> methods such as :code:`compute`, :code:`apply_nonlinear`, and :code:`apply_linear`, but everywhere, including the user's run script.
 
 3. In :code:`add_input` and :code:`add_output`, all arguments are assumed given in the specified units.
 In the case of :code:`add_input`, if :code:`units` is specified, then :code:`val` is assumed to be given in those units.

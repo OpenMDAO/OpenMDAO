@@ -7,7 +7,7 @@ from six.moves import cStringIO, range
 from six import assertRaisesRegex
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestConnections(unittest.TestCase):
@@ -278,7 +278,6 @@ class TestConnections(unittest.TestCase):
 class TestConnectionsPromoted(unittest.TestCase):
 
     def test_inp_inp_promoted_no_src(self):
-        raise unittest.SkipTest("connected inputs w/o src not supported yet")
 
         p = Problem(model=Group())
         root = p.model
@@ -293,12 +292,14 @@ class TestConnectionsPromoted(unittest.TestCase):
         C3 = G4.add_subsystem("C3", ExecComp('y=x*2.0'), promotes=['x'])
         C4 = G4.add_subsystem("C4", ExecComp('y=x*2.0'), promotes=['x'])
 
-        p.setup(check=False)
+        p.setup()
+        p.final_setup()
 
         # setting promoted name should set both inputs mapped to that name
-        p['G3.x'] = 999.
-        self.assertEqual(C3._inputs['x'], 999.)
-        self.assertEqual(C4._inputs['x'], 999.)
+        with self.assertRaises(Exception) as context:
+            p['G3.x'] = 999.
+        self.assertEqual(str(context.exception),
+                         "The promoted name G3.x is invalid because it refers to multiple inputs: [G3.G4.C3.x, G3.G4.C4.x] that are not connected to an output variable.")
 
     def test_inp_inp_promoted_w_prom_src(self):
         p = Problem(model=Group())
@@ -673,6 +674,51 @@ class TestShapes(unittest.TestCase):
             #root.connect('src1.x', 'sink1.x', src_indices=np.ones(1,dtype=int))
         #except TypeError:
             #self.fail('Issuing a connection with src_indices as int raised a TypeError')
+
+class TestMultiConns(unittest.TestCase):
+    def test_mult_conns(self):
+
+        class SubGroup(Group):
+            def setup(self):
+                self.add_subsystem('c1', ExecComp('y = 2*x', x=np.ones(4), y=2*np.ones(4)), promotes=['y', 'x'])
+                self.add_subsystem('c2', ExecComp('z = 2*y', y=np.ones(4), z=2*np.ones(4)), promotes=['z', 'y'])
+
+        prob = Problem()
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('x', 10*np.ones(4))
+        indeps.add_output('y', np.ones(4))
+
+        prob.model.add_subsystem('sub', SubGroup())
+
+        prob.model.connect('x', 'sub.x')
+        prob.model.connect('y', 'sub.y')
+
+
+        with self.assertRaises(Exception) as context:
+            prob.setup()
+
+        self.assertEqual(str(context.exception),
+                         "The following inputs have multiple connections: sub.c2.y from ['indeps.y', 'sub.c1.y']")
+
+    def test_mixed_conns_same_level(self):
+
+        prob = Problem()
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp())
+        indeps.add_output('x', 10*np.ones(4))
+
+        # c2.y is implicitly connected to c1.y
+        prob.model.add_subsystem('c1', ExecComp('y = 2*x', x=np.ones(4), y=2*np.ones(4)), promotes=['y'])
+        prob.model.add_subsystem('c2', ExecComp('z = 2*y', y=np.ones(4), z=2*np.ones(4)), promotes=['y'])
+
+        # make a second, explicit, connection to y (which is c2.y promoted)
+        prob.model.connect('indeps.x', 'y')
+
+        with self.assertRaises(Exception) as context:
+            prob.setup()
+            prob.final_setup()
+
+        self.assertEqual(str(context.exception),
+                         "Input 'c2.y' cannot be connected to 'indeps.x' because it's already connected to 'c1.y'")
 
 
 if __name__ == "__main__":

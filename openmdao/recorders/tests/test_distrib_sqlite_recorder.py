@@ -149,8 +149,8 @@ class DistributedRecorderTest(unittest.TestCase):
             self.fail('RuntimeError expected.')
 
     def test_distrib_record_driver(self):
-        size = 100  # how many items in the array
 
+        size = 100  # how many items in the array
         prob = Problem()
         prob.model = Group()
 
@@ -161,6 +161,7 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.driver.recording_options['record_responses'] = True
         prob.driver.recording_options['record_objectives'] = True
         prob.driver.recording_options['record_constraints'] = True
+        prob.driver.recording_options['includes'] = []
         prob.driver.add_recorder(self.recorder)
 
         prob.model.add_design_var('x')

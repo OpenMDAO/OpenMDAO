@@ -96,10 +96,10 @@ class TestSqliteRecorder(unittest.TestCase):
         assertSolverIterationDataRecorded(self, cur, expected, tolerance)
         con.close()
 
-    def assertMetadataRecorded(self):
+    def assertMetadataRecorded(self, expected_abs2prom, expected_prom2abs):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
-        assertMetadataRecorded(self, cur)
+        assertMetadataRecorded(self, cur, expected_abs2prom, expected_prom2abs)
         con.close()
 
     def assertDriverMetadataRecorded(self, expected_driver_metadata):
@@ -179,6 +179,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.recording_options['record_responses'] = False
         self.prob.driver.recording_options['record_objectives'] = False
         self.prob.driver.recording_options['record_constraints'] = False
+        self.prob.driver.recording_options['includes'] = []
         self.prob.driver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
@@ -205,6 +206,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.recording_options['record_responses'] = False
         self.prob.driver.recording_options['record_objectives'] = False
         self.prob.driver.recording_options['record_constraints'] = False
+        self.prob.driver.recording_options['includes'] = []
 
         self.prob.setup(check=False)
 
@@ -232,6 +234,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.recording_options['record_responses'] = False
         self.prob.driver.recording_options['record_objectives'] = True
         self.prob.driver.recording_options['record_constraints'] = False
+        self.prob.driver.recording_options['includes'] = []
         self.prob.driver.add_recorder(self.recorder)
         self.prob.setup(check=False)
 
@@ -254,6 +257,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.recording_options['record_responses'] = False
         self.prob.driver.recording_options['record_objectives'] = False
         self.prob.driver.recording_options['record_constraints'] = True
+        self.prob.driver.recording_options['includes'] = []
         self.prob.driver.add_recorder(self.recorder)
         self.prob.setup(check=False)
 
@@ -320,6 +324,51 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
                                            expected_objectives, expected_constraints, None),), self.eps)
+    
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
+    def test_driver_everything_recorded_by_default(self):
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        model.suppress_solver_output = True
+
+        prob.driver = pyOptSparseDriver()
+
+        prob.driver.add_recorder(self.recorder)
+
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+        prob.setup(check=False)
+
+        t0, t1 = run_driver(prob)
+
+        prob.cleanup()
+
+        coordinate = [0, 'SLSQP', (3, )]
+
+        expected_desvars = {
+                            "p1.x": [7.16706813, ],
+                            "p2.y": [-7.83293187, ]
+                           }
+
+        expected_objectives = {"comp.f_xy": [-27.0833, ], }
+
+        expected_constraints = {"con.c": [-15.0, ], }
+
+        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
+                                           expected_objectives, expected_constraints, None),), self.eps)
 
     def test_driver_records_metadata(self):
         self.setup_sellar_model()
@@ -334,7 +383,50 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        self.assertMetadataRecorded()
+        prom2abs = {
+            'input': {
+                'z': ['d1.z', 'd2.z', 'obj_cmp.z'],
+                'x': ['d1.x', 'obj_cmp.x'],
+                'y2': ['d1.y2', 'obj_cmp.y2', 'con_cmp2.y2'],
+                'y1': ['d2.y1', 'obj_cmp.y1', 'con_cmp1.y1']
+            },
+            'output': {
+                'x': ['px.x'],
+                'z': ['pz.z'],
+                'y1': ['d1.y1'],
+                'y2': ['d2.y2'],
+                'obj': ['obj_cmp.obj'],
+                'con1': ['con_cmp1.con1'],
+                'con2': ['con_cmp2.con2']
+            }
+        }
+
+        abs2prom = {
+            'input': {
+                'd1.z': 'z',
+                'd1.x': 'x',
+                'd1.y2': 'y2',
+                'd2.z': 'z',
+                'd2.y1': 'y1',
+                'obj_cmp.x': 'x',
+                'obj_cmp.y1': 'y1',
+                'obj_cmp.y2': 'y2',
+                'obj_cmp.z': 'z',
+                'con_cmp1.y1': 'y1',
+                'con_cmp2.y2': 'y2'
+            },
+            'output': {
+                'px.x': 'x',
+                'pz.z': 'z',
+                'd1.y1': 'y1',
+                'd2.y2': 'y2',
+                'obj_cmp.obj': 'obj',
+                'con_cmp1.con1': 'con1',
+                'con_cmp2.con2': 'con2'
+            }
+        }
+
+        self.assertMetadataRecorded(prom2abs, abs2prom)
         expected_driver_metadata = {
             'connections_list_length': 11,
             'tree_length': 4,
@@ -352,7 +444,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.cleanup()
 
-        self.assertMetadataRecorded()
+        self.assertMetadataRecorded(None, None)
         expected_driver_metadata = None
         self.assertDriverMetadataRecorded(expected_driver_metadata)
 
@@ -416,7 +508,6 @@ class TestSqliteRecorder(unittest.TestCase):
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_includes(self):
-
         prob = Problem()
         model = prob.model = Group()
 
@@ -1119,6 +1210,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         # Add recorders
         # Driver
+        self.prob.driver.recording_options['includes'] = []
         self.prob.driver.recording_options['record_metadata'] = True
         self.prob.driver.recording_options['record_desvars'] = True
         self.prob.driver.recording_options['record_responses'] = True
@@ -1439,6 +1531,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.recording_options['record_responses'] = False
         self.prob.driver.recording_options['record_objectives'] = False
         self.prob.driver.recording_options['record_constraints'] = False
+        self.prob.driver.recording_options['includes'] = []
         self.prob.driver.add_recorder(self.recorder)
 
         self.prob.setup(check=False)
@@ -1448,12 +1541,13 @@ class TestSqliteRecorder(unittest.TestCase):
         # Open up a new instance of the recorder but with the same filename
         self.setup_sellar_model()
         recorder = SqliteRecorder(self.filename)
-        # recorder.options['record_metadata'] = True
-        # recorder.options['record_desvars'] = True
-        # recorder.options['record_responses'] = False
-        # recorder.options['record_objectives'] = False
-        # recorder.options['record_constraints'] = False
         self.prob.driver.add_recorder(recorder)
+        self.prob.driver.recording_options['record_metadata'] = True
+        self.prob.driver.recording_options['record_desvars'] = True
+        self.prob.driver.recording_options['record_responses'] = False
+        self.prob.driver.recording_options['record_objectives'] = False
+        self.prob.driver.recording_options['record_constraints'] = False
+        self.prob.driver.recording_options['includes'] = []
 
         self.prob.setup(check=False)
         t0, t1 = run_driver(self.prob)

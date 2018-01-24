@@ -1,3 +1,5 @@
+.. _instbasedprofile:
+
 ************************
 Instance-based Profiling
 ************************
@@ -14,13 +16,13 @@ OpenMDAO classes or their descendants, for example, :code:`System`, :code:`Probl
 :code:`Driver`, :code:`Matrix` and :code:`Jacobian`.
 
 
-The simplest way to use instance-based profiling is via the command line using the `iprofview`
+The simplest way to use instance-based profiling is via the command line using the :code:`openmdao iprof`
 command.  For example:
 
 
 .. code::
 
-   iprofview <your_python_script_here>
+   openmdao iprof <your_python_script_here>
 
 
 This will collect the profiling data, start a web server, and pop up an icicle viewer
@@ -33,7 +35,7 @@ using the `-t` option, for example:
 
 ::
 
-    iprofview <your_python_script_here> -p 8801 -t "Instance Profile for propulsor.py"
+    openmdao iprof <your_python_script_here> -p 8801 -t "Instance Profile for propulsor.py"
 
 
 You should then see something like this:
@@ -60,23 +62,23 @@ There is a *Reset* button that will take you back to the top level of the profil
 you have clicked down into a sub-call.
 
 
-.. note::
+Documentation of options for all commands described here can be obtained by running the
+command followed by the `-h` option.  For example:
 
-   Documentation of options for all commands described here can be obtained by running the
-   command followed by the `-h` option.  For example:
-
-   iprofview -h
+.. embed-shell-cmd::
+   :cmd: openmdao iprof -h
 
 
-If you just want to see the timing totals for each method, you can call `iproftotals` instead
-of `iprofview`.  For example:
+
+If you just want to see the timing totals for each method, you can call :code:`openmdao iprof_totals` instead
+of :code:`openmdao iprof`.  For example:
 
 .. code::
 
-   iproftotals <your_python_script_here>
+   openmdao iprof_totals <your_python_script_here>
 
 
-`iproftotals` will write tabular output to the terminal containing total
+:code:`openmdao iprof_totals` will write tabular output to the terminal containing total
 runtime and total number of calls for each profiled function.  For example:
 
 
@@ -127,19 +129,19 @@ runtime and total number of calls for each profiled function.  For example:
 
 
 Note that the totals are sorted with the largest values at the end so that when
-running `iproftotals` in a terminal the most important functions will show up without having to
+running :code:`openmdao iprof_totals` in a terminal the most important functions will show up without having to
 scroll to the top of the output, which can be large. Also note that the function names are a
 combination of the OpenMDAO pathname (when available) plus the function name qualified by the owning
 class, or the class name followed by an instance id plus the function name.
 
 .. note::
 
-    Running either `iprofview` or `iproftotals` will generate by default a file called `iprof.0` in your
+    Running either :code:`openmdao iprof` or :code:`openmdao iprof_totals` will generate by default a file called `iprof.0` in your
     current directory.  Either script can be run directly on the `iprof.0` file and will generate the
     same outputs as running your python script.
 
 
-If you want more control over the profiling process, you can import `openmdao.devtools.iprofile` and manually
+If you want more control over the profiling process, you can import :code:`openmdao.devtools.iprofile` and manually
 call `setup()`, `start()` and `stop()`.  For example:
 
 
@@ -162,9 +164,9 @@ After your script is finished running, you should see a new file called
 `iprof.0` in your current directory.  If you happen
 to have activated profiling for an MPI run, then you'll have a copy of that
 file for each MPI process, so `iprof.0`, `iprof.1`, etc.  As mentioned earlier, you can
-run either `iprofview` or `iproftotals` directly on the `iprof.*` data file(s).
+run either :code:`openmdao iprof` or :code:`openmdao iprof_totals` directly on the :code:`iprof.*` data file(s).
 
-.. note::
+.. warning::
 
    The timing numbers obtained from instance-based profiling will not be exact due to overhead
    introduced by the python function that collects timing data.

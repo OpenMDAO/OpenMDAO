@@ -1,6 +1,6 @@
-*********************************************************
+********************************
 Understanding How Variables Work
-*********************************************************
+********************************
 
 In general, a numerical model can be complex, multidisciplinary, and heterogeneous.
 It can be decomposed into a series of smaller computations that are chained together.
@@ -46,7 +46,7 @@ There are two main component types:
     * :ref:`ExplicitComponent <openmdao.core.explicitcomponent.py>`
     * :ref:`ImplicitComponent <openmdao.core.implicitcomponent.py>`
 
-The :code:`ExplicitComponent` allows you to define your equations in the explicit form (e.g. :math:1z = \sin(y)`) and it computes the implicit transformation for you in order to compute the residuals.
+The :code:`ExplicitComponent` allows you to define your equations in the explicit form (e.g. :math:`z = \sin(y)`) and it computes the implicit transformation for you in order to compute the residuals.
 The :code:`ImplicitComponent` expects you to compute all the residuals yourself in the :code:`apply_linear` method.
 Regardless of which type of component you chose, OpenMDAO sees everything in the implicit form, and treats your model as system of nonlinear equations.
 

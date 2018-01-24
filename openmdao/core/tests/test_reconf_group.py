@@ -2,7 +2,7 @@ from __future__ import division
 import unittest
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 try:
     from openmdao.parallel_api import PETScVector

@@ -32,11 +32,20 @@ class SqliteCaseReader(BaseCaseReader):
     ----------
     format_version : int
         The version of the format assumed when loading the file.
+    _abs2prom : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names to promoted names.
+    _prom2abs : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names to absolute names.
     """
 
     def __init__(self, filename):
         """
         Initialize.
+
+        Parameters
+        ----------
+        filename : str
+            The path to the filename containing the recorded data.
         """
         super(SqliteCaseReader, self).__init__(filename)
 
@@ -47,9 +56,18 @@ class SqliteCaseReader(BaseCaseReader):
 
         with sqlite3.connect(self.filename) as con:
             cur = con.cursor()
-            cur.execute("SELECT format_version FROM metadata")
+            cur.execute("SELECT format_version, abs2prom, prom2abs FROM metadata")
             row = cur.fetchone()
             self.format_version = row[0]
+            self._abs2prom = None
+            self._prom2abs = None
+
+            if PY2:
+                self._abs2prom = pickle.loads(str(row[1])) if row[1] is not None else None
+                self._prom2abs = pickle.loads(str(row[2])) if row[2] is not None else None
+            if PY3:
+                self._abs2prom = pickle.loads(row[1]) if row[1] is not None else None
+                self._prom2abs = pickle.loads(row[2]) if row[2] is not None else None
         con.close()
 
         self._load()
@@ -68,6 +86,10 @@ class SqliteCaseReader(BaseCaseReader):
         self.driver_cases = DriverCases(self.filename)
         self.system_cases = SystemCases(self.filename)
         self.solver_cases = SolverCases(self.filename)
+
+        self.driver_cases._prom2abs = self._prom2abs
+        self.system_cases._prom2abs = self._prom2abs
+        self.solver_cases._prom2abs = self._prom2abs
 
         if self.format_version in (1,):
             with sqlite3.connect(self.filename) as con:
@@ -100,10 +122,12 @@ class SqliteCaseReader(BaseCaseReader):
                 cur.execute("SELECT id, scaling_factors FROM system_metadata")
                 for row in cur:
                     id = row[0]
+                    self.system_metadata[id] = {}
+
                     if PY2:
-                        self.system_metadata[id] = pickle.loads(str(row[1]))
+                        self.system_metadata[id]['scaling_factors'] = pickle.loads(str(row[1]))
                     if PY3:
-                        self.system_metadata[id] = pickle.loads(row[1])
+                        self.system_metadata[id]['scaling_factors'] = pickle.loads(row[1])
 
                 cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")
                 for row in cur:
@@ -164,7 +188,7 @@ class DriverCases(BaseCases):
 
         case = DriverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
                           desvars_array, responses_array, objectives_array, constraints_array,
-                          sysincludes_array)
+                          sysincludes_array, self._prom2abs)
 
         return case
 
@@ -200,15 +224,15 @@ class SystemCases(BaseCases):
         con.close()
 
         # inputs , outputs , residuals
-        idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob, outputs_blob, \
-            residuals_blob = row
+        idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob,\
+            outputs_blob, residuals_blob = row
 
         inputs_array = blob_to_array(inputs_blob)
         outputs_array = blob_to_array(outputs_blob)
         residuals_array = blob_to_array(residuals_blob)
 
         case = SystemCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
-                          inputs_array, outputs_array, residuals_array)
+                          inputs_array, outputs_array, residuals_array, self._prom2abs)
 
         return case
 
@@ -229,7 +253,7 @@ class SolverCases(BaseCases):
 
         Returns
         -------
-            An instance of a Driver Case populated with data from the
+            An instance of a solver Case populated with data from the
             specified case/iteration.
         """
         iteration_coordinate = self.get_iteration_coordinate(case_id)
@@ -250,6 +274,6 @@ class SolverCases(BaseCases):
         residuals_array = blob_to_array(residuals_blob)
 
         case = SolverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
-                          abs_err, rel_err, output_array, residuals_array)
+                          abs_err, rel_err, output_array, residuals_array, self._prom2abs)
 
         return case

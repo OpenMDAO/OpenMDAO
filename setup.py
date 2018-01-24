@@ -2,8 +2,8 @@ from distutils.core import setup
 
 setup(
     name='openmdao',
-    version='2.0.2',
-    description="OpenMDAO v2.0 framework infrastructure",
+    version='2.1.0',
+    description="OpenMDAO v2 framework infrastructure",
     long_description="""OpenMDAO is an open-source high-performance computing platform
     for systems analysis and multidisciplinary optimization, written in Python. It
     enables you to decompose your models, making them easier to build and maintain,
@@ -27,7 +27,7 @@ setup(
     author='OpenMDAO Team',
     author_email='openmdao@openmdao.org',
     url='http://openmdao.org',
-    download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/2.0.0',
+    download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/2.1.0',
     license='Apache License, Version 2.0',
     packages=[
         'openmdao',
@@ -37,6 +37,7 @@ setup(
         'openmdao.core',
         'openmdao.devtools',
         'openmdao.devtools.problem_viewer',
+        'openmdao.devtools.iprofile_app',
         'openmdao.docs',
         'openmdao.drivers',
         'openmdao.error_checking',
@@ -87,17 +88,15 @@ setup(
         'redbaron',
         'mock',
         'requests_mock',
-        'tornado'
+        'tornado',
+        'pyDOE'
     ],
     # scripts=['bin/om-pylint.sh']
     entry_points="""
     [console_scripts]
     wingproj=openmdao.devtools.wingproj:run_wing
     webview=openmdao.devtools.webview:webview_argv
-    iprofview=openmdao.devtools.iprofile_app.iprofile_app:_prof_view
-    iproftotals=openmdao.devtools.iprofile:_prof_totals
-    iprofmem=openmdao.devtools.iprof_mem:_profile_py_file
-    icalltrace=openmdao.devtools.itrace:_trace_py_file
     run_test=openmdao.devtools.run_test:run_test
+    openmdao=openmdao.utils.om:openmdao_cmd
     """
 )

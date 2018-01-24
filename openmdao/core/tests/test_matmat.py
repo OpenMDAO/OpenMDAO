@@ -6,7 +6,7 @@ import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, \
                          ScipyOptimizer, DefaultVector, DenseJacobian, DirectSolver
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 def lgl(n, tol=np.finfo(float).eps):
     """
@@ -399,8 +399,8 @@ class MatMatTestCase(unittest.TestCase):
 
         #import matplotlib.pyplot as plt
 
-        #plt.plot(x_mid, p['truth.y_mid'], 'ro')
-        #plt.plot(x_lgl, p['y_lgl'], 'bo')
+        #plt.plot(p['y_lgl'], 'bo')
+        #plt.plot(expected, 'go')
         #plt.show()
 
         y_lgl = p['y_lgl']

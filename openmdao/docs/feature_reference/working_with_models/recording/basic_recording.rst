@@ -57,8 +57,6 @@ How To Attach a Recorder to an Object
 So you have a recorder created, and you've set the options you'd like.  Next, you need to attach the recorder to an
 object or objects using the `add_recorder` command.
 
-.. note::  It is imperative to only use `add_recorder` once `setup` is finished. Before that time, an `add_recorder` call may mistakenly attach a recorder to an unintended object.  For example, attaching a recorder to a `Group`'s `nonlinear_solver` before setup might mistakenly attach it to the `NLRunOnce`, but `NewtonSolver` is assigned (and intended for recorder attachment) in `setup`.
-
 Here's an example of adding a recorder to the top-level `Problem`'s driver:
 
 .. code-block:: console
@@ -71,54 +69,5 @@ A recorder can be attached to more than one object.  Also, more than one recorde
 A More Comprehensive Example
 ++++++++++++++++++++++++++++
 
-.. code-block:: console
-
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
-    def test_simple_driver_recording(self):
-
-        prob = Problem()
-        model = prob.model = Group()
-
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
-
-        model.suppress_solver_output = True
-
-        prob.driver = pyOptSparseDriver()
-
-        prob.driver.add_recorder(self.recorder)
-        prob.driver.recording_options['record_desvars'] = True
-        prob.driver.recording_options['record_responses'] = True
-        prob.driver.recording_options['record_objectives'] = True
-        prob.driver.recording_options['record_constraints'] = True
-
-        prob.driver.options['optimizer'] = OPTIMIZER
-        if OPTIMIZER == 'SLSQP':
-            prob.driver.opt_settings['ACC'] = 1e-9
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15.0)
-        prob.setup(check=False)
-
-        prob.run_driver()
-
-        prob.cleanup()
-
-        coordinate = [0, 'SLSQP', (3, )]
-
-        expected_desvars = {
-                            "p1.x": [7.16706813, ],
-                            "p2.y": [-7.83293187, ]
-                           }
-
-        expected_objectives = {"comp.f_xy": [-27.0833, ], }
-
-        expected_constraints = {"con.c": [-15.0, ], }
-
-        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
-                                           expected_objectives, expected_constraints, None),), self.eps)
+.. embed-code::
+    openmdao.recorders.tests.test_sqlite_recorder.TestSqliteRecorder.test_simple_driver_recording

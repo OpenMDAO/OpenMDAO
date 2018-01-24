@@ -10,8 +10,8 @@ Equation:
 .. math::
      E - e \sin{E} = M
 
-Here `M` is the mean anomaly, `E` is the eccentric anomaly,
-and `e` is the eccentricity of the orbit.
+Here :math:`M` is the mean anomaly, :math:`E` is the eccentric anomaly,
+and :math:`e` is the eccentricity of the orbit.
 
 If we know the eccentric anomaly, computing the mean anomaly is
 trivial.  However, solving for the eccentric anomaly when given
@@ -26,22 +26,22 @@ to the balance, it solves the following equation:
 .. math::
      lhs(var) \cdot mult(var) = rhs(var)
 
-The _mult_ term is an optional multipler than can be applied to the
-left-hand-side (LHS) of the equation.  For our example we will assign the right-hand-side
-(RHS) to the mean anomaly (M) and the left-hand-side to :math:`E - e \sin{E}`
+The :math:`mult` term is an optional multiplier than can be applied to the
+left-hand side (LHS) of the equation.  For our example, we will assign the right-hand side
+(RHS) to the mean anomaly (:math:`M`), and the left-hand side to :math:`E - e \sin{E}`
 
 In this implementation, we rely on an ExecComp to compute the value of the LHS.
 
 Implicit components in OpenMDAO also provide an "initial guess" method,
-*guess_nonlinear* which provides the starting value for the implicit state
-variable (`E` in this case) for the nonlinear solver.  When solving Kepler's
-equation, using `M` as the initial guess for `E` is a good starting point.
+*guess_nonlinear*, which provides the starting value for the implicit state
+variable (:math:`E` in this case) for the nonlinear solver.  When solving Kepler's
+equation, using :math:`M` as the initial guess for :math:`E` is a good starting point.
 
 In summary, the recipe for solving Kepler's equation is as follows:
 
-- Define a problem with a `Group` as it's model.
-- To that Group, add components which provide, `M`, `e`, and the left-hand-side of Kepler's equation.
-- Add a linear and nonlinear solver to the Group, since the default solver's do not iterate.
+- Define a problem with a `Group` as its model.
+- To that Group, add components which provide, :math:`M`, :math:`e`, and the left-hand side of Kepler's equation.
+- Add a linear and nonlinear solver to the Group, since the default solvers do not iterate.
 - Setup the problem, set values for the inputs, and run the model.
 
 .. embed-test::

@@ -13,13 +13,14 @@ import traceback
 from six import iteritems
 
 import numpy as np
+from scipy.sparse import coo_matrix
 
 from pyoptsparse import Optimization
 
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.core.driver import Driver
-from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.record_util import create_local_meta
+
 
 # names of optimizers that use gradients
 grad_drivers = {'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
@@ -32,6 +33,11 @@ multi_obj_drivers = {'NSGA2'}
 def _check_imports():
     """
     Dynamically remove optimizers we don't have.
+
+    Returns
+    -------
+    list of str
+        List of valid optimizer strings.
     """
     optlist = ['ALPSO', 'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
                'NSGA2', 'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'NOMAD']
@@ -43,6 +49,16 @@ def _check_imports():
             optlist.remove(optimizer)
 
     return optlist
+
+
+CITATIONS = """
+@phdthesis{hwang_thesis_2015,
+  author       = {John T. Hwang},
+  title        = {A Modular Approach to Large-Scale Design Optimization of Aerospace Systems},
+  school       = {University of Michigan},
+  year         = 2015
+}
+"""
 
 
 class pyOptSparseDriver(Driver):
@@ -119,6 +135,7 @@ class pyOptSparseDriver(Driver):
         self.supports['multiple_objectives'] = True
         self.supports['two_sided_constraints'] = True
         self.supports['linear_constraints'] = True
+        self.supports['simultaneous_derivatives'] = True
 
         # What we don't support yet
         self.supports['active_set'] = False
@@ -151,6 +168,8 @@ class pyOptSparseDriver(Driver):
         self._indep_list = []
         self._quantities = []
         self.fail = False
+
+        self.cite = CITATIONS
 
     def _setup_driver(self, problem):
         """
@@ -194,7 +213,7 @@ class pyOptSparseDriver(Driver):
         # Metadata Setup
         self.metadata = create_local_meta(self.options['optimizer'])
 
-        with Recording(self.options['optimizer'], self.iter_count, self) as rec:
+        with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
             # Initial Run
             model._solve_nonlinear()
             rec.abs = 0.0
@@ -226,6 +245,19 @@ class pyOptSparseDriver(Driver):
         lcons = [key for (key, con) in iteritems(con_meta) if con['linear'] is True]
         if len(lcons) > 0:
             _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list, return_format='dict')
+            # convert all of our linear constraint jacs to COO format. Otherwise pyoptsparse will
+            # do it for us and we'll end up with a fully dense COO matrix and very slow evaluation
+            # of linear constraints!
+            to_remove = []
+            for oname, jacdct in iteritems(_lin_jacs):
+                for n, subjac in iteritems(jacdct):
+                    if isinstance(subjac, np.ndarray):
+                        # we can safely use coo_matrix to automatically convert the ndarray
+                        # since our linear constraint jacs are constant, so zeros won't become
+                        # nonzero during the optimization.
+                        mat = coo_matrix(subjac)
+                        if mat.row.size > 0:
+                            jacdct[n] = {'coo': [mat.row, mat.col, mat.data], 'shape': mat.shape}
 
         # Add all equality constraints
         self.active_tols = {}
@@ -241,11 +273,15 @@ class pyOptSparseDriver(Driver):
                 wrt = [v for v in indep_list if v in rels]
 
             if meta['linear']:
+                jac = {w: _lin_jacs[name][w] for w in wrt}
                 opt_prob.addConGroup(name, size, lower=lower, upper=upper,
-                                     linear=True, wrt=wrt,
-                                     jac=_lin_jacs[name])
+                                     linear=True, wrt=wrt, jac=jac)
             else:
-                opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrt)
+                if name in self._res_jacs:
+                    jac = self._res_jacs[name]
+                else:
+                    jac = None
+                opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrt, jac=jac)
                 self._quantities.append(name)
 
         # Add all inequality constraints
@@ -265,11 +301,15 @@ class pyOptSparseDriver(Driver):
                 wrt = [v for v in indep_list if v in rels]
 
             if meta['linear']:
+                jac = {w: _lin_jacs[name][w] for w in wrt}
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower,
-                                     linear=True, wrt=wrt,
-                                     jac=_lin_jacs[name])
+                                     linear=True, wrt=wrt, jac=jac)
             else:
-                opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt)
+                if name in self._res_jacs:
+                    jac = self._res_jacs[name]
+                else:
+                    jac = None
+                opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=jac)
                 self._quantities.append(name)
 
         # Instantiate the requested optimizer
@@ -329,7 +369,7 @@ class pyOptSparseDriver(Driver):
             val = dv_dict[name]
             self.set_design_var(name, val)
 
-        with Recording(self.options['optimizer'], self.iter_count, self) as rec:
+        with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
             model._solve_nonlinear()
             rec.abs = 0.0
             rec.rel = 0.0
@@ -346,8 +386,8 @@ class pyOptSparseDriver(Driver):
                 self.fail = True
 
         except KeyError:
-            # Nothing is here, so something bad happened!
-            self.fail = True
+            # optimizers other than pySNOPT may not populate this dict
+            pass
 
         return self.fail
 
@@ -383,7 +423,7 @@ class pyOptSparseDriver(Driver):
             # print(dv_dict)
 
             # Execute the model
-            with Recording(self.options['optimizer'], self.iter_count, self) as rec:
+            with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
                 self.iter_count += 1
                 try:
                     model._solve_nonlinear()
@@ -427,7 +467,6 @@ class pyOptSparseDriver(Driver):
         ----------
         dv_dict : dict
             Dictionary of design variable values.
-
         func_dict : dict
             Dictionary of all functional variables evaluated at design point.
 
@@ -449,7 +488,6 @@ class pyOptSparseDriver(Driver):
                 sens_dict = self._compute_totals(of=self._quantities,
                                                  wrt=self._indep_list,
                                                  return_format='dict')
-
             # Let the optimizer try to handle the error
             except AnalysisError:
                 self._problem.model._clear_iprint()
@@ -465,6 +503,16 @@ class pyOptSparseDriver(Driver):
                     for ikey, ival in iteritems(dv_dict):
                         isize = len(ival)
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
+            else:
+                # if we don't convert to 'coo' here, pyoptsparse will do a
+                # conversion of our dense array into a fully dense 'coo', which is bad.
+                # TODO: look into getting rid of all of these conversions!
+                for name, dvdct in iteritems(self._res_jacs):
+                    for dv, coo in iteritems(dvdct):
+                        arr = sens_dict[name][dv]
+                        row, col, data = coo['coo']
+                        coo['coo'][2] = arr[row, col].flatten()
+                        sens_dict[name][dv] = coo
 
         except Exception as msg:
             tb = traceback.format_exc()
@@ -483,5 +531,43 @@ class pyOptSparseDriver(Driver):
     def _get_name(self):
         """
         Get name of current driver.
+
+        Returns
+        -------
+        optimizer : str
+            The name of the current driver.
         """
         return self.options['optimizer']
+
+    def _setup_simul_coloring(self, mode='fwd'):
+        """
+        Set up metadata for simultaneous derivative solution.
+
+        Parameters
+        ----------
+        mode : str
+            Derivative direction, either 'fwd' or 'rev'.
+        """
+        super(pyOptSparseDriver, self)._setup_simul_coloring(mode)
+
+        for res, meta in iteritems(self._responses):
+            if 'simul_map' in meta and meta['simul_map']:
+                dv_dict = meta['simul_map']
+                self._res_jacs[res] = {}
+                for dv, col_dict in iteritems(dv_dict):
+                    # don't set the sparsity unless the corresponding desvar coloring is set
+                    if self._designvars[dv]['simul_deriv_color']:
+                        rows = []
+                        cols = []
+                        for color, (row_idxs, col_idxs) in iteritems(col_dict):
+                            rows.append(row_idxs)
+                            cols.append(col_idxs)
+
+                        row = np.hstack(rows)
+                        col = np.hstack(cols)
+                        # print("sparsity for %s, %s: %d of %s" % (res, dv, row.size,
+                        #       (self._responses[res]['size'] * self._designvars[dv]['size'],)))
+                        self._res_jacs[res][dv] = {
+                            'coo': [row, col, np.zeros(row.size)],
+                            'shape': [self._responses[res]['size'], self._designvars[dv]['size']]
+                        }

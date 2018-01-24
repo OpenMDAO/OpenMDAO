@@ -1,14 +1,17 @@
+.. _instbasedmemory:
+
 ****************
 Memory Profiling
 ****************
 
-The `iprofmem` command can be used to obtain an estimate of the memory usage of method calls for
-a specified set of functions.  By default, All of the methods of core OpenMDAO classes are included.
+The :code:`openmdao mem` command can be used to obtain an estimate of the memory usage of method calls for
+a specified set of functions.  By default, all of the methods of core OpenMDAO classes are included.
+
 For example:
 
 .. code-block:: none
 
-   iprofmem <your_python_script_here>
+   openmdao mem <your_python_script_here>
 
 
 This will generate output to the console that looks like this:

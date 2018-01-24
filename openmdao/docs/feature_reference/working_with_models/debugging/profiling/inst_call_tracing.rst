@@ -1,18 +1,25 @@
+.. _instbasedtrace:
+
 ***************************
-Instance-based Call Tracing
+Instance-Based Call Tracing
 ***************************
 
-The `icalltrace` command can be used to print a trace of each instance method call.  For example:
+The :code:`openmdao trace` command can be used to print a trace of each instance method call.  For example:
 
 .. code-block:: none
 
-   icalltrace <your_python_script_here>
+   openmdao trace <your_python_script_here>
 
 
-Whenever a method is called that matches the search criteria, the pathname of the object instance, if
-available, and its class and an instance ID, along with the method name, will be written to the
-console, indented based on its location in the call stack. For example:
+Whenever a method is called that matches the search criteria, the following will be written to the console,
+indented based on its location in the call stack. :
 
+    #. Pathname of the object instance (if available)
+    #. Class
+    #. Instance ID
+    #. Method name
+
+    For example:
 
 .. code-block:: none
 
@@ -66,7 +73,7 @@ console, indented based on its location in the call stack. For example:
 
 
 Note that we must always include the class name and instance ID, even when the instance has a pathname
-attribute, because there are times early in execution where either the pathname attriubute doesn't exist
+attribute, because there are times early in execution where either the pathname attribute doesn't exist
 yet, as in the beginning of `__init__` method, or pathname exists but still has the default value of ""
 instead of its eventual value, as in the `_setup_procs` method.
 
@@ -75,7 +82,7 @@ the number of times a function has been called, use the `-v` arg. For example:
 
 .. code-block:: none
 
-   icalltrace -v <your_python_script_here>
+   openmdao trace -v <your_python_script_here>
 
 
 Which will result in output that looks like this:
@@ -129,4 +136,18 @@ Which will result in output that looks like this:
     ...
 
 
-The `-h` command line option will display all of the available command line options.
+
+By default, a pre-defined set of general OpenMDAO functions will be included in the trace,
+but that can be changed using the `-g` option.  For example, in order to trace only
+setup related functions, do the following:
+
+.. code-block:: none
+
+   openmdao trace -v <your_python_script_here> -g setup
+
+
+To see a list of the available pre-defined sets of functions to trace, look at the usage info
+for the `-g` command that can be obtained as follows:
+
+.. embed-shell-cmd::
+    :cmd: openmdao trace -h

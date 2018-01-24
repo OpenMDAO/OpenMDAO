@@ -8,8 +8,8 @@ import numpy as np
 
 from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp, ExecComp
 from openmdao.utils.mpi import MPI
-from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
+from openmdao.utils.assert_utils import assert_rel_error
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -22,22 +22,6 @@ if MPI:
 else:
     rank = 0
     commsize = 1
-
-
-def take_nth(rank, size, seq):
-    """Return an iterator over the sequence that returns every
-    nth element of seq based on the given rank within a group of
-    the given size.  For example, if size = 2, a rank of 0 returns
-    even indexed elements and a rank of 1 returns odd indexed elements.
-    """
-    assert(rank < size)
-    it = iter(seq)
-    while True:
-        for proc in range(size):
-            if rank == proc:
-                yield six.next(it)
-            else:
-                six.next(it)
 
 
 class InOutArrayComp(ExplicitComponent):
@@ -227,7 +211,7 @@ class DistribGatherComp(ExplicitComponent):
         start = self.offsets[rank]
         end = start + self.sizes[rank]
 
-        #need to initialize the variable to have the correct local size
+        # need to initialize the variable to have the correct local size
         self.add_input('invec', np.ones(self.sizes[rank], float),
                        src_indices=np.arange(start, end, dtype=int))
         self.add_output('outvec', np.ones(self.arr_size, float))
@@ -538,21 +522,23 @@ class TestGroupMPI(unittest.TestCase):
 
         p = Problem(model=Group())
 
-        #import wingdbstub
-
         p.model.add_subsystem('indep', IndepVarComp('x', np.arange(5, dtype=float)),
                               promotes_outputs=['x'])
-        C1 = p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
+
+        p.model.add_subsystem('C1', MyComp(),
+                              promotes_inputs=['x'])
 
         p.set_solver_print(level=0)
         p.setup(PETScVector)
         p.run_model()
-        if C1.comm.rank == 0:
-            assert_rel_error(self, p['C1.x'], np.arange(3, dtype=float))
-            assert_rel_error(self, p['C1.y'], 6.)
-        else:
-            assert_rel_error(self, p['C1.x'], np.arange(3, 5, dtype=float))
-            assert_rel_error(self, p['C1.y'], 14.)
+
+        # each rank holds the assigned portion of the input array
+        assert_rel_error(self, p['C1.x'],
+                         np.arange(3, dtype=float) if p.model.C1.comm.rank == 0 else
+                         np.arange(3, 5, dtype=float))
+
+        # the output in each rank is based on the local inputs
+        assert_rel_error(self, p['C1.y'], 6. if p.model.C1.comm.rank == 0 else 14.)
 
 
 if __name__ == '__main__':

@@ -16,8 +16,8 @@ Use :code:`pip` to install openmdao locally:
 
 :code:`pip install .`
 
-Hello world!
-*******************
+Hello, World!
+*************
 Here is a really short run file to get you started running your first optimization.
 Copy the code into a file named `hello_world.py` and run it by typing:
 

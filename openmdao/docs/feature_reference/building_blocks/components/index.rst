@@ -6,9 +6,9 @@ Components
 .. toctree::
     :maxdepth: 1
 
-    metamodel.rst
     exec_comp.rst
-    external_code.rst
-    file_wrap.rst
     balance.rst
+    external_code.rst
     linearsystem.rst
+    metamodelstructured.rst
+    metamodelunstructured.rst

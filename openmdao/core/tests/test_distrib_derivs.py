@@ -7,7 +7,7 @@ from openmdao.api import ParallelGroup, Group, Problem, IndepVarComp, \
     ExecComp, LinearBlockGS, ExplicitComponent, ImplicitComponent, PETScKrylov
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -394,7 +394,6 @@ class MPITests3(unittest.TestCase):
         p.run_model()
         jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
         assert_rel_error(self, jac['out_var']['a'], expected, 1e-6)
-
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

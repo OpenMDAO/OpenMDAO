@@ -1,14 +1,17 @@
 """MetaModel provides basic meta modeling capability."""
 
+from six.moves import range
+
 import numpy as np
 from copy import deepcopy
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.utils.class_util import overrides_method
+from openmdao.utils.general_utils import warn_deprecation
 
 
-class MetaModel(ExplicitComponent):
+class MetaModelUnStructured(ExplicitComponent):
     """
     Class that creates a reduced order model for outputs from inputs.
 
@@ -22,8 +25,15 @@ class MetaModel(ExplicitComponent):
     def __init__(self, default_surrogate=None, vectorize=None):
         """
         Initialize all attributes.
+
+        Parameters
+        ----------
+        default_surrogate : SurrogateModel
+            Default surrogate model to use.
+        vectorize : None or int
+            First dimension of all inputs and outputs for case where data is vectorized, optional.
         """
-        super(MetaModel, self).__init__()
+        super(MetaModelUnStructured, self).__init__()
 
         # This surrogate will be used for all outputs that don't have
         # a specific surrogate assigned to them
@@ -66,15 +76,20 @@ class MetaModel(ExplicitComponent):
         ----------
         name : string
             Name of the input.
-
         val : float or ndarray
             Initial value for the input.
-
         training_data : float or ndarray
             training data for this variable. Optional, can be set
             by the problem later.
+        **kwargs : dict
+            Additional agruments for add_input.
+
+        Returns
+        -------
+        dict
+            metadata for added variable
         """
-        metadata = super(MetaModel, self).add_input(name, val, **kwargs)
+        metadata = super(MetaModelUnStructured, self).add_input(name, val, **kwargs)
 
         if self._vectorize is not None:
             if metadata['shape'][0] != self._vectorize:
@@ -94,7 +109,7 @@ class MetaModel(ExplicitComponent):
 
         return metadata
 
-    def add_output(self, name, val=1.0, training_data=None, num_training_points=None, **kwargs):
+    def add_output(self, name, val=1.0, training_data=None, **kwargs):
         """
         Add an output to this component and a corresponding training output.
 
@@ -102,18 +117,23 @@ class MetaModel(ExplicitComponent):
         ----------
         name : string
             Name of the variable output.
-
         val : float or ndarray
             Initial value for the output. While the value is overwritten during
             execution, it is useful for inferring size.
-
         training_data : float or ndarray
             training data for this variable. Optional, can be set
             by the problem later.
+        **kwargs : dict
+            Additional arguments for add_output.
+
+        Returns
+        -------
+        dict
+            metadata for added variable
         """
         surrogate = kwargs.pop('surrogate', None)
 
-        metadata = super(MetaModel, self).add_output(name, val, **kwargs)
+        metadata = super(MetaModelUnStructured, self).add_output(name, val, **kwargs)
 
         if self._vectorize is not None:
             if metadata['shape'][0] != self._vectorize:
@@ -143,9 +163,14 @@ class MetaModel(ExplicitComponent):
 
     def _setup_vars(self, recurse=True):
         """
-        Return our inputs and outputs dictionaries re-keyed to use absolute variable names.
+        Call setup in components and count variables, total and by var_set.
 
         Also instantiates surrogates for the output variables that use the default surrogate.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
         """
         # create an instance of the default surrogate for outputs that
         # did not have a surrogate specified
@@ -159,7 +184,7 @@ class MetaModel(ExplicitComponent):
         # training will occur on first execution after setup
         self.train = True
 
-        return super(MetaModel, self)._setup_vars()
+        super(MetaModelUnStructured, self)._setup_vars()
 
     def check_config(self, logger):
         """
@@ -196,7 +221,6 @@ class MetaModel(ExplicitComponent):
         ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
@@ -345,7 +369,7 @@ class MetaModel(ExplicitComponent):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        super(MetaModel, self)._setup_partials()
+        super(MetaModelUnStructured, self)._setup_partials()
         self._declare_partials(of=[name[0] for name in self._surrogate_output_names],
                                wrt=[name[0] for name in self._surrogate_input_names])
 
@@ -364,7 +388,7 @@ class MetaModel(ExplicitComponent):
             if num_sample is None:
                 num_sample = len(val)
             elif len(val) != num_sample:
-                msg = "MetaModel: Each variable must have the same number"\
+                msg = "MetaModelUnStructured: Each variable must have the same number"\
                       " of training points. Expected {0} but found {1} "\
                       "points for '{2}'."\
                       .format(num_sample, len(val), name)
@@ -377,14 +401,14 @@ class MetaModel(ExplicitComponent):
                 missing_training_data.append(train_name)
                 continue
             if len(val) != num_sample:
-                msg = "MetaModel: Each variable must have the same number" \
+                msg = "MetaModelUnStructured: Each variable must have the same number" \
                       " of training points. Expected {0} but found {1} " \
                       "points for '{2}'." \
                     .format(num_sample, len(val), name)
                 raise RuntimeError(msg)
 
         if len(missing_training_data) > 0:
-            msg = "MetaModel: The following training data sets must be " \
+            msg = "MetaModelUnStructured: The following training data sets must be " \
                   "provided as metadata for %s: " % self.pathname + \
                   str(missing_training_data)
             raise RuntimeError(msg)
@@ -451,3 +475,24 @@ class MetaModel(ExplicitComponent):
 
     def _metadata(self, name):
         return self._static_var_rel2data_io[name]['metadata']
+
+
+class MetaModel(MetaModelUnStructured):
+    """
+    Deprecated.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Capture Initialize to throw warning.
+
+        Parameters
+        ----------
+        *args : list
+            Deprecated arguments.
+        **kwargs : dict
+            Deprecated arguments.
+        """
+        warn_deprecation("'MetaModel' component has been deprecated. Use"
+                         "'MetaModelUnStructured' instead.")
+        super(Metamodel, self).__init__(*args, **kwargs)

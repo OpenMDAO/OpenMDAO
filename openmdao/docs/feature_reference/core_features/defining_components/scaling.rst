@@ -6,7 +6,7 @@ Scaling variables
 
 As we saw in <Section declaring_variables>, we can specify scaling parameters for outputs and residuals.
 Scaling can be important for the efficiency of some linear solvers and can have an impact on some gradient free
-non-linear solvers such as Broyden. Knowing when and how to use scaling can be tricky, but in general, it is a good
+nonlinear solvers such as Broyden. Knowing when and how to use scaling can be tricky, but in general, it is a good
 idea to scale outputs and residuals so that both have values that are :math:`\mathcal{O}(1)` and so that they have
 roughly the same range of variation in your design space.
 

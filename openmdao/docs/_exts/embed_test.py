@@ -12,7 +12,7 @@ import sphinx
 from sphinx.util.compat import Directive
 from sphinx.writers.html import HTMLTranslator
 
-from openmdao.docs._utils.docutil import get_test_src
+from openmdao.docs._utils.docutil import get_and_run_test
 
 
 if sys.version_info[0] == 2:
@@ -105,9 +105,9 @@ class EmbedTestDirective(Directive):
         # grabbing source, and output of a test segment
         method_path = self.arguments[0]
 
-        src, exc_txt, input_blocks, output_blocks, skipped, failed = get_test_src(method_path)
+        src, exc_txt, input_blocks, output_blocks, skipped = get_and_run_test(method_path)
 
-        if skipped or failed:  # do the old way
+        if skipped:  # do the old way
             # we want the body of test code to be formatted and code highlighted
             body = nodes.literal_block(src, src)
             body['language'] = 'python'
@@ -140,8 +140,9 @@ class EmbedTestDirective(Directive):
                     input_node = nodes.literal_block(input_block, input_block)
                     input_node['language'] = 'python'
                     doc_nodes.append(input_node)
-                    output_node = in_or_out_node(kind="Out", number=n, text=output_block)
-                    doc_nodes.append(output_node)
+                    if len(output_block) > 0:
+                        output_node = in_or_out_node(kind="Out", number=n, text=output_block)
+                        doc_nodes.append(output_node)
                     n += 1
 
         return doc_nodes

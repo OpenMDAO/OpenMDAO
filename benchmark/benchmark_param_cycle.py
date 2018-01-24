@@ -4,7 +4,7 @@ import unittest
 from openmdao.api import Problem, Group, NewtonSolver, ScipyKrylov, NonlinearBlockGS, \
     LinearBlockGS, DirectSolver
 from openmdao.test_suite.parametric_suite import ParameterizedInstance
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 def _build(solver_class=NewtonSolver, linear_solver_class=ScipyKrylov,
@@ -49,7 +49,6 @@ class BM(unittest.TestCase):
             vector_class='default',
             assembled_jac=False,
             jacobian_type='dense',
-            component_class='explicit',
             connection_type='explicit',
             partial_type='array',
             finite_difference=False,
@@ -67,7 +66,6 @@ class BM(unittest.TestCase):
             vector_class='default',
             assembled_jac=False,
             jacobian_type='dense',
-            component_class='explicit',
             connection_type='explicit',
             partial_type='array',
             finite_difference=False,
@@ -83,7 +81,6 @@ class BM(unittest.TestCase):
             vector_class='default',
             assembled_jac=True,
             jacobian_type='dense',
-            component_class='explicit',
             connection_type='explicit',
             partial_type='array',
             finite_difference=False,
@@ -99,7 +96,6 @@ class BM(unittest.TestCase):
             vector_class='default',
             assembled_jac=True,
             jacobian_type='dense',
-            component_class='explicit',
             connection_type='explicit',
             partial_type='array',
             finite_difference=True,

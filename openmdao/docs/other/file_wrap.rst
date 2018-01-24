@@ -11,14 +11,14 @@ Communicating with External Codes in OpenMDAO
 =============================================
 
 
-The :ref:`ExternalCode Example <externalcode_feature>` describes how to
-define a component that calls an external program to perform it's computation,
+The :ref:`ExternalCode <externalcode_feature>` example describes how to
+define a component that calls an external program to perform its computation,
 passing input and output values via files.
 
 The input and output files were very simple in that basic example, containing only
 the values of interest.  In the general case however, you will probably need to
-generate an input file with a specific format of rows and fields and to parse a
-similarly formatted output file to get the output values. To facilitate working
+generate an input file (with a specific format of rows and fields), and you'll also need to parse a
+similarly-formatted output file to get the output values. To facilitate working
 with these more complex input and output files, OpenMDAO provides a couple of utility
 classes: `InputFileGenerator` and `FileParser`.
 
@@ -151,7 +151,7 @@ array in a template to add more terms.
 The named argument ``sep`` defines which separator to include between the
 additional terms of the array.
 
-The input file templating capability that comes with OpenMDAO is basic but quite
+The input file templating capability that comes with OpenMDAO is basic, but quite
 functional. If you need a more powerful templating engine, particularly one that
 allows the inclusion of logic in your template files, then you may want to consider
 one of the community-developed templating_ engines.
@@ -487,7 +487,7 @@ decimal precision using formatted output (i.e., ``"%.16f"``).
 Quibbling over the 11th--15th decimal place may sound unnecessary,
 but some applications are sensitive to changes of this magnitude. Moreover, it
 is important to consider how your component may be used during optimization. A
-gradient optimizer will often use a finite-difference scheme to calculate the
+gradient optimizer will often use a finite difference scheme to calculate the
 gradients for a model, and this means that some component params might be
 subjected to small increments and decrements. A loss of precision here can
 completely change the calculated gradient and prevent the optimizer from

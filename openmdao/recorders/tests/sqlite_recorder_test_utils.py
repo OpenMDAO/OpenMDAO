@@ -8,7 +8,7 @@ if PY3:
 import numpy as np
 
 from openmdao.utils.record_util import format_iteration_coordinate
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
 
 def assertDriverIterationDataRecorded(test, db_cur, expected, tolerance):
@@ -170,13 +170,33 @@ def assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
                     assert_rel_error(test, actual[0][key], expected[key], tolerance)
         return
 
-def assertMetadataRecorded(test, db_cur):
+def assertMetadataRecorded(test, db_cur, expected_prom2abs, expected_abs2prom):
 
-    db_cur.execute("SELECT format_version FROM metadata")
+    db_cur.execute("SELECT format_version, prom2abs, abs2prom FROM metadata")
     row = db_cur.fetchone()
 
     format_version_actual = row[0]
     format_version_expected = format_version
+
+    if PY2:
+        prom2abs = pickle.loads(str(row[1])) if row[1] is not None else None
+        abs2prom = pickle.loads(str(row[2])) if row[2] is not None else None
+    if PY3:
+        prom2abs = pickle.loads(row[1]) if row[1] is not None else None
+        abs2prom = pickle.loads(row[2]) if row[2] is not None else None
+
+    if prom2abs is None:
+        test.assertIsNone(expected_prom2abs)
+    else:
+        for io in ['input', 'output']:
+            for var in prom2abs[io]:
+                test.assertEqual(prom2abs[io][var].sort(), expected_prom2abs[io][var].sort())
+    if abs2prom is None:
+        test.assertIsNone(expected_abs2prom)
+    else:
+        for io in ['input', 'output']:
+            for var in abs2prom[io]:
+                test.assertEqual(abs2prom[io][var], expected_abs2prom[io][var])
 
     # this always gets recorded
     test.assertEqual(format_version_actual, format_version_expected)

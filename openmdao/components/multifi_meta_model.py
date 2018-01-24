@@ -1,8 +1,11 @@
 """Define the MultiFiMetaModel class."""
 
+from six.moves import range
+
 import numpy as np
 
-from openmdao.components.meta_model import MetaModel
+from openmdao.components.meta_model_unstructured import MetaModelUnStructured
+from openmdao.utils.general_utils import warn_deprecation
 
 
 def _get_name_fi(name, fi_index):
@@ -13,7 +16,6 @@ def _get_name_fi(name, fi_index):
     ----------
     name : str
         base name
-
     fi_index : int
         fidelity level
 
@@ -28,7 +30,7 @@ def _get_name_fi(name, fi_index):
         return name
 
 
-class MultiFiMetaModel(MetaModel):
+class MultiFiMetaModelUnStructured(MetaModelUnStructured):
     """
     Generalize MetaModel to be able to train surrogates with multi-fidelity training inputs.
 
@@ -48,7 +50,7 @@ class MultiFiMetaModel(MetaModel):
 
     Thus given the initialization::
 
-    >>> mm = MultiFiMetaModel(nfi=2)`
+    >>> mm = MultiFiMetaModelUnStructured(nfi=2)`
     >>> mm.add_input('x1', 0.)
     >>> mm.add_input('x2', 0.)
     >>> mm.add_ouput('y1', 0.)
@@ -67,8 +69,8 @@ class MultiFiMetaModel(MetaModel):
     Where Y is a list [Y1_fi1, Y1_fi2] where Y1_fi1 is a (m1, 1) ndarray of
     y1 values and Y1_fi2 a (m2, 1) ndarray y1_fi2 values.
 
-    .. note:: when *nfi* ==1 a :class:`MultiFiMetaModel` object behaves as
-        a :class:`MetaModel` object.
+    .. note:: when *nfi* ==1 a :class:`MultiFiMetaModelUnStructured` object behaves as
+        a :class:`MetaModelUnStructured` object.
     """
 
     def __init__(self, nfi=1):
@@ -77,17 +79,19 @@ class MultiFiMetaModel(MetaModel):
 
         Parameters
         ----------
-        nfi : number of levels of fidelity
+        nfi : float
+            number of levels of fidelity
         """
-        super(MultiFiMetaModel, self).__init__()
+        super(MultiFiMetaModelUnStructured, self).__init__()
 
         self._nfi = nfi
 
-        # generalize MetaModel training inputs to a list of training inputs
+        # generalize MetaModelUnStructured training inputs to a list of training inputs
         self._training_input = nfi * [np.zeros(0)]
         self._input_sizes = nfi * [0]
 
-    def add_input(self, name, val=1.0, **kwargs):
+    def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
+                  units=None, desc='', var_set=0):
         """
         Add an input variable to the component.
 
@@ -106,6 +110,10 @@ class MultiFiMetaModel(MetaModel):
             If val is given as an array_like object, the shapes of val and
             src_indices must match. A value of None implies this input depends
             on all entries of source. Default is None.
+        flat_src_indices : bool
+            If True, each entry of src_indices is assumed to be an index into the
+            flattened source.  Otherwise each entry must be a tuple or list of size equal
+            to the number of dimensions of the source.
         units : str or None
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.
@@ -115,7 +123,10 @@ class MultiFiMetaModel(MetaModel):
             For advanced users only. ID or color for this variable, relevant for
             reconfigurability. Default is 0.
         """
-        metadata = super(MultiFiMetaModel, self).add_input(name, val, **kwargs)
+        item = MultiFiMetaModelUnStructured
+        metadata = super(item, self).add_input(name, val, shape=shape, src_indices=src_indices,
+                                               flat_src_indices=flat_src_indices, units=units,
+                                               desc=desc, var_set=var_set)
         input_size = metadata['value'].size
 
         self._input_sizes[0] = self._input_size
@@ -128,7 +139,8 @@ class MultiFiMetaModel(MetaModel):
                     name_with_fi, default=None, desc='Training data for %s' % name_with_fi)
                 self._input_sizes[fi] += input_size
 
-    def add_output(self, name, val=1.0, **kwargs):
+    def add_output(self, name, val=1.0, surrogate=None, shape=None, units=None, res_units=None,
+                   desc='', lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0):
         """
         Add an output variable to the component.
 
@@ -138,6 +150,8 @@ class MultiFiMetaModel(MetaModel):
             name of the variable in this component's namespace.
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
+        surrogate : SurrogateModel
+            Surrogate model to use.
         shape : int or tuple or list or None
             Shape of this variable, only required if val is not an array.
             Default is None.
@@ -172,7 +186,11 @@ class MultiFiMetaModel(MetaModel):
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
         """
-        super(MultiFiMetaModel, self).add_output(name, val, **kwargs)
+        super(MultiFiMetaModelUnStructured, self).add_output(name, val, shape=shape, units=units,
+                                                             res_units=res_units, desc=desc,
+                                                             lower=lower, upper=upper, ref=ref,
+                                                             ref0=ref0, res_ref=res_ref,
+                                                             var_set=var_set, surrogate=surrogate)
         self._training_output[name] = self._nfi * [np.zeros(0)]
 
         # Add train:<outvar>_fi<n>
@@ -184,11 +202,11 @@ class MultiFiMetaModel(MetaModel):
 
     def _train(self):
         """
-        Override MetaModel _train method to take into account multi-fidelity input data.
+        Override MetaModelUnStructured _train method to take into account multi-fidelity input data.
         """
         if self._nfi == 1:
             # shortcut: fallback to base class behaviour immediatly
-            super(MultiFiMetaModel, self)._train()
+            super(MultiFiMetaModelUnStructured, self)._train()
             return
 
         num_sample = self._nfi * [None]
@@ -199,7 +217,7 @@ class MultiFiMetaModel(MetaModel):
                 if num_sample[fi] is None:
                     num_sample[fi] = len(val)
                 elif len(val) != num_sample[fi]:
-                    msg = "MetaModel: Each variable must have the same number"\
+                    msg = "MetaModelUnStructured: Each variable must have the same number"\
                           " of training points. Expected {0} but found {1} "\
                           "points for '{2}'."\
                           .format(num_sample[fi], len(val), name)
@@ -210,7 +228,7 @@ class MultiFiMetaModel(MetaModel):
                 name = _get_name_fi(name, fi)
                 val = self.metadata['train:' + name]
                 if len(val) != num_sample[fi]:
-                    msg = "MetaModel: Each variable must have the same number" \
+                    msg = "MetaModelUnStructured: Each variable must have the same number" \
                           " of training points. Expected {0} but found {1} " \
                           "points for '{2}'." \
                         .format(num_sample[fi], len(val), name)
@@ -289,3 +307,24 @@ class MultiFiMetaModel(MetaModel):
                                         self._training_output[name])
 
         self.train = False
+
+
+class MultiFiMetaModel(MultiFiMetaModelUnStructured):
+    """
+    Deprecated.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Capture Initialize to throw warning.
+
+        Parameters
+        ----------
+        *args : list
+            Deprecated arguments.
+        **kwargs : dict
+            Deprecated arguments.
+        """
+        warn_deprecation("'MultiFiMetaModel' component has been deprecated. Use"
+                         "'MultiFiMetaModelUnStructured' instead.")
+        super(MultiFiMetaModel, self).__init__(*args, **kwargs)

@@ -1,18 +1,18 @@
 import numpy as np
 import unittest
 
-from openmdao.api import Group, Problem, MetaModel, IndepVarComp, ResponseSurface, \
+from openmdao.api import Group, Problem, MetaModelUnStructured, IndepVarComp, ResponseSurface, \
     FloatKrigingSurrogate, KrigingSurrogate, MultiFiCoKrigingSurrogate
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
-from openmdao.devtools.testutil import TestLogger
+from openmdao.utils.logger_utils import TestLogger
 
 
 class MetaModelTestCase(unittest.TestCase):
 
     def test_sin_metamodel(self):
-        # create a MetaModel for sine and add it to a Problem
-        sin_mm = MetaModel()
+        # create a MetaModelUnStructured for sine and add it to a Problem
+        sin_mm = MetaModelUnStructured()
         sin_mm.add_input('x', 0.)
         sin_mm.add_output('f_x', 0.)
 
@@ -21,7 +21,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         # check that missing surrogate is detected in check_config
         testlogger = TestLogger()
-        prob.setup(logger=testlogger)
+        prob.setup(check=True, logger=testlogger)
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -45,7 +45,7 @@ class MetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        msg = ("MetaModel: The following training data sets must be "
+        msg = ("MetaModelUnStructured: The following training data sets must be "
                "provided as metadata for sin_mm: ['train:x', 'train:f_x']")
         self.assertEqual(str(cm.exception), msg)
 
@@ -64,8 +64,8 @@ class MetaModelTestCase(unittest.TestCase):
         x = np.linspace(0,10,200)
         f_x = .5*np.sin(x)
 
-        # create a MetaModel for Sin and add it to a Problem
-        sin_mm = MetaModel()
+        # create a MetaModelUnStructured for Sin and add it to a Problem
+        sin_mm = MetaModelUnStructured()
         sin_mm.add_input('x', 0., training_data = np.linspace(0,10,200))
         sin_mm.add_output('f_x', 0., training_data=f_x)
 
@@ -74,7 +74,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         # check that missing surrogate is detected in check_setup
         testlogger = TestLogger()
-        prob.setup(logger=testlogger)
+        prob.setup(check=True, logger=testlogger)
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -102,8 +102,8 @@ class MetaModelTestCase(unittest.TestCase):
         assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
 
     def test_sin_metamodel_rmse(self):
-        # create MetaModel with Kriging, using the rmse option
-        sin_mm = MetaModel()
+        # create MetaModelUnStructured with Kriging, using the rmse option
+        sin_mm = MetaModelUnStructured()
         sin_mm.add_input('x', 0.)
         sin_mm.add_output('f_x', 0.)
         sin_mm.default_surrogate = KrigingSurrogate(eval_rmse=True)
@@ -126,7 +126,7 @@ class MetaModelTestCase(unittest.TestCase):
 
     def test_basics(self):
         # create a metamodel component
-        mm = MetaModel()
+        mm = MetaModelUnStructured()
 
         mm.add_input('x1', 0.)
         mm.add_input('x2', 0.)
@@ -191,7 +191,7 @@ class MetaModelTestCase(unittest.TestCase):
 
     def test_warm_start(self):
         # create metamodel with warm_restart = True
-        mm = MetaModel()
+        mm = MetaModelUnStructured()
         mm.add_input('x1', 0.)
         mm.add_input('x2', 0.)
         mm.add_output('y1', 0.)
@@ -232,7 +232,7 @@ class MetaModelTestCase(unittest.TestCase):
         assert_rel_error(self, prob['mm.y2'], 4.0, .00001)
 
     def test_vector_inputs(self):
-        mm = MetaModel()
+        mm = MetaModelUnStructured()
         mm.add_input('x', np.zeros(4))
         mm.add_output('y1', 0.)
         mm.add_output('y2', 0.)
@@ -259,7 +259,7 @@ class MetaModelTestCase(unittest.TestCase):
         assert_rel_error(self, prob['mm.y2'], 7.0, .00001)
 
     def test_array_inputs(self):
-        mm = MetaModel()
+        mm = MetaModelUnStructured()
         mm.add_input('x', np.zeros((2,2)))
         mm.add_output('y1', 0.)
         mm.add_output('y2', 0.)
@@ -286,7 +286,7 @@ class MetaModelTestCase(unittest.TestCase):
         assert_rel_error(self, prob['mm.y2'], 7.0, .00001)
 
     def test_array_outputs(self):
-        mm = MetaModel()
+        mm = MetaModelUnStructured()
         mm.add_input('x', np.zeros((2, 2)))
         mm.add_output('y', np.zeros(2,))
         mm.default_surrogate = FloatKrigingSurrogate()
@@ -317,7 +317,7 @@ class MetaModelTestCase(unittest.TestCase):
         assert_rel_error(self, prob['mm.y'], np.array([1.0, 7.0]), .00001)
 
     def test_2darray_outputs(self):
-        mm = MetaModel()
+        mm = MetaModelUnStructured()
         mm.add_input('x', np.zeros((2, 2)))
         mm.add_output('y', np.zeros((2, 2)))
         mm.default_surrogate = FloatKrigingSurrogate()
@@ -348,7 +348,7 @@ class MetaModelTestCase(unittest.TestCase):
         assert_rel_error(self, prob['mm.y'], np.array([[1.0, 7.0], [1.0, 7.0]]), .00001)
 
     def test_unequal_training_inputs(self):
-        mm = MetaModel()
+        mm = MetaModelUnStructured()
         mm.add_input('x', 0.)
         mm.add_input('y', 0.)
         mm.add_output('f', 0.)
@@ -368,14 +368,14 @@ class MetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected = ("MetaModel: Each variable must have the same number"
+        expected = ("MetaModelUnStructured: Each variable must have the same number"
                     " of training points. Expected 4 but found"
                     " 2 points for 'y'.")
 
         self.assertEqual(str(cm.exception), expected)
 
     def test_unequal_training_outputs(self):
-        mm = MetaModel()
+        mm = MetaModelUnStructured()
         mm.add_input('x', 0.)
         mm.add_input('y', 0.)
         mm.add_output('f', 0.)
@@ -395,13 +395,13 @@ class MetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected = ("MetaModel: Each variable must have the same number"
+        expected = ("MetaModelUnStructured: Each variable must have the same number"
                     " of training points. Expected 4 but found"
                     " 2 points for 'f'.")
         self.assertEqual(str(cm.exception), expected)
 
     def test_derivatives(self):
-        mm = MetaModel()
+        mm = MetaModelUnStructured()
         mm.add_input('x', 0.)
         mm.add_output('f', 0.)
         mm.default_surrogate = FloatKrigingSurrogate()
@@ -437,12 +437,12 @@ class MetaModelTestCase(unittest.TestCase):
             self.assertTrue(abs_error < 1.e-6)
 
     def test_metamodel_feature(self):
-        # create a MetaModel, specifying surrogates for the outputs
+        # create a MetaModelUnStructured, specifying surrogates for the outputs
         import numpy as np
 
-        from openmdao.api import Problem, MetaModel, FloatKrigingSurrogate
+        from openmdao.api import Problem, MetaModelUnStructured, FloatKrigingSurrogate
 
-        trig = MetaModel()
+        trig = MetaModelUnStructured()
         trig.add_input('x', 0.)
         trig.add_output('sin_x', 0., surrogate=FloatKrigingSurrogate())
         trig.add_output('cos_x', 0.)
@@ -469,10 +469,10 @@ class MetaModelTestCase(unittest.TestCase):
         # similar to previous example, but output is 2d
         import numpy as np
 
-        from openmdao.api import Problem, MetaModel, FloatKrigingSurrogate
+        from openmdao.api import Problem, MetaModelUnStructured, FloatKrigingSurrogate
 
-        # create a MetaModel that predicts sine and cosine as an array
-        trig = MetaModel(default_surrogate=FloatKrigingSurrogate())
+        # create a MetaModelUnStructured that predicts sine and cosine as an array
+        trig = MetaModelUnStructured(default_surrogate=FloatKrigingSurrogate())
         trig.add_input('x', 0)
         trig.add_output('y', np.zeros(2))
 
@@ -507,12 +507,12 @@ class MetaModelTestCase(unittest.TestCase):
         # array but you skip all the n-copies thing and do it all as an array
         import numpy as np
 
-        from openmdao.api import Problem, MetaModel, FloatKrigingSurrogate
+        from openmdao.api import Problem, MetaModelUnStructured, FloatKrigingSurrogate
 
         size = 3
 
-        # create a vectorized MetaModel for sine
-        trig = MetaModel(vectorize=size, default_surrogate=FloatKrigingSurrogate())
+        # create a vectorized MetaModelUnStructured for sine
+        trig = MetaModelUnStructured(vectorize=size, default_surrogate=FloatKrigingSurrogate())
         trig.add_input('x', np.zeros(size))
         trig.add_output('y', np.zeros(size))
 
@@ -536,12 +536,12 @@ class MetaModelTestCase(unittest.TestCase):
         # similar to previous example, but processes 3 inputs/outputs at a time
         import numpy as np
 
-        from openmdao.api import Problem, MetaModel, FloatKrigingSurrogate
+        from openmdao.api import Problem, MetaModelUnStructured, FloatKrigingSurrogate
 
         size = 3
 
-        # create a vectorized MetaModel for sine and cosine
-        trig = MetaModel(vectorize=size, default_surrogate=FloatKrigingSurrogate())
+        # create a vectorized MetaModelUnStructured for sine and cosine
+        trig = MetaModelUnStructured(vectorize=size, default_surrogate=FloatKrigingSurrogate())
         trig.add_input('x', np.zeros(size))
         trig.add_output('y', np.zeros((size, 2)))
 
@@ -571,14 +571,14 @@ class MetaModelTestCase(unittest.TestCase):
         # invalid values for vectorize argument. Bad.
         for bad_value in [True, -1, 0, 1, 1.5]:
             with self.assertRaises(RuntimeError) as cm:
-                MetaModel(vectorize=True)
+                MetaModelUnStructured(vectorize=True)
                 self.assertEqual(str(cm.exception),
                                  "Metamodel: The value of the 'vectorize' "
                                  "argument must be an integer greater than "
                                  "one, found '%s'." % str(bad_value))
 
         # first dimension of all inputs/outputs must be 3
-        mm = MetaModel(vectorize=3)
+        mm = MetaModelUnStructured(vectorize=3)
 
         with self.assertRaises(RuntimeError) as cm:
             mm.add_input('x', np.zeros(2))

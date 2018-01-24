@@ -5,7 +5,7 @@ import unittest
 
 from openmdao.api import ExplicitComponent, ImplicitComponent, Group, NewtonSolver, DirectSolver
 
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class Resistor(ExplicitComponent):
@@ -72,6 +72,7 @@ class Node(ImplicitComponent):
         for i_conn in range(self.metadata['n_out']):
             residuals['V'] -= inputs['I_out:{}'.format(i_conn)]
 
+
 # note: This is defined twice in the file. Once so you can import it, and once inside a test that gets included in the docs.
 class Circuit(Group):
 
@@ -101,7 +102,6 @@ class TestCircuit(unittest.TestCase):
 
     def test_circuit_plain_newton(self):
 
-
         from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarComp
 
         from openmdao.test_suite.test_examples.test_circuit_analysis import Resistor, Diode, Node
@@ -129,7 +129,6 @@ class TestCircuit(unittest.TestCase):
                 self.nonlinear_solver.options['maxiter'] = 20
                 self.linear_solver = DirectSolver()
 
-
         p = Problem()
         model = p.model
 
@@ -153,9 +152,9 @@ class TestCircuit(unittest.TestCase):
         assert_rel_error(self, p['circuit.R1.I'], 0.09908303, 1e-5)
         assert_rel_error(self, p['circuit.R2.I'], 0.00091697, 1e-5)
         assert_rel_error(self, p['circuit.D1.I'], 0.00091697, 1e-5)
-        #'Sanity check: shoudl sum to .1 Amps
-        assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
+        # sanity check: should sum to .1 Amps
+        assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
     def test_circuit_plain_newton_many_iter(self):
 
@@ -187,7 +186,8 @@ class TestCircuit(unittest.TestCase):
 
         assert_rel_error(self, p['circuit.n1.V'], 9.98744708, 1e-5)
         assert_rel_error(self, p['circuit.n2.V'], 8.73215484, 1e-5)
-        #'Sanity check: shoudl sum to .1 Amps
+
+        # sanity check: should sum to .1 Amps
         assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], 0.09987447, 1e-6)
 
     def test_circuit_advanced_newton(self):
@@ -227,7 +227,8 @@ class TestCircuit(unittest.TestCase):
         assert_rel_error(self, p['circuit.R1.I'], 0.09908303, 1e-5)
         assert_rel_error(self, p['circuit.R2.I'], 0.00091697, 1e-5)
         assert_rel_error(self, p['circuit.D1.I'], 0.00091697, 1e-5)
-        # 'Sanity check: shoudl sum to .1 Amps
+
+        # sanity check: should sum to .1 Amps
         assert_rel_error(self, p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
     def test_circuit_voltage_source(self):

@@ -1,8 +1,6 @@
 """
 Script for uploading data from a local sqlite file to the web server.
 """
-
-import sys
 import json
 import argparse
 from openmdao.recorders.web_recorder import WebRecorder
@@ -33,6 +31,10 @@ def upload(sqlite_file, token, name=None, case_id=None, suppress_output=False):
         recorder = WebRecorder(token, name, case_id=case_id)
 
     if not suppress_output:
+        print('Data Uploader: Recording metadata')
+    _upload_metadata(reader._abs2prom, reader._prom2abs, recorder)
+
+    if not suppress_output:
         print('Data Uploader: Recording driver iteration data')
     _upload_driver_iterations(reader.driver_cases, recorder)
 
@@ -53,6 +55,26 @@ def upload(sqlite_file, token, name=None, case_id=None, suppress_output=False):
         print('Finished uploading')
 
 
+def _upload_metadata(abs2prom, prom2abs, recorder):
+    """
+    Upload the abs2prom and prom2abs metadata ot the server.
+
+    Parameters
+    ----------
+    abs2prom : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names to promoted names.
+    prom2abs : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names to absolute names.
+    recorder : WebRecorder
+        The web recorder used to upload this data.
+    """
+    metadata = {
+        'abs2prom': recorder.convert_to_list(abs2prom),
+        'prom2abs': recorder.convert_to_list(prom2abs)
+    }
+    recorder._record_metadata(metadata)
+
+
 def _upload_system_iterations(new_list, recorder):
     """
     Upload all system iterations to the web server.
@@ -71,22 +93,22 @@ def _upload_system_iterations(new_list, recorder):
         outputs = []
         residuals = []
         if data.inputs is not None:
-            for n in data.inputs.dtype.names:
+            for n in data.inputs._values.dtype.names:
                 inputs.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.inputs[n])
+                    'values': recorder.convert_to_list(data.inputs._values[n])
                 })
         if data.outputs is not None:
-            for n in data.outputs.dtype.names:
+            for n in data.outputs._values.dtype.names:
                 outputs.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.outputs[n])
+                    'values': recorder.convert_to_list(data.outputs._values[n])
                 })
         if data.residuals is not None:
-            for n in data.residuals.dtype.names:
+            for n in data.residuals._values.dtype.names:
                 residuals.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.residuals[n])
+                    'values': recorder.convert_to_list(data.residuals._values[n])
                 })
 
         data.inputs = inputs
@@ -99,7 +121,7 @@ def _upload_system_iterations(new_list, recorder):
 
 def _upload_solver_iterations(new_list, recorder):
     """
-    Upload all slver iterations to the web server.
+    Upload all solver iterations to the web server.
 
     Parameters
     ----------
@@ -114,16 +136,16 @@ def _upload_solver_iterations(new_list, recorder):
         outputs = []
         residuals = []
         if data.outputs is not None:
-            for n in data.outputs.dtype.names:
+            for n in data.outputs._values.dtype.names:
                 outputs.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.outputs[n])
+                    'values': recorder.convert_to_list(data.outputs._values[n])
                 })
         if data.residuals is not None:
-            for n in data.residuals.dtype.names:
+            for n in data.residuals._values.dtype.names:
                 residuals.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.residuals[n])
+                    'values': recorder.convert_to_list(data.residuals._values[n])
                 })
 
         data.outputs = outputs
@@ -153,35 +175,35 @@ def _upload_driver_iterations(new_list, recorder):
         constraints = []
         sysincludes = []
         if data.desvars is not None:
-            for n in data.desvars.dtype.names:
+            for n in data.desvars._values.dtype.names:
                 desvars.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.desvars[n])
+                    'values': recorder.convert_to_list(data.desvars._values[n])
                 })
         if data.responses is not None:
-            for n in data.responses.dtype.names:
+            for n in data.responses._values.dtype.names:
                 responses.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.responses[n])
+                    'values': recorder.convert_to_list(data.responses._values[n])
                 })
         if data.objectives is not None:
-            for n in data.objectives.dtype.names:
+            for n in data.objectives._values.dtype.names:
                 objectives.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.objectives[n])
+                    'values': recorder.convert_to_list(data.objectives._values[n])
                 })
         if data.constraints is not None:
-            for n in data.constraints.dtype.names:
+            for n in data.constraints._values.dtype.names:
                 constraints.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.constraints[n])
+                    'values': recorder.convert_to_list(data.constraints._values[n])
                 })
 
         if data.sysincludes is not None:
-            for n in data.sysincludes.dtype.names:
+            for n in data.sysincludes._values.dtype.names:
                 sysincludes.append({
                     'name': n,
-                    'values': recorder.convert_to_list(data.sysincludes[n])
+                    'values': recorder.convert_to_list(data.sysincludes._values[n])
                 })
 
         data.desvars = desvars

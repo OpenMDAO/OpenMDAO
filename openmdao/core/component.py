@@ -293,11 +293,6 @@ class Component(System):
         dict
             metadata for added variable
         """
-        if self._static_mode:
-            warn_deprecation("In the future, the 'add_input' method must be "
-                             "called from 'setup' rather than "
-                             "in the '__init__' function.")
-
         if units == 'unitless':
             warn_deprecation("Input '%s' has units='unitless' but 'unitless' "
                              "has been deprecated. Use "
@@ -419,11 +414,6 @@ class Component(System):
         dict
             metadata for added variable
         """
-        if self._static_mode:
-            warn_deprecation("In the future, the 'add_output' method must be "
-                             "called from 'setup' rather than "
-                             "in the '__init__' function.")
-
         if units == 'unitless':
             warn_deprecation("Output '%s' has units='unitless' but 'unitless' "
                              "has been deprecated. Use "
@@ -784,7 +774,10 @@ class Component(System):
                     'dependent': dependent
                 }
                 abs_key = rel_key2abs_key(self, rel_key)
-                meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
+                if abs_key in self._subjacs_info:
+                    meta = self._subjacs_info[abs_key]
+                else:
+                    meta = SUBJAC_META_DEFAULTS.copy()
                 meta.update(meta_changes)
                 self._check_partials_meta(abs_key, meta)
                 self._subjacs_info[abs_key] = meta
@@ -825,12 +818,11 @@ class Component(System):
 
         Parameters
         ----------
-        abs_key : tuple(str,str)
+        abs_key : tuple(str, str)
             The of/wrt pair (given absolute names) defining the partial derivative.
         meta : dict
             Metadata dictionary from declare_partials.
         """
-        of, wrt = abs_key2rel_key(self, abs_key)
         if meta['dependent']:
             out_size = np.prod(self._var_abs2meta['output'][abs_key[0]]['shape'])
             if abs_key[1] in self._var_abs2meta['input']:
@@ -845,12 +837,15 @@ class Component(System):
             cols = meta['cols']
             if not (rows is None or rows.size == 0):
                 if rows.min() < 0:
+                    of, wrt = abs_key2rel_key(self, abs_key)
                     msg = '{}: d({})/d({}): row indices must be non-negative'
                     raise ValueError(msg.format(self.pathname, of, wrt))
                 if cols.min() < 0:
+                    of, wrt = abs_key2rel_key(self, abs_key)
                     msg = '{}: d({})/d({}): col indices must be non-negative'
                     raise ValueError(msg.format(self.pathname, of, wrt))
                 if rows.max() >= out_size or cols.max() >= in_size:
+                    of, wrt = abs_key2rel_key(self, abs_key)
                     msg = '{}: d({})/d({}): Expected {}x{} but declared at least {}x{}'
                     raise ValueError(msg.format(
                         self.pathname, of, wrt,
@@ -864,6 +859,7 @@ class Component(System):
                 else:
                     val_out, val_in = val.shape
                 if val_out > out_size or val_in > in_size:
+                    of, wrt = abs_key2rel_key(self, abs_key)
                     msg = '{}: d({})/d({}): Expected {}x{} but val is {}x{}'
                     raise ValueError(msg.format(
                         self.pathname, of, wrt,

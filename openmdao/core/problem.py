@@ -1,6 +1,8 @@
 """Define the Problem class and a FakeComm class for non-MPI users."""
 
-from __future__ import division
+from __future__ import division, print_function
+
+import sys
 
 from collections import OrderedDict, defaultdict, namedtuple
 from itertools import product
@@ -14,7 +16,6 @@ import scipy.sparse as sparse
 
 from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
 from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
-from openmdao.components.deprecated_component import Component as DepComponent
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver
 from openmdao.core.explicitcomponent import ExplicitComponent
@@ -27,6 +28,7 @@ from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.vectors.default_vector import DefaultVector
+
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
@@ -38,6 +40,18 @@ ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 _contains_all = ContainsAll()
+
+CITATION = """@inproceedings{2014_openmdao_derivs,
+    Author = {Justin S. Gray and Tristan A. Hearn and Kenneth T. Moore
+              and John Hwang and Joaquim Martins and Andrew Ning},
+    Booktitle = {15th AIAA/ISSMO Multidisciplinary Analysis and Optimization Conference},
+    Doi = {doi:10.2514/6.2014-2042},
+    Month = {2014/07/08},
+    Publisher = {American Institute of Aeronautics and Astronautics},
+    Title = {Automatic Evaluation of Multidisciplinary Derivatives Using
+             a Graph-Based Problem Formulation in OpenMDAO},
+    Year = {2014}
+}"""
 
 
 class Problem(object):
@@ -68,7 +82,12 @@ class Problem(object):
         0 -- Newly initialized problem or newly added model.
         1 -- The `setup` method has been called, but vectors not initialized.
         2 -- The `final_setup` has been run, everything ready to run.
+    cite : str
+        Listing of relevant citataions that should be referenced when
+        publishing work that uses this class.
     """
+
+    _post_setup_func = None
 
     def __init__(self, model=None, comm=None, use_ref_vector=True, root=None):
         """
@@ -85,6 +104,8 @@ class Problem(object):
         root : <System> or None
             Deprecated kwarg for `model`.
         """
+        self.cite = CITATION
+
         if comm is None:
             try:
                 from mpi4py import MPI
@@ -338,7 +359,7 @@ class Problem(object):
         """
         self.driver.cleanup()
 
-    def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='rev',
+    def setup(self, vector_class=DefaultVector, check=False, logger=None, mode='rev',
               force_alloc_complex=False):
         """
         Set up the model hierarchy.
@@ -353,7 +374,7 @@ class Problem(object):
         vector_class : type
             reference to an actual <Vector> class; not an instance.
         check : boolean
-            whether to run error check after setup is complete.
+            whether to run config check after setup is complete.
         logger : object
             Object for logging config checks if check is True.
         mode : string
@@ -394,6 +415,7 @@ class Problem(object):
         self._force_alloc_complex = force_alloc_complex
 
         self._setup_status = 1
+
         return self
 
     def final_setup(self):
@@ -407,16 +429,14 @@ class Problem(object):
         started, and the rest of the framework is prepared for execution.
         """
         vector_class = self._vector_class
-        check = self._check
-        logger = self._logger
         force_alloc_complex = self._force_alloc_complex
 
-        model = self.model
         comm = self.comm
         mode = self._mode
 
         if self._setup_status < 2:
-            model._final_setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex)
+            self.model._final_setup(comm, vector_class, 'full',
+                                    force_alloc_complex=force_alloc_complex)
 
         self.driver._setup_driver(self)
 
@@ -424,12 +444,16 @@ class Problem(object):
         for items in self._solver_print_cache:
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
 
-        if check and comm.rank == 0:
-            check_config(self, logger)
+        if self._check and comm.rank == 0:
+            check_config(self, self._logger)
 
         if self._setup_status < 2:
             self._setup_status = 2
             self._set_initial_conditions()
+
+        # check for post-setup hook
+        if Problem._post_setup_func is not None:
+            Problem._post_setup_func(self)
 
     def check_partials(self, logger=None, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6,
@@ -537,7 +561,6 @@ class Problem(object):
                     continue
 
                 explicit = isinstance(comp, ExplicitComponent)
-                deprecated = isinstance(comp, DepComponent)
                 matrix_free = comp.matrix_free
                 c_name = comp.pathname
                 indep_key[c_name] = set()
@@ -553,9 +576,7 @@ class Problem(object):
                     wrt_list = list(comp._var_allprocs_prom2abs_list['input'].keys())
 
                     # The only outputs in wrt should be implicit states.
-                    if deprecated:
-                        wrt_list.extend(comp._state_names)
-                    elif not explicit:
+                    if not explicit:
                         wrt_list.extend(of_list)
 
                     # Matrix-free components need to calculate their Jacobian by matrix-vector
@@ -590,7 +611,7 @@ class Problem(object):
                                 dstate.set_const(0.0)
 
                                 # TODO - Sort out the minus sign difference.
-                                perturb = 1.0 if (deprecated or not explicit) else -1.0
+                                perturb = 1.0 if not explicit else -1.0
 
                                 # Dictionary access returns a scaler for 1d input, and we
                                 # need a vector for clean code, so use _views_flat.
@@ -701,7 +722,6 @@ class Problem(object):
             c_name = comp.pathname
             all_fd_options[c_name] = {}
             explicit = isinstance(comp, ExplicitComponent)
-            deprecated = isinstance(comp, DepComponent)
 
             approximations = {'fd': FiniteDifference(),
                               'cs': ComplexStep()}
@@ -710,9 +730,7 @@ class Problem(object):
             wrt = list(comp._var_allprocs_prom2abs_list['input'].keys())
 
             # The only outputs in wrt should be implicit states.
-            if deprecated:
-                wrt.extend(comp._state_names)
-            elif not explicit:
+            if not explicit:
                 wrt.extend(of)
 
             # Load up approximation objects with the requested settings.
@@ -1072,7 +1090,7 @@ class Problem(object):
         iproc = model.comm.rank
 
         for vois in itervalues(voi_lists):
-            for input_name, old_input_name in vois:
+            for input_name, old_input_name, _, _, _ in vois:
                 vecname = inp2rhs_name[input_name]
                 if vecname not in input_vec:
                     continue
@@ -1095,7 +1113,10 @@ class Problem(object):
                         in_idxs = in_voi_meta['indices']
 
                 if in_idxs is not None:
+                    neg = in_idxs[in_idxs < 0]
                     irange = in_idxs
+                    if neg:
+                        irange[neg] += end
                     max_i = np.max(in_idxs)
                     min_i = np.min(in_idxs)
                     loc_size = len(in_idxs)
@@ -1129,143 +1150,6 @@ class Problem(object):
                                         loc_size, start, end, dup, store)
 
         return voi_info
-
-    def _compute_totals_multi(self, totals, vois, voi_info, lin_vec_names, mode,
-                              output_list, old_output_list, output_vois,
-                              use_rel_reduction, rel_systems, return_format):
-        fwd = mode == 'fwd'
-        if fwd:
-            remote_outputs = self.driver._remote_responses
-        else:
-            remote_outputs = self.driver._remote_dvs
-
-        model = self.model
-        nproc = model.comm.size
-        iproc = model.comm.rank
-        sizes = model._var_sizes['nonlinear']['output']
-        owning_ranks = model._owning_rank['output']
-
-        # this sets dinputs for the current parallel_deriv_color to 0
-        voi_info[vois[0][0]][0].set_const(0.0)
-        if use_rel_reduction:
-            if fwd:
-                model._vectors['output']['linear'].set_const(0.0)
-            else:
-                model._vectors['input']['linear'].set_const(0.0)
-
-        for input_name, old_input_name in vois:
-            dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
-                dup, store = voi_info[input_name]
-            if input_name in dinputs:
-                vec = dinputs._views_flat[input_name]
-                for i, idx in enumerate(idxs):
-                    if idx < 0:
-                        idx += end
-
-                    if start <= idx < end:
-                        # not all vars will be matrix-matrix, so we have to check here
-                        if len(vec.shape) > 1:
-                            dinputs._views_flat[input_name][idx - start, i] = 1.0
-                        else:
-                            dinputs._views_flat[input_name][idx - start] = 1.0
-
-        model._solve_linear(lin_vec_names, mode, rel_systems)
-
-        for input_name, old_input_name in vois:
-            dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
-                dup, store = voi_info[input_name]
-            ncol = dinputs._ncol
-
-            # Pull out the answers and pack into our data structure.
-            for ocount, output_name in enumerate(output_list):
-                out_idxs = None
-                if output_name in output_vois:
-                    out_voi_meta = output_vois[output_name]
-                    out_idxs = out_voi_meta['indices']
-
-                if use_rel_reduction and output_name not in model._relevant[input_name]:
-                    # irrelevant output, just give zeros
-                    if out_idxs is None:
-                        out_var_idx = \
-                            model._var_allprocs_abs2idx['nonlinear']['output'][output_name]
-                        if output_name in remote_outputs:
-                            _, sz = remote_outputs[output_name]
-                        else:
-                            sz = sizes[iproc, out_var_idx]
-                        if ncol > 1:
-                            deriv_val = np.zeros((sz, ncol))
-                        else:
-                            deriv_val = np.zeros(sz)
-                    else:
-                        if ncol > 1:
-                            deriv_val = np.zeros((len(out_idxs), ncol))
-                        else:
-                            deriv_val = np.zeros(len(out_idxs))
-                else:  # relevant output
-                    if output_name in doutputs._views_flat:
-                        deriv_val = doutputs._views_flat[output_name]
-                        size = deriv_val.size
-                    else:
-                        deriv_val = None
-
-                    if out_idxs is not None:
-                        size = out_idxs.size
-                        if deriv_val is not None:
-                            deriv_val = deriv_val[out_idxs]
-
-                    if dup and nproc > 1:
-                        out_var_idx = \
-                            model._var_allprocs_abs2idx['nonlinear']['output'][output_name]
-                        root = owning_ranks[output_name]
-                        if deriv_val is None:
-                            if out_idxs is not None:
-                                sz = size
-                            else:
-                                sz = sizes[root, out_var_idx]
-                            if ncol > 1:
-                                deriv_val = np.empty((sz, ncol))
-                            else:
-                                deriv_val = np.empty(sz, dtype=float)
-                        self.comm.Bcast(deriv_val, root=root)
-
-                len_val = len(deriv_val)
-
-                if store and len(deriv_val.shape) == 1:
-                    deriv_val = np.atleast_2d(deriv_val).T
-
-                if return_format == 'flat_dict':
-                    if fwd:
-                        key = (old_output_list[ocount], old_input_name)
-
-                        if totals[key] is None:
-                            totals[key] = np.zeros((len_val, loc_size))
-                        if store:
-                            totals[key][:, loc_idxs] = deriv_val
-                    else:
-                        key = (old_input_name, old_output_list[ocount])
-
-                        if totals[key] is None:
-                            totals[key] = np.zeros((loc_size, len_val))
-                        if store:
-                            totals[key][loc_idxs, :] = deriv_val.T
-
-                elif return_format == 'dict':
-                    if fwd:
-                        okey = old_output_list[ocount]
-
-                        if totals[okey][old_input_name] is None:
-                            totals[okey][old_input_name] = np.zeros((len_val, loc_size))
-                        if store:
-                            totals[okey][old_input_name][:, loc_idxs] = deriv_val
-                    else:
-                        ikey = old_output_list[ocount]
-
-                        if totals[old_input_name][ikey] is None:
-                            totals[old_input_name][ikey] = np.zeros((loc_size, len_val))
-                        if store:
-                            totals[old_input_name][ikey][loc_idxs, :] = deriv_val.T
-                else:
-                    raise RuntimeError("unsupported return format")
 
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
@@ -1322,9 +1206,6 @@ class Problem(object):
         # vectors.
         matmat = False
         for vec_name in model._lin_vec_names:
-
-            # TODO: Do all three deriv vectors have the same keys?
-
             vec_dinput[vec_name].set_const(0.0)
             vec_doutput[vec_name].set_const(0.0)
             vec_dresid[vec_name].set_const(0.0)
@@ -1358,6 +1239,9 @@ class Problem(object):
 
         owning_ranks = self.model._owning_rank['output']
 
+        # we don't do simultaneous derivatives when compute_totals is called for linear constaints
+        has_lin_constraints = False
+
         if fwd:
             input_list, output_list = wrt, of
             old_input_list, old_output_list = oldwrt, oldof
@@ -1365,6 +1249,10 @@ class Problem(object):
             input_vois = self.driver._designvars
             output_vois = self.driver._responses
             remote_outputs = self.driver._remote_responses
+            for n in of:
+                if n in output_vois and 'linear' in output_vois[n] and output_vois[n]['linear']:
+                    has_lin_constraints = True
+                    break
         else:  # rev
             input_list, output_list = of, wrt
             old_input_list, old_output_list = oldof, oldwrt
@@ -1396,69 +1284,104 @@ class Problem(object):
         # in the model)
         use_rel_reduction = True
 
-        matmat = False
         for i, name in enumerate(input_list):
-            varmatmat = False
+            matmat = False
             if name in input_vois:
                 meta = input_vois[name]
                 parallel_deriv_color = meta['parallel_deriv_color']
-                varmatmat |= (meta['vectorize_derivs'] and meta['size'] > 1)
+                simul_coloring = meta['simul_deriv_color']
+                matmat = (meta['vectorize_derivs'] and meta['size'] > 1)
             else:
-                parallel_deriv_color = None
+                parallel_deriv_color = simul_coloring = None
                 use_rel_reduction = False
+
+            if simul_coloring is not None:
+                if parallel_deriv_color:
+                    raise RuntimeError("Using both simul_coloring and parallel_deriv_color with "
+                                       "variable '%s' is not supported." % name)
+                if matmat:
+                    raise RuntimeError("Using both simul_coloring and vectorize_derivs with "
+                                       "variable '%s' is not supported." % name)
 
             if parallel_deriv_color is None:  # variable is not in an parallel_deriv_color
                 if name in voi_lists:
-                    raise RuntimeError("Variable name '%s' matches an parallel_deriv_color name." %
+                    raise RuntimeError("Variable name '%s' matches a parallel_deriv_color name." %
                                        name)
                 else:
                     # store the absolute name along with the original name, which
                     # can be either promoted or absolute depending on the value
                     # of the 'global_names' flag.
-                    voi_lists[name] = [(name, old_input_list[i])]
-                    inp2rhs_name[name] = name if varmatmat else 'linear'
+                    voi_lists[name] = [(name, old_input_list[i], parallel_deriv_color, matmat,
+                                        simul_coloring)]
+                    inp2rhs_name[name] = name if matmat else 'linear'
             else:
                 if parallel_deriv_color not in voi_lists:
                     voi_lists[parallel_deriv_color] = []
-                voi_lists[parallel_deriv_color].append((name, old_input_list[i]))
+                voi_lists[parallel_deriv_color].append((name, old_input_list[i],
+                                                        parallel_deriv_color, matmat,
+                                                        simul_coloring))
                 inp2rhs_name[name] = name
-
-            matmat |= varmatmat
 
         lin_vec_names = sorted(set(inp2rhs_name.values()))
 
         voi_info = self._get_voi_info(voi_lists, inp2rhs_name, input_vec, output_vec, input_vois)
 
-        if matmat:
-            for vois in itervalues(voi_lists):
-                if use_rel_reduction:
-                    rel_systems = set()
-                    for voi, _ in vois:
-                        rel_systems.update(relevant[voi]['@all'][1])
-                else:
-                    rel_systems = _contains_all
-                self._compute_totals_multi(totals, vois, voi_info, lin_vec_names, mode,
-                                           output_list, old_output_list,
-                                           output_vois, use_rel_reduction, rel_systems,
-                                           return_format)
-            recording_iteration.stack.pop()
-            return totals
-
         for vois in itervalues(voi_lists):
             # If Forward mode, solve linear system for each 'wrt'
             # If Adjoint mode, solve linear system for each 'of'
 
+            matmats = [m for _, _, _, m, _ in vois]
+            matmat = matmats[0]
+            if any(matmats) and not all(matmats):
+                raise RuntimeError("Mixing of vectorized and non-vectorized derivs in the same "
+                                   "parallel color group (%s) is not supported." %
+                                   [name for _, name, _, _, _ in vois])
+            simul_coloring = vois[0][4] if not has_lin_constraints else None
+
             if use_rel_reduction:
                 rel_systems = set()
-                for voi, _ in vois:
+                for voi, _, _, _, _ in vois:
                     rel_systems.update(relevant[voi]['@all'][1])
             else:
                 rel_systems = _contains_all
 
-            loc_idxs = defaultdict(lambda: -1)
+            if matmat:
+                idx_iter = range(1)
+            elif simul_coloring is not None:
+                loc_idx_dict = defaultdict(lambda: -1)
+                # here we're guaranteed that there is only one voi
+                input_name = vois[0][0]
+                info = voi_info[input_name]
+                dinputs = info[0]
+                colors = set(simul_coloring)
+                if not isinstance(simul_coloring, np.ndarray):
+                    simul_coloring = np.array(simul_coloring, dtype=int)
 
-            max_len = max(len(voi_info[name][2]) for name, _ in vois)
-            for i in range(max_len):
+                def idx_iter():
+                    for c in colors:
+                        # iterate over negative colors individually
+                        if c < 0:
+                            for i in np.nonzero(simul_coloring == c)[0]:
+                                yield (c, i)
+                        else:
+                            nzs = np.nonzero(simul_coloring == c)[0]
+                            if nzs.size == 1:
+                                yield (c, nzs[0])
+                            else:
+                                yield (c, nzs)
+                idx_iter = idx_iter()
+            else:
+                loc_idx_dict = defaultdict(lambda: -1)
+                max_len = max(len(voi_info[name][2]) for name, _, _, _, _ in vois)
+                idx_iter = range(max_len)
+
+            for i in idx_iter:
+                if simul_coloring is not None:
+                    color, i = i
+                    do_color_iter = isinstance(i, np.ndarray) and i.size > 1
+                else:
+                    do_color_iter = False
+
                 # this sets dinputs for the current parallel_deriv_color to 0
                 # dinputs is dresids in fwd, doutouts in rev
                 if fwd:
@@ -1470,49 +1393,66 @@ class Problem(object):
                     if use_rel_reduction:
                         vec_dinput['linear'].set_const(0.0)
 
-                for input_name, old_input_name in vois:
+                for input_name, old_input_name, pd_color, matmat, simul in vois:
                     dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
                         voi_info[input_name]
-                    if i >= len(idxs):
-                        # reuse the last index if loop iter is larger than current var size
-                        idx = idxs[-1]
-                    else:
-                        idx = idxs[i]
 
-                    if idx < 0:
-                        idx += end
-                    if start <= idx < end and input_name in dinputs._views_flat:
-                        # Dictionary access returns a scaler for 1d input, and we
-                        # need a vector for clean code, so use _views_flat.
-                        dinputs._views_flat[input_name][idx - start] = 1.0
+                    if matmat:
+                        if input_name in dinputs:
+                            vec = dinputs._views_flat[input_name]
+                            for ii, idx in enumerate(idxs):
+                                if start <= idx < end:
+                                    dinputs._views_flat[input_name][idx - start, ii] = 1.0
+                    elif simul is not None:
+                        ii = idxs[i]
+                        final_idxs = ii[np.logical_and(ii >= start, ii < end)]
+                        vec_dinput['linear'].set_const(0.0)
+                        dinputs._views_flat[input_name][final_idxs] = 1.0
+                    else:
+                        if i >= len(idxs):
+                            # reuse the last index if loop iter is larger than current var size
+                            idx = idxs[-1]
+                        else:
+                            idx = idxs[i]
+                        if start <= idx < end and input_name in dinputs._views_flat:
+                            # Dictionary access returns a scaler for 1d input, and we
+                            # need a vector for clean code, so use _views_flat.
+                            dinputs._views_flat[input_name][idx - start] = 1.0
 
                 model._solve_linear(lin_vec_names, mode, rel_systems)
 
-                for input_name, old_input_name in vois:
-                    dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
-                        voi_info[input_name]
-                    if i >= len(idxs):
-                        idx = idxs[-1]  # reuse the last index
-                        delta_loc_idx = 0  # don't increment local_idx
-                    else:
-                        idx = idxs[i]
-                        delta_loc_idx = 1
+                for input_name, old_input_name, _, matmat, simul in vois:
+                    dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
+                        dup, store = voi_info[input_name]
+                    ncol = dinputs._ncol
 
-                    # totals to zeros instead of None in those cases when none
-                    # of the specified indices are within the range of interest
-                    # for this proc.
-                    store = True if start <= idx < end else dup
-                    if store:
-                        loc_idxs[input_name] += delta_loc_idx
-                    loc_idx = loc_idxs[input_name]
+                    if matmat:
+                        loc_idx = loc_idxs
+                    elif simul is not None and do_color_iter:
+                        loc_idx = loc_idxs[i - start]
+                    else:
+                        if simul is None:
+                            if i >= len(idxs):
+                                idx = idxs[-1]  # reuse the last index
+                                delta_loc_idx = 0  # don't increment local_idx
+                            else:
+                                idx = idxs[i]
+                                delta_loc_idx = 1
+                            # totals to zeros instead of None in those cases when none
+                            # of the specified indices are within the range of interest
+                            # for this proc.
+                            if store:
+                                loc_idx_dict[input_name] += delta_loc_idx
+                            loc_idx = loc_idx_dict[input_name]
+                        else:
+                            idx = loc_idx = i
 
                     # Pull out the answers and pack into our data structure.
                     for ocount, output_name in enumerate(output_list):
                         out_idxs = None
                         if output_name in output_vois:
                             out_voi_meta = output_vois[output_name]
-                            if 'indices' in out_voi_meta:
-                                out_idxs = out_voi_meta['indices']
+                            out_idxs = out_voi_meta['indices']
 
                         if use_rel_reduction and output_name not in relevant[input_name]:
                             # irrelevant output, just give zeros
@@ -1520,9 +1460,14 @@ class Problem(object):
                                 out_var_idx = abs2idx_out[output_name]
                                 if output_name in remote_outputs:
                                     _, sz = remote_outputs[output_name]
-                                    deriv_val = np.zeros(sz)
                                 else:
-                                    deriv_val = np.zeros(sizes[iproc, out_var_idx])
+                                    sz = sizes[iproc, out_var_idx]
+                                if ncol > 1:
+                                    deriv_val = np.zeros((sz, ncol))
+                                else:
+                                    deriv_val = np.zeros(sz)
+                            elif ncol > 1:
+                                deriv_val = np.zeros((len(out_idxs), ncol))
                             else:
                                 deriv_val = np.zeros(len(out_idxs))
                         else:  # relevant output
@@ -1545,10 +1490,16 @@ class Problem(object):
                                         sz = size
                                     else:
                                         sz = sizes[root, out_var_idx]
-                                    deriv_val = np.empty(sz, dtype=float)
+                                    if ncol > 1:
+                                        deriv_val = np.empty((sz, ncol))
+                                    else:
+                                        deriv_val = np.empty(sz)
                                 self.comm.Bcast(deriv_val, root=root)
 
                         len_val = len(deriv_val)
+
+                        if store and ncol > 1 and len(deriv_val.shape) == 1:
+                            deriv_val = np.atleast_2d(deriv_val).T
 
                         if return_format == 'flat_dict':
                             if fwd:
@@ -1557,14 +1508,26 @@ class Problem(object):
                                 if totals[key] is None:
                                     totals[key] = np.zeros((len_val, loc_size))
                                 if store:
-                                    totals[key][:, loc_idx] = deriv_val
+                                    if simul is not None and do_color_iter:
+                                        smap = output_vois[output_name]['simul_map']
+                                        if (smap is not None and input_name in smap and
+                                                color in smap[input_name]):
+                                            col_idxs = smap[input_name][color][1]
+                                            if col_idxs:
+                                                row_idxs = smap[input_name][color][0]
+                                                mat = totals[key]
+                                                for idx, col in enumerate(col_idxs):
+                                                    mat[row_idxs[idx], col] = \
+                                                        deriv_val[row_idxs[idx]]
+                                    else:
+                                        totals[key][:, loc_idx] = deriv_val
                             else:
                                 key = (old_input_name, old_output_list[ocount])
 
                                 if totals[key] is None:
                                     totals[key] = np.zeros((loc_size, len_val))
                                 if store:
-                                    totals[key][loc_idx, :] = deriv_val
+                                    totals[key][loc_idx, :] = deriv_val.T
 
                         elif return_format == 'dict':
                             if fwd:
@@ -1573,18 +1536,31 @@ class Problem(object):
                                 if totals[okey][old_input_name] is None:
                                     totals[okey][old_input_name] = np.zeros((len_val, loc_size))
                                 if store:
-                                    totals[okey][old_input_name][:, loc_idx] = deriv_val
+                                    if simul is not None and do_color_iter:
+                                        smap = output_vois[output_name]['simul_map']
+                                        if (smap is not None and input_name in smap and
+                                                color in smap[input_name]):
+                                            col_idxs = smap[input_name][color][1]
+                                            if col_idxs:
+                                                row_idxs = smap[input_name][color][0]
+                                                mat = totals[okey][old_input_name]
+                                                for idx, col in enumerate(col_idxs):
+                                                    mat[row_idxs[idx], col] = \
+                                                        deriv_val[row_idxs[idx]]
+                                    else:
+                                        totals[okey][old_input_name][:, loc_idx] = deriv_val
                             else:
                                 ikey = old_output_list[ocount]
 
                                 if totals[old_input_name][ikey] is None:
                                     totals[old_input_name][ikey] = np.zeros((loc_size, len_val))
                                 if store:
-                                    totals[old_input_name][ikey][loc_idx, :] = deriv_val
+                                    totals[old_input_name][ikey][loc_idx, :] = deriv_val.T
                         else:
                             raise RuntimeError("unsupported return format")
 
         recording_iteration.stack.pop()
+
         return totals
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):

@@ -9,7 +9,7 @@ from six import iterkeys
 from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, \
                                                   CSRJacobian, CSCJacobian
 from openmdao.solvers.nonlinear.newton import NewtonSolver
@@ -72,7 +72,7 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
                 with self.assertRaises(Exception) as context:
                     prob.run_model()
                 self.assertEqual(str(context.exception),
-                                 "Direct solver is not compatible with mtx type COOMatrix in system ''.")
+                                 "Direct solver is not compatible with matrix type COOMatrix in system ''.")
                 continue
 
             prob.run_model()
@@ -128,7 +128,6 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         partial_type=['array', 'sparse', 'aij'],
         num_var=[2, 3],
         var_shape=[(2, 3), (2,)],
-        component_class=['explicit'],
         connection_type=['implicit', 'explicit'],
         run_by_default=False,
     )

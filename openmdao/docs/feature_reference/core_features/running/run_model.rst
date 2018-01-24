@@ -8,6 +8,7 @@ Once :code:`setup()` is done, you can then execute your model with :code:`run_mo
 
 :code:`run_model()` will execute one pass through your model.
 
+
 Examples
 ---------
 
@@ -22,4 +23,3 @@ To use any of the PETSc linear solvers and/or to run in parallel under MPI, the 
 
 .. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_petsc_setup
-

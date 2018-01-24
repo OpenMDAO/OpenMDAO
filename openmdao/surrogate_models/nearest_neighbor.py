@@ -21,6 +21,16 @@ _interpolators = OrderedDict([('linear', LinearInterpolator),
 class NearestNeighbor(SurrogateModel):
     """
     Surrogate model that approximates values using a nearest neighbor approximation.
+
+    Attributes
+    ----------
+    interpolant : object
+        Interpolator object
+    interpolant_init_args : dict
+        Input keyword arguments for the interpolator.
+    interpolant_type : str
+        Type of interpolator from ['linear', 'weighted', 'rbf']
+
     """
 
     def __init__(self, interpolant_type='rbf', **kwargs):
@@ -31,7 +41,6 @@ class NearestNeighbor(SurrogateModel):
         ----------
         interpolant_type : str
             must be one of 'linear', 'weighted', or 'rbf'.
-
         **kwargs : dict
             keyword arguments
         """
@@ -57,7 +66,6 @@ class NearestNeighbor(SurrogateModel):
         ----------
         x : array-like
             Training input locations
-
         y : array-like
             Model responses at given inputs.
         """
@@ -73,9 +81,13 @@ class NearestNeighbor(SurrogateModel):
         ----------
         x : array-like
             Point(s) at which the surrogate is evaluated.
-
-        kwargs :
+        **kwargs : dict
             Additional keyword arguments passed to the interpolant.
+
+        Returns
+        -------
+        float
+            Predicted value.
         """
         super(NearestNeighbor, self).predict(x)
         return self.interpolant(x, **kwargs)
@@ -88,9 +100,13 @@ class NearestNeighbor(SurrogateModel):
         ----------
         x : array-like
             Point at which the surrogate Jacobian is evaluated.
-
-        kwargs :
+        **kwargs : dict
             Additional keyword arguments passed to the interpolant.
+
+        Returns
+        -------
+        ndarray
+            Jacobian of surrogate output wrt inputs.
         """
         jac = self.interpolant.gradient(x, **kwargs)
         if jac.shape[0] == 1 and len(jac.shape) > 2:
