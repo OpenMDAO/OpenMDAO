@@ -691,8 +691,7 @@ class Group(System):
         """
         desvars = self.get_design_vars(recurse=True, get_sizes=False)
         responses = self.get_responses(recurse=True, get_sizes=False)
-        sys_graph = self.compute_sys_graph(comps_only=True)
-        return get_relevant_vars(sys_graph, desvars, responses, mode)
+        return get_relevant_vars(self._conn_global_abs_in2out, desvars, responses, mode)
 
     def _setup_connections(self, recurse=True):
         """
@@ -1746,7 +1745,7 @@ class Group(System):
         return graph
 
 
-def get_relevant_vars(graph, desvars, responses, mode):
+def get_relevant_vars(connections, desvars, responses, mode):
     """
     Find all relevant vars between desvars and responses.
 
@@ -1754,8 +1753,8 @@ def get_relevant_vars(graph, desvars, responses, mode):
 
     Parameters
     ----------
-    graph : networkx.DiGraph
-        System graph with var connection info on the edges.
+    connections : dict
+        Mapping of inputs and their connected sources.
     desvars : list of str
         Names of design variables.
     responses : list of str
@@ -1773,19 +1772,34 @@ def get_relevant_vars(graph, desvars, responses, mode):
     edge_cache = {}
     fwd = mode == 'fwd'
 
+    # Create a hybrid graph with components and all connected vars.  If a var is connected,
+    # also connect it to its corresponding component.
+    graph = nx.DiGraph()
+    for tgt, src in iteritems(connections):
+        src_sys = src.rsplit('.', 1)[0]
+        if src_sys not in graph:
+            graph.add_node(src_sys, type_='comp')
+        graph.add_edge(src_sys, src)
+
+        tgt_sys = tgt.rsplit('.', 1)[0]
+        if tgt_sys not in graph:
+            graph.add_node(tgt_sys, type_='comp')
+        graph.add_edge(tgt, tgt_sys)
+
+        graph.add_edge(src, tgt)
+
     grev = graph.reverse()
 
     for desvar in desvars:
-        start_sys = (desvar.rsplit('.', 1)[0], 'dv')
-        if start_sys not in edge_cache:
-            edge_cache[start_sys] = set(all_connected_edges(graph, start_sys[0]))
-        start_edges = edge_cache[start_sys]
+        dv = (desvar, 'dv')
+        if dv not in edge_cache:
+            edge_cache[dv] = set(all_connected_edges(graph, desvar))
+        start_edges = edge_cache[dv]
 
         for response in responses:
-            end_sys = (response.rsplit('.', 1)[0], 'r')
-            if end_sys not in edge_cache:
-                edge_cache[end_sys] = set((v, u) for u, v in
-                                          all_connected_edges(grev, end_sys[0]))
+            if response not in edge_cache:
+                edge_cache[response] = set((v, u) for u, v in
+                                          all_connected_edges(grev, response))
             end_edges = edge_cache[end_sys]
 
             common_edges = start_edges.intersection(end_edges)
