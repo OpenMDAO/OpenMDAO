@@ -22,15 +22,14 @@ exclude = [
 ]
 
 directories = []
-top = ".."  # the top dir is up one level in the current dir structure.
+
+top = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 for root, dirs, files in os.walk(top, topdown=True):
     dirs[:] = [d for d in dirs if d not in exclude]
     for di in dirs:
-        if root is "..":
-            directories.append(di)
-        else:
-            directories.append(os.path.join(root, di)[3:])  # don't want ../ in dir name
+        directories.append(os.path.join(root, di))
+
 
 def _is_context_manager(func):
     """

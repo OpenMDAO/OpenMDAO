@@ -18,18 +18,13 @@ exclude = [
 
 directories = []
 
-# the top dir, "openmdao", is up one level in the current dir structure.
-top = ".."
+top = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 for root, dirs, files in os.walk(top, topdown=True):
     # do not bother looking further down in excluded dirs
     dirs[:] = [d for d in dirs if d not in exclude]
     for di in dirs:
-        if root is "..":
-            directories.append(di)
-        else:
-            # don't want ../ in dir name of subdirs
-            directories.append(os.path.join(root, di)[3:])
+            directories.append(os.path.join(root, di))
 
 
 class LintAttributesTestCase(unittest.TestCase):
