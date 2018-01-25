@@ -21,6 +21,7 @@ exclude = [
     'test',
 ]
 
+# we will build a list of dirs in which to do linting.
 directories = []
 
 top = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -469,15 +470,13 @@ class LintTestCase(unittest.TestCase):
                 failures[key] = new_failures
 
     def test_docstrings(self):
-        topdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
         print_info = False
 
         failures = {}
 
         # Loop over directories
         for dir_name in directories:
-            dirpath = os.path.join(topdir, dir_name)
+            dirpath = dir_name
             if print_info:
                 print('-'*len(dir_name))
                 print(dir_name)
@@ -489,7 +488,15 @@ class LintTestCase(unittest.TestCase):
                     if print_info:
                         print(file_name)
 
-                    module_name = 'openmdao.%s.%s' % (dir_name, file_name[:-3])
+                    # to construct module name, use only part of abs path that
+                    # follows 'OpenMDAO' and replace '/' with '.' in the remainder.
+                    mod1 = dir_name.split('OpenMDAO/')[-1].replace('/', '.')
+
+                    # then, get rid of the '.py' to get final part of module name.
+                    mod2 = file_name[:-3]
+
+                    module_name = '{}.{}'.format(mod1, mod2)
+
                     try:
                         mod = importlib.import_module(module_name)
                     except ImportError as err:
