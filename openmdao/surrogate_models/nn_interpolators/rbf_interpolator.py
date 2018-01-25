@@ -373,6 +373,11 @@ class RBFInterpolator(NNBase):
         ----------
         prediction_points : ndarray
             Points at which interpolation is done.
+
+        Returns
+        -------
+        predz
+            Need a type for predz.
         """
         if len(prediction_points.shape) == 1:
             # Reshape vector to n x 1 array
@@ -408,6 +413,11 @@ class RBFInterpolator(NNBase):
         ----------
         prediction_points : ndarray
             Points at which interpolation is done.
+
+        Returns
+        -------
+        ndarray
+            Gradient value at prediction points.
         """
         if len(prediction_points.shape) == 1:
             # Reshape vector to n x 1 array
