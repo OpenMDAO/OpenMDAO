@@ -18,6 +18,12 @@ class RBFInterpolator(NNBase):
         Specifies the order of the radial basis function to be used.
         <-2> uses an 11th order, <-1> uses a 9th order, and any value from <0> to <4> uses an order
         equal to <floor((dimensions-1)/2) + (3*comp) +1>.
+
+    N : int
+        The number of neighbors used for interpolation.
+
+    weights : ndarray
+        Weights for each interpolation point.
     """
 
     def _find_R(self, npp, T, neighbor_idx):
@@ -323,14 +329,21 @@ class RBFInterpolator(NNBase):
         Parameters
         ----------
         training_points : ndarray
+            ndarray of shape (num_points x independent dims) containing training input locations.
 
         training_values : ndarray
+            ndarray of shape (num_points x dependent dims) containing training output values.
 
         num_leaves : int
+            How many leaves the tree should have.
 
         num_neighbors : int
+            The number of neighbors to use for interpolation.
 
         rbf_family : int
+            Specifies the order of the radial basis function to be used.
+            <-2> uses an 11th order, <-1> uses a 9th order, and any value from <0> to <4> uses an
+            order equal to <floor((dimensions-1)/2) + (3*comp) +1>.
         """
         super(RBFInterpolator, self).__init__(training_points, training_values, num_leaves)
 
