@@ -25,7 +25,7 @@ from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ancestors
 from openmdao.utils.units import is_compatible
 from openmdao.utils.mpi import MPI
-from openmdao.utils.graph_utils import all_connected_edges
+from openmdao.utils.graph_utils import all_connected_nodes
 
 # regex to check for valid names.
 import re
@@ -1769,7 +1769,7 @@ def get_relevant_vars(connections, desvars, responses, mode):
         keyed by design vars and responses.
     """
     relevant = defaultdict(dict)
-    edge_cache = {}
+    cache = {}
     fwd = mode == 'fwd'
 
     # Create a hybrid graph with components and all connected vars.  If a var is connected,
@@ -1779,50 +1779,73 @@ def get_relevant_vars(connections, desvars, responses, mode):
         src_sys = src.rsplit('.', 1)[0]
         if src_sys not in graph:
             graph.add_node(src_sys, type_='comp')
+        if src not in graph:
+            graph.add_node(src, type_='out')
+        graph.add_node(tgt, type_='in')
+
         graph.add_edge(src_sys, src)
 
         tgt_sys = tgt.rsplit('.', 1)[0]
         if tgt_sys not in graph:
             graph.add_node(tgt_sys, type_='comp')
-        graph.add_edge(tgt, tgt_sys)
 
+        graph.add_edge(tgt, tgt_sys)
         graph.add_edge(src, tgt)
 
+    for dv in desvars:
+        if dv not in graph:
+            graph.add_node(dv, type_='out')
+            system = dv.rsplit('.', 1)[0]
+            if system not in graph:
+                graph.add_node(system, type_='comp')
+            graph.add_edge(system, dv)
+
+    for res in responses:
+        if res not in graph:
+            graph.add_node(res, type_='out')
+            system = res.rsplit('.', 1)[0]
+            if system not in graph:
+                graph.add_node(system, type_='comp')
+            graph.add_edge(system, res)
+
+    nodes = graph.nodes
     grev = graph.reverse()
 
     for desvar in desvars:
         dv = (desvar, 'dv')
-        if dv not in edge_cache:
-            edge_cache[dv] = set(all_connected_edges(graph, desvar))
-        start_edges = edge_cache[dv]
+        if dv not in cache:
+            cache[dv] = set(all_connected_nodes(graph, desvar))
 
         for response in responses:
-            if response not in edge_cache:
-                edge_cache[response] = set((v, u) for u, v in
-                                          all_connected_edges(grev, response))
-            end_edges = edge_cache[end_sys]
+            res = (response, 'r')
+            if res not in cache:
+                cache[res] = set(all_connected_nodes(grev, response))
 
-            common_edges = start_edges.intersection(end_edges)
+            common = cache[dv].intersection(cache[res])
 
-            if common_edges:
+            if common:
                 input_deps = set()
                 output_deps = set()
                 sys_deps = set()
-                for edge in common_edges:
-                    sys_deps.update(all_ancestors(edge[0]))
-                    sys_deps.update(all_ancestors(edge[1]))
-                    conns = graph[edge[0]][edge[1]]['conns']
-                    output_deps.update(conns)
-                    for inputs in conns.values():
-                        input_deps.update(inputs)
+                for node in common:
+                    typ = nodes[node]['type_']
+                    if typ == 'in':
+                        input_deps.add(node)
+                        system = node.rsplit('.', 1)[0]
+                        if system not in sys_deps:
+                            sys_deps.update(all_ancestors(system))
+                    elif typ == 'out':
+                        output_deps.add(node)
+                        system = node.rsplit('.', 1)[0]
+                        if system not in sys_deps:
+                            sys_deps.update(all_ancestors(system))
 
-                output_deps.update((desvar, response))
             elif desvar == response:
                 input_deps = set()
                 output_deps = set([response])
-                sys_deps = set(all_ancestors(start_sys[0]))
+                sys_deps = set(all_ancestors(desvar.rsplit('.', 1)[0]))
 
-            if common_edges or desvar == response:
+            if common or desvar == response:
                 if fwd:
                     relevant[desvar][response] = ({'input': input_deps,
                                                    'output': output_deps}, sys_deps)
