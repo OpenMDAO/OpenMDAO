@@ -12,6 +12,7 @@ exclude = [
     'devtools',
     'docs',
     'test_suite',
+    'test_examples',
     'tests',
     'test',
 ]
@@ -72,9 +73,16 @@ class LintAttributesTestCase(unittest.TestCase):
                 if file_name != '__init__.py' and file_name[-3:] == '.py':
                     if print_info:
                         print('File: {}'.format(file_name))
-                    dir_name = dir_name.replace('/', '.')
-                    module_name = 'openmdao.{}.{}'.format(dir_name,
-                                                          file_name[:-3]).replace('/', '.')
+
+                    # to construct module name, use only part of abs path that
+                    # follows 'OpenMDAO' and replace '/' with '.' in the remainder.
+                    mod1 = dir_name.split('OpenMDAO/')[-1].replace('/', '.')
+
+                    # then, get rid of the '.py' to get final part of module name.
+                    mod2 = file_name[:-3]
+
+                    module_name = '{}.{}'.format(mod1, mod2)
+
                     if print_info:
                         print(' Module: {}'.format(module_name))
                     try:

@@ -11,7 +11,7 @@ from six import PY3
 
 from numpydoc.docscrape import NumpyDocString
 
-# directories in which we do not wish to lint for attributes.
+# directories in which we do not wish to lint for docstrings/parameters.
 exclude = [
     'code_review',
     'devtools',
