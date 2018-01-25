@@ -1502,7 +1502,7 @@ class Problem(object):
 
                         len_val = len(deriv_val)
 
-                        if store and ncol > 1 and len(deriv_val.shape) == 1:
+                        if store and matmat and len(deriv_val.shape) == 1:
                             deriv_val = np.atleast_2d(deriv_val).T
 
                         if return_format == 'flat_dict':
