@@ -49,13 +49,13 @@ class NNBase(object):
         Parameters
         ----------
         training_points : ndarray
-            ndarray of shape (num_points x independent dims) containing
-            training inpit locations.
+            ndarray of shape (num_points x independent dims) containing training input locations.
 
         training_values : ndarray
-            ndarray of shape (num_points x dependent dims) containing
-            training output values.
+            ndarray of shape (num_points x dependent dims) containing training output values.
 
+        num_leaves : int
+            How many leaves the tree should have.
         """
         # training_points and training_values are the known points and their
         # respective values which will be interpolated against.
