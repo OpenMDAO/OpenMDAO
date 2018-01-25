@@ -306,6 +306,7 @@ class TestParallelGroups(unittest.TestCase):
             self.assertTrue(msg in testlogger.get('info')[0])
 
 
+@unittest.skipUnless(PETScVector, "PETSc is required.")
 class MatMatParDevTestCase(unittest.TestCase):
     N_PROCS = 2
 
