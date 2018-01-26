@@ -1263,7 +1263,7 @@ class Problem(object):
 
         # Solve for derivs using linear solver.
 
-        # this maps either an parallel_deriv_color to a list of tuples of (absname, oldname)
+        # this maps either a parallel_deriv_color to a list of tuples of (absname, oldname)
         # of variables in that group, or, for variables that aren't in an
         # parallel_deriv_color, it maps the variable name to a one entry list containing
         # the tuple (absname, oldname) for that variable.  oldname will be
@@ -1285,15 +1285,15 @@ class Problem(object):
         use_rel_reduction = True
 
         for i, name in enumerate(input_list):
-            matmat = False
             if name in input_vois:
                 meta = input_vois[name]
                 parallel_deriv_color = meta['parallel_deriv_color']
                 simul_coloring = meta['simul_deriv_color']
-                matmat = (meta['vectorize_derivs'] and meta['size'] > 1)
+                matmat = meta['vectorize_derivs']
             else:
                 parallel_deriv_color = simul_coloring = None
                 use_rel_reduction = False
+                matmat = False
 
             if simul_coloring is not None:
                 if parallel_deriv_color:
@@ -1303,7 +1303,7 @@ class Problem(object):
                     raise RuntimeError("Using both simul_coloring and vectorize_derivs with "
                                        "variable '%s' is not supported." % name)
 
-            if parallel_deriv_color is None:  # variable is not in an parallel_deriv_color
+            if parallel_deriv_color is None:  # variable is not in a parallel_deriv_color
                 if name in voi_lists:
                     raise RuntimeError("Variable name '%s' matches a parallel_deriv_color name." %
                                        name)
@@ -1400,9 +1400,13 @@ class Problem(object):
                     if matmat:
                         if input_name in dinputs:
                             vec = dinputs._views_flat[input_name]
-                            for ii, idx in enumerate(idxs):
-                                if start <= idx < end:
-                                    dinputs._views_flat[input_name][idx - start, ii] = 1.0
+                            if vec.size == 1:
+                                if start <= idxs[0] < end:
+                                    vec[idxs[0] - start] = 1.0
+                            else:
+                                for ii, idx in enumerate(idxs):
+                                    if start <= idx < end:
+                                        vec[idx - start, ii] = 1.0
                     elif simul is not None:
                         ii = idxs[i]
                         final_idxs = ii[np.logical_and(ii >= start, ii < end)]
@@ -1498,7 +1502,7 @@ class Problem(object):
 
                         len_val = len(deriv_val)
 
-                        if store and ncol > 1 and len(deriv_val.shape) == 1:
+                        if store and matmat and len(deriv_val.shape) == 1:
                             deriv_val = np.atleast_2d(deriv_val).T
 
                         if return_format == 'flat_dict':

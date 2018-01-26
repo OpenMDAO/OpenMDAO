@@ -129,7 +129,7 @@ class AssembledJacobian(Jacobian):
             in_ranges[abs_name] = self._get_var_range(abs_name, 'input')
 
         # set up view ranges for all subsystems
-        for s in system.system_iter(local=True, recurse=True, include_self=True):
+        for s in system.system_iter(recurse=True, include_self=True):
             min_res_offset = sys.maxsize
             max_res_offset = 0
             min_in_offset = sys.maxsize
@@ -251,8 +251,7 @@ class AssembledJacobian(Jacobian):
             src_indices_dict[abs_name] = \
                 system._var_abs2meta['input'][abs_name]['src_indices']
 
-        for s in system.system_iter(local=True, recurse=True,
-                                    include_self=True, typ=Component):
+        for s in system.system_iter(recurse=True, include_self=True, typ=Component):
             for res_abs_name in s._var_abs_names['output']:
                 res_offset = self._get_var_range(res_abs_name, 'output')[0]
                 res_size = abs2meta_out[res_abs_name]['size']
