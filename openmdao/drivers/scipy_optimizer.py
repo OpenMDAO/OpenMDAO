@@ -6,6 +6,7 @@ from __future__ import print_function
 from collections import OrderedDict
 import sys
 
+
 from six import itervalues, iteritems, reraise
 from six.moves import range
 
@@ -13,6 +14,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 from openmdao.core.driver import Driver, RecordingDebugging
+from openmdao.utils.general_utils import warn_deprecation
 
 
 _optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -39,7 +41,7 @@ CITATIONS = """
 """
 
 
-class ScipyOptimizerDriver(Driver):
+class ScipyOptimizeDriver(Driver):
     """
     Driver wrapper for the scipy.optimize.minimize family of local optimizers.
 
@@ -99,7 +101,7 @@ class ScipyOptimizerDriver(Driver):
         """
         Initialize the ScipyOptimizer.
         """
-        super(ScipyOptimizerDriver, self).__init__()
+        super(ScipyOptimizeDriver, self).__init__()
 
         # What we support
         self.supports['inequality_constraints'] = True
@@ -151,7 +153,7 @@ class ScipyOptimizerDriver(Driver):
         problem : <Problem>
             Pointer
         """
-        super(ScipyOptimizerDriver, self)._setup_driver(problem)
+        super(ScipyOptimizeDriver, self)._setup_driver(problem)
         opt = self.options['optimizer']
 
         self.supports['gradients'] = opt in _gradient_optimizers
@@ -536,9 +538,9 @@ class ScipyOptimizerDriver(Driver):
         reraise(*exc)
 
 
-class ScipyOptimizer(ScipyOptimizerDriver):
+class ScipyOptimizer(ScipyOptimizeDriver):
     """
-    Deprecated.  Use PETScKrylov.
+    Deprecated.  Use ScipyOptimizeDriver.
     """
 
     def __init__(self, **kwargs):
@@ -550,5 +552,6 @@ class ScipyOptimizer(ScipyOptimizerDriver):
         kwargs : dict
             Named args.
         """
-        super(PetscKSP, self).__init__(**kwargs)
-        warn_deprecation('ScipyOptimizer is deprecated.  Use ScipyOptimizerDriver instead.')
+        super(ScipyOptimizeDriver, self).__init__(**kwargs)
+        warn_deprecation("'ScipyOptimizer' property provides backwards compatibility "
+                         "with OpenMDAO <= 2.2 ; use 'ScipyOptimizeDriver' instead.")

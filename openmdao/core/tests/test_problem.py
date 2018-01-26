@@ -7,7 +7,7 @@ from six import assertRaisesRegex
 import numpy as np
 
 from openmdao.core.group import get_relevant_vars
-from openmdao.api import Problem, Group, IndepVarComp, PETScVector, NonlinearBlockGS, ScipyOptimizerDriver, \
+from openmdao.api import Problem, Group, IndepVarComp, PETScVector, NonlinearBlockGS, ScipyOptimizeDriver, \
      ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov
 from openmdao.utils.assert_utils import assert_rel_error
 
@@ -413,14 +413,14 @@ class TestProblem(unittest.TestCase):
     def test_feature_run_driver(self):
         import numpy as np
 
-        from openmdao.api import Problem, NonlinearBlockGS, ScipyOptimizerDriver
+        from openmdao.api import Problem, NonlinearBlockGS, ScipyOptimizeDriver
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
         model = prob.model = SellarDerivatives()
         model.nonlinear_solver = NonlinearBlockGS()
 
-        prob.driver = ScipyOptimizerDriver()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
 
