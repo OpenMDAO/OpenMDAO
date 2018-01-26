@@ -14,7 +14,6 @@ exclude = [
     'test_suite',
     'tests',
     'test',
-    'recorders',
     'components',
 ]
 
