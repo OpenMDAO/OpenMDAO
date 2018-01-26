@@ -68,7 +68,7 @@ class TestNonlinearRunOnceSolverMPI(unittest.TestCase):
 
     N_PROCS = 2
 
-    #@unittest.skipUnless(MPI, "MPI is not active.")
+    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_reraise_analylsis_error(self):
 
         class AEComp(ExplicitComponent):
