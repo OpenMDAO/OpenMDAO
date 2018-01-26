@@ -600,6 +600,28 @@ class LinearSolver(Solver):
         super(LinearSolver, self).__init__(**kwargs)
         self._rel_systems = None
 
+    def _setup_solvers(self, system, depth):
+        """
+        Assign system instance, set depth, and optionally perform setup.
+
+        Parameters
+        ----------
+        system : <System>
+            pointer to the owning system.
+        depth : int
+            depth of the current system (already incremented).
+        """
+        super(LinearSolver, self)._setup_solvers(system, depth)
+
+        if self._mode == 'fwd':
+            b_vecs = self._system._vectors['residual']
+        else:  # rev
+            b_vecs = self._system._vectors['output']
+
+        self._rhs_vecs = {}
+        for vec_name in self._system._rel_vec_names:
+            self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
+
     def solve(self, vec_names, mode, rel_systems=None):
         """
         Run the solver.
@@ -640,14 +662,13 @@ class LinearSolver(Solver):
         """
         system = self._system
 
-        self._rhs_vecs = {}
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']
         else:  # rev
             b_vecs = system._vectors['output']
 
         for vec_name in self._vec_names:
-            self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
+            self._rhs_vecs[vec_name].set_vec(b_vecs[vec_name])
 
         if self.options['maxiter'] > 1:
             self._run_apply()

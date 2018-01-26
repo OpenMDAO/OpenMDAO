@@ -85,7 +85,7 @@ class ScipyOptimizeDriver(Driver):
     _grad_cache : OrderedDict
         Cached result of nonlinear constraint derivatives because scipy asks for them in a separate
         function.
-    _lincongrad_cache : OrderedDict
+    _lincon_grad_cache : OrderedDict
         Cached result of linear constraint derivatives because scipy asks for them in a separate
         function.
     _objs : dict
@@ -135,7 +135,6 @@ class ScipyOptimizeDriver(Driver):
         self._con_cache = None
         self._con_idx = {}
         self._obj_and_nlcons = None
-        self.objs = None
         self.fail = False
         self.iter_count = 0
         self._exc_info = None
@@ -196,7 +195,6 @@ class ScipyOptimizeDriver(Driver):
         # Initial Run
         model._solve_nonlinear()
 
-        self.objs = list(self.get_objective_values())
         self._con_cache = self.get_constraint_values()
         desvar_vals = self.get_design_var_values()
 

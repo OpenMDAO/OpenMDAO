@@ -159,9 +159,9 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
             fullJ += np.abs(J)
 
     # normalize the full J
-    J = fullJ / np.linalg.norm(fullJ)
+    fullJ /= np.max(fullJ)
 
-    boolJ = np.zeros(J.shape, dtype=bool)
+    boolJ = np.zeros(fullJ.shape, dtype=bool)
     boolJ[J > tol] = True
 
     J = boolJ
@@ -230,10 +230,10 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
         total_dv_offsets[dv] = tot_dv = OrderedDict()
 
         for color, cols in enumerate(full_disjoint.values()):
-            tot_dv[color] = tot_dv_colors = []
+            tot_dv[color] = tot_dv_columns = []
             for c in sorted(cols):
                 dvoffset = c - start
-                tot_dv_colors.append(dvoffset)
+                tot_dv_columns.append(dvoffset)
                 for crow in rows[c]:
                     res, resoffset = _find_var_from_range(crow, res_offsets)
                     dct = total_res_offsets[res][dv][color]
@@ -335,6 +335,7 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, show_jac=False, s
             s = s.replace('{"', '{\n"')
             s = s.replace(', {', ',\n{')
             s = s.replace(']}', ']\n}')
+            s = s.replace('{}', '{\n}')
             s = s.replace('}}', '}\n}')
             s = s.replace('[{', '[\n{')
             s = s.replace(' {', '\n{')
@@ -357,7 +358,7 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, show_jac=False, s
             stream.write('\n'.join(lines))
             stream.write("\n")
 
-    if show_jac:
+    if show_jac and stream is not None:
         of = list(driver._objs)
         of.extend([c for c, meta in iteritems(driver._cons)
                    if not ('linear' in meta and meta['linear'])])
