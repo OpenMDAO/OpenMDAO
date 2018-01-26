@@ -22,11 +22,16 @@ class LinearSystemComp(ImplicitComponent):
         matrix factorization returned from scipy.linag.lu_factor
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """
         Intialize the LinearSystemComp component.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            available here and in all descendants of this system.
         """
-        super(LinearSystemComp, self).__init__()
+        super(LinearSystemComp, self).__init__(**kwargs)
         self._lup = None
 
     def initialize(self):
