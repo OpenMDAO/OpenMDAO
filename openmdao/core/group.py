@@ -1776,36 +1776,28 @@ def get_relevant_vars(connections, desvars, responses, mode):
     # also connect it to its corresponding component.
     graph = nx.DiGraph()
     for tgt, src in iteritems(connections):
-        src_sys = src.rsplit('.', 1)[0]
-        if src_sys not in graph:
-            graph.add_node(src_sys, type_='comp')
         if src not in graph:
             graph.add_node(src, type_='out')
         graph.add_node(tgt, type_='in')
 
+        src_sys = src.rsplit('.', 1)[0]
         graph.add_edge(src_sys, src)
 
         tgt_sys = tgt.rsplit('.', 1)[0]
-        if tgt_sys not in graph:
-            graph.add_node(tgt_sys, type_='comp')
-
         graph.add_edge(tgt, tgt_sys)
+
         graph.add_edge(src, tgt)
 
     for dv in desvars:
         if dv not in graph:
             graph.add_node(dv, type_='out')
             system = dv.rsplit('.', 1)[0]
-            if system not in graph:
-                graph.add_node(system, type_='comp')
             graph.add_edge(system, dv)
 
     for res in responses:
         if res not in graph:
             graph.add_node(res, type_='out')
             system = res.rsplit('.', 1)[0]
-            if system not in graph:
-                graph.add_node(system, type_='comp')
             graph.add_edge(system, res)
 
     nodes = graph.nodes
@@ -1828,17 +1820,18 @@ def get_relevant_vars(connections, desvars, responses, mode):
                 output_deps = set()
                 sys_deps = set()
                 for node in common:
-                    typ = nodes[node]['type_']
-                    if typ == 'in':
-                        input_deps.add(node)
-                        system = node.rsplit('.', 1)[0]
-                        if system not in sys_deps:
-                            sys_deps.update(all_ancestors(system))
-                    elif typ == 'out':
-                        output_deps.add(node)
-                        system = node.rsplit('.', 1)[0]
-                        if system not in sys_deps:
-                            sys_deps.update(all_ancestors(system))
+                    if 'type_' in nodes[node]:
+                        typ = nodes[node]['type_']
+                        if typ == 'in':  # input var
+                            input_deps.add(node)
+                            system = node.rsplit('.', 1)[0]
+                            if system not in sys_deps:
+                                sys_deps.update(all_ancestors(system))
+                        else:  # output var
+                            output_deps.add(node)
+                            system = node.rsplit('.', 1)[0]
+                            if system not in sys_deps:
+                                sys_deps.update(all_ancestors(system))
 
             elif desvar == response:
                 input_deps = set()
