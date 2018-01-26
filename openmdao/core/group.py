@@ -1809,7 +1809,7 @@ def get_relevant_vars(connections, desvars, responses, mode):
             graph.add_edge(system, res)
 
     nodes = graph.nodes
-    grev = graph.reverse()
+    grev = graph.reverse(copy=False)
 
     for desvar in desvars:
         dv = (desvar, 'dv')
