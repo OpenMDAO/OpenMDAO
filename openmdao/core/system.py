@@ -1413,7 +1413,7 @@ class System(object):
             self._jacobian._system = self
             self._jacobian._initialize()
 
-            for s in self.system_iter(local=True, recurse=True):
+            for s in self.system_iter(recurse=True):
                 if s._views_assembled_jac:
                     self._jacobian._init_view(s)
 
@@ -1914,15 +1914,13 @@ class System(object):
         """
         pass
 
-    def system_iter(self, local=True, include_self=False, recurse=True,
+    def system_iter(self, include_self=False, recurse=True,
                     typ=None):
         """
-        Yield a generator of subsystems of this system.
+        Yield a generator of local subsystems of this system.
 
         Parameters
         ----------
-        local : bool
-            If True, only iterate over systems on this proc.
         include_self : bool
             If True, include this system in the iteration.
         recurse : bool
@@ -1931,19 +1929,14 @@ class System(object):
             If not None, only yield Systems that match that are instances of the
             given type.
         """
-        if local:
-            sysiter = self._subsystems_myproc
-        else:
-            sysiter = self._subsystems_allprocs
-
         if include_self and (typ is None or isinstance(self, typ)):
             yield self
 
-        for s in sysiter:
+        for s in self._subsystems_myproc:
             if typ is None or isinstance(s, typ):
                 yield s
             if recurse:
-                for sub in s.system_iter(local=local, recurse=True, typ=typ):
+                for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
 
     def add_design_var(self, name, lower=None, upper=None, ref=None,
