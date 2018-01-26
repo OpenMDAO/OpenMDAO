@@ -146,7 +146,7 @@ def MultiProcFailCheck(comm):
     else:
         try:
             yield
-        except:
+        except AnalysisError:
             msg = traceback.format_exc()
         else:
             msg = ''
