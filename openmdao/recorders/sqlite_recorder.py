@@ -84,6 +84,8 @@ class SqliteRecorder(BaseRecorder):
         Dictionary mapping absolute names to promoted names.
     _prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
+    _open_close_sqlite: bool
+        If True, open, write, and close the sqlite file. Needed for when running under MPI.
     """
 
     def __init__(self, filepath, append=False):
@@ -124,7 +126,6 @@ class SqliteRecorder(BaseRecorder):
                 self.cursor.execute("INSERT INTO metadata(format_version, abs2prom, "
                                     "prom2abs) VALUES(?,?,?)",
                                     (format_version, None, None))
-                self._set_full_metadata = False  # we haven't inserted abs2prom and prom2abs
 
                 # used to keep track of the order of the case records across all three tables
                 self.cursor.execute("CREATE TABLE global_iterations(id INTEGER PRIMARY KEY, "
