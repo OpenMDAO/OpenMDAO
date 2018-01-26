@@ -37,6 +37,17 @@ def array_idx_iter(shape):
 class ExecComp(ExplicitComponent):
     """
     A component defined by an expression string.
+
+    Attributes
+    ----------
+    _kwargs : dict of named args
+        Initial values of variables.
+    _exprs : list
+        List of expressions.
+    _codes : list
+        List of code objects.
+    complex_stepsize : double
+        Step size used for complex step which is used for derivatives.
     """
 
     def __init__(self, exprs, **kwargs):
@@ -356,6 +367,15 @@ class _TmpDict(object):
     __setitem__.  After values have been modified they are managed
     thereafter by the wrapper.  This protects the inner dict from
     modification.
+
+    Attributes
+    ----------
+    _inner : dict-like
+        The dictionary to be wrapped.
+    _changed : dict-like
+        The key names for the values that were changed.
+    _complex : bool
+        If True, return a complex version of values from __getitem__.
     """
 
     def __init__(self, inner, return_complex=False):
@@ -402,6 +422,13 @@ class _IODict(object):
 
     Items are first looked for in the outputs
     and then the inputs.
+
+    Attributes
+    ----------
+    _inputs : dict-like
+        The inputs object to be wrapped.
+    _outputs : dict-like
+        The outputs object to be wrapped.
     """
 
     def __init__(self, outputs, inputs):

@@ -18,6 +18,12 @@ class RBFInterpolator(NNBase):
         Specifies the order of the radial basis function to be used.
         <-2> uses an 11th order, <-1> uses a 9th order, and any value from <0> to <4> uses an order
         equal to <floor((dimensions-1)/2) + (3*comp) +1>.
+    N : int
+        Number of neighbors.
+    weights : int
+        Specifies the order of the radial basis function to be used.
+        <-2> uses an 11th order, <-1> uses a 9th order, and any value from <0> to <4> uses an order
+        equal to <floor((dimensions-1)/2) + (3*comp) +1>.
     """
 
     def _find_R(self, npp, T, neighbor_idx):

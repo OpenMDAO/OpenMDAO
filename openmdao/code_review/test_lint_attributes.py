@@ -7,15 +7,24 @@ import inspect
 import re
 
 directories = [
-    'surrogate_models',
-    'drivers',
     'core',
     'jacobians',
     'matrices',
     'proc_allocators',
     'solvers',
+    'solvers/linear',
+    'solvers/linesearch',
+    'solvers/nonlinear',
     'utils',
     'vectors',
+    'approximation_schemes',
+    'components',
+    'drivers',
+    'error_checking',
+    'proc_allocators',
+    'recorders',
+    'surrogate_models',
+    'surrogate_models/nn_interpolators'
 ]
 
 
@@ -65,8 +74,9 @@ class LintAttributesTestCase(unittest.TestCase):
                     if print_info:
                         print('File: {}'.format(file_name))
 
+                    dir_name = dir_name.replace('/','.')
                     module_name = 'openmdao.{}.{}'.format(dir_name,
-                                                          file_name[:-3]).replace('/', '.')
+                                                          file_name[:-3])
                     if print_info:
                         print(' Module: {}'.format(module_name))
                     try:

@@ -4,12 +4,13 @@ from openmdao.utils.mpi import MPI
 
 class _RecIteration(object):
     """
-    A class that encapsulates the iteration stack.
+    A class that encapsulates the iteration stack. Some tests needed to reset the stack
+    and this avoids issues with data left over from other tests.
 
     Attributes
     ----------
     stack : list
-        A list that holds the stack of iteration coordinates at a point of the execution.
+        A list that holds the stack of iteration coordinates.
     """
 
     def __init__(self):
