@@ -21,6 +21,16 @@ _interpolators = OrderedDict([('linear', LinearInterpolator),
 class NearestNeighbor(SurrogateModel):
     """
     Surrogate model that approximates values using a nearest neighbor approximation.
+
+    Attributes
+    ----------
+    interpolant : object
+        Interpolator object
+    interpolant_init_args : dict
+        Input keyword arguments for the interpolator.
+    interpolant_type : str
+        Type of interpolator from ['linear', 'weighted', 'rbf']
+
     """
 
     def __init__(self, interpolant_type='rbf', **kwargs):

@@ -4,7 +4,6 @@ from six.moves import range
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
 from openmdao.utils.logger_utils import TestLogger
-from openmdao.utils.graph_utils import all_connected_edges
 from openmdao.error_checking.check_config import get_sccs_topo
 
 
@@ -200,7 +199,7 @@ class TestCheckConfig(unittest.TestCase):
 
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 3)
-        
+
         info = testlogger.get('info')
         self.assertEqual(len(info), 1)
 

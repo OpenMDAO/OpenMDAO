@@ -25,10 +25,9 @@ def get_sccs_topo(graph):
     return sccs
 
 
-def all_connected_edges(graph, start):
+def all_connected_nodes(graph, start):
     """
-
-    Yield all downstream edges starting at the given node.
+    Yield all downstream nodes starting at the given node.
 
     Parameters
     ----------
@@ -40,14 +39,15 @@ def all_connected_edges(graph, start):
     Yields
     ------
     list
-        A list of all edges found when traversal starts at start.
+        A list of all nodes found when traversal starts at start.
     """
     stack = [start]
     visited = set(stack)
+    yield start
     while stack:
         src = stack.pop()
         for tgt in graph[src]:
-            yield src, tgt
+            yield tgt
             if tgt not in visited:
                 visited.add(tgt)
                 stack.append(tgt)

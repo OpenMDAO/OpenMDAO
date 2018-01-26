@@ -12,6 +12,15 @@ from six.moves import range
 class ResponseSurface(SurrogateModel):
     """
     Surrogate Model based on second order response surface equations.
+
+    Attributes
+    ----------
+    betas : ndarray
+        Vector of response surface equation coefficients.
+    m : int
+        Number of training points.
+    n : int
+        Number of independent variables.
     """
 
     def __init__(self):

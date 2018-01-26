@@ -7,13 +7,15 @@ import inspect
 import re
 
 directories = [
+    'surrogate_models',
+    'drivers',
     'core',
     'jacobians',
     'matrices',
     'proc_allocators',
     'solvers',
     'utils',
-    'vectors'
+    'vectors',
 ]
 
 
@@ -64,7 +66,7 @@ class LintAttributesTestCase(unittest.TestCase):
                         print('File: {}'.format(file_name))
 
                     module_name = 'openmdao.{}.{}'.format(dir_name,
-                                                          file_name[:-3])
+                                                          file_name[:-3]).replace('/', '.')
                     if print_info:
                         print(' Module: {}'.format(module_name))
                     try:
@@ -75,7 +77,7 @@ class LintAttributesTestCase(unittest.TestCase):
 
                     # Loop over classes
                     classes = [x for x in dir(mod)
-                               if inspect.isclass(getattr(mod, x)) and not x.startswith('_') and
+                               if inspect.isclass(getattr(mod, x)) and
                                getattr(mod, x).__module__ == module_name]
                     for class_name in classes:
                         new_failures = []
@@ -90,8 +92,6 @@ class LintAttributesTestCase(unittest.TestCase):
                                 [c.__name__ for c in parent_classes])
                             )
                         class_doc = inspect.getdoc(class_)
-                        if class_doc is None:
-                            class_doc = ''
                         classdoc_matches = classdoc_re.findall(class_doc)
                         if len(classdoc_matches) > 1:
                             new_failures.append('multiple Attributes section in docstring')
