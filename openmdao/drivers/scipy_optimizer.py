@@ -551,5 +551,5 @@ class ScipyOptimizer(ScipyOptimizeDriver):
             Named args.
         """
         super(ScipyOptimizeDriver, self).__init__(**kwargs)
-        warn_deprecation("'ScipyOptimizer' property provides backwards compatibility "
+        warn_deprecation("'ScipyOptimizer' provides backwards compatibility "
                          "with OpenMDAO <= 2.2 ; use 'ScipyOptimizeDriver' instead.")
