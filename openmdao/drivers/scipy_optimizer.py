@@ -49,7 +49,7 @@ class ScipyOptimizeDriver(Driver):
     but equality constraints are only supported by COBYLA. None of the other
     optimizers support constraints.
 
-    ScipyOptimizer supports the following:
+    ScipyOptimizeDriver supports the following:
         equality_constraints
         inequality_constraints
 
@@ -99,7 +99,7 @@ class ScipyOptimizeDriver(Driver):
 
     def __init__(self):
         """
-        Initialize the ScipyOptimizer.
+        Initialize the ScipyOptimizeDriver.
         """
         super(ScipyOptimizeDriver, self).__init__()
 
