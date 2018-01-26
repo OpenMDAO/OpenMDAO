@@ -4,8 +4,10 @@ from openmdao.utils.mpi import MPI
 
 class _RecIteration(object):
     """
-    A class that encapsulates the iteration stack. Some tests needed to reset the stack
-    and this avoids issues with data left over from other tests.
+    A class that encapsulates the iteration stack.
+
+    Some tests needed to reset the stack and this avoids issues
+    with data left over from other tests.
 
     Attributes
     ----------
