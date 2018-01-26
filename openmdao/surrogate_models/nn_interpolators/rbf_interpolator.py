@@ -18,10 +18,8 @@ class RBFInterpolator(NNBase):
         Specifies the order of the radial basis function to be used.
         <-2> uses an 11th order, <-1> uses a 9th order, and any value from <0> to <4> uses an order
         equal to <floor((dimensions-1)/2) + (3*comp) +1>.
-
     N : int
         The number of neighbors used for interpolation.
-
     weights : ndarray
         Weights for each interpolation point.
     """

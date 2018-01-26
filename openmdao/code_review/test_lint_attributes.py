@@ -12,9 +12,10 @@ exclude = [
     'devtools',
     'docs',
     'test_suite',
-    'test_examples',
     'tests',
     'test',
+    'recorders',
+    'components',
 ]
 
 directories = []
