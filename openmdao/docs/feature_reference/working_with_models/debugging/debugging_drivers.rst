@@ -15,6 +15,6 @@ The only valid strings are 'desvars','ln_cons','nl_cons',and 'objs'.
 
 
   .. embed-test::
-      openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizerFeatures.test_debug_print_option
+      openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizeDriverFeatures.test_debug_print_option
 
 
