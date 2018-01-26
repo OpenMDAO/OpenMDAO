@@ -11,15 +11,15 @@ optimizer to find the minimum of the Paraboloid problem.
       openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizerFeatures.test_feature_basic
 
 
-ScipyOptimizer Options
+ScipyOptimizeDriver Options
 -------------------------
 
 .. embed-options::
     openmdao.drivers.scipy_optimizer
-    ScipyOptimizer
+    ScipyOptimizerDriver
     options
 
-ScipyOptimizer Option Examples
+ScipyOptimizeDriver Option Examples
 ------------------------------
 
 **optimizer**
