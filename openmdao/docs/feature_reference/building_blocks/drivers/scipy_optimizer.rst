@@ -12,7 +12,7 @@ optimizer to find the minimum of the Paraboloid problem.
 
 
 ScipyOptimizeDriver Options
--------------------------
+---------------------------
 
 .. embed-options::
     openmdao.drivers.scipy_optimizer
@@ -20,7 +20,7 @@ ScipyOptimizeDriver Options
     options
 
 ScipyOptimizeDriver Option Examples
-------------------------------
+-----------------------------------
 
 **optimizer**
 
