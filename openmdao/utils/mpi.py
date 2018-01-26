@@ -130,7 +130,7 @@ class FakeComm(object):
 @contextmanager
 def MultiProcFailCheck(comm):
     """
-    Raise an AnalysisError on all procs if it fails on one.
+    Raise an AnalysisError on all procs if it is raised on one.
 
     Wrap this around code that you want to globally fail if it fails
     on any MPI process in comm.  If not running under MPI, don't
