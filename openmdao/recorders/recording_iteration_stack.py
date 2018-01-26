@@ -16,6 +16,9 @@ class _RecIteration(object):
     """
 
     def __init__(self):
+        """
+        Initialize.
+        """
         self.stack = []
 
 

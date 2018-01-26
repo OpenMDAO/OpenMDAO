@@ -186,7 +186,7 @@ class PETScKrylov(LinearSolver):
 
         Parameters
         ----------
-        **kwargs : {}
+        **kwargs : dict
             dictionary of options set by the instantiating class/script.
         """
         if PETSc is None:
@@ -326,6 +326,8 @@ class PETScKrylov(LinearSolver):
             list of vector names.
         mode : string
             Derivative mode, can be 'fwd' or 'rev'.
+        rel_systems : set of str
+            Names of systems relevant to the current solve.
 
         Returns
         -------
@@ -511,7 +513,7 @@ class PetscKSP(PETScKrylov):
 
         Parameters
         ----------
-        kwargs : dict
+        **kwargs : dict
             Named args.
         """
         super(PetscKSP, self).__init__(**kwargs)
