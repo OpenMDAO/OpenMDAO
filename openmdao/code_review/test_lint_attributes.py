@@ -74,10 +74,9 @@ class LintAttributesTestCase(unittest.TestCase):
                     if print_info:
                         print('File: {}'.format(file_name))
 
-                    # to construct module name, use only part of abs path that
-                    # follows 'OpenMDAO' and replace '/' with '.' in the remainder.
-                    mod1 = dir_name.split('OpenMDAO/')[-1].replace('/', '.')
-
+                    # to construct module name, remove part of abs path that
+                    # precedes 'openmdao', and then replace '/' with '.' in the remainder.
+                    mod1 = re.sub(r'.*openmdao', 'openmdao', dir_name).replace('/', '.')
                     # then, get rid of the '.py' to get final part of module name.
                     mod2 = file_name[:-3]
 
