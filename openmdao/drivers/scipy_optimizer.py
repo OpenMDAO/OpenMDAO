@@ -547,7 +547,7 @@ class ScipyOptimizer(ScipyOptimizeDriver):
 
         Parameters
         ----------
-        kwargs : dict
+        **kwargs : dict
             Named args.
         """
         super(ScipyOptimizeDriver, self).__init__(**kwargs)

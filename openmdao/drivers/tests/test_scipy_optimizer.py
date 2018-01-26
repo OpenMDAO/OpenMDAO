@@ -21,7 +21,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
     def test_scipyoptimizer_deprecation(self): 
 
-        msg = "'ScipyOptimizer' property provides backwards compatibility " \
+        msg = "'ScipyOptimizer' provides backwards compatibility " \
             + "with OpenMDAO <= 2.2 ; use 'ScipyOptimizeDriver' instead."
 
         # check deprecation on getter
