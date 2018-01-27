@@ -8,7 +8,7 @@ import unittest
 
 import numpy as np
 from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp, \
-    ExecComp, ScipyOptimizer
+    ExecComp, ScipyOptimizeDriver
 
 
 class VCircComp(ExplicitComponent):
@@ -131,7 +131,7 @@ class TransferOrbitComp(ExplicitComponent):
 class TestHohmannTransfer(unittest.TestCase):
 
     def test_dv_at_apogee(self):
-        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizer
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizeDriver
         from openmdao.test_suite.test_examples.test_hohmann_transfer import  VCircComp, TransferOrbitComp, DeltaVComp
 
         prob = Problem(model=Group())
@@ -187,7 +187,7 @@ class TestHohmannTransfer(unittest.TestCase):
         model.connect('dinc1', 'dinc_total.dinc1')
         model.connect('dinc2', 'dinc_total.dinc2')
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
 
         model.add_design_var('dinc1', lower=0, upper=28.5)
         model.add_design_var('dinc2', lower=0, upper=28.5)

@@ -41,7 +41,7 @@ class Paraboloid(ExplicitComponent):
 
 
 if __name__ == "__main__":
-    from openmdao.api import Problem, Group, ScipyOptimizer, ExecComp, IndepVarComp
+    from openmdao.api import Problem, Group, ScipyOptimizeDriver, ExecComp, IndepVarComp
 
     model = Group()
     ivc = IndepVarComp()
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     model.connect('des_vars.y', 'parab_comp.y')
 
     prob = Problem(model)
-    prob.driver = ScipyOptimizer()  # so 'openmdao cite' will report it for cite docs
+    prob.driver = ScipyOptimizeDriver()  # so 'openmdao cite' will report it for cite docs
     prob.setup()
     prob.run_model()
     print(prob['parab_comp.f_xy'])
