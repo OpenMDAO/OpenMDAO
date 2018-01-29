@@ -20,11 +20,12 @@ Remember that we built our Sellar model as follows:
 
 .. embed-code::
     openmdao.test_suite.components.sellar_feature.SellarMDA
-
+    
 All the variables we need to set up the optimization are there. So now we just need the run script to execute the optimization.
 
 .. embed-test::
     openmdao.test_suite.test_examples.test_sellar_opt.TestSellarOpt.test_sellar_opt
+    :no-split:
 
 
 Controlling the Solver Print Output
