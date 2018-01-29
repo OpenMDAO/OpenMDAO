@@ -28,7 +28,6 @@ They explain important secondary concepts that you will run into when working wi
     getting_started/index.rst
     basic_guide/index.rst
     advanced_guide/index.rst
-    debugging/index.rst
 
 Reference Guide:
 ****************************

@@ -1,3 +1,5 @@
+.. _debugging_features:
+
 *********
 Debugging
 *********

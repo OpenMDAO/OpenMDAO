@@ -13,4 +13,5 @@ Anything documented here has been thoroughly tested, and should be considered fu
    core_features/index.rst
    building_blocks/index.rst
    recording/index.rst
+   debugging/index.rst
    units.rst
