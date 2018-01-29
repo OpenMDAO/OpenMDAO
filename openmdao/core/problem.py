@@ -1289,7 +1289,7 @@ class Problem(object):
                 meta = input_vois[name]
                 parallel_deriv_color = meta['parallel_deriv_color']
                 simul_coloring = meta['simul_deriv_color']
-                matmat = (meta['vectorize_derivs'] and meta['size'] > 1)
+                matmat = meta['vectorize_derivs']
             else:
                 parallel_deriv_color = simul_coloring = None
                 use_rel_reduction = False
@@ -1400,9 +1400,13 @@ class Problem(object):
                     if matmat:
                         if input_name in dinputs:
                             vec = dinputs._views_flat[input_name]
-                            for ii, idx in enumerate(idxs):
-                                if start <= idx < end:
-                                    dinputs._views_flat[input_name][idx - start, ii] = 1.0
+                            if vec.size == 1:
+                                if start <= idxs[0] < end:
+                                    vec[idxs[0] - start] = 1.0
+                            else:
+                                for ii, idx in enumerate(idxs):
+                                    if start <= idx < end:
+                                        vec[idx - start, ii] = 1.0
                     elif simul is not None:
                         ii = idxs[i]
                         final_idxs = ii[np.logical_and(ii >= start, ii < end)]
@@ -1498,7 +1502,7 @@ class Problem(object):
 
                         len_val = len(deriv_val)
 
-                        if store and ncol > 1 and len(deriv_val.shape) == 1:
+                        if store and matmat and len(deriv_val.shape) == 1:
                             deriv_val = np.atleast_2d(deriv_val).T
 
                         if return_format == 'flat_dict':
