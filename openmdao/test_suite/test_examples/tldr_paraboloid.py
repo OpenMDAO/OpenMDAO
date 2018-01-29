@@ -4,13 +4,13 @@ import unittest
 
 from openmdao.utils.assert_utils import assert_rel_error
 
-from openmdao.api import Problem, ScipyOptimizer, ExecComp, IndepVarComp
+from openmdao.api import Problem, ScipyOptimizeDriver, ExecComp, IndepVarComp
 
 
 class TestParaboloidTLDR(unittest.TestCase):
 
     def test_tldr(self):
-        from openmdao.api import Problem, ScipyOptimizer, ExecComp, IndepVarComp
+        from openmdao.api import Problem, ScipyOptimizeDriver, ExecComp, IndepVarComp
 
         # build the model
         prob = Problem()
@@ -24,7 +24,7 @@ class TestParaboloidTLDR(unittest.TestCase):
         prob.model.connect('indeps.y', 'paraboloid.y')
 
         # setup the optimization
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
         prob.model.add_design_var('indeps.x', lower=-50, upper=50)
