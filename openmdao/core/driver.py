@@ -716,7 +716,8 @@ class Driver(object):
         #     if _totals_iter == 0:
         #         import cPickle as pickle
         #         with open(os.path.join(_totals_save_dir, "vois"), "wb") as f:
-        #             pickle.dump((self._designvars, self._objs, self._cons, self._responses, order),
+        #             pickle.dump((self._designvars, self._objs, self._cons, self._responses,
+        #                          order),
         #                         f, protocol=pickle.HIGHEST_PROTOCOL)
         #     if _totals_iter <= 5:
         #         np.save(os.path.join(_totals_save_dir, "total_jac_%d.out" % _totals_iter),
