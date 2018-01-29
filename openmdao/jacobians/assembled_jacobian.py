@@ -180,8 +180,6 @@ class AssembledJacobian(Jacobian):
                     info = SUBJAC_META_DEFAULTS
                     shape = (res_size, abs2meta_in[in_abs_name]['size'])
 
-                self._keymap[abs_key] = abs_key
-
                 if not info['dependent']:
                     continue
 
@@ -215,6 +213,9 @@ class AssembledJacobian(Jacobian):
                     ext_mtx._add_submat(
                         abs_key, info, res_offset, in_ranges[in_abs_name][0],
                         None, shape)
+
+                if abs_key not in self._keymap:
+                    self._keymap[abs_key] = abs_key
 
         sizes = system._var_sizes
         iproc = system.comm.rank
@@ -257,16 +258,15 @@ class AssembledJacobian(Jacobian):
                 res_size = abs2meta_out[res_abs_name]['size']
 
                 for in_abs_name in s._var_abs_names['input']:
-                    abs_key = (res_abs_name, in_abs_name)
-                    self._keymap[abs_key] = abs_key
-
-                    if abs_key in self._subjacs_info:
-                        info, shape = self._subjacs_info[abs_key]
-                    else:
-                        info = SUBJAC_META_DEFAULTS
-                        shape = (res_size, abs2meta_in[in_abs_name]['size'])
-
                     if in_abs_name not in system._conn_global_abs_in2out:
+                        abs_key = (res_abs_name, in_abs_name)
+
+                        if abs_key in self._subjacs_info:
+                            info, shape = self._subjacs_info[abs_key]
+                        else:
+                            info = SUBJAC_META_DEFAULTS
+                            shape = (res_size, abs2meta_in[in_abs_name]['size'])
+
                         ext_mtx._add_submat(
                             abs_key, info, res_offset - ranges[0],
                             in_ranges[in_abs_name] - ranges[2],
