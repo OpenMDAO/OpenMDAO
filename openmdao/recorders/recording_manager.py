@@ -19,6 +19,8 @@ class RecordingManager(object):
         All of the recorders attached to the current object.
     rank : int
         Rank of the iteration coordinate.
+    _has_serial_recorders: bool
+        True if any of the recorders managed by this object are serial recorders.
     """
 
     def __init__(self):

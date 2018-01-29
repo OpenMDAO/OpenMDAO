@@ -22,6 +22,22 @@ class ExternalCode(ExplicitComponent):
     Default stdin is the 'null' device, default stdout is the console, and
     default stderr is ``error.out``.
 
+    Attributes
+    ----------
+    stdin : str or file object
+        Input stream external code reads from.
+    stdout : str or file object
+        Output stream external code writes to.
+    stderr : str or file object
+        Error stream external code writes to.
+    DEV_NULL : File object
+        NULL device.
+    STDOUT : File object
+        Special value that can be used as the stderr argument to Popen and indicates
+        that standard error should go into the same handle as standard output.
+    return_code : int
+        Exit status of the child process.
+
     Options
     -------
     options['command'] :  list([])

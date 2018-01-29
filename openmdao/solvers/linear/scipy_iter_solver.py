@@ -175,6 +175,8 @@ class ScipyKrylov(LinearSolver):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
+        rel_systems : set of str
+            Names of systems relevant to the current solve.
 
         Returns
         -------
