@@ -6,17 +6,26 @@ import importlib
 import inspect
 import re
 
-directories = [
-    'surrogate_models',
-    'drivers',
-    'core',
-    'jacobians',
-    'matrices',
-    'proc_allocators',
-    'solvers',
-    'utils',
-    'vectors',
+# directories in which we do not wish to lint for attributes.
+exclude = [
+    'code_review',
+    'devtools',
+    'docs',
+    'test_suite',
+    'tests',
+    'test',
+    'components',
 ]
+
+directories = []
+
+top = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+for root, dirs, files in os.walk(top, topdown=True):
+    # do not bother looking further down in excluded dirs
+    dirs[:] = [d for d in dirs if d not in exclude]
+    for di in dirs:
+            directories.append(os.path.join(root, di))
 
 
 class LintAttributesTestCase(unittest.TestCase):
@@ -65,8 +74,14 @@ class LintAttributesTestCase(unittest.TestCase):
                     if print_info:
                         print('File: {}'.format(file_name))
 
-                    module_name = 'openmdao.{}.{}'.format(dir_name,
-                                                          file_name[:-3]).replace('/', '.')
+                    # to construct module name, remove part of abs path that
+                    # precedes 'openmdao', and then replace '/' with '.' in the remainder.
+                    mod1 = re.sub(r'.*openmdao', 'openmdao', dir_name).replace('/', '.')
+                    # then, get rid of the '.py' to get final part of module name.
+                    mod2 = file_name[:-3]
+
+                    module_name = '{}.{}'.format(mod1, mod2)
+
                     if print_info:
                         print(' Module: {}'.format(module_name))
                     try:
@@ -93,6 +108,7 @@ class LintAttributesTestCase(unittest.TestCase):
                             )
                         class_doc = inspect.getdoc(class_)
                         classdoc_matches = classdoc_re.findall(class_doc)
+
                         if len(classdoc_matches) > 1:
                             new_failures.append('multiple Attributes section in docstring')
                         classdoc_varnames_matches = classdoc_varnames_re.findall(classdoc_matches[0]) if(len(classdoc_matches) == 1) else []

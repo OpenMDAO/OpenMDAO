@@ -6,6 +6,7 @@ from __future__ import print_function
 from collections import OrderedDict
 import sys
 
+
 from six import itervalues, iteritems, reraise
 from six.moves import range
 
@@ -13,6 +14,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 from openmdao.core.driver import Driver, RecordingDebugging
+from openmdao.utils.general_utils import warn_deprecation
 
 
 _optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -39,7 +41,7 @@ CITATIONS = """
 """
 
 
-class ScipyOptimizer(Driver):
+class ScipyOptimizeDriver(Driver):
     """
     Driver wrapper for the scipy.optimize.minimize family of local optimizers.
 
@@ -47,7 +49,7 @@ class ScipyOptimizer(Driver):
     but equality constraints are only supported by COBYLA. None of the other
     optimizers support constraints.
 
-    ScipyOptimizer supports the following:
+    ScipyOptimizeDriver supports the following:
         equality_constraints
         inequality_constraints
 
@@ -97,9 +99,9 @@ class ScipyOptimizer(Driver):
 
     def __init__(self):
         """
-        Initialize the ScipyOptimizer.
+        Initialize the ScipyOptimizeDriver.
         """
-        super(ScipyOptimizer, self).__init__()
+        super(ScipyOptimizeDriver, self).__init__()
 
         # What we support
         self.supports['inequality_constraints'] = True
@@ -150,7 +152,7 @@ class ScipyOptimizer(Driver):
         problem : <Problem>
             Pointer
         """
-        super(ScipyOptimizer, self)._setup_driver(problem)
+        super(ScipyOptimizeDriver, self)._setup_driver(problem)
         opt = self.options['optimizer']
 
         self.supports['gradients'] = opt in _gradient_optimizers
@@ -532,3 +534,22 @@ class ScipyOptimizer(Driver):
         exc = self._exc_info
         self._exc_info = None
         reraise(*exc)
+
+
+class ScipyOptimizer(ScipyOptimizeDriver):
+    """
+    Deprecated.  Use ScipyOptimizeDriver.
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Named args.
+        """
+        super(ScipyOptimizeDriver, self).__init__(**kwargs)
+        warn_deprecation("'ScipyOptimizer' provides backwards compatibility "
+                         "with OpenMDAO <= 2.2 ; use 'ScipyOptimizeDriver' instead.")

@@ -66,7 +66,7 @@ try:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 except ImportError:
     pass
-from openmdao.drivers.scipy_optimizer import ScipyOptimizer
+from openmdao.drivers.scipy_optimizer import ScipyOptimizer, ScipyOptimizeDriver
 from openmdao.drivers.genetic_algorithm_driver import SimpleGADriver
 
 # System-Building Tools

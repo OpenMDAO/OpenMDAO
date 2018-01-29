@@ -4,7 +4,7 @@ import unittest
 
 from openmdao.utils.assert_utils import assert_rel_error
 
-from openmdao.api import Problem, ScipyOptimizer, IndepVarComp, ExplicitComponent
+from openmdao.api import Problem, ScipyOptimizeDriver, IndepVarComp, ExplicitComponent
 
 # duplicate definition here so it can be included in docs by itself
 class ActuatorDisc(ExplicitComponent):
@@ -90,7 +90,7 @@ class ActuatorDisc(ExplicitComponent):
 class TestBetzLimit(unittest.TestCase):
 
     def test_betz(self):
-        from openmdao.api import Problem, ScipyOptimizer, IndepVarComp, ExplicitComponent
+        from openmdao.api import Problem, ScipyOptimizeDriver, IndepVarComp, ExplicitComponent
 
         class ActuatorDisc(ExplicitComponent):
             """Simple wind turbine model based on actuator disc theory"""
@@ -186,7 +186,7 @@ class TestBetzLimit(unittest.TestCase):
                                 promotes_inputs=['a', 'Area', 'rho', 'Vu'])
 
         # setup the optimization
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
         prob.model.add_design_var('a', lower=0., upper=1.)

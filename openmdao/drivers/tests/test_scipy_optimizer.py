@@ -1,13 +1,14 @@
-""" Unit tests for the ScipyOptimizer Driver."""
+""" Unit tests for the ScipyOptimizeDriver."""
 
 import unittest
 import sys
+import warnings
 
 from six import StringIO
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizer, ExplicitComponent
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizeDriver, ScipyOptimizer, ExplicitComponent
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -16,7 +17,20 @@ from openmdao.test_suite.components.simple_comps import NonSquareArrayComp
 from openmdao.test_suite.groups.sin_fitter import SineFitter
 
 
-class TestScipyOptimizer(unittest.TestCase):
+class TestScipyOptimizeDriver(unittest.TestCase):
+
+    def test_scipyoptimizer_deprecation(self): 
+
+        msg = "'ScipyOptimizer' provides backwards compatibility " \
+            + "with OpenMDAO <= 2.2 ; use 'ScipyOptimizeDriver' instead."
+
+        # check deprecation on getter
+        with warnings.catch_warnings(record=True) as w:
+            driver = ScipyOptimizer()
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), msg)
 
     def test_compute_totals_basic_return_array(self):
         # Make sure 'array' return_format works.
@@ -128,7 +142,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -157,7 +171,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'COBYLA'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -188,7 +202,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -221,7 +235,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -255,7 +269,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -289,7 +303,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'COBYLA'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -322,7 +336,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -353,7 +367,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -386,7 +400,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -417,7 +431,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -448,7 +462,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -479,7 +493,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -512,7 +526,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -543,7 +557,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -574,7 +588,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -605,7 +619,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -636,7 +650,7 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -667,7 +681,7 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -691,7 +705,7 @@ class TestScipyOptimizer(unittest.TestCase):
         prob = Problem()
         model = prob.model = SellarDerivativesGrouped()
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -717,7 +731,7 @@ class TestScipyOptimizer(unittest.TestCase):
         # We were getting extra constraints created because lower and upper are maxfloat instead of
         # None when unused.
         p = Problem(model=SineFitter())
-        p.driver = ScipyOptimizer()
+        p.driver = ScipyOptimizeDriver()
 
         p.setup(check=False)
         p.run_driver()
@@ -758,7 +772,7 @@ class TestScipyOptimizer(unittest.TestCase):
                                  promotes_inputs=['a', 'Vu'])
 
         # setup the optimization
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
         prob.model.add_design_var('a', lower=0., upper=1.)
@@ -785,7 +799,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'COBYLA'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -811,7 +825,7 @@ class TestScipyOptimizer(unittest.TestCase):
         prob = Problem()
         model = prob.model = SellarDerivativesGrouped()
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'COBYLA'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -845,7 +859,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -880,7 +894,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -913,7 +927,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -954,10 +968,10 @@ class TestScipyOptimizer(unittest.TestCase):
                         "Should be more than one comp.f_xy printed")
 
 
-class TestScipyOptimizerFeatures(unittest.TestCase):
+class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
     def test_feature_basic(self):
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizeDriver
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
@@ -967,7 +981,7 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = True
@@ -987,7 +1001,7 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
 
     def test_feature_optimizer(self):
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizeDriver
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
@@ -997,7 +1011,7 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'COBYLA'
         prob.driver.options['disp'] = True
 
@@ -1016,7 +1030,7 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
 
     def test_feature_maxiter(self):
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizeDriver
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
@@ -1026,7 +1040,7 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['maxiter'] = 20
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
@@ -1044,7 +1058,7 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
 
     def test_feature_tol(self):
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizeDriver
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
@@ -1054,7 +1068,7 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['tol'] = 1.0e-9
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
@@ -1073,7 +1087,7 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
 
     def test_debug_print_option(self):
 
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer, ExecComp
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizeDriver, ExecComp
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
@@ -1086,7 +1100,7 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False

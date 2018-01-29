@@ -3,7 +3,22 @@ from openmdao.utils.mpi import MPI
 
 
 class _RecIteration(object):
+    """
+    A class that encapsulates the iteration stack.
+
+    Some tests needed to reset the stack and this avoids issues
+    with data left over from other tests.
+
+    Attributes
+    ----------
+    stack : list
+        A list that holds the stack of iteration coordinates.
+    """
+
     def __init__(self):
+        """
+        Initialize.
+        """
         self.stack = []
 
 
@@ -67,8 +82,6 @@ class Recording(object):
         Absolute error.
     rel : float
         Relative error.
-    method : str
-        Current method.
     _is_solver : bool
         True if recording_requester is a Solver.
     """

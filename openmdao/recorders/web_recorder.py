@@ -29,6 +29,17 @@ class WebRecorder(BaseRecorder):
     ----------
     model_viewer_data : dict
         Dict that holds the data needed to generate N2 diagram.
+    _endpoint : str
+        The base URL of the HTTP server.
+    _headers : dict
+        The set of headers used in the HTTP requests.
+    _abs2prom : dict
+        The mapping of absolute variable names to promoted variable names.
+    _prom2abs : dict
+        The mapping of promoted variable names to absolute variable names.
+    _case_id : str
+        The ID associated with the current recording, which is assigned by the server.
+
     """
 
     def __init__(self, token, case_name='Case Recording',
