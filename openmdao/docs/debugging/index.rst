@@ -2,6 +2,9 @@
 Debugging
 *********
 
+Sometimes things don't work. We have a set of tools and methods that you can use to try and figure out whats going on. 
+
+
 
 .. toctree::
     :maxdepth: 1
