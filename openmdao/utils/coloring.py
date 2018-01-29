@@ -152,14 +152,6 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
         else:
             fullJ += np.abs(J)
 
-    # fullJ = None
-    # for i in range(1, 7):
-    #     nocolor = os.path.join('NOCOLOR', 'total_jac_%d.out.npy' % i)
-    #     if fullJ is None:
-    #         fullJ = np.abs(np.load(nocolor))
-    #     else:
-    #         fullJ += np.abs(np.load(nocolor))
-
     # normalize the full J
     fullJ /= np.max(fullJ)
 
