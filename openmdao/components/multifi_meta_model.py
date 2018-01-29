@@ -71,7 +71,7 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
 
     .. note:: when *nfi* ==1 a :class:`MultiFiMetaModelUnStructured` object behaves as
         a :class:`MetaModelUnStructured` object.
-   
+
     Attributes
     ----------
     _input_sizes : list
