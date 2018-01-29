@@ -71,6 +71,13 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
 
     .. note:: when *nfi* ==1 a :class:`MultiFiMetaModelUnStructured` object behaves as
         a :class:`MetaModelUnStructured` object.
+
+    Attributes
+    ----------
+    _input_sizes : list
+        Stores the size of the inputs at each level.
+    _nfi : float
+        number of levels of fidelity
     """
 
     def __init__(self, nfi=1):
