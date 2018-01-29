@@ -18,6 +18,13 @@ from openmdao.recorders.recording_iteration_stack import get_formatted_iteration
 from openmdao.utils.options_dictionary import OptionsDictionary
 
 
+# _totals_iter = 0
+# _save_total_jacs = False
+# _totals_save_dir = os.environ.get("TOTALS_DIR", "TOTALS")
+# if _save_total_jacs and not os.path.isdir(_totals_save_dir):
+#     os.mkdir(_totals_save_dir)
+
+
 def _is_debug_print_opts_valid(opts):
     """
     Check validity of debug_print option for Driver.
@@ -695,8 +702,26 @@ class Driver(object):
             raise RuntimeError("Derivative scaling by the driver only supports the 'dict' and "
                                "'array' formats at present.")
 
+        # if _save_total_jacs:
+        #     order = (list(derivs), list(derivs[self._objs.keys()[0]]))
+
         if return_format == 'array':
             derivs = self._dict2array_jac(derivs)
+        #    total_jac = derivs
+        # elif _save_total_jacs:
+        #     total_jac = self._dict2array_jac(derivs)
+        #
+        # global _totals_iter
+        # if _save_total_jacs:
+        #     if _totals_iter == 0:
+        #         import cPickle as pickle
+        #         with open(os.path.join(_totals_save_dir, "vois"), "wb") as f:
+        #             pickle.dump((self._designvars, self._objs, self._cons, self._responses, order),
+        #                         f, protocol=pickle.HIGHEST_PROTOCOL)
+        #     if _totals_iter <= 5:
+        #         np.save(os.path.join(_totals_save_dir, "total_jac_%d.out" % _totals_iter),
+        #                 total_jac)
+        #     _totals_iter += 1
 
         return derivs
 

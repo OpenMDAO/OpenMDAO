@@ -127,8 +127,7 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
             system._jacobian._set_abs = _SubjacRandomizer(system._jacobian, tol)
             seen.add(system._jacobian)
 
-    prob.final_setup()
-    #prob.run_model()
+    prob.run_model()
 
     desvars = prob.driver._designvars
     responses = prob.driver._responses
@@ -153,11 +152,19 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
         else:
             fullJ += np.abs(J)
 
+    # fullJ = None
+    # for i in range(1, 7):
+    #     nocolor = os.path.join('NOCOLOR', 'total_jac_%d.out.npy' % i)
+    #     if fullJ is None:
+    #         fullJ = np.abs(np.load(nocolor))
+    #     else:
+    #         fullJ += np.abs(np.load(nocolor))
+
     # normalize the full J
     fullJ /= np.max(fullJ)
 
     boolJ = np.zeros(fullJ.shape, dtype=bool)
-    boolJ[J > tol] = True
+    boolJ[fullJ > tol] = True
 
     J = boolJ
 
