@@ -172,7 +172,6 @@ class AssembledJacobian(Jacobian):
 
             for in_abs_name in system._var_abs_names['input']:
                 abs_key = (res_abs_name, in_abs_name)
-                self._keymap[abs_key] = abs_key
 
                 if abs_key in self._subjacs_info:
                     info, shape = self._subjacs_info[abs_key]
@@ -191,8 +190,10 @@ class AssembledJacobian(Jacobian):
                     # calculate unit conversion
                     in_units = abs2meta_in[in_abs_name]['units']
                     out_units = abs2meta_out[out_abs_name]['units']
-                    if in_units and out_units:
+                    if in_units and out_units and in_units != out_units:
                         factor, _ = get_conversion(out_units, in_units)
+                        if factor == 1.0:
+                            factor = None
                     else:
                         factor = None
 
@@ -307,7 +308,7 @@ class AssembledJacobian(Jacobian):
                         if abs_key in int_mtx._submats:
                             iters.append((abs_key, abs_key))
                         else:
-                            # This happens when the input is an indepvarcomp that is
+                            # This happens when the src is an indepvarcomp that is
                             # contained in the system.
                             of, wrt = abs_key
                             for tgt, src in iteritems(system._conn_global_abs_in2out):

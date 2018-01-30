@@ -75,8 +75,8 @@ class DenseMatrix(Matrix):
 
         Parameters
         ----------
-        key : (int, int)
-            the global output and input variable indices.
+        key : (str, str)
+            the global output and input variable names.
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
