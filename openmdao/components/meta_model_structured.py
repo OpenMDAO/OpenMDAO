@@ -4,6 +4,7 @@ from __future__ import division, print_function, absolute_import
 import warnings
 
 from six import raise_from
+from six.moves import range
 
 from scipy import __version__ as scipy_version
 try:
@@ -317,7 +318,7 @@ class _RegularGridInterp(object):
             If a spline interpolation method is chosen, this determines whether gradient
             calculations should be made and cached. Default is True.
         first_dim_gradient : bool, optional
-            Sset to True to calculate first dimension gradients. Default is False.
+            Set to True to calculate first dimension gradients. Default is False.
 
         Returns
         -------
@@ -373,7 +374,7 @@ class _RegularGridInterp(object):
             # Main process: Apply 1D interpolate in each dimension
             # sequentially, starting with the last dimension. These are then
             # "folded" into the next dimension in-place.
-            for i in reversed(range(1, n)):
+            for i in range(n - 1, 0, -1):  # reversed(range(1, n)):
                 if i == n - 1:
                     values = first_values[j]
                     if compute_gradients:
@@ -450,12 +451,12 @@ class _RegularGridInterp(object):
         None or array_like, optional
             Value of gradient of interpolant at point of interest.
         """
-        interp_kwargs = {'k': k, 'axis': 0}
-        local_interp = interpolator(x, y, **interp_kwargs)
+        local_interp = interpolator(x, y, k=k, axis=0)
         values = local_interp(pt)
-        local_derivs = None
         if compute_gradients:
             local_derivs = local_interp(pt, 1)
+        else:
+            local_derivs = None
         return values, local_derivs
 
     def _find_indices(self, xi):
