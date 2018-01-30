@@ -83,7 +83,7 @@ setup(
         'testflo',
         'parameterized',
         'pyparsing',
-        'networkx',
+        'networkx>=2.0',
         'sphinx',
         'redbaron',
         'mock',

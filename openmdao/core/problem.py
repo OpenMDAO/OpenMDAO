@@ -41,6 +41,7 @@ MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 _contains_all = ContainsAll()
 
+
 CITATION = """@inproceedings{2014_openmdao_derivs,
     Author = {Justin S. Gray and Tristan A. Hearn and Kenneth T. Moore
               and John Hwang and Joaquim Martins and Andrew Ning},
@@ -1115,7 +1116,7 @@ class Problem(object):
                 if in_idxs is not None:
                     neg = in_idxs[in_idxs < 0]
                     irange = in_idxs
-                    if neg:
+                    if np.any(neg):
                         irange[neg] += end
                     max_i = np.max(in_idxs)
                     min_i = np.min(in_idxs)
@@ -1192,7 +1193,7 @@ class Problem(object):
             wrt = list(self.driver._designvars)
         if of is None:
             of = list(self.driver._objs)
-            of.extend(list(self.driver._cons))
+            of.extend(self.driver._cons)
 
         # A number of features will need to be supported here as development
         # goes forward.

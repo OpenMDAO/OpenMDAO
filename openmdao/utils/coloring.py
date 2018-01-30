@@ -3,6 +3,7 @@ Routines to compute coloring for use with simultaneous derivatives.
 """
 from __future__ import division, print_function
 
+import os
 import sys
 import json
 
@@ -21,6 +22,10 @@ from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.array_utils import array_viz
+
+# If this is True, then IF simul coloring is specified, use it.  If False, don't use it regardless.
+# The command line simul_coloring command makes this False when generating a new coloring.
+_use_simul_coloring = True
 
 
 def _find_var_from_range(idx, ranges):
@@ -117,13 +122,6 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     prob.driver._simul_coloring_info = None
     prob.driver._res_jacs = {}
 
-    # remove any existing coloring metadata from dvs and responses
-    for meta in chain(itervalues(prob.driver._designvars), itervalues(prob.driver._responses)):
-        if 'simul_coloring' in meta:
-            meta['simul_coloring'] = None
-        if 'simul_map' in meta:
-            meta['simul_map'] = None
-
     prob.setup(mode=mode)
 
     seen = set()
@@ -162,7 +160,7 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     fullJ /= np.max(fullJ)
 
     boolJ = np.zeros(fullJ.shape, dtype=bool)
-    boolJ[J > tol] = True
+    boolJ[fullJ > tol] = True
 
     J = boolJ
 
@@ -464,6 +462,9 @@ def _simul_coloring_cmd(options):
         The post-setup hook function.
     """
     from openmdao.core.problem import Problem
+    global _use_simul_coloring
+
+    _use_simul_coloring = False
 
     def _simul_coloring(prob):
         if options.outfile is None:
