@@ -89,7 +89,7 @@ def _filter_citations(citations, classes):
     return cits
 
 
-def print_citations(prob, classes=None, out_stream='stdout'):
+def print_citations(prob, classes=None, out_stream=sys.stdout):
     """
     Write a list of citations from classes in the problem to the given stream.
 
@@ -99,18 +99,15 @@ def print_citations(prob, classes=None, out_stream='stdout'):
         The Problem instance to be searched
     classes : list of str
         List of class names for classes to include in the displayed citations.
-    out_stream : 'stdout', 'stderr' or file-like
-            Where to send human readable output. Default is 'stdout'.
+    out_stream : file-like object
+            Where to send human readable output. Default is 'sys.stdout'.
             Set to None to suppress.
     """
     citations = _filter_citations(find_citations(prob), classes)
 
     if out_stream:
-        logger = get_logger('citations', out_stream=out_stream)
         for klass, cite in citations.items():
-            # print("Class: {}".format(klass), file=out_stream)
-            logger.info("Class: {}".format(klass))
+            print("Class: {}".format(klass), file=out_stream)
             lines = cite.split('\n')
             for line in lines:
-                # print("    {}".format(line), file=out_stream)
-                logger.info("    {}".format(line))
+                print("    {}".format(line), file=out_stream)
