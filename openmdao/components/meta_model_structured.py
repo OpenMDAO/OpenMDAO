@@ -374,7 +374,7 @@ class _RegularGridInterp(object):
             # Main process: Apply 1D interpolate in each dimension
             # sequentially, starting with the last dimension. These are then
             # "folded" into the next dimension in-place.
-            for i in range(n - 1, 0, -1):  # reversed(range(1, n)):
+            for i in range(n - 1, 0, -1):
                 if i == n - 1:
                     values = first_values[j]
                     if compute_gradients:
@@ -453,10 +453,9 @@ class _RegularGridInterp(object):
         """
         local_interp = interpolator(x, y, k=k, axis=0)
         values = local_interp(pt)
+        local_derivs = None
         if compute_gradients:
             local_derivs = local_interp(pt, 1)
-        else:
-            local_derivs = None
         return values, local_derivs
 
     def _find_indices(self, xi):
