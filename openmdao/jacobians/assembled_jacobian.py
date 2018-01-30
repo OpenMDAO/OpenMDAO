@@ -291,9 +291,15 @@ class AssembledJacobian(Jacobian):
         """
         system = self._system
         int_mtx = self._int_mtx
+        subjacs = self._subjacs
+        keymap = self._keymap
         ext_mtx = self._ext_mtx[system.pathname]
-        iters = self._subjac_iters[system.pathname]
-        if iters is None:
+        global_conns = system._conn_global_abs_in2out
+        output_names = system._var_abs_names['output']
+        input_names = system._var_abs_names['input']
+
+        subjac_iters = self._subjac_iters[system.pathname]
+        if subjac_iters is None:
 
             # This is the level where the AssembledJacobian is slotted.
             # The of and wrt are the inputs and outputs that it sees, if they are in the subjacs.
@@ -301,38 +307,38 @@ class AssembledJacobian(Jacobian):
 
             iters = []
             iters_in_ext = []
-            for res_abs_name in system._var_abs_names['output']:
-                for out_abs_name in system._var_abs_names['output']:
+            for res_abs_name in output_names:
+                for out_abs_name in output_names:
                     abs_key = (res_abs_name, out_abs_name)
-                    if abs_key in self._subjacs:
+                    if abs_key in subjacs:
                         if abs_key in int_mtx._submats:
                             iters.append((abs_key, abs_key))
                         else:
                             # This happens when the src is an indepvarcomp that is
                             # contained in the system.
                             of, wrt = abs_key
-                            for tgt, src in iteritems(system._conn_global_abs_in2out):
+                            for tgt, src in iteritems(global_conns):
                                 if src == wrt and (of, tgt) in int_mtx._submats:
                                     iters.append((of, tgt), abs_key)
                                     break
 
-                for in_abs_name in system._var_abs_names['input']:
+                for in_abs_name in input_names:
                     abs_key = (res_abs_name, in_abs_name)
-                    if abs_key in self._subjacs:
-                        if in_abs_name in system._conn_global_abs_in2out:
-                            iters.append((self._keymap[abs_key], abs_key))
+                    if abs_key in subjacs:
+                        if in_abs_name in global_conns:
+                            iters.append((keymap[abs_key], abs_key))
                         elif ext_mtx is not None:
                             iters_in_ext.append(abs_key)
 
             self._subjac_iters[system.pathname] = (iters, iters_in_ext)
         else:
-            iters, iters_in_ext = iters
+            iters, iters_in_ext = subjac_iters
 
         for key1, key2 in iters:
-            int_mtx._update_submat(key1, self._subjacs[key2])
+            int_mtx._update_submat(key1, subjacs[key2])
 
         for key in iters_in_ext:
-            ext_mtx._update_submat(key, self._subjacs[key])
+            ext_mtx._update_submat(key, subjacs[key])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """
