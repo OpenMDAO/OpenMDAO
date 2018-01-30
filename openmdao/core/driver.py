@@ -16,6 +16,7 @@ from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.mpi import MPI
 from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate
 from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.coloring import _use_simul_coloring
 
 
 def _is_debug_print_opts_valid(opts):
@@ -839,7 +840,7 @@ class Driver(object):
                                       "in 'rev' mode")
 
         # command line simul_coloring uses this env var to turn pre-existing coloring off
-        if os.environ.get("SIMUL_NO_COLOR"):
+        if not _use_simul_coloring:
             return
 
         prom2abs = self._problem.model._var_allprocs_prom2abs_list['output']

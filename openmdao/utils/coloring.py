@@ -23,6 +23,10 @@ from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.array_utils import array_viz
 
+# If this is True, then IF simul coloring is specified, use it.  If False, don't use it regardless.
+# The command line simul_coloring command makes this False when generating a new coloring.
+_use_simul_coloring = True
+
 
 def _find_var_from_range(idx, ranges):
     # TODO: use bisection
@@ -458,6 +462,9 @@ def _simul_coloring_cmd(options):
         The post-setup hook function.
     """
     from openmdao.core.problem import Problem
+    global _use_simul_coloring
+
+    _use_simul_coloring = False
 
     def _simul_coloring(prob):
         if options.outfile is None:
