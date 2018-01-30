@@ -124,30 +124,28 @@ class AssembledJacobian(Jacobian):
                 system._var_allprocs_abs_names['output']
         }
 
-        in_ranges = {}
-        for abs_name in system._var_allprocs_abs_names['input']:
-            in_ranges[abs_name] = self._get_var_range(abs_name, 'input')
+        in_ranges = {
+            abs_name: self._get_var_range(abs_name, 'input') for abs_name in
+                system._var_allprocs_abs_names['input']
+        }
 
         # set up view ranges for all subsystems
         for s in system.system_iter(recurse=True, include_self=True):
-            min_res_offset = sys.maxsize
-            max_res_offset = 0
-            min_in_offset = sys.maxsize
-            max_in_offset = 0
+            input_names = s._var_abs_names['input']
+            if input_names:
+                min_in_offset = in_ranges[input_names[0]][0]
+                max_in_offset = in_ranges[input_names[-1]][1]
+            else:
+                min_in_offset = sys.maxsize
+                max_in_offset = 0
 
-            for in_abs_name in s._var_abs_names['input']:
-                in_offset, in_end = in_ranges[in_abs_name]
-                if in_end > max_in_offset:
-                    max_in_offset = in_end
-                if in_offset < min_in_offset:
-                    min_in_offset = in_offset
-
-            for res_abs_name in s._var_abs_names['output']:
-                res_offset, res_end = out_ranges[res_abs_name]
-                if res_end > max_res_offset:
-                    max_res_offset = res_end
-                if res_offset < min_res_offset:
-                    min_res_offset = res_offset
+            output_names = s._var_abs_names['output']
+            if output_names:
+                min_res_offset = out_ranges[output_names[0]][0]
+                max_res_offset = out_ranges[output_names[-1]][1]
+            else:
+                min_res_offset = sys.maxsize
+                max_res_offset = 0
 
             self._view_ranges[s.pathname] = (
                 min_res_offset, max_res_offset, min_in_offset, max_in_offset)
