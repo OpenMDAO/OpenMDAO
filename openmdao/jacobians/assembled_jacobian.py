@@ -246,12 +246,8 @@ class AssembledJacobian(Jacobian):
 
         ext_mtx = self.options['matrix_class'](system.comm)
 
-        in_ranges = {}
-        src_indices_dict = {}
-        for abs_name in system._var_allprocs_abs_names['input']:
-            in_ranges[abs_name] = self._get_var_range(abs_name, 'input')[0]
-            src_indices_dict[abs_name] = \
-                system._var_abs2meta['input'][abs_name]['src_indices']
+        in_ranges = {n: self._get_var_range(n, 'input')[0] for n in
+                     system._var_allprocs_abs_names['input']}
 
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
             for res_abs_name in s._var_abs_names['output']:
