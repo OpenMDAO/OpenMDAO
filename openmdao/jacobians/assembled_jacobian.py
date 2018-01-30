@@ -184,8 +184,6 @@ class AssembledJacobian(Jacobian):
 
                 if in_abs_name in system._conn_global_abs_in2out:
                     out_abs_name = system._conn_global_abs_in2out[in_abs_name]
-                    out_offset, _ = out_ranges[out_abs_name]
-                    src_indices = abs2meta_in[in_abs_name]['src_indices']
 
                     # calculate unit conversion
                     in_units = abs2meta_in[in_abs_name]['units']
@@ -197,6 +195,8 @@ class AssembledJacobian(Jacobian):
                     else:
                         factor = None
 
+                    out_offset, _ = out_ranges[out_abs_name]
+                    src_indices = abs2meta_in[in_abs_name]['src_indices']
                     if src_indices is None:
                         int_mtx._add_submat(
                             abs_key, info, res_offset, out_offset, None, shape,
