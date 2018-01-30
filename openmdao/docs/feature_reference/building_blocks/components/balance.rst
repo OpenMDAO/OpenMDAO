@@ -63,7 +63,7 @@ equation:
     2 \cdot x^2 = 4
 
 Here, our LHS is connected to a computed value for :math:`x^2`, the multiplier is 2, and the RHS
-is 4.  The expected solution is :math:`x=\sqrt{2}`.  We initialize ``x`` with a value of 1 so that
+is 4.  The expected solution is :math:`x=\sqrt{2}`.  We initialize :math:`x` with a value of 1 so that
 it finds the positive root.
 
 .. embed-test::
@@ -72,15 +72,14 @@ it finds the positive root.
 Example:  Vectorized Root Finding
 ---------------------------------
 
-The following example uses the Balance Component to implicitly solve the
-equation:
+The following example uses the Balance Component to implicitly solve the equation:
 
 .. math::
 
     b \cdot x + c  = 0
 
-for various values of ``b``, and ``c``.  Here, our LHS is connected to a computed value of
-the linear equation.  The multiplier is one and the RHS is zero (the defaults) and thus
+for various values of :math:`b`, and :math:`c`.  Here, our LHS is connected to a computed value of
+the linear equation.  The multiplier is one and the RHS is zero (the defaults), and thus
 they need not be connected.
 
 .. embed-test::

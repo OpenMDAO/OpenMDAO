@@ -71,7 +71,7 @@ We include this component in a model and run the model.
     openmdao.components.tests.test_external_code.TestExternalCodeFeature.test_main
 
 
-Next we will go through each section and explain how this code works.
+Next, we will go through each section and explain how this code works.
 
 ::
 
@@ -83,8 +83,8 @@ Next we will go through each section and explain how this code works.
 OpenMDAO provides a base class, `ExternalCode`, which you should inherit from to
 build your wrapper components. Just like any other component, you will define the
 necessary inputs and outputs in the `setup` method.
-If you want the component to check to make sure any files exist before/after you run
-then you can set the `external_input_files` and `external_output_files` respectively.
+If you want the component to check to make sure any files exist before/after you run,
+then you can set the `external_input_files` and `external_output_files`, respectively.
 You'll also define the command that should be called by the external code.
 
 .. embed-code::
@@ -94,7 +94,7 @@ You'll also define the command that should be called by the external code.
 The `compute` method is responsible for calculating outputs for a
 given set of inputs. When running an external code, this means
 you have to take the parameter values and push them down into files,
-run your code, then pull the output values back up. So there is some python
+run your code, then pull the output values back up. So there is some Python
 code needed to do all that file writing, reading, and parsing.
 
 .. embed-code::

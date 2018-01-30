@@ -6,7 +6,7 @@ MetaModelUnStructured Component
 
 `MetaModelUnStructured` lets you quickly create a component with surrogate models
 used to compute the outputs based on unstructured training data. Generally, this is
-used to construct a low computational cost replacement for computationally
+used to construct a low-computational-cost replacement for computationally
 expensive components.
 
 You can define a `MetaModelUnStructured` with as many inputs and outputs as you like,
@@ -47,7 +47,7 @@ values. This training step only occurs on the first run.
 The inputs and outputs of a `MetaModelUnStructured` are not limited to scalar values. The
 following modified version of the example uses an array to predict sine and
 cosine as a single output array of two values.  You will also note that the default
-surrogate can been passed as an argument to the `MetaModelUnStructured` constructor, as an
+surrogate can be passed as an argument to the `MetaModelUnStructured` constructor, as an
 alternative to specifying it later.
 
 .. embed-test::

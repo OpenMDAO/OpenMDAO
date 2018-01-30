@@ -1,9 +1,9 @@
 .. _feature_exec_comp:
 .. index:: ExecComp Example
 
-*********
+********
 ExecComp
-*********
+********
 
 The `ExecComp` is a component that provides a shortcut for building an ExplicitComponent that
 represents a set of simple mathematical relationships between inputs and outputs. The ExecComp
@@ -80,7 +80,7 @@ Functions from the math library are available for use in the expression strings.
 .. embed-test::
     openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_math
 
-You can also access built-in Numpy functions by using the prefix "numpy." in front of the function name.
+You can also access built-in Numpy functions by using the prefix "numpy." with the function name.
 
 .. embed-test::
     openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_numpy

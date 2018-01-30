@@ -1,8 +1,8 @@
 .. _feature_MetaModelStructured:
 
-*********************************
+*****************************
 MetaModelStructured Component
-*********************************
+*****************************
 
 `MetaModelStructured` is a smooth interpolation Component for data that exists on a regular, structured, grid.
 This differs from :ref:`MetaModelUnStructured <feature_MetaModelUnStructured>` which accepts unstructured data as collections of points.
@@ -14,8 +14,8 @@ derivatives are automatically computed.
 For multi-dimensional data, fits are computed
 on a separable per-axis basis. If a particular dimension does not have
 enough training data points to support a selected spline order (e.g. 3
-sample points, but an order 5 quintic spline is specified) the order of the
-fitted spline with be automatically reduced for that dimension alone.
+sample points, but an order 5 quintic spline is specified), the order of the
+fitted spline will be automatically reduced for that dimension alone.
 
 Extrapolation is supported, but disabled by default. It can be enabled
 via initialization attribute (see below).
@@ -27,7 +27,7 @@ via initialization attribute (see below).
     metadata
 
 Examples
----------------
+--------
 
 A simple quick-start example is fitting the exclusive-or ("XOR") operator between
 two inputs, `x` and `y`:
@@ -37,7 +37,7 @@ two inputs, `x` and `y`:
     :no-split:
 
 
-An important consideration for multi-dimensional input is that the order that
+An important consideration for multi-dimensional input is that the order in which
 the input variables are added sets the expected dimension of the output 
 training data. For example, if inputs `x`, `y` and `z` are added to the component
 with training data array lengths of 5, 12, and 20 respectively, and are added
