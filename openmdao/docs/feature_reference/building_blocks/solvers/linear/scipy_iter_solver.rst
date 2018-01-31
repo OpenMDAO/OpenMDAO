@@ -1,8 +1,8 @@
 .. _scipyiterativesolver:
 
-********************
+***********
 ScipyKrylov
-********************
+***********
 
 ScipyKrylov is an iterative linear solver that wraps the methods found in `scipy.sparse.linalg`.
 The default method is "gmres", or the Generalized Minimal RESidual method. Support for other
@@ -19,7 +19,7 @@ Here, we calculate the total derivatives across the Sellar system.
     openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyKrylovFeature.test_specify_solver
 
 ScipyKrylov Options
-----------------------------
+-------------------
 
 .. embed-options::
     openmdao.solvers.linear.scipy_iter_solver
@@ -27,11 +27,11 @@ ScipyKrylov Options
     options
 
 ScipyKrylov Option Examples
-------------------------------------
+---------------------------
 
 **maxiter**
 
-  This lets you specify the maximum number of GMRES iterations to apply. The default maximum is 1000, which
+  `maxiter` lets you specify the maximum number of GMRES iterations to apply. The default maximum is 1000, which
   is much higher than the other linear solvers because each multiplication by the system Jacobian is considered
   to be an iteration. You may have to decrease this value if you have a coupled system that is converging
   very slowly. (Of course, in such a case, it may be better to add a preconditioner.)  Alternatively, you
@@ -52,7 +52,7 @@ ScipyKrylov Option Examples
   normalized at the start of each new matrix-vector product. The end result here is that we iterate longer to get
   a marginally better answer.
 
-  You may need to adjust this setting if you have abnormally large or small values in your global Jacobean.
+  You may need to adjust this setting if you have abnormally large or small values in your global Jacobian.
 
   .. embed-test::
       openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyKrylovFeature.test_feature_atol
@@ -69,7 +69,7 @@ motivation for using a preconditioner is the observation that iterative methods 
 properties if the linear system has a smaller condition number, so the goal of the preconditioner is to
 improve the condition number in part or all of the Jacobian.
 
-Here, we add a Gauss Seidel preconditioner to the simple Sellar solution with Newton. Note that the number of
+Here, we add a Gauss-Seidel preconditioner to the simple Sellar solution with Newton. Note that the number of
 GMRES iterations is lower when using the preconditioner.
 
 .. embed-test::

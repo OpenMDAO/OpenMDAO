@@ -4,7 +4,7 @@
 NonlinearBlockGS
 ****************
 
-The NonlinearBlockGS solver applies Block Gauss Seidel (also known as Fixed Point Iteration) to the
+The NonlinearBlockGS solver applies Block Gauss-Seidel (also known as Fixed Point Iteration) to the
 components and subsystems in the system. This is mainly used to solve cyclic connections. You
 should try this solver for systems that satisfy the following conditions:
 
@@ -18,7 +18,7 @@ Note that you may not know if you satisfy the second condition, so choosing a so
 NonlinearBlockGS doesn't work, then you will need to use :ref:`NewtonSolver <openmdao.solvers.nonlinear.newton.py>`.
 
 Here, we choose the NonlinearBlockGS to solve the Sellar problem, which has two components with a
-cyclic dependency, has no implicit states, and works very well with Gauss Seidel.
+cyclic dependency, has no implicit states, and works very well with Gauss-Seidel.
 
 .. embed-test::
     openmdao.solvers.nonlinear.tests.test_nonlinear_block_gs.TestNLBGaussSeidel.test_feature_basic
@@ -42,7 +42,7 @@ NonlinearBlockGS Option Examples
 
 **maxiter**
 
-  This lets you specify the maximum number of Gauss Seidel iterations to apply. In this example, we
+  `maxiter` lets you specify the maximum number of Gauss-Seidel iterations to apply. In this example, we
   cut it back from the default (10) to 2 so that it terminates a few iterations earlier and doesn't
   reach the specified absolute or relative tolerance.
 

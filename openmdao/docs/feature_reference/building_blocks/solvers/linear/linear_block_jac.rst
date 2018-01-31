@@ -29,8 +29,8 @@ LinearBlockJac Option Examples
 
 **maxiter**
 
-  This lets you specify the maximum number of Gauss Seidel iterations to apply. In this example, we
-  cut it back from the default (10) to 5 so that it terminates a few iterations earlier and doesn't
+  This lets you specify the maximum number of Gauss-Seidel iterations to apply. In this example, we
+  cut it back from the default (10), to 5 so that it terminates a few iterations earlier and doesn't
   reach the specified absolute or relative tolerance. Note that due to the delayed transfer of
   information, this takes more iterations to converge than the LinearBlockGS solver.
 

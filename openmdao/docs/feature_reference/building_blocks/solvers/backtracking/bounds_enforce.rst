@@ -4,7 +4,7 @@
 Bounds Enforce
 **************
 
-The BoundsEnforceLS linesearch only backtracks until variables that violate their upper and lower bounds.
+The BoundsEnforceLS linesearch only backtracks until variables violate their upper and lower bounds.
 
 BoundsEnforceLS Options
 -----------------------
@@ -20,7 +20,7 @@ BoundsEnforceLS Option Examples
 
 **bound_enforcement**
 
-The BoundsEnforceLS subsolver includes the `bound_enforcement` option in the options dictionary. This option has a dual role:
+The BoundsEnforceLS subsolver includes the `bound_enforcement` option in its options dictionary. This option has a dual role:
 
 1. Behavior of the the non-bounded variables when the bounded ones are capped.
 2. Direction of the further backtracking.

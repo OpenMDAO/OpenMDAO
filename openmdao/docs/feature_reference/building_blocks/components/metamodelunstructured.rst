@@ -37,7 +37,7 @@ names prefixed with ``train:``.  This can be done anytime before the `MetaModelU
 runs for the first time.
 
 The first time a `MetaModelUnStructured` runs, it will train the surrogates using the
-training data that has been provided and then it will predict the output
+training data that has been provided, and then it will predict the output
 values. This training step only occurs on the first run.
 
 .. embed-test::

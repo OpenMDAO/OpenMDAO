@@ -8,13 +8,13 @@ Simple GA Driver
     notes for the class 2009 AAE550 taught by Prof. William A. Crossley at Purdue University.
 
 This genetic algorithm optimizer supports integer and continuous variables. 
-It uses a binary encoding scheme to encode any continuous variables into a user definable number of bits.
+It uses a binary encoding scheme to encode any continuous variables into a user-definable number of bits.
 The number of bits you choose should be equal to the base-2 logarithm of the number of discrete values you
 want between the min and max value.  A higher value means more accuracy for this variable, but it also increases
 the number of generations (and hence total evaluations) that will be required to find the minimum. If you do not
-specify a value for bits for a continuous variable, then the variable is assumed to be integer, and encoded thusly.
+specify a value for bits for a continuous variable, then the variable is assumed to be integer, and encoded as such.
 
-The examples below show a mixed integer problem to illustrate usage of this driver with both integer and
+The examples below show a mixed-integer problem to illustrate usage of this driver with both integer and
 discrete design variables.
 
 .. embed-test::

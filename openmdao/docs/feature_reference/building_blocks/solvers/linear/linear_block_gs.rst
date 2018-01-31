@@ -4,7 +4,7 @@
 LinearBlockGS
 *************
 
-The LinearBlockGS uses Block Gauss Seidel to solve the linear system. The LinearBlockGS solver iterates until the linear
+The LinearBlockGS uses Block Gauss-Seidel to solve the linear system. The LinearBlockGS solver iterates until the linear
 residual is below a tolerance, or the maximum number of iterations has been exceeded. As such,
 it is generally usable for any system topology, and can handle cycles and implicit states
 alike. It is not always the best solver to choose, however, and is known to diverge or plateau
@@ -14,11 +14,11 @@ on some problems. In such a case, you may need to use a solver such as
 The LinearBlockGS solver is a block solver, so you can specify different linear solvers in the subsystems and they
 will be utilized to solve the subsystem linear problem.
 
-Note that systems without cycles or implicit states will converge in one iteration of Block Gauss Seidel.
+Note that systems without cycles or implicit states will converge in one iteration of Block Gauss-Seidel.
 
 Here, we calculate the total derivatives across the Sellar system.
 
-.. embed-=test::
+.. embed-test::
     openmdao.solvers.linear.tests.test_linear_block_gs.TestBGSSolverFeature.test_specify_solver
 
 
@@ -35,9 +35,9 @@ LinearBlockGS Option Examples
 
 **maxiter**
 
-  This lets you specify the maximum number of Gauss Seidel iterations to apply. In this example, we
-  cut it back from the default (10) to 2 so that it terminates a few iterations earlier and doesn't
-  reach the specified absolute or relative tolerance.
+  This lets you specify the maximum number of Gauss-Seidel iterations to apply. In this example, we
+  cut it back from the default(10) to 2, so that it terminates a few iterations earlier and doesn't
+  reach either of the specified absolute or relative tolerances.
 
   .. embed-test::
       openmdao.solvers.linear.tests.test_linear_block_gs.TestBGSSolverFeature.test_feature_maxiter

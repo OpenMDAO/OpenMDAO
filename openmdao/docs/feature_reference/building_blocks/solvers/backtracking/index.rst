@@ -5,7 +5,7 @@ Linesearch/Backtracking
 ***********************
 
 Backtracking line searches are subsolvers that can be specified in the `line_search` attribute
-of a NewtonSolver and are used to pull back to a reasonable point when a Newton step goes to far. This
+of a NewtonSolver, and are used to pull back to a reasonable point when a Newton step goes too far. This
 can occur when a step causes output variables to exceed their specified lower and upper bounds. It can
 also happen in more complicated problems where a full Newton step happens to take you well past the nonlinear solution,
 even to an area where the residual norm is worse than the initial point. Specifying a value for line_search can

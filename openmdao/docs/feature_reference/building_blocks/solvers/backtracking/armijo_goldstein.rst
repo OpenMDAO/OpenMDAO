@@ -4,9 +4,9 @@
 Armijo-Goldstein
 ****************
 
-The ArmijoGoldsteinLS linesearch Checks bounds and backtracks to a point that satisfies them. From there,
-further backtracking is performed until the termination criteria are satisfied.
-The main termination criteria is the Amijo-Goldstein condition, which checks for a sufficient
+The ArmijoGoldsteinLS linesearch checks bounds and backtracks to a point that satisfies them. From there,
+further backtracking is performed, until the termination criteria are satisfied.
+The main termination criteria is the Armijo-Goldstein condition, which checks for a sufficient
 decrease from the initial point by measuring the slope. There is also an iteration maximum.
 
 Armijo-Goldstein Options
@@ -23,12 +23,12 @@ Armijo-Goldstein Option Examples
 
 **bound_enforcement**
 
-The ArmijoGoldsteinLS subsolver includes the `bound_enforcement` option in the options dictionary. This option has a dual role:
+The ArmijoGoldsteinLS subsolver includes the `bound_enforcement` option in its options dictionary. This option has a dual role:
 
 1. Behavior of the the non-bounded variables when the bounded ones are capped.
 2. Direction of the further backtracking.
 
-There are three difference bounds enforcement schemes available in this option.
+There are three different acceptable values for bounds-enforcement schemes available in this option.
 
 With "vector" bounds enforcement, the solution in the output vector is pulled back to a point where none of the
 variables violate any upper or lower bounds. Further backtracking continues along the Newton gradient direction vector back towards the
@@ -48,7 +48,7 @@ variables, so that it will move along the wall.
 
 .. image:: BT3.jpg
 
-Here are a few examples of this option:
+Here are examples of each acceptable value for the **bound_enforcement** option:
 
 - bound_enforcement: vector
 
@@ -110,7 +110,7 @@ Here are a few examples of this option:
 - retry_on_analysis_error
 
   By default, the ArmijoGoldsteinLS line-search will backtrack if the model raises an AnalysisError, which can happen if
-  the component explicity raises it, or a subsolver hits its iteration limit with the 'err_on_maxiter' option set to True.
+  the component explicitly raises it, or a subsolver hits its iteration limit with the 'err_on_maxiter' option set to True.
   If you would rather terminate on an AnalysisError, you can set this option to False.
 
 .. tags:: linesearch, backtracking

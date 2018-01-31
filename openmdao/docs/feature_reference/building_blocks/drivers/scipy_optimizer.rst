@@ -24,10 +24,10 @@ ScipyOptimizeDriver Option Examples
 
 **optimizer**
 
-  The "optimize" option lets you choose which optimizer to use. The ScipyOptimizer driver supports all
+  The "optimizer" option lets you choose which optimizer to use. The ScipyOptimizer driver supports all
   of the optimizers in scipy.optimize except for 'dogleg' and 'trust-ncg'. Generally, the optimizers that
   you are most likely to use are "COBYLA" and "SLSQP", as these are the only ones that support constraints.
-  Only SLSQP supports equality constraints, and SLSQP also uses gradients provide by OpenMDAO while COBYLA is
+  Only SLSQP supports equality constraints. SLSQP also uses gradients provided by OpenMDAO, while COBYLA is
   gradient-free.
 
   .. embed-test::
@@ -35,7 +35,7 @@ ScipyOptimizeDriver Option Examples
 
 **maxiter**
 
-  The "maxiter" option is used to specify the maxinum number of major iterations before termination. It
+  The "maxiter" option is used to specify the maximum number of major iterations before termination. It
   is generally a valid option across all of the available options.
 
   .. embed-test::
