@@ -1,5 +1,5 @@
 """Define the AssembledJacobian class."""
-from __future__ import division
+from __future__ import division, print_function
 
 import sys
 from collections import defaultdict
@@ -150,6 +150,10 @@ class AssembledJacobian(Jacobian):
             self._view_ranges[s.pathname] = (
                 min_res_offset, max_res_offset, min_in_offset, max_in_offset)
 
+        # keep track of mapped keys to check for corner case where one source connects to
+        # multiple inputs using src_indices on the same component.
+        mapped_keys = {}
+
         # create the matrix subjacs
         for res_abs_name in system._var_abs_names['output']:
             res_offset, _ = out_ranges[res_abs_name]
@@ -204,7 +208,17 @@ class AssembledJacobian(Jacobian):
                         # instead of d(output)/d(input) when we have
                         # src_indices
                         abs_key2 = (res_abs_name, out_abs_name)
+                        if abs_key2 in mapped_keys:
+                            raise RuntimeError("Jacobian assembly failure.  Output '%s' is "
+                                               "connected to multiple inputs %s on the same "
+                                               "component using src_indices. To correct this "
+                                               "issue, replace the multiple inputs with a single "
+                                               "input and handle splitting the entries inside "
+                                               "the component." %
+                                               (out_abs_name, sorted([abs_key[1],
+                                                                      mapped_keys[abs_key2][1]])))
                         self._keymap[abs_key] = abs_key2
+                        mapped_keys[abs_key2] = abs_key
                         int_mtx._add_submat(
                             abs_key2, info, res_offset, out_offset,
                             src_indices, shape, factor)
