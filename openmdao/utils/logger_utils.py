@@ -54,7 +54,7 @@ def get_logger(name='default_logger', level=logging.INFO, use_format=False,
     use_format : bool
         Set to True to use the openmdao format "Level: message".
         (applied only when creating a new logger or setting a new stream).
-    out_stream : file-like object`
+    out_stream : 'stdout', 'stderr' or file-like
         output stream to which logger output will be directed.
     lock : bool
         if True, do not allow the handler to be changed until unlocked.
