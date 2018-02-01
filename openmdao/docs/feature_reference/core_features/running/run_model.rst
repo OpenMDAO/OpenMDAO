@@ -12,7 +12,7 @@ Once :code:`setup()` is done, you can then execute your model with :code:`run_mo
 Examples
 ---------
 
-A basic :code:`setup()` using numpy vectors for the the framework data handling, and executing a single pass through the model.
+A basic :code:`setup()` using numpy vectors for the framework data handling, and executing a single pass through the model.
 
 .. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_numpyvec_setup

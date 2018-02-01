@@ -36,7 +36,7 @@ In this example we will give an example based on a common scenario of a code tha
 its inputs from an input file, performs some computations, and then writes the results
 to an output file. `ExternalCode` supports multiple input and output files but
 for simplicity, this example only uses one of each.  Also, for the purposes of this
-example we have kept the the input and output files as simple as possible. In practice,
+example we have kept the input and output files as simple as possible. In practice,
 the data will likely be organized in some defined way and thus some care must be taken
 to read and write the data as dictated by the file format. OpenMDAO provides a set
 of :ref:`File Wrapping <filewrap_feature>` tools to help with this.

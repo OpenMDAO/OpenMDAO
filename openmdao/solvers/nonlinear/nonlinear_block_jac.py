@@ -54,7 +54,7 @@ class NonlinearBlockJac(NonlinearSolver):
 
     def _run_apply(self):
         """
-        Run the the apply_nonlinear method on the system.
+        Run the apply_nonlinear method on the system.
         """
         system = self._system
 

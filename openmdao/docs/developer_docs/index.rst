@@ -24,7 +24,7 @@ Use :code:`pip` to install openmdao locally:
 Building the Docs
 -------------------
 
-You can read the docs online, so it is not necessary to build the them locally on your machine.
+You can read the docs online, so it is not necessary to build them locally on your machine.
 But if you're going to build new features or add new examples, you'll want to build the docs locally, so that you can check them while you are writing them.
 
 :code:`cd openmdao/docs`
