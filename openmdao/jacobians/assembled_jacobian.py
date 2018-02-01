@@ -102,7 +102,7 @@ class AssembledJacobian(Jacobian):
         idx = system._var_allprocs_abs2idx['nonlinear'][type_][abs_name]
 
         ind1 = np.sum(sizes[iproc, :idx])
-        ind2 = np.sum(sizes[iproc, :idx + 1])
+        ind2 = ind1 + sizes[iproc, idx]
 
         return ind1, ind2
 
@@ -112,6 +112,7 @@ class AssembledJacobian(Jacobian):
         """
         # var_indices are the *global* indices for variables on this proc
         system = self._system
+        is_top = system.pathname == ''
 
         abs2meta_in = system._var_abs2meta['input']
         abs2meta_out = system._var_abs2meta['output']
@@ -222,7 +223,7 @@ class AssembledJacobian(Jacobian):
                         int_mtx._add_submat(
                             abs_key2, info, res_offset, out_offset,
                             src_indices, shape, factor)
-                else:
+                elif not is_top:  # input is connected to something outside current system
                     ext_mtx._add_submat(
                         abs_key, info, res_offset, in_ranges[in_abs_name][0],
                         None, shape)

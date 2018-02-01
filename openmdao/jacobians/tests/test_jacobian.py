@@ -596,28 +596,6 @@ class TestJacobian(unittest.TestCase):
 
         assert_rel_error(self, prob['y'], 2 * np.ones(2))
 
-    def test_sparse_jac_with_subsolver_error(self):
-        prob = Problem()
-        indeps = prob.model.add_subsystem('indeps', IndepVarComp('x', 1.0))
-
-        G1 = prob.model.add_subsystem('G1', Group())
-        G1.add_subsystem('C1', ExecComp('y=2.0*x'))
-        G1.add_subsystem('C2', ExecComp('y=3.0*x'))
-
-        G1.nonlinear_solver = NewtonSolver()
-        prob.model.jacobian = CSRJacobian()
-
-        prob.model.connect('indeps.x', 'G1.C1.x')
-        prob.model.connect('indeps.x', 'G1.C2.x')
-
-        prob.setup(check=False)
-
-        with self.assertRaises(Exception) as context:
-            prob.run_model()
-        self.assertEqual(str(context.exception),
-                         "System 'G1' has a solver of type 'NewtonSolver'but a sparse "
-                         "AssembledJacobian has been set in a higher level system.")
-
     def test_assembled_jacobian_unsupported_cases(self):
 
         class ParaboloidApply(ImplicitComponent):

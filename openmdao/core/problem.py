@@ -1105,7 +1105,7 @@ class Problem(object):
                 dup = not in_var_meta['distributed']
 
                 start = np.sum(sizes[:iproc, in_var_idx])
-                end = np.sum(sizes[:iproc + 1, in_var_idx])
+                end = start + sizes[iproc, in_var_idx]
 
                 in_idxs = None
                 if input_name in input_vois:
