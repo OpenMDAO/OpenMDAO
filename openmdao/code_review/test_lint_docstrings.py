@@ -7,25 +7,30 @@ import importlib
 import inspect
 import textwrap
 import collections
+import re
 from six import PY3
 
 from numpydoc.docscrape import NumpyDocString
 
-#TODO: make this more robust by implementing an excludes list, instead of this list, which must be kept up-to-date.
-directories = [
-    'components',
-    'core',
-    'drivers',
-    'error_checking',
-    'jacobians',
-    'matrices',
-    'proc_allocators',
-    'recorders',
-    'solvers',
-    'surrogate_models',
-    'utils',
-    'vectors',
+# directories in which we do not wish to lint for docstrings/parameters.
+exclude = [
+    'code_review',
+    'devtools',
+    'docs',
+    'test_suite',
+    'tests',
+    'test',
 ]
+
+# we will build a list of dirs in which to do linting.
+directories = []
+
+top = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+for root, dirs, files in os.walk(top, topdown=True):
+    dirs[:] = [d for d in dirs if d not in exclude]
+    for di in dirs:
+        directories.append(os.path.join(root, di))
 
 
 def _is_context_manager(func):
@@ -466,15 +471,13 @@ class LintTestCase(unittest.TestCase):
                 failures[key] = new_failures
 
     def test_docstrings(self):
-        topdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
         print_info = False
 
         failures = {}
 
         # Loop over directories
         for dir_name in directories:
-            dirpath = os.path.join(topdir, dir_name)
+            dirpath = dir_name
             if print_info:
                 print('-'*len(dir_name))
                 print(dir_name)
@@ -486,7 +489,15 @@ class LintTestCase(unittest.TestCase):
                     if print_info:
                         print(file_name)
 
-                    module_name = 'openmdao.%s.%s' % (dir_name, file_name[:-3])
+                    # to construct module name, remove part of abs path that
+                    # precedes 'openmdao', and then replace '/' with '.' in the remainder.
+                    mod1 = re.sub(r'.*openmdao', 'openmdao', dir_name).replace('/', '.')
+
+                    # then, get rid of the '.py' to get final part of module name.
+                    mod2 = file_name[:-3]
+
+                    module_name = '{}.{}'.format(mod1, mod2)
+
                     try:
                         mod = importlib.import_module(module_name)
                     except ImportError as err:

@@ -49,11 +49,11 @@ Setting a Driver
 ---------------------
 
 Telling OpenMDAO to use a specific optimizer is done by setting the :code:`driver` attribute of the problem.
-Here we'll use the :ref:`ScipyOptimizer <scipyoptimizer>`, and tell it to use the *COBYLA* algorithm.
+Here we'll use the :ref:`ScipyOptimizeDriver <scipyoptimizer>`, and tell it to use the *COBYLA* algorithm.
 
 .. code::
 
-    prob.driver = ScipyOptimizer()
+    prob.driver = ScipyOptimizeDriver()
     prob.driver.options['optimizer'] = 'COBYLA'
 
 Defining the Design Variables and Objective

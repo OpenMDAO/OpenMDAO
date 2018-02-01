@@ -4,7 +4,7 @@ import unittest
 
 from openmdao.utils.assert_utils import assert_rel_error
 
-from openmdao.api import Problem, ScipyOptimizer
+from openmdao.api import Problem, ScipyOptimizeDriver
 from openmdao.test_suite.test_examples.beam_optimization.beam_group import BeamGroup
 
 
@@ -13,7 +13,7 @@ class TestCase(unittest.TestCase):
     def test(self):
         import numpy as np
 
-        from openmdao.api import Problem, ScipyOptimizer
+        from openmdao.api import Problem, ScipyOptimizeDriver
 
         from openmdao.test_suite.test_examples.beam_optimization.beam_group import BeamGroup
 
@@ -26,7 +26,7 @@ class TestCase(unittest.TestCase):
 
         prob = Problem(model=BeamGroup(E=E, L=L, b=b, volume=volume, num_elements=num_elements))
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = True

@@ -22,6 +22,8 @@ class LinearRunOnce(LinearBlockGS):
             List of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
+        rel_systems : set of str
+            Names of systems relevant to the current solve.
 
         Returns
         -------
@@ -36,7 +38,6 @@ class LinearRunOnce(LinearBlockGS):
         system = self._system
 
         # Pre-processing
-        self._rhs_vecs = {}
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']
         else:  # rev
@@ -44,7 +45,7 @@ class LinearRunOnce(LinearBlockGS):
 
         for vec_name in self._vec_names:
             if vec_name in system._rel_vec_names:
-                self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
+                self._rhs_vecs[vec_name].set_vec(b_vecs[vec_name])
 
         with Recording('LinearRunOnce', 0, self) as rec:
             # Single iteration of GS

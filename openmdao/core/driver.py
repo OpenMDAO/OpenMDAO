@@ -1,6 +1,7 @@
 """Define a base class for all Drivers in OpenMDAO."""
 from __future__ import print_function
 
+import os
 import json
 from collections import OrderedDict
 import warnings
@@ -15,6 +16,7 @@ from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.mpi import MPI
 from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate
 from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.coloring import _use_simul_coloring
 
 
 def _is_debug_print_opts_valid(opts):
@@ -837,6 +839,10 @@ class Driver(object):
             raise NotImplementedError("Simultaneous derivatives are currently not supported "
                                       "in 'rev' mode")
 
+        # command line simul_coloring uses this env var to turn pre-existing coloring off
+        if not _use_simul_coloring:
+            return
+
         prom2abs = self._problem.model._var_allprocs_prom2abs_list['output']
 
         if isinstance(self._simul_coloring_info, string_types):
@@ -862,7 +868,7 @@ class Driver(object):
                     # convert name from promoted to absolute and replace dictionary key
                     del dvdict[dv]
                     dv = prom2abs[dv][0]
-                    dvdict[dv] = col_dict
+                dvdict[dv] = col_dict
 
     def _pre_run_model_debug_print(self):
         """

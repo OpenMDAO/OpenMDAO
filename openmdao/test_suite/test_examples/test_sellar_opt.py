@@ -4,20 +4,20 @@ import unittest
 
 from openmdao.utils.assert_utils import assert_rel_error
 
-from openmdao.api import Problem, ScipyOptimizer, ExecComp, IndepVarComp, DirectSolver
+from openmdao.api import Problem, ScipyOptimizeDriver, ExecComp, IndepVarComp, DirectSolver
 
 
 class TestSellarOpt(unittest.TestCase):
 
     def test_sellar_opt(self):
-        from openmdao.api import Problem, ScipyOptimizer, ExecComp, IndepVarComp, DirectSolver
+        from openmdao.api import Problem, ScipyOptimizeDriver, ExecComp, IndepVarComp, DirectSolver
         from openmdao.test_suite.components.sellar_feature import SellarMDA
 
         prob = Problem()
         prob.model = SellarMDA()
 
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         # prob.driver.options['maxiter'] = 100
         prob.driver.options['tol'] = 1e-8

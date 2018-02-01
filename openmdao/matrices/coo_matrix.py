@@ -139,8 +139,8 @@ class COOMatrix(Matrix):
 
         Parameters
         ----------
-        key : (int, int)
-            the global output and input variable indices.
+        key : (str, str)
+            the global output and input variable names.
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
@@ -154,7 +154,7 @@ class COOMatrix(Matrix):
             self._matrix.data[idxs] = jac.flat
         elif isinstance(jac, sparse_types):
             self._matrix.data[idxs] = jac.data
-        elif isinstance(jac, list):
+        else:  # list format  [data, rows, cols]
             self._matrix.data[idxs] = jac[0]
 
         if factor is not None:
@@ -180,5 +180,5 @@ class COOMatrix(Matrix):
         """
         if mode == 'fwd':
             return self._matrix.dot(in_vec)
-        elif mode == 'rev':
+        else:  # rev
             return self._matrix.T.dot(in_vec)

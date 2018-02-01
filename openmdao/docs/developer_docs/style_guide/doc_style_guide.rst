@@ -304,14 +304,14 @@ embed-bibtex
 
         .. embed-bibtex::
             openmdao.drivers.scipy_optimizer
-            ScipyOptimizer
+            ScipyOptimizeDriver
 
 
     The output from the above syntax should look like this:
 
     .. embed-bibtex::
         openmdao.drivers.scipy_optimizer
-        ScipyOptimizer
+        ScipyOptimizeDriver
 
 
 Tagging
