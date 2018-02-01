@@ -576,8 +576,8 @@ class pyOptSparseDriver(Driver):
                         else:
                             row = col = np.zeros(0, dtype=int)
 
-                        print("sparsity for %s, %s: %d of %s" % (res, dv, row.size,
-                              (self._responses[res]['size'] * self._designvars[dv]['size'],)))
+                        # print("sparsity for %s, %s: %d of %s" % (res, dv, row.size,
+                        #       (self._responses[res]['size'] * self._designvars[dv]['size'],)))
 
                         self._res_jacs[res][dv] = {
                             'coo': [row, col, np.zeros(row.size)],

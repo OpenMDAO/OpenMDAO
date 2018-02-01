@@ -21,42 +21,42 @@ class DenseMatrix(Matrix):
         num_cols : int
             number of cols in the matrix.
         """
-        self._matrix = matrix = np.zeros((num_rows, num_cols))
+        self._matrix = np.zeros((num_rows, num_cols))
         submats = self._submats
         metadata = self._metadata
 
         for key in submats:
             info, irow, icol, src_indices, shape, factor = submats[key]
             rows = info['rows']
-            cols = info['cols']
-            val = info['value']
 
-            if rows is None and (val is None or isinstance(val,
-                                                           np.ndarray)):
-                nrows, ncols = shape
-                irow2 = irow + nrows
-                if src_indices is None:
-                    icol2 = icol + ncols
-                    metadata[key] = (slice(irow, irow2),
-                                     slice(icol, icol2), np.ndarray, factor)
-                else:
-                    metadata[key] = (slice(irow, irow2),
-                                     src_indices + icol, np.ndarray, factor)
-            elif isinstance(val, sparse_types):
-                jac = val.tocoo()
-                if src_indices is None:
-                    irows = irow + jac.row
-                    icols = icol + jac.col
-                else:
-                    irows, icols, idxs = _compute_index_map(jac.row,
-                                                            jac.col,
-                                                            irow, icol,
-                                                            src_indices)
-                    revidxs = np.argsort(idxs)
-                    irows, icols = irows[revidxs], icols[revidxs]
+            if rows is None:
+                val = info['value']
+                if val is None or isinstance(val, np.ndarray):
+                    nrows, ncols = shape
+                    irow2 = irow + nrows
+                    if src_indices is None:
+                        icol2 = icol + ncols
+                        metadata[key] = (slice(irow, irow2),
+                                         slice(icol, icol2), np.ndarray, factor)
+                    else:
+                        metadata[key] = (slice(irow, irow2),
+                                         src_indices + icol, np.ndarray, factor)
+                else:  # sparse
+                    jac = val.tocoo()
+                    if src_indices is None:
+                        irows = irow + jac.row
+                        icols = icol + jac.col
+                    else:
+                        irows, icols, idxs = _compute_index_map(jac.row,
+                                                                jac.col,
+                                                                irow, icol,
+                                                                src_indices)
+                        revidxs = np.argsort(idxs)
+                        irows, icols = irows[revidxs], icols[revidxs]
 
-                metadata[key] = (irows, icols, type(val), factor)
-            elif rows is not None:
+                    metadata[key] = (irows, icols, type(val), factor)
+            else:  # list format [data, rows, cols]
+                cols = info['cols']
                 if src_indices is None:
                     irows = rows + irow
                     icols = cols + icol
@@ -75,8 +75,8 @@ class DenseMatrix(Matrix):
 
         Parameters
         ----------
-        key : (int, int)
-            the global output and input variable indices.
+        key : (str, str)
+            the global output and input variable names.
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
@@ -88,10 +88,10 @@ class DenseMatrix(Matrix):
                                                                   jac_type.__name__))
         if isinstance(jac, np.ndarray):
             self._matrix[irows, icols] = jac
-        elif isinstance(jac, sparse_types):
-            self._matrix[irows, icols] = jac.data
         elif isinstance(jac, list):
             self._matrix[irows, icols] = jac[0]
+        else:  # sparse
+            self._matrix[irows, icols] = jac.data
 
         if factor is not None:
             self._matrix[irows, icols] *= factor
@@ -123,6 +123,7 @@ class DenseMatrix(Matrix):
         else:
             rstart, rend, cstart, cend = ranges
             mat = self._matrix[rstart:rend, cstart:cend]
+
         if mode == 'fwd':
             return mat.dot(in_vec)
         else:  # rev

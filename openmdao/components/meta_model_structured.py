@@ -4,6 +4,7 @@ from __future__ import division, print_function, absolute_import
 import warnings
 
 from six import raise_from
+from six.moves import range
 
 from scipy import __version__ as scipy_version
 try:
@@ -66,11 +67,50 @@ class _RegularGridInterp(object):
     object, the interpolation method (*slinear*, *cubic*, and *quintic*) may be chosen at each
     evaluation. Additionally, gradients are provided for the spline interpolation methods.
 
+    Attributes
+    ----------
+    _xi : ndarray
+        Current evaluation point.
+    values : array_like, shape (m1, ..., mn, ...)
+        The data on the regular grid in n dimensions.
+    bounds_error : bool
+        If True, when interpolated values are requested outside of the
+        domain of the input data, a ValueError is raised.
+        If False, then `fill_value` is used.
+        Default is True (raise an exception).
+    _gmethod : string
+        Name of interpolation method used to compute the last gradient.
+    _spline_dim_error : bool
+        If spline_dim_error=True and an order `k` spline interpolation method
+        is used, then if any dimension has fewer points than `k` + 1, an error
+        will be raised. If spline_dim_error=False, then the spline interpolant
+        order will be reduced as needed on a per-dimension basis. Default
+        is True (raise an exception).
+    _interp_config : dict
+        Configuration object that stores limitations of each interpolation
+        method.
+    method : string
+        Name of interpolation method.
+    _all_gradients : ndarray
+        Cache of computed gradients.
+    _ki : list
+        Interpolation order to be used in each dimension.
+    fill_value : float
+        If provided, the value to use for points outside of the
+        interpolation domain. If None, values outside
+        the domain are extrapolated. Note that gradient values will always be
+        extrapolated rather than set to the fill_value if bounds_error=False
+        for any points outside of the interpolation domain.
+        Default is `np.nan`.
+    grid : tuple
+        Collection of points that determine the regular grid.
+
     Methods
     -------
     __call__
     gradient
     methods
+
     """
 
     @staticmethod
@@ -317,7 +357,7 @@ class _RegularGridInterp(object):
             If a spline interpolation method is chosen, this determines whether gradient
             calculations should be made and cached. Default is True.
         first_dim_gradient : bool, optional
-            Sset to True to calculate first dimension gradients. Default is False.
+            Set to True to calculate first dimension gradients. Default is False.
 
         Returns
         -------
@@ -373,7 +413,7 @@ class _RegularGridInterp(object):
             # Main process: Apply 1D interpolate in each dimension
             # sequentially, starting with the last dimension. These are then
             # "folded" into the next dimension in-place.
-            for i in reversed(range(1, n)):
+            for i in range(n - 1, 0, -1):
                 if i == n - 1:
                     values = first_values[j]
                     if compute_gradients:
@@ -450,8 +490,7 @@ class _RegularGridInterp(object):
         None or array_like, optional
             Value of gradient of interpolant at point of interest.
         """
-        interp_kwargs = {'k': k, 'axis': 0}
-        local_interp = interpolator(x, y, **interp_kwargs)
+        local_interp = interpolator(x, y, k=k, axis=0)
         values = local_interp(pt)
         local_derivs = None
         if compute_gradients:
