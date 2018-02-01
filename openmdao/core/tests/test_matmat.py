@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, \
-                         ScipyOptimizer, DefaultVector, DenseJacobian, DirectSolver
+                         ScipyOptimizeDriver, DefaultVector, DenseJacobian, DirectSolver
 from openmdao.utils.assert_utils import assert_rel_error
 
 def lgl(n, tol=np.finfo(float).eps):
@@ -355,7 +355,7 @@ def simple_model(order, dvgroup='pardv', congroup='parc', vectorize=False):
     p.model.add_design_var('y_lgl', lower=-1000.0, upper=1000.0, parallel_deriv_color=dvgroup, vectorize_derivs=vectorize)
     p.model.add_constraint('defect.defect', lower=-1e-6, upper=1e-6, parallel_deriv_color=congroup, vectorize_derivs=vectorize)
     p.model.add_objective('arclength_quad.arclength')
-    p.driver = ScipyOptimizer()
+    p.driver = ScipyOptimizeDriver()
     return p, np.sin(x_lgl)
 
 def phase_model(order, nphases, dvgroup='pardv', congroup='parc', vectorize=False):
@@ -378,7 +378,7 @@ def phase_model(order, nphases, dvgroup='pardv', congroup='parc', vectorize=Fals
     p.model.add_subsystem('sum', Summer(n_phases=N_PHASES))
 
     p.model.add_objective('sum.total_arc_length')
-    p.driver = ScipyOptimizer()
+    p.driver = ScipyOptimizeDriver()
 
     x_lgl, _ = lgl(n)
     x_lgl = x_lgl * np.pi # put x_lgl on [-pi, pi]

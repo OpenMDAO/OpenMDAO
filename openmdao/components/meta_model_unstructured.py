@@ -20,6 +20,35 @@ class MetaModelUnStructured(ExplicitComponent):
     'train:' prepended to the corresponding inputeter/output name.
 
     For a Float variable, the training data is an array of length m.
+
+    Attributes
+    ----------
+    _surrogate_input_names : [str, ..]
+        List of inputs that are not the training vars
+    _surrogate_output_names : [str, ..]
+        List of outputs that are not the training vars
+    _vectorize : None or int
+        First dimension of all inputs and outputs for case where data is vectorized
+    warm_restart : bool
+        When set to False (default), the metamodel retrains with the new
+        dataset whenever the training data values are changed. When set to
+        True, the new data is appended to the old data and all of the data
+        is used to train.
+    _surrogate_overrides : set
+        keeps track of which sur_<name> slots are full.
+    _training_input : dict
+        Training data for inputs.
+    _training_output : dict
+        Training data for outputs.
+    _input_size : int
+        Keeps track of the cumulative size of all inputs.
+    default_surrogate : str
+        This surrogate will be used for all outputs that don't have
+        a specific surrogate assigned to them
+    train : bool
+        If True, training will occur on the first execution.
+
+
     """
 
     def __init__(self, default_surrogate=None, vectorize=None):

@@ -204,19 +204,20 @@ class ExplicitComponent(Component):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
+        outputs = self._outputs
+        residuals = self._residuals
         with Recording(self.pathname + '._apply_nonlinear', self.iter_count, self):
-            with self._unscaled_context(
-                    outputs=[self._outputs], residuals=[self._residuals]):
-                self._residuals.set_vec(self._outputs)
-                self.compute(self._inputs, self._outputs)
+            with self._unscaled_context(outputs=[outputs], residuals=[residuals]):
+                residuals.set_vec(outputs)
+                self.compute(self._inputs, outputs)
 
                 # Restore any complex views if under complex step.
-                if self._outputs._vector_info._under_complex_step:
-                    for vec in [self._outputs, self._residuals]:
-                        vec._remove_complex_views()
+                if outputs._vector_info._under_complex_step:
+                    outputs._remove_complex_views()
+                    residuals._remove_complex_views()
 
-                self._residuals -= self._outputs
-                self._outputs += self._residuals
+                residuals -= outputs
+                outputs += residuals
 
     def _solve_nonlinear(self):
         """

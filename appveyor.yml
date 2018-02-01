@@ -17,7 +17,6 @@ init:
 
 install:
   - set CONDA=Miniconda
-  - if "%PYTHON%" == "3.4" (set CONDA=%CONDA%3)
   - if "%PLATFORM%" == "x64" (set CONDA=%CONDA%-x64)
   - echo %CONDA%
   - set PATH=C:\%CONDA%;C:\%CONDA%\Scripts;%PATH%

@@ -32,4 +32,15 @@ Multidisciplinary Optimization
     first_mdao.rst
 
 
+----------------------------------------
+Using the OpenMDAO Command Line Utility
+----------------------------------------
+
+.. toctree::
+    :maxdepth: 1
+
+    check_setup.rst
+    make_n2.rst
+
+
 
