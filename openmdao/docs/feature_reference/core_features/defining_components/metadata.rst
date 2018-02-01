@@ -9,20 +9,24 @@ as well as to do the mapping that computes the outputs given the inputs.
 Often, however, there are incidental parameters that affect the behavior of the component,
 but which are not considered input variables in the sense of being computed as an output of another component.
 
-OpenMDAO provides a way of declaring these parameters, which are referred to as *metadata*.
-They are declared in the 'initialize' method of the user's component,
-and the values are typically passed in upon instantiation of the component.
-Once the values are passed in during instantiation, they are automatically set into the metadata object
-and are available for use in any method other than 'initialize'.
+OpenMDAO provides a way of declaring these parameters, which are contained in an
+`OptionsDictionary` named *metadata* that is available in every component. Metadata
+associated with a particular component must be declared in the `initialize` method
+of the component definition. A default value can be provided as well as various checks
+for validity, such as a list of acceptable values or types.
 
-Alternatively, the values can be set at any time, whether in any method of the component
-(except for 'initialize') or outside of the component definition after the component is instantiated.
-Metadata can be declared along with their default values and various checks for validity,
-such as a list of acceptable values or types.
-The full list of options can be found in the method signature below.
+The full list of options is shown in the method signature below.
 
 .. automethod:: openmdao.utils.options_dictionary.OptionsDictionary.declare
     :noindex:
+
+Metadata values are typically passed at component instantiation time as keyword arguments,
+which are automatically assigned into the metadata dictionary. The metadata is then available
+for use in the component's other methods, such as `setup` and `compute`.
+
+Alternatively, values can be set at a later time, in another method of the component
+(except for 'initialize') or outside of the component definition after the component is
+instantiated.
 
 A Simple Example
 ----------------
@@ -35,13 +39,18 @@ Metadata is commonly used to specify the shape or size of the component's input 
 .. embed-test::
     openmdao.utils.tests.test_options_dictionary_feature.TestOptionsDictionaryFeature.test_simple
 
-In this example, 'size' is required; the first time we try to get 'size',
-we would have gotten an error if we:
+
+Not setting a default value when declaring a metadata parameter implies that the value must be set by the user.
+
+In this example, 'size' is required; We would have gotten an error if we:
 
 1. did not pass in 'size' when instantiating 'VectorDoublingComp' and
 2. did not set its value in the code for VectorDoublingComp.
 
-Not setting a default value when declaring it implies that the value must be set prior to getting it.
+
+.. embed-test::
+    openmdao.utils.tests.test_options_dictionary_feature.TestOptionsDictionaryFeature.test_simple_fail
+
 
 Providing Default Values
 ------------------------
