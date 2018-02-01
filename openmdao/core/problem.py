@@ -804,7 +804,8 @@ class Problem(object):
 
         return partials_data
 
-    def check_totals(self, of=None, wrt=None, out_stream=sys.stdout, compact_print=False,
+    # def check_totals(self, of=None, wrt=None, out_stream=sys.stdout, compact_print=False,
+    def check_totals(self, of=None, wrt=None, out_stream=None, compact_print=False,
                      abs_err_tol=1e-6,
                      rel_err_tol=1e-6, method='fd', step=1e-6, form='forward', step_calc='abs',
                      suppress_output=False):

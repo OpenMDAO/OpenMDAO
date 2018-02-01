@@ -26,6 +26,10 @@ from openmdao.utils.units import get_conversion
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta, check_path
 
+# Use this as a sentinel to be able to tell if the caller set a value for the optional
+#   out_stream argument. We run into problems running testflo if we don't do this.
+_DEFAULT_OUT_STREAM = object()
+
 
 class System(object):
     """
@@ -2506,7 +2510,7 @@ class System(object):
                     units=False,
                     hierarchical=True,
                     print_arrays=False,
-                    out_stream=sys.stdout):
+                    out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of input names and other optional information.
 
@@ -2528,7 +2532,7 @@ class System(object):
             When True, also display full values of the ndarray below the row. Format is affected
             by the values set with numpy.set_printoptions
             Default is False.
-        out_stream : 'stdout', 'stderr' or file-like
+        out_stream : file-like object
             Where to send human readable output. Default is 'stdout'.
             Set to None to suppress.
 
@@ -2551,6 +2555,9 @@ class System(object):
                 outs['units'] = meta['input'][name]['units']
             inputs.append((name, outs))
 
+        if out_stream == _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
+
         if out_stream:
             self._write_outputs('input', None, inputs, hierarchical, print_arrays, out_stream)
 
@@ -2567,7 +2574,7 @@ class System(object):
                      scaling=False,
                      hierarchical=True,
                      print_arrays=False,
-                     out_stream=sys.stdout):
+                     out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of output names and other optional information.
 
@@ -2649,6 +2656,9 @@ class System(object):
             else:
                 expl_outputs.append((name, outs))
 
+        if out_stream == _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
+
         if out_stream:
             if explicit:
                 self._write_outputs('output', 'Explicit', expl_outputs, hierarchical, print_arrays,
@@ -2667,7 +2677,7 @@ class System(object):
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
     def _write_outputs(self, in_or_out, comp_type, outputs, hierarchical, print_arrays,
-                       out_stream=sys.stdout):
+                       out_stream):
         """
         Write table of variable names, values, residuals, and metadata to out_stream.
 
@@ -2690,8 +2700,8 @@ class System(object):
             When True, also display full values of the ndarray below the row. Format  is affected
             by the values set with numpy.set_printoptions
             Default is False.
-        out_stream : 'stdout', 'stderr' or file-like
-            Where to send human readable output. Default is 'stdout'.
+        out_stream : file-like object
+            Where to send human readable output.
             Set to None to suppress.
         """
         if out_stream is None:
