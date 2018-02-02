@@ -1,5 +1,5 @@
 """Define the base System class."""
-from __future__ import division
+from __future__ import division, print_function
 
 from contextlib import contextmanager
 from collections import OrderedDict, Iterable, defaultdict
