@@ -10,6 +10,10 @@ from six import iteritems
 
 from openmdao.utils.logger_utils import get_logger
 
+# Use this as a special value to be able to tell if the caller set a value for the optional
+#   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
+_DEFAULT_OUT_STREAM = object()
+
 
 def _check_cite(obj, citations):
     """
@@ -89,7 +93,7 @@ def _filter_citations(citations, classes):
     return cits
 
 
-def print_citations(prob, classes=None, out_stream=sys.stdout):
+def print_citations(prob, classes=None, out_stream=_DEFAULT_OUT_STREAM):
     """
     Write a list of citations from classes in the problem to the given stream.
 
@@ -100,10 +104,13 @@ def print_citations(prob, classes=None, out_stream=sys.stdout):
     classes : list of str
         List of class names for classes to include in the displayed citations.
     out_stream : file-like object
-            Where to send human readable output. Default is 'sys.stdout'.
-            Set to None to suppress.
+        Where to send human readable output. Default is sys.stdout.
+        Set to None to suppress.
     """
     citations = _filter_citations(find_citations(prob), classes)
+
+    if out_stream == _DEFAULT_OUT_STREAM:
+        out_stream = sys.stdout
 
     if out_stream:
         for klass, cite in citations.items():

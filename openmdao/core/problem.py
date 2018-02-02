@@ -805,7 +805,6 @@ class Problem(object):
 
         return partials_data
 
-    # def check_totals(self, of=None, wrt=None, out_stream=sys.stdout, compact_print=False,
     def check_totals(self, of=None, wrt=None, out_stream=None, compact_print=False,
                      abs_err_tol=1e-6,
                      rel_err_tol=1e-6, method='fd', step=1e-6, form='forward', step_calc='abs',
@@ -822,7 +821,7 @@ class Problem(object):
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
         out_stream : file-like object
-            Where to send human readable output. Default is sys.stdout.
+            Where to send human readable output. Default is None.
             Set to None to suppress.
         compact_print : bool
             Set to True to just print the essentials, one line per unknown-param pair.

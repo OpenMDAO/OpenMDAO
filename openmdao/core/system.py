@@ -26,8 +26,8 @@ from openmdao.utils.units import get_conversion
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta, check_path
 
-# Use this as a sentinel to be able to tell if the caller set a value for the optional
-#   out_stream argument. We run into problems running testflo if we don't do this.
+# Use this as a special value to be able to tell if the caller set a value for the optional
+#   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
 _DEFAULT_OUT_STREAM = object()
 
 
@@ -2533,7 +2533,7 @@ class System(object):
             by the values set with numpy.set_printoptions
             Default is False.
         out_stream : file-like object
-            Where to send human readable output. Default is 'stdout'.
+            Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
         Returns
@@ -2612,8 +2612,8 @@ class System(object):
             When True, also display full values of the ndarray below the row. Format  is affected
             by the values set with numpy.set_printoptions
             Default is False.
-        out_stream : 'stdout', 'stderr' or file-like
-            Where to send human readable output. Default is 'stdout'.
+        out_stream : file-like
+            Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
         Returns
