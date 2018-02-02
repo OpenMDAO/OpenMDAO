@@ -222,7 +222,7 @@ def get_source_code_of_class_or_method(class_or_method_path, remove_docstring=Tr
     if remove_docstring:
         source = remove_docstrings(source)
 
-    return source
+    return remove_leading_trailing_whitespace_lines(source)
 
 
 def get_test_source_code_for_feature(feature_name):
@@ -275,7 +275,7 @@ def remove_raise_skip_tests(src):
 
 def remove_leading_trailing_whitespace_lines(src):
     """
-    Remove any trailing whitespace lines.
+    Remove any leading or trailing whitespace lines.
 
     Parameters
     ----------

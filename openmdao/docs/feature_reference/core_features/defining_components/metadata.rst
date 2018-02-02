@@ -25,13 +25,14 @@ which are automatically assigned into the metadata dictionary. The metadata is t
 for use in the component's other methods, such as `setup` and `compute`.
 
 Alternatively, values can be set at a later time, in another method of the component
-(except for 'initialize') or outside of the component definition after the component is
+(except for `initialize`) or outside of the component definition after the component is
 instantiated.
 
 A Simple Example
 ----------------
 
-Metadata is commonly used to specify the shape or size of the component's input and output variables.
+Metadata is commonly used to specify the shape or size of the component's input and output 
+variables, such as in this simple example.
 
 .. embed-code::
     openmdao.test_suite.components.metadata_feature_vector
@@ -52,6 +53,29 @@ In this example, 'size' is required; We would have gotten an error if we:
     openmdao.utils.tests.test_options_dictionary_feature.TestOptionsDictionaryFeature.test_simple_fail
 
 
+Metadata Types
+--------------
+
+Metadata is not limited to simple types like :code:`int`.  In the following example, the
+component takes a `Numpy` array as metadata:
+
+
+.. embed-code::
+    openmdao.test_suite.components.metadata_feature_array
+
+.. embed-test::
+    openmdao.utils.tests.test_options_dictionary_feature.TestOptionsDictionaryFeature.test_simple_array
+
+
+It is even possible to provide a function as metadata:
+
+
+.. embed-code::
+    openmdao.test_suite.components.metadata_feature_function
+
+.. embed-test::
+    openmdao.utils.tests.test_options_dictionary_feature.TestOptionsDictionaryFeature.test_simple_function
+
 Providing Default Values
 ------------------------
 
@@ -71,9 +95,9 @@ Specifying Values or Types
 
 Another commonly-used metadata feature is specifying acceptable values or types.
 If only the list of acceptable values is specified,
-the default value and the value passed in must be one of these values, or None if allow_none is True.
+the default value and the value passed in must be one of these values, or None if `allow_none` is True.
 If only the list of acceptable types is specified,
-the default value and the value passed in must be an instance one of these types, or None if allow_none is True.
+the default value and the value passed in must be an instance one of these types, or None if `allow_none` is True.
 It is an error to attempt to specify both a list of acceptable values and a list of acceptable types.
 
 .. tags:: Metadata

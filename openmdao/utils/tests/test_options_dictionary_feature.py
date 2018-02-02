@@ -53,8 +53,9 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
         prob.run_model()
         self.assertEqual(prob['linear.y'], 7.)
 
-
     def test_simple_array(self):
+        import numpy as np
+
         from openmdao.api import Problem, IndepVarComp
         from openmdao.test_suite.components.metadata_feature_array import ArrayMultiplyComp
 
@@ -70,6 +71,26 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['a_comp.y'], [5., 10., 15.])
+
+    def test_simple_function(self):
+        from openmdao.api import Problem, IndepVarComp
+        from openmdao.test_suite.components.metadata_feature_function import UnitaryFunctionComp
+
+        def my_func(x):
+            return x*2
+
+        prob = Problem()
+        prob.model.add_subsystem('inputs', IndepVarComp('x', 1.))
+        prob.model.add_subsystem('f_comp', UnitaryFunctionComp(func=my_func))
+        prob.model.connect('inputs.x', 'f_comp.x')
+
+        prob.setup()
+
+        prob['inputs.x'] = 5.
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['f_comp.y'], 10.)
 
 
 if __name__ == "__main__":
