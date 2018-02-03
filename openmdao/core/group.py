@@ -514,15 +514,8 @@ class Group(System):
                             owns[name] = rank
                             break
 
-        for vec_name in self._lin_rel_vec_name_list:
-            self._var_row_offsets[vec_name] = {}
-            sizes = self._var_sizes[vec_name]
-            for typ in ['input', 'output']:
-                self._var_row_offsets[vec_name][typ] = np.cumsum(sizes[typ], axis=1) - sizes[typ]
-
         self._var_sizes['nonlinear'] = self._var_sizes['linear']
         self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']
-        self._var_row_offsets['nonlinear'] = self._var_row_offsets['linear']
 
         self._setup_global_shapes()
 
@@ -1023,7 +1016,6 @@ class Group(System):
             allprocs_abs2idx_byset = self._var_allprocs_abs2idx_byset[vec_name]
             sizes_byset_in = self._var_sizes_byset[vec_name]['input']
             sizes_byset_out = self._var_sizes_byset[vec_name]['output']
-            row_offsets_in = self._var_row_offsets[vec_name]['input']
 
             # Loop through all explicit / implicit connections owned by this system
             for abs_in, abs_out in iteritems(self._conn_abs_in2out):

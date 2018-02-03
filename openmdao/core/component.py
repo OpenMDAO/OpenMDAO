@@ -234,15 +234,8 @@ class Component(System):
                     for set_name, sbyset in iteritems(sizes_byset[type_]):
                         self.comm.Allgather(sbyset[iproc, :], sbyset)
 
-        for vec_name in vec_names:
-            sizes = self._var_sizes[vec_name]
-            self._var_row_offsets[vec_name] = {}
-            for typ in ['input', 'output']:
-                self._var_row_offsets[vec_name][typ] = np.cumsum(sizes[typ], axis=1) - sizes[typ]
-
         self._var_sizes['nonlinear'] = self._var_sizes['linear']
         self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']
-        self._var_row_offsets['nonlinear'] = self._var_row_offsets['linear']
 
         self._setup_global_shapes()
 

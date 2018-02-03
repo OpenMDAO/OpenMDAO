@@ -181,7 +181,7 @@ class Vector(object):
         self._initialize_data(root_vector)
         self._initialize_views()
 
-        self._length = np.sum(a.shape[0] for a in self._data.values())
+        self._length = np.sum(self._system._var_sizes[self._name][self._typ][self._iproc, :])
 
     def __str__(self):
         """

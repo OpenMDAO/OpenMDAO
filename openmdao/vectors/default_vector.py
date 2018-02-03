@@ -111,7 +111,6 @@ class DefaultVector(Vector):
 
         sizes_byset_t = system._var_sizes_byset[self._name][type_]
         sizes_t = system._var_sizes[self._name][type_]
-        row_offsets = system._var_row_offsets[self._name][type_]
 
         data = {}
         indices = {}
@@ -136,8 +135,8 @@ class DefaultVector(Vector):
                 ind_byset2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1])
 
                 idx = allprocs_abs2idx_t[abs_name]
-                ind1 = row_offsets[iproc, idx]
-                ind2 = ind1 + sizes_t[iproc, idx]
+                ind1 = np.sum(sizes_t[iproc, :idx])
+                ind2 = np.sum(sizes_t[iproc, :idx + 1])
 
                 indices[set_name][ind_byset1:ind_byset2] = np.arange(ind1, ind2)
 
