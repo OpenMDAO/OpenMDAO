@@ -932,6 +932,7 @@ class System(object):
         """
         self._var_sizes = {}
         self._var_sizes_byset = {}
+        self._var_row_offsets = {}
         self._owning_rank = {'input': defaultdict(int), 'output': defaultdict(int)}
 
     def _setup_global_shapes(self):
