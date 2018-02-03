@@ -100,7 +100,7 @@ class System(object):
     _var_allprocs_abs2idx : dict
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
-    _var_allprocs_abs2idx_byset : {<vec_name>:{'input': dict of dict, 'output': dict of dict}, ...}
+    _var_allprocs_abs2idx_byset : {<vec_name>: {dict of dict}, ...}
         Same as above, but by var_set name.
     _var_sizes : {'input': ndarray, 'output': ndarray}
         Array of local sizes of this system's allprocs variables.
@@ -900,10 +900,9 @@ class System(object):
 
         for vec_name in self._lin_rel_vec_name_list:
             abs2idx[vec_name] = abs2idx_t = {}
-            abs2idx_byset[vec_name] = {'input': {}, 'output': {}}
+            abs2idx_byset[vec_name] = abs2idx_byset_t = {}
             for type_ in ['input', 'output']:
                 counter = defaultdict(int)
-                abs2idx_byset_t = abs2idx_byset[vec_name][type_]
                 abs2meta_t = self._var_allprocs_abs2meta[type_]
 
                 for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):

@@ -1040,8 +1040,8 @@ class Group(System):
                     # Get varset info
                     set_name_in = meta_in['var_set']
                     set_name_out = meta_out['var_set']
-                    idx_byset_in = allprocs_abs2idx_byset['input'][abs_in]
-                    idx_byset_out = allprocs_abs2idx_byset['output'][abs_out]
+                    idx_byset_in = allprocs_abs2idx_byset[abs_in]
+                    idx_byset_out = allprocs_abs2idx_byset[abs_out]
 
                     # Get the sizes (byset) array
                     sizes_in = sizes_byset_in[set_name_in]

@@ -125,7 +125,7 @@ class DefaultVector(Vector):
 
         if nsets > 1:
             abs2meta_t = system._var_abs2meta[type_]
-            allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[self._name][type_]
+            allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[self._name]
             allprocs_abs2idx_t = system._var_allprocs_abs2idx[self._name]
             for abs_name in system._var_relevant_names[self._name][type_]:
                 set_name = abs2meta_t[abs_name]['var_set']
@@ -343,7 +343,7 @@ class DefaultVector(Vector):
         self._imag_views = imag_views = {}
         self._imag_views_flat = imag_views_flat = {}
 
-        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[self._name][type_]
+        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[self._name]
         sizes_byset_t = system._var_sizes_byset[self._name][type_]
         abs2meta_t = system._var_abs2meta[type_]
         for abs_name in system._var_relevant_names[self._name][type_]:
