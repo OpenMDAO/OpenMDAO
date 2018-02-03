@@ -1090,8 +1090,9 @@ class Group(System):
                     # 2. Compute the input indices
                     iproc = self.comm.rank
                     ind1 = ind2 = np.sum(sizes_in[:iproc, :])
-                    ind1 += np.sum(sizes_in[iproc, :idx_byset_in])
-                    ind2 += np.sum(sizes_in[iproc, :idx_byset_in + 1])
+                    delta = np.sum(sizes_in[iproc, :idx_byset_in])
+                    ind1 += delta
+                    ind2 += (delta + sizes_in[iproc, idx_byset_in])
                     input_inds = np.arange(ind1, ind2)
 
                     # Now the indices are ready - input_inds, output_inds

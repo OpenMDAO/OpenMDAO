@@ -1,5 +1,5 @@
 """Define the AssembledJacobian class."""
-from __future__ import division
+from __future__ import division, print_function
 
 import sys
 from collections import defaultdict
@@ -102,7 +102,7 @@ class AssembledJacobian(Jacobian):
         idx = system._var_allprocs_abs2idx['nonlinear'][type_][abs_name]
 
         ind1 = np.sum(sizes[iproc, :idx])
-        ind2 = np.sum(sizes[iproc, :idx + 1])
+        ind2 = ind1 + sizes[iproc, idx]
 
         return ind1, ind2
 
@@ -112,6 +112,7 @@ class AssembledJacobian(Jacobian):
         """
         # var_indices are the *global* indices for variables on this proc
         system = self._system
+        is_top = system.pathname == ''
 
         abs2meta_in = system._var_abs2meta['input']
         abs2meta_out = system._var_abs2meta['output']
@@ -124,33 +125,35 @@ class AssembledJacobian(Jacobian):
                 system._var_allprocs_abs_names['output']
         }
 
-        in_ranges = {}
-        for abs_name in system._var_allprocs_abs_names['input']:
-            in_ranges[abs_name] = self._get_var_range(abs_name, 'input')
+        in_ranges = {
+            abs_name: self._get_var_range(abs_name, 'input') for abs_name in
+                system._var_allprocs_abs_names['input']
+        }
 
         # set up view ranges for all subsystems
         for s in system.system_iter(recurse=True, include_self=True):
-            min_res_offset = sys.maxsize
-            max_res_offset = 0
-            min_in_offset = sys.maxsize
-            max_in_offset = 0
+            input_names = s._var_abs_names['input']
+            if input_names:
+                min_in_offset = in_ranges[input_names[0]][0]
+                max_in_offset = in_ranges[input_names[-1]][1]
+            else:
+                min_in_offset = sys.maxsize
+                max_in_offset = 0
 
-            for in_abs_name in s._var_abs_names['input']:
-                in_offset, in_end = in_ranges[in_abs_name]
-                if in_end > max_in_offset:
-                    max_in_offset = in_end
-                if in_offset < min_in_offset:
-                    min_in_offset = in_offset
-
-            for res_abs_name in s._var_abs_names['output']:
-                res_offset, res_end = out_ranges[res_abs_name]
-                if res_end > max_res_offset:
-                    max_res_offset = res_end
-                if res_offset < min_res_offset:
-                    min_res_offset = res_offset
+            output_names = s._var_abs_names['output']
+            if output_names:
+                min_res_offset = out_ranges[output_names[0]][0]
+                max_res_offset = out_ranges[output_names[-1]][1]
+            else:
+                min_res_offset = sys.maxsize
+                max_res_offset = 0
 
             self._view_ranges[s.pathname] = (
                 min_res_offset, max_res_offset, min_in_offset, max_in_offset)
+
+        # keep track of mapped keys to check for corner case where one source connects to
+        # multiple inputs using src_indices on the same component.
+        mapped_keys = {}
 
         # create the matrix subjacs
         for res_abs_name in system._var_abs_names['output']:
@@ -206,11 +209,21 @@ class AssembledJacobian(Jacobian):
                         # instead of d(output)/d(input) when we have
                         # src_indices
                         abs_key2 = (res_abs_name, out_abs_name)
+                        if abs_key2 in mapped_keys:
+                            raise RuntimeError("Jacobian assembly failure.  Output '%s' is "
+                                               "connected to multiple inputs %s on the same "
+                                               "component using src_indices. To correct this "
+                                               "issue, replace the multiple inputs with a single "
+                                               "input and handle splitting the entries inside "
+                                               "the component." %
+                                               (out_abs_name, sorted([abs_key[1],
+                                                                      mapped_keys[abs_key2][1]])))
                         self._keymap[abs_key] = abs_key2
+                        mapped_keys[abs_key2] = abs_key
                         int_mtx._add_submat(
                             abs_key2, info, res_offset, out_offset,
                             src_indices, shape, factor)
-                else:
+                elif not is_top:  # input is connected to something outside current system
                     ext_mtx._add_submat(
                         abs_key, info, res_offset, in_ranges[in_abs_name][0],
                         None, shape)
@@ -246,12 +259,8 @@ class AssembledJacobian(Jacobian):
 
         ext_mtx = self.options['matrix_class'](system.comm)
 
-        in_ranges = {}
-        src_indices_dict = {}
-        for abs_name in system._var_allprocs_abs_names['input']:
-            in_ranges[abs_name] = self._get_var_range(abs_name, 'input')[0]
-            src_indices_dict[abs_name] = \
-                system._var_abs2meta['input'][abs_name]['src_indices']
+        in_ranges = {n: self._get_var_range(n, 'input')[0] for n in
+                     system._var_allprocs_abs_names['input']}
 
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
             for res_abs_name in s._var_abs_names['output']:

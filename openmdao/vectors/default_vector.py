@@ -132,11 +132,11 @@ class DefaultVector(Vector):
 
                 idx_byset = allprocs_abs2idx_byset_t[abs_name]
                 ind_byset1 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset])
-                ind_byset2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1])
+                ind_byset2 = ind_byset1 + sizes_byset_t[set_name][iproc, idx_byset]
 
                 idx = allprocs_abs2idx_t[abs_name]
                 ind1 = np.sum(sizes_t[iproc, :idx])
-                ind2 = np.sum(sizes_t[iproc, :idx + 1])
+                ind2 = ind1 + sizes_t[iproc, idx]
 
                 indices[set_name][ind_byset1:ind_byset2] = np.arange(ind1, ind2)
 
@@ -351,7 +351,7 @@ class DefaultVector(Vector):
             set_name = abs2meta_t[abs_name]['var_set']
 
             ind_byset1 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset])
-            ind_byset2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1])
+            ind_byset2 = ind_byset1 + sizes_byset_t[set_name][iproc, idx_byset]
             shape = abs2meta_t[abs_name]['shape']
             if ncol > 1:
                 if not isinstance(shape, tuple):

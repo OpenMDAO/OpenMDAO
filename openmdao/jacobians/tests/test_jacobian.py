@@ -291,7 +291,7 @@ class TestJacobian(unittest.TestCase):
     dtypes = [
         ('int', 1),
         ('float', 2.1),
-        # ('complex', 3.2 + 1.1j), # TODO: enable when Vectors support complex entries.
+        #('complex', 3.2 + 1.1j), # TODO: enable when Vectors support complex entries.
     ]
 
     shapes = [
@@ -596,28 +596,6 @@ class TestJacobian(unittest.TestCase):
 
         assert_rel_error(self, prob['y'], 2 * np.ones(2))
 
-    def test_sparse_jac_with_subsolver_error(self):
-        prob = Problem()
-        indeps = prob.model.add_subsystem('indeps', IndepVarComp('x', 1.0))
-
-        G1 = prob.model.add_subsystem('G1', Group())
-        G1.add_subsystem('C1', ExecComp('y=2.0*x'))
-        G1.add_subsystem('C2', ExecComp('y=3.0*x'))
-
-        G1.nonlinear_solver = NewtonSolver()
-        prob.model.jacobian = CSRJacobian()
-
-        prob.model.connect('indeps.x', 'G1.C1.x')
-        prob.model.connect('indeps.x', 'G1.C2.x')
-
-        prob.setup(check=False)
-
-        with self.assertRaises(Exception) as context:
-            prob.run_model()
-        self.assertEqual(str(context.exception),
-                         "System 'G1' has a solver of type 'NewtonSolver'but a sparse "
-                         "AssembledJacobian has been set in a higher level system.")
-
     def test_assembled_jacobian_unsupported_cases(self):
 
         class ParaboloidApply(ImplicitComponent):
@@ -777,6 +755,34 @@ class TestJacobian(unittest.TestCase):
         msg = 'Variable name pair \("{}", "{}"\) must first be declared.'
         with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
             J = prob.compute_totals(of=['comp.y'], wrt=['p.x'])
+
+    def test_one_src_2_tgts_with_src_indices_error(self):
+        size = 10
+        prob = Problem()
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)))
+
+        G1 = prob.model.add_subsystem('G1', Group())
+        G1.add_subsystem('C1', ExecComp('z=2.0*y+3.0*x', x=np.zeros(size//2), y=np.zeros(size//2),
+                                        z=np.zeros(size//2)))
+
+        prob.model.jacobian = DenseJacobian()
+
+        prob.model.add_objective('G1.C1.z')
+        prob.model.add_design_var('indeps.x')
+
+        prob.model.connect('indeps.x', 'G1.C1.x', src_indices=[0,1,2,3,4])
+        prob.model.connect('indeps.x', 'G1.C1.y', src_indices=[5,6,7,8,9])
+
+        prob.setup(check=False)
+
+        with self.assertRaises(Exception) as context:
+            prob.final_setup()
+        self.assertEqual(str(context.exception),
+                         "Jacobian assembly failure.  Output 'indeps.x' is connected to multiple "
+                         "inputs ['G1.C1.x', 'G1.C1.y'] on the same component using src_indices. "
+                         "To correct this issue, replace the multiple inputs with a single input "
+                         "and handle splitting the entries inside the component.")
+
 
 if __name__ == '__main__':
     unittest.main()
