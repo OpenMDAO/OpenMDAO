@@ -97,7 +97,7 @@ class System(object):
         ('units', 'shape', 'size', 'var_set', 'ref', 'ref0', 'res_ref', 'distributed') for outputs.
     _var_abs2meta : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to metadata dictionaries for myproc variables.
-    _var_allprocs_abs2idx : {'input': dict, 'output': dict}
+    _var_allprocs_abs2idx : dict
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
     _var_allprocs_abs2idx_byset : {<vec_name>:{'input': dict of dict, 'output': dict of dict}, ...}
@@ -298,7 +298,7 @@ class System(object):
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_abs2meta = {'input': {}, 'output': {}}
 
-        self._var_allprocs_abs2idx = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2idx = {}
         self._var_allprocs_abs2idx_byset = None
 
         self._var_sizes = None
@@ -595,7 +595,7 @@ class System(object):
                                 ncol = voi['size']
                             else:
                                 owner = self._owning_rank['output'][vec_name]
-                                ncol = sizes[owner, abs2idx[vec_name]['output'][vec_name]]
+                                ncol = sizes[owner, abs2idx[vec_name][vec_name]]
                         rdct, _ = relevant[vec_name]['@all']
                         rel = rdct['output']
 
@@ -899,11 +899,10 @@ class System(object):
         self._var_allprocs_abs2idx_byset = abs2idx_byset = {}
 
         for vec_name in self._lin_rel_vec_name_list:
-            abs2idx[vec_name] = {'input': {}, 'output': {}}
+            abs2idx[vec_name] = abs2idx_t = {}
             abs2idx_byset[vec_name] = {'input': {}, 'output': {}}
             for type_ in ['input', 'output']:
                 counter = defaultdict(int)
-                abs2idx_t = abs2idx[vec_name][type_]
                 abs2idx_byset_t = abs2idx_byset[vec_name][type_]
                 abs2meta_t = self._var_allprocs_abs2meta[type_]
 
@@ -1587,7 +1586,7 @@ class System(object):
                 if abs_in in self._conn_global_abs_in2out:
                     abs_out = self._conn_global_abs_in2out[abs_in]
 
-                    if abs_out not in excl_sub._var_allprocs_abs2idx['linear']['output']:
+                    if abs_out not in excl_sub._var_allprocs_abs2idx['linear']:
                         scope_in.add(abs_in)
 
         self._scope_cache[excl_sub] = (scope_out, scope_in)
@@ -2379,7 +2378,7 @@ class System(object):
         if get_sizes:
             # Size them all
             sizes = self._var_sizes['nonlinear']['output']
-            abs2idx = self._var_allprocs_abs2idx['nonlinear']['output']
+            abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name in out:
                 if 'size' not in out[name]:
                     out[name]['size'] = sizes[self._owning_rank['output'][name], abs2idx[name]]
@@ -2431,7 +2430,7 @@ class System(object):
         if get_sizes:
             # Size them all
             sizes = self._var_sizes['nonlinear']['output']
-            abs2idx = self._var_allprocs_abs2idx['nonlinear']['output']
+            abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name in out:
                 if 'size' not in out[name]:
                     out[name]['size'] = sizes[self._owning_rank['output'][name], abs2idx[name]]

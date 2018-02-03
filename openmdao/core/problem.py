@@ -1099,7 +1099,7 @@ class Problem(object):
                 dinputs = input_vec[vecname]
                 doutputs = output_vec[vecname]
 
-                in_var_idx = model._var_allprocs_abs2idx[vecname]['output'][input_name]
+                in_var_idx = model._var_allprocs_abs2idx[vecname][input_name]
                 in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
 
                 dup = not in_var_meta['distributed']
@@ -1187,7 +1187,7 @@ class Problem(object):
         relevant = model._relevant
         fwd = (mode == 'fwd')
         prom2abs = model._var_allprocs_prom2abs_list['output']
-        abs2idx_out = model._var_allprocs_abs2idx['linear']['output']
+        abs2idx = model._var_allprocs_abs2idx['linear']
 
         if wrt is None:
             wrt = list(self.driver._designvars)
@@ -1462,7 +1462,7 @@ class Problem(object):
                         if use_rel_reduction and output_name not in relevant[input_name]:
                             # irrelevant output, just give zeros
                             if out_idxs is None:
-                                out_var_idx = abs2idx_out[output_name]
+                                out_var_idx = abs2idx[output_name]
                                 if output_name in remote_outputs:
                                     _, sz = remote_outputs[output_name]
                                 else:
@@ -1488,7 +1488,7 @@ class Problem(object):
                                     deriv_val = deriv_val[out_idxs]
 
                             if dup and nproc > 1:
-                                out_var_idx = abs2idx_out[output_name]
+                                out_var_idx = abs2idx[output_name]
                                 root = owning_ranks[output_name]
                                 if deriv_val is None:
                                     if out_idxs is not None:

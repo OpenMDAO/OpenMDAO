@@ -214,12 +214,12 @@ class Component(System):
                 sz = sizes[vec_name][type_]
                 sz_byset = sizes_byset[vec_name][type_]
                 abs2meta_t = self._var_abs2meta[type_]
-                allprocs_abs2idx_byset_t = self._var_allprocs_abs2idx_byset[vec_name][type_]
+                allprocs_abs2idx_byset_t = self._var_allprocs_abs2idx_byset[vec_name]
                 for idx, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
                     meta = abs2meta_t[abs_name]
                     set_name = meta['var_set']
                     size = meta['size']
-                    idx_byset = allprocs_abs2idx_byset_t[abs_name]
+                    idx_byset = allprocs_abs2idx_byset_t[type_][abs_name]
 
                     sz[iproc, idx] = size
                     sz_byset[set_name][iproc, idx_byset] = size

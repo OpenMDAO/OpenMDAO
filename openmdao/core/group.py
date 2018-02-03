@@ -1020,8 +1020,7 @@ class Group(System):
                         rev_xfer_in[isub][key] = []
                         rev_xfer_out[isub][key] = []
 
-            allprocs_abs2idx_byset_in = self._var_allprocs_abs2idx_byset[vec_name]['input']
-            allprocs_abs2idx_byset_out = self._var_allprocs_abs2idx_byset[vec_name]['output']
+            allprocs_abs2idx_byset = self._var_allprocs_abs2idx_byset[vec_name]
             sizes_byset_in = self._var_sizes_byset[vec_name]['input']
             sizes_byset_out = self._var_sizes_byset[vec_name]['output']
             row_offsets_in = self._var_row_offsets[vec_name]['input']
@@ -1041,8 +1040,8 @@ class Group(System):
                     # Get varset info
                     set_name_in = meta_in['var_set']
                     set_name_out = meta_out['var_set']
-                    idx_byset_in = allprocs_abs2idx_byset_in[abs_in]
-                    idx_byset_out = allprocs_abs2idx_byset_out[abs_out]
+                    idx_byset_in = allprocs_abs2idx_byset['input'][abs_in]
+                    idx_byset_out = allprocs_abs2idx_byset['output'][abs_out]
 
                     # Get the sizes (byset) array
                     sizes_in = sizes_byset_in[set_name_in]
