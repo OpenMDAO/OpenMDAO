@@ -181,8 +181,7 @@ class Vector(object):
         self._initialize_data(root_vector)
         self._initialize_views()
 
-        offs = self._system._var_row_offsets[self._name][self._typ][self._iproc]
-        self._length = offs[-1] if offs.size > 0 else 0
+        self._length = np.sum(a.shape[0] for a in self._data.values())
 
     def __str__(self):
         """

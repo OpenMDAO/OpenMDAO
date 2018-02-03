@@ -235,10 +235,10 @@ class Component(System):
                         self.comm.Allgather(sbyset[iproc, :], sbyset)
 
         for vec_name in vec_names:
+            sizes = self._var_sizes[vec_name]
             self._var_row_offsets[vec_name] = {}
             for typ in ['input', 'output']:
-                self._var_row_offsets[vec_name][typ] = np.cumsum(self._var_sizes[vec_name][typ],
-                                                                 axis=1)
+                self._var_row_offsets[vec_name][typ] = np.cumsum(sizes[typ], axis=1) - sizes[typ]
 
         self._var_sizes['nonlinear'] = self._var_sizes['linear']
         self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']
