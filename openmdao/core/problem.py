@@ -1656,9 +1656,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 out_stream.write('-' * (len(sys_name) + 15) + '\n')
                 out_stream.write("{}: '{}'".format(sys_type, sys_name) + '\n')
                 out_stream.write('-' * (len(sys_name) + 15) + '\n')
-            # print('-' * (len(sys_name) + 15), file=out_stream)
-            # print("{}: '{}'".format(sys_type, sys_name), file=out_stream)
-            # print('-' * (len(sys_name) + 15), file=out_stream)
 
             if compact_print:
                 # Error Header
@@ -1690,8 +1687,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 if out_stream:
                     out_stream.write(header + '\n')
                     out_stream.write('-' * len(header) + '\n' + '\n')
-                # print(header, file=out_stream)
-                # print('-' * len(header) + '\n', file=out_stream)
 
         # Sorted keys ensures deterministic ordering
         sorted_keys = sorted(iterkeys(derivatives))
@@ -1752,14 +1747,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 abs_err.forward,
                                 rel_err.forward,
                             ) + '\n')
-                        # print(deriv_line.format(
-                        #     _pad_name(of, 30, True),
-                        #     _pad_name(wrt, 30, True),
-                        #     magnitude.forward,
-                        #     magnitude.fd,
-                        #     abs_err.forward,
-                        #     rel_err.forward,
-                        # ), file=out_stream)
                     else:
                         if out_stream:
                             out_stream.write(deriv_line.format(
@@ -1775,19 +1762,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 rel_err.reverse,
                                 rel_err.forward_reverse,
                             ) + '\n')
-                        # print(deriv_line.format(
-                        #     _pad_name(of, 13, True),
-                        #     _pad_name(wrt, 13, True),
-                        #     magnitude.forward,
-                        #     magnitude.reverse,
-                        #     magnitude.fd,
-                        #     abs_err.forward,
-                        #     abs_err.reverse,
-                        #     abs_err.forward_reverse,
-                        #     rel_err.forward,
-                        #     rel_err.reverse,
-                        #     rel_err.forward_reverse,
-                        # ), file=out_stream)
                 else:
 
                     if totals:
@@ -1806,21 +1780,15 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     # Magnitudes
                     if out_stream:
                         out_stream.write("  {}: '{}' wrt '{}'".format(sys_name, of, wrt) + '\n')
-                        # print("  {}: '{}' wrt '{}'".format(sys_name, of, wrt), file=out_stream)
                         out_stream.write('    Forward Magnitude : {:.6e}'.format(magnitude.forward)
                                          + '\n')
-                        # print('    Forward Magnitude : {:.6e}'.format(magnitude.forward),
-                        #       file=out_stream)
                     if not totals:
                         txt = '    Reverse Magnitude : {:.6e}'
                         if out_stream:
                             out_stream.write(txt.format(magnitude.reverse) + '\n')
-                        # print(txt.format(magnitude.reverse), file=out_stream)
                     if out_stream:
                         out_stream.write('         Fd Magnitude : {:.6e} ({})'.format(magnitude.fd,
                                          fd_desc) + '\n')
-                    # print('         Fd Magnitude : {:.6e} ({})'.format(magnitude.fd,
-                    #       fd_desc), file=out_stream)
                     # Absolute Errors
                     if totals:
                         error_descs = ('(Jfor  - Jfd) ', )
@@ -1831,11 +1799,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         if out_stream:
                             out_stream.write('    Absolute Error {}: {}'.format(desc, error_str) +
                                              '\n')
-                        # print('    Absolute Error {}: {}'.format(desc, error_str),
-                        # file=out_stream)
                     if out_stream:
                         out_stream.write('\n')
-                    # print('', file=out_stream)
 
                     # Relative Errors
                     for error, desc in zip(rel_err, error_descs):
@@ -1843,41 +1808,28 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         if out_stream:
                             out_stream.write('    Relative Error {}: {}'.format(desc, error_str) +
                                              '\n')
-                        # print('    Relative Error {}: {}'.format(desc, error_str),
-                        # file=out_stream)
                     if out_stream:
                         out_stream.write('\n')
-                    # print('')
 
                     # Raw Derivatives
                     if out_stream:
                         out_stream.write('    Raw Forward Derivative (Jfor)\n')
-                        # print('    Raw Forward Derivative (Jfor)', file=out_stream)
                         out_stream.write(str(forward) + '\n')
-                        # print(str(forward), file=out_stream)
                         out_stream.write('\n')
-                        # print('', file=out_stream)
 
                     if not totals:
                         if out_stream:
                             out_stream.write('    Raw Reverse Derivative (Jfor)\n')
-                            # print('    Raw Reverse Derivative (Jfor)', file=out_stream)
                             out_stream.write(str(reverse) + '\n')
-                            # print(str(reverse), file=out_stream)
                             out_stream.write('\n')
-                            # print('', file=out_stream)
 
                     if out_stream:
                         out_stream.write('    Raw FD Derivative (Jfd)\n')
-                        # print('    Raw FD Derivative (Jfd)', file=out_stream)
                         out_stream.write(str(fd) + '\n')
-                        # print(str(fd), file=out_stream)
                         out_stream.write('\n')
-                        # print('', file=out_stream)
 
                     if out_stream:
                         out_stream.write(' -' * 30 + '\n')
-                    # print(' -' * 30, file=out_stream)
 
 
 def _pad_name(name, pad_num=10, quotes=False):
