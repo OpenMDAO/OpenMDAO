@@ -151,36 +151,24 @@ class AssembledJacobian(Jacobian):
             self._view_ranges[s.pathname] = (
                 min_res_offset, max_res_offset, min_in_offset, max_in_offset)
 
+        abs2prom_out = system._var_abs2prom['output']
+        conns = system._conn_global_abs_in2out
+
         # create the matrix subjacs
-        for res_abs_name in system._var_abs_names['output']:
+        for abs_key, (info, shape) in iteritems(self._subjacs_info):
+            if not info['dependent']:
+                continue
+            res_abs_name, wrt_abs_name = abs_key
             res_offset, _ = out_ranges[res_abs_name]
-            res_size = abs2meta[res_abs_name]['size']
-
-            for out_abs_name in system._var_abs_names['output']:
-                out_offset, _ = out_ranges[out_abs_name]
-
-                abs_key = (res_abs_name, out_abs_name)
-                if abs_key in self._subjacs_info:
-                    info, shape = self._subjacs_info[abs_key]
-                    if info['dependent']:
-                        int_mtx._add_submat(
-                            abs_key, info, res_offset, out_offset, None, shape)
-
-            for in_abs_name in system._var_abs_names['input']:
-                abs_key = (res_abs_name, in_abs_name)
-
-                if abs_key in self._subjacs_info:
-                    info, shape = self._subjacs_info[abs_key]
-                    if not info['dependent']:
-                        continue
-                else:
-                    continue
-
-                if in_abs_name in system._conn_global_abs_in2out:
-                    out_abs_name = system._conn_global_abs_in2out[in_abs_name]
-
+            if wrt_abs_name in abs2prom_out:
+                out_offset, _ = out_ranges[wrt_abs_name]
+                int_mtx._add_submat(
+                    abs_key, info, res_offset, out_offset, None, shape)
+            else:
+                if wrt_abs_name in conns:  # connected input
+                    out_abs_name = conns[wrt_abs_name]
                     # calculate unit conversion
-                    in_units = abs2meta[in_abs_name]['units']
+                    in_units = abs2meta[wrt_abs_name]['units']
                     out_units = abs2meta[out_abs_name]['units']
                     if in_units and out_units and in_units != out_units:
                         factor, _ = get_conversion(out_units, in_units)
@@ -190,7 +178,7 @@ class AssembledJacobian(Jacobian):
                         factor = None
 
                     out_offset, _ = out_ranges[out_abs_name]
-                    src_indices = abs2meta[in_abs_name]['src_indices']
+                    src_indices = abs2meta[wrt_abs_name]['src_indices']
                     if src_indices is None:
                         int_mtx._add_submat(
                             abs_key, info, res_offset, out_offset, None, shape,
@@ -204,9 +192,10 @@ class AssembledJacobian(Jacobian):
                         int_mtx._add_submat(
                             abs_key2, info, res_offset, out_offset,
                             src_indices, shape, factor)
-                else:
+
+                else:  # input connected to src outside current system
                     ext_mtx._add_submat(
-                        abs_key, info, res_offset, in_ranges[in_abs_name][0],
+                        abs_key, info, res_offset, in_ranges[wrt_abs_name][0],
                         None, shape)
 
                 if abs_key not in self._keymap:

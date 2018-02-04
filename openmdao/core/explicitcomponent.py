@@ -171,31 +171,19 @@ class ExplicitComponent(Component):
         """
         Set subjacobian info into our jacobian.
         """
+        abs2prom = self._var_abs2prom
+
         with self.jacobian_context() as J:
-            outputs = self._var_abs_names['output']
-            inputs = self._var_abs_names['input']
+            for abs_key, meta in iteritems(self._subjacs_info):
+                if meta['value'] is None:
+                    out_size = self._var_abs2meta[abs_key[0]]['size']
+                    in_size = self._var_abs2meta[abs_key[1]]['size']
+                    meta['value'] = np.zeros((out_size, in_size))
 
-            for wrt_name, wrt_vars in (('output', outputs), ('input', inputs)):
-                for abs_key in product(outputs, wrt_vars):
-                    if abs_key in self._subjacs_info:
-                        meta = self._subjacs_info[abs_key]
-                    else:
-                        meta = SUBJAC_META_DEFAULTS.copy()
-                    dependent = meta['dependent']
+                J._set_partials_meta(abs_key, meta, abs_key[1] in abs2prom['input'])
 
-                    if not dependent:
-                        continue
-
-                    if meta['value'] is None:
-                        out_size = self._var_abs2meta[abs_key[0]]['size']
-                        in_size = self._var_abs2meta[abs_key[1]]['size']
-                        meta['value'] = np.zeros((out_size, in_size))
-
-                    J._set_partials_meta(abs_key, meta, wrt_name == 'input')
-
-                    method = meta.get('method', False)
-                    if method:
-                        self._approx_schemes[method].add_approximation(abs_key, meta)
+                if 'method' in meta and meta['method']:
+                    self._approx_schemes[meta['method']].add_approximation(abs_key, meta)
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()

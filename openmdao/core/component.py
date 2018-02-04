@@ -727,6 +727,9 @@ class Component(System):
             Value of subjacobian.  If rows and cols are not None, this will
             contain the values found at each (row, col) location in the subjac.
         """
+        if not dependent:
+            return
+
         if val is not None and not issparse(val):
             val = np.atleast_1d(val)
             # np.promote_types  will choose the smallest dtype that can contain both arguments
@@ -768,8 +771,6 @@ class Component(System):
             multiple_items = True
 
             for rel_key in product(of_matches, wrt_matches):
-                if not dependent:
-                    continue
                 meta_changes = {
                     'rows': rows,
                     'cols': cols,
@@ -877,9 +878,10 @@ class Component(System):
                 self._check_partials_meta(key, meta)
                 J._set_partials_meta(key, meta)
 
-                method = meta.get('method', False)
-                if method:
-                    self._approx_schemes[method].add_approximation(key, meta)
+                if 'method' in meta:
+                    method = meta['method']
+                    if method:
+                        self._approx_schemes[method].add_approximation(key, meta)
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()
