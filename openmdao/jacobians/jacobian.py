@@ -69,6 +69,7 @@ class Jacobian(object):
         """
         abs2meta = self._system._var_abs2meta
 
+        print('abs', abs_key, abs2meta)
         if abs_key[1] in abs2meta['output']:
             return (abs2meta['output'][abs_key[0]]['size'], abs2meta['output'][abs_key[1]]['size'])
         return (abs2meta['output'][abs_key[0]]['size'], abs2meta['input'][abs_key[1]]['size'])

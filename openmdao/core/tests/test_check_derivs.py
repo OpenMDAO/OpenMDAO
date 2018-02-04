@@ -6,14 +6,14 @@ from six import iteritems
 import numpy as np
 
 from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NonlinearRunOnce, \
-                         ImplicitComponent, NonlinearBlockGS, LinearBlockGS
+                         ImplicitComponent, NonlinearBlockGS, LinearBlockGS, ParallelGroup, \
+                         ExecComp
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 from openmdao.test_suite.components.sellar import SellarDerivatives
-from openmdao.test_suite.groups.parallel_groups import FanOutGrouped
 
 if MPI:
     from openmdao.api import PETScVector
@@ -1479,13 +1479,24 @@ class TestProblemCheckTotalsMPI(unittest.TestCase):
     def test_fan_out(self):
 
         prob = Problem()
-        prob.model = FanOutGrouped()
-        prob.model.linear_solver = LinearBlockGS()
-        prob.model.sub.linear_solver = LinearBlockGS()
+        group = prob.model = Group()
 
-        prob.model.add_design_var('iv.x')
-        prob.model.add_constraint('c2.y', upper=0.0)
-        prob.model.add_constraint('c3.y', upper=0.0)
+        sub = group.add_subsystem('sub', ParallelGroup())
+
+        sub.add_subsystem('p1', IndepVarComp('x', 3.0))
+        sub.add_subsystem('p2', IndepVarComp('x', 5.0))
+        sub.add_subsystem('c1', ExecComp(['y = 2.0*x']))
+        sub.add_subsystem('c2', ExecComp(['y = 4.0*x']))
+        sub.connect('p1.x', 'c1.x')
+        sub.connect('p2.x', 'c2.x')
+
+        group.add_subsystem('sum', ExecComp(['y = z1 + z2']))
+        group.connect('sub.c1.y', 'sum.z1')
+        group.connect('sub.c2.y', 'sum.z2')
+
+        prob.model.sub.add_design_var('p1.x')
+        prob.model.sub.add_design_var('p2.x')
+        prob.model.add_objective('sum.y')
 
         prob.setup(vector_class=vector_class, check=False, mode='fwd')
         prob.set_solver_print(level=0)
