@@ -162,23 +162,18 @@ class AssembledJacobian(Jacobian):
                 abs_key = (res_abs_name, out_abs_name)
                 if abs_key in self._subjacs_info:
                     info, shape = self._subjacs_info[abs_key]
-                else:
-                    info = SUBJAC_META_DEFAULTS
-                    shape = (res_size, abs2meta[out_abs_name]['size'])
-
-                int_mtx._add_submat(
-                    abs_key, info, res_offset, out_offset, None, shape)
+                    if info['dependent']:
+                        int_mtx._add_submat(
+                            abs_key, info, res_offset, out_offset, None, shape)
 
             for in_abs_name in system._var_abs_names['input']:
                 abs_key = (res_abs_name, in_abs_name)
 
                 if abs_key in self._subjacs_info:
                     info, shape = self._subjacs_info[abs_key]
+                    if not info['dependent']:
+                        continue
                 else:
-                    info = SUBJAC_META_DEFAULTS
-                    shape = (res_size, abs2meta[in_abs_name]['size'])
-
-                if not info['dependent']:
                     continue
 
                 if in_abs_name in system._conn_global_abs_in2out:

@@ -768,6 +768,8 @@ class Component(System):
             multiple_items = True
 
             for rel_key in product(of_matches, wrt_matches):
+                if not dependent:
+                    continue
                 meta_changes = {
                     'rows': rows,
                     'cols': cols,
@@ -870,11 +872,13 @@ class Component(System):
         """
         with self.jacobian_context() as J:
             for key, meta in iteritems(self._subjacs_info):
+                if not meta['dependent']:
+                    continue
                 self._check_partials_meta(key, meta)
                 J._set_partials_meta(key, meta)
 
                 method = meta.get('method', False)
-                if method and meta['dependent']:
+                if method:
                     self._approx_schemes[method].add_approximation(key, meta)
 
         for approx in itervalues(self._approx_schemes):
