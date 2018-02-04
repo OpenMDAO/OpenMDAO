@@ -171,15 +171,12 @@ class Problem(object):
             else:
                 proms = self.model._var_allprocs_prom2abs_list
                 meta = self.model._var_abs2meta
-                if name in meta['input']:
+                if name in meta:
                     if name in self.model._conn_abs_in2out:
                         src_name = self.model._conn_abs_in2out[name]
-                        val = meta['input'][src_name]['value']
+                        val = meta[src_name]['value']
                     else:
-                        val = meta['input'][name]['value']
-
-                elif name in meta['output']:
-                    val = meta['output'][name]['value']
+                        val = meta[name]['value']
 
                 elif name in proms['input']:
                     abs_name = proms['input'][name][0]
@@ -192,16 +189,16 @@ class Problem(object):
                             # This triggers a check for unconnected non-unique inputs, and
                             # raises the same error as vector access.
                             abs_name = prom_name2abs_name(self.model, name, 'input')
-                        val = meta['output'][src_name]['value']
+                        val = meta[src_name]['value']
                     else:
                         # This triggers a check for unconnected non-unique inputs, and
                         # raises the same error as vector access.
                         abs_name = prom_name2abs_name(self.model, name, 'input')
-                        val = meta['input'][abs_name]['value']
+                        val = meta[abs_name]['value']
 
                 elif name in proms['output']:
                     abs_name = prom_name2abs_name(self.model, name, 'output')
-                    val = meta['output'][abs_name]['value']
+                    val = meta[abs_name]['value']
 
                 else:
                     msg = 'Variable name "{}" not found.'
@@ -674,20 +671,20 @@ class Problem(object):
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
                                 try:
-                                    in_size = comp._var_abs2meta['input'][wrt]['size']
+                                    in_size = comp._var_abs2meta[wrt]['size']
                                 except KeyError:
-                                    in_size = comp._var_abs2meta['output'][wrt]['size']
+                                    in_size = comp._var_abs2meta[wrt]['size']
 
-                                out_size = comp._var_abs2meta['output'][of]['size']
+                                out_size = comp._var_abs2meta[of]['size']
                                 deriv_value = np.zeros((out_size, in_size))
 
                             if force_dense:
                                 if isinstance(deriv_value, list):
                                     try:
-                                        in_size = comp._var_abs2meta['input'][wrt]['size']
+                                        in_size = comp._var_abs2meta[wrt]['size']
                                     except KeyError:
-                                        in_size = comp._var_abs2meta['output'][wrt]['size']
-                                    out_size = comp._var_abs2meta['output'][of]['size']
+                                        in_size = comp._var_abs2meta[wrt]['size']
+                                    out_size = comp._var_abs2meta[of]['size']
                                     tmp_value = np.zeros((out_size, in_size))
                                     jac_val, jac_i, jac_j = deriv_value
                                     # if a scalar value is provided (in declare_partials),
@@ -1100,7 +1097,7 @@ class Problem(object):
                 doutputs = output_vec[vecname]
 
                 in_var_idx = model._var_allprocs_abs2idx[vecname][input_name]
-                in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
+                in_var_meta = model._var_allprocs_abs2meta[input_name]
 
                 dup = not in_var_meta['distributed']
 

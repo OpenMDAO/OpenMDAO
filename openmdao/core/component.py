@@ -170,13 +170,13 @@ class Component(System):
                 abs2prom[type_][abs_name] = prom_name
 
                 # Compute allprocs_abs2meta
-                allprocs_abs2meta[type_][abs_name] = {
+                allprocs_abs2meta[abs_name] = {
                     meta_name: metadata[meta_name]
                     for meta_name in global_meta_names[type_]
                 }
 
                 # Compute abs2meta
-                abs2meta[type_][abs_name] = metadata
+                abs2meta[abs_name] = metadata
 
     def _setup_var_sizes(self, recurse=True):
         """
@@ -212,12 +212,12 @@ class Component(System):
             allprocs_abs2idx_byset_t = self._var_allprocs_abs2idx_byset[vec_name]
 
             # Compute _var_sizes and _var_sizes_byset
+            abs2meta = self._var_abs2meta
             for type_ in ('input', 'output'):
                 sz = sizes[vec_name][type_]
                 sz_byset = sizes_byset[vec_name][type_]
-                abs2meta_t = self._var_abs2meta[type_]
                 for idx, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
-                    meta = abs2meta_t[abs_name]
+                    meta = abs2meta[abs_name]
                     set_name = meta['var_set']
                     size = meta['size']
                     idx_byset = allprocs_abs2idx_byset_t[abs_name]
@@ -825,11 +825,8 @@ class Component(System):
             Metadata dictionary from declare_partials.
         """
         if meta['dependent']:
-            out_size = np.prod(self._var_abs2meta['output'][abs_key[0]]['shape'])
-            if abs_key[1] in self._var_abs2meta['input']:
-                in_size = self._var_abs2meta['input'][abs_key[1]]['size']
-            else:  # assume output (or get a KeyError)
-                in_size = self._var_abs2meta['output'][abs_key[1]]['size']
+            out_size = np.prod(self._var_abs2meta[abs_key[0]]['shape'])
+            in_size = self._var_abs2meta[abs_key[1]]['size']
 
             if in_size == 0 and self.comm.rank != 0:  # 'inactive' component
                 return

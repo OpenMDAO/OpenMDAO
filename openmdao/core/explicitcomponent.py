@@ -74,14 +74,14 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._setup_partials()
 
-        abs2meta_out = self._var_abs2meta['output']
+        abs2meta = self._var_abs2meta
         abs2prom_out = self._var_abs2prom['output']
 
         # Note: These declare calls are outside of setup_partials so that users do not have to
         # call the super version of setup_partials. This is still in the final setup.
         other_names = []
         for out_abs in self._var_abs_names['output']:
-            meta = abs2meta_out[out_abs]
+            meta = abs2meta[out_abs]
             out_name = abs2prom_out[out_abs]
             arange = np.arange(meta['size'])
 
@@ -187,8 +187,8 @@ class ExplicitComponent(Component):
                         continue
 
                     if meta['value'] is None:
-                        out_size = self._var_abs2meta['output'][abs_key[0]]['size']
-                        in_size = self._var_abs2meta[wrt_name][abs_key[1]]['size']
+                        out_size = self._var_abs2meta[abs_key[0]]['size']
+                        in_size = self._var_abs2meta[abs_key[1]]['size']
                         meta['value'] = np.zeros((out_size, in_size))
 
                     J._set_partials_meta(abs_key, meta, wrt_name == 'input')

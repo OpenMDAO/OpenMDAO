@@ -113,8 +113,7 @@ class AssembledJacobian(Jacobian):
         # var_indices are the *global* indices for variables on this proc
         system = self._system
 
-        abs2meta_in = system._var_abs2meta['input']
-        abs2meta_out = system._var_abs2meta['output']
+        abs2meta = system._var_abs2meta
 
         self._int_mtx = int_mtx = self.options['matrix_class'](system.comm)
         ext_mtx = self.options['matrix_class'](system.comm)
@@ -155,7 +154,7 @@ class AssembledJacobian(Jacobian):
         # create the matrix subjacs
         for res_abs_name in system._var_abs_names['output']:
             res_offset, _ = out_ranges[res_abs_name]
-            res_size = abs2meta_out[res_abs_name]['size']
+            res_size = abs2meta[res_abs_name]['size']
 
             for out_abs_name in system._var_abs_names['output']:
                 out_offset, _ = out_ranges[out_abs_name]
@@ -165,7 +164,7 @@ class AssembledJacobian(Jacobian):
                     info, shape = self._subjacs_info[abs_key]
                 else:
                     info = SUBJAC_META_DEFAULTS
-                    shape = (res_size, abs2meta_out[out_abs_name]['size'])
+                    shape = (res_size, abs2meta[out_abs_name]['size'])
 
                 int_mtx._add_submat(
                     abs_key, info, res_offset, out_offset, None, shape)
@@ -177,7 +176,7 @@ class AssembledJacobian(Jacobian):
                     info, shape = self._subjacs_info[abs_key]
                 else:
                     info = SUBJAC_META_DEFAULTS
-                    shape = (res_size, abs2meta_in[in_abs_name]['size'])
+                    shape = (res_size, abs2meta[in_abs_name]['size'])
 
                 if not info['dependent']:
                     continue
@@ -186,8 +185,8 @@ class AssembledJacobian(Jacobian):
                     out_abs_name = system._conn_global_abs_in2out[in_abs_name]
 
                     # calculate unit conversion
-                    in_units = abs2meta_in[in_abs_name]['units']
-                    out_units = abs2meta_out[out_abs_name]['units']
+                    in_units = abs2meta[in_abs_name]['units']
+                    out_units = abs2meta[out_abs_name]['units']
                     if in_units and out_units and in_units != out_units:
                         factor, _ = get_conversion(out_units, in_units)
                         if factor == 1.0:
@@ -196,7 +195,7 @@ class AssembledJacobian(Jacobian):
                         factor = None
 
                     out_offset, _ = out_ranges[out_abs_name]
-                    src_indices = abs2meta_in[in_abs_name]['src_indices']
+                    src_indices = abs2meta[in_abs_name]['src_indices']
                     if src_indices is None:
                         int_mtx._add_submat(
                             abs_key, info, res_offset, out_offset, None, shape,
@@ -240,8 +239,7 @@ class AssembledJacobian(Jacobian):
         system : <System>
             The system being solved using a sub-view of the jacobian.
         """
-        abs2meta_in = system._var_abs2meta['input']
-        abs2meta_out = system._var_abs2meta['output']
+        abs2meta = system._var_abs2meta
         ranges = self._view_ranges[system.pathname]
 
         ext_mtx = self.options['matrix_class'](system.comm)
@@ -251,12 +249,12 @@ class AssembledJacobian(Jacobian):
         for abs_name in system._var_allprocs_abs_names['input']:
             in_ranges[abs_name] = self._get_var_range(abs_name, 'input')[0]
             src_indices_dict[abs_name] = \
-                system._var_abs2meta['input'][abs_name]['src_indices']
+                system._var_abs2meta[abs_name]['src_indices']
 
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
             for res_abs_name in s._var_abs_names['output']:
                 res_offset = self._get_var_range(res_abs_name, 'output')[0]
-                res_size = abs2meta_out[res_abs_name]['size']
+                res_size = abs2meta[res_abs_name]['size']
 
                 for in_abs_name in s._var_abs_names['input']:
                     if in_abs_name not in system._conn_global_abs_in2out:
@@ -266,7 +264,7 @@ class AssembledJacobian(Jacobian):
                             info, shape = self._subjacs_info[abs_key]
                         else:
                             info = SUBJAC_META_DEFAULTS
-                            shape = (res_size, abs2meta_in[in_abs_name]['size'])
+                            shape = (res_size, abs2meta[in_abs_name]['size'])
 
                         ext_mtx._add_submat(
                             abs_key, info, res_offset - ranges[0],
