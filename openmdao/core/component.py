@@ -553,15 +553,16 @@ class Component(System):
             if not wrt_matches:
                 raise ValueError('No matches were found for wrt="{}"'.format(wrt_pattern))
 
+            info = self._subjacs_info
             for rel_key in product(of_matches, wrt_matches):
-                meta_changes = {
-                    'method': method,
-                }
                 abs_key = rel_key2abs_key(self, rel_key)
-                meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
-                meta.update(meta_changes)
+                if abs_key in info:
+                    meta = info[abs_key]
+                else:
+                    meta = SUBJAC_META_DEFAULTS.copy()
+                meta['method'] = method
                 meta.update(kwargs)
-                self._subjacs_info[abs_key] = meta
+                info[abs_key] = meta
 
     def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None,
                          method='exact', **kwargs):
