@@ -114,7 +114,9 @@ def print_citations(prob, classes=None, out_stream=_DEFAULT_OUT_STREAM):
 
     if out_stream:
         for klass, cite in citations.items():
-            print("Class: {}".format(klass), file=out_stream)
+            out_stream.write("Class: {}".format(klass) + '\n')
+            # print("Class: {}".format(klass), file=out_stream)
             lines = cite.split('\n')
             for line in lines:
-                print("    {}".format(line), file=out_stream)
+                out_stream.write("    {}".format(line) + '\n')
+                # print("    {}".format(line), file=out_stream)

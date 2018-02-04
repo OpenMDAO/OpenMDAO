@@ -2762,8 +2762,10 @@ class System(object):
             header = "%d %s(s) in '%s'" % (count, header_name, pathname)
         else:
             header = "%d %s %s(s) in '%s'" % (count, comp_type, header_name, pathname)
-        print(header, file=out_stream)
-        print("-" * len(header) + "\n", file=out_stream)
+        out_stream.write(header + '\n')
+        out_stream.write('-' * len(header) + '\n' + '\n')
+        # print(header, file=out_stream)
+        # print("-" * len(header) + "\n", file=out_stream)
 
         if not count:
             return
@@ -2820,12 +2822,15 @@ class System(object):
             column_header += '{:{align}{width}}'.format(column_name, align=self._align,
                                                         width=self._column_widths[column_name])
             column_dashes += self._column_spacing * ' ' + self._column_widths[column_name] * '-'
-        print(column_header, file=out_stream)
-        print(column_dashes, file=out_stream)
+        out_stream.write(column_header + '\n')
+        out_stream.write(column_dashes + '\n')
+        # print(column_header, file=out_stream)
+        # print(column_dashes, file=out_stream)
 
         # Write out the variable names and optional values and metadata
         if hierarchical:
-            print(top_level_system_name, file=out_stream)
+            out_stream.write(top_level_system_name + '\n')
+            # print(top_level_system_name, file=out_stream)
 
             cur_sys_names = []
             # _var_allprocs_abs_names has all the vars across all procs in execution order
@@ -2854,7 +2859,8 @@ class System(object):
                 indent = len(existing_sys_names) * self._indent_inc
                 for i, sys_name in enumerate(remaining_sys_path_parts):
                     indent += self._indent_inc
-                    print(indent * ' ' + sys_name, file=out_stream)
+                    out_stream.write(indent * ' ' + sys_name + '\n')
+                    # print(indent * ' ' + sys_name, file=out_stream)
                 cur_sys_names = varname_sys_names
 
                 indent += self._indent_inc
@@ -2868,7 +2874,8 @@ class System(object):
                     row = '{:{align}{width}}'.format(name, align=self._align, width=max_varname_len)
                     self._write_outputs_rows(out_stream, row, column_names, dict_of_outputs[name],
                                              print_arrays)
-        print('\n', file=out_stream)
+        out_stream.write(2 * '\n')
+        # print('\n', file=out_stream)
 
     def _write_outputs_rows(self, out_stream, row, column_names, dict_of_outputs, print_arrays):
         """
@@ -2909,14 +2916,17 @@ class System(object):
                 out = str(dict_of_outputs[column_name])
             row += '{:{align}{width}}'.format(out, align=self._align,
                                               width=self._column_widths[column_name])
-        print(row, file=out_stream)
+        out_stream.write(row + '\n')
+        # print(row, file=out_stream)
         if print_arrays:
             for column_name in have_array_values:
-                print("{}  {}:".format(left_column_width * ' ', column_name), file=out_stream)
+                out_stream.write("{}  {}:\n".format(left_column_width * ' ', column_name))
+                # print("{}  {}:".format(left_column_width * ' ', column_name), file=out_stream)
                 out_str = str(dict_of_outputs[column_name])
                 indented_lines = [(left_column_width + self._indent_inc) * ' ' +
                                   s for s in out_str.splitlines()]
-                print('\n'.join(indented_lines), file=out_stream)
+                out_stream.write('\n'.join(indented_lines) + '\n')
+                # print('\n'.join(indented_lines), file=out_stream)
 
     def run_solve_nonlinear(self):
         """
