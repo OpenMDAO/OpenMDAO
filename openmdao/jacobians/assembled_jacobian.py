@@ -246,9 +246,10 @@ class AssembledJacobian(Jacobian):
 
                         if abs_key in self._subjacs_info:
                             info, shape = self._subjacs_info[abs_key]
+                            if not info['dependent']:
+                                continue
                         else:
-                            info = SUBJAC_META_DEFAULTS
-                            shape = (res_size, abs2meta[in_abs_name]['size'])
+                            continue
 
                         ext_mtx._add_submat(
                             abs_key, info, res_offset - ranges[0],
@@ -273,15 +274,15 @@ class AssembledJacobian(Jacobian):
         """
         system = self._system
         int_mtx = self._int_mtx
-        subjacs = self._subjacs
-        keymap = self._keymap
         ext_mtx = self._ext_mtx[system.pathname]
-        global_conns = system._conn_global_abs_in2out
-        output_names = system._var_abs_names['output']
-        input_names = system._var_abs_names['input']
+        subjacs = self._subjacs
 
         subjac_iters = self._subjac_iters[system.pathname]
         if subjac_iters is None:
+            keymap = self._keymap
+            global_conns = system._conn_global_abs_in2out
+            output_names = system._var_abs_names['output']
+            input_names = system._var_abs_names['input']
 
             # This is the level where the AssembledJacobian is slotted.
             # The of and wrt are the inputs and outputs that it sees, if they are in the subjacs.
