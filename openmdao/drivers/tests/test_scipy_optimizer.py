@@ -1,10 +1,14 @@
-""" Unit tests for the ScipyOptimizer Driver."""
+""" Unit tests for the ScipyOptimizeDriver."""
 
 import unittest
+import sys
+import warnings
+
+from six import StringIO
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizer, ExplicitComponent
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizeDriver, ScipyOptimizer, ExplicitComponent
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -13,7 +17,20 @@ from openmdao.test_suite.components.simple_comps import NonSquareArrayComp
 from openmdao.test_suite.groups.sin_fitter import SineFitter
 
 
-class TestScipyOptimizer(unittest.TestCase):
+class TestScipyOptimizeDriver(unittest.TestCase):
+
+    def test_scipyoptimizer_deprecation(self): 
+
+        msg = "'ScipyOptimizer' provides backwards compatibility " \
+            + "with OpenMDAO <= 2.2 ; use 'ScipyOptimizeDriver' instead."
+
+        # check deprecation on getter
+        with warnings.catch_warnings(record=True) as w:
+            driver = ScipyOptimizer()
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), msg)
 
     def test_compute_totals_basic_return_array(self):
         # Make sure 'array' return_format works.
@@ -30,7 +47,10 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed.")
 
         of = ['comp.f_xy']
         wrt = ['p1.x', 'p2.y']
@@ -40,7 +60,10 @@ class TestScipyOptimizer(unittest.TestCase):
         assert_rel_error(self, derivs[0, 1], 8.0, 1e-6)
 
         prob.setup(check=False, mode='rev')
-        prob.run_model()
+
+        failed, rel_err, abs_err = prob.run_model()
+
+        self.assertFalse(failed, "Optimization failed.")
 
         of = ['comp.f_xy']
         wrt = ['p1.x', 'p2.y']
@@ -64,18 +87,22 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('comp.y2')
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed.")
 
         derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'],
-                                                   return_format='array')
+                                             return_format='array')
 
         J = comp.JJ[0:3, 0:2]
         assert_rel_error(self, J, derivs, 1.0e-3)
 
         # Support for a name to be in 'of' and 'wrt'
 
-        derivs = prob.driver._compute_totals(of=['comp.y2', 'px.x', 'comp.y1'], wrt=['px.x'],
-                                                   return_format='array')
+        derivs = prob.driver._compute_totals(of=['comp.y2', 'px.x', 'comp.y1'],
+                                             wrt=['px.x'],
+                                             return_format='array')
 
         assert_rel_error(self, J, derivs[3:, :], 1.0e-3)
         assert_rel_error(self, comp.JJ[3:4, 0:2], derivs[0:1, :], 1.0e-3)
@@ -92,12 +119,15 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_objective('px.x')
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed.")
 
         # Support for a name to be in 'of' and 'wrt'
 
         J = prob.driver._compute_totals(of=['px.x'], wrt=['px.x'],
-                                                   return_format='array')
+                                        return_format='array')
 
         assert_rel_error(self, J, np.eye(2), 1.0e-3)
 
@@ -112,7 +142,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -122,7 +152,11 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
@@ -137,7 +171,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'COBYLA'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -147,7 +181,11 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
@@ -164,7 +202,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -175,7 +213,11 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', upper=-15.0)
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -193,7 +235,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -205,7 +247,11 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=15.0)
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -223,7 +269,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -234,7 +280,11 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', equals=-15.0)
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         # (Note, loose tol because of appveyor py3.4 machine.)
@@ -253,7 +303,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'COBYLA'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -286,7 +336,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -297,9 +347,12 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=-11.0, upper=-10.0)
 
         prob.setup(check=False)
-        prob.run_driver()
 
-        # Minimum should be at (7.166667, -7.833334)
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+
         assert_rel_error(self, prob['y'] - prob['x'], -11.0, 1e-6)
 
     def test_simple_paraboloid_double_sided_high(self):
@@ -314,7 +367,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -325,9 +378,12 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0)
 
         prob.setup(check=False)
-        prob.run_driver()
 
-        # Minimum should be at (7.166667, -7.833334)
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_array_comp2D(self):
@@ -344,7 +400,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -354,7 +410,11 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', equals=0.0)
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         obj = prob['o']
         assert_rel_error(self, obj, 20.0, 1e-6)
@@ -371,7 +431,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -381,7 +441,11 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('areas', equals=np.array([24.0, 21.0, 3.5, 17.5]))
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         obj = prob['o']
         assert_rel_error(self, obj, 41.5, 1e-6)
@@ -398,7 +462,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -408,7 +472,11 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('areas', lower=np.array([24.0, 21.0, 3.5, 17.5]), upper=np.array([24.0, 21.0, 3.5, 17.5]))
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         con = prob['areas']
         assert_rel_error(self, con, np.array([[24.0, 21.0], [3.5, 17.5]]), 1e-6)
@@ -425,7 +493,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -435,7 +503,11 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('areas', lower=20.0, upper=20.0)
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         obj = prob['o']
         assert_rel_error(self, obj, 20.0, 1e-6)
@@ -454,7 +526,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -464,7 +536,11 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', equals=0.0)
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         obj = prob['o']
         assert_rel_error(self, obj, 20.0, 1e-6)
@@ -481,25 +557,24 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
 
-        model.add_design_var('x', lower=-50.0, upper=50.0, ref=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0, ref=50.0)
+        model.add_design_var('x', lower=-50.0, upper=50.0, ref=.02)
+        model.add_design_var('y', lower=-50.0, upper=50.0, ref=.02)
         model.add_objective('f_xy')
         model.add_constraint('c', lower=10.0, upper=11.0)
 
         prob.setup(check=False, mode='fwd')
+
         failed = prob.run_driver()
 
-        # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
-        # test fails if we add this, but I don't know how to fix the failure, so
-        # I just put in a story to fix it.
-        # self.assertTrue(not failed, "Optimization FAILED.")
+        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_desvars_rev(self):
 
@@ -513,20 +588,23 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
 
-        model.add_design_var('x', lower=-50.0, upper=50.0, ref=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0, ref=50.0)
+        model.add_design_var('x', lower=-50.0, upper=50.0, ref=.02)
+        model.add_design_var('y', lower=-50.0, upper=50.0, ref=.02)
         model.add_objective('f_xy')
         model.add_constraint('c', lower=10.0, upper=11.0)
 
         prob.setup(check=False, mode='rev')
-        prob.run_driver()
 
-        # Minimum should be at (7.166667, -7.833334)
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_constraint_fwd(self):
@@ -541,7 +619,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -552,9 +630,12 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0, ref=10.)
 
         prob.setup(check=False, mode='fwd')
-        prob.run_driver()
 
-        # Minimum should be at (7.166667, -7.833334)
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_objective_fwd(self):
@@ -569,7 +650,7 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -580,9 +661,12 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0)
 
         prob.setup(check=False, mode='fwd')
-        prob.run_driver()
 
-        # Minimum should be at (7.166667, -7.833334)
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_objective_rev(self):
@@ -597,7 +681,7 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -608,9 +692,12 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=10.0, upper=11.0)
 
         prob.setup(check=False, mode='rev')
-        prob.run_driver()
 
-        # Minimum should be at (7.166667, -7.833334)
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_sellar_mdf(self):
@@ -618,7 +705,7 @@ class TestScipyOptimizer(unittest.TestCase):
         prob = Problem()
         model = prob.model = SellarDerivativesGrouped()
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -630,7 +717,11 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('con2', upper=0.0)
 
         prob.setup(check=False, mode='rev')
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
@@ -640,7 +731,7 @@ class TestScipyOptimizer(unittest.TestCase):
         # We were getting extra constraints created because lower and upper are maxfloat instead of
         # None when unused.
         p = Problem(model=SineFitter())
-        p.driver = ScipyOptimizer()
+        p.driver = ScipyOptimizeDriver()
 
         p.setup(check=False)
         p.run_driver()
@@ -681,7 +772,7 @@ class TestScipyOptimizer(unittest.TestCase):
                                  promotes_inputs=['a', 'Vu'])
 
         # setup the optimization
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
         prob.model.add_design_var('a', lower=0., upper=1.)
@@ -708,7 +799,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'COBYLA'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -719,7 +810,11 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', upper=-15.0)
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -730,7 +825,7 @@ class TestScipyOptimizer(unittest.TestCase):
         prob = Problem()
         model = prob.model = SellarDerivativesGrouped()
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'COBYLA'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -742,7 +837,11 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('con2', upper=0.0)
 
         prob.setup(check=False, mode='rev')
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
@@ -760,7 +859,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -771,9 +870,11 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', lower=15.0, linear=True)
 
         prob.setup(check=False)
-        fail = prob.run_driver()
 
-        self.assertTrue(not fail, "Optimization failed!")
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
@@ -793,7 +894,7 @@ class TestScipyOptimizer(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -804,19 +905,73 @@ class TestScipyOptimizer(unittest.TestCase):
         model.add_constraint('c', equals=-15.0, linear=True)
 
         prob.setup(check=False)
-        fail = prob.run_driver()
 
-        self.assertTrue(not fail, "Optimization failed!")
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
         assert_rel_error(self, prob['y'], -7.833334, 1e-6)
 
+    def test_debug_print_option(self):
 
-class TestScipyOptimizerFeatures(unittest.TestCase):
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        prob.driver.options['debug_print'] = ['desvars','ln_cons','nl_cons','objs']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.run_driver()
+        finally:
+            sys.stdout = stdout
+
+        output = strout.getvalue().split('\n')
+        self.assertTrue(output.count("Design Vars") > 1,
+                        "Should be more than one design vars header printed")
+        self.assertTrue(output.count("Nonlinear constraints") > 1,
+                        "Should be more than one nonlinear constraint header printed")
+        self.assertTrue(output.count("Linear constraints") > 1,
+                        "Should be more than one linear constraint header printed")
+        self.assertTrue(output.count("Objectives") > 1,
+                        "Should be more than one objective header printed")
+        self.assertTrue(len([s for s in output if s.startswith('p1.x')]) > 1,
+                        "Should be more than one p1.x printed")
+        self.assertTrue(len([s for s in output if s.startswith('p2.y')]) > 1,
+                        "Should be more than one p2.y printed")
+        self.assertTrue(len([s for s in output if s.startswith('con.c')]) > 1,
+                        "Should be more than one con.c printed")
+        self.assertTrue(len([s for s in output if s.startswith('comp.f_xy')]) > 1,
+                        "Should be more than one comp.f_xy printed")
+
+
+class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
     def test_feature_basic(self):
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizeDriver
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
@@ -826,7 +981,7 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = True
@@ -836,13 +991,17 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.setup()
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
 
     def test_feature_optimizer(self):
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizeDriver
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
@@ -852,7 +1011,7 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'COBYLA'
         prob.driver.options['disp'] = True
 
@@ -861,13 +1020,17 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
 
     def test_feature_maxiter(self):
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizeDriver
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
@@ -877,7 +1040,7 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['maxiter'] = 20
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
@@ -885,13 +1048,17 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
 
     def test_feature_tol(self):
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizer
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizeDriver
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
@@ -901,7 +1068,7 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['tol'] = 1.0e-9
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
@@ -909,10 +1076,45 @@ class TestScipyOptimizerFeatures(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.setup(check=False)
-        prob.run_driver()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
+
+    def test_debug_print_option(self):
+
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizeDriver, ExecComp
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        prob.driver.options['debug_print'] = ['desvars','ln_cons','nl_cons','objs']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+
+        prob.run_driver()
 
 
 if __name__ == "__main__":

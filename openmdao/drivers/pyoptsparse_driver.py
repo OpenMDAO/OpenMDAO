@@ -7,10 +7,10 @@ additional MPI capability.
 """
 
 from __future__ import print_function
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict
 import traceback
 
-from six import iteritems, itervalues
+from six import iteritems
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -18,10 +18,9 @@ from scipy.sparse import coo_matrix
 from pyoptsparse import Optimization
 
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.core.driver import Driver
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian
-from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.record_util import create_local_meta
+
 
 # names of optimizers that use gradients
 grad_drivers = {'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
@@ -214,7 +213,7 @@ class pyOptSparseDriver(Driver):
         # Metadata Setup
         self.metadata = create_local_meta(self.options['optimizer'])
 
-        with Recording(self.options['optimizer'], self.iter_count, self) as rec:
+        with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
             # Initial Run
             model._solve_nonlinear()
             rec.abs = 0.0
@@ -370,7 +369,7 @@ class pyOptSparseDriver(Driver):
             val = dv_dict[name]
             self.set_design_var(name, val)
 
-        with Recording(self.options['optimizer'], self.iter_count, self) as rec:
+        with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
             model._solve_nonlinear()
             rec.abs = 0.0
             rec.rel = 0.0
@@ -387,8 +386,8 @@ class pyOptSparseDriver(Driver):
                 self.fail = True
 
         except KeyError:
-            # Nothing is here, so something bad happened!
-            self.fail = True
+            # optimizers other than pySNOPT may not populate this dict
+            pass
 
         return self.fail
 
@@ -424,7 +423,7 @@ class pyOptSparseDriver(Driver):
             # print(dv_dict)
 
             # Execute the model
-            with Recording(self.options['optimizer'], self.iter_count, self) as rec:
+            with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
                 self.iter_count += 1
                 try:
                     model._solve_nonlinear()
@@ -551,22 +550,36 @@ class pyOptSparseDriver(Driver):
         """
         super(pyOptSparseDriver, self)._setup_simul_coloring(mode)
 
+        relevant = self._problem.model._relevant
+
         for res, meta in iteritems(self._responses):
+            if 'linear' in meta and meta['linear']:
+                continue
             if 'simul_map' in meta and meta['simul_map']:
                 dv_dict = meta['simul_map']
                 self._res_jacs[res] = {}
                 for dv, col_dict in iteritems(dv_dict):
-                    rows = []
-                    cols = []
-                    for color, (row_idxs, col_idxs) in iteritems(col_dict):
-                        rows.append(row_idxs)
-                        cols.append(col_idxs)
+                    # don't set the sparsity unless the corresponding desvar coloring is set
+                    if res in relevant[dv] and self._designvars[dv]['simul_deriv_color']:
+                        rows = []
+                        cols = []
+                        for color, (row_idxs, col_idxs) in iteritems(col_dict):
+                            if len(row_idxs) > 0:
+                                rows.append(row_idxs)
+                                cols.append(col_idxs)
 
-                    row = np.hstack(rows)
-                    col = np.hstack(cols)
-                    # print("sparsity for %s, %s: %d of %s" % (res, dv, row.size,
-                    #       (self._responses[res]['size'] * self._designvars[dv]['size'],)))
-                    self._res_jacs[res][dv] = {
-                        'coo': [row, col, np.zeros(row.size)],
-                        'shape': [self._responses[res]['size'], self._designvars[dv]['size']]
-                    }
+                        if len(rows) > 0:
+                            row = np.hstack(rows)
+                            col = np.hstack(cols)
+                        elif res in self._objs:
+                            continue
+                        else:
+                            row = col = np.zeros(0, dtype=int)
+
+                        # print("sparsity for %s, %s: %d of %s" % (res, dv, row.size,
+                        #       (self._responses[res]['size'] * self._designvars[dv]['size'],)))
+
+                        self._res_jacs[res][dv] = {
+                            'coo': [row, col, np.zeros(row.size)],
+                            'shape': [self._responses[res]['size'], self._designvars[dv]['size']]
+                        }

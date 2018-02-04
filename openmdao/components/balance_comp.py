@@ -13,6 +13,12 @@ from openmdao.core.implicitcomponent import ImplicitComponent
 class BalanceComp(ImplicitComponent):
     """
     A simple equation balance for solving implicit equations.
+
+    Attributes
+    ----------
+    _state_vars : dict
+        Cache the data provided during `add_balance`
+        so everything can be saved until setup is called.
     """
 
     def __init__(self, name=None, eq_units=None, lhs_name=None,

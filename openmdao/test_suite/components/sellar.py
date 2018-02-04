@@ -418,8 +418,12 @@ class SellarStateConnection(Group):
         subgrp = sub.add_subsystem('state_eq_group', Group(), promotes=['state_eq.y2_actual', 'state_eq.y2_command'])
         subgrp.add_subsystem('state_eq', StateConnection())
 
-        sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1'])
-        sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1'])
+        subsub = sub.add_subsystem('subsub', Group(), promotes=['*'])
+        subsub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1'])
+        subsub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1'])
+
+        from openmdao.api import DenseJacobian
+        subsub.jacobian = DenseJacobian()
 
         self.connect('state_eq.y2_command', 'd1.y2')
         self.connect('d2.y2', 'state_eq.y2_actual')

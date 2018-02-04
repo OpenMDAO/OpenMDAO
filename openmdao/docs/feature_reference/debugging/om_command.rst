@@ -73,7 +73,7 @@ will generate an :math:`N^2` diagram like the one below.
 
 
 .. raw:: html
-    :file: ../../../advanced_guide/implicit_comps/n2.html
+    :file: ../../advanced_guide/implicit_comps/n2.html
 
 .. _om-command-view_connections:
 

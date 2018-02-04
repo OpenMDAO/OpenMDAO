@@ -83,12 +83,13 @@ setup(
         'testflo',
         'parameterized',
         'pyparsing',
-        'networkx',
+        'networkx>=2.0',
         'sphinx',
         'redbaron',
         'mock',
         'requests_mock',
-        'tornado'
+        'tornado',
+        'pyDOE'
     ],
     # scripts=['bin/om-pylint.sh']
     entry_points="""

@@ -65,6 +65,8 @@ class DriverCase(Case):
         Driver objectives that have been read in from the recording file.
     constraints : PromotedToAbsoluteMap
         Driver constraints that have been read in from the recording file.
+    sysincludes : PromotedToAbsoluteMap
+        Driver sysincludes that have been read in from the recording file.
     """
 
     def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, desvars,
@@ -233,7 +235,7 @@ class PromotedToAbsoluteMap:
         Array of values accessible via absolute variable name.
     _prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
-    _output : bool
+    _is_output : bool
         True if this should map using output variable names, False for input variable names.
     """
 

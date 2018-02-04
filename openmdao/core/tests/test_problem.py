@@ -7,7 +7,7 @@ from six import assertRaisesRegex
 import numpy as np
 
 from openmdao.core.group import get_relevant_vars
-from openmdao.api import Problem, Group, IndepVarComp, PETScVector, NonlinearBlockGS, ScipyOptimizer, \
+from openmdao.api import Problem, Group, IndepVarComp, PETScVector, NonlinearBlockGS, ScipyOptimizeDriver, \
      ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov
 from openmdao.utils.assert_utils import assert_rel_error
 
@@ -413,14 +413,14 @@ class TestProblem(unittest.TestCase):
     def test_feature_run_driver(self):
         import numpy as np
 
-        from openmdao.api import Problem, NonlinearBlockGS, ScipyOptimizer
+        from openmdao.api import Problem, NonlinearBlockGS, ScipyOptimizeDriver
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
         model = prob.model = SellarDerivatives()
         model.nonlinear_solver = NonlinearBlockGS()
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
 
@@ -698,9 +698,8 @@ class TestProblem(unittest.TestCase):
 
         p.setup(check=False, mode='rev')
 
-        g = p.model.compute_sys_graph(comps_only=True)
-        relevant = get_relevant_vars(g, ['indep1.x', 'indep2.x'], ['C8.y', 'Unconnected.y'],
-                                     mode='rev')
+        relevant = get_relevant_vars(model._conn_global_abs_in2out, ['indep1.x', 'indep2.x'],
+                                     ['C8.y', 'Unconnected.y'], mode='rev')
 
         indep1_ins = set(['C3.b', 'C3.c', 'C8.b', 'G1.C1.a', 'G2.C5.a', 'G2.C5.b'])
         indep1_outs = set(['C3.y', 'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'])

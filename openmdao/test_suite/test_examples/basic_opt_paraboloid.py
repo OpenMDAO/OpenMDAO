@@ -4,14 +4,14 @@ import unittest
 
 from openmdao.utils.assert_utils import assert_rel_error
 
-from openmdao.api import Problem, ScipyOptimizer, ExecComp, IndepVarComp
+from openmdao.api import Problem, ScipyOptimizeDriver, ExecComp, IndepVarComp
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
 class BasicOptParaboloid(unittest.TestCase):
 
     def test_unconstrainted(self):
-        from openmdao.api import Problem, ScipyOptimizer, IndepVarComp
+        from openmdao.api import Problem, ScipyOptimizeDriver, IndepVarComp
 
         # We'll use the component that was defined in the last tutorial
         from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -28,7 +28,7 @@ class BasicOptParaboloid(unittest.TestCase):
         prob.model.connect('indeps.y', 'paraboloid.y')
 
         # setup the optimization
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'COBYLA'
 
         prob.model.add_design_var('indeps.x', lower=-50, upper=50)
@@ -47,7 +47,7 @@ class BasicOptParaboloid(unittest.TestCase):
 
 
     def test_constrained(self):
-        from openmdao.api import Problem, ScipyOptimizer, ExecComp, IndepVarComp
+        from openmdao.api import Problem, ScipyOptimizeDriver, ExecComp, IndepVarComp
 
         # We'll use the component that was defined in the last tutorial
         from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -67,7 +67,7 @@ class BasicOptParaboloid(unittest.TestCase):
         prob.model.connect('indeps.y', ['parab.y', 'const.y'])
 
         # setup the optimization
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'COBYLA'
 
         prob.model.add_design_var('indeps.x', lower=-50, upper=50)
