@@ -176,7 +176,9 @@ class DistributedAdderTest(unittest.TestCase):
 
         if OPTIMIZER:
             from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-
+        else:
+            raise unittest.SkipTest("pyOptSparseDriver is required.")
+            
         from openmdao.core.parallel_group import ParallelGroup
         from openmdao.components.exec_comp import ExecComp
 

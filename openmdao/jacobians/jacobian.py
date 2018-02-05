@@ -68,10 +68,7 @@ class Jacobian(object):
             local size of the input variable.
         """
         abs2meta = self._system._var_abs2meta
-
-        if abs_key[1] in abs2meta['output']:
-            return (abs2meta['output'][abs_key[0]]['size'], abs2meta['output'][abs_key[1]]['size'])
-        return (abs2meta['output'][abs_key[0]]['size'], abs2meta['input'][abs_key[1]]['size'])
+        return (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
 
     def _multiply_subjac(self, abs_key, val):
         """

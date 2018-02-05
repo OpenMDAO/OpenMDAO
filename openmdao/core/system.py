@@ -90,17 +90,17 @@ class System(object):
         For outputs, the list will have length one since promoted output names are unique.
     _var_abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names, on current proc.
-    _var_allprocs_abs2meta : {'input': dict, 'output': dict}
+    _var_allprocs_abs2meta : {}
         Dictionary mapping absolute names to metadata dictionaries for allprocs variables.
         The keys are
         ('units', 'shape', 'size', 'var_set') for inputs and
         ('units', 'shape', 'size', 'var_set', 'ref', 'ref0', 'res_ref', 'distributed') for outputs.
-    _var_abs2meta : {'input': dict, 'output': dict}
+    _var_abs2meta : {}
         Dictionary mapping absolute names to metadata dictionaries for myproc variables.
-    _var_allprocs_abs2idx : {'input': dict, 'output': dict}
+    _var_allprocs_abs2idx : dict
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
-    _var_allprocs_abs2idx_byset : {<vec_name>:{'input': dict of dict, 'output': dict of dict}, ...}
+    _var_allprocs_abs2idx_byset : {<vec_name>: {dict of dict}, ...}
         Same as above, but by var_set name.
     _var_sizes : {'input': ndarray, 'output': ndarray}
         Array of local sizes of this system's allprocs variables.
@@ -295,10 +295,10 @@ class System(object):
         self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = None
         self._var_abs2prom = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
-        self._var_abs2meta = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2meta = {}
+        self._var_abs2meta = {}
 
-        self._var_allprocs_abs2idx = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2idx = {}
         self._var_allprocs_abs2idx_byset = None
 
         self._var_sizes = None
@@ -595,7 +595,7 @@ class System(object):
                                 ncol = voi['size']
                             else:
                                 owner = self._owning_rank['output'][vec_name]
-                                ncol = sizes[owner, abs2idx[vec_name]['output'][vec_name]]
+                                ncol = sizes[owner, abs2idx[vec_name][vec_name]]
                         rdct, _ = relevant[vec_name]['@all']
                         rel = rdct['output']
 
@@ -883,8 +883,8 @@ class System(object):
         self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
         self._var_abs2prom = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
-        self._var_abs2meta = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2meta = {}
+        self._var_abs2meta = {}
 
     def _setup_var_index_maps(self, recurse=True):
         """
@@ -897,19 +897,17 @@ class System(object):
         """
         self._var_allprocs_abs2idx = abs2idx = {}
         self._var_allprocs_abs2idx_byset = abs2idx_byset = {}
+        abs2meta = self._var_allprocs_abs2meta
 
         for vec_name in self._lin_rel_vec_name_list:
-            abs2idx[vec_name] = {'input': {}, 'output': {}}
-            abs2idx_byset[vec_name] = {'input': {}, 'output': {}}
+            abs2idx[vec_name] = abs2idx_t = {}
+            abs2idx_byset[vec_name] = abs2idx_byset_t = {}
             for type_ in ['input', 'output']:
                 counter = defaultdict(int)
-                abs2idx_t = abs2idx[vec_name][type_]
-                abs2idx_byset_t = abs2idx_byset[vec_name][type_]
-                abs2meta_t = self._var_allprocs_abs2meta[type_]
 
                 for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
                     abs2idx_t[abs_name] = i
-                    set_name = abs2meta_t[abs_name]['var_set']
+                    set_name = abs2meta[abs_name]['var_set']
                     abs2idx_byset_t[abs_name] = counter[set_name]
                     counter[set_name] += 1
 
@@ -938,7 +936,7 @@ class System(object):
         """
         Compute the global size and shape of all variables on this system.
         """
-        meta = self._var_allprocs_abs2meta['output']
+        meta = self._var_allprocs_abs2meta
 
         # now set global sizes and shapes into metadata for distributed outputs
         sizes = self._var_sizes['nonlinear']['output']
@@ -1181,7 +1179,9 @@ class System(object):
         self._upper_bounds = upper = vector_class(
             'nonlinear', 'output', self, root_upper, resize=resize)
 
-        for abs_name, meta in iteritems(self._var_abs2meta['output']):
+        abs2meta = self._var_abs2meta
+        for abs_name in self._var_abs_names['output']:
+            meta = abs2meta[abs_name]
             shape = meta['shape']
             ref0 = meta['ref0']
             ref = meta['ref']
@@ -1221,8 +1221,8 @@ class System(object):
             ('input', 'norm'): (0.0, 1.0)
         })
 
-        abs2meta_in = self._var_abs2meta['input']
-        allprocs_meta_out = self._var_allprocs_abs2meta['output']
+        abs2meta_in = self._var_abs2meta
+        allprocs_meta_out = self._var_allprocs_abs2meta
 
         for abs_name in self._var_allprocs_abs_names['output']:
             meta = allprocs_meta_out[abs_name]
@@ -1417,11 +1417,12 @@ class System(object):
         """
         Set all input and output variables to their declared initial values.
         """
-        for abs_name, meta in iteritems(self._var_abs2meta['input']):
-            self._inputs._views[abs_name][:] = meta['value']
+        abs2meta = self._var_abs2meta
+        for abs_name in self._var_abs_names['input']:
+            self._inputs._views[abs_name][:] = abs2meta[abs_name]['value']
 
-        for abs_name, meta in iteritems(self._var_abs2meta['output']):
-            self._outputs._views[abs_name][:] = meta['value']
+        for abs_name in self._var_abs_names['output']:
+            self._outputs._views[abs_name][:] = abs2meta[abs_name]['value']
 
     def _transfer(self, vec_name, mode, isub=None):
         """
@@ -1582,7 +1583,7 @@ class System(object):
                 if abs_in in self._conn_global_abs_in2out:
                     abs_out = self._conn_global_abs_in2out[abs_in]
 
-                    if abs_out not in excl_sub._var_allprocs_abs2idx['linear']['output']:
+                    if abs_out not in excl_sub._var_allprocs_abs2idx['linear']:
                         scope_in.add(abs_in)
 
         self._scope_cache[excl_sub] = (scope_out, scope_in)
@@ -2374,7 +2375,7 @@ class System(object):
         if get_sizes:
             # Size them all
             sizes = self._var_sizes['nonlinear']['output']
-            abs2idx = self._var_allprocs_abs2idx['nonlinear']['output']
+            abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name in out:
                 if 'size' not in out[name]:
                     out[name]['size'] = sizes[self._owning_rank['output'][name], abs2idx[name]]
@@ -2426,7 +2427,7 @@ class System(object):
         if get_sizes:
             # Size them all
             sizes = self._var_sizes['nonlinear']['output']
-            abs2idx = self._var_allprocs_abs2idx['nonlinear']['output']
+            abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name in out:
                 if 'size' not in out[name]:
                     out[name]['size'] = sizes[self._owning_rank['output'][name], abs2idx[name]]
@@ -2545,7 +2546,7 @@ class System(object):
             if values:
                 outs['value'] = val
             if units:
-                outs['units'] = meta['input'][name]['units']
+                outs['units'] = meta[name]['units']
             inputs.append((name, outs))
 
         if out_stream:
@@ -2631,16 +2632,16 @@ class System(object):
             if residuals:
                 outs['resids'] = self._residuals._views[name]
             if units:
-                outs['units'] = meta['output'][name]['units']
+                outs['units'] = meta[name]['units']
             if shape:
                 outs['shape'] = val.shape
             if bounds:
-                outs['lower'] = meta['output'][name]['lower']
-                outs['upper'] = meta['output'][name]['upper']
+                outs['lower'] = meta[name]['lower']
+                outs['upper'] = meta[name]['upper']
             if scaling:
-                outs['ref'] = meta['output'][name]['ref']
-                outs['ref0'] = meta['output'][name]['ref0']
-                outs['res_ref'] = meta['output'][name]['res_ref']
+                outs['ref'] = meta[name]['ref']
+                outs['ref0'] = meta[name]['ref0']
+                outs['res_ref'] = meta[name]['res_ref']
             if name in states:
                 impl_outputs.append((name, outs))
             else:
@@ -2695,7 +2696,7 @@ class System(object):
             return
 
         # Only local metadata but the most complete
-        meta = self._var_abs2meta[in_or_out]
+        meta = self._var_abs2meta
 
         # Make a dict of outputs. Makes it easier to work with in this method
         dict_of_outputs = OrderedDict()

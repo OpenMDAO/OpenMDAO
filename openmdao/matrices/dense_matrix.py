@@ -56,12 +56,11 @@ class DenseMatrix(Matrix):
 
                     metadata[key] = (irows, icols, type(val), factor)
             else:  # list format [data, rows, cols]
-                cols = info['cols']
                 if src_indices is None:
                     irows = rows + irow
-                    icols = cols + icol
+                    icols = info['cols'] + icol
                 else:
-                    irows, icols, idxs = _compute_index_map(rows, cols,
+                    irows, icols, idxs = _compute_index_map(rows, info['cols'],
                                                             irow, icol,
                                                             src_indices)
                     revidxs = np.argsort(idxs)
