@@ -1,7 +1,6 @@
 """
 Helper function to find all the `cite` attributes throughout a model.
 """
-from __future__ import print_function
 from collections import OrderedDict
 import inspect
 import sys
