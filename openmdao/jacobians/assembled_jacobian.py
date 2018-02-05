@@ -155,6 +155,7 @@ class AssembledJacobian(Jacobian):
         # multiple inputs using src_indices on the same component.
         mapped_keys = {}
 
+        seen = {}
         # create the matrix subjacs
         for res_abs_name in system._var_abs_names['output']:
             res_offset, _ = out_ranges[res_abs_name]
@@ -164,6 +165,10 @@ class AssembledJacobian(Jacobian):
                 out_offset, _ = out_ranges[out_abs_name]
 
                 abs_key = (res_abs_name, out_abs_name)
+                if ('in', res_offset, out_offset) in seen:
+                    print("seen", res_offset, out_offset, abs_key)
+                else:
+                    seen['in', res_offset, out_offset] = abs_key
                 if abs_key in self._subjacs_info:
                     info, shape = self._subjacs_info[abs_key]
                 else:
@@ -200,6 +205,11 @@ class AssembledJacobian(Jacobian):
 
                     out_offset, _ = out_ranges[out_abs_name]
                     src_indices = abs2meta_in[in_abs_name]['src_indices']
+                    if ('in', res_offset, out_offset) in seen:
+                        print("seen", res_offset, out_offset, abs_key)
+                    else:
+                        seen['in', res_offset, out_offset] = abs_key
+
                     if src_indices is None:
                         int_mtx._add_submat(
                             abs_key, info, res_offset, out_offset, None, shape,
@@ -224,6 +234,10 @@ class AssembledJacobian(Jacobian):
                             abs_key2, info, res_offset, out_offset,
                             src_indices, shape, factor)
                 elif not is_top:  # input is connected to something outside current system
+                    if ('ext', res_offset, in_ranges[in_abs_name][0]) in seen:
+                        print("seen", res_offset, in_ranges[in_abs_name][0], abs_key)
+                    else:
+                        seen['ext', res_offset, in_ranges[in_abs_name][0]] = abs_key
                     ext_mtx._add_submat(
                         abs_key, info, res_offset, in_ranges[in_abs_name][0],
                         None, shape)

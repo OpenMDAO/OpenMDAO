@@ -143,8 +143,6 @@ class BalanceComp(ImplicitComponent):
         """
         Define the independent variables, output variables, and partials.
         """
-        self.declare_partials(of='*', wrt='*', dependent=False)
-
         for name, options in iteritems(self._state_vars):
 
             for s in ('lhs', 'rhs', 'mult'):

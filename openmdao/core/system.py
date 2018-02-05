@@ -1366,21 +1366,17 @@ class System(object):
         self._views_assembled_jac = False
 
         if jacobian is not None:
-            # this means that somewhere above us is an AssembledJacobian. If
-            # we have a nonlinear solver that uses derivatives, this is
-            # currently an error if the AssembledJacobian is not a DenseJacobian.
-            # In a future story we'll add support for sparse AssembledJacobians.
             if self._nonlinear_solver is not None and self._nonlinear_solver.supports['gradients']:
-                if not isinstance(jacobian, DenseJacobian):
-                    raise RuntimeError("System '%s' has a solver of type '%s'"
-                                       "but a sparse AssembledJacobian has been set in a "
-                                       "higher level system." %
-                                       (self.pathname,
-                                        self._nonlinear_solver.__class__.__name__))
                 self._views_assembled_jac = True
-            self._owns_assembled_jac = False
 
         if self._owns_assembled_jac:
+
+            if jacobian is not None:
+                jacobian._subjacs.update(self._jacobian._subjacs)
+                jacobian._subjacs_info.update(self._jacobian._subjacs_info)
+                self._jacobian._subjacs = jacobian._subjacs
+                self._jacobian._subjacs_info = jacobian._subjacs_info
+                self._jacobian._keymap = jacobian._keymap
 
             # At present, we don't support a AssembledJacobian in a group
             # if any subcomponents are matrix-free.
@@ -1414,7 +1410,7 @@ class System(object):
             self._jacobian._initialize()
 
             for s in self.system_iter(recurse=True):
-                if s._views_assembled_jac:
+                if s._jacobian is self._jacobian and s._views_assembled_jac:
                     self._jacobian._init_view(s)
 
     def set_initial_values(self):
