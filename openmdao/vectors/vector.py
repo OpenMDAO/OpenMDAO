@@ -2,7 +2,7 @@
 from __future__ import division, print_function
 import numpy as np
 
-from six import iteritems
+from six import iteritems, PY3
 
 from openmdao.utils.general_utils import ensure_compatible
 from openmdao.utils.name_maps import name2abs_name
@@ -294,14 +294,14 @@ class Vector(object):
 
     def keys(self):
         """
-        Return absolute variable names of variables contained in this vector.
+        Return variable names of variables contained in this vector (relative names).
 
         Returns
         -------
-        list
-            absolute variable names of variables contained in this vector.
+        listiterator (Python 3.x) or list (Python 2.x)
+            the variable names.
         """
-        return self._views.keys()
+        return self.__iter__() if PY3 else list(self.__iter__())
 
     def __iter__(self):
         """
