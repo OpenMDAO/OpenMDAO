@@ -728,16 +728,13 @@ class Component(System):
             Value of subjacobian.  If rows and cols are not None, this will
             contain the values found at each (row, col) location in the subjac.
         """
-        if not dependent:
-            return
-
-        if val is not None and not issparse(val):
+        if dependent and val is not None and not issparse(val):
             val = np.atleast_1d(val)
             # np.promote_types  will choose the smallest dtype that can contain both arguments
             safe_dtype = np.promote_types(val.dtype, float)
             val = val.astype(safe_dtype, copy=False)
 
-        if rows is not None:
+        if dependent and rows is not None:
             rows = np.array(rows, dtype=int, copy=False)
             cols = np.array(cols, dtype=int, copy=False)
 
@@ -772,13 +769,18 @@ class Component(System):
             multiple_items = True
 
             for rel_key in product(of_matches, wrt_matches):
+                abs_key = rel_key2abs_key(self, rel_key)
+                if not dependent:
+                    if abs_key in self._subjacs_info:
+                        del self._subjacs_info[abs_key]
+                    continue
+
                 meta_changes = {
                     'rows': rows,
                     'cols': cols,
                     'value': deepcopy(val) if make_copies else val,
                     'dependent': dependent
                 }
-                abs_key = rel_key2abs_key(self, rel_key)
                 if abs_key in self._subjacs_info:
                     meta = self._subjacs_info[abs_key]
                 else:
