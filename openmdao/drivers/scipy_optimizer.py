@@ -108,6 +108,7 @@ class ScipyOptimizeDriver(Driver):
         self.supports['equality_constraints'] = True
         self.supports['two_sided_constraints'] = True
         self.supports['linear_constraints'] = True
+        self.supports['simultaneous_derivatives'] = True
 
         # What we don't support
         self.supports['multiple_objectives'] = False
@@ -140,6 +141,17 @@ class ScipyOptimizeDriver(Driver):
         self._exc_info = None
 
         self.cite = CITATIONS
+
+    def _get_name(self):
+        """
+        Get name of current driver.
+
+        Returns
+        -------
+        optimizer : str
+            The name of the current driver.
+        """
+        return self.options['optimizer']
 
     def _setup_driver(self, problem):
         """
