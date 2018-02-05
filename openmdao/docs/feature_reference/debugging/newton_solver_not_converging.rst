@@ -23,10 +23,10 @@ You can use the :ref:`check_partials()<feature_check_partials>` method to have O
 Iterative linear solvers
 ------------------------
 
-If you are using one of the iterative linear solvers (e.g. :ref:`PETScKrylov<petscKSP>`, :ref:`ScipyKrylov<scipyiterativesolver>`),
+If you are using one of the iterative linear solvers (e.g. :ref:`PETScKrylov<petscKrylov>`, :ref:`ScipyKrylov<scipyiterativesolver>`),
 try switching to the :ref:`DirectSolver <directsolver>` instead.
 This solver will compute an LU factorization and then use it to solve for the Newton update.
-Alternatively, you could try adding the :ref:`DirectSolver <directsolver>` as a :ref:`preconditioner<petscksp_precon>` on one of the Krylov solvers.
+Alternatively, you could try adding the :ref:`DirectSolver <directsolver>` as a :ref:`preconditioner<petsckrylov_precon>` on one of the Krylov solvers.
 
 You should set :ref:`options['iprint']=2<solver-options>` setting on any iterative linear solver.
 You can use the :ref:`set_solver_print<solver-options-set_solver_print>` helper method to set `iprint` on every solver in the model.

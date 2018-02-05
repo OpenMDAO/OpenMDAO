@@ -16,8 +16,8 @@ An example is given below.
 .. embed-code::
     openmdao.test_suite.components.expl_comp_simple.TestExplCompSimple
 
-Method Signature
-----------------
+Method Signatures
+-----------------
 
 .. automethod:: openmdao.core.component.Component.add_input
     :noindex:
@@ -36,7 +36,7 @@ Usage
   .. embed-test::
       openmdao.core.tests.test_add_var.TestAddVar.test_val
 
-2. Declaring with only the shape argument.
+2. Declaring with only the `shape` argument.
 
   .. embed-code::
       openmdao.core.tests.test_add_var.CompAddWithShape
@@ -44,7 +44,7 @@ Usage
   .. embed-test::
       openmdao.core.tests.test_add_var.TestAddVar.test_shape
 
-3. Declaring with only the indices argument.
+3. Declaring with only the `indices` argument.
 
   .. embed-code::
       openmdao.core.tests.test_add_var.CompAddWithIndices
@@ -68,7 +68,7 @@ Usage
   .. embed-test::
       openmdao.core.tests.test_add_var.TestAddVar.test_array_indices
 
-6. Declaring an output with bounds.
+6. Declaring an output with bounds, using `upper` and/or `lower` arguments.
 
   .. embed-code::
       openmdao.core.tests.test_add_var.CompAddWithBounds

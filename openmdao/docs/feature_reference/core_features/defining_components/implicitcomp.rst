@@ -38,14 +38,14 @@ The implementation of each method will be illustrated using a simple implicit co
 
 - :code:`apply_nonlinear(inputs, outputs, residuals)` :
 
-  Compute the :code:`residuals` given the :code:`inputs` and :code:`outputs`.
+  Compute the :code:`residuals`, given the :code:`inputs` and :code:`outputs`.
 
   .. embed-code::
       openmdao.core.tests.test_impl_comp.QuadraticComp.apply_nonlinear
 
 - :code:`solve_nonlinear(inputs, outputs)` :
 
-  [Optional] Compute the :code:`outputs` given the :code:`inputs`.
+  [Optional] Compute the :code:`outputs`, given the :code:`inputs`.
 
   .. embed-code::
       openmdao.core.tests.test_impl_comp.QuadraticComp.solve_nonlinear
@@ -77,10 +77,10 @@ The implementation of each method will be illustrated using a simple implicit co
 - :code:`guess_nonlinear(self, inputs, outputs, residuals)` :
 
   [Optional] This method allows the user to calculate and specify an initial guess for implicit states. It is called prior to every call to
-  `solve_nonlinear`, so it is useful for when you would like to "reset" the initial conditions on an inner nested solve whenever an outer
+  `solve_nonlinear`, so it is useful for when you would like to "reset" the initial conditions on an inner-nested solve whenever an outer
   loop solver or driver changes other values. Since it is a hook for custom code, you could also use it to monitor variables in the input,
   output, or residual vectors and change the initial guess when some condition is met. Here is a simple example where we use NewtonSolver to
-  find one of the roots of a second order quadratic equation. Which root you get depends on the initial guess.
+  find one of the roots of a second-order quadratic equation. Which root you get depends on the initial guess.
 
   .. embed-code::
       openmdao.core.tests.test_impl_comp.ImplicitCompTestCase.test_guess_nonlinear_feature

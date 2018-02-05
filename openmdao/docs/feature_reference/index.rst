@@ -1,8 +1,8 @@
-.. _FeatureManual:
+.. _FeatureReference:
 
-**************
-Feature Manual
-**************
+********
+Features
+********
 
 OpenMDAO's fully-supported features are documented here, each in a self-contained context.
 Anything documented here has been thoroughly tested, and should be considered fully functional.

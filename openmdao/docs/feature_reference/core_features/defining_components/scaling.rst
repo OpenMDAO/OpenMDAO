@@ -1,7 +1,7 @@
 .. _scale_outputs_and_resids:
 
 *****************
-Scaling variables
+Scaling Variables
 *****************
 
 As we saw in <Section declaring_variables>, we can specify scaling parameters for outputs and residuals.

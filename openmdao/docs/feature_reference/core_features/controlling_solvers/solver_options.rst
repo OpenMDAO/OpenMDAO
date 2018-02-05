@@ -1,8 +1,8 @@
 .. _solver-options:
 
-**************
-Solver Options
-**************
+********************
+Using Solver Options
+********************
 
 All solvers (both nonlinear and linear) have a number of options that you access via the `options` attribute that control its behavior.
 For instance, here is how you would change the iteration limit and convergence tolerances for the :ref: `NonlinearBlockGS <openmdao.solvers.nonlinear.nonlinear_block_gs.NonlinearBlockGS>`
@@ -27,21 +27,21 @@ iprint = -1: Print nothing
 
 ----
 
-iprint = 0: Print only errors or convergence failures
+iprint = 0: Print only errors or convergence failures.
 
 .. embed-test::
     openmdao.solvers.tests.test_solver_iprint.TestSolverPrint.test_feature_iprint_0
 
 ----
 
-iprint = 1: Print a convergence summary as well as errors and convergence failures
+iprint = 1: Print a convergence summary, as well as errors and convergence failures.
 
 .. embed-test::
     openmdao.solvers.tests.test_solver_iprint.TestSolverPrint.test_feature_iprint_1
 
 -----
 
-iprint = 2: Print the residual for every solver iteration
+iprint = 2: Print the residual for every solver iteration.
 
 .. embed-test::
     openmdao.solvers.tests.test_solver_iprint.TestSolverPrint.test_feature_iprint_2
@@ -62,8 +62,8 @@ To print everything, just call `set_solver_print` with a level of "2".
     openmdao.solvers.tests.test_solver_iprint.TestSolverPrint.test_feature_set_solver_print1
 
 To print everything for nonlinear solvers, and nothing for the linear solvers, first turn everything
-on, and then call `set_solver_print` again to set a level of "-1" on just the linear solvers, so that we
-suppress everything including the messages when the linear block Gauss-Seidel solver hits the maximum
+on, as shown above, and then call `set_solver_print` again to set a level of "-1" on just the linear solvers (using the `type_` argument),
+so that we suppress everything, including the messages when the linear block Gauss-Seidel solver hits the maximum
 iteration limit. You can call the `set_solver_print` method multiple times to stack different solver
 print types in your model.
 
@@ -71,7 +71,7 @@ print types in your model.
     openmdao.solvers.tests.test_solver_iprint.TestSolverPrint.test_feature_set_solver_print2
 
 If we just want to print solver output for the first level of this multi-level model, we first turn
-off all printing, and then set a print level of "2" with a depth of "2" so that we only print the
+off all printing, and then set a print level of "2" with a `depth` argument of "2" so that we only print the
 top solver and the solver in 'g2', but not the solver in 'sub1.sub2.g1'.
 
 .. embed-test::

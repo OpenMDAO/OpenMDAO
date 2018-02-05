@@ -4,7 +4,7 @@
 LinearBlockJac
 **************
 
-The LinearBlockJac uses the Block Jacobi method to solve the linear system. The method is similar to that used by the
+The LinearBlockJac uses the block Jacobi method to solve the linear system. The method is similar to that used by the
 :ref:`LinearBlockGS <openmdao.solvers.linear.linear_block_gs.py>` solver, except that it propagates the derivatives from outputs
 to inputs only once per iteration. When to choose this solver over the other ones is an advanced topic.
 
@@ -30,8 +30,7 @@ LinearBlockJac Option Examples
 **maxiter**
 
   This lets you specify the maximum number of Gauss-Seidel iterations to apply. In this example, we
-  cut it back from the default (10), to 5 so that it terminates a few iterations earlier and doesn't
-  reach the specified absolute or relative tolerance. Note that due to the delayed transfer of
+  cut it back from the default, ten, down to five, so that it terminates a few iterations earlier and doesn't  reach the specified absolute or relative tolerance. Note that due to the delayed transfer of
   information, this takes more iterations to converge than the LinearBlockGS solver.
 
   .. embed-test::

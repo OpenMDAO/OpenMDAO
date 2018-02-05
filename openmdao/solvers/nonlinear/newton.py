@@ -132,7 +132,7 @@ class NewtonSolver(NonlinearSolver):
 
     def _run_apply(self):
         """
-        Run the the apply_nonlinear method on the system.
+        Run the apply_nonlinear method on the system.
         """
         recording_iteration.stack.append(('_run_apply', 0))
 

@@ -7,7 +7,7 @@ derivatives with respect to certain groups of variables concurrently.  For a
 detailed explanation of when it's worthwhile to do this, see :ref:`parallel-derivatives-theory`.
 We can specify groups of variables that should have their derivatives computed concurrently
 using the *parallel_deriv_color* argument to `add_design_var`, `add_constraint`,
-or `add_objective`.  The types of variables to be grouped depends upon the direction
+or `add_objective`.  The types of variables to be grouped depend upon the direction
 of derivative computation that we specified in the call to `setup()`.  In fwd mode,
 we group design variables, for example:
 

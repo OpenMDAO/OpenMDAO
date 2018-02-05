@@ -36,7 +36,7 @@ LinearBlockGS Option Examples
 **maxiter**
 
   This lets you specify the maximum number of Gauss-Seidel iterations to apply. In this example, we
-  cut it back from the default(10) to 2, so that it terminates a few iterations earlier and doesn't
+  cut it back from the default, ten, down to two, so that it terminates a few iterations earlier and doesn't
   reach either of the specified absolute or relative tolerances.
 
   .. embed-test::

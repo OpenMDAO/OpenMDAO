@@ -10,7 +10,7 @@ From the perspective of a model, they can be viewed as design variables or model
 
 Independent variables are defined via the *IndepVarComp* class.
 The *IndepVarComp* class is instantiated directly (without defining a subclass).
-The name, initial value, and other options of the independent variable(s) to be declared can be either passed in during instantiation and declared via the :code:`add_output` method.
+The name, initial value, and other options of the independent variable(s) to be declared can be either passed in during instantiation, or declared via the :code:`add_output` method.
 
 Method Signature
 ----------------

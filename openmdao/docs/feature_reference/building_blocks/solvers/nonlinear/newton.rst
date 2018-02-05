@@ -5,7 +5,7 @@ NewtonSolver
 ************
 
 The `NewtonSolver` solver implements Newton's method to solve the system that contains it. This
-is the most general solver in OpenMDAO in that it can solve any topology including cyclic
+is the most general solver in OpenMDAO, in that it can solve any topology including cyclic
 connections and implicit states in the system or subsystems. Newton's method requires derivatives,
 so a linear solver can also be specified. By default, the NewtonSolver uses the linear solver
 that is slotted in the containing system.
@@ -13,11 +13,11 @@ that is slotted in the containing system.
 .. embed-test::
     openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_basic
 
-Most of the solver in OpenMDAO operate hierarchically in that you can use solvers on subgroups
+Most of the solvers in OpenMDAO operate hierarchically, in that you can use solvers on subgroups
 to subdivide the calculation effort. However, the NewtonSolver is an exception. It does not
 call `solve_nonlinear` on its subsystems, nor does it pass data along the connections. Instead,
 the Newton solver sets all inputs in all systems and subsystems that it contains, as it follows
-the gradient driving the residuals to convergence.  After each iteration, the iteration count and the residual norm are
+the gradient, driving the residuals to convergence.  After each iteration, the iteration count and the residual norm are
 checked to see if termination has been satisfied.
 
 NewtonSolver Options
@@ -33,8 +33,8 @@ NewtonSolver Option Examples
 
 **maxiter**
 
-  This lets you specify the maximum number of Newton iterations to apply. In this example, we
-  cut it back from the default (10) to 2 so that it terminates a few iterations earlier and doesn't
+  :code:`maxiter` lets you specify the maximum number of Newton iterations to apply. In this example, we
+  cut it back from the default, ten, down to two, so that it terminates a few iterations earlier and doesn't
   reach the specified absolute or relative tolerance.
 
   .. embed-test::
@@ -66,8 +66,8 @@ NewtonSolver Option Examples
   use this to solve difficult multi-level problems by attaching solvers to subsystems. This assures that those
   subsystems will already be in an internally solved state when the Newton solver goes to solve it.
 
-  This example shows two instances of the Sellar model which we have connected together to form a larger cycle.
-  We specify a Newton solver in each Sellar subgroup as well as a top level Newton solver which we tell to solve
+  This example shows two instances of the Sellar model, which we have connected together to form a larger cycle.
+  We specify a Newton solver in each Sellar subgroup as well as a top-level Newton solver, which we tell to solve
   its subsystems.
 
   .. embed-test::
@@ -75,7 +75,7 @@ NewtonSolver Option Examples
 
 **max_sub_solves**
 
-  This option is used in conjuction with the "solve_subsystems" option. It controls the number of iterations for which
+  This option is used in conjunction with the "solve_subsystems" option. It controls the number of iterations for which
   the NewtonSolver will allow subsystems to solve themselves. When the iteration count exceeds `max_sub_solves`,  Newton
   returns to its default behavior.
 
@@ -88,7 +88,7 @@ NewtonSolver Option Examples
 **err_on_maxiter**
 
   If you set this to True, then when the solver hits the iteration limit without meeting the tolerance criteria, it
-  will raise an AnalysisError exception. This is mainly important when coupled with a higher level solver or
+  will raise an AnalysisError exception. This is mainly important when coupled with a higher-level solver or
   driver (e.g., `pyOptSparseDriver`)that can handle the AnalysisError by adapting the stepsize and retrying.
 
   .. embed-test::
@@ -100,21 +100,21 @@ Specifying a Linear Solver
 --------------------------
 
 We can choose a different linear solver for calculating the Newton step by setting the `linear_solver` attribute. The default is to use the
-linear solver that was specified on the containing system, which by default is LinearBlockGS. Here,
+linear solver that was specified on the containing system, which by default is LinearBlockGS. In the following example,
 we modify the model to use :ref:`DirectSolver <openmdao.solvers.linear.direct.py>` instead.
 
 .. embed-test::
     openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_linear_solver
 
-Specifying a Linesearch algorithm
----------------------------------
+Specifying a Line Search Algorithm
+----------------------------------
 
-The NewtonSolver supports specification of a supplemental algorithm that can find a better point
-along the Newton search direction via specification of the `linesearch` attribute. This is typically used for cases where we have declared upper
+The NewtonSolver has a `linesearch` attribute, which supports specification of a supplemental algorithm that can find a better point
+along the Newton search direction. This is typically used for cases where we have declared upper
 or lower bounds on some of the model outputs and we want to prevent Newton from moving into this
-non feasible space during iteration. An algorithm that does this is called a Line Search.
+non-feasible space during iteration. An algorithm that does this is called a line search.
 
-By default, the NewtonSolver does not perform any line search. We will show how to specify one. First,
+By default, the NewtonSolver does not perform a line search. We will show how to specify one. First,
 let's set up a problem that has implicit bounds on one of its states.
 
 .. embed-code::

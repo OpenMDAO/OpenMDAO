@@ -25,8 +25,8 @@ The implementation of each method will be illustrated using a simple explicit co
 - :code:`setup()` :
 
   Declare input and output variables via :code:`add_input` and :code:`add_output`.
-  Information like variable names, sizes, units, and bounds are declared. Also, declare partial derivatives that this component provides. Here we use the wild card to say that
-  this component provides derivatives of all outputs with respect to all inputs.
+  Information such as variable names, sizes, units, and bounds are declared here. Also in :code:`setup`, we declare partial derivatives that this component provides,
+  using wild cards to say that this component provides derivatives of all outputs with respect to all inputs.
 
   .. embed-code::
       openmdao.core.tests.test_expl_comp.RectangleComp.setup
@@ -52,4 +52,4 @@ The implementation of each method will be illustrated using a simple explicit co
   .. embed-code::
       openmdao.core.tests.test_expl_comp.RectangleJacVec.compute_jacvec_product
 
-Note that the last two are optional, because the class can implement one, the other, or neither if the user wants to use the finite difference or complex-step method.
+Note that the last two are optional, because the class can implement one, the other, or neither if the user wants to use the finite-difference or complex-step method.
