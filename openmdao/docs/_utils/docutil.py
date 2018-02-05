@@ -222,7 +222,7 @@ def get_source_code_of_class_or_method(class_or_method_path, remove_docstring=Tr
     if remove_docstring:
         source = remove_docstrings(source)
 
-    return source
+    return remove_leading_trailing_whitespace_lines(source)
 
 
 def get_test_source_code_for_feature(feature_name):
@@ -275,7 +275,7 @@ def remove_raise_skip_tests(src):
 
 def remove_leading_trailing_whitespace_lines(src):
     """
-    Remove any trailing whitespace lines.
+    Remove any leading or trailing whitespace lines.
 
     Parameters
     ----------
@@ -397,6 +397,11 @@ def insert_output_start_stop_indicators(src):
     # find all nodes that might produce output
     nodes = rb.findAll(lambda identifier: identifier in ['print', 'atomtrailers'])
     for r in nodes:
+        # assume that whatever is in the try block will fail and produce no output
+        # this way we can properly handle display of error messages in the except
+        if hasattr(r.parent, 'type') and r.parent.type == 'try':
+            continue
+
         # Output within if/else statements is not a good idea for docs, because
         # we don't know which branch execution will follow and thus where to put
         # the output block. Regardless of which branch is taken, though, the
@@ -410,8 +415,6 @@ def insert_output_start_stop_indicators(src):
             # if there was a trailing comment on this line, output goes after it
             if r in lines_with_comments:
                 r = lines_with_comments[r]  # r is now the comment
-                if r.previous.value == '\n':
-                    r.previous.value = ''   # don't want endl before comment
 
             # find the correct node to 'insert_after'
             while hasattr(r, 'parent') and not hasattr(r.parent, 'insert'):
@@ -419,6 +422,11 @@ def insert_output_start_stop_indicators(src):
 
             r.insert_after('print(">>>>>%d")\n' % input_block_number)
             input_block_number += 1
+
+    # curse you, redbaron! stop inserting endl before trailing comments!
+    for l, c in lines_with_comments.items():
+        if c.previous and c.previous.type == 'endl':
+            c.previous.value = ''
 
     return rb.dumps()
 
