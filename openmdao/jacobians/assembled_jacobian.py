@@ -99,7 +99,7 @@ class AssembledJacobian(Jacobian):
 
         sizes = system._var_sizes['nonlinear'][type_]
         iproc = system.comm.rank
-        idx = system._var_allprocs_abs2idx['nonlinear'][type_][abs_name]
+        idx = system._var_allprocs_abs2idx['nonlinear'][abs_name]
 
         ind1 = np.sum(sizes[iproc, :idx])
         ind2 = np.sum(sizes[iproc, :idx + 1])
@@ -113,8 +113,7 @@ class AssembledJacobian(Jacobian):
         # var_indices are the *global* indices for variables on this proc
         system = self._system
 
-        abs2meta_in = system._var_abs2meta['input']
-        abs2meta_out = system._var_abs2meta['output']
+        abs2meta = system._var_abs2meta
 
         self._int_mtx = int_mtx = self.options['matrix_class'](system.comm)
         ext_mtx = self.options['matrix_class'](system.comm)
@@ -152,52 +151,34 @@ class AssembledJacobian(Jacobian):
             self._view_ranges[s.pathname] = (
                 min_res_offset, max_res_offset, min_in_offset, max_in_offset)
 
+        abs2prom_out = system._var_abs2prom['output']
+        conns = system._conn_global_abs_in2out
+
         # create the matrix subjacs
-        for res_abs_name in system._var_abs_names['output']:
+        for abs_key, (info, shape) in iteritems(self._subjacs_info):
+            if not info['dependent']:
+                continue
+            res_abs_name, wrt_abs_name = abs_key
             res_offset, _ = out_ranges[res_abs_name]
-            res_size = abs2meta_out[res_abs_name]['size']
-
-            for out_abs_name in system._var_abs_names['output']:
-                out_offset, _ = out_ranges[out_abs_name]
-
-                abs_key = (res_abs_name, out_abs_name)
-                if abs_key in self._subjacs_info:
-                    info, shape = self._subjacs_info[abs_key]
-                else:
-                    info = SUBJAC_META_DEFAULTS
-                    shape = (res_size, abs2meta_out[out_abs_name]['size'])
-
+            if wrt_abs_name in abs2prom_out:
+                out_offset, _ = out_ranges[wrt_abs_name]
                 int_mtx._add_submat(
                     abs_key, info, res_offset, out_offset, None, shape)
-
-            for in_abs_name in system._var_abs_names['input']:
-                abs_key = (res_abs_name, in_abs_name)
-                self._keymap[abs_key] = abs_key
-
-                if abs_key in self._subjacs_info:
-                    info, shape = self._subjacs_info[abs_key]
-                else:
-                    info = SUBJAC_META_DEFAULTS
-                    shape = (res_size, abs2meta_in[in_abs_name]['size'])
-
-                self._keymap[abs_key] = abs_key
-
-                if not info['dependent']:
-                    continue
-
-                if in_abs_name in system._conn_global_abs_in2out:
-                    out_abs_name = system._conn_global_abs_in2out[in_abs_name]
-                    out_offset, _ = out_ranges[out_abs_name]
-                    src_indices = abs2meta_in[in_abs_name]['src_indices']
-
+            else:
+                if wrt_abs_name in conns:  # connected input
+                    out_abs_name = conns[wrt_abs_name]
                     # calculate unit conversion
-                    in_units = abs2meta_in[in_abs_name]['units']
-                    out_units = abs2meta_out[out_abs_name]['units']
-                    if in_units and out_units:
+                    in_units = abs2meta[wrt_abs_name]['units']
+                    out_units = abs2meta[out_abs_name]['units']
+                    if in_units and out_units and in_units != out_units:
                         factor, _ = get_conversion(out_units, in_units)
+                        if factor == 1.0:
+                            factor = None
                     else:
                         factor = None
 
+                    out_offset, _ = out_ranges[out_abs_name]
+                    src_indices = abs2meta[wrt_abs_name]['src_indices']
                     if src_indices is None:
                         int_mtx._add_submat(
                             abs_key, info, res_offset, out_offset, None, shape,
@@ -211,10 +192,14 @@ class AssembledJacobian(Jacobian):
                         int_mtx._add_submat(
                             abs_key2, info, res_offset, out_offset,
                             src_indices, shape, factor)
-                else:
+
+                else:  # input connected to src outside current system
                     ext_mtx._add_submat(
-                        abs_key, info, res_offset, in_ranges[in_abs_name][0],
+                        abs_key, info, res_offset, in_ranges[wrt_abs_name][0],
                         None, shape)
+
+                if abs_key not in self._keymap:
+                    self._keymap[abs_key] = abs_key
 
         sizes = system._var_sizes
         iproc = system.comm.rank
@@ -238,8 +223,7 @@ class AssembledJacobian(Jacobian):
         system : <System>
             The system being solved using a sub-view of the jacobian.
         """
-        abs2meta_in = system._var_abs2meta['input']
-        abs2meta_out = system._var_abs2meta['output']
+        abs2meta = system._var_abs2meta
         ranges = self._view_ranges[system.pathname]
 
         ext_mtx = self.options['matrix_class'](system.comm)
@@ -249,24 +233,24 @@ class AssembledJacobian(Jacobian):
         for abs_name in system._var_allprocs_abs_names['input']:
             in_ranges[abs_name] = self._get_var_range(abs_name, 'input')[0]
             src_indices_dict[abs_name] = \
-                system._var_abs2meta['input'][abs_name]['src_indices']
+                system._var_abs2meta[abs_name]['src_indices']
 
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
             for res_abs_name in s._var_abs_names['output']:
                 res_offset = self._get_var_range(res_abs_name, 'output')[0]
-                res_size = abs2meta_out[res_abs_name]['size']
+                res_size = abs2meta[res_abs_name]['size']
 
                 for in_abs_name in s._var_abs_names['input']:
-                    abs_key = (res_abs_name, in_abs_name)
-                    self._keymap[abs_key] = abs_key
-
-                    if abs_key in self._subjacs_info:
-                        info, shape = self._subjacs_info[abs_key]
-                    else:
-                        info = SUBJAC_META_DEFAULTS
-                        shape = (res_size, abs2meta_in[in_abs_name]['size'])
-
                     if in_abs_name not in system._conn_global_abs_in2out:
+                        abs_key = (res_abs_name, in_abs_name)
+
+                        if abs_key in self._subjacs_info:
+                            info, shape = self._subjacs_info[abs_key]
+                            if not info['dependent']:
+                                continue
+                        else:
+                            continue
+
                         ext_mtx._add_submat(
                             abs_key, info, res_offset - ranges[0],
                             in_ranges[in_abs_name] - ranges[2],
@@ -289,54 +273,55 @@ class AssembledJacobian(Jacobian):
         Read the user's sub-Jacobians and set into the global matrix.
         """
         system = self._system
+        int_mtx = self._int_mtx
         ext_mtx = self._ext_mtx[system.pathname]
-        iters = self._subjac_iters[system.pathname]
-        if iters is None:
+        subjacs = self._subjacs
+
+        subjac_iters = self._subjac_iters[system.pathname]
+        if subjac_iters is None:
+            keymap = self._keymap
+            global_conns = system._conn_global_abs_in2out
+            output_names = system._var_abs_names['output']
+            input_names = system._var_abs_names['input']
 
             # This is the level where the AssembledJacobian is slotted.
             # The of and wrt are the inputs and outputs that it sees, if they are in the subjacs.
             # TODO - For top level FD, the subjacs might not contain all derivs.
 
-            iters_out = []
-            iters_in = []
+            iters = []
             iters_in_ext = []
-            for res_abs_name in system._var_abs_names['output']:
-                for out_abs_name in system._var_abs_names['output']:
+            for res_abs_name in output_names:
+                for out_abs_name in output_names:
                     abs_key = (res_abs_name, out_abs_name)
-                    if abs_key in self._subjacs:
-                        iters_out.append(abs_key)
+                    if abs_key in subjacs:
+                        if abs_key in int_mtx._submats:
+                            iters.append((abs_key, abs_key))
+                        else:
+                            # This happens when the src is an indepvarcomp that is
+                            # contained in the system.
+                            of, wrt = abs_key
+                            for tgt, src in iteritems(global_conns):
+                                if src == wrt and (of, tgt) in int_mtx._submats:
+                                    iters.append((of, tgt), abs_key)
+                                    break
 
-                for in_abs_name in system._var_abs_names['input']:
+                for in_abs_name in input_names:
                     abs_key = (res_abs_name, in_abs_name)
-                    if abs_key in self._subjacs:
-                        if in_abs_name in system._conn_global_abs_in2out:
-                            iters_in.append(abs_key)
+                    if abs_key in subjacs:
+                        if in_abs_name in global_conns:
+                            iters.append((keymap[abs_key], abs_key))
                         elif ext_mtx is not None:
                             iters_in_ext.append(abs_key)
 
-            self._subjac_iters[system.pathname] = (iters_out, iters_in, iters_in_ext)
+            self._subjac_iters[system.pathname] = (iters, iters_in_ext)
         else:
-            iters_out, iters_in, iters_in_ext = iters
+            iters, iters_in_ext = subjac_iters
 
-        int_mtx = self._int_mtx
-        for abs_key in iters_out:
-            if iters is None and abs_key not in int_mtx._submats:
+        for key1, key2 in iters:
+            int_mtx._update_submat(key1, subjacs[key2])
 
-                # This happens when the input is an indepvarcomp that is contained in the system.
-                of, wrt = abs_key
-                for tgt, src in iteritems(system._conn_global_abs_in2out):
-                    if src == wrt and (of, tgt) in int_mtx._submats:
-                        int_mtx._update_submat((of, tgt), self._subjacs[abs_key])
-                        break
-
-            else:
-                int_mtx._update_submat(abs_key, self._subjacs[abs_key])
-
-        for abs_key in iters_in:
-            int_mtx._update_submat(self._keymap[abs_key], self._subjacs[abs_key])
-
-        for abs_key in iters_in_ext:
-            ext_mtx._update_submat(abs_key, self._subjacs[abs_key])
+        for key in iters_in_ext:
+            ext_mtx._update_submat(key, subjacs[key])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """

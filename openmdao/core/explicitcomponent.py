@@ -74,14 +74,14 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._setup_partials()
 
-        abs2meta_out = self._var_abs2meta['output']
+        abs2meta = self._var_abs2meta
         abs2prom_out = self._var_abs2prom['output']
 
         # Note: These declare calls are outside of setup_partials so that users do not have to
         # call the super version of setup_partials. This is still in the final setup.
         other_names = []
         for out_abs in self._var_abs_names['output']:
-            meta = abs2meta_out[out_abs]
+            meta = abs2meta[out_abs]
             out_name = abs2prom_out[out_abs]
             arange = np.arange(meta['size'])
 
@@ -171,31 +171,19 @@ class ExplicitComponent(Component):
         """
         Set subjacobian info into our jacobian.
         """
+        abs2prom = self._var_abs2prom
+
         with self.jacobian_context() as J:
-            outputs = self._var_abs_names['output']
-            inputs = self._var_abs_names['input']
+            for abs_key, meta in iteritems(self._subjacs_info):
+                if meta['value'] is None:
+                    out_size = self._var_abs2meta[abs_key[0]]['size']
+                    in_size = self._var_abs2meta[abs_key[1]]['size']
+                    meta['value'] = np.zeros((out_size, in_size))
 
-            for wrt_name, wrt_vars in (('output', outputs), ('input', inputs)):
-                for abs_key in product(outputs, wrt_vars):
-                    if abs_key in self._subjacs_info:
-                        meta = self._subjacs_info[abs_key]
-                    else:
-                        meta = SUBJAC_META_DEFAULTS.copy()
-                    dependent = meta['dependent']
+                J._set_partials_meta(abs_key, meta, abs_key[1] in abs2prom['input'])
 
-                    if not dependent:
-                        continue
-
-                    if meta['value'] is None:
-                        out_size = self._var_abs2meta['output'][abs_key[0]]['size']
-                        in_size = self._var_abs2meta[wrt_name][abs_key[1]]['size']
-                        meta['value'] = np.zeros((out_size, in_size))
-
-                    J._set_partials_meta(abs_key, meta, wrt_name == 'input')
-
-                    method = meta.get('method', False)
-                    if method:
-                        self._approx_schemes[method].add_approximation(abs_key, meta)
+                if 'method' in meta and meta['method']:
+                    self._approx_schemes[meta['method']].add_approximation(abs_key, meta)
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()
@@ -204,19 +192,20 @@ class ExplicitComponent(Component):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
+        outputs = self._outputs
+        residuals = self._residuals
         with Recording(self.pathname + '._apply_nonlinear', self.iter_count, self):
-            with self._unscaled_context(
-                    outputs=[self._outputs], residuals=[self._residuals]):
-                self._residuals.set_vec(self._outputs)
-                self.compute(self._inputs, self._outputs)
+            with self._unscaled_context(outputs=[outputs], residuals=[residuals]):
+                residuals.set_vec(outputs)
+                self.compute(self._inputs, outputs)
 
                 # Restore any complex views if under complex step.
-                if self._outputs._vector_info._under_complex_step:
-                    for vec in [self._outputs, self._residuals]:
-                        vec._remove_complex_views()
+                if outputs._vector_info._under_complex_step:
+                    outputs._remove_complex_views()
+                    residuals._remove_complex_views()
 
-                self._residuals -= self._outputs
-                self._outputs += self._residuals
+                residuals -= outputs
+                outputs += residuals
 
     def _solve_nonlinear(self):
         """

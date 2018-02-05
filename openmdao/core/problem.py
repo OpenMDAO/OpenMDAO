@@ -41,6 +41,7 @@ MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 _contains_all = ContainsAll()
 
+
 CITATION = """@inproceedings{2014_openmdao_derivs,
     Author = {Justin S. Gray and Tristan A. Hearn and Kenneth T. Moore
               and John Hwang and Joaquim Martins and Andrew Ning},
@@ -170,15 +171,12 @@ class Problem(object):
             else:
                 proms = self.model._var_allprocs_prom2abs_list
                 meta = self.model._var_abs2meta
-                if name in meta['input']:
+                if name in meta:
                     if name in self.model._conn_abs_in2out:
                         src_name = self.model._conn_abs_in2out[name]
-                        val = meta['input'][src_name]['value']
+                        val = meta[src_name]['value']
                     else:
-                        val = meta['input'][name]['value']
-
-                elif name in meta['output']:
-                    val = meta['output'][name]['value']
+                        val = meta[name]['value']
 
                 elif name in proms['input']:
                     abs_name = proms['input'][name][0]
@@ -191,16 +189,16 @@ class Problem(object):
                             # This triggers a check for unconnected non-unique inputs, and
                             # raises the same error as vector access.
                             abs_name = prom_name2abs_name(self.model, name, 'input')
-                        val = meta['output'][src_name]['value']
+                        val = meta[src_name]['value']
                     else:
                         # This triggers a check for unconnected non-unique inputs, and
                         # raises the same error as vector access.
                         abs_name = prom_name2abs_name(self.model, name, 'input')
-                        val = meta['input'][abs_name]['value']
+                        val = meta[abs_name]['value']
 
                 elif name in proms['output']:
                     abs_name = prom_name2abs_name(self.model, name, 'output')
-                    val = meta['output'][abs_name]['value']
+                    val = meta[abs_name]['value']
 
                 else:
                     msg = 'Variable name "{}" not found.'
@@ -673,20 +671,20 @@ class Problem(object):
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
                                 try:
-                                    in_size = comp._var_abs2meta['input'][wrt]['size']
+                                    in_size = comp._var_abs2meta[wrt]['size']
                                 except KeyError:
-                                    in_size = comp._var_abs2meta['output'][wrt]['size']
+                                    in_size = comp._var_abs2meta[wrt]['size']
 
-                                out_size = comp._var_abs2meta['output'][of]['size']
+                                out_size = comp._var_abs2meta[of]['size']
                                 deriv_value = np.zeros((out_size, in_size))
 
                             if force_dense:
                                 if isinstance(deriv_value, list):
                                     try:
-                                        in_size = comp._var_abs2meta['input'][wrt]['size']
+                                        in_size = comp._var_abs2meta[wrt]['size']
                                     except KeyError:
-                                        in_size = comp._var_abs2meta['output'][wrt]['size']
-                                    out_size = comp._var_abs2meta['output'][of]['size']
+                                        in_size = comp._var_abs2meta[wrt]['size']
+                                    out_size = comp._var_abs2meta[of]['size']
                                     tmp_value = np.zeros((out_size, in_size))
                                     jac_val, jac_i, jac_j = deriv_value
                                     # if a scalar value is provided (in declare_partials),
@@ -1098,8 +1096,8 @@ class Problem(object):
                 dinputs = input_vec[vecname]
                 doutputs = output_vec[vecname]
 
-                in_var_idx = model._var_allprocs_abs2idx[vecname]['output'][input_name]
-                in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
+                in_var_idx = model._var_allprocs_abs2idx[vecname][input_name]
+                in_var_meta = model._var_allprocs_abs2meta[input_name]
 
                 dup = not in_var_meta['distributed']
 
@@ -1115,7 +1113,7 @@ class Problem(object):
                 if in_idxs is not None:
                     neg = in_idxs[in_idxs < 0]
                     irange = in_idxs
-                    if neg:
+                    if np.any(neg):
                         irange[neg] += end
                     max_i = np.max(in_idxs)
                     min_i = np.min(in_idxs)
@@ -1186,13 +1184,13 @@ class Problem(object):
         relevant = model._relevant
         fwd = (mode == 'fwd')
         prom2abs = model._var_allprocs_prom2abs_list['output']
-        abs2idx_out = model._var_allprocs_abs2idx['linear']['output']
+        abs2idx = model._var_allprocs_abs2idx['linear']
 
         if wrt is None:
             wrt = list(self.driver._designvars)
         if of is None:
             of = list(self.driver._objs)
-            of.extend(list(self.driver._cons))
+            of.extend(self.driver._cons)
 
         # A number of features will need to be supported here as development
         # goes forward.
@@ -1461,7 +1459,7 @@ class Problem(object):
                         if use_rel_reduction and output_name not in relevant[input_name]:
                             # irrelevant output, just give zeros
                             if out_idxs is None:
-                                out_var_idx = abs2idx_out[output_name]
+                                out_var_idx = abs2idx[output_name]
                                 if output_name in remote_outputs:
                                     _, sz = remote_outputs[output_name]
                                 else:
@@ -1487,7 +1485,7 @@ class Problem(object):
                                     deriv_val = deriv_val[out_idxs]
 
                             if dup and nproc > 1:
-                                out_var_idx = abs2idx_out[output_name]
+                                out_var_idx = abs2idx[output_name]
                                 root = owning_ranks[output_name]
                                 if deriv_val is None:
                                     if out_idxs is not None:
