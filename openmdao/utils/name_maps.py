@@ -223,16 +223,14 @@ def key2abs_key(system, key):
     (str, str) or None
         Absolute name pair of sub-Jacobian if unique abs_key found or None otherwise.
     """
-    abs2meta_out = system._var_abs2meta['output']
-    abs2meta_in = system._var_abs2meta['input']
+    abs2meta = system._var_abs2meta
 
     abs_key = prom_key2abs_key(system, key)
     if abs_key is not None:
         return abs_key
 
     abs_key = rel_key2abs_key(system, key)
-    if (abs_key[0] in abs2meta_out
-            and (abs_key[1] in abs2meta_out or abs_key[1] in abs2meta_in)):
+    if abs_key[0] in abs2meta and abs_key[1] in abs2meta:
         return abs_key
     else:
         return None

@@ -170,13 +170,13 @@ class Component(System):
                 abs2prom[type_][abs_name] = prom_name
 
                 # Compute allprocs_abs2meta
-                allprocs_abs2meta[type_][abs_name] = {
+                allprocs_abs2meta[abs_name] = {
                     meta_name: metadata[meta_name]
                     for meta_name in global_meta_names[type_]
                 }
 
                 # Compute abs2meta
-                abs2meta[type_][abs_name] = metadata
+                abs2meta[abs_name] = metadata
 
     def _setup_var_sizes(self, recurse=True):
         """
@@ -209,14 +209,15 @@ class Component(System):
                 for set_name, nvars in iteritems(self._num_var_byset[vec_name][type_]):
                     sizes_byset[vec_name][type_][set_name] = np.zeros((nproc, nvars), int)
 
+            allprocs_abs2idx_byset_t = self._var_allprocs_abs2idx_byset[vec_name]
+
             # Compute _var_sizes and _var_sizes_byset
+            abs2meta = self._var_abs2meta
             for type_ in ('input', 'output'):
                 sz = sizes[vec_name][type_]
                 sz_byset = sizes_byset[vec_name][type_]
-                abs2meta_t = self._var_abs2meta[type_]
-                allprocs_abs2idx_byset_t = self._var_allprocs_abs2idx_byset[vec_name][type_]
                 for idx, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
-                    meta = abs2meta_t[abs_name]
+                    meta = abs2meta[abs_name]
                     set_name = meta['var_set']
                     size = meta['size']
                     idx_byset = allprocs_abs2idx_byset_t[abs_name]
@@ -552,15 +553,16 @@ class Component(System):
             if not wrt_matches:
                 raise ValueError('No matches were found for wrt="{}"'.format(wrt_pattern))
 
+            info = self._subjacs_info
             for rel_key in product(of_matches, wrt_matches):
-                meta_changes = {
-                    'method': method,
-                }
                 abs_key = rel_key2abs_key(self, rel_key)
-                meta = self._subjacs_info.get(abs_key, SUBJAC_META_DEFAULTS.copy())
-                meta.update(meta_changes)
+                if abs_key in info:
+                    meta = info[abs_key]
+                else:
+                    meta = SUBJAC_META_DEFAULTS.copy()
+                meta['method'] = method
                 meta.update(kwargs)
-                self._subjacs_info[abs_key] = meta
+                info[abs_key] = meta
 
     def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None,
                          method='exact', **kwargs):
@@ -726,13 +728,13 @@ class Component(System):
             Value of subjacobian.  If rows and cols are not None, this will
             contain the values found at each (row, col) location in the subjac.
         """
-        if val is not None and not issparse(val):
+        if dependent and val is not None and not issparse(val):
             val = np.atleast_1d(val)
             # np.promote_types  will choose the smallest dtype that can contain both arguments
             safe_dtype = np.promote_types(val.dtype, float)
             val = val.astype(safe_dtype, copy=False)
 
-        if rows is not None:
+        if dependent and rows is not None:
             rows = np.array(rows, dtype=int, copy=False)
             cols = np.array(cols, dtype=int, copy=False)
 
@@ -767,13 +769,18 @@ class Component(System):
             multiple_items = True
 
             for rel_key in product(of_matches, wrt_matches):
+                abs_key = rel_key2abs_key(self, rel_key)
+                if not dependent:
+                    if abs_key in self._subjacs_info:
+                        del self._subjacs_info[abs_key]
+                    continue
+
                 meta_changes = {
                     'rows': rows,
                     'cols': cols,
                     'value': deepcopy(val) if make_copies else val,
                     'dependent': dependent
                 }
-                abs_key = rel_key2abs_key(self, rel_key)
                 if abs_key in self._subjacs_info:
                     meta = self._subjacs_info[abs_key]
                 else:
@@ -824,11 +831,8 @@ class Component(System):
             Metadata dictionary from declare_partials.
         """
         if meta['dependent']:
-            out_size = np.prod(self._var_abs2meta['output'][abs_key[0]]['shape'])
-            if abs_key[1] in self._var_abs2meta['input']:
-                in_size = self._var_abs2meta['input'][abs_key[1]]['size']
-            else:  # assume output (or get a KeyError)
-                in_size = self._var_abs2meta['output'][abs_key[1]]['size']
+            out_size = np.prod(self._var_abs2meta[abs_key[0]]['shape'])
+            in_size = self._var_abs2meta[abs_key[1]]['size']
 
             if in_size == 0 and self.comm.rank != 0:  # 'inactive' component
                 return
@@ -872,12 +876,15 @@ class Component(System):
         """
         with self.jacobian_context() as J:
             for key, meta in iteritems(self._subjacs_info):
+                if not meta['dependent']:
+                    continue
                 self._check_partials_meta(key, meta)
                 J._set_partials_meta(key, meta)
 
-                method = meta.get('method', False)
-                if method and meta['dependent']:
-                    self._approx_schemes[method].add_approximation(key, meta)
+                if 'method' in meta:
+                    method = meta['method']
+                    if method:
+                        self._approx_schemes[method].add_approximation(key, meta)
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()
