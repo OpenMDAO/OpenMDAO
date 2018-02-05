@@ -19,7 +19,7 @@ class TestVector(unittest.TestCase):
         p.setup()
         p.final_setup()
 
-        keys = list(p.model._outputs.keys())
+        keys = sorted(p.model._outputs.keys())
         expected = ['des_vars.v1', 'des_vars.v2']
 
         self.assertListEqual(keys, expected, msg='keys() is not returning the expected names')
