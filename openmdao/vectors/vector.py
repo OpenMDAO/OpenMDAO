@@ -292,6 +292,17 @@ class Vector(object):
         """
         return abs_name in self._names
 
+    def keys(self):
+        """
+        Return absolute variable names of variables contained in this vector.
+
+        Returns
+        -------
+        list
+            absolute variable names of variables contained in this vector.
+        """
+        return self._views.keys()
+
     def __iter__(self):
         """
         Yield an iterator over variables involved in the current mat-vec product (relative names).
