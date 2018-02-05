@@ -29,6 +29,7 @@ class RunOnceCounter(LinearRunOnce):
 
 def run_opt(driver_class, options, color_info=None):
 
+    # note: size must be an even number
     SIZE = 10
     p = Problem()
 
@@ -79,8 +80,8 @@ def run_opt(driver_class, options, color_info=None):
 
     IND = np.arange(SIZE, dtype=int)
     ODD_IND = IND[0::2]  # all odd indices
-    p.model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=ODD_IND)#  equals=0,)
-    p.model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5) # equals=0)
+    p.model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=ODD_IND)
+    p.model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
 
     # this constrains x[0] to be 1 (see definition of l_conx)
     p.model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
@@ -104,8 +105,6 @@ class SimulColoringTestCase(unittest.TestCase):
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_simul_coloring_snopt(self):
-
-        #note: size must always be an even number!!
 
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, {'optimizer': 'SNOPT', 'print_results': False})
@@ -165,8 +164,6 @@ class SimulColoringTestCase(unittest.TestCase):
         except:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
-        #note: size must always be an even number!!
-
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, {'optimizer': 'SLSQP', 'print_results': False})
 
@@ -218,8 +215,6 @@ class SimulColoringTestCase(unittest.TestCase):
 class SimulColoringScipyTestCase(unittest.TestCase):
 
     def test_simul_coloring(self):
-
-        #note: size must always be an even number!!
 
         # first, run w/o coloring
         p = run_opt(ScipyOptimizeDriver, {'optimizer': 'SLSQP', 'disp': False})
@@ -273,6 +268,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         from openmdao.api import Problem, IndepVarComp, ExecComp, ScipyOptimizeDriver
         import numpy as np
 
+        # note: size must be an even number
         SIZE = 10
         p = Problem()
 
