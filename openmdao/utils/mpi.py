@@ -139,7 +139,7 @@ def MultiProcFailCheck(comm):
     Parameters
     ----------
     comm : MPI communicator or None
-        Communicator from the ParallelSystem that owns the calling solver.
+        Communicator from the ParallelGroup that owns the calling solver.
     """
     if MPI is None:
         yield

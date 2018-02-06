@@ -60,7 +60,7 @@ class NonlinearBlockJac(NonlinearSolver):
 
         # If this is a parallel group, check for analysis errors and reraise.
         if len(system._subsystems_myproc) != len(system._subsystems_allprocs):
-            with MultiProcFailCheck(self._system.comm):
+            with MultiProcFailCheck(system.comm):
                 super(NonlinearBlockJac, self)._run_apply()
         else:
             super(NonlinearBlockJac, self)._run_apply()

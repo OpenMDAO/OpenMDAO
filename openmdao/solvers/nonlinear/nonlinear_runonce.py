@@ -38,7 +38,7 @@ class NonlinearRunOnce(NonlinearSolver):
             if len(system._subsystems_myproc) != len(system._subsystems_allprocs):
                 system._transfer('nonlinear', 'fwd')
 
-                with MultiProcFailCheck(self._system.comm):
+                with MultiProcFailCheck(system.comm):
                     for subsys in system._subsystems_myproc:
                         subsys._solve_nonlinear()
 

@@ -4,8 +4,8 @@ import unittest
 
 from openmdao.api import Problem, ScipyKrylov, IndepVarComp, Group, ExplicitComponent, \
      AnalysisError, ParallelGroup, ExecComp
-from openmdao.core.driver import Driver
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
+from openmdao.test_suite.components.ae_tests import AEComp, AEDriver
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import ConvergeDivergeGroups
 from openmdao.utils.assert_utils import assert_rel_error
@@ -70,41 +70,6 @@ class TestNonlinearRunOnceSolverMPI(unittest.TestCase):
 
     @unittest.skipUnless(MPI, "MPI is not active.")
     def test_reraise_analylsis_error(self):
-
-        class AEComp(ExplicitComponent):
-
-            def setup(self):
-                self.add_input('x', val=0.0)
-                self.add_output('y', val=0.0)
-
-            def compute(self, inputs, outputs):
-                """
-                This will error if x is more than 2.
-                """
-                x = inputs['x']
-
-                if x > 2.0:
-                    raise AnalysisError('Try again.')
-
-                outputs['y'] = x*x + 2.0
-
-        class AEDriver(Driver):
-            """
-            Handle an Analysis Error from below.
-            """
-
-            def run(self):
-                """
-                Just handle it and return an error state.
-                """
-                try:
-                    failure_flag, _, _ = self._problem.model._solve_nonlinear()
-                except AnalysisError:
-                    return True
-
-                return False
-
-
         prob = Problem()
         prob.model = model = Group()
 
