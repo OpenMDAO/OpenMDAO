@@ -93,8 +93,9 @@ class EmbedTestDirective(Directive):
     has_content = False
 
     option_spec = {
-        'no-split': unchanged
-    }
+        'no-split': unchanged,
+        'keep-docstrings': unchanged
+}
 
     def run(self):
         """

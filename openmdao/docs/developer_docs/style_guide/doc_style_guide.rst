@@ -228,6 +228,21 @@ embed-code
         a feature doc that may, for example, illustrate a usage example. Another great benefit of this
         method is that now your embedded example changes along with the code, so the docs maintain themselves.
 
+        By default, docstrings will be removed from the embedded code. There is an option
+        to the directive to keep the docstrings:
+
+        .. code-block:: python
+
+          .. embed-code::
+              openmdao.core.tests.test_expl_comp.RectangleComp
+              :keep-docstrings:
+
+        The resulting output with the docstring look like this:
+
+        .. embed-code::
+          openmdao.core.tests.test_expl_comp.RectangleComp
+          :keep-docstrings:
+
 
 embed-test
 ++++++++++
