@@ -162,6 +162,8 @@ class AssembledJacobian(Jacobian):
             if not info['dependent']:
                 continue
             res_abs_name, wrt_abs_name = abs_key
+            # because self._subjacs_info is shared among all 'related' assembled jacs,
+            # we use out_ranges (and later in_ranges) to weed out keys outside of this jac
             if res_abs_name not in out_ranges:
                 continue
             res_offset, _ = out_ranges[res_abs_name]
@@ -191,7 +193,12 @@ class AssembledJacobian(Jacobian):
                     abs_key2 = (res_abs_name, out_abs_name)
                     self._keymap[abs_key] = abs_key2
 
-                    if src_indices is not None:
+                    if src_indices is None:
+                        # if there's an existing key for d(output)/d(source), don't
+                        # override it. Just have the d(output)/d(input) subjac refer to it.
+                        if abs_key2 in self._subjacs_info and abs_key2[1] in out_ranges:
+                            continue
+                    else:
                         if abs_key2 in mapped_keys:
                             raise RuntimeError("Jacobian assembly failure.  Output '%s' is "
                                                "connected to multiple inputs %s on the same "

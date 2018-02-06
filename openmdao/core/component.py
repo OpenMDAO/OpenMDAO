@@ -781,15 +781,6 @@ class Component(System):
 
                 if abs_key in self._subjacs_info:
                     meta = self._subjacs_info[abs_key]
-                    # print("SECOND:", abs_key)
-                    # if meta['rows'] != rows:
-                    #     print("rows differ:", meta['rows'], rows)
-                    # if meta['cols'] != cols:
-                    #     print("cols differ:", meta['cols'], cols)
-                    # if meta['value'] != val:
-                    #     print("value differs:", meta['value'], val)
-                    # if meta['dependent'] != dependent:
-                    #     print("dependent differs:", meta['dependent'], dependent)
                 else:
                     meta = SUBJAC_META_DEFAULTS.copy()
                 meta['rows'] = rows
