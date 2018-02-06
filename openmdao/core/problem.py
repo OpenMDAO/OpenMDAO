@@ -34,6 +34,10 @@ except ImportError:
 
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
+# Use this as a special value to be able to tell if the caller set a value for the optional
+#   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
+_DEFAULT_OUT_STREAM = object()
+
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
@@ -451,7 +455,7 @@ class Problem(object):
         if Problem._post_setup_func is not None:
             Problem._post_setup_func(self)
 
-    def check_partials(self, out_stream=None, comps=None, compact_print=False,
+    def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6,
                        method='fd', step=None, form=DEFAULT_FD_OPTIONS['form'],
                        step_calc=DEFAULT_FD_OPTIONS['step_calc'],
@@ -796,13 +800,16 @@ class Problem(object):
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
 
+        if out_stream == _DEFAULT_OUT_STREAM and not suppress_output:
+            out_stream = sys.stdout
+
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, all_fd_options,
                                   suppress_output=suppress_output, indep_key=indep_key)
 
         return partials_data
 
-    def check_totals(self, of=None, wrt=None, out_stream=None, compact_print=False,
+    def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
                      abs_err_tol=1e-6,
                      rel_err_tol=1e-6, method='fd', step=1e-6, form='forward', step_calc='abs',
                      suppress_output=False):
@@ -890,6 +897,9 @@ class Problem(object):
             data[''][key]['J_fwd'] = Jcalc[key]
             data[''][key]['J_fd'] = Jfd[key]
         fd_args['method'] = 'fd'
+
+        if out_stream == _DEFAULT_OUT_STREAM and not suppress_output:
+            out_stream = sys.stdout
 
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, out_stream, compact_print,
                                   [model],
