@@ -56,7 +56,7 @@ def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma:
             set_total = 0
             for rank in range(g.comm.size):
                 for ivar, vname in enumerate(vnames[type_]):
-                    vset = abs2meta[type_][vname]['var_set']
+                    vset = abs2meta[vname]['var_set']
                     if vset == sname:
                         sz = sizes[type_][vset][rank, set_idxs[type_][vname]]
                         if sz > 0:
@@ -210,7 +210,7 @@ def config_summary(problem, stream=sys.stdout):
     sysnames = [s.pathname for s in allsystems]
     maxdepth = max([len(name.split('.')) for name in sysnames])
     setup_done = problem._setup_status == 2
-    meta_in = model._var_allprocs_abs2meta['input']
+    meta = model._var_allprocs_abs2meta
 
     print("============== Problem Summary ============", file=stream)
     print("Groups:           %5d" % len(allgroups), file=stream)
@@ -252,7 +252,7 @@ def config_summary(problem, stream=sys.stdout):
         print(file=stream)
         conns = model._conn_global_abs_in2out
         print("Total connections: %d   Total transfer data size: %d" %
-              (len(conns), sum(meta_in[n]['size'] for n in conns)), file=stream)
+              (len(conns), sum(meta[n]['size'] for n in conns)), file=stream)
 
     print(file=stream)
     print("Driver type: %s" % problem.driver.__class__.__name__, file=stream)

@@ -1,7 +1,6 @@
 """
 Helper function to find all the `cite` attributes throughout a model.
 """
-from __future__ import print_function
 from collections import OrderedDict
 import inspect
 import sys
@@ -9,6 +8,10 @@ import sys
 from six import iteritems
 
 from openmdao.utils.logger_utils import get_logger
+
+# Use this as a special value to be able to tell if the caller set a value for the optional
+#   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
+_DEFAULT_OUT_STREAM = object()
 
 
 def _check_cite(obj, citations):
@@ -89,7 +92,7 @@ def _filter_citations(citations, classes):
     return cits
 
 
-def print_citations(prob, classes=None, out_stream='stdout'):
+def print_citations(prob, classes=None, out_stream=_DEFAULT_OUT_STREAM):
     """
     Write a list of citations from classes in the problem to the given stream.
 
@@ -99,18 +102,18 @@ def print_citations(prob, classes=None, out_stream='stdout'):
         The Problem instance to be searched
     classes : list of str
         List of class names for classes to include in the displayed citations.
-    out_stream : 'stdout', 'stderr' or file-like
-            Where to send human readable output. Default is 'stdout'.
-            Set to None to suppress.
+    out_stream : file-like object
+        Where to send human readable output. Default is sys.stdout.
+        Set to None to suppress.
     """
     citations = _filter_citations(find_citations(prob), classes)
 
+    if out_stream == _DEFAULT_OUT_STREAM:
+        out_stream = sys.stdout
+
     if out_stream:
-        logger = get_logger('citations', out_stream=out_stream)
         for klass, cite in citations.items():
-            # print("Class: {}".format(klass), file=out_stream)
-            logger.info("Class: {}".format(klass))
+            out_stream.write("Class: {}".format(klass) + '\n')
             lines = cite.split('\n')
             for line in lines:
-                # print("    {}".format(line), file=out_stream)
-                logger.info("    {}".format(line))
+                out_stream.write("    {}".format(line) + '\n')
