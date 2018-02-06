@@ -25,7 +25,10 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import get_conversion
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.logger_utils import get_logger
+
+# Use this as a special value to be able to tell if the caller set a value for the optional
+#   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
+_DEFAULT_OUT_STREAM = object()
 
 
 class System(object):
@@ -2508,7 +2511,7 @@ class System(object):
                     units=False,
                     hierarchical=True,
                     print_arrays=False,
-                    out_stream='stdout'):
+                    out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of input names and other optional information.
 
@@ -2530,8 +2533,8 @@ class System(object):
             When True, also display full values of the ndarray below the row. Format is affected
             by the values set with numpy.set_printoptions
             Default is False.
-        out_stream : 'stdout', 'stderr' or file-like
-            Where to send human readable output. Default is 'stdout'.
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
         Returns
@@ -2553,6 +2556,9 @@ class System(object):
                 outs['units'] = meta[name]['units']
             inputs.append((name, outs))
 
+        if out_stream == _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
+
         if out_stream:
             self._write_outputs('input', None, inputs, hierarchical, print_arrays, out_stream)
 
@@ -2569,7 +2575,7 @@ class System(object):
                      scaling=False,
                      hierarchical=True,
                      print_arrays=False,
-                     out_stream='stdout'):
+                     out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of output names and other optional information.
 
@@ -2607,8 +2613,8 @@ class System(object):
             When True, also display full values of the ndarray below the row. Format  is affected
             by the values set with numpy.set_printoptions
             Default is False.
-        out_stream : 'stdout', 'stderr' or file-like
-            Where to send human readable output. Default is 'stdout'.
+        out_stream : file-like
+            Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
         Returns
@@ -2651,6 +2657,9 @@ class System(object):
             else:
                 expl_outputs.append((name, outs))
 
+        if out_stream == _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
+
         if out_stream:
             if explicit:
                 self._write_outputs('output', 'Explicit', expl_outputs, hierarchical, print_arrays,
@@ -2669,7 +2678,7 @@ class System(object):
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
     def _write_outputs(self, in_or_out, comp_type, outputs, hierarchical, print_arrays,
-                       out_stream='stdout'):
+                       out_stream):
         """
         Write table of variable names, values, residuals, and metadata to out_stream.
 
@@ -2692,8 +2701,8 @@ class System(object):
             When True, also display full values of the ndarray below the row. Format  is affected
             by the values set with numpy.set_printoptions
             Default is False.
-        out_stream : 'stdout', 'stderr' or file-like
-            Where to send human readable output. Default is 'stdout'.
+        out_stream : file-like object
+            Where to send human readable output.
             Set to None to suppress.
         """
         if out_stream is None:
@@ -2748,16 +2757,14 @@ class System(object):
         count = len(dict_of_outputs)
 
         # Write header
-        logger_name = 'list_inputs' if in_or_out == 'input' else 'list_outputs'
-        logger = get_logger(logger_name, out_stream=out_stream)
         pathname = self.pathname if self.pathname else 'model'
         header_name = 'Input' if in_or_out == 'input' else 'Output'
         if in_or_out == 'input':
             header = "%d %s(s) in '%s'" % (count, header_name, pathname)
         else:
             header = "%d %s %s(s) in '%s'" % (count, comp_type, header_name, pathname)
-        logger.info(header)
-        logger.info("-" * len(header) + "\n")
+        out_stream.write(header + '\n')
+        out_stream.write('-' * len(header) + '\n' + '\n')
 
         if not count:
             return
@@ -2814,12 +2821,12 @@ class System(object):
             column_header += '{:{align}{width}}'.format(column_name, align=self._align,
                                                         width=self._column_widths[column_name])
             column_dashes += self._column_spacing * ' ' + self._column_widths[column_name] * '-'
-        logger.info(column_header)
-        logger.info(column_dashes)
+        out_stream.write(column_header + '\n')
+        out_stream.write(column_dashes + '\n')
 
         # Write out the variable names and optional values and metadata
         if hierarchical:
-            logger.info(top_level_system_name)
+            out_stream.write(top_level_system_name + '\n')
 
             cur_sys_names = []
             # _var_allprocs_abs_names has all the vars across all procs in execution order
@@ -2847,33 +2854,32 @@ class System(object):
                 # Write the Systems in the var name path
                 indent = len(existing_sys_names) * self._indent_inc
                 for i, sys_name in enumerate(remaining_sys_path_parts):
-                    num_parts = len(existing_sys_names) + i + 1
                     indent += self._indent_inc
-                    logger.info(indent * ' ' + sys_name)
+                    out_stream.write(indent * ' ' + sys_name + '\n')
                 cur_sys_names = varname_sys_names
 
                 indent += self._indent_inc
                 row = '{:{align}{width}}'.format(indent * ' ' + varname.split('.')[-1],
                                                  align=self._align, width=max_varname_len)
-                self._write_outputs_rows(logger, row, column_names, dict_of_outputs[varname],
+                self._write_outputs_rows(out_stream, row, column_names, dict_of_outputs[varname],
                                          print_arrays)
         else:
             for name in self._var_allprocs_abs_names[in_or_out]:
                 if name in dict_of_outputs:
                     row = '{:{align}{width}}'.format(name, align=self._align, width=max_varname_len)
-                    self._write_outputs_rows(logger, row, column_names, dict_of_outputs[name],
+                    self._write_outputs_rows(out_stream, row, column_names, dict_of_outputs[name],
                                              print_arrays)
-        logger.info('\n')
+        out_stream.write(2 * '\n')
 
-    def _write_outputs_rows(self, logger, row, column_names, dict_of_outputs, print_arrays):
+    def _write_outputs_rows(self, out_stream, row, column_names, dict_of_outputs, print_arrays):
         """
         For one variable, write name, values, residuals, and metadata to out_stream.
 
         Parameters
         ----------
-        logger : Logger
-            Logger to which the output will be written.
-
+        out_stream : file-like object
+            Where to send human readable output.
+            Set to None to suppress.
         row : str
             The string containing the contents of the beginning of this row output.
             Contains the name of the System or varname, possibley indented to show hierarchy.
@@ -2892,6 +2898,8 @@ class System(object):
             Default is False.
 
         """
+        if out_stream is None:
+            return
         left_column_width = len(row)
         have_array_values = []  # keep track of which values are arrays
         for column_name in column_names:
@@ -2904,14 +2912,14 @@ class System(object):
                 out = str(dict_of_outputs[column_name])
             row += '{:{align}{width}}'.format(out, align=self._align,
                                               width=self._column_widths[column_name])
-        logger.info(row)
+        out_stream.write(row + '\n')
         if print_arrays:
             for column_name in have_array_values:
-                logger.info("{}  {}:".format(left_column_width * ' ', column_name))
+                out_stream.write("{}  {}:\n".format(left_column_width * ' ', column_name))
                 out_str = str(dict_of_outputs[column_name])
                 indented_lines = [(left_column_width + self._indent_inc) * ' ' +
                                   s for s in out_str.splitlines()]
-                logger.info('\n'.join(indented_lines))
+                out_stream.write('\n'.join(indented_lines) + '\n')
 
     def run_solve_nonlinear(self):
         """
