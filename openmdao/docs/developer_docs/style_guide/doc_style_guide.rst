@@ -219,7 +219,7 @@ embed-code
 
         What the above will do is replace the directive and its arg with the class
         definition for `openmdao.core.tests.test_expl_comp.RectangleComp`.
-        The resulting output will looks like this:
+        The resulting output will look like this:
 
         .. embed-code::
           openmdao.core.tests.test_expl_comp.RectangleComp
@@ -237,7 +237,7 @@ embed-code
               openmdao.core.tests.test_expl_comp.RectangleComp
               :keep-docstrings:
 
-        The resulting output with the docstring look like this:
+        The resulting output with the docstring looks like this:
 
         .. embed-code::
           openmdao.core.tests.test_expl_comp.RectangleComp
