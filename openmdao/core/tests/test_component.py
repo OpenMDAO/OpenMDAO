@@ -27,13 +27,13 @@ class TestExplicitComponent(unittest.TestCase):
 
         # check optional metadata (desc)
         self.assertEqual(
-            comp._var_abs2meta['input']['length']['desc'],
+            comp._var_abs2meta['length']['desc'],
             'length of rectangle')
         self.assertEqual(
-            comp._var_abs2meta['input']['width']['desc'],
+            comp._var_abs2meta['width']['desc'],
             'width of rectangle')
         self.assertEqual(
-            comp._var_abs2meta['output']['area']['desc'],
+            comp._var_abs2meta['area']['desc'],
             'area of rectangle')
 
         prob['length'] = 3.
