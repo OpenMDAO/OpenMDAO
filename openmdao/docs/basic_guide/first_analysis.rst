@@ -71,6 +71,7 @@ and in this case you also ask OpenMDAO to approximate all the partial derivative
 
 .. embed-code::
     openmdao.test_suite.components.paraboloid_feature.Paraboloid
+    :keep-docstrings:
 
 
 The Run Script
