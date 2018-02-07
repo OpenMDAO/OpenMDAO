@@ -28,7 +28,8 @@ Take a look at the full run script first, then we'll break it down part by part 
 
 
 .. embed-code::
-    openmdao.test_suite.components.paraboloid_feature
+    openmdao.test_suite.components.paraboloid_feature 
+    :keep-docstrings:
 
 
 Next, let's break this script down and understand each section:
@@ -70,6 +71,7 @@ and in this case you also ask OpenMDAO to approximate all the partial derivative
 
 .. embed-code::
     openmdao.test_suite.components.paraboloid_feature.Paraboloid
+    :keep-docstrings:
 
 
 The Run Script
