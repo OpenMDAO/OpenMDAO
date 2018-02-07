@@ -2,11 +2,19 @@
 
 import unittest
 
-from openmdao.api import Problem, ScipyKrylov, IndepVarComp, Group
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.api import Problem, ScipyKrylov, IndepVarComp, Group, ExplicitComponent, \
+     AnalysisError, ParallelGroup, ExecComp
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
+from openmdao.test_suite.components.ae_tests import AEComp, AEDriver
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import ConvergeDivergeGroups
+from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.mpi import MPI
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class TestNonlinearRunOnceSolver(unittest.TestCase):
@@ -53,6 +61,38 @@ class TestNonlinearRunOnceSolver(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['f_xy'], 122.0)
+
+
+@unittest.skipUnless(PETScVector, "PETSc is required.")
+class TestNonlinearRunOnceSolverMPI(unittest.TestCase):
+
+    N_PROCS = 2
+
+    @unittest.skipUnless(MPI, "MPI is not active.")
+    def test_reraise_analylsis_error(self):
+        prob = Problem()
+        prob.model = model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 0.5))
+        model.add_subsystem('p2', IndepVarComp('x', 3.0))
+        sub = model.add_subsystem('sub', ParallelGroup())
+
+        sub.add_subsystem('c1', AEComp())
+        sub.add_subsystem('c2', AEComp())
+
+        model.add_subsystem('obj', ExecComp(['val = x1 + x2']))
+
+        model.connect('p1.x', 'sub.c1.x')
+        model.connect('p2.x', 'sub.c2.x')
+        model.connect('sub.c1.y', 'obj.x1')
+        model.connect('sub.c2.y', 'obj.x2')
+
+        prob.driver = AEDriver()
+
+        prob.setup(vector_class=PETScVector, check=False)
+
+        handled = prob.run_driver()
+        self.assertTrue(handled)
 
 if __name__ == "__main__":
     unittest.main()

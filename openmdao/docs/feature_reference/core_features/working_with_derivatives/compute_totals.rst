@@ -7,7 +7,7 @@ Computing Total Derivatives
 :code:`Problem` has a method, :code:`compute_totals`, that computes derivatives of desired quantities with respect to
 desired inputs.
 
-This method allows you to see the derivative values for the model.
+This method allows you to compute the derivative values for the model.
 
 .. automethod:: openmdao.core.problem.Problem.compute_totals
     :noindex:

@@ -25,7 +25,10 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import get_conversion
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.logger_utils import get_logger
+
+# Use this as a special value to be able to tell if the caller set a value for the optional
+#   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
+_DEFAULT_OUT_STREAM = object()
 
 
 class System(object):
@@ -90,17 +93,17 @@ class System(object):
         For outputs, the list will have length one since promoted output names are unique.
     _var_abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names, on current proc.
-    _var_allprocs_abs2meta : {'input': dict, 'output': dict}
+    _var_allprocs_abs2meta : {}
         Dictionary mapping absolute names to metadata dictionaries for allprocs variables.
         The keys are
         ('units', 'shape', 'size', 'var_set') for inputs and
         ('units', 'shape', 'size', 'var_set', 'ref', 'ref0', 'res_ref', 'distributed') for outputs.
-    _var_abs2meta : {'input': dict, 'output': dict}
+    _var_abs2meta : {}
         Dictionary mapping absolute names to metadata dictionaries for myproc variables.
-    _var_allprocs_abs2idx : {'input': dict, 'output': dict}
+    _var_allprocs_abs2idx : dict
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
-    _var_allprocs_abs2idx_byset : {<vec_name>:{'input': dict of dict, 'output': dict of dict}, ...}
+    _var_allprocs_abs2idx_byset : {<vec_name>: {dict of dict}, ...}
         Same as above, but by var_set name.
     _var_sizes : {'input': ndarray, 'output': ndarray}
         Array of local sizes of this system's allprocs variables.
@@ -295,10 +298,10 @@ class System(object):
         self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = None
         self._var_abs2prom = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
-        self._var_abs2meta = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2meta = {}
+        self._var_abs2meta = {}
 
-        self._var_allprocs_abs2idx = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2idx = {}
         self._var_allprocs_abs2idx_byset = None
 
         self._var_sizes = None
@@ -595,7 +598,7 @@ class System(object):
                                 ncol = voi['size']
                             else:
                                 owner = self._owning_rank['output'][vec_name]
-                                ncol = sizes[owner, abs2idx[vec_name]['output'][vec_name]]
+                                ncol = sizes[owner, abs2idx[vec_name][vec_name]]
                         rdct, _ = relevant[vec_name]['@all']
                         rel = rdct['output']
 
@@ -883,8 +886,8 @@ class System(object):
         self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
         self._var_abs2prom = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
-        self._var_abs2meta = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2meta = {}
+        self._var_abs2meta = {}
 
     def _setup_var_index_maps(self, recurse=True):
         """
@@ -897,19 +900,17 @@ class System(object):
         """
         self._var_allprocs_abs2idx = abs2idx = {}
         self._var_allprocs_abs2idx_byset = abs2idx_byset = {}
+        abs2meta = self._var_allprocs_abs2meta
 
         for vec_name in self._lin_rel_vec_name_list:
-            abs2idx[vec_name] = {'input': {}, 'output': {}}
-            abs2idx_byset[vec_name] = {'input': {}, 'output': {}}
+            abs2idx[vec_name] = abs2idx_t = {}
+            abs2idx_byset[vec_name] = abs2idx_byset_t = {}
             for type_ in ['input', 'output']:
                 counter = defaultdict(int)
-                abs2idx_t = abs2idx[vec_name][type_]
-                abs2idx_byset_t = abs2idx_byset[vec_name][type_]
-                abs2meta_t = self._var_allprocs_abs2meta[type_]
 
                 for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
                     abs2idx_t[abs_name] = i
-                    set_name = abs2meta_t[abs_name]['var_set']
+                    set_name = abs2meta[abs_name]['var_set']
                     abs2idx_byset_t[abs_name] = counter[set_name]
                     counter[set_name] += 1
 
@@ -938,7 +939,7 @@ class System(object):
         """
         Compute the global size and shape of all variables on this system.
         """
-        meta = self._var_allprocs_abs2meta['output']
+        meta = self._var_allprocs_abs2meta
 
         # now set global sizes and shapes into metadata for distributed outputs
         sizes = self._var_sizes['nonlinear']['output']
@@ -1181,7 +1182,9 @@ class System(object):
         self._upper_bounds = upper = vector_class(
             'nonlinear', 'output', self, root_upper, resize=resize)
 
-        for abs_name, meta in iteritems(self._var_abs2meta['output']):
+        abs2meta = self._var_abs2meta
+        for abs_name in self._var_abs_names['output']:
+            meta = abs2meta[abs_name]
             shape = meta['shape']
             ref0 = meta['ref0']
             ref = meta['ref']
@@ -1221,8 +1224,8 @@ class System(object):
             ('input', 'norm'): (0.0, 1.0)
         })
 
-        abs2meta_in = self._var_abs2meta['input']
-        allprocs_meta_out = self._var_allprocs_abs2meta['output']
+        abs2meta_in = self._var_abs2meta
+        allprocs_meta_out = self._var_allprocs_abs2meta
 
         for abs_name in self._var_allprocs_abs_names['output']:
             meta = allprocs_meta_out[abs_name]
@@ -1421,11 +1424,12 @@ class System(object):
         """
         Set all input and output variables to their declared initial values.
         """
-        for abs_name, meta in iteritems(self._var_abs2meta['input']):
-            self._inputs._views[abs_name][:] = meta['value']
+        abs2meta = self._var_abs2meta
+        for abs_name in self._var_abs_names['input']:
+            self._inputs._views[abs_name][:] = abs2meta[abs_name]['value']
 
-        for abs_name, meta in iteritems(self._var_abs2meta['output']):
-            self._outputs._views[abs_name][:] = meta['value']
+        for abs_name in self._var_abs_names['output']:
+            self._outputs._views[abs_name][:] = abs2meta[abs_name]['value']
 
     def _transfer(self, vec_name, mode, isub=None):
         """
@@ -1586,7 +1590,7 @@ class System(object):
                 if abs_in in self._conn_global_abs_in2out:
                     abs_out = self._conn_global_abs_in2out[abs_in]
 
-                    if abs_out not in excl_sub._var_allprocs_abs2idx['linear']['output']:
+                    if abs_out not in excl_sub._var_allprocs_abs2idx['linear']:
                         scope_in.add(abs_in)
 
         self._scope_cache[excl_sub] = (scope_out, scope_in)
@@ -2378,7 +2382,7 @@ class System(object):
         if get_sizes:
             # Size them all
             sizes = self._var_sizes['nonlinear']['output']
-            abs2idx = self._var_allprocs_abs2idx['nonlinear']['output']
+            abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name in out:
                 if 'size' not in out[name]:
                     out[name]['size'] = sizes[self._owning_rank['output'][name], abs2idx[name]]
@@ -2430,7 +2434,7 @@ class System(object):
         if get_sizes:
             # Size them all
             sizes = self._var_sizes['nonlinear']['output']
-            abs2idx = self._var_allprocs_abs2idx['nonlinear']['output']
+            abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name in out:
                 if 'size' not in out[name]:
                     out[name]['size'] = sizes[self._owning_rank['output'][name], abs2idx[name]]
@@ -2507,7 +2511,7 @@ class System(object):
                     units=False,
                     hierarchical=True,
                     print_arrays=False,
-                    out_stream='stdout'):
+                    out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of input names and other optional information.
 
@@ -2529,8 +2533,8 @@ class System(object):
             When True, also display full values of the ndarray below the row. Format is affected
             by the values set with numpy.set_printoptions
             Default is False.
-        out_stream : 'stdout', 'stderr' or file-like
-            Where to send human readable output. Default is 'stdout'.
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
         Returns
@@ -2549,8 +2553,11 @@ class System(object):
             if values:
                 outs['value'] = val
             if units:
-                outs['units'] = meta['input'][name]['units']
+                outs['units'] = meta[name]['units']
             inputs.append((name, outs))
+
+        if out_stream == _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
 
         if out_stream:
             self._write_outputs('input', None, inputs, hierarchical, print_arrays, out_stream)
@@ -2568,7 +2575,7 @@ class System(object):
                      scaling=False,
                      hierarchical=True,
                      print_arrays=False,
-                     out_stream='stdout'):
+                     out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of output names and other optional information.
 
@@ -2606,8 +2613,8 @@ class System(object):
             When True, also display full values of the ndarray below the row. Format  is affected
             by the values set with numpy.set_printoptions
             Default is False.
-        out_stream : 'stdout', 'stderr' or file-like
-            Where to send human readable output. Default is 'stdout'.
+        out_stream : file-like
+            Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
         Returns
@@ -2635,20 +2642,23 @@ class System(object):
             if residuals:
                 outs['resids'] = self._residuals._views[name]
             if units:
-                outs['units'] = meta['output'][name]['units']
+                outs['units'] = meta[name]['units']
             if shape:
                 outs['shape'] = val.shape
             if bounds:
-                outs['lower'] = meta['output'][name]['lower']
-                outs['upper'] = meta['output'][name]['upper']
+                outs['lower'] = meta[name]['lower']
+                outs['upper'] = meta[name]['upper']
             if scaling:
-                outs['ref'] = meta['output'][name]['ref']
-                outs['ref0'] = meta['output'][name]['ref0']
-                outs['res_ref'] = meta['output'][name]['res_ref']
+                outs['ref'] = meta[name]['ref']
+                outs['ref0'] = meta[name]['ref0']
+                outs['res_ref'] = meta[name]['res_ref']
             if name in states:
                 impl_outputs.append((name, outs))
             else:
                 expl_outputs.append((name, outs))
+
+        if out_stream == _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
 
         if out_stream:
             if explicit:
@@ -2668,7 +2678,7 @@ class System(object):
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
     def _write_outputs(self, in_or_out, comp_type, outputs, hierarchical, print_arrays,
-                       out_stream='stdout'):
+                       out_stream):
         """
         Write table of variable names, values, residuals, and metadata to out_stream.
 
@@ -2691,15 +2701,15 @@ class System(object):
             When True, also display full values of the ndarray below the row. Format  is affected
             by the values set with numpy.set_printoptions
             Default is False.
-        out_stream : 'stdout', 'stderr' or file-like
-            Where to send human readable output. Default is 'stdout'.
+        out_stream : file-like object
+            Where to send human readable output.
             Set to None to suppress.
         """
         if out_stream is None:
             return
 
         # Only local metadata but the most complete
-        meta = self._var_abs2meta[in_or_out]
+        meta = self._var_abs2meta
 
         # Make a dict of outputs. Makes it easier to work with in this method
         dict_of_outputs = OrderedDict()
@@ -2747,16 +2757,14 @@ class System(object):
         count = len(dict_of_outputs)
 
         # Write header
-        logger_name = 'list_inputs' if in_or_out == 'input' else 'list_outputs'
-        logger = get_logger(logger_name, out_stream=out_stream)
         pathname = self.pathname if self.pathname else 'model'
         header_name = 'Input' if in_or_out == 'input' else 'Output'
         if in_or_out == 'input':
             header = "%d %s(s) in '%s'" % (count, header_name, pathname)
         else:
             header = "%d %s %s(s) in '%s'" % (count, comp_type, header_name, pathname)
-        logger.info(header)
-        logger.info("-" * len(header) + "\n")
+        out_stream.write(header + '\n')
+        out_stream.write('-' * len(header) + '\n' + '\n')
 
         if not count:
             return
@@ -2813,12 +2821,12 @@ class System(object):
             column_header += '{:{align}{width}}'.format(column_name, align=self._align,
                                                         width=self._column_widths[column_name])
             column_dashes += self._column_spacing * ' ' + self._column_widths[column_name] * '-'
-        logger.info(column_header)
-        logger.info(column_dashes)
+        out_stream.write(column_header + '\n')
+        out_stream.write(column_dashes + '\n')
 
         # Write out the variable names and optional values and metadata
         if hierarchical:
-            logger.info(top_level_system_name)
+            out_stream.write(top_level_system_name + '\n')
 
             cur_sys_names = []
             # _var_allprocs_abs_names has all the vars across all procs in execution order
@@ -2846,33 +2854,32 @@ class System(object):
                 # Write the Systems in the var name path
                 indent = len(existing_sys_names) * self._indent_inc
                 for i, sys_name in enumerate(remaining_sys_path_parts):
-                    num_parts = len(existing_sys_names) + i + 1
                     indent += self._indent_inc
-                    logger.info(indent * ' ' + sys_name)
+                    out_stream.write(indent * ' ' + sys_name + '\n')
                 cur_sys_names = varname_sys_names
 
                 indent += self._indent_inc
                 row = '{:{align}{width}}'.format(indent * ' ' + varname.split('.')[-1],
                                                  align=self._align, width=max_varname_len)
-                self._write_outputs_rows(logger, row, column_names, dict_of_outputs[varname],
+                self._write_outputs_rows(out_stream, row, column_names, dict_of_outputs[varname],
                                          print_arrays)
         else:
             for name in self._var_allprocs_abs_names[in_or_out]:
                 if name in dict_of_outputs:
                     row = '{:{align}{width}}'.format(name, align=self._align, width=max_varname_len)
-                    self._write_outputs_rows(logger, row, column_names, dict_of_outputs[name],
+                    self._write_outputs_rows(out_stream, row, column_names, dict_of_outputs[name],
                                              print_arrays)
-        logger.info('\n')
+        out_stream.write(2 * '\n')
 
-    def _write_outputs_rows(self, logger, row, column_names, dict_of_outputs, print_arrays):
+    def _write_outputs_rows(self, out_stream, row, column_names, dict_of_outputs, print_arrays):
         """
         For one variable, write name, values, residuals, and metadata to out_stream.
 
         Parameters
         ----------
-        logger : Logger
-            Logger to which the output will be written.
-
+        out_stream : file-like object
+            Where to send human readable output.
+            Set to None to suppress.
         row : str
             The string containing the contents of the beginning of this row output.
             Contains the name of the System or varname, possibley indented to show hierarchy.
@@ -2891,6 +2898,8 @@ class System(object):
             Default is False.
 
         """
+        if out_stream is None:
+            return
         left_column_width = len(row)
         have_array_values = []  # keep track of which values are arrays
         for column_name in column_names:
@@ -2903,14 +2912,14 @@ class System(object):
                 out = str(dict_of_outputs[column_name])
             row += '{:{align}{width}}'.format(out, align=self._align,
                                               width=self._column_widths[column_name])
-        logger.info(row)
+        out_stream.write(row + '\n')
         if print_arrays:
             for column_name in have_array_values:
-                logger.info("{}  {}:".format(left_column_width * ' ', column_name))
+                out_stream.write("{}  {}:\n".format(left_column_width * ' ', column_name))
                 out_str = str(dict_of_outputs[column_name])
                 indented_lines = [(left_column_width + self._indent_inc) * ' ' +
                                   s for s in out_str.splitlines()]
-                logger.info('\n'.join(indented_lines))
+                out_stream.write('\n'.join(indented_lines) + '\n')
 
     def run_solve_nonlinear(self):
         """

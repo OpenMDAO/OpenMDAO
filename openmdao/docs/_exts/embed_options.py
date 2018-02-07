@@ -10,7 +10,7 @@ import sphinx
 from sphinx.util.compat import Directive
 from sphinx.util.nodes import nested_parse_with_titles
 
-from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary, _undefined
 
 
 class EmbedOptionsDirective(Directive):
@@ -47,7 +47,8 @@ class EmbedOptionsDirective(Directive):
         outputs = []
         for option_name, option_data in sorted(iteritems(options._dict)):
             name = option_name
-            default = option_data['value']
+            default = option_data['value'] if option_data['value'] is not _undefined \
+                else '**Required**'
             values = option_data['values']
             types = option_data['types']
             desc = option_data['desc']
