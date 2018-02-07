@@ -40,7 +40,7 @@ documentation of the arguments/options/settings for a specific method, Component
     :maxdepth: 1
     :name: referenceguide
 
-    feature_reference/index.rst
+    features/index.rst
     examples/index.rst
     theory_manual/index.rst
 

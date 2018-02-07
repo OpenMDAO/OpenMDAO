@@ -1,4 +1,4 @@
-.. _FeatureReference:
+.. _Features:
 
 ********
 Features
