@@ -17,11 +17,9 @@ def rel_name2abs_name(system, rel_name):
     str
         Absolute variable name.
     """
-    if system.pathname == '':
-        abs_name = rel_name
-    else:
-        abs_name = system.pathname + '.' + rel_name
-    return abs_name
+    if system.pathname is '':
+        return rel_name
+    return system.pathname + '.' + rel_name
 
 
 def abs_name2rel_name(system, abs_name):
@@ -161,8 +159,6 @@ def name2abs_name(system, name, names, type_):
     abs_name2 = rel_name2abs_name(system, name)
     if abs_name2 in names:
         return abs_name2
-    else:
-        return None
 
 
 def prom_key2abs_key(system, prom_key):
@@ -200,8 +196,6 @@ def prom_key2abs_key(system, prom_key):
 
     if abs_name0 is not None and abs_name1 is not None:
         return (abs_name0, abs_name1)
-    else:
-        return None
 
 
 def key2abs_key(system, key):
