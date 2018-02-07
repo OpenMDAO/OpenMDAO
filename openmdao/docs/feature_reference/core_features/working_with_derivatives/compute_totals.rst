@@ -9,7 +9,7 @@ approximations to check your implementations of the partial derivatives for a co
 
 :code:`Problem` has a method, :code:`check_partials`, that checks partial derivatives
  comprehensively for all Components in your model. To do this check, the framework compares the
- analytic result against a finite difference result. This means that the check_partial_derivatives
+ analytic result against a finite difference result. This means that the :code:`check_partial_derivatives`
  function can be quite computationally expensive. So use it to check your work, but don’t leave
  the call in your production run scripts.
 
@@ -36,7 +36,7 @@ Changing Settings for Inputs on a Component
 -------------------------------------------
 
 You can change the settings for the approximation schemes that will be used to compare with your component's derivatives by
-calling the `set_check_partial_options` method.
+calling the :code:`set_check_partial_options` method.
 
 .. automethod:: openmdao.core.component.Component.set_check_partial_options
     :noindex:
@@ -57,7 +57,7 @@ less accurate.
 .. embed-test::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_method_on_comp
 
-Here, we use central difference on TrickyParaboloid to get a slight improvment over forward difference.
+Here, we use central difference on TrickyParaboloid to get a slight improvement over forward difference.
 
 .. embed-test::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_form_on_comp
@@ -94,12 +94,12 @@ are fairly large, so we give it a higher stepsize. However, we choose here to us
 Here, we show how to set the method. In this case, we use Complex Step on TrickyParaboloid because the finite difference is
 less accurate. However, we choose here to use this setting for all comps.
 
-**Note**: You need to set `force_alloc_complex` to True during setup to utilize Complex Step during a check.
+**Note**: You need to set :code:`force_alloc_complex` to `True` during setup to utilize Complex Step during a check.
 
 .. embed-test::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_method_global
 
-Here, we use central difference on TrickyParaboloid to get a slight improvment over forward difference. However, we choose
+Here, we use central difference on TrickyParaboloid to get a slight improvement over forward difference. However, we choose
 here to use this setting for all comps.
 
 .. embed-test::
