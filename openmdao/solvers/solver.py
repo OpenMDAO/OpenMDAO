@@ -560,7 +560,7 @@ class NonlinearSolver(Solver):
 
     def _run_apply(self):
         """
-        Run the the apply_nonlinear method on the system.
+        Run the apply_nonlinear method on the system.
         """
         recording_iteration.stack.append(('_run_apply', 0))
         self._system._apply_nonlinear()
@@ -680,7 +680,7 @@ class LinearSolver(Solver):
 
     def _run_apply(self):
         """
-        Run the the apply_linear method on the system.
+        Run the apply_linear method on the system.
         """
         recording_iteration.stack.append(('_run_apply', 0))
 

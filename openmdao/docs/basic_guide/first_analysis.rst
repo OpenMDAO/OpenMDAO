@@ -90,7 +90,7 @@ The first component is an :ref:`IndepVarComp <openmdao.core.indepvarcomp.py>` in
 This is a special component that OpenMDAO provides for you to specify the independent variables in your problem.
 The second component is an instance of the `Paraboloid` class that we just defined.
 
-As part of the the model hierarchy, you will also define any connections to move data between components in the relevant group.
+As part of the model hierarchy, you will also define any connections to move data between components in the relevant group.
 Here, we connect the independent variables to the inputs on the paraboloid component.
 
 Once the model hierarchy is defined,
