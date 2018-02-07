@@ -20,7 +20,7 @@ Failing Linear Solve
 Before you try any other debugging method, you need to check to make sure that you've correctly defined all the partial derivatives in all components inside the relevant group.
 You can use the :ref:`check_partials()<feature_check_partials>` method to have OpenMDAO compare your analytic derivatives against finite-difference or complex-step approximations.
 
-Iterative linear solvers
+Iterative Linear Solvers
 ------------------------
 
 If you are using one of the iterative linear solvers (e.g. :ref:`PETScKrylov<petscKrylov>`, :ref:`ScipyKrylov<scipyiterativesolver>`),
@@ -32,7 +32,7 @@ You should set :ref:`options['iprint']=2<solver-options>` setting on any iterati
 You can use the :ref:`set_solver_print<solver-options-set_solver_print>` helper method to set `iprint` on every solver in the model.
 
 
-Direct linear solver
+Direct Linear Solver
 --------------------
 
 If you are seeing `NAN` in the output, then you need to resolve that.
@@ -41,7 +41,7 @@ You can't have `NAN` values in either the residual calculation or any of the par
 If you are getting errors complaining about `Singular Matrix`, then you have at least one row or column of your Jacobian that has all zeros in it.
 This can be caused by several different things:
 
-    - You did run :ref:`check_partials()<feature_check_partials>` right?!!!
+    - You did run :ref:`check_partials()<feature_check_partials>`, right?!!!
     - Check for missing or incorrect data connections to one or more components.
         * Use the :ref:`N2 diagram<om-command-view_model>` to inspect your model hierarchy and connections in a matrix format.
         * Use the :ref:`connection viewer <om-command-view_connections>` in a list format.

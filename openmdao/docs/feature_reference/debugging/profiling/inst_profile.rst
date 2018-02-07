@@ -7,7 +7,7 @@ Instance-based Profiling
 Python has several good profilers available for general python
 code, and instance-based profiling is not meant to replace general profiling.
 However, because the OpenMDAO profiler lets you view the profiled functions grouped
-by the specific problem, system, group, driver, or solver that called them, it
+by the specific :code:`Problem`, :code:`System`, :code:`Group`, :code:`Driver`, or :code:`Solver` that called them, it
 can provide insight into which parts of your model are more expensive, even when
 different parts of your model use many of the same underlying functions.
 
@@ -130,9 +130,9 @@ runtime and total number of calls for each profiled function.  For example:
 
 Note that the totals are sorted with the largest values at the end so that when
 running :code:`openmdao iprof_totals` in a terminal the most important functions will show up without having to
-scroll to the top of the output, which can be large. Also note that the function names are a
+scroll to the top of the output, which can be lengthy. Also note that the function names are a
 combination of the OpenMDAO pathname (when available) plus the function name qualified by the owning
-class, or the class name followed by an instance id plus the function name.
+class, or the class name followed by an instance identifier, plus the function name.
 
 .. note::
 

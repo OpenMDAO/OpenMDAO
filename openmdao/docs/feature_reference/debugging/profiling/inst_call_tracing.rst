@@ -74,8 +74,8 @@ indented based on its location in the call stack. :
 
 Note that we must always include the class name and instance ID, even when the instance has a pathname
 attribute, because there are times early in execution where either the pathname attribute doesn't exist
-yet, as in the beginning of `__init__` method, or pathname exists but still has the default value of ""
-instead of its eventual value, as in the `_setup_procs` method.
+yet, as in the beginning of :code:`__init__` method, or pathname exists but still has the default value of ""
+instead of its eventual value, as in the :code:`_setup_procs` method.
 
 For more verbose output, which includes values of function locals and return values, as well as
 the number of times a function has been called, use the `-v` arg. For example:
@@ -139,7 +139,7 @@ Which will result in output that looks like this:
 
 By default, a pre-defined set of general OpenMDAO functions will be included in the trace,
 but that can be changed using the `-g` option.  For example, in order to trace only
-setup related functions, do the following:
+:code:`setup`-related functions, do the following:
 
 .. code-block:: none
 

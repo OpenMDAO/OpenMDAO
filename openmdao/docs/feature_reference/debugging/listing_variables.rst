@@ -18,17 +18,17 @@ Example
 -------
 
 In the following example, we create a model consisting of two instances of
-`ImplicitComponent` and an `IndepVarComp`.
+:code:`ImplicitComponent` and an :code:`IndepVarComp`.
 
-The implicit components are both instances of `QuadraticComp` defined
+The implicit components are both instances of :code:`QuadraticComp`, defined
 as shown here.
 
 .. embed-code::
     openmdao.core.tests.test_impl_comp.QuadraticComp
 
 
-These two components are placed in a `Group` with inputs provided by
-the `IndepVarComp`.
+These two components are placed in a :code:`Group` with inputs provided by
+the :code:`IndepVarComp`.
 
 .. embed-test::
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.setUp
@@ -39,9 +39,9 @@ Usage
 *List Inputs*
 ~~~~~~~~~~~~~
 
-The :code:`list_inputs()` method on a `System` will display all the inputs
+The :code:`list_inputs()` method on a :code:`System` will display all the inputs
 in execution order with their values. By default, the variable name and variable value
-is displayed. Also by default, the variables are displayed as part of the System hierarchy.
+are displayed. Also by default, the variables are displayed as part of the System hierarchy.
 Finally, the default is to display this information to :code:`'stdout'`.
 
 .. embed-test::
@@ -53,7 +53,7 @@ Finally, the default is to display this information to :code:`'stdout'`.
 ~~~~~~~~~~~~~~
 
 The :code:`list_outputs()` method will display all the outputs in execution order.
-There are many options to this method which we will explore below. For this example,
+There are many options to this method, which we will explore below. For this example,
 we will only display the value in addition to the name of the output variable.
 
 .. embed-test::
@@ -116,11 +116,11 @@ scaling (res, res0, and res_ref) for the variables.
 
 
 *Write Full Array Values*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The :code:`list_inputs()` and :code:`list_outputs()` methods both have a :code:`print_arrays` option. The default is
-False. When set to False, in the tablular display, only the value of the array norm will appear. The norm is
-surrounded by vertical bars to indicate that it is a norm. When the options is set to True, there will also be a display
+False. When set to False, in the tabular display, only the value of the array norm will appear. The norm is
+surrounded by vertical bars to indicate that it is a norm. When the option is set to True, there will also be a display
 of full values of the array below the row. The format is affected by the values set with :code:`numpy.set_printoptions`.
 
 
