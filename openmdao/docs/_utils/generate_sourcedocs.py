@@ -63,8 +63,8 @@ Source Docs
     # get added will show up at the end.
     packages = [
         'approximation_schemes',
-        'core',
         'components',
+        'core',
         'drivers',
         'error_checking',
         'jacobians',
@@ -73,9 +73,11 @@ Source Docs
         'recorders',
         'solvers',
         'surrogate_models',
+        'surrogate_models.nn_interpolators',
         'solvers.linear',
         'solvers.nonlinear',
         'solvers.linesearch',
+        'test_suite.components',
         'vectors',
     ]
 
