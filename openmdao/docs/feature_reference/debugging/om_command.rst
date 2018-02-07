@@ -9,7 +9,7 @@ command.  There are two types of commands available, those that perform some sor
 configuration checking on the Problem after its setup is complete, and those that are used to
 collect information about the entire run of the Problem, things like profilers and tracers.
 
-All available *openmdao* sub-commands can be shown using the following command:
+All available :code:`openmdao` sub-commands can be shown using the following command:
 
 .. embed-shell-cmd::
     :cmd: openmdao -h
@@ -26,7 +26,7 @@ Post-setup Commands
 -------------------
 
 The following commands all register a function that will run at the end of a Problem's
-final_setup function.  After the registered function completes, the program will exit, rather than
+:code:`final_setup` function.  After the registered function completes, the program will exit, rather than
 continuing to the end of the user's run script. This makes it convenient to view or check the
 configuration of a model in any run script without having to wait around for the entire script
 to run.
@@ -81,13 +81,13 @@ openmdao view_connections
 #########################
 
 The :code:`openmdao view_connections` command generates a table of connection information for all input and
-output variables in the model.  Units can be compared for each connection and unconnected inputs
+output variables in the model.  Units can be compared for each connection, and unconnected inputs
 and outputs can be easily identified.  The displayed variables can be filtered by source system
 and/or target system.  They can also be filtered by NO CONNECTION, which will show all of the
 unconnected inputs or outputs, depending on whether the NO CONNECTION filter is active for the
-source or target side.  When units differ between a source and a target they are highlighted in
-red, and when inputs are connected to outputs outside of the currently selected top level system,
-they are highlighted in purple.  This can be used to easily identify variables that are connected
+source or target side.  When units differ between a source and a target, they are highlighted in
+red, and when inputs are connected to outputs outside of the currently-selected, top-level system,
+they are highlighted in purple.  This highlighting can be used to easily identify variables that are connected
 across group boundaries.  Below is an example of a connection viewer for a pycycle propulsor
 model obtained using the command:
 
@@ -153,7 +153,7 @@ Profiling and Tracing Commands
 
 The following commands perform profiling or tracing on a run script, filtering their target
 functions based on pre-defined groups of functions that can be displayed using the `-h` command
-line option.  For example, here's the usage output for the `openmdao trace` command, which includes
+line option.  For example, here's the usage output for the :code:`openmdao trace` command, which includes
 the function groups available at the time of this writing:
 
 .. code-block:: none
@@ -187,8 +187,8 @@ methods corresponding to each object instance that they were called on.  For mor
 openmdao iprof_totals
 #####################
 
-The :code:`openmdao iprof_totals` command performs the same profiling as `openmdao iprof`, but it outputs a simple
-text based summary of the total time spent in each method.  The :ref:`Instance-based Profiling <instbasedprofile>`
+The :code:`openmdao iprof_totals` command performs the same profiling as `openmdao iprof`, but it outputs a simple,
+text-based summary of the total time spent in each method.  The :ref:`Instance-based Profiling <instbasedprofile>`
 section contains more details.
 
 .. _om-command-mem:

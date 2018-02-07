@@ -6,7 +6,7 @@ Approximating Partial Derivatives
 
 OpenMDAO allows you to specify analytic derivatives for your models, but it is not a requirement.
 If certain partial derivatives are not available, you can ask the framework to approximate the
-derivatives by using the :code:`declare_partials` method inside :code:`setup` and giving it a
+derivatives by using the :code:`declare_partials` method inside :code:`setup`, and give it a
 method that is either 'fd' for finite diffference or 'cs' for complex step.
 
 .. automethod:: openmdao.core.component.Component.declare_partials
@@ -20,7 +20,7 @@ Usage
 .. embed-test::
     openmdao.jacobians.tests.test_jacobian_features.TestJacobianForDocs.test_fd_glob
 
-2. For finite difference approximations (:code:`method='fd'`), we have three (optional) parameters: the form, step size, and the step_calc The form should be one of the following:
+2. For finite difference approximations (:code:`method='fd'`), we have three (optional) parameters: the :code:`form`, :code:`step size`, and the :code:`step_calc`. The form should be one of the following:
         - :code:`form='forward'` (default): Approximates the derivative as :math:`\displaystyle\frac{\partial f}{\partial x} \approx \frac{f(x+\delta, y) - f(x,y)}{||\delta||}`. Error scales like :math:`||\delta||`.
         - :code:`form='backward'`: Approximates the derivative as :math:`\displaystyle\frac{\partial f}{\partial x} \approx \frac{f(x,y) - f(x-\delta, y) }{||\delta||}`. Error scales like :math:`||\delta||`.
         - :code:`form='central'`: Approximates the derivative as :math:`\displaystyle\frac{\partial f}{\partial x} \approx \frac{f(x+\delta, y) - f(x-\delta,y)}{2||\delta||}`. Error scales like :math:`||\delta||^2`, but requires an extra function evaluation.
@@ -34,12 +34,12 @@ The step_calc can be either 'abs' for absoluate or 'rel' for relative. It determ
 Complex Step
 ------------
 
-If you have a pure python component (or an external code that can support complex inputs and outputs) then you can also choose to use
+If you have a pure python component (or an external code that can support complex inputs and outputs), then you can also choose to use
 complex step to calculate the Jacobian of that component. This will give more accurate derivatives that are insensitive to the step size.
-Like finite difference, complex step runs your component using the apply_nonlinear or solve_nonlinear functions, but it applies a step
+Like finite difference, complex step runs your component using the :code:`apply_nonlinear` or :code:`solve_nonlinear` functions, but it applies a step
 in the complex direction. You can activate it using the :code:`declare_partials` method inside :code:`setup` and giving it a method of 'cs'.
-In many cases, this will require no other changes to your code, as long as all of the calculation in your solve_nonlinear and
-apply_nonlinear support complex numbers. During a complex step, the incoming inputs vector will return a complex number when a variable
+In many cases, this will require no other changes to your code, as long as all of the calculation in your :code:`solve_nonlinear` and
+:code:`apply_nonlinear` support complex numbers. During a complex step, the incoming inputs vector will return a complex number when a variable
 is being stepped. Likewise, the outputs and residuals vectors will accept complex values. If you are allocating temporary numpy arrays,
 remember to conditionally set their dtype based on the dtype in the outputs vector.
 

@@ -12,9 +12,9 @@ there would be *N* solves for an array variable of size *N*.
 
 Certain models have a special kind of sparsity structure in the total derivative Jacobian that
 allows OpenMDAO to solve for multiple derivatives simultaneously. This results in far fewer linear
-solves and much improved performance. For example, in 'fwd' mode, this requires that there is some
+solves and much-improved performance. For example, in 'fwd' mode, this requires that there is some
 subset of the design variables that don't affect any of the same responses.  In other words, there
-is some subset of columns of the total jacobian where none of those columns have nonzero values
+is some subset of columns of the total Jacobian where none of those columns have nonzero values
 in any of the same rows.
 
 .. note::
@@ -59,23 +59,23 @@ columns colored such that no columns of the same color share any nonzero rows.
    :alt: Our total jacobian
 
 
-Looking at the total jacobian above, it's clear that we can solve for all of the blue columns
+Looking at the total Jacobian above, it's clear that we can solve for all of the blue columns
 at the same time because none of them affect the same entries of :math:`y`.  We can similarly
-solve all of the red columns at the same time.  So instead of doing 10 linear solves to get
-our total jacobian, we can do only 2 instead.
+solve all of the red columns at the same time.  So instead of doing ten linear solves to get
+our total Jacobian, we can do only two instead.
 
 
 The way to tell OpenMDAO that you want to make use of simultaneous derivatives is to call the
-`set_simul_deriv_color` method on the driver.
+:code:`set_simul_deriv_color` method on the driver.
 
 
 .. automethod:: openmdao.core.driver.Driver.set_simul_deriv_color
     :noindex:
 
 
-`set_simul_deriv_color` is given a data structure that specifies the color
+:code:`set_simul_deriv_color` is given a data structure that specifies the color
 for each entry of the design variables (or the responses in 'rev' mode).  The structure also
-specifies which rows and columns of the total jacobian corresponding to each color of each
+specifies which rows and columns of the total Jacobian corresponding to each color of each
 design variable for each response.  For our problem above, our coloring structure would
 look like this:
 
@@ -91,9 +91,9 @@ look like this:
 
         # next, our dictionary of response variables
         {
-            # dictionary for our response variable y
+            # dictionary for our response variable, y
             'y': {
-                # dictionary for our design variable x
+                # dictionary for our design variable, x
                 'x': {
                     # first color: (rows of y, columns of x)
                     0: [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8]],
@@ -110,8 +110,7 @@ look like this:
 
 
 You can see a more complete example of setting up an optimization with
-simultaneous derivatives in the
-:ref:`Simple Optimization using Simultaneous Derivatives <simul_deriv_example>`
+simultaneous derivatives in the :ref:`Simple Optimization using Simultaneous Derivatives <simul_deriv_example>`
 example.
 
 
@@ -124,11 +123,11 @@ simultaneous coloring of your model. So care must be taken to keep the coloring 
 you change your model.
 
 To streamline the process, OpenMDAO provides an automatic coloring algorithm.
-OpenMDAO assigns random numbers to the non-zero entries of the partial derivative jacobian,
+OpenMDAO assigns random numbers to the nonzero entries of the partial derivative jacobian,
 then solves for the total jacobian.  Given this total jacobian, the coloring algorithm examines
 its sparsity and computes a coloring.
 
-OpenMDAO finds the non-zero entries based on the :ref:`declare_partials<feature_sparse_partials>`
+OpenMDAO finds the nonzero entries based on the :ref:`declare_partials <feature_sparse_partials>`
 calls from all of the components in your model, so if you're not specifying the sparsity of the
 partial derivatives of your components, then it won't be possible to find an automatic coloring
 for your model.
@@ -141,7 +140,7 @@ The *color_info* data structure can be generated automatically using the followi
 
 
 The data structure will be written to the console and can be cut and pasted into your script
-file and passed into the *set_simul_deriv_color* function.  For example, if we were to run
+file and passed into the :code:`set_simul_deriv_color` function.  For example, if we were to run
 it on the example shown :ref:`here <simul_deriv_example>`, the output written to the console
 would look like this:
 
@@ -198,7 +197,7 @@ would look like this:
 Note that only the first part of the console output should be cut and pasted into your script.
 The Coloring Summary part is just for informational purposes to help give you an idea of what sort
 of performance improvement you should see when computing your total derivatives.  For example, in
-the output show above, the total number of linear solves to compute the total jacobian will drop
+the output show above, the total number of linear solves to compute the total Jacobian will drop
 from 21 down to 5.
 
 It may be more convenient, especially for larger colorings, to use the `-o` command line option
@@ -219,10 +218,10 @@ The coloring will be written in json format to the given file and can be loaded 
 
 
 If you run *openmdao simul_coloring* and it turns out there is no simultaneous coloring available,
-don't be surprised.  Problems that have the necessary total jacobian sparsity to allow
-simultaneous derivatives are relatively uncommon.  If you think that your total jacobian is sparse
-enough that openmdao should be computing a smaller coloring than it gave you, then you can run
-the coloring algorithm with a tolerance so that very small entries in the jacobian will be treated
+don't be surprised.  Problems that have the necessary total Jacobian sparsity to allow
+simultaneous derivatives are relatively uncommon.  If you think that your total Jacobian is sparse
+enough that OpenMDAO should be computing a smaller coloring than it gave you, then you can run
+the coloring algorithm with a tolerance so that very small entries in the Jacobian will be treated
 as zeros.  You can set this tolerance using the *-t* command line option as follows:
 
 
@@ -231,26 +230,26 @@ as zeros.  You can set this tolerance using the *-t* command line option as foll
     openmdao simul_coloring <your_script_name> -o my_coloring.json -t 1e-15
 
 
-Be careful when setting the tolerance however, because if you make it too large then you will be
-zeroing out jacobian entries that should not be ignored and your optimization may not converge.
+Be careful when setting the tolerance, however, because if you make it too large then you will be
+zeroing out Jacobian entries that should not be ignored and your optimization may not converge.
 
 
 Checking that it works
 ######################
 
 After activating simultaneous derivatives, you need to check your total
-derivatives using the :ref:`check_totals<check-total-derivatives>` function.
-If you provided a manually computed coloring, you need to be sure it was correct.
+derivatives using the :ref:`check_totals <check-total-derivatives>` function.
+If you provided a manually-computed coloring, you need to be sure it was correct.
 If you used the automatic coloring, the algorithm that we use still has a small chance of
-computing an incorrect coloring due to the possibility that the total jacobian being analyzed
+computing an incorrect coloring due to the possibility that the total Jacobian being analyzed
 by the algorithm contained one or more zero values that are only incidentally zero.
-Using :ref:`check_totals<check-total-derivatives>` is the way to be sure that something hasn't
+Using :code:`check_totals` is the way to be sure that something hasn't
 gone wrong.
 
-If you used the automatic coloring algorithm and you find that :ref:`check_totals<check-total-derivatives>`
-is reporting incorrect total derivatives then you should try increasing the number of total derivative
+If you used the automatic coloring algorithm, and you find that :code:`check_totals`
+is reporting incorrect total derivatives, then you should try increasing the number of total derivative
 computations that the algorithm uses to compute the total derivative sparsity pattern. The default
-is 1, but you can increment that to 2 or higher if needed.
+is one, but you can increment that to two or higher if needed.
 
 .. code-block:: none
 

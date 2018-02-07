@@ -26,7 +26,7 @@ Usage
 
 ----
 
-Turn off standard output and just view the derivatives in the return:
+2. Turn off standard output and just view the derivatives in the return:
 
 .. embed-test::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_check_partials_suppress
@@ -36,7 +36,7 @@ Changing Settings for Inputs on a Component
 -------------------------------------------
 
 You can change the settings for the approximation schemes that will be used to compare with your component's derivatives by
-calling the `set_check_partial_options` method.
+calling the :code:`set_check_partial_options` method.
 
 .. automethod:: openmdao.core.component.Component.set_check_partial_options
     :noindex:
@@ -57,7 +57,7 @@ less accurate.
 .. embed-test::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_method_on_comp
 
-Here, we use central difference on TrickyParaboloid to get a slight improvment over forward difference.
+Here, we use central difference on TrickyParaboloid to get a slight improvement over forward difference.
 
 .. embed-test::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_form_on_comp
@@ -94,18 +94,18 @@ are fairly large, so we give it a higher stepsize. However, we choose here to us
 Here, we show how to set the method. In this case, we use Complex Step on TrickyParaboloid because the finite difference is
 less accurate. However, we choose here to use this setting for all comps.
 
-**Note**: You need to set `force_alloc_complex` to True during setup to utilize Complex Step during a check.
+**Note**: You need to set :code:`force_alloc_complex` to True during setup to utilize Complex Step during a check.
 
 .. embed-test::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_method_global
 
-Here, we use central difference on TrickyParaboloid to get a slight improvment over forward difference. However, we choose
+Here, we use central difference on TrickyParaboloid to get a slight improvement over forward difference. However, we choose
 here to use this setting for all comps.
 
 .. embed-test::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_form_global
 
-Here we use a relative step calculation instead of absolute for TrickyParaboloid because the values and derivatives are fairly large.
+Here we use a relative step calculation (instead of absolute) for TrickyParaboloid because the values and derivatives are fairly large.
 However, we choose here to use this setting for all comps.
 
 .. embed-test::

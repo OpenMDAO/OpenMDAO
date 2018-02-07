@@ -9,7 +9,7 @@ before calling this method.
 
 .. note::
     You should probably **not** use this method until you've used :code:`check_partials()` to verify the
-    partials for each component in your model. :code:`check_totals()` is a very blunt instrument, since it can only tell you that there is a problem, but will not give you much insight into which component or group is causing the problem.
+    partials for each component in your model. :code:`check_totals()` is a blunt instrument, since it can only tell you that there is a problem, but will not give you much insight into which component or group is causing the problem.
 
 .. automethod:: openmdao.core.problem.Problem.check_totals
     :noindex:
@@ -24,7 +24,7 @@ You can check specific combinations of variables by specifying them manually:
 
 ----
 
-Check the all the derivatives that the driver will need:
+Check all the derivatives that the driver will need:
 
 .. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_check_totals_from_driver

@@ -22,7 +22,7 @@ same order as given in :code:`declare_partials`.
 .. embed-test::
     openmdao.jacobians.tests.test_jacobian_features.TestJacobianForDocs.test_sparse_jacobian
 
-2. If only some of your jacobian entries change across iterations or if you wish to avoid creating intermediate arrays, you may update the entries in-place.
+2. If only some of your Jacobian entries change across iterations, or if you wish to avoid creating intermediate arrays, you may update the entries in-place.
 
 .. embed-test::
     openmdao.jacobians.tests.test_jacobian_features.TestJacobianForDocs.test_sparse_jacobian_in_place
