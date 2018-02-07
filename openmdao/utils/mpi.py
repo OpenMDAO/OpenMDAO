@@ -128,7 +128,7 @@ class FakeComm(object):
 
 
 @contextmanager
-def MultiProcFailCheck(comm):
+def multi_proc_fail_check(comm):
     """
     Raise an AnalysisError on all procs if it is raised on one.
 

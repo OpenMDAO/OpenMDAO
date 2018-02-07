@@ -6,7 +6,7 @@ This is a simple nonlinear solver that just runs the system once.
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.mpi import MultiProcFailCheck
+from openmdao.utils.mpi import multi_proc_fail_check
 
 
 class NonlinearRunOnce(NonlinearSolver):
@@ -38,7 +38,7 @@ class NonlinearRunOnce(NonlinearSolver):
             if len(system._subsystems_myproc) != len(system._subsystems_allprocs):
                 system._transfer('nonlinear', 'fwd')
 
-                with MultiProcFailCheck(system.comm):
+                with multi_proc_fail_check(system.comm):
                     for subsys in system._subsystems_myproc:
                         subsys._solve_nonlinear()
 
