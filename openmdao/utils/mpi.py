@@ -1,11 +1,15 @@
 """A bunch of MPI utilities."""
 
+from contextlib import contextmanager
+import io
 import os
 import sys
-import io
+import traceback
 import unittest
 
 from six import PY3
+
+from openmdao.core.analysis_error import AnalysisError
 
 
 def _redirect_streams(to_fd):
@@ -121,6 +125,38 @@ class FakeComm(object):
         """
         self.rank = 0
         self.size = 1
+
+
+@contextmanager
+def multi_proc_fail_check(comm):
+    """
+    Raise an AnalysisError on all procs if it is raised on one.
+
+    Wrap this around code that you want to globally fail if it fails
+    on any MPI process in comm.  If not running under MPI, don't
+    handle any exceptions.
+
+    Parameters
+    ----------
+    comm : MPI communicator or None
+        Communicator from the ParallelGroup that owns the calling solver.
+    """
+    if MPI is None:
+        yield
+    else:
+        try:
+            yield
+        except AnalysisError:
+            msg = traceback.format_exc()
+        else:
+            msg = ''
+
+        fails = comm.allgather(msg)
+
+        for i, f in enumerate(fails):
+            if f:
+                raise AnalysisError("AnalysisError raised in rank %d: traceback follows\n%s"
+                                    % (i, f))
 
 
 if MPI:

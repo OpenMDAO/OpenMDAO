@@ -530,12 +530,12 @@ class pyOptSparseDriver(Driver):
 
     def _get_name(self):
         """
-        Get name of current driver.
+        Get name of current optimizer.
 
         Returns
         -------
-        optimizer : str
-            The name of the current driver.
+        str
+            The name of the current optimizer.
         """
         return self.options['optimizer']
 

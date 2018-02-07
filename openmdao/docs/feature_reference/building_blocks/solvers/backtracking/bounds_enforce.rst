@@ -22,7 +22,7 @@ BoundsEnforceLS Option Examples
 
 The BoundsEnforceLS subsolver includes the `bound_enforcement` option in its options dictionary. This option has a dual role:
 
-1. Behavior of the the non-bounded variables when the bounded ones are capped.
+1. Behavior of the non-bounded variables when the bounded ones are capped.
 2. Direction of the further backtracking.
 
 There are three difference bounds enforcement schemes available in this option.
