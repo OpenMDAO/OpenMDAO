@@ -381,9 +381,16 @@ class Vector(object):
         if abs_name is not None:
             if self._icol is None:
                 slc = _full_slice
+                oldval = self._views[abs_name]
             else:
                 slc = (_full_slice, self._icol)
-            value, _ = ensure_compatible(name, value, self._views[abs_name][slc].shape)
+                oldval = self._views[abs_name][slc]
+
+            value = np.asarray(value)
+            if value.shape != () and value.shape != (1,) and oldval.shape != value.shape:
+                raise ValueError("Incompatible shape for '%s': "
+                                 "Expected %s but got %s." %
+                                 (name, oldval.shape, value.shape))
             if self._vector_info._under_complex_step:
 
                 # setitem overwrites anything you may have done with numpy indexing
