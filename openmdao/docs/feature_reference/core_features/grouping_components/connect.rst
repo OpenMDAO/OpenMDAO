@@ -9,7 +9,7 @@ will automatically perform the conversion.  We can also connect only part
 of an array output to an input by specifying the indices of the entries
 that we want.
 
-To connect two variables within a model, use the connect function.
+To connect two variables within a model, use the :code:`connect` function.
 
 
 .. automethod:: openmdao.core.group.Group.connect
@@ -19,8 +19,7 @@ To connect two variables within a model, use the connect function.
 Usage
 -----
 
-1. Connect an output variable to an input variable, with an automatic
-unit conversion.
+1. Connect an output variable to an input variable, with an automatic unit conversion.
 
 .. embed-test::
     openmdao.core.tests.test_group.TestGroup.test_basic_connect_units

@@ -1,15 +1,14 @@
 
-**************************************
+***********************************
 Changing Model Settings After Setup
-**************************************
+***********************************
 
-After problem :code:`setup` has been called, you the entire model hierarchy has been instantiated and
-:ref`setup and configure <feature_configure>` have been called on all groups and components.
-However you may still want to make some changes to your model configuration.
+After Problem :code:`setup` has been called, the entire model hierarchy has been instantiated and
+:ref:`setup and configure <feature_configure>` have been called on all Groups and Components.
+However, you may still want to make some changes to your model configuration.
 
-OpenMDAO allows you to do a limited number of things after the Problem :code:`setup` is called, but before
-you have called :code:`run_model` or :code:`run_driver`.
-These include the following:
+OpenMDAO allows you to do a limited number of things after the Problem :code:`setup` has been called, but before
+you have called :code:`run_model` or :code:`run_driver`. These allowed actions include the following:
 
  - :ref:`Set initial conditions for unconnected inputs or states <set-and-get-variables>`
  - :ref:`Assign linear and nonlinear solvers <feature_solvers>`
@@ -19,7 +18,7 @@ These include the following:
  - Assign case recorders
 
 
-Here, we instantiate a hierarchy of groups, and then change the solver to one that can solve this problem.
+Here, we instantiate a hierarchy of Groups, and then change the solver to one that can solve this problem.
 
 .. embed-test::
     openmdao.core.tests.test_problem.TestProblem.test_feature_post_setup_solver_configure

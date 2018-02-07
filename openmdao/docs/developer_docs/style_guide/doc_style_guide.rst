@@ -201,8 +201,8 @@ which makes a link like this, that leads to the Direct solver's user docs:
     :ref:`Direct <openmdao.solvers.linear.direct.py>`
 
 
-Feature Docs and Their Custom Directives for Including Code in Documentation
-----------------------------------------------------------------------------
+Custom Directives for Embedding Items into OpenMDAO Documentation
+-----------------------------------------------------------------
 
 embed-code
 ++++++++++
@@ -293,7 +293,7 @@ embed-shell-cmd
 
 
 embed-bibtex
-+++++++++++++++
+++++++++++++
 
     `embed-bibtex` is a custom directive that lets a developer insert a citation for a
     particular class into a doc.  The arguments are the module path and the name of the

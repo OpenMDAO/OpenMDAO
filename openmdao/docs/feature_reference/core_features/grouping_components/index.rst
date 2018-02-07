@@ -1,11 +1,11 @@
 .. _feature_grouping_components:
 
-**********************
+*******************
 Working with Groups
-**********************
+*******************
 
 It's often desirable to represent a complex model as a collection of components.
-Using Group objects, we can group components, as well as other Groups,
+Using :code:`Group` objects, we can group components, as well as other :code:`Groups`,
 together to form a tree structure.  These feature docs explain how to create that
 tree structure, how to access subsystems and variables within the tree, and how
 to connect those variables.  These docs will also explain how to *promote* a

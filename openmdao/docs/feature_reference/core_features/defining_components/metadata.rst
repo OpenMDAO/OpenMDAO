@@ -4,8 +4,7 @@
 Component Metadata (Arguments to Components)
 ********************************************
 
-The primary jobs of a component, whether explicit or implicit, are
- to define inputs and outputs,
+The primary jobs of a component, whether explicit or implicit, are to define inputs and outputs,
 as well as to do the mapping that computes the outputs given the inputs.
 Often, however, there are incidental parameters that affect the behavior of the component,
 but which are not considered input variables in the sense of being computed as an output of another component.

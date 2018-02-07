@@ -1,19 +1,19 @@
 .. _feature_configure:
 
-*********************************************************
+************************************************
 Modify Children of a Group with Configure Method
-*********************************************************
+************************************************
 
 
-Most of the time, the "setup" method is the only one you need to define on a group. The main exception is the case where you
-want to modify a solver that was set in one of your children groups. When you call add_subsystem, the system you add is
-instantiated, but its "setup" method is not called until after the parent group's "setup" method is finished with its
-execution. That means that anything you do with that subsystem (such as changing the nonlinear solver) will potentially be
-overwritten by the child system's setup if it is assigned there as well.
+Most of the time, the :code:`setup` method is the only one you need to define on a group. The main exception is the case where you
+want to modify a solver that was set in one of your children groups. When you call :code:`add_subsystem`, the system you add is
+instantiated, but its :code:`setup` method is not called until after the parent group's :code:`setup` method is finished with its
+execution. That means that anything you do with that subsystem (e.g., changing the nonlinear solver) will potentially be
+overwritten by the child system's :code:`setup` if it is assigned there as well.
 
-To get around this timing problem, there is a second setup method called "configure" that runs after the "setup" on all
-subsystems has completed. While "setup" recurses from top down, "configure" recurses from bottom up, so that the highest
-system in the hiearchy takes precedence over all lower ones for any modifications.
+To get around this timing problem, there is a second setup method called :code:`configure`, that runs after the :code:`setup` on all
+subsystems has completed. While :code:`setup` recurses from the top down, :code:`configure` recurses from the bottom up, so that the highest
+system in the hierarchy takes precedence over all lower ones for any modifications.
 
 Here is a simple example where a lower system sets a solver, but we want to change it to a different one in the top-most
 system.
@@ -23,14 +23,13 @@ system.
     :no-split:
 
 
-
-What you can do with each method
-----------------------------------
+Uses of setup vs. configure
+---------------------------
 
 **setup**
 
  - Add subsystems
- - Issue Connections
+ - Issue connections
  - Assign linear and nonlinear solvers at group level
  - Change solver settings in group
  - Assign Jacobians at group level
