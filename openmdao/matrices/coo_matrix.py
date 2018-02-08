@@ -58,7 +58,6 @@ class COOMatrix(Matrix):
         rows = -np.ones(counter, int)
         cols = -np.ones(counter, int)
 
-        revmap = defaultdict(list)
         for key, (ind1, ind2, idxs) in iteritems(pre_metadata):
             info, irow, icol, src_indices, shape, factor = submats[key]
 
@@ -107,16 +106,8 @@ class COOMatrix(Matrix):
                     rows[ind1:ind2] = irows
                     cols[ind1:ind2] = icols
 
-            for idx in zip(rows[ind1:ind2], cols[ind1:ind2]):
-                revmap[idx].append(key)
-
             metadata[key] = (ind1, ind2, idxs, jac_type, factor)
 
-        c = Counter(list(zip(rows, cols)))
-        if c.most_common(10)[0][1] > 1:
-            msg = ['\n'] + sorted(["%s, %s" % (revmap[i[0]], i)
-                                  for i in c.most_common(10) if i[1] > 1])
-            raise RuntimeError("DUPS!  %s" % '\n'.join(msg))
         return data, rows, cols
 
     def _build(self, num_rows, num_cols):
