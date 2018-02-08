@@ -28,7 +28,8 @@ Take a look at the full run script first, then we'll break it down part by part 
 
 
 .. embed-code::
-    openmdao.test_suite.components.paraboloid_feature
+    openmdao.test_suite.components.paraboloid_feature 
+    :keep-docstrings:
 
 
 Next, let's break this script down and understand each section:
@@ -70,6 +71,7 @@ and in this case you also ask OpenMDAO to approximate all the partial derivative
 
 .. embed-code::
     openmdao.test_suite.components.paraboloid_feature.Paraboloid
+    :keep-docstrings:
 
 
 The Run Script
@@ -88,7 +90,7 @@ The first component is an :ref:`IndepVarComp <openmdao.core.indepvarcomp.py>` in
 This is a special component that OpenMDAO provides for you to specify the independent variables in your problem.
 The second component is an instance of the `Paraboloid` class that we just defined.
 
-As part of the the model hierarchy, you will also define any connections to move data between components in the relevant group.
+As part of the model hierarchy, you will also define any connections to move data between components in the relevant group.
 Here, we connect the independent variables to the inputs on the paraboloid component.
 
 Once the model hierarchy is defined,

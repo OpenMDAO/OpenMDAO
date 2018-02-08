@@ -201,8 +201,8 @@ which makes a link like this, that leads to the Direct solver's user docs:
     :ref:`Direct <openmdao.solvers.linear.direct.py>`
 
 
-Feature Docs and Their Custom Directives for Including Code in Documentation
-----------------------------------------------------------------------------
+Custom Directives for Embedding Items into OpenMDAO Documentation
+-----------------------------------------------------------------
 
 embed-code
 ++++++++++
@@ -227,6 +227,21 @@ embed-code
         Embedding in this fashion has the benefit of allowing you to drop entire code blocks into
         a feature doc that may, for example, illustrate a usage example. Another great benefit of this
         method is that now your embedded example changes along with the code, so the docs maintain themselves.
+
+        By default, docstrings will be removed from the embedded code. There is an option
+        to the directive to keep the docstrings:
+
+        .. code-block:: python
+
+          .. embed-code::
+              openmdao.core.tests.test_expl_comp.RectangleComp
+              :keep-docstrings:
+
+        The resulting output with the docstring looks like this:
+
+        .. embed-code::
+          openmdao.core.tests.test_expl_comp.RectangleComp
+          :keep-docstrings:
 
 
 embed-test
@@ -293,7 +308,7 @@ embed-shell-cmd
 
 
 embed-bibtex
-+++++++++++++++
+++++++++++++
 
     `embed-bibtex` is a custom directive that lets a developer insert a citation for a
     particular class into a doc.  The arguments are the module path and the name of the
