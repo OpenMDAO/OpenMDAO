@@ -12,7 +12,6 @@ Working with Derivatives
     specifying_partials.rst
     approximating_totals.rst
     compute_totals.rst
-    compute_totals.rst
     check_total_derivatives.rst
     picking_mode.rst
     simul_derivs.rst
