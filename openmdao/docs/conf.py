@@ -18,7 +18,7 @@ for mod_name in MOCK_MODULES:
     try:
         importlib.import_module(mod_name)
     except ImportError:
-        sys.modules.update({mod_name: Mock()})
+        sys.modules[mod_name]=Mock()
 
 # start off running the monkeypatch to keep options/parameters
 # usable in docstring for autodoc.
