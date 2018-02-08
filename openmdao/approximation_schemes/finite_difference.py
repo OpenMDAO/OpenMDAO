@@ -168,6 +168,7 @@ class FiniteDifference(ApproximationScheme):
         out_tmp = current_vec.get_data()
         in_tmp = system._inputs.get_data()
 
+        count = 0
         for key, approximations in groupby(self._exec_list, self._key_fun):
             # groupby (along with this key function) will group all 'of's that have the same wrt and
             # step size.
@@ -198,7 +199,7 @@ class FiniteDifference(ApproximationScheme):
                 in_idx = system._owns_approx_wrt_idx[wrt]
                 in_size = len(in_idx)
             else:
-                in_size = system._var_abs2meta[wrt]['size']
+                in_size = system._var_allprocs_abs2meta[wrt]['size']
                 in_idx = range(in_size)
 
             result.set_vec(system._outputs)
@@ -214,7 +215,7 @@ class FiniteDifference(ApproximationScheme):
                     out_idx = system._owns_approx_of_idx[of]
                     out_size = len(out_idx)
                 else:
-                    out_size = system._var_abs2meta[of]['size']
+                    out_size = system._var_allprocs_abs2meta[of]['size']
                 outputs.append((of, np.zeros((out_size, in_size))))
 
             for i_count, idx in enumerate(in_idx):
@@ -249,3 +250,5 @@ class FiniteDifference(ApproximationScheme):
             for of, subjac in outputs:
                 rel_key = abs_key2rel_key(system, (of, wrt))
                 jac[rel_key] = subjac
+
+            count += 1
