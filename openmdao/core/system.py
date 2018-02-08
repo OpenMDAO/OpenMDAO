@@ -1371,6 +1371,9 @@ class System(object):
 
         if self._owns_assembled_jac:
 
+            # if we have an assembled jac at this level and an assembled jac above us, then
+            # our jacs (and any of our children's assembled jacs) will share their internal
+            # subjac dicts.  Each will maintain its own internal Matrix objects though.
             if jacobian is not None:
                 jacobian._subjacs.update(self._jacobian._subjacs)
                 jacobian._subjacs_info.update(self._jacobian._subjacs_info)
