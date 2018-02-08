@@ -4,17 +4,17 @@
 NewtonSolver
 ************
 
-The `NewtonSolver` solver implements Newton's method to solve the system that contains it. This
+NewtonSolver implements Newton's method to solve the system that contains it. This
 is the most general solver in OpenMDAO, in that it can solve any topology including cyclic
 connections and implicit states in the system or subsystems. Newton's method requires derivatives,
-so a linear solver can also be specified. By default, the NewtonSolver uses the linear solver
+so a linear solver can also be specified. By default, NewtonSolver uses the linear solver
 that is slotted in the containing system.
 
 .. embed-test::
     openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_basic
 
 Most of the solvers in OpenMDAO operate hierarchically, in that you can use solvers on subgroups
-to subdivide the calculation effort. However, the NewtonSolver is an exception. It does not
+to subdivide the calculation effort. However, NewtonSolver is an exception. It does not
 call `solve_nonlinear` on its subsystems, nor does it pass data along the connections. Instead,
 the Newton solver sets all inputs in all systems and subsystems that it contains, as it follows
 the gradient, driving the residuals to convergence.  After each iteration, the iteration count and the residual norm are
@@ -62,7 +62,7 @@ NewtonSolver Option Examples
 
 **solve_subsystems**
 
-  If you set this option to True, the NewtonSolver will call `solve_nonlinear` on all of its subsystems. You can
+  If you set this option to True, NewtonSolver will call `solve_nonlinear` on all of its subsystems. You can
   use this to solve difficult multi-level problems by attaching solvers to subsystems. This assures that those
   subsystems will already be in an internally solved state when the Newton solver goes to solve it.
 
@@ -76,7 +76,7 @@ NewtonSolver Option Examples
 **max_sub_solves**
 
   This option is used in conjunction with the "solve_subsystems" option. It controls the number of iterations for which
-  the NewtonSolver will allow subsystems to solve themselves. When the iteration count exceeds `max_sub_solves`,  Newton
+  NewtonSolver will allow subsystems to solve themselves. When the iteration count exceeds `max_sub_solves`,  Newton
   returns to its default behavior.
 
   For example, if you set `max_sub_solves` to zero, then the solvers on subsystems are executed during the initial
@@ -109,12 +109,12 @@ we modify the model to use :ref:`DirectSolver <openmdao.solvers.linear.direct.py
 Specifying a Line Search Algorithm
 ----------------------------------
 
-The NewtonSolver has a `linesearch` attribute, which supports specification of a supplemental algorithm that can find a better point
+NewtonSolver has a `linesearch` attribute, which supports specification of a supplemental algorithm that can find a better point
 along the Newton search direction. This is typically used for cases where we have declared upper
 or lower bounds on some of the model outputs and we want to prevent Newton from moving into this
 non-feasible space during iteration. An algorithm that does this is called a line search.
 
-By default, the NewtonSolver does not perform a line search. We will show how to specify one. First,
+By default, NewtonSolver does not perform a line search. We will show how to specify one. First,
 let's set up a problem that has implicit bounds on one of its states.
 
 .. embed-code::

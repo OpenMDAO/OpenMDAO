@@ -4,14 +4,14 @@
 LinearBlockGS
 *************
 
-The LinearBlockGS uses Block Gauss-Seidel to solve the linear system. The LinearBlockGS solver iterates until the linear
+LinearBlockGS uses Block Gauss-Seidel to solve the linear system. LinearBlockGS iterates until the linear
 residual is below a tolerance, or the maximum number of iterations has been exceeded. As such,
 it is generally usable for any system topology, and can handle cycles and implicit states
 alike. It is not always the best solver to choose, however, and is known to diverge or plateau
 on some problems. In such a case, you may need to use a solver such as
 :ref:`ScipyKrylov <openmdao.solvers.linear.scipy_iter_solver.py>`.
 
-The LinearBlockGS solver is a block solver, so you can specify different linear solvers in the subsystems and they
+LinearBlockGS is a block solver, so you can specify different linear solvers in the subsystems and they
 will be utilized to solve the subsystem linear problem.
 
 Note that systems without cycles or implicit states will converge in one iteration of Block Gauss-Seidel.

@@ -4,7 +4,7 @@
 Armijo-Goldstein
 ****************
 
-The ArmijoGoldsteinLS linesearch checks bounds and backtracks to a point that satisfies them. From there,
+ArmijoGoldsteinLS checks bounds and backtracks to a point that satisfies them. From there,
 further backtracking is performed, until the termination criteria are satisfied.
 The main termination criteria is the Armijo-Goldstein condition, which checks for a sufficient
 decrease from the initial point by measuring the slope. There is also an iteration maximum.
@@ -23,7 +23,7 @@ Armijo-Goldstein Option Examples
 
 **bound_enforcement**
 
-The ArmijoGoldsteinLS subsolver includes the `bound_enforcement` option in its options dictionary. This option has a dual role:
+ArmijoGoldsteinLS includes the `bound_enforcement` option in its options dictionary. This option has a dual role:
 
 1. Behavior of the non-bounded variables when the bounded ones are capped.
 2. Direction of the further backtracking.
@@ -109,7 +109,7 @@ Here are examples of each acceptable value for the **bound_enforcement** option:
 
 - retry_on_analysis_error
 
-  By default, the ArmijoGoldsteinLS line-search will backtrack if the model raises an AnalysisError, which can happen if
+  By default, the ArmijoGoldsteinLS linesearch will backtrack if the model raises an AnalysisError, which can happen if
   the component explicitly raises it, or a subsolver hits its iteration limit with the 'err_on_maxiter' option set to True.
   If you would rather terminate on an AnalysisError, you can set this option to False.
 

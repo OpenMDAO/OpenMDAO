@@ -1,10 +1,10 @@
 .. _feature_bounds_enforce:
 
-**************
-Bounds Enforce
-**************
+***************
+BoundsEnforceLS
+***************
 
-The BoundsEnforceLS linesearch only backtracks until variables violate their upper and lower bounds.
+The BoundsEnforceLS only backtracks until variables violate their upper and lower bounds.
 
 BoundsEnforceLS Options
 -----------------------
@@ -20,7 +20,7 @@ BoundsEnforceLS Option Examples
 
 **bound_enforcement**
 
-The BoundsEnforceLS subsolver includes the `bound_enforcement` option in its options dictionary. This option has a dual role:
+BoundsEnforceLS includes the `bound_enforcement` option in its options dictionary. This option has a dual role:
 
 1. Behavior of the non-bounded variables when the bounded ones are capped.
 2. Direction of the further backtracking.
@@ -43,7 +43,7 @@ With "wall" bounds enforcement, only the variables that violate their bounds are
 remaining values are kept at the Newton-stepped point. Further backtracking only occurs in the direction of the non-violating
 variables, so that it will move along the wall.
 
-Note: when using the `BoundsEnforceLS` line search, the `scalar` and `wall` methods are exactly the same because no further
+Note: when using BoundsEnforceLS linesearch, the `scalar` and `wall` methods are exactly the same because no further
 backtracking is performed.
 
 .. image:: BT3.jpg

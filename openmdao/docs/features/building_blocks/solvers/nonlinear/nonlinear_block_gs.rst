@@ -4,20 +4,20 @@
 NonlinearBlockGS
 ****************
 
-The NonlinearBlockGS solver applies Block Gauss-Seidel (also known as fixed-point iteration) to the
+NonlinearBlockGS applies Block Gauss-Seidel (also known as fixed-point iteration) to the
 components and subsystems in the system. This is mainly used to solve cyclic connections. You
 should try this solver for systems that satisfy the following conditions:
 
 1. System (or subsystem) contains a cycle, though subsystems may.
 2. System does not contain any implicit states, though subsystems may.
 
-The NonlinearBlockGS solver is a block solver, so you can specify different nonlinear solvers in the subsystems and they
+NonlinearBlockGS is a block solver, so you can specify different nonlinear solvers in the subsystems and they
 will be utilized to solve the subsystem nonlinear problem.
 
 Note that you may not know if you satisfy the second condition, so choosing a solver can be a trial-and-error proposition. If
 NonlinearBlockGS doesn't work, then you will need to use :ref:`NewtonSolver <openmdao.solvers.nonlinear.newton.py>`.
 
-Here, we choose the NonlinearBlockGS to solve the Sellar problem, which has two components with a
+Here, we choose NonlinearBlockGS to solve the Sellar problem, which has two components with a
 cyclic dependency, has no implicit states, and works very well with Gauss-Seidel.
 
 .. embed-test::

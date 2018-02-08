@@ -4,7 +4,7 @@
 PETScKrylov
 ***********
 
-The PETScKrylov is an iterative linear solver that wraps the linear solution methods found in PETSc via petsc4py.
+PETScKrylov is an iterative linear solver that wraps the linear solution methods found in PETSc via petsc4py.
 The default method is "fgmres", or the Flexible Generalized Minimal RESidual method, though you may choose any of
 the other methods in PETSc. This linear solver is capable of handling any system topology
 effectively. It also solves all subsystems below it in the hierarchy, so assigning different solvers to

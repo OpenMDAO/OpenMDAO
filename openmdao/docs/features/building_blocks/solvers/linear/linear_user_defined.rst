@@ -5,7 +5,7 @@
 LinearUserDefined
 =================
 
-This is a solver that lets you define a custom method for performing a linear solve on a component. The default
+LinearUserDefined is a solver that lets you define a custom method for performing a linear solve on a component. The default
 method is named "solve_linear", but you can give it any name by passing in the function or method handle to
 the "solve_function" attribute.
 
