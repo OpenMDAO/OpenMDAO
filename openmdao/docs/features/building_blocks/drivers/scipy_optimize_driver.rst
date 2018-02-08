@@ -1,10 +1,10 @@
-.. _scipyoptimizer:
+.. _scipy_optimize_driver:
 
-*********************
-ScipyOptimizer Driver
-*********************
+*******************
+ScipyOptimizeDriver
+*******************
 
-The ScipyOptimizer driver wraps the optimizers in `scipy.optimize.minimize`. In this example, we use the SLSQP
+ScipyOptimizeDriver wraps the optimizers in `scipy.optimize.minimize`. In this example, we use the SLSQP
 optimizer to find the minimum of the Paraboloid problem.
 
   .. embed-test::
@@ -24,7 +24,7 @@ ScipyOptimizeDriver Option Examples
 
 **optimizer**
 
-  The "optimizer" option lets you choose which optimizer to use. The ScipyOptimizer driver supports all
+  The "optimizer" option lets you choose which optimizer to use. ScipyOptimizeDriver supports all
   of the optimizers in scipy.optimize except for 'dogleg' and 'trust-ncg'. Generally, the optimizers that
   you are most likely to use are "COBYLA" and "SLSQP", as these are the only ones that support constraints.
   Only SLSQP supports equality constraints. SLSQP also uses gradients provided by OpenMDAO, while COBYLA is

@@ -9,7 +9,7 @@ ExternalCode Component
 ExternalCode is a component that runs an external program in a subprocess on your operating system.
 
 If external programs do not have Python APIs, it is necessary to "file wrap" them.
-The `ExternalCode` is a utility component that makes file wrapping easier by
+`ExternalCode` is a utility component that makes file wrapping easier by
 taking care of the mundane tasks associated with executing the external application.
 These include:
 

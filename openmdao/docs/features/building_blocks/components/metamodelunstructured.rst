@@ -9,12 +9,12 @@ used to compute the outputs based on unstructured training data. Generally, this
 used to construct a low-computational-cost replacement for computationally
 expensive components.
 
-You can define a `MetaModelUnStructured` with as many inputs and outputs as you like,
+You can define `MetaModelUnStructured` with as many inputs and outputs as you like,
 and you can also use a different surrogate model for each output.
 
 .. note::
 
-    What's the difference between a `MetaModelUnStructured` and a surrogate model? In
+    What's the difference between `MetaModelUnStructured` and a surrogate model? In
     OpenMDAO, "surrogate model" refers to the model for a single response, and
     `MetaModelUnStructured` represents a collection of surrogate models trained at the
     same locations in the design space.
@@ -25,7 +25,7 @@ The following example demonstrates a simple `Problem` in which a
 In this example, the `MetaModelUnStructured` component ``trig`` has a single input,
 ``x``, and two outputs, ``sin_x`` and ``cos_x``.
 
-A `FloatKrigingSurrogate` is given as the surrogate for the ``sin_x`` output.
+`FloatKrigingSurrogate` is given as the surrogate for the ``sin_x`` output.
 Although no surrogate has been given for the ``cos_x`` output, a
 ``default_surrogate`` is specified for the component. Any output which has
 not had a surrogate assigned will use one of the default type.

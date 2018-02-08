@@ -5,7 +5,7 @@
 ExecComp
 ********
 
-The `ExecComp` is a component that provides a shortcut for building an ExplicitComponent that
+`ExecComp` is a component that provides a shortcut for building an ExplicitComponent that
 represents a set of simple mathematical relationships between inputs and outputs. The ExecComp
 automatically takes care of all of the component API methods, so you just need to instantiate
 it with an equation. Derivatives are also automatically determined using the complex step

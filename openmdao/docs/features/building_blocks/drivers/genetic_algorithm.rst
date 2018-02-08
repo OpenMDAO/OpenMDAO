@@ -1,10 +1,10 @@
 
-****************
-Simple GA Driver
-****************
+**************
+SimpleGADriver
+**************
 
 .. note:: 
-    The SimpleGADriver is based on a simple genetic algorithm implementation sourced from the lecture
+    SimpleGADriver is based on a simple genetic algorithm implementation sourced from the lecture
     notes for the class 2009 AAE550 taught by Prof. William A. Crossley at Purdue University.
 
 This genetic algorithm optimizer supports integer and continuous variables. 
