@@ -76,12 +76,12 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         totals = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'])
-        print("Total derivative of 'comp.f_xy' wrt to 'p1.x' is {}".format(totals[('comp.f_xy','p1.x')][0][0]))
-        print("Total derivative of 'comp.f_xy' wrt to 'p2.y' is {}".format(totals[('comp.f_xy','p2.y')][0][0]))
+        assert_rel_error(self, totals[('comp.f_xy','p1.x')][0][0], -4.0)
+        assert_rel_error(self, totals[('comp.f_xy','p2.y')][0][0], 3.0)
 
         totals = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'], return_format= 'dict')
-        print("Total derivative of 'comp.f_xy' wrt to 'p1.x' is {}".format(totals['comp.f_xy']['p1.x'][0][0]))
-        print("Total derivative of 'comp.f_xy' wrt to 'p2.y' is {}".format(totals['comp.f_xy']['p2.y'][0][0]))
+        assert_rel_error(self, totals['comp.f_xy']['p1.x'][0][0], -4.0)
+        assert_rel_error(self, totals['comp.f_xy']['p2.y'][0][0], 3.0)
 
     def test_feature_simple_run_once_set_deriv_mode(self):
         from openmdao.api import Problem, Group, IndepVarComp
