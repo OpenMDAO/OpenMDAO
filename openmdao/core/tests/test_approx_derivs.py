@@ -25,6 +25,7 @@ try:
 except ImportError:
     from openmdao.api import DefaultVector
     vector_class = DefaultVector
+    PETScVector = None
 
 
 class TestGroupFiniteDifference(unittest.TestCase):
