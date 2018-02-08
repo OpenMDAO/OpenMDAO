@@ -919,8 +919,9 @@ class Problem(object):
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
         return_format : string
-            Format to return the derivatives. Default is a 'flat_dict', which
-            returns them in a dictionary whose keys are tuples of form (of, wrt).
+            Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
+            Default is a 'flat_dict', which returns them in a dictionary whose keys are
+            tuples of form (of, wrt).
 
         Returns
         -------
@@ -956,8 +957,9 @@ class Problem(object):
         wrt : list of variable name strings or None
             Variables with respect to which the derivatives will be computed.
         return_format : string
-            Format to return the derivatives. Default is a 'flat_dict', which
-            returns them in a dictionary whose keys are tuples of form (of, wrt).
+            Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
+            Default is a 'flat_dict', which returns them in a dictionary whose keys are
+            tuples of form (of, wrt).
         global_names : bool
             Set to True when passing in global names to skip some translation steps.
         initialize : bool
@@ -1171,8 +1173,9 @@ class Problem(object):
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
         return_format : string
-            Format to return the derivatives. Default is a 'flat_dict', which
-            returns them in a dictionary whose keys are tuples of form (of, wrt).
+            Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
+            Default is a 'flat_dict', which returns them in a dictionary whose keys are
+            tuples of form (of, wrt).
         global_names : bool
             Set to True when passing in global names to skip some translation steps.
 

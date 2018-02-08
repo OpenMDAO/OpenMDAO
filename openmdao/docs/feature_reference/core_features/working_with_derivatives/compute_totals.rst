@@ -4,10 +4,10 @@
 Computing Total Derivatives
 ***************************
 
-:code:`Problem` has a method, :code:`compute_totals`, that computes derivatives of desired quantities with respect to
-desired inputs.
+:code:`Problem` has a method, :code:`compute_totals`, that allows you to compute the total derivative values
+for a model.
 
-This method allows you to compute the derivative values for the model.
+If the model approximated its Jacobian, the method uses an approximation method.
 
 .. automethod:: openmdao.core.problem.Problem.compute_totals
     :noindex:
