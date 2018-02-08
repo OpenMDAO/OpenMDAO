@@ -21,8 +21,10 @@ from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
 
 try:
     from openmdao.parallel_api import PETScVector
+    vector_class = PETScVector
 except ImportError:
-    PETScVector = None
+    from openmdao.api import DefaultVector
+    vector_class = DefaultVector
 
 
 class TestGroupFiniteDifference(unittest.TestCase):
@@ -559,7 +561,7 @@ class TestGroupFiniteDifferenceMPI(unittest.TestCase):
         prob = Problem()
         prob.model = FanInSubbedIDVC()
 
-        prob.setup(vector_class=PETScVector, check=False, mode='rev')
+        prob.setup(vector_class=vector_class, check=False, mode='rev')
         prob.model.approx_totals()
         prob.set_solver_print(level=0)
         prob.run_model()
