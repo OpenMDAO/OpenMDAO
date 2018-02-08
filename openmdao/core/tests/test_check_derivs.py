@@ -2,13 +2,13 @@
 
 import unittest
 from six import iteritems
+from six.moves import cStringIO
 
 import numpy as np
 
 from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NonlinearRunOnce, \
                          ImplicitComponent, NonlinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
-from openmdao.utils.logger_utils import TestLogger
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 from openmdao.test_suite.components.sellar import SellarDerivatives
@@ -90,12 +90,11 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        testlogger = TestLogger()
-        prob.check_partials(logger=testlogger)
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream)
+        lines = stream.getvalue().splitlines()
 
-        lines = testlogger.get('info')
-
-        y_wrt_x1_line = lines.index("  comp: 'y' wrt 'x1'\n")
+        y_wrt_x1_line = lines.index("  comp: 'y' wrt 'x1'")
 
         self.assertTrue(lines[y_wrt_x1_line+4].endswith('*'),
                         msg='Error flag expected in output but not displayed')
@@ -132,12 +131,11 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        testlogger = TestLogger()
-        prob.check_partials(logger=testlogger)
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream)
+        lines = stream.getvalue().splitlines()
 
-        lines = testlogger.get('info')
-
-        y_wrt_x1_line = lines.index("  : 'y' wrt 'x1'\n")
+        y_wrt_x1_line = lines.index("  : 'y' wrt 'x1'")
 
         self.assertTrue(lines[y_wrt_x1_line+4].endswith('*'),
                         msg='Error flag expected in output but not displayed')
@@ -174,8 +172,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        testlogger = TestLogger()
-        data = prob.check_partials(logger=testlogger, suppress_output=True)
+        stream = cStringIO()
+        data = prob.check_partials(out_stream=stream, suppress_output=True)
 
         subheads = data[''][('y', 'x1')]
         self.assertTrue('J_fwd' in subheads)
@@ -183,7 +181,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertTrue('abs error' in subheads)
         self.assertTrue('magnitude' in subheads)
 
-        lines = testlogger.get('info')
+        lines = stream.getvalue().splitlines()
         self.assertEqual(len(lines), 0)
 
     def test_missing_entry(self):
@@ -526,13 +524,13 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.setup(check=False)
 
-        testlogger = TestLogger()
-        data = prob.check_partials(logger=testlogger)
-        lines = testlogger.get('info')
+        stream = cStringIO()
+        data = prob.check_partials(out_stream=stream)
+        lines = stream.getvalue().splitlines()
 
-        self.assertTrue("  comp: 'g' wrt 'z'\n" not in lines)
+        self.assertTrue("  comp: 'g' wrt 'z'" not in lines)
         self.assertTrue(('g', 'z') not in data['comp'])
-        self.assertTrue("  comp: 'g' wrt 'x'\n"  in lines)
+        self.assertTrue("  comp: 'g' wrt 'x'"  in lines)
         self.assertTrue(('g', 'x') in data['comp'])
 
     def test_dependent_false_show(self):
@@ -566,13 +564,13 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.setup(check=False)
 
-        testlogger = TestLogger()
-        data = prob.check_partials(logger=testlogger)
-        lines = testlogger.get('info')
+        stream = cStringIO()
+        data = prob.check_partials(out_stream=stream)
+        lines = stream.getvalue().splitlines()
 
-        self.assertTrue("  comp: 'g' wrt 'z'\n" in lines)
+        self.assertTrue("  comp: 'g' wrt 'z'" in lines)
         self.assertTrue(('g', 'z') in data['comp'])
-        self.assertTrue("  comp: 'g' wrt 'x'\n"  in lines)
+        self.assertTrue("  comp: 'g' wrt 'x'"  in lines)
         self.assertTrue(('g', 'x') in data['comp'])
 
     def test_set_step_on_comp(self):
@@ -865,11 +863,11 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False, force_alloc_complex=True)
         prob.run_model()
 
-        testlogger = TestLogger()
+        stream = cStringIO()
         prob.check_partials()
-        totals = prob.check_partials(logger=testlogger)
+        totals = prob.check_partials(out_stream=stream)
 
-        lines = testlogger.get('info')
+        lines = stream.getvalue().splitlines()
         self.assertTrue('cs' in lines[6], msg='Did you change the format for printing check derivs?')
         self.assertTrue('fd' in lines[28], msg='Did you change the format for printing check derivs?')
 
@@ -1189,10 +1187,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_model()
 
         # check derivatives with complex step and a larger step size.
-        testlogger = TestLogger()
-        totals = prob.check_totals(method='cs', step=1.0e-1, logger=testlogger)
+        stream = cStringIO()
+        totals = prob.check_totals(method='cs', step=1.0e-1, out_stream=stream)
 
-        lines = testlogger.get('info')
+        lines = stream.getvalue().splitlines()
 
         self.assertTrue('9.80614' in lines[4], "'9.80614' not found in '%s'" % lines[4])
         self.assertTrue('9.80614' in lines[5], "'9.80614' not found in '%s'" % lines[5])
@@ -1217,10 +1215,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_model()
 
         # check derivatives with complex step and a larger step size.
-        testlogger = TestLogger()
-        totals = prob.check_totals(method='cs', step=1.0e-1, logger=testlogger)
+        stream = cStringIO()
+        totals = prob.check_totals(method='cs', step=1.0e-1, out_stream=stream)
 
-        lines = testlogger.get('info')
+        lines = stream.getvalue().splitlines()
 
         self.assertTrue('1.000' in lines[4])
         self.assertTrue('1.000' in lines[5])
@@ -1344,8 +1342,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_model()
 
         # check derivatives with complex step and a larger step size.
-        testlogger = TestLogger()
-        totals = prob.check_totals(method='cs', step=1.0e-1, logger=testlogger,
+        stream = cStringIO()
+        totals = prob.check_totals(method='cs', step=1.0e-1, out_stream=stream,
                                    suppress_output=True)
 
         data = totals['con_cmp2.con2', 'px.x']
@@ -1354,7 +1352,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertTrue('abs error' in data)
         self.assertTrue('magnitude' in data)
 
-        lines = testlogger.get('info')
+        lines = stream.getvalue().splitlines()
         self.assertEqual(len(lines), 0)
 
     def test_two_desvar_as_con(self):
@@ -1375,10 +1373,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         # actually want the optimizer to run
         prob.run_model()
 
-        testlogger = TestLogger()
-        totals = prob.check_totals(method='fd', step=1.0e-1, logger=testlogger)
+        stream = cStringIO()
+        totals = prob.check_totals(method='fd', step=1.0e-1, out_stream=stream)
 
-        lines = testlogger.get('info')
+        lines = stream.getvalue().splitlines()
 
         assert_rel_error(self, totals['px.x', 'px.x']['J_fwd'], [[1.0]], 1e-5)
         assert_rel_error(self, totals['px.x', 'px.x']['J_fd'], [[1.0]], 1e-5)
@@ -1405,10 +1403,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         # actually want the optimizer to run
         prob.run_model()
 
-        testlogger = TestLogger()
-        totals = prob.check_totals(method='fd', step=1.0e-1, logger=testlogger)
+        stream = cStringIO()
+        totals = prob.check_totals(method='fd', step=1.0e-1, out_stream=stream)
 
-        lines = testlogger.get('info')
+        lines = stream.getvalue().splitlines()
 
         assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[0.0], [1.0]], 1e-5)
         assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0], [1.0]], 1e-5)
@@ -1429,10 +1427,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         # actually want the optimizer to run
         prob.run_model()
 
-        testlogger = TestLogger()
-        totals = prob.check_totals(method='fd', step=1.0e-1, logger=testlogger)
+        stream = cStringIO()
+        totals = prob.check_totals(method='fd', step=1.0e-1, out_stream=stream)
 
-        lines = testlogger.get('info')
+        lines = stream.getvalue().splitlines()
 
         assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[0.0, 1.0]], 1e-5)
         assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0, 1.0]], 1e-5)
@@ -1453,10 +1451,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         # actually want the optimizer to run
         prob.run_model()
 
-        testlogger = TestLogger()
-        totals = prob.check_totals(method='fd', step=1.0e-1, logger=testlogger)
+        stream = cStringIO()
+        totals = prob.check_totals(method='fd', step=1.0e-1, out_stream=stream)
 
-        lines = testlogger.get('info')
+        lines = stream.getvalue().splitlines()
 
         assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[0.0, 1.0]], 1e-5)
         assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0, 1.0]], 1e-5)
