@@ -49,7 +49,7 @@ allow you to give some reasonable default values.
 
 .. note::
     Since we've provided default values for the metadata, they won't be required arguments when instantiating :code:`Resistor` or :code:`Diode`.
-    Check out the :ref:`Feature Manual <FeatureManual>` for more details on how to use :ref:`component metadata <component_metadata>`.
+    Check out the :ref:`Features <Features>` section for more details on how to use :ref:`component metadata <component_metadata>`.
 
 
 ImplicitComponent - Node
