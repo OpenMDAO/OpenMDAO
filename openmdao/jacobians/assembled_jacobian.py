@@ -378,10 +378,12 @@ class AssembledJacobian(Jacobian):
 
                     # Masking
                     cache_key = tuple(d_inputs._names)
-                    if cache_key not in self._mask_caches:
-                        self._create_mask_cache(d_inputs, cache_key, ext_mtx)
+                    try:
+                        mask = self._mask_caches[cache_key]
+                    except KeyError:
+                        mask = _create_mask_cache(d_inputs, cache_key, ext_mtx)
+                        self._mask_caches[cache_key] = mask
 
-                    mask = self._mask_caches.get(cache_key)
                     if mask is not None:
                         inputs_masked = np.ma.array(d_inputs.get_data(), mask=mask)
 
@@ -402,10 +404,12 @@ class AssembledJacobian(Jacobian):
 
                     # Masking
                     cache_key = tuple(d_inputs._names)
-                    if cache_key not in self._mask_caches:
-                        self._create_mask_cache(d_inputs, cache_key, ext_mtx)
+                    try:
+                        mask_cols = self._mask_caches[cache_key]
+                    except KeyError:
+                        mask_cols = _create_mask_cache(d_inputs, cache_key, ext_mtx)
+                        self._mask_caches[cache_key] = mask_cols
 
-                    mask_cols = self._mask_caches.get(cache_key)
                     if mask_cols is not None:
 
                         # Mask need to be applied to ext_mtx so that we can ignore multiplication
@@ -422,36 +426,39 @@ class AssembledJacobian(Jacobian):
                     else:
                         d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None))
 
-    def _create_mask_cache(self, d_inputs, cache_key, ext_mtx):
-        """
-        Create masking array for d_inputs vector.
 
-        Parameters
-        ----------
-        d_inputs : Vector
-            The inputs linear vector.
-        cache_key : tuple
-            Hashable unique key, from d_inputs._names
-        ext_mtx : Matrix
-            External matrix
-        """
-        masked = [name for name in d_inputs._views if name not in cache_key]
-        if masked:
-            mask = np.zeros(d_inputs._data[0].shape, dtype=np.bool)
-            for name in masked:
+def _create_mask_cache(d_inputs, cache_key, ext_mtx):
+    """
+    Create masking array for d_inputs vector.
 
-                # TODO: For now, we figure out where each variable in the matrix is using
-                # the matrix metadata, but this is not ideal. The framework does not provide
-                # this information cleanly, but an upcoming refactor will address this.
-                for key, val in iteritems(ext_mtx._metadata):
-                    if key[1] == name:
-                        mask[val[1]] = True
-                        continue
+    Parameters
+    ----------
+    d_inputs : Vector
+        The inputs linear vector.
+    cache_key : tuple
+        Hashable unique key, from d_inputs._names.
+    ext_mtx : Matrix
+        External matrix.
 
-            self._mask_caches[cache_key] = mask
+    Returns
+    -------
+    ndarray or None
+        The mask array or None.
+    """
+    masked = [name for name in d_inputs._views if name not in cache_key]
+    if masked:
+        mask = np.zeros(d_inputs._data[0].shape, dtype=np.bool)
+        for name in masked:
 
-        else:
-            self._mask_caches[cache_key] = None
+            # TODO: For now, we figure out where each variable in the matrix is using
+            # the matrix metadata, but this is not ideal. The framework does not provide
+            # this information cleanly, but an upcoming refactor will address this.
+            for key, val in iteritems(ext_mtx._metadata):
+                if key[1] == name:
+                    mask[val[1]] = True
+                    continue
+
+        return mask
 
 
 class DenseJacobian(AssembledJacobian):

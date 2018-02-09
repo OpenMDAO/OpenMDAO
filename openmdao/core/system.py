@@ -1567,20 +1567,22 @@ class System(object):
         return maps
 
     def _get_scope(self, excl_sub=None):
-        if excl_sub in self._scope_cache:
+        try:
             return self._scope_cache[excl_sub]
+        except KeyError:
+            pass
 
         if excl_sub is None:
             # All myproc outputs
-            scope_out = set(self._var_abs_names['output'])
+            scope_out = frozenset(self._var_abs_names['output'])
 
             # All myproc inputs connected to an output in this system
-            scope_in = set(self._conn_global_abs_in2out).intersection(
+            scope_in = frozenset(self._conn_global_abs_in2out).intersection(
                 self._var_abs_names['input'])
 
         else:
             # All myproc outputs not in excl_sub
-            scope_out = set(self._var_abs_names['output']).difference(
+            scope_out = frozenset(self._var_abs_names['output']).difference(
                 excl_sub._var_abs_names['output'])
 
             # All myproc inputs connected to an output in this system but not in excl_sub
@@ -1591,6 +1593,7 @@ class System(object):
 
                     if abs_out not in excl_sub._var_allprocs_abs2idx['linear']:
                         scope_in.add(abs_in)
+            scope_in = frozenset(scope_in)
 
         self._scope_cache[excl_sub] = (scope_out, scope_in)
         return scope_out, scope_in
