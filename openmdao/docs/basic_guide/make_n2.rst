@@ -33,6 +33,6 @@ You can also see that it's a member of the cycle group (in this case, that was o
 Furthermore, you can see that the variable you would want to connect `cycle.d1.y1` to, `cycle.d2.y2`, is in the same group.
 The lack of cycles in the model is made visually evident by the lack of any connections in the lower triangle of the diagram.
 
-understanding complex models.
-Collapse groups down by right-clicking on them, and zoom in and out of different parts of the hierarchy by left-clicking. These controls show that the :math:`N^2` diagram is a powerful tool for letting you inspect large, complex models.
+Collapse groups down by right-clicking on them, and zoom in and out of different parts of the hierarchy by left-clicking.
+These controls help show that the :math:`N^2` diagram is a powerful tool for letting you inspect and understand large, complex models.
 
