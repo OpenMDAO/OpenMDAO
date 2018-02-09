@@ -1712,10 +1712,10 @@ class System(object):
         ----------
         vec_name : str
             Name of the vector to use.
-        scope_out : set or None
+        scope_out : frozenset or None
             Set of absolute output names in the scope of this mat-vec product.
             If None, all are in the scope.
-        scope_in : set or None
+        scope_in : frozenset or None
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         mode : str
@@ -1746,6 +1746,9 @@ class System(object):
         if scope_out is None and scope_in is None:
             yield d_inputs, d_outputs, d_residuals
         else:
+            old_ins = d_inputs._names
+            old_outs = d_outputs._names
+
             if scope_out is not None:
                 d_outputs._names = scope_out.intersection(d_outputs._views)
             if scope_in is not None:
@@ -1754,8 +1757,8 @@ class System(object):
             yield d_inputs, d_outputs, d_residuals
 
             # reset _names so users will see full vector contents
-            d_inputs._names = d_inputs._views
-            d_outputs._names = d_outputs._views
+            d_inputs._names = old_ins
+            d_outputs._names = old_outs
 
     def get_nonlinear_vectors(self):
         """
@@ -3159,7 +3162,7 @@ class System(object):
                     # use filtered inputs
                     for inp in self._filtered_vars_to_record['i']:
                         if inp in inputs._names:
-                            data['i'][inp] = inputs._names[inp]
+                            data['i'][inp] = inputs._views[inp]
                 else:
                     # use all the inputs
                     data['i'] = inputs._names
@@ -3173,7 +3176,7 @@ class System(object):
                     # use outputs from filtered list.
                     for out in self._filtered_vars_to_record['o']:
                         if out in outputs._names:
-                            data['o'][out] = outputs._names[out]
+                            data['o'][out] = outputs._views[out]
                 else:
                     # use all the outputs
                     data['o'] = outputs._names
@@ -3187,7 +3190,7 @@ class System(object):
                     # use filtered residuals
                     for res in self._filtered_vars_to_record['r']:
                         if res in residuals._names:
-                            data['r'][res] = residuals._names[res]
+                            data['r'][res] = residuals._views[res]
                 else:
                     # use all the residuals
                     data['r'] = residuals._names

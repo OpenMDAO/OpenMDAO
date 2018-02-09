@@ -336,7 +336,7 @@ class DefaultVector(Vector):
             factors = system._scale_factors
             scaling = self._scaling
 
-        self._views = self._names = views = {}
+        self._views = views = {}
         self._views_flat = views_flat = {}
 
         alloc_complex = self._alloc_complex
@@ -378,6 +378,8 @@ class DefaultVector(Vector):
                     if vec[0] is not None:
                         vec[0][ind_byset1:ind_byset2] = scale0
                     vec[1][ind_byset1:ind_byset2] = scale1
+
+        self._names = frozenset(views)
 
     def _clone_data(self):
         """

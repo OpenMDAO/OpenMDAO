@@ -377,12 +377,11 @@ class AssembledJacobian(Jacobian):
                 if ext_mtx is not None and d_inputs._names and d_residuals._names:
 
                     # Masking
-                    cache_key = tuple(d_inputs._names)
                     try:
-                        mask = self._mask_caches[cache_key]
+                        mask = self._mask_caches[d_inputs._names]
                     except KeyError:
-                        mask = _create_mask_cache(d_inputs, cache_key, ext_mtx)
-                        self._mask_caches[cache_key] = mask
+                        mask = _create_mask_cache(d_inputs, ext_mtx)
+                        self._mask_caches[d_inputs._names] = mask
 
                     if mask is not None:
                         inputs_masked = np.ma.array(d_inputs.get_data(), mask=mask)
@@ -403,15 +402,13 @@ class AssembledJacobian(Jacobian):
                 if ext_mtx is not None and d_inputs._names and d_residuals._names:
 
                     # Masking
-                    cache_key = tuple(d_inputs._names)
                     try:
-                        mask_cols = self._mask_caches[cache_key]
+                        mask_cols = self._mask_caches[d_inputs._names]
                     except KeyError:
-                        mask_cols = _create_mask_cache(d_inputs, cache_key, ext_mtx)
-                        self._mask_caches[cache_key] = mask_cols
+                        mask_cols = _create_mask_cache(d_inputs, ext_mtx)
+                        self._mask_caches[d_inputs._names] = mask_cols
 
                     if mask_cols is not None:
-
                         # Mask need to be applied to ext_mtx so that we can ignore multiplication
                         # by certain columns.
                         mask = np.zeros(ext_mtx._matrix.T.shape, dtype=np.bool)
@@ -427,7 +424,7 @@ class AssembledJacobian(Jacobian):
                         d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None))
 
 
-def _create_mask_cache(d_inputs, cache_key, ext_mtx):
+def _create_mask_cache(d_inputs, ext_mtx):
     """
     Create masking array for d_inputs vector.
 
@@ -435,8 +432,6 @@ def _create_mask_cache(d_inputs, cache_key, ext_mtx):
     ----------
     d_inputs : Vector
         The inputs linear vector.
-    cache_key : tuple
-        Hashable unique key, from d_inputs._names.
     ext_mtx : Matrix
         External matrix.
 
@@ -445,19 +440,18 @@ def _create_mask_cache(d_inputs, cache_key, ext_mtx):
     ndarray or None
         The mask array or None.
     """
-    masked = [name for name in d_inputs._views if name not in cache_key]
-    if masked:
+    if len(d_inputs._views) > len(d_inputs._names):
         mask = np.zeros(d_inputs._data[0].shape, dtype=np.bool)
-        for name in masked:
-
-            # TODO: For now, we figure out where each variable in the matrix is using
-            # the matrix metadata, but this is not ideal. The framework does not provide
-            # this information cleanly, but an upcoming refactor will address this.
-            for key, val in iteritems(ext_mtx._metadata):
-                if key[1] == name:
-                    mask[val[1]] = True
-                    continue
-
+        sub = d_inputs._names
+        for name in d_inputs._views:
+            if name not in sub:
+                # TODO: For now, we figure out where each variable in the matrix is using
+                # the matrix metadata, but this is not ideal. The framework does not provide
+                # this information cleanly, but an upcoming refactor will address this.
+                for key, val in iteritems(ext_mtx._metadata):
+                    if key[1] == name:
+                        mask[val[1]] = True
+                        continue
         return mask
 
 
