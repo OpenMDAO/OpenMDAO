@@ -1617,21 +1617,20 @@ class Group(System):
 
             from openmdao.core.indepvarcomp import IndepVarComp
             wrt = set()
-            ivc = []
+            ivc = set()
             for var in candidate_wrt:
-                src = self._conn_abs_in2out.get(var)
-
-                if src is None:
-                    wrt.add(var)
 
                 # Weed out inputs connected to anything inside our system unless the source is an
                 # indepvarcomp.
-                else:
+                if var in self._conn_abs_in2out:
+                    src = self._conn_abs_in2out[var]
                     compname = src.rsplit('.', 1)[0]
                     comp = self._get_subsystem(compname)
                     if isinstance(comp, IndepVarComp):
                         wrt.add(src)
-                        ivc.append(src)
+                        ivc.add(src)
+                else:
+                    wrt.add(var)
 
             with self.jacobian_context() as J:
                 for key in product(of, wrt.union(of)):
