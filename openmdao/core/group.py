@@ -1642,7 +1642,7 @@ class Group(System):
 
                     meta['method'] = method
                     if key[0] == key[1]:
-                        size = self._outputs._views_flat[key[0]].shape[0]
+                        size = self._var_allprocs_abs2meta[key[0]]['size']
                         meta['rows'] = meta['cols'] = np.arange(size)
                         meta['value'] = np.ones(size)
 

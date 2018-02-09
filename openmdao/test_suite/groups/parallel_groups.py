@@ -363,3 +363,30 @@ class ConvergeDivergeGroups(Group):
 
         self.connect('g3.c5.y1', 'c7.x1')
         self.connect('g3.c6.y1', 'c7.x2')
+
+
+class FanInSubbedIDVC(Group):
+    """
+    Classic Fan In with indepvarcomps buried below the parallel group, and a summation
+    component.
+    """
+
+    def setup(self):
+        sub = self.add_subsystem('sub', ParallelGroup())
+        sub1 = sub.add_subsystem('sub1', Group())
+        sub2 = sub.add_subsystem('sub2', Group())
+
+        sub1.add_subsystem('p1', IndepVarComp('x', 3.0))
+        sub2.add_subsystem('p2', IndepVarComp('x', 5.0))
+        sub1.add_subsystem('c1', ExecComp(['y = 2.0*x']))
+        sub2.add_subsystem('c2', ExecComp(['y = 4.0*x']))
+        sub1.connect('p1.x', 'c1.x')
+        sub2.connect('p2.x', 'c2.x')
+
+        self.add_subsystem('sum', ExecComp(['y = z1 + z2']))
+        self.connect('sub.sub1.c1.y', 'sum.z1')
+        self.connect('sub.sub2.c2.y', 'sum.z2')
+
+        self.sub.sub1.add_design_var('p1.x')
+        self.sub.sub2.add_design_var('p2.x')
+        self.add_objective('sum.y')

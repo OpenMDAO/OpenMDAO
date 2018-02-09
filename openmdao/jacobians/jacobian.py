@@ -67,7 +67,7 @@ class Jacobian(object):
         in_size : int
             local size of the input variable.
         """
-        abs2meta = self._system._var_abs2meta
+        abs2meta = self._system._var_allprocs_abs2meta
         return (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
 
     def _multiply_subjac(self, abs_key, val):

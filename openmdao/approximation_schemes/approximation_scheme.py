@@ -87,8 +87,11 @@ class ApproximationScheme(object):
         for in_name, idxs, delta in input_deltas:
             if in_name in outputs._views_flat:
                 outputs._views_flat[in_name][idxs] += delta
-            else:
+            elif in_name in inputs._views_flat:
                 inputs._views_flat[in_name][idxs] += delta
+            else:
+                # If we make it here, this variable is remote, so don't increment by any delta.
+                pass
 
         run_model()
 
