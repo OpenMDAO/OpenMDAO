@@ -24,6 +24,7 @@ from openmdao.recorders.tests.sqlite_recorder_test_utils import assertDriverIter
     assertSystemIterationDataRecorded, assertSolverIterationDataRecorded, assertMetadataRecorded, \
     assertDriverMetadataRecorded
 from openmdao.recorders.tests.recorder_test_utils import run_driver
+from openmdao.utils.assert_utils import assert_rel_error
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -49,6 +50,10 @@ class TestSqliteRecorder(unittest.TestCase):
     CaseRecorder
     """
     def setUp(self):
+        import os
+        from tempfile import mkdtemp
+        from openmdao.api import SqliteRecorder
+        from openmdao.recorders.recording_iteration_stack import recording_iteration
         recording_iteration.stack = []
         self.dir = mkdtemp()
         self.filename = os.path.join(self.dir, "sqlite_test")
@@ -57,6 +62,16 @@ class TestSqliteRecorder(unittest.TestCase):
         self.eps = 1e-3
 
     def tearDown(self):
+        from shutil import rmtree
+
+        # to cleanup the test_feature_simple_driver_recording test
+        # There does not seem to be a good way to set a variable for the
+        # file name so that it works out well when that test is embedded in a doc!
+        try:
+            os.remove('cases.sql')
+        except OSError:
+            pass
+
         # return  # comment out to allow db file to be removed.
         try:
             rmtree(self.dir)
@@ -324,7 +339,50 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
                                            expected_objectives, expected_constraints, None),), self.eps)
-    
+
+    def test_feature_simple_driver_recording(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, \
+            ScipyOptimizeDriver, SqliteRecorder, CaseReader
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.driver = ScipyOptimizeDriver()
+
+        case_recorder_filename = 'cases.sql'
+        recorder = SqliteRecorder(case_recorder_filename)
+
+        prob.driver.add_recorder(recorder)
+        prob.driver.recording_options['record_desvars'] = True
+        prob.driver.recording_options['record_responses'] = True
+        prob.driver.recording_options['record_objectives'] = True
+        prob.driver.recording_options['record_constraints'] = True
+
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(case_recorder_filename)
+        case = cr.driver_cases.get_case('rank0:SLSQP|3')
+
+        assert_rel_error(self, case.desvars['x'], 7.16666667, 1e-6)
+        assert_rel_error(self, case.desvars['y'], -7.83333333, 1e-6)
+
+
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_driver_everything_recorded_by_default(self):
