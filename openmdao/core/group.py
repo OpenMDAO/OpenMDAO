@@ -1637,8 +1637,9 @@ class Group(System):
                     meta_changes = {
                         'method': method,
                     }
+
                     if key[0] == key[1]:
-                        size = self._outputs._views_flat[key[0]].shape[0]
+                        size = self._var_allprocs_abs2meta[key[0]]['size']
                         meta_changes['rows'] = np.arange(size)
                         meta_changes['cols'] = np.arange(size)
                         meta_changes['value'] = np.ones(size)

@@ -1,4 +1,40 @@
 ################################################################################################
+Release Notes for OpenMDAO 2.2.0
+
+February 9, 2018
+
+New Features:
+--------------
+- `DirectSolver` now tells you which row or column is singular when it gets a singluar matrix error.
+- `ScipyOptimizeDriver` now handles linear constraints more efficiently by only computing them one time.
+- Added the `openmdao` command line script to allow for model checking, visualization, and profiling without making modifications to the run script.
+- Added a `SimpleGADriver` with a basic genetic algorithm implementation.
+- Added a `MetaModelStructured` component with a interpolative method.
+- New option for derivative calculations: Simultaneous derivatives, useful when you have totally disjoint Jacobians (e.g. diagonal Jacobians).
+- Automatic coloring algorithm added to compute the valid coloring scheme for simultaneous derivatives.
+- `list_outputs` method updated with new display options, ability to filter variables by residual value, ability to change sorting scheme, and ability to display unit details.
+- openmdao citation helper added to the `openmdao` command line script, making it easy to generate the correct bibtex citations based on which classes are being used.
+- `NewtonSolver` modified so that maxiter=0 case now will compute residuals, but not do a linear solve (useful for debugging nonlinear errors).
+
+Backwards-Compatible API Changes:
+-----------------------------------
+- Changed `ScipyOptimizer` to `ScipyOptimizeDriver` for consistency (deprecated older class).
+- Renamed `MetaModel` to `MetaModelUnstructured` to allow for new structured interpolant (deprecated old class).
+- Renamed `PetscKSP` to `PETScKrylov` for consistency. (deprecated old class).
+- Renamed `ScipyIterativeSolver` to `ScipyKrylov` for consistency. (deprecated old class).
+
+
+Backwards-Incompatible API changes:
+-----------------------------------
+- CaseRecorder now uses variables' promoted names for storing and accessing data.
+- Removed `DeprecatedComp` from codebase.
+- `list_residuals` method on Groups and Components removed.
+
+Bug Fixes:
+-----------
+- Fixed error check for duplicate connections to a single input from multiple levels of the hierarchy
+
+################################################################################################
 Release Notes for OpenMDAO 2.1.0
 
 December 7, 2017

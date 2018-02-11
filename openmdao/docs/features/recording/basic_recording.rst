@@ -61,7 +61,7 @@ Here's an example of adding a recorder to the top-level `Problem`'s driver:
 
 .. code-block:: console
 
-    self.prob.driver.add_recorder(self.my_recorder)
+    prob.driver.add_recorder(my_recorder)
 
 A recorder can be attached to more than one object.  Also, more than one recorder can be attached to an object.
 
@@ -69,5 +69,5 @@ A recorder can be attached to more than one object.  Also, more than one recorde
 A More Comprehensive Example
 ++++++++++++++++++++++++++++
 
-.. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestSqliteRecorder.test_simple_driver_recording
+.. embed-test::
+    openmdao.recorders.tests.test_sqlite_recorder.TestSqliteRecorder.test_feature_simple_driver_recording

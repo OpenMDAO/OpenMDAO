@@ -7,19 +7,26 @@ from parameterized import parameterized
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, ExecComp, NewtonSolver, \
-     ExplicitComponent, DefaultVector, NonlinearBlockGS, LinearRunOnce, DenseJacobian
+     ExplicitComponent, DefaultVector, NonlinearBlockGS, LinearRunOnce, DenseJacobian, \
+     ParallelGroup
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.components.sellar_feature import SellarNoDerivativesCS
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.unit_conv import SrcComp, TgtCompC, TgtCompF, TgtCompK
+from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
 
 try:
     from openmdao.parallel_api import PETScVector
+    vector_class = PETScVector
 except ImportError:
+    from openmdao.api import DefaultVector
+    vector_class = DefaultVector
     PETScVector = None
+
 
 class TestGroupFiniteDifference(unittest.TestCase):
 
@@ -544,6 +551,25 @@ class TestGroupFiniteDifference(unittest.TestCase):
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+
+
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
+class TestGroupFiniteDifferenceMPI(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_indepvarcomp_under_par_sys(self):
+        prob = Problem()
+        prob.model = FanInSubbedIDVC()
+
+        prob.setup(vector_class=vector_class, check=False, mode='rev')
+        prob.model.approx_totals()
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        J = prob.compute_totals(wrt=['sub.sub1.p1.x', 'sub.sub2.p2.x'], of=['sum.y'])
+        assert_rel_error(self, J['sum.y', 'sub.sub1.p1.x'], [[2.0]], 1.0e-6)
+        assert_rel_error(self, J['sum.y', 'sub.sub2.p2.x'], [[4.0]], 1.0e-6)
 
 
 def title(txt):
