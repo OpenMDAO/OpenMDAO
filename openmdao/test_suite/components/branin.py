@@ -3,12 +3,12 @@ Test objects for the single-discipline Branin (or Branin-Hoo) problem.
 
 The Branin, or Branin-Hoo, function has three global minima. The recommended
 values of a, b, c, r, s and t are:
-  a = 1
-  b = 5.1/(4pi2),
-  c = 5/pi,
-  r = 6,
-  s = 10 and
-  t = 1/(8pi).
+a = 1
+b = 5.1/(4pi2),
+c = 5/pi,
+r = 6,
+s = 10 and
+t = 1/(8pi).
 
 This function is usually evaluated on the square x0 ~ [-5, 10], x1 ~ [0, 15].
 

@@ -46,7 +46,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         children = []
         for typ in ['input', 'output']:
             for ind, abs_name in enumerate(system._var_abs_names[typ]):
-                meta = system._var_abs2meta[typ][abs_name]
+                meta = system._var_abs2meta[abs_name]
                 name = system._var_abs2prom[typ][abs_name]
 
                 var_dict = OrderedDict()
@@ -280,7 +280,7 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
         index = index.replace('{{draw_potential_connections}}', 'true')
     else:
         index = index.replace('{{draw_potential_connections}}', 'false')
-        
+
     with open(outfile, 'w') as f:
         f.write(index)
 

@@ -783,6 +783,29 @@ class TestJacobian(unittest.TestCase):
                          "To correct this issue, replace the multiple inputs with a single input "
                          "and handle splitting the entries inside the component.")
 
+    def test_one_src_2_tgts_csc_error(self):
+        size = 10
+        prob = Problem()
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)))
+
+        G1 = prob.model.add_subsystem('G1', Group())
+        G1.add_subsystem('C1', ExecComp('z=2.0*y+3.0*x', x=np.zeros(size), y=np.zeros(size),
+                                        z=np.zeros(size)))
+
+        prob.model.jacobian = CSCJacobian()
+
+        prob.model.add_objective('G1.C1.z')
+        prob.model.add_design_var('indeps.x')
+
+        prob.model.connect('indeps.x', 'G1.C1.x')
+        prob.model.connect('indeps.x', 'G1.C1.y')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        # before ths fix, this would raise an exception due to an indexing error if CSCJacobian
+        # was used.
+        J = prob.compute_totals()
 
 if __name__ == '__main__':
     unittest.main()

@@ -23,7 +23,7 @@ tab = '    '
 
 addr_regex = re.compile(" at 0x[0-9a-fA-F]+")
 
-def _indented_print(f_locals, d, indent, excludes=('__init__',), file=sys.stdout):
+def _indented_print(f_locals, d, indent, excludes=set(['__init__', 'self']), file=sys.stdout):
     """
     Print trace info, indenting based on call depth.
     """

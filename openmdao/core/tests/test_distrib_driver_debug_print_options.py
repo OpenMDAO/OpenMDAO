@@ -26,6 +26,8 @@ class DistributedDriverDebugPrintOptionsTest(unittest.TestCase):
 
         if OPTIMIZER:
             from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+        else:
+            raise unittest.SkipTest("pyOptSparseDriver is required.")
 
         class Mygroup(Group):
 

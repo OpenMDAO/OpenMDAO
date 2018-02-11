@@ -237,7 +237,7 @@ class DistributedRecorderTest(unittest.TestCase):
         # Get values for vars on this rank
         inputs, outputs, residuals = prob.model.get_nonlinear_vectors()
         #   Potential local sysvars are in this
-        sysvars = outputs._names
+        sysvars = outputs._views
         # Just get the values for the sysincl vars on this rank
         local_vars = {c: sysvars[c] for c in local_inclnames}
         # Gather up the values for all the sysincl vars on all ranks

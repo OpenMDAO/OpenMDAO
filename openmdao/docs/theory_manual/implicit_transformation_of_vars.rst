@@ -38,7 +38,7 @@ If we say we want to evaluate the numerical model at :math:`x=\pi`, the reformul
 The variables in this model would be x, y, and z.
 
 The Relationship Between Variables and Components
---------------------------------------------------
+-------------------------------------------------
 
 In OpenMDAO, all three of these variables would be defined as the output of one or more `Component` instances.
 There are two main component types:

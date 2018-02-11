@@ -3,6 +3,8 @@ from __future__ import division
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, csc_matrix
 
+from collections import OrderedDict
+
 # scipy sparse types allowed to be subjacs
 sparse_types = (csr_matrix, csc_matrix, coo_matrix)
 
@@ -36,8 +38,8 @@ class Matrix(object):
         """
         self._comm = comm
         self._matrix = None
-        self._submats = {}
-        self._metadata = {}
+        self._submats = OrderedDict()
+        self._metadata = OrderedDict()
 
     def _add_submat(self, key, info, irow, icol, src_indices, shape, factor=None):
         """
@@ -61,7 +63,28 @@ class Matrix(object):
         factor : float or None
             Unit conversion factor.
         """
-        self._submats[key] = (info, irow, icol, src_indices, shape, factor)
+        if key in self._submats:
+            infoset = set(info)
+            submat = self._submats[key][0]
+            oldset = set(submat)
+            common = infoset & oldset
+            new = infoset - oldset
+            diffs = []
+            for name in common:
+                same = submat[name] == info[name]
+                if same is True:
+                    continue
+                if isinstance(same, np.ndarray) and np.all(same):
+                    continue
+                diffs.append(name)
+
+            if diffs:
+                raise RuntimeError("multiple submat definitions with differing metadata values "
+                                   "%s for key %s" % (sorted(diffs), key))
+            for name in new:
+                submat[name] = info[name]
+        else:
+            self._submats[key] = (info, irow, icol, src_indices, shape, factor)
 
     def _build(self, num_rows, num_cols):
         """

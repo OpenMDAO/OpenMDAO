@@ -748,9 +748,9 @@ class Driver(object):
             outputs = root._outputs
             # outputsinputs, outputs, residuals = root.get_nonlinear_vectors()
             sysvars = {}
-            for name, value in iteritems(outputs._names):
+            for name in outputs._names:
                 if name in self._filtered_vars_to_record['sys']:
-                    sysvars[name] = value
+                    sysvars[name] = outputs._views[name]
         else:
             sysvars = {}
 

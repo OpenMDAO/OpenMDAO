@@ -75,9 +75,13 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.f_xy'], -15.0)
+        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'])
+        assert_rel_error(self, totals[('comp.f_xy','p1.x')][0][0], -4.0)
+        assert_rel_error(self, totals[('comp.f_xy','p2.y')][0][0], 3.0)
 
-        prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'])
+        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'], return_format= 'dict')
+        assert_rel_error(self, totals['comp.f_xy']['p1.x'][0][0], -4.0)
+        assert_rel_error(self, totals['comp.f_xy']['p2.y'][0][0], 3.0)
 
     def test_feature_simple_run_once_set_deriv_mode(self):
         from openmdao.api import Problem, Group, IndepVarComp

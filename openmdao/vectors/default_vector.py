@@ -124,11 +124,11 @@ class DefaultVector(Vector):
                 indices[set_name] = np.empty(size, int)
 
         if nsets > 1:
-            abs2meta_t = system._var_abs2meta[type_]
-            allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[self._name][type_]
-            allprocs_abs2idx_t = system._var_allprocs_abs2idx[self._name][type_]
+            abs2meta = system._var_abs2meta
+            allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[self._name]
+            allprocs_abs2idx_t = system._var_allprocs_abs2idx[self._name]
             for abs_name in system._var_relevant_names[self._name][type_]:
-                set_name = abs2meta_t[abs_name]['var_set']
+                set_name = abs2meta[abs_name]['var_set']
 
                 idx_byset = allprocs_abs2idx_byset_t[abs_name]
                 ind_byset1 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset])
@@ -336,23 +336,23 @@ class DefaultVector(Vector):
             factors = system._scale_factors
             scaling = self._scaling
 
-        self._views = self._names = views = {}
+        self._views = views = {}
         self._views_flat = views_flat = {}
 
         alloc_complex = self._alloc_complex
         self._imag_views = imag_views = {}
         self._imag_views_flat = imag_views_flat = {}
 
-        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[self._name][type_]
+        allprocs_abs2idx_byset_t = system._var_allprocs_abs2idx_byset[self._name]
         sizes_byset_t = system._var_sizes_byset[self._name][type_]
-        abs2meta_t = system._var_abs2meta[type_]
+        abs2meta = system._var_abs2meta
         for abs_name in system._var_relevant_names[self._name][type_]:
             idx_byset = allprocs_abs2idx_byset_t[abs_name]
-            set_name = abs2meta_t[abs_name]['var_set']
+            set_name = abs2meta[abs_name]['var_set']
 
             ind_byset1 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset])
             ind_byset2 = ind_byset1 + sizes_byset_t[set_name][iproc, idx_byset]
-            shape = abs2meta_t[abs_name]['shape']
+            shape = abs2meta[abs_name]['shape']
             if ncol > 1:
                 if not isinstance(shape, tuple):
                     shape = (shape,)
@@ -378,6 +378,8 @@ class DefaultVector(Vector):
                     if vec[0] is not None:
                         vec[0][ind_byset1:ind_byset2] = scale0
                     vec[1][ind_byset1:ind_byset2] = scale1
+
+        self._names = frozenset(views)
 
     def _clone_data(self):
         """

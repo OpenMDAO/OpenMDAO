@@ -1,10 +1,10 @@
 """
-Component for a metadata feature test.
+A component that computes y = a*x + b, where a and b
+are given as metadata of type 'numpy.ScalarType'.
 """
 import numpy as np
 
 from openmdao.api import ExplicitComponent
-
 
 class LinearCombinationComp(ExplicitComponent):
 

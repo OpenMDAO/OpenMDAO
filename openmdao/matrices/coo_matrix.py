@@ -1,11 +1,12 @@
 """Define the COOmatrix class."""
-from __future__ import division
+from __future__ import division, print_function
 
 import numpy as np
 from numpy import ndarray
 from scipy.sparse import coo_matrix, csr_matrix
 
 from six import iteritems
+from collections import OrderedDict, Counter, defaultdict
 
 from openmdao.matrices.matrix import Matrix, _compute_index_map, sparse_types
 
@@ -35,7 +36,7 @@ class COOMatrix(Matrix):
 
         submats = self._submats
         metadata = self._metadata
-        pre_metadata = {}
+        pre_metadata = OrderedDict()
         for key, (info, irow, icol, src_indices, shape, factor) in iteritems(submats):
             if not info['dependent']:
                 continue
@@ -59,6 +60,7 @@ class COOMatrix(Matrix):
 
         for key, (ind1, ind2, idxs) in iteritems(pre_metadata):
             info, irow, icol, src_indices, shape, factor = submats[key]
+
             val = info['value']
             dense = (info['rows'] is None and (val is None or
                      isinstance(val, ndarray)))
