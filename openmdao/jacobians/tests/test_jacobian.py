@@ -789,23 +789,24 @@ class TestJacobian(unittest.TestCase):
         indeps = prob.model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)))
 
         G1 = prob.model.add_subsystem('G1', Group())
-        G1.add_subsystem('C1', ExecComp(['z1=2.0*y', 'z2=3.0*x'], x=np.zeros(size), y=np.zeros(size),
-                                        z1=np.zeros(size), z2=np.zeros(size)))
+        G1.add_subsystem('C1', ExecComp('z=2.0*y+3.0*x', x=np.zeros(size), y=np.zeros(size),
+                                        z=np.zeros(size)))
 
         prob.model.jacobian = CSCJacobian()
         prob.model.linear_solver = DirectSolver()
 
-        prob.model.add_objective('G1.C1.z2')
+        prob.model.add_objective('G1.C1.z')
         prob.model.add_design_var('indeps.x')
 
         prob.model.connect('indeps.x', 'G1.C1.x')
         prob.model.connect('indeps.x', 'G1.C1.y')
 
-        prob.setup(mode='rev')
+        prob.setup(mode='fwd')
         prob.run_model()
 
-        J = prob.compute_totals(of=['G1.C1.z2'], wrt=['indeps.x'])
-        print(J)
+        J = prob.compute_totals(of=['G1.C1.z'], wrt=['indeps.x'])
+        assert_rel_error(self, J['G1.C1.z', 'indeps.x'], np.eye(10)*5.0, .0001)
+
 
 if __name__ == '__main__':
     unittest.main()
