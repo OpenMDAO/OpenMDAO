@@ -1247,7 +1247,7 @@ class Problem(object):
             of = [prom2abs[name][0] for name in oldof]
             wrt = [prom2abs[name][0] for name in oldwrt]
 
-        owning_ranks = self.model._owning_rank['output']
+        owning_ranks = self.model._owning_rank
 
         # we don't do simultaneous derivatives when compute_totals is called for linear constaints
         has_lin_constraints = False

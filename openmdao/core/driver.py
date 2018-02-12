@@ -290,7 +290,7 @@ class Driver(object):
 
             # If we have remote VOIs, pick an owning rank for each and use that
             # to bcast to others later
-            owning_ranks = model._owning_rank['output']
+            owning_ranks = model._owning_rank
             sizes = model._var_sizes['nonlinear']['output']
             for i, vname in enumerate(model._var_allprocs_abs_names['output']):
                 owner = owning_ranks[vname]
@@ -365,7 +365,7 @@ class Driver(object):
                     "RecordingManager.startup should never be called when "
                     "running in parallel on an inactive System")
             rrank = self._problem.comm.rank  # root ( aka model ) rank.
-            rowned = model._owning_rank['output']
+            rowned = model._owning_rank
             mydesvars = [n for n in mydesvars if rrank == rowned[n]]
             myresponses = [n for n in myresponses if rrank == rowned[n]]
             myobjectives = [n for n in myobjectives if rrank == rowned[n]]
@@ -486,7 +486,7 @@ class Driver(object):
             Value for the design variable.
         """
         if (name in self._remote_dvs and
-                self._problem.model._owning_rank['output'][name] != self._problem.comm.rank):
+                self._problem.model._owning_rank[name] != self._problem.comm.rank):
             return
 
         meta = self._designvars[name]
