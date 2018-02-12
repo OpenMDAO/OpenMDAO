@@ -1,12 +1,11 @@
 
 import unittest
-import numpy as np
-from six import text_type, PY3
-from six.moves import cStringIO
-import warnings
 
-from openmdao.api import ImplicitComponent, Problem, Group, IndepVarComp, ExecComp, ScipyKrylov
-from openmdao.test_suite.components.sellar import StateConnection
+import numpy as np
+
+from openmdao.api import ImplicitComponent, Problem, Group, IndepVarComp, ExecComp, \
+    LinearBlockGS, ScipyKrylov, NewtonSolver
+from openmdao.test_suite.components.sellar import StateConnection, SellarDerivativesGrouped
 
 
 class StateConnWithSolveLinear(StateConnection):
@@ -20,15 +19,14 @@ class TestProblemCheckSolvers(unittest.TestCase):
         prob = Problem()
         prob.model.add_subsystem('statecomp', StateConnection())
 
-        try:
+        with self.assertRaises(RuntimeError) as cm:
             prob.setup()
-        except Exception as err:
-            self.assertTrue("Group '' has a LinearRunOnce solver but it contains "
-                            "implicit outputs ['statecomp.y2_command']. To fix "
-                            "this error, change to a different linear solver, "
-                            "e.g. ScipyKrylov or PETScKrylov." in str(err))
-        else:
-            self.fail("Exception expected")
+
+        self.assertTrue("Group '' has a LinearRunOnce solver but it contains "
+                        "implicit outputs ['statecomp.y2_command']. To fix "
+                        "this error, change to a different linear solver, "
+                        "e.g. ScipyKrylov or PETScKrylov."
+                        in str(cm.exception))
 
     def test_state_single_w_ancestor_iter(self):
         prob = Problem()
@@ -37,6 +35,7 @@ class TestProblemCheckSolvers(unittest.TestCase):
         model.add_subsystem("G1", Group())
         model.G1.add_subsystem('statecomp', StateConnection())
 
+        model.linear_solver = LinearBlockGS()
         model.linear_solver.options['maxiter'] = 5
 
         # should be no exception here since top level solver has maxiter > 1
@@ -55,6 +54,7 @@ class TestProblemCheckSolvers(unittest.TestCase):
     def test_state_single_maxiter_gt_1(self):
         prob = Problem()
         model = prob.model
+        model.linear_solver = LinearBlockGS()
         model.linear_solver.options['maxiter'] = 2
 
         model.add_subsystem('statecomp', StateConnection())
@@ -76,7 +76,6 @@ class TestProblemCheckSolvers(unittest.TestCase):
     def test_cycle(self):
         prob = Problem()
         model = prob.model
-        model.linear_solver.options['maxiter'] = 1
 
         model.add_subsystem("C1", ExecComp('y=2.0*x'))
         model.add_subsystem("C2", ExecComp('y=2.0*x'))
@@ -86,19 +85,19 @@ class TestProblemCheckSolvers(unittest.TestCase):
         model.connect('C2.y','C3.x')
         model.connect('C3.y','C1.x')
 
-        try:
+        with self.assertRaises(RuntimeError) as cm:
             prob.setup()
-        except Exception as err:
-            self.assertTrue("Group '' has a LinearRunOnce solver but it "
-                            "contains cycles [['C1', 'C2', 'C3']]. To fix "
-                            "this error, change to a different linear solver, "
-                            "e.g. ScipyKrylov or PETScKrylov." in str(err))
-        else:
-            self.fail("Exception expected")
+
+        self.assertTrue("Group '' has a LinearRunOnce solver but it "
+                        "contains cycles [['C1', 'C2', 'C3']]. To fix "
+                        "this error, change to a different linear solver, "
+                        "e.g. ScipyKrylov or PETScKrylov."
+                        in str(cm.exception))
 
     def test_cycle_maxiter_gt_1(self):
         prob = Problem()
         model = prob.model
+        model.linear_solver = LinearBlockGS()
         model.linear_solver.options['maxiter'] = 2
 
         C1 = model.add_subsystem("C1", ExecComp('y=2.0*x'))
@@ -115,7 +114,7 @@ class TestProblemCheckSolvers(unittest.TestCase):
     def test_cycle_maxiter_gt_1_subgroup(self):
         prob = Problem()
         model = prob.model
-        model.linear_solver.options['maxiter'] = 2
+        model.linear_solver = LinearBlockGS()  # maxiter = 10
 
         G1 = model.add_subsystem("G1", Group())
         C1 = G1.add_subsystem("C1", ExecComp('y=2.0*x'))
@@ -128,6 +127,22 @@ class TestProblemCheckSolvers(unittest.TestCase):
 
         # this should not raise an exception because maxiter > 1 in an ancestor group
         prob.setup()
+
+    def test_complex_step_around_newton_error(self):
+        prob = Problem()
+        prob.model = SellarDerivativesGrouped()
+        prob.model.approx_totals(method='cs')
+
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.model.mda.nonlinear_solver = NewtonSolver()
+            prob.final_setup()
+
+        print(str(cm.exception))
+        self.assertTrue("The solver in 'mda' requires derivatives. We "
+                        "currently do not support complex step around it."
+                        in str(cm.exception))
 
 
 if __name__ == "__main__":

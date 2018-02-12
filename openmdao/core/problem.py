@@ -18,6 +18,7 @@ from openmdao.approximation_schemes.finite_difference import FiniteDifference, D
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
+from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
@@ -422,14 +423,6 @@ class Problem(object):
 
         self._force_alloc_complex = force_alloc_complex
 
-        # errors in solver configuration will be recorded in self._setup_errors
-        self._check_solvers()
-
-        # if any hard errors were encountered during setup that have not been
-        # handled yet, raise RuntimeError now
-        if len(self._setup_errors) > 0:
-            raise RuntimeError(str(self._setup_errors))
-
         self._setup_status = 1
 
         return self
@@ -444,6 +437,14 @@ class Problem(object):
         are created and populated, the drivers and solvers are initialized, and the recorders are
         started, and the rest of the framework is prepared for execution.
         """
+        # make sure solver config is legit before proceeding
+        self._check_solvers()
+
+        # if any hard errors were encountered during setup that have not been
+        # handled yet, raise RuntimeError now
+        if len(self._setup_errors) > 0:
+            raise RuntimeError(str(self._setup_errors))
+
         vector_class = self._vector_class
         force_alloc_complex = self._force_alloc_complex
 
@@ -1617,9 +1618,9 @@ class Problem(object):
 
     def _check_solvers(self):
         """
-        Search over all solvers and raise errors for unsupported configurations.
+        Search over all solvers and raise an error for unsupported configurations.
 
-        Report any implicit component that does not have an appropriate nonlinear 
+        Report any implicit component that does not have an appropriate nonlinear
         and linear solver (i.e. not the default solvers) upstream of it. Note that
         a linear solver is only required when doing a gradient-based optimization
         with analytic derivatives, so we need to determine if the derivatives are
@@ -1631,26 +1632,17 @@ class Problem(object):
         group_states = []
 
         # put entry for '' into has_iter_solver just in case we're a subproblem
-        has_iter_solver = {'': False}
+        has_iter_ls = {'': False}
+        has_iter_nl = {'': False}
+
         for group in self.model.system_iter(include_self=True, recurse=True, typ=Group):
-            try:
-                print(group.pathname, group.linear_solver, 'maxiter:', group.linear_solver.options['maxiter'])
-                has_iter_solver[group.pathname] = (group.linear_solver.options['maxiter'] > 1)
-            except KeyError:
-                # DirectSolver handles coupled derivatives without iteration
-                if isinstance(group.linear_solver, DirectSolver):
-                    has_iter_solver[group.pathname] = (True)
+            has_iter_ls[group.pathname] = group.linear_solver.options['maxiter'] > 1
+            has_iter_nl[group.pathname] = group.nonlinear_solver.options['maxiter'] > 1
 
             # Look for nonlinear solvers that require derivs under Complex Step.
             if 'cs' in group._approx_schemes:
-                # TODO: Support using complex step on a subsystem
-                # if group.name != '':
-                #     msg = "Complex step is currently not supported for groups"
-                #     msg += " other than root."
-                #     self._setup_errors.append(msg)
-
                 # Complex Step, so check for deriv requirement in subsolvers
-                for sub in self.model.system_iter(include_self=True, recurse=True, typ=Group):
+                for sub in group.system_iter(include_self=True, recurse=True, typ=Group):
                     if hasattr(sub.nonlinear_solver, 'linear_solver'):
                         msg = ("The solver in '%s' requires derivatives. We "
                                "currently do not support complex step around it."
@@ -1659,23 +1651,20 @@ class Problem(object):
 
             parts = group.pathname.split('.')
             for i in range(len(parts)):
-                # if an ancestor solver iterates, we're ok
-                if has_iter_solver['.'.join(parts[:i])]:
+                gname = '.'.join(parts[:i])
+                if has_iter_ls[gname]:
                     is_iterated_somewhere = True
                     break
             else:
                 is_iterated_somewhere = False
-            print(group.pathname, 'is_iterated_somewhere:', is_iterated_somewhere)
 
             # if we're iterated at this level or somewhere above, then it's
             # ok if we have cycles or states.
             if is_iterated_somewhere:
                 continue
 
-            print(">>>>>>>>>>>>>>>>>", group.pathname, 'is NOT iterated_somewhere', group.linear_solver)
-
             if isinstance(group.linear_solver, LinearRunOnce):
-                # If group has a cycle and the linear solver doesn't iterate, 
+                # If group has a cycle and the linear solver doesn't iterate,
                 # then it's an error if an ancestor linear solver doesn't iterate.
                 graph = group.compute_sys_graph(comps_only=False)
                 sccs = get_sccs_topo(graph)
@@ -1685,7 +1674,7 @@ class Problem(object):
                 if cycles:
                     msg = ("Group '%s' has a LinearRunOnce solver but it contains "
                            "cycles %s. To fix this error, change to a different "
-                           "linear solver, e.g. ScipyKrylov or PETScKrylov."   
+                           "linear solver, e.g. ScipyKrylov or PETScKrylov."
                            % (group.pathname, cycles))
                     self._setup_errors.append(msg)
 
@@ -1712,13 +1701,13 @@ class Problem(object):
         for group, states in group_states:
             uniterated_states = [s for s in states if s not in iterated_states]
 
-            # It's an error if we find states that don't have some iterative 
+            # It's an error if we find states that don't have some iterative
             # linear solver as a parent somewhere in the tree
             if uniterated_states:
                 msg = ("Group '%s' has a LinearRunOnce solver but it contains "
-                       "implicit outputs %s.\n To fix this error, " 
-                       "change to a different linear solver, e.g. ScipyKrylov "  
-                       "or PETScKrylov, or increase maxiter (not recommended)."   
+                       "implicit outputs %s.\n To fix this error, "
+                       "change to a different linear solver, e.g. ScipyKrylov "
+                       "or PETScKrylov, or increase maxiter (not recommended)."
                        % (group.pathname, uniterated_states))
                 self._setup_errors.append(msg)
 
