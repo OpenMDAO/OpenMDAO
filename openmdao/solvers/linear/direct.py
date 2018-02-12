@@ -28,7 +28,7 @@ def format_singluar_error(err, system, mtx):
     err : Exception
         Exception object
     system : <System>
-        OpenMDAO system containing the Directsolver.
+        System containing the Directsolver.
     mtx : ndarray
         Matrix of interest.
 
@@ -72,7 +72,7 @@ def format_singluar_csc_error(system, matrix):
     Parameters
     ----------
     system : <System>
-        OpenMDAO system containing the Directsolver.
+        System containing the Directsolver.
     matrix : ndarray
         Matrix of interest.
 
