@@ -291,7 +291,7 @@ class TestJacobian(unittest.TestCase):
     dtypes = [
         ('int', 1),
         ('float', 2.1),
-        #('complex', 3.2 + 1.1j), # TODO: enable when Vectors support complex entries.
+        # ('complex', 3.2 + 1.1j), # TODO: enable when Vectors support complex entries.
     ]
 
     shapes = [

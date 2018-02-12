@@ -200,7 +200,7 @@ class Jacobian(object):
                 else:
                     self._subjacs[abs_key] = subjac.copy()
             else:
-                # Sparse 'list' subjac
+                # Sparse subjac
                 if subjac.shape == (1,):
                     subjac = subjac[0] * np.ones(rows.shape, dtype=safe_dtype)
 
