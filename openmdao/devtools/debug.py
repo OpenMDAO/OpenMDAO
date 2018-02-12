@@ -5,8 +5,6 @@ from __future__ import print_function
 import sys
 import os
 
-from resource import getrusage, RUSAGE_SELF, RUSAGE_CHILDREN
-
 from six.moves import zip_longest
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group, System
@@ -269,6 +267,8 @@ def max_mem_usage():
     -------
     The max memory used by this process and its children, in MB.
     """
+    from resource import getrusage, RUSAGE_SELF, RUSAGE_CHILDREN
+
     denom = 1024.
     if sys.platform == 'darwin':
         denom *= denom
