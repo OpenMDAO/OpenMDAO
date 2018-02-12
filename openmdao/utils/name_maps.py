@@ -17,9 +17,7 @@ def rel_name2abs_name(system, rel_name):
     str
         Absolute variable name.
     """
-    if system.pathname is '':
-        return rel_name
-    return system.pathname + '.' + rel_name
+    return rel_name if system.pathname is '' else system.pathname + '.' + rel_name
 
 
 def abs_name2rel_name(system, abs_name):
@@ -38,10 +36,7 @@ def abs_name2rel_name(system, abs_name):
     str
         Relative variable name.
     """
-    if system.pathname == '':
-        return abs_name
-    else:
-        return abs_name[len(system.pathname) + 1:]
+    return abs_name if system.pathname is '' else abs_name[len(system.pathname) + 1:]
 
 
 def rel_key2abs_key(system, rel_key):
@@ -60,9 +55,7 @@ def rel_key2abs_key(system, rel_key):
     (str, str)
         Absolute variable name pair.
     """
-    abs_key0 = rel_name2abs_name(system, rel_key[0])
-    abs_key1 = rel_name2abs_name(system, rel_key[1])
-    return (abs_key0, abs_key1)
+    return (rel_name2abs_name(system, rel_key[0]), rel_name2abs_name(system, rel_key[1]))
 
 
 def abs_key2rel_key(system, abs_key):
@@ -81,9 +74,7 @@ def abs_key2rel_key(system, abs_key):
     (str, str)
         Relative variable name pair.
     """
-    rel_key0 = abs_name2rel_name(system, abs_key[0])
-    rel_key1 = abs_name2rel_name(system, abs_key[1])
-    return (rel_key0, rel_key1)
+    return (abs_name2rel_name(system, abs_key[0]), abs_name2rel_name(system, abs_key[1]))
 
 
 def prom_name2abs_name(system, prom_name, type_):
