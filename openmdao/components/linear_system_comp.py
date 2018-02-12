@@ -20,8 +20,6 @@ class LinearSystemComp(ImplicitComponent):
     ----------
     _lup : object
         matrix factorization returned from scipy.linag.lu_factor
-    _dx_dA_cache : ndarray or None
-        Storage for the ['x', 'A'] sub-jacobian array.
     """
 
     def __init__(self, **kwargs):
@@ -35,7 +33,6 @@ class LinearSystemComp(ImplicitComponent):
         """
         super(LinearSystemComp, self).__init__(**kwargs)
         self._lup = None
-        self._dx_dA_cache = None
 
     def initialize(self):
         """
@@ -53,7 +50,6 @@ class LinearSystemComp(ImplicitComponent):
         size = self.metadata['size']
 
         self._lup = None
-        self._dx_dA_cache = None
 
         if self.metadata['partial_type'] == "matrix_free":
             self.apply_linear = self._mat_vec_prod
@@ -141,11 +137,7 @@ class LinearSystemComp(ImplicitComponent):
         x = outputs['x']
         size = self.metadata['size']
         if partial_type == "dense":
-            dx_dA = self._dx_dA_cache
-            if dx_dA is None:
-                self._dx_dA_cache = dx_dA = np.zeros((size, size**2))
-            else:
-                dx_dA[:] = 0.
+            dx_dA = np.zeros((size, size**2))
 
             for i in range(size):
                 dx_dA[i, i * size:(i + 1) * size] = x
