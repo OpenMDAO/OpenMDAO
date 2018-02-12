@@ -17,6 +17,7 @@ from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_
 from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver
+from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
@@ -25,6 +26,7 @@ from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
+from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.vectors.default_vector import DefaultVector
 
 try:
@@ -80,6 +82,8 @@ class Problem(object):
     _initial_condition_cache : dict
         Any initial conditions that are set at the problem level via setitem are cached here
         until they can be processed.
+    _setup_errors : list
+        list of errors encountered during setup
     _setup_status : int
         Current status of the setup in _model.
         0 -- Newly initialized problem or newly added model.
@@ -141,6 +145,9 @@ class Problem(object):
         recording_iteration.stack = []
 
         self._initial_condition_cache = {}
+
+        # list of errors encountered during setup
+        self._setup_errors = []
 
         # Status of the setup of _model.
         # 0 -- Newly initialized problem or newly added model.
@@ -412,7 +419,16 @@ class Problem(object):
         self._vector_class = vector_class
         self._check = check
         self._logger = logger
+
         self._force_alloc_complex = force_alloc_complex
+
+        # errors in solver configuration will be recorded in self._setup_errors
+        self._check_solvers()
+
+        # if any hard errors were encountered during setup that have not been
+        # handled yet, raise RuntimeError now
+        if len(self._setup_errors) > 0:
+            raise RuntimeError(str(self._setup_errors))
 
         self._setup_status = 1
 
@@ -1598,6 +1614,127 @@ class Problem(object):
             self._solver_print_cache.append((level, depth, type_))
 
         self.model._set_solver_print(level=level, depth=depth, type_=type_)
+
+    def _check_solvers(self):
+        """
+        Search over all solvers and raise errors for unsupported configurations.
+
+        Report any implicit component that does not have an appropriate nonlinear 
+        and linear solver (i.e. not the default solvers) upstream of it. Note that
+        a linear solver is only required when doing a gradient-based optimization
+        with analytic derivatives, so we need to determine if the derivatives are
+        being approximated.
+        """
+
+        # all states that have some maxiter>1 linear solver above them in the tree
+        iterated_states = set()
+        group_states = []
+
+        # put entry for '' into has_iter_solver just in case we're a subproblem
+        has_iter_solver = {'': False}
+        for group in self.model.system_iter(include_self=True, recurse=True, typ=Group):
+            try:
+                print(group.pathname, group.linear_solver, 'maxiter:', group.linear_solver.options['maxiter'])
+                has_iter_solver[group.pathname] = (group.linear_solver.options['maxiter'] > 1)
+            except KeyError:
+                # DirectSolver handles coupled derivatives without iteration
+                if isinstance(group.linear_solver, DirectSolver):
+                    has_iter_solver[group.pathname] = (True)
+
+            # Look for nonlinear solvers that require derivs under Complex Step.
+            if 'cs' in group._approx_schemes:
+                # TODO: Support using complex step on a subsystem
+                # if group.name != '':
+                #     msg = "Complex step is currently not supported for groups"
+                #     msg += " other than root."
+                #     self._setup_errors.append(msg)
+
+                # Complex Step, so check for deriv requirement in subsolvers
+                for sub in self.model.system_iter(include_self=True, recurse=True, typ=Group):
+                    if hasattr(sub.nonlinear_solver, 'linear_solver'):
+                        msg = ("The solver in '%s' requires derivatives. We "
+                               "currently do not support complex step around it."
+                               % sub.name)
+                        self._setup_errors.append(msg)
+
+            parts = group.pathname.split('.')
+            for i in range(len(parts)):
+                # if an ancestor solver iterates, we're ok
+                if has_iter_solver['.'.join(parts[:i])]:
+                    is_iterated_somewhere = True
+                    break
+            else:
+                is_iterated_somewhere = False
+            print(group.pathname, 'is_iterated_somewhere:', is_iterated_somewhere)
+
+            # if we're iterated at this level or somewhere above, then it's
+            # ok if we have cycles or states.
+            if is_iterated_somewhere:
+                continue
+
+            print(">>>>>>>>>>>>>>>>>", group.pathname, 'is NOT iterated_somewhere', group.linear_solver)
+
+            if isinstance(group.linear_solver, LinearRunOnce):
+                # If group has a cycle and the linear solver doesn't iterate, 
+                # then it's an error if an ancestor linear solver doesn't iterate.
+                graph = group.compute_sys_graph(comps_only=False)
+                sccs = get_sccs_topo(graph)
+                sub2i = {sub.name: i for i, sub in enumerate(group._subsystems_allprocs)}
+                cycles = [sorted(s, key=lambda n: sub2i[n]) for s in sccs if len(s) > 1]
+
+                if cycles:
+                    msg = ("Group '%s' has a LinearRunOnce solver but it contains "
+                           "cycles %s. To fix this error, change to a different "
+                           "linear solver, e.g. ScipyKrylov or PETScKrylov."   
+                           % (group.pathname, cycles))
+                    self._setup_errors.append(msg)
+
+            # states = [n for n,m in iteritems(group._unknowns_dict) if m.get('state')]
+            # if states:
+            #     group_states.append((group, states))
+
+            #     # this group has an iterative lin solver, so all states in it are ok
+            #     if isinstance(group.linear_solver, DirectSolver) or \
+            #        group.linear_solver.options['maxiter'] > 1:
+            #         iterated_states.update(states)
+            #     else:
+            #         # see if any states are in comps that have their own
+            #         # solve_linear method
+            #         for s in states:
+            #             if s not in iterated_states:
+            #                 cname = s.rsplit('.', 1)[0]
+            #                 comp = self.root
+            #                 for name in cname.split('.'):
+            #                     comp = getattr(comp, name)
+            #                 if not _needs_iteration(comp):
+            #                     iterated_states.add(s)
+
+        for group, states in group_states:
+            uniterated_states = [s for s in states if s not in iterated_states]
+
+            # It's an error if we find states that don't have some iterative 
+            # linear solver as a parent somewhere in the tree
+            if uniterated_states:
+                msg = ("Group '%s' has a LinearRunOnce solver but it contains "
+                       "implicit outputs %s.\n To fix this error, " 
+                       "change to a different linear solver, e.g. ScipyKrylov "  
+                       "or PETScKrylov, or increase maxiter (not recommended)."   
+                       % (group.pathname, uniterated_states))
+                self._setup_errors.append(msg)
+
+        # from pprint import pprint
+        # print("=================")
+        # pprint("has_iter_solver:")
+        # print("=================")
+        # pprint(has_iter_solver)
+        # print("================")
+        # print("Iterated states:")
+        # print("================")
+        # pprint(iterated_states)
+        # print("==================")
+        # print("Uniterated states:")
+        # pprint(iterated_states)
+        # print("==================")
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
