@@ -260,21 +260,23 @@ def config_summary(problem, stream=sys.stdout):
                                                          allgroups)),
           file=stream)
 
+try:
+    import resource
 
-def max_mem_usage():
-    """
-    Returns
-    -------
-    The max memory used by this process and its children, in MB.
-    """
-    from resource import getrusage, RUSAGE_SELF, RUSAGE_CHILDREN
-
-    denom = 1024.
-    if sys.platform == 'darwin':
-        denom *= denom
-    total = getrusage(RUSAGE_SELF).ru_maxrss / denom
-    total += getrusage(RUSAGE_CHILDREN).ru_maxrss / denom
-    return total
+    def max_mem_usage():
+        """
+        Returns
+        -------
+        The max memory used by this process and its children, in MB.
+        """
+        denom = 1024.
+        if sys.platform == 'darwin':
+            denom *= denom
+        total = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / denom
+        total += resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / denom
+        return total
+except ImportError:
+    pass
 
 try:
     import psutil
