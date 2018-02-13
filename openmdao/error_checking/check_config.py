@@ -113,6 +113,40 @@ def _get_out_of_order_subs(group, input_srcs):
     return ubcs
 
 
+def _check_dup_comp_inputs(problem, logger):
+    """
+    Issue a logger warning if any components have multiple inputs that share the same source.
+
+    Parameters
+    ----------
+    problem : <Problem>
+        The problem being checked.
+    logger : object
+        The object that managers logging output.
+    """
+    input_srcs = problem.model._conn_global_abs_in2out
+    src2inps = defaultdict(list)
+    for inp, src in iteritems(input_srcs):
+        src2inps[src].append(inp)
+
+    msgs = []
+    for src, inps in iteritems(src2inps):
+        comps = defaultdict(list)
+        for inp in inps:
+            comp, vname = inp.rsplit('.', 1)
+            comps[comp].append(vname)
+
+        dups = [(c, v) for c, v in iteritems(comps) if len(v) > 1]
+        if dups:
+            for comp, vnames in dups:
+                msgs.append("   %s has inputs %s connected to %s\n" % (comp, vnames, src))
+
+    if msgs:
+        msg = ["The following components have multiple inputs connected to the same source:\n"]
+        msg += sorted(msgs)
+        logger.warning(''.join(msg))
+
+
 def _check_hanging_inputs(problem, logger):
     """
     Issue a logger warning if any inputs are not connected.
@@ -167,6 +201,7 @@ _checks = {
     'hanging_inputs': _check_hanging_inputs,
     'cycles': _check_dataflow_prob,
     'system': _check_system_configs,
+    'dup_inputs': _check_dup_comp_inputs,
 }
 
 
