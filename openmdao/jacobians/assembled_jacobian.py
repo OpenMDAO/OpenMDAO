@@ -208,7 +208,7 @@ class AssembledJacobian(Jacobian):
                                                "the component." %
                                                (out_abs_name, sorted([abs_key[1],
                                                                       mapped_keys[abs_key2][1]])))
-                        mapped_keys[abs_key2] = abs_key
+                    mapped_keys[abs_key2] = abs_key
 
                     int_mtx._add_submat(abs_key2, info, res_offset, out_offset,
                                         src_indices, shape, factor)
@@ -296,7 +296,6 @@ class AssembledJacobian(Jacobian):
         subjac_iters = self._subjac_iters[system.pathname]
         if subjac_iters is None:
             keymap = self._keymap
-            seen = set()
             global_conns = system._conn_global_abs_in2out
             output_names = system._var_abs_names['output']
             input_names = system._var_abs_names['input']
@@ -312,26 +311,21 @@ class AssembledJacobian(Jacobian):
                     abs_key = (res_abs_name, out_abs_name)
                     if abs_key in subjacs:
                         if abs_key in int_mtx._submats:
-                            iters.append((abs_key, abs_key, False))
+                            iters.append((abs_key, abs_key))
                         else:
                             # This happens when the src is an indepvarcomp that is
                             # contained in the system.
                             of, wrt = abs_key
                             for tgt, src in iteritems(global_conns):
                                 if src == wrt and (of, tgt) in int_mtx._submats:
-                                    iters.append((of, tgt), abs_key, False)
+                                    iters.append((of, tgt), abs_key)
                                     break
 
                 for in_abs_name in input_names:
                     abs_key = (res_abs_name, in_abs_name)
                     if abs_key in subjacs:
                         if in_abs_name in global_conns:
-                            mapped = keymap[abs_key]
-                            if mapped in seen:
-                                iters.append((mapped, abs_key, True))
-                            else:
-                                iters.append((mapped, abs_key, False))
-                                seen.add(mapped)
+                            iters.append((keymap[abs_key], abs_key))
                         elif ext_mtx is not None:
                             iters_in_ext.append(abs_key)
 
@@ -339,11 +333,8 @@ class AssembledJacobian(Jacobian):
         else:
             iters, iters_in_ext = subjac_iters
 
-        for key1, key2, do_add in iters:
-            if do_add:
-                int_mtx._update_add_submat(key1, subjacs[key2])
-            else:
-                int_mtx._update_submat(key1, subjacs[key2])
+        for key1, key2 in iters:
+            int_mtx._update_submat(key1, subjacs[key2])
 
         for key in iters_in_ext:
             ext_mtx._update_submat(key, subjacs[key])

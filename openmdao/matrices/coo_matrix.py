@@ -162,35 +162,6 @@ class COOMatrix(Matrix):
         if factor is not None:
             self._matrix.data[idxs] *= factor
 
-    def _update_add_submat(self, key, jac):
-        """
-        Add the subjac values to an existing  sub-jacobian.
-
-        Parameters
-        ----------
-        key : (str, str)
-            the global output and input variable names.
-        jac : ndarray or scipy.sparse or tuple
-            the sub-jacobian, the same format with which it was declared.
-        """
-        idxs, jac_type, factor = self._metadata[key]
-        if not isinstance(jac, jac_type):
-            raise TypeError("Jacobian entry for %s is of different type (%s) than "
-                            "the type (%s) used at init time." % (key,
-                                                                  type(jac).__name__,
-                                                                  jac_type.__name__))
-        if isinstance(jac, ndarray):
-            val = jac.flatten()
-        elif isinstance(jac, sparse_types):
-            val = jac.data
-        else:  # list format  [data, rows, cols]
-            val = jac[0]
-
-        if factor is not None:
-            self._matrix.data[idxs] += val * factor
-        else:
-            self._matrix.data[idxs] += val
-
     def _prod(self, in_vec, mode, ranges):
         """
         Perform a matrix vector product.
