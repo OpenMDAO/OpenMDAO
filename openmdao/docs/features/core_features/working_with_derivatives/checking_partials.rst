@@ -49,10 +49,10 @@ are fairly large, so we give it a higher stepsize.
 .. embed-test::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_step_on_comp
 
-Here, we show how to set the method. In this case, we use Complex Step on TrickyParaboloid because the finite difference is
+Here, we show how to set the method. In this case, we use complex step on TrickyParaboloid because the finite difference is
 less accurate.
 
-**Note**: You need to set `force_alloc_complex` to True during setup to utilize Complex Step during a check.
+**Note**: You need to set `force_alloc_complex` to True during setup to utilize complex Step during a check.
 
 .. embed-test::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_method_on_comp
@@ -91,10 +91,10 @@ are fairly large, so we give it a higher stepsize. However, we choose here to us
 .. embed-test::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_step_global
 
-Here, we show how to set the method. In this case, we use Complex Step on TrickyParaboloid because the finite difference is
+Here, we show how to set the method. In this case, we use complex step on TrickyParaboloid because the finite difference is
 less accurate. However, we choose here to use this setting for all comps.
 
-**Note**: You need to set :code:`force_alloc_complex` to True during setup to utilize Complex Step during a check.
+**Note**: You need to set :code:`force_alloc_complex` to True during setup to utilize complex step during a check.
 
 .. embed-test::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_method_global

@@ -1690,8 +1690,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
                     header = "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}"\
                         .format(
-                            # _pad_name('<output>', 13, True),
-                            # _pad_name('<variable>', 13, True),
                             _pad_name('<output>', max_width_of, True),
                             _pad_name('<variable>', max_width_wrt, True),
                             _pad_name('fwd mag.'),
@@ -1707,9 +1705,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 if out_stream:
                     out_stream.write(header + '\n')
                     out_stream.write('-' * len(header) + '\n' + '\n')
-
-        # # Sorted keys ensures deterministic ordering
-        # sorted_keys = sorted(iterkeys(derivatives))
 
         for of, wrt in sorted_keys:
 
@@ -1782,8 +1777,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             out_stream.write(deriv_line.format(
                                 _pad_name(of, max_width_of, True),
                                 _pad_name(wrt, max_width_wrt, True),
-                                # _pad_name(of, 13, True),
-                                # _pad_name(wrt, 13, True),
                                 magnitude.forward,
                                 magnitude.reverse,
                                 magnitude.fd,
