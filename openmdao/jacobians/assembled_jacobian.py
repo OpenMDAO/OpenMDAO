@@ -150,9 +150,9 @@ class AssembledJacobian(Jacobian):
             self._view_ranges[s.pathname] = (
                 min_res_offset, max_res_offset, min_in_offset, max_in_offset)
 
-        # keep track of mapped keys to check for corner case where one source connects to
-        # multiple inputs using src_indices on the same component.
-        mapped_keys = {}
+        # # keep track of mapped keys to check for corner case where one source connects to
+        # # multiple inputs using src_indices on the same component.
+        # mapped_keys = {}
 
         abs2prom_out = system._var_abs2prom['output']
         conns = system._conn_global_abs_in2out
@@ -170,8 +170,7 @@ class AssembledJacobian(Jacobian):
 
             if wrt_abs_name in abs2prom_out:
                 out_offset, _ = out_ranges[wrt_abs_name]
-                int_mtx._add_submat(
-                    abs_key, info, res_offset, out_offset, None, shape)
+                int_mtx._add_submat(abs_key, info, res_offset, out_offset, None, shape)
             elif wrt_abs_name in in_ranges:
                 if wrt_abs_name in conns:  # connected input
                     out_abs_name = conns[wrt_abs_name]
@@ -193,30 +192,14 @@ class AssembledJacobian(Jacobian):
                     abs_key2 = (res_abs_name, out_abs_name)
                     self._keymap[abs_key] = abs_key2
 
-                    if src_indices is None:
-                        # if there's an existing key for d(output)/d(source), don't
-                        # override it. Just have the d(output)/d(input) subjac refer to it.
-                        if abs_key2 in self._subjacs_info and abs_key2[1] in out_ranges:
-                            continue
-                    else:
-                        if abs_key2 in mapped_keys:
-                            raise RuntimeError("Jacobian assembly failure.  Output '%s' is "
-                                               "connected to multiple inputs %s on the same "
-                                               "component using src_indices. To correct this "
-                                               "issue, replace the multiple inputs with a single "
-                                               "input and handle splitting the entries inside "
-                                               "the component." %
-                                               (out_abs_name, sorted([abs_key[1],
-                                                                      mapped_keys[abs_key2][1]])))
-                    mapped_keys[abs_key2] = abs_key
+                    shape = self._abs_key2shape(abs_key2)
 
-                    int_mtx._add_submat(abs_key2, info, res_offset, out_offset,
+                    int_mtx._add_submat(abs_key, info, res_offset, out_offset,
                                         src_indices, shape, factor)
 
                 elif not is_top:  # input is connected to something outside current system
-                    ext_mtx._add_submat(
-                        abs_key, info, res_offset, in_ranges[wrt_abs_name][0],
-                        None, shape)
+                    ext_mtx._add_submat(abs_key, info, res_offset,
+                                        in_ranges[wrt_abs_name][0], None, shape)
 
                 if abs_key not in self._keymap:
                     self._keymap[abs_key] = abs_key
@@ -267,10 +250,8 @@ class AssembledJacobian(Jacobian):
                         else:
                             continue
 
-                        ext_mtx._add_submat(
-                            abs_key, info, res_offset - ranges[0],
-                            in_ranges[in_abs_name] - ranges[2],
-                            None, shape)
+                        ext_mtx._add_submat(abs_key, info, res_offset - ranges[0],
+                                            in_ranges[in_abs_name] - ranges[2], None, shape)
 
         sizes = system._var_sizes
         iproc = system.comm.rank
@@ -296,6 +277,7 @@ class AssembledJacobian(Jacobian):
         subjac_iters = self._subjac_iters[system.pathname]
         if subjac_iters is None:
             keymap = self._keymap
+            seen = set()
             global_conns = system._conn_global_abs_in2out
             output_names = system._var_abs_names['output']
             input_names = system._var_abs_names['input']
@@ -311,21 +293,26 @@ class AssembledJacobian(Jacobian):
                     abs_key = (res_abs_name, out_abs_name)
                     if abs_key in subjacs:
                         if abs_key in int_mtx._submats:
-                            iters.append((abs_key, abs_key))
+                            iters.append((abs_key, abs_key, False))
                         else:
                             # This happens when the src is an indepvarcomp that is
                             # contained in the system.
                             of, wrt = abs_key
                             for tgt, src in iteritems(global_conns):
                                 if src == wrt and (of, tgt) in int_mtx._submats:
-                                    iters.append((of, tgt), abs_key)
+                                    iters.append((of, tgt), abs_key, False)
                                     break
 
                 for in_abs_name in input_names:
                     abs_key = (res_abs_name, in_abs_name)
                     if abs_key in subjacs:
                         if in_abs_name in global_conns:
-                            iters.append((keymap[abs_key], abs_key))
+                            mapped = keymap[abs_key]
+                            if mapped in seen:
+                                iters.append((mapped, abs_key, True))
+                            else:
+                                iters.append((mapped, abs_key, False))
+                                seen.add(mapped)
                         elif ext_mtx is not None:
                             iters_in_ext.append(abs_key)
 
@@ -333,8 +320,11 @@ class AssembledJacobian(Jacobian):
         else:
             iters, iters_in_ext = subjac_iters
 
-        for key1, key2 in iters:
-            int_mtx._update_submat(key1, subjacs[key2])
+        for key1, key2, do_add in iters:
+            if do_add:
+                int_mtx._update_add_submat(key2, subjacs[key2])
+            else:
+                int_mtx._update_submat(key2, subjacs[key2])
 
         for key in iters_in_ext:
             ext_mtx._update_submat(key, subjacs[key])
