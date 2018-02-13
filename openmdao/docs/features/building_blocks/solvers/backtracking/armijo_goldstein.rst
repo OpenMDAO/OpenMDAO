@@ -9,6 +9,12 @@ further backtracking is performed, until the termination criteria are satisfied.
 The main termination criteria is the Armijo-Goldstein condition, which checks for a sufficient
 decrease from the initial point by measuring the slope. There is also an iteration maximum.
 
+Here is a simple example where ArmijoGoldsteinLS is used to backtrack during the Newton solver's iteration on
+a system that contains an implicit component with 3 states that are confined to a small range of values.
+
+.. embed-test::
+    openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_armijogoldsteinls_basic
+
 Armijo-Goldstein Options
 ------------------------
 
@@ -58,7 +64,7 @@ Here are examples of each acceptable value for the **bound_enforcement** option:
   computed gradient.
 
 .. embed-test::
-    openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_boundscheck_vector
+    openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_armijo_boundscheck_vector
 
 - bound_enforcement: scalar
 
@@ -67,7 +73,7 @@ Here are examples of each acceptable value for the **bound_enforcement** option:
   are the ones that violate their upper or lower bounds. The backtracking continues along the modified gradient.
 
 .. embed-test::
-    openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_boundscheck_scalar
+    openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_armijo_boundscheck_scalar
 
 - bound_enforcement: wall
 
@@ -77,7 +83,7 @@ Here are examples of each acceptable value for the **bound_enforcement** option:
   direction that follows the boundary of the violated output bounds.
 
 .. embed-test::
-    openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_boundscheck_wall
+    openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_armijo_boundscheck_wall
 
 **maxiter**
 
