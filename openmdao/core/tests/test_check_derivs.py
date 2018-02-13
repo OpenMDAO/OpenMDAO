@@ -7,11 +7,21 @@ from six.moves import cStringIO
 import numpy as np
 
 from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NonlinearRunOnce, \
-                         ImplicitComponent, NonlinearBlockGS
+                         ImplicitComponent, NonlinearBlockGS, LinearBlockGS, ParallelGroup, \
+                         ExecComp
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 from openmdao.test_suite.components.sellar import SellarDerivatives
+from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
+
+if MPI:
+    from openmdao.api import PETScVector
+    vector_class = PETScVector
+else:
+    from openmdao.api import DefaultVector
+    vector_class = DefaultVector
 
 
 class ParaboloidTricky(ExplicitComponent):
@@ -1459,6 +1469,26 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[0.0, 1.0]], 1e-5)
         assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0, 1.0]], 1e-5)
 
+
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
+class TestProblemCheckTotalsMPI(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_indepvarcomp_under_par_sys(self):
+
+        prob = Problem()
+        group = prob.model = FanInSubbedIDVC()
+
+        prob.setup(vector_class=vector_class, check=False, mode='rev')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        J = prob.check_totals(suppress_output=True)
+        assert_rel_error(self, J['sum.y', 'sub.sub1.p1.x']['J_fwd'], [[2.0]], 1.0e-6)
+        assert_rel_error(self, J['sum.y', 'sub.sub2.p2.x']['J_fwd'], [[4.0]], 1.0e-6)
+        assert_rel_error(self, J['sum.y', 'sub.sub1.p1.x']['J_fd'], [[2.0]], 1.0e-6)
+        assert_rel_error(self, J['sum.y', 'sub.sub2.p2.x']['J_fd'], [[4.0]], 1.0e-6)
 
 if __name__ == "__main__":
     unittest.main()
