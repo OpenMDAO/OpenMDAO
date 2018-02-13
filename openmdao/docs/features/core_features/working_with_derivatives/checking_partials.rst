@@ -71,8 +71,8 @@ Here we use a relative step calculation instead of absolute for TrickyParaboloid
 Changing Global Settings
 ------------------------
 
-You can change the settings globally for all approximations used for all components. This is done by passing in a dictionary
-which contains any setting you want to enforce globally, from the following choices:
+You can change the settings globally for all approximations used for all components. This is done by passing in a value
+for any of the following arguments:
 
 =========  ====================================================================================================
  Name      Description
@@ -111,5 +111,14 @@ However, we choose here to use this setting for all comps.
 .. embed-test::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_step_calc_global
 
+Compact Printing Option
+-----------------------
+
+For a more compact display, set :code:`compact_print` to True. Notice that if any of the absolute tolerances are
+exceeded, `>ABS_TOL` is printed at the end of the line. Similarly, if any of the relative tolerances are
+exceeded, `>REL_TOL` is printed at the end of the line.
+
+.. embed-test::
+    openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_compact_print_formatting
 
 .. tags:: Derivatives
