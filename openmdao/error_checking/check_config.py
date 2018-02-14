@@ -145,10 +145,10 @@ def _check_dup_comp_inputs(problem, logger):
             comp, vname = inp.rsplit('.', 1)
             comps[comp].append(vname)
 
-        dups = [(c, v) for c, v in iteritems(comps) if len(v) > 1]
+        dups = sorted([(c, v) for c, v in iteritems(comps) if len(v) > 1], key=lambda x: x[0])
         if dups:
             for comp, vnames in dups:
-                msgs.append("   %s has inputs %s connected to %s\n" % (comp, vnames, src))
+                msgs.append("   %s has inputs %s connected to %s\n" % (comp, sorted(vnames), src))
 
     if msgs:
         msg = ["The following components have multiple inputs connected to the same source, ",
