@@ -15,17 +15,18 @@ from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.logger_utils import get_logger
 
 
-def _check_dataflow(group, logger):
+def _check_dataflow(group, infos, warnings):
     """
     Report any cycles and out of order Systems to the logger.
 
     Parameters
     ----------
     group : <Group>
-        The Group being checked for dataflow issues.
-
-    logger : object
-        The object that manages logging output.
+        The Group being checked for dataflow issues
+    infos : list
+        List to collect informational messages.
+    warnings : list
+        List to collect warning messages.
     """
     graph = group.compute_sys_graph(comps_only=False)
     sccs = get_sccs_topo(graph)
@@ -34,7 +35,7 @@ def _check_dataflow(group, logger):
     cycle_idxs = {}
 
     if cycles:
-        logger.info("Group '%s' has the following cycles: %s" % (group.pathname, cycles))
+        infos.append("   Group '%s' has the following cycles: %s\n" % (group.pathname, cycles))
         for i, cycle in enumerate(cycles):
             # keep track of cycles so we can detect when a system in
             # one cycle is out of order with a system in a different cycle.
@@ -55,9 +56,9 @@ def _check_dataflow(group, logger):
                 keep_srcs.append(src_system)
 
         if keep_srcs:
-            logger.warning("System '%s' executes out-of-order with "
-                           "respect to its source systems %s" %
-                           (tgt_system, sorted(keep_srcs)))
+            warnings.append("   System '%s' executes out-of-order with "
+                            "respect to its source systems %s\n" %
+                            (tgt_system, sorted(keep_srcs)))
 
 
 def _check_dataflow_prob(prob, logger):
@@ -72,8 +73,16 @@ def _check_dataflow_prob(prob, logger):
         The object that manages logging output.
 
     """
+    infos = ["The following groups contain cycles:\n"]
+    warnings = ["The following systems are executed out-of-order:\n"]
     for group in prob.model.system_iter(include_self=True, recurse=True, typ=Group):
-        _check_dataflow(group, logger)
+        _check_dataflow(group, infos, warnings)
+
+    if len(infos) > 1:
+        logger.info(''.join(infos))
+
+    if len(warnings) > 1:
+        logger.warning(''.join(warnings))
 
 
 def _get_out_of_order_subs(group, input_srcs):
