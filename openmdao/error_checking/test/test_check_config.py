@@ -153,7 +153,7 @@ class TestCheckConfig(unittest.TestCase):
         self.assertEqual(len(warnings), 2)
 
         self.assertEqual(warnings[0], "System 'C1' executes out-of-order with respect to its source systems ['C2']")
-        self.assertEqual(warnings[1], "The following components have multiple inputs connected to the same source:\n   C1 has inputs ['a', 'b'] connected to C2.y\n")
+        self.assertEqual(warnings[1], "The following components have multiple inputs connected to the same source, which can introduce unnecessary data transfer overhead:\n   C1 has inputs ['a', 'b'] connected to C2.y\n")
 
     def test_multi_cycles(self):
         p = Problem(model=Group())

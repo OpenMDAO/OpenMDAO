@@ -156,6 +156,8 @@ class AssembledJacobian(Jacobian):
 
         abs2prom_out = system._var_abs2prom['output']
         conns = system._conn_global_abs_in2out
+        keymap = self._keymap
+        abs_key2shape = self._abs_key2shape
 
         # create the matrix subjacs
         for abs_key, (info, shape) in iteritems(self._subjacs_info):
@@ -171,6 +173,7 @@ class AssembledJacobian(Jacobian):
             if wrt_abs_name in abs2prom_out:
                 out_offset, _ = out_ranges[wrt_abs_name]
                 int_mtx._add_submat(abs_key, info, res_offset, out_offset, None, shape)
+                keymap[abs_key] = abs_key
             elif wrt_abs_name in in_ranges:
                 if wrt_abs_name in conns:  # connected input
                     out_abs_name = conns[wrt_abs_name]
@@ -190,9 +193,9 @@ class AssembledJacobian(Jacobian):
                     # need to add an entry for d(output)/d(source)
                     # instead of d(output)/d(input)
                     abs_key2 = (res_abs_name, out_abs_name)
-                    self._keymap[abs_key] = abs_key2
+                    keymap[abs_key] = abs_key2
 
-                    shape = self._abs_key2shape(abs_key2)
+                    shape = abs_key2shape(abs_key2)
 
                     int_mtx._add_submat(abs_key, info, res_offset, out_offset,
                                         src_indices, shape, factor)
@@ -200,9 +203,6 @@ class AssembledJacobian(Jacobian):
                 elif not is_top:  # input is connected to something outside current system
                     ext_mtx._add_submat(abs_key, info, res_offset,
                                         in_ranges[wrt_abs_name][0], None, shape)
-
-                if abs_key not in self._keymap:
-                    self._keymap[abs_key] = abs_key
 
         sizes = system._var_sizes
         iproc = system.comm.rank
@@ -234,6 +234,8 @@ class AssembledJacobian(Jacobian):
         in_ranges = {n: self._get_var_range(n, 'input')[0] for n in
                      system._var_allprocs_abs_names['input']}
 
+        subjacs_info = self._subjacs_info
+
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
             for res_abs_name in s._var_abs_names['output']:
                 res_offset = self._get_var_range(res_abs_name, 'output')[0]
@@ -243,8 +245,8 @@ class AssembledJacobian(Jacobian):
                     if in_abs_name not in system._conn_global_abs_in2out:
                         abs_key = (res_abs_name, in_abs_name)
 
-                        if abs_key in self._subjacs_info:
-                            info, shape = self._subjacs_info[abs_key]
+                        if abs_key in subjacs_info:
+                            info, shape = subjacs_info[abs_key]
                             if not info['dependent']:
                                 continue
                         else:

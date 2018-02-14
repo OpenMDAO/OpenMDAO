@@ -142,7 +142,8 @@ def _check_dup_comp_inputs(problem, logger):
                 msgs.append("   %s has inputs %s connected to %s\n" % (comp, vnames, src))
 
     if msgs:
-        msg = ["The following components have multiple inputs connected to the same source:\n"]
+        msg = ["The following components have multiple inputs connected to the same source, ",
+               "which can introduce unnecessary data transfer overhead:\n"]
         msg += sorted(msgs)
         logger.warning(''.join(msg))
 

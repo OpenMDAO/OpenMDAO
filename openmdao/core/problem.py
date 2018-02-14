@@ -1465,8 +1465,7 @@ class Problem(object):
                     for ocount, output_name in enumerate(output_list):
                         out_idxs = None
                         if output_name in output_vois:
-                            out_voi_meta = output_vois[output_name]
-                            out_idxs = out_voi_meta['indices']
+                            out_idxs = output_vois[output_name]['indices']
 
                         if use_rel_reduction and output_name not in relevant[input_name]:
                             # irrelevant output, just give zeros
