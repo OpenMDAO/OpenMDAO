@@ -79,10 +79,10 @@ def _check_dataflow_prob(prob, logger):
         _check_dataflow(group, infos, warnings)
 
     if len(infos) > 1:
-        logger.info(''.join(infos))
+        logger.info(''.join(infos[:1] + sorted(infos[1:])))
 
     if len(warnings) > 1:
-        logger.warning(''.join(warnings))
+        logger.warning(''.join(warnings[:1] + sorted(warnings[1:])))
 
 
 def _get_out_of_order_subs(group, input_srcs):
