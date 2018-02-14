@@ -20,6 +20,7 @@ from openmdao.core.driver import Driver
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
@@ -1627,103 +1628,104 @@ class Problem(object):
         being approximated.
         """
 
+
+
+
+
+        # if you don't have any cycles or implicit comps, but driver requests derivs, 
+        # then you are fine with LRO everywhere
+
+        # TODO: if you have a (nonlinear) Newton solver in a group, you either need a 
+        #       linear_solver in that group, or slotted in the Newton solver.
+
+        # nonlinear: cycle
+        # linear:    (cycle or implicit) and derivs
+
         # all states that have some maxiter>1 linear solver above them in the tree
-        iterated_states = set()
-        group_states = []
+        # iterated_states = set()
+        # group_states = []
+
+        uses_deriv = {}
+        has_cycles = {}
+        has_states = {}
 
         # put entry for '' into has_iter_solver just in case we're a subproblem
-        has_iter_ls = {'': False}
+        has_iter_ln = {'': False}
         has_iter_nl = {'': False}
 
         for group in self.model.system_iter(include_self=True, recurse=True, typ=Group):
-            has_iter_ls[group.pathname] = group.linear_solver.options['maxiter'] > 1
-            has_iter_nl[group.pathname] = group.nonlinear_solver.options['maxiter'] > 1
+            path = group.pathname
 
-            # Look for nonlinear solvers that require derivs under Complex Step.
+            # determine if this group requires derivatives
+            derivs_needed = uses_deriv[path] = 'fd' not in group._approx_schemes and \
+                                               'cs' not in group._approx_schemes
+
+            # determine if this group has cycles
+            graph = group.compute_sys_graph(comps_only=False)
+            sccs = get_sccs_topo(graph)
+            sub2i = {sub.name: i for i, sub in enumerate(group._subsystems_allprocs)}
+            has_cycles[path] = [sorted(s, key=lambda n: sub2i[n]) for s in sccs if len(s) > 1]
+
+            # determine if this group has states (implicit components)
+            has_states[path] = [
+                comp.pathname for comp in group.system_iter(recurse=True, typ=ImplicitComponent)
+            ]
+
+            # determine if the current group has appropriate solvers for 
+            # handling cycles, derivatives and implicit components
+            is_iter_nl = has_iter_nl[path] = group.nonlinear_solver.options['maxiter'] > 1
+            is_iter_ln = has_iter_ln[path] = group.linear_solver.options['maxiter'] > 1 or \
+                                             isinstance(group.linear_solver, DirectSolver)
+
+            # check upstream groups for iterative solvers and derivative requirements
+            parts = path.split('.')
+            for i in range(len(parts)):
+                gname = '.'.join(parts[:i])
+                is_iter_nl = is_iter_nl or has_iter_nl[gname]
+                is_iter_ln = is_iter_ln or has_iter_ln[gname]
+                derivs_needed = derivs_needed and uses_deriv[gname]
+
+            print('============')
+            print(path)
+            print('uses_deriv:', uses_deriv[path])
+            print('has_cycles:', has_cycles[path])
+            print('has_states:', has_states[path])
+            print('has_iter_nl:', has_iter_nl[path])
+            print('has_iter_ln:', has_iter_ln[path])
+            print('is_iter_nl:', is_iter_nl)
+            print('is_iter_ln:', is_iter_ln)
+            print('derivs_needed:', derivs_needed)
+            print('============')
+
+            # if you have a cycle, then you need a nonlinear solver with maxiter > 1
+            # if you also are asking for derivatives up above, you need a linear solver too
+            if has_cycles[path]:
+                if not is_iter_nl:
+                    msg = ("Group '%s' contains cycles %s, but does not have an iterative "
+                           "nonlinear solver." % (group.pathname, has_cycles[path]))
+                    self._setup_errors.append(msg)
+                if derivs_needed and not is_iter_ln:
+                    msg = ("Group '%s' contains cycles %s and uses derivatives, but does "
+                           "not have an iterative linear solver." 
+                           % (group.pathname, has_cycles[path]))
+                    self._setup_errors.append(msg)
+
+            # if you have implicit components and you use derivatives, then you
+            # need a better linear solver than LinearRunOnce
+            if derivs_needed and has_states[path] and not is_iter_ln:
+                msg = ("Group '%s' contains implicit components %s and uses "
+                       "derivatives, but does not have an iterative linear solver." 
+                       % (group.pathname, has_states[path]))
+                self._setup_errors.append(msg)
+
+            # look for nonlinear solvers that require derivs under complex step.
             if 'cs' in group._approx_schemes:
-                # Complex Step, so check for deriv requirement in subsolvers
                 for sub in group.system_iter(include_self=True, recurse=True, typ=Group):
                     if hasattr(sub.nonlinear_solver, 'linear_solver'):
                         msg = ("The solver in '%s' requires derivatives. We "
                                "currently do not support complex step around it."
                                % sub.name)
                         self._setup_errors.append(msg)
-
-            parts = group.pathname.split('.')
-            for i in range(len(parts)):
-                gname = '.'.join(parts[:i])
-                if has_iter_ls[gname]:
-                    is_iterated_somewhere = True
-                    break
-            else:
-                is_iterated_somewhere = False
-
-            # if we're iterated at this level or somewhere above, then it's
-            # ok if we have cycles or states.
-            if is_iterated_somewhere:
-                continue
-
-            if isinstance(group.linear_solver, LinearRunOnce):
-                # If group has a cycle and the linear solver doesn't iterate,
-                # then it's an error if an ancestor linear solver doesn't iterate.
-                graph = group.compute_sys_graph(comps_only=False)
-                sccs = get_sccs_topo(graph)
-                sub2i = {sub.name: i for i, sub in enumerate(group._subsystems_allprocs)}
-                cycles = [sorted(s, key=lambda n: sub2i[n]) for s in sccs if len(s) > 1]
-
-                if cycles:
-                    msg = ("Group '%s' has a LinearRunOnce solver but it contains "
-                           "cycles %s. To fix this error, change to a different "
-                           "linear solver, e.g. ScipyKrylov or PETScKrylov."
-                           % (group.pathname, cycles))
-                    self._setup_errors.append(msg)
-
-            # states = [n for n,m in iteritems(group._unknowns_dict) if m.get('state')]
-            # if states:
-            #     group_states.append((group, states))
-
-            #     # this group has an iterative lin solver, so all states in it are ok
-            #     if isinstance(group.linear_solver, DirectSolver) or \
-            #        group.linear_solver.options['maxiter'] > 1:
-            #         iterated_states.update(states)
-            #     else:
-            #         # see if any states are in comps that have their own
-            #         # solve_linear method
-            #         for s in states:
-            #             if s not in iterated_states:
-            #                 cname = s.rsplit('.', 1)[0]
-            #                 comp = self.root
-            #                 for name in cname.split('.'):
-            #                     comp = getattr(comp, name)
-            #                 if not _needs_iteration(comp):
-            #                     iterated_states.add(s)
-
-        for group, states in group_states:
-            uniterated_states = [s for s in states if s not in iterated_states]
-
-            # It's an error if we find states that don't have some iterative
-            # linear solver as a parent somewhere in the tree
-            if uniterated_states:
-                msg = ("Group '%s' has a LinearRunOnce solver but it contains "
-                       "implicit outputs %s.\n To fix this error, "
-                       "change to a different linear solver, e.g. ScipyKrylov "
-                       "or PETScKrylov, or increase maxiter (not recommended)."
-                       % (group.pathname, uniterated_states))
-                self._setup_errors.append(msg)
-
-        # from pprint import pprint
-        # print("=================")
-        # pprint("has_iter_solver:")
-        # print("=================")
-        # pprint(has_iter_solver)
-        # print("================")
-        # print("Iterated states:")
-        # print("================")
-        # pprint(iterated_states)
-        # print("==================")
-        # print("Uniterated states:")
-        # pprint(iterated_states)
-        # print("==================")
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
