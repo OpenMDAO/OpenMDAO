@@ -448,7 +448,9 @@ class TestJacobian(unittest.TestCase):
         sup.linear_solver = LinearBlockGS()
 
         sub1.jacobian = DenseJacobian()
+        sub1.linear_solver = DirectSolver()
         sub2.jacobian = DenseJacobian()
+        sub2.linear_solver = DirectSolver()
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='rev')
@@ -555,6 +557,7 @@ class TestJacobian(unittest.TestCase):
 
         prob.model.nonlinear_solver = NewtonSolver()
         G1.jacobian = DenseJacobian()
+        G1.linear_solver = DirectSolver()
 
         # before the fix, we got bad offsets into the _ext_mtx matrix.
         # to get entries in _ext_mtx, there must be at least one connection

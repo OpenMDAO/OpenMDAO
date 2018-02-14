@@ -8,7 +8,7 @@ import numpy as np
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.api import LinearBlockGS, Problem, Group, ImplicitComponent, IndepVarComp, \
-    DirectSolver, NewtonSolver, ScipyKrylov, AssembledJacobian, ExecComp, NonlinearBlockGS
+    DirectSolver, NewtonSolver, ScipyKrylov, DenseJacobian, ExecComp, NonlinearBlockGS
 from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2, \
     SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
@@ -44,7 +44,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         model.linear_solver = self.linear_solver_class()
         prob.set_solver_print(level=0)
 
-        prob.model.jacobian = AssembledJacobian()
+        prob.model.jacobian = DenseJacobian()
         prob.setup(check=False, mode='fwd')
 
         prob['width'] = 2.0
@@ -128,14 +128,14 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
 
     def test_error_under_assembled_jac(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('p', IndepVarComp('a', 5.0))
         comp = model.add_subsystem('comp', SimpleImp())
         model.connect('p.a', 'comp.a')
 
         comp.linear_solver = self.linear_solver_class()
+        comp.jacobian = DenseJacobian()
 
-        prob.model.jacobian = AssembledJacobian()
         prob.setup(check=False, mode='fwd')
 
         with self.assertRaises(RuntimeError) as context:
@@ -147,7 +147,6 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
 
     def test_full_desvar_with_index_obj_relevance_bug(self):
         prob = Problem()
-        prob.model = Group()
         sub = prob.model.add_subsystem('sub', SellarDerivatives())
         prob.model.nonlinear_solver = NonlinearBlockGS()
         prob.model.linear_solver = LinearBlockGS()
@@ -179,7 +178,7 @@ class TestBGSSolverFeature(unittest.TestCase):
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
