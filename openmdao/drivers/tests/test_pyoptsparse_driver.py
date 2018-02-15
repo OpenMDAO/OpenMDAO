@@ -1487,6 +1487,15 @@ class TestPyoptSparse(unittest.TestCase):
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 class TestPyoptSparseFeature(unittest.TestCase):
 
+    def setUp(self):
+        from openmdao.utils.general_utils import set_pyoptsparse_opt
+        OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
+        if OPT is None:
+            raise unittest.SkipTest("pyoptsparse is not installed")
+
+        if OPTIMIZER is None:
+            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
+
     def test_basic(self):
         import numpy as np
 
@@ -1593,7 +1602,6 @@ class TestPyoptSparseFeature(unittest.TestCase):
 
         assert_rel_error(self, prob['z'][0], 1.98337708, 1e-3)
 
-    @unittest.skipIf(OPTIMIZER in [None, "SLSQP"], "pyoptsparse is not providing SNOPT")
     def test_snopt_atol(self):
         import numpy as np
 
