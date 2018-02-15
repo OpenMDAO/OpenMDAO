@@ -1645,12 +1645,10 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             continue
 
         sys_name = system.pathname
-        explicit = False
 
         # Match header to appropriate type.
         if isinstance(system, Component):
             sys_type = 'Component'
-            explicit = isinstance(system, ExplicitComponent)
         elif isinstance(system, Group):
             sys_type = 'Group'
         else:
@@ -1660,6 +1658,9 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
         if totals:
             sys_name = 'Full Model'
+
+        # Sorted keys ensures deterministic ordering
+        sorted_keys = sorted(iterkeys(derivatives))
 
         if not suppress_output:
             if out_stream:
@@ -1680,10 +1681,17 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             _pad_name('r(cal-chk)'),
                         )
                 else:
+                    #
+                    max_width_of = len('<output>')
+                    max_width_wrt = len('<variable>')
+                    for of, wrt in sorted_keys:
+                        max_width_of = max(max_width_of, len(of))
+                        max_width_wrt = max(max_width_wrt, len(wrt))
+
                     header = "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}"\
                         .format(
-                            _pad_name('<output>', 13, True),
-                            _pad_name('<variable>', 13, True),
+                            _pad_name('<output>', max_width_of, True),
+                            _pad_name('<variable>', max_width_wrt, True),
                             _pad_name('fwd mag.'),
                             _pad_name('rev mag.'),
                             _pad_name('check mag.'),
@@ -1697,9 +1705,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 if out_stream:
                     out_stream.write(header + '\n')
                     out_stream.write('-' * len(header) + '\n' + '\n')
-
-        # Sorted keys ensures deterministic ordering
-        sorted_keys = sorted(iterkeys(derivatives))
 
         for of, wrt in sorted_keys:
 
@@ -1758,10 +1763,20 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 rel_err.forward,
                             ) + '\n')
                     else:
+                        error_string = ''
+                        for error in abs_err:
+                            if not np.isnan(error) and error >= abs_error_tol:
+                                error_string += ' >ABS_TOL'
+                                break
+                        for error in rel_err:
+                            if not np.isnan(error) and error >= rel_error_tol:
+                                error_string += ' >REL_TOL'
+                                break
+
                         if out_stream:
                             out_stream.write(deriv_line.format(
-                                _pad_name(of, 13, True),
-                                _pad_name(wrt, 13, True),
+                                _pad_name(of, max_width_of, True),
+                                _pad_name(wrt, max_width_wrt, True),
                                 magnitude.forward,
                                 magnitude.reverse,
                                 magnitude.fd,
@@ -1771,7 +1786,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 rel_err.forward,
                                 rel_err.reverse,
                                 rel_err.forward_reverse,
-                            ) + '\n')
+                            ) + error_string + '\n')
                 else:
 
                     if totals:
@@ -1861,8 +1876,9 @@ def _pad_name(name, pad_num=10, quotes=False):
         Padded string
     """
     l_name = len(name)
-    if l_name < pad_num:
-        pad = pad_num - l_name
+    quotes_len = 2 if quotes else 0
+    if l_name + quotes_len < pad_num:
+        pad = pad_num - (l_name + quotes_len)
         if quotes:
             pad_str = "'{name}'{sep:<{pad}}"
         else:
