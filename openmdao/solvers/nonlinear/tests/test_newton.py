@@ -6,7 +6,7 @@ import numpy as np
 
 from openmdao.api import Group, Problem, IndepVarComp, LinearBlockGS, \
     NewtonSolver, ExecComp, ScipyKrylov, ImplicitComponent, \
-    DirectSolver, DenseJacobian, AnalysisError
+    DirectSolver, DenseJacobian, AnalysisError, CSCJacobian
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.double_sellar import DoubleSellar, DoubleSellarImplicit, \
      SubSellar
@@ -302,13 +302,46 @@ class TestNewton(unittest.TestCase):
     def test_solve_subsystems_basic(self):
         prob = Problem(model=DoubleSellar())
         model = prob.model
+        model.jacobian = DenseJacobian()
 
         g1 = model.g1
+        g1.jacobian = DenseJacobian()
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = DirectSolver()
 
         g2 = model.g2
+        g2.jacobian = DenseJacobian()
+        g2.nonlinear_solver = NewtonSolver()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = DirectSolver()
+
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyKrylov()
+
+        model.nonlinear_solver.options['solve_subsystems'] = True
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
+        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+
+    def test_solve_subsystems_basic_csc(self):
+        prob = Problem(model=DoubleSellar())
+        model = prob.model
+        model.jacobian = CSCJacobian()
+
+        g1 = model.g1
+        g1.jacobian = DenseJacobian()
+        g1.nonlinear_solver = NewtonSolver()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = DirectSolver()
+
+        g2 = model.g2
+        g2.jacobian = DenseJacobian()
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = DirectSolver()

@@ -54,23 +54,21 @@ class TestSqliteRecorder(unittest.TestCase):
         from tempfile import mkdtemp
         from openmdao.api import SqliteRecorder
         from openmdao.recorders.recording_iteration_stack import recording_iteration
+
         recording_iteration.stack = []
         self.dir = mkdtemp()
-        self.filename = os.path.join(self.dir, "sqlite_test")
+        self.startdir = os.getcwd()
+        self.filename = "sqlite_test"
+        self.eps = 1e-3
+
+        os.chdir(self.dir)
+
         self.recorder = SqliteRecorder(self.filename)
         # print(self.filename)  # comment out to make filename printout go away.
-        self.eps = 1e-3
 
     def tearDown(self):
         from shutil import rmtree
-
-        # to cleanup the test_feature_simple_driver_recording test
-        # There does not seem to be a good way to set a variable for the
-        # file name so that it works out well when that test is embedded in a doc!
-        try:
-            os.remove('cases.sql')
-        except OSError:
-            pass
+        os.chdir(self.startdir)
 
         # return  # comment out to allow db file to be removed.
         try:

@@ -196,10 +196,7 @@ class NewtonSolver(NonlinearSolver):
                 # should call the subsystems solve before computing the first residual
                 for isub, subsys in enumerate(system._subsystems_myproc):
                     system._transfer('nonlinear', 'fwd', isub)
-
-                    if subsys in system._subsystems_myproc:
-                        subsys._solve_nonlinear()
-
+                    subsys._solve_nonlinear()
                     system._check_reconf_update()
 
                 self._solver_info.pop()

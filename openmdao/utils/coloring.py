@@ -235,8 +235,9 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
                 for crow in rows[c]:
                     res, resoffset = _find_var_from_range(crow, res_offsets)
                     dct = total_res_offsets[res][dv][color]
-                    dct[0].append(resoffset)
-                    dct[1].append(dvoffset)
+                    # need to convert these to int to avoid error during JSON serialization
+                    dct[0].append(int(resoffset))
+                    dct[1].append(int(dvoffset))
 
     prob.driver._simul_coloring_info = None
     prob.driver._res_jacs = {}
@@ -282,14 +283,15 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, show_jac=False, s
         # negative colors will be iterated over individually, so start by filling the coloring array
         # with -1.  We then replace specific entries with positive colors which will be iterated
         # over as a group.
-        coloring = np.full(driver._designvars[dv]['size'], -1)
+        coloring = np.full(driver._designvars[dv]['size'], -1, dtype=int)
 
         for color in dv_idxs[dv]:
             coloring[np.array(dv_idxs[dv][color], dtype=int)] = color
             all_colors.add(color)
 
         if np.any(coloring != -1):
-            simul_colorings[dv] = list(coloring)
+            # need int conversion to avoid JSON serialization error
+            simul_colorings[dv] = [int(c) for c in coloring]
 
     simul_colorings = OrderedDict(sorted(simul_colorings.items()))
 
