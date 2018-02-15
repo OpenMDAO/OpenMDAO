@@ -331,8 +331,7 @@ class Vector(object):
         boolean
             True or False.
         """
-        abs_name = name2abs_name(self._system, name, self._names, self._typ)
-        return abs_name is not None
+        return name2abs_name(self._system, name, self._names, self._typ) is not None
 
     def __getitem__(self, name):
         """

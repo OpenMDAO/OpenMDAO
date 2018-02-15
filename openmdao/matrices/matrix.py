@@ -22,7 +22,7 @@ class Matrix(object):
     _matrix : object
         implementation-specific representation of the actual matrix.
     _submats : dict
-        dictionary of sub-jacobian data keyed by (out_ind, in_ind).
+        dictionary of sub-jacobian data keyed by (out_name, in_name).
     _metadata : dict
         implementation-specific data for the sub-jacobians.
     """
@@ -47,8 +47,8 @@ class Matrix(object):
 
         Parameters
         ----------
-        key : (int, int)
-            the global output and input variable indices.
+        key : (str, str)
+            Tuple of the form (output_var_name, input_var_name).
         info : dict
             sub-jacobian metadata.
         irow : int
@@ -63,28 +63,7 @@ class Matrix(object):
         factor : float or None
             Unit conversion factor.
         """
-        if key in self._submats:
-            infoset = set(info)
-            submat = self._submats[key][0]
-            oldset = set(submat)
-            common = infoset & oldset
-            new = infoset - oldset
-            diffs = []
-            for name in common:
-                same = submat[name] == info[name]
-                if same is True:
-                    continue
-                if isinstance(same, np.ndarray) and np.all(same):
-                    continue
-                diffs.append(name)
-
-            if diffs:
-                raise RuntimeError("multiple submat definitions with differing metadata values "
-                                   "%s for key %s" % (sorted(diffs), key))
-            for name in new:
-                submat[name] = info[name]
-        else:
-            self._submats[key] = (info, irow, icol, src_indices, shape, factor)
+        self._submats[key] = (info, (irow, icol), src_indices, shape, factor)
 
     def _build(self, num_rows, num_cols):
         """
@@ -105,8 +84,8 @@ class Matrix(object):
 
         Parameters
         ----------
-        key : (int, int)
-            the global output and input variable indices.
+        key : (str, str)
+            the global output and input variable names.
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
