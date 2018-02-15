@@ -388,7 +388,7 @@ class Driver(object):
             self._rec_mgr.record_metadata(self)
 
         # set up simultaneous deriv coloring
-        if self._simul_coloring_info and self.supports['simultaneous_derivatives']:
+        if _use_simul_coloring and self._simul_coloring_info and self.supports['simultaneous_derivatives']:
             if problem._mode == 'fwd':
                 self._setup_simul_coloring(problem._mode)
             else:
