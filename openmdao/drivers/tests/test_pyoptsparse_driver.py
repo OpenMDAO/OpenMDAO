@@ -1494,7 +1494,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
             raise unittest.SkipTest("pyoptsparse is not installed")
 
         if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
+            raise unittest.SkipTest("pyoptsparse is not providing SNOPT")
 
     def test_basic(self):
         import numpy as np
