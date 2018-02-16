@@ -159,7 +159,7 @@ from openmdao.devtools.docs_experiment._utils.generate_sourcedocs import generat
 exclude_patterns = ['_build', '_srcdocs/dev']
 absp = os.path.join('.', '_srcdocs')
 sys.path.insert(0, os.path.abspath(absp))
-generate_docs()
+generate_docs("")
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
@@ -174,16 +174,16 @@ todo_include_todos = False
 html_theme = '_theme'
 
 # Add any paths that contain custom themes here, relative to this directory.
-html_theme_path = ['.']
+html_theme_path = ['../../docs']
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-html_logo = '_static/OpenMDAO_Logo.png'
+html_logo = '../../docs/_static/OpenMDAO_Logo.png'
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
 # pixels large.
-html_favicon = '_static/OpenMDAO_Favicon.ico'
+html_favicon = '../../docs/_static/OpenMDAO_Favicon.ico'
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.

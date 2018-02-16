@@ -55,7 +55,7 @@ all: mock redbaron
 	rm -rf _srcdocs/*
 
 	# Running things before docbuild
-	python _utils/preprocess_tags.py
+	python ../../docs/_utils/preprocess_tags.py
 
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 

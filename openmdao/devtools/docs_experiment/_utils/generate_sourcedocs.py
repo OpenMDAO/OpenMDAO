@@ -4,7 +4,7 @@ import os
 # of our source docs, as well as writing out each individual rst file.
 IGNORE_LIST = []
 
-def generate_docs():
+def generate_docs(doc_dir):
     """
     generate_docs
     """
@@ -38,7 +38,7 @@ Source Docs
    :maxdepth: 1
 """
 
-    docs_dir = os.path.dirname("..")
+    docs_dir = os.path.dirname(doc_dir)
 
     doc_dir = os.path.join(docs_dir, "_srcdocs")
     if os.path.isdir(doc_dir):
