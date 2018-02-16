@@ -1,0 +1,190 @@
+/*
+ * sytle.css
+ * ~~~~~~~~~~~~~
+ *
+ * OpenMDAO stylesheet
+ *
+ */
+
+@import url("sphinxdoc.css");
+
+/* link colors */
+a {
+    color: navy;
+    text-decoration: none;
+}
+div.body h1 a, div.body h2 a, div.body h3 a, div.body h4 a, div.body h5 a, div.body h6 a {
+  color: navy!important;
+}
+
+a:visited {
+    color: navy;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+    color: #6699FF;
+}
+
+div.sphinxsidebar h4, div.sphinxsidebar h3 {
+  background-color: navy;
+}
+
+div.sphinxsidebar input{
+  border: 1px solid navy;
+
+}
+
+/* hide overflowing content in the sidebar */
+div.sphinxsidebarwrapper p.topless {
+    overflow: hidden;
+}
+
+/*Args bkgrd in reference sheets*/
+table.field-list td, table.field-list th {
+  border: 0 !important;
+}
+
+/*top links "breadcrumbs"*/
+div.related ul li a {
+  margin: 0;
+  padding: 0 5px 0 5px;
+  line-height: 1.75em;
+  color: navy;
+}
+
+/*a very thin underline of headers*/
+h1, h2, h3, h4, h5, h6 {
+  color: navy;
+  font-weight: normal;
+  border-bottom: 1px solid #ccc;
+}
+
+/*default h3 is kind of screwy with negative border. Fix it.*/
+h3 {
+    margin: 1em 0 0.3em 0;
+}
+
+/*in the source docs, the header color block for "Args"*/
+th {
+  /*background-color: #BFD1D4;*/
+  background-color: #E6E6E9; /*light gray*/
+}
+
+body {
+  font-family: 'Lucida Grande', 'Lucida Sans Unicode', 'Geneva', 'Verdana', sans-serif;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  line-height: 150%;
+  text-align: center;
+  /*in the main page, background-color is the color of the bars down the sides*/
+  /*background-color: #BFD1D4; /*blue*/ */
+  background-color: #66C2FF; /*blue*/
+
+
+  color: black;
+  padding: 0;
+  border: 1px solid #aaa;
+  margin: 0px 80px 0px 80px;
+  min-width: 740px;
+}
+
+div.viewcode-block:target {
+  background-color: #BFD1D4;
+  border-top: 1px solid #ac9;
+  border-bottom: 1px solid #ac9;
+}
+
+div.footer {
+  background-color: #BFD1D4;
+  color: navy;
+  padding: 3px 8px 3px 0;
+  clear: both;
+  font-size: 0.8em;
+  text-align: right;
+}
+
+a code {
+  border: 0;
+  color: navy;
+}
+
+
+div.skipped pre {
+  background-color: rgba(213, 236, 22, 0.35);
+    border-radius: 2px;
+}
+
+div.failed pre {
+  background-color: rgba(255, 0, 0, 0.35);
+    border-radius: 2px;
+}
+
+
+/* For In/Out blocks for embedded tests */
+div.input_area {
+    border-radius: 1px;
+
+}
+
+div.input_area pre {
+    background-color: white;
+    border-radius: 2px;
+    margin-top: 0px;
+    margin-bottom: 0px;
+}
+
+div.output_area pre {
+    background-color: #ddd;
+    border-radius: 2px;
+    margin-top: 0px;
+    margin-bottom: 0px;
+}
+
+div.rosetta_left {
+    background-color: rgba(255, 238, 238, 1.0);
+    border-radius: 2px;
+    display: table-cell;
+    width: 50%;
+    border-top: 2px solid #c9a;
+    border-bottom: 2px solid #c9a;
+    border-left: 1px solid #c9a;
+    border-right: 2px solid #c9a;
+  }
+
+div.rosetta_right {
+    background-color: rgba(238, 255, 238, 1.0);
+    border-radius: 2px;
+    display: table-cell;
+    width: 50%;
+    border-top: 2px solid #ac9;
+    border-bottom: 2px solid #ac9;
+    border-left: 1px solid #ac9;
+    border-right: 2px solid #ac9;
+}
+
+div.rosetta_left pre {
+    background-color: rgba(255, 238, 238, 1.0);
+    border: none;
+}
+
+div.rosetta_right pre {
+    background-color: rgba(238, 255, 238, 1.0);
+    border: none;
+}
+
+div.rosetta_outer {
+    display: table;
+    width: 100%
+}
+
+div.highlight-python {
+  margin-top: 0px;
+  margin-bottom: 0px;
+}
+
+/* Fix the Parameter block width problem */
+table.field-list th {
+    width: 80px;
+  }
