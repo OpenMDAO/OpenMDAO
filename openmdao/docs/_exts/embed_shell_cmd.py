@@ -79,7 +79,7 @@ class EmbedShellCmdDirective(Directive):
     An example usage would look like this:
 
     .. embed-shell-cmd::
-        ls -ltr
+        :cmd: ls -ltr
 
     What the above will do is replace the directive and its args with the shell command,
     run the command, and show the resulting output.

@@ -10,6 +10,7 @@ import inspect
 import sqlite3
 import subprocess
 import tempfile
+import unittest
 
 import numpy as np
 
@@ -180,85 +181,102 @@ def remove_initial_empty_lines(source):
     return source[idx:]
 
 
-def get_source_code_of_class_or_method(class_or_method_path, remove_docstring=True):
+def get_source_code(path):
     """
     Return source code as a text string.
 
     Parameters
     ----------
-    class_or_method_path : str
-        Package path to the class or function.
-    remove_docstring : bool
-        Set to False to keep docstrings in the text.
+    path : str
+        Path to a file, module, function, class, or class method.
+
+    Returns
+    -------
+    str
+        The source code.
+    int
+        Indentation level.
+    bool
+        If True, this is a test.
     """
 
-    # First, assume module path since we want to support loading a full module as well.
-    try:
-        module = importlib.import_module(class_or_method_path)
-        source = inspect.getsource(module)
+    is_test = False
+    indent = 0
 
-    except ImportError:
-
-        # Second, assume class and see if it works
+    if path.endswith('.py'):
+        if not os.path.isfile(path):
+            raise SphinxError("Can't find file '%s' cwd='%s'" % (path, os.getcwd()))
+        with open(path, 'r') as f:
+            source = f.read()
+    else:
+        # First, assume module path since we want to support loading a full module as well.
         try:
-            module_path = '.'.join(class_or_method_path.split('.')[:-1])
-            module_with_class = importlib.import_module(module_path)
-            class_name = class_or_method_path.split('.')[-1]
-            cls = getattr(module_with_class, class_name)
-            source = inspect.getsource(cls)
+            module = importlib.import_module(path)
+            source = inspect.getsource(module)
 
         except ImportError:
 
-            # else assume it is a path to a method
-            module_path = '.'.join(class_or_method_path.split('.')[:-2])
-            module_with_method = importlib.import_module(module_path)
-            class_name = class_or_method_path.split('.')[-2]
-            method_name = class_or_method_path.split('.')[-1]
-            cls = getattr(module_with_method, class_name)
-            meth = getattr(cls, method_name)
-            source = inspect.getsource(meth)
+            # Second, assume class and see if it works
+            try:
+                parts = path.split('.')
 
-    # Remove docstring from source code
-    if remove_docstring:
-        source = remove_docstrings(source)
+                module_path = '.'.join(parts[:-1])
+                module_with_class = importlib.import_module(module_path)
+                class_name = parts[-1]
+                cls = getattr(module_with_class, class_name)
+                source = inspect.getsource(cls)
+                indent = 1
 
-    return remove_leading_trailing_whitespace_lines(source)
+            except ImportError:
 
+                # else assume it is a path to a method
+                module_path = '.'.join(parts[:-2])
+                module_with_method = importlib.import_module(module_path)
+                class_name = parts[-2]
+                method_name = parts[-1]
+                cls = getattr(module_with_method, class_name)
+                meth = getattr(cls, method_name)
+                source = inspect.getsource(meth)
+                is_test = issubclass(cls, unittest.TestCase)
+                indent = 2
 
-def get_test_source_code_for_feature(feature_name):
-    '''The function to be called from the custom Sphinx directive code
-    that includes relevant unit test code(s).
-
-    It gets the test source from the unit tests that have been
-    marked to indicate that they are associated with the "feature_name"'''
-
-    # get the:
-    #
-    #   1. title of the test
-    #   2. test source code
-    #   3. output of running the test
-    #
-    # from from the database that was created during an earlier
-    # phase of the doc build process using the
-    # devtools/create_feature_docs_unit_test_db.py script
-
-    conn = sqlite3.connect(sqlite_file)
-    cur = conn.cursor()
-    cur.execute('SELECT title, unit_test_source, run_outputs FROM {tn} WHERE feature="{fn}"'.
-                format(tn=table_name, fn=feature_name))
-    all_rows = cur.fetchall()
-    conn.close()
-
-    test_source_code_for_feature = []
-
-    # Loop through all the unit tests that are relevant to this feature name
-    for title, unit_test_source, run_outputs in all_rows:
-        # add to the list that will be returned
-        test_source_code_for_feature.append((title, unit_test_source, run_outputs))
-
-    return test_source_code_for_feature
+    return remove_leading_trailing_whitespace_lines(source), indent, is_test
 
 
+# def get_test_source_code_for_feature(feature_name):
+#     '''The function to be called from the custom Sphinx directive code
+#     that includes relevant unit test code(s).
+#
+#     It gets the test source from the unit tests that have been
+#     marked to indicate that they are associated with the "feature_name"'''
+#
+#     # get the:
+#     #
+#     #   1. title of the test
+#     #   2. test source code
+#     #   3. output of running the test
+#     #
+#     # from from the database that was created during an earlier
+#     # phase of the doc build process using the
+#     # devtools/create_feature_docs_unit_test_db.py script
+#
+#     conn = sqlite3.connect(sqlite_file)
+#     cur = conn.cursor()
+#     cur.execute('SELECT title, unit_test_source, run_outputs FROM {tn} WHERE feature="{fn}"'.
+#                 format(tn=table_name, fn=feature_name))
+#     all_rows = cur.fetchall()
+#     conn.close()
+#
+#     test_source_code_for_feature = []
+#
+#     # Loop through all the unit tests that are relevant to this feature name
+#     for title, unit_test_source, run_outputs in all_rows:
+#         # add to the list that will be returned
+#         test_source_code_for_feature.append((title, unit_test_source, run_outputs))
+#
+#     return test_source_code_for_feature
+#
+#
 def remove_raise_skip_tests(src):
     """
     Remove from the code any raise unittest.SkipTest lines since we don't want those in
@@ -496,54 +514,6 @@ def extract_output_blocks(run_output):
     return output_blocks
 
 
-def globals_for_imports(src):
-    """
-    Generate text that creates a global for each imported class, method, or module.
-
-    It appears that sphinx royally screws up something in python, so that when exec-ing
-    code with imports, they aren't always available inside of classes or methods. This
-    can be solved by issuing a global for each class, method, or module.
-
-    Parameters
-    ----------
-    src : str
-        Source code to be tested.
-
-    Returns
-    -------
-    str
-        New code string with global statements
-    """
-    # HACK: A test had problems loading this specific user-defined class under exec+sphinx, so
-    # hacking it in.
-    new_txt = ['from __future__ import print_function',
-               'global Sub',
-               'global ImplSimple']
-
-    continuation = False
-    for line in src.split('\n'):
-        if continuation or 'import ' in line:
-
-            if continuation:
-                tail = line
-            elif ' as ' in line:
-                tail = line.split(' as ')[1]
-            else:
-                tail = line.split('import ')[1]
-
-            if ', \\' in tail:
-                continuation = True
-                tail = tail.replace(', \\', '')
-            else:
-                continuation = False
-
-            modules = tail.split(',')
-            for module in modules:
-                new_txt.append('global %s' % module.strip())
-
-    return '\n'.join(new_txt)
-
-
 def strip_header(src):
     """
     Directly manipulating function text to strip header and remove leading whitespace.
@@ -555,33 +525,27 @@ def strip_header(src):
     src : str
         sourec code for method
     """
-    meth_lines = src.split('\n')
     counter = 0
     past_header = False
     new_lines = []
-    for line in meth_lines:
+    for line in src.split('\n'):
         if not past_header:
             n1 = len(line)
             newline = line.lstrip()
-            n2 = len(newline)
-            tab = n1-n2
+            tab = n1 - len(newline)
             if counter == 0:
                 first_len = tab
             elif n1 == 0:
                 continue
             if tab == first_len:
                 counter += 1
-                newline = line[tab:]
             else:
                 past_header = True
+                new_lines.append(line[tab:])
         else:
-            newline = line[tab:]
+            new_lines.append(line[tab:])
 
-        # exclude 'global' directives, not needed the way we are running things
-        if not newline.startswith("global "):
-            new_lines.append(newline)
-
-    return '\n'.join(new_lines[counter:])
+    return '\n'.join(new_lines)
 
 
 def get_and_run_test(method_path):
@@ -628,14 +592,6 @@ def get_and_run_test(method_path):
     test_module = importlib.import_module(module_path)
     cls = getattr(test_module, class_name)
 
-    try:
-        import mpi4py
-    except ImportError:
-        use_mpi = False
-    else:
-        N_PROCS = getattr(cls, 'N_PROCS', 1)
-        use_mpi =  N_PROCS > 1
-
     method = getattr(cls, method_name)
     method_source = inspect.getsource(method)
     method_source = strip_header(method_source)
@@ -646,13 +602,11 @@ def get_and_run_test(method_path):
     #-----------------------------------------------------------------------------------
     # 3. Insert extra print statements to indicate start and end of print Out blocks
     #-----------------------------------------------------------------------------------
-    source_with_output_start_stop_indicators = insert_output_start_stop_indicators(method_source)
+    method_source = insert_output_start_stop_indicators(method_source)
 
     #------------------------------------------------------------------------------------
     # Get all the pieces of code needed to run the unit test method
     #-----------------------------------------------------------------------------------
-
-    global_imports = globals_for_imports(method_source)
 
     # make 'self' available to test code (as an instance of the test case)
     self_code = "from %s import %s\nself = %s('%s')\n" % \
@@ -665,11 +619,7 @@ def get_and_run_test(method_path):
     teardown_code = '' if method_name == 'tearDown' else \
         get_method_body(inspect.getsource(getattr(cls, 'tearDown')))
 
-    code_to_run = '\n'.join([global_imports,
-                             self_code,
-                             setup_code,
-                             source_with_output_start_stop_indicators,
-                             teardown_code])
+    code_to_run = '\n'.join([self_code, setup_code, method_source, teardown_code])
 
     #-----------------------------------------------------------------------------------
     # 4. Run the test using source_with_out_start_stop_indicators -> run_outputs
@@ -677,6 +627,16 @@ def get_and_run_test(method_path):
 
     skipped = False
     failed = False
+
+    try:
+        import mpi4py
+    except ImportError:
+        use_mpi = False
+    else:
+        N_PROCS = getattr(cls, 'N_PROCS', 1)
+        use_mpi =  N_PROCS > 1
+
+    use_mpi = False
 
     try:
         if use_mpi:
@@ -731,7 +691,7 @@ def get_and_run_test(method_path):
             os.chdir('/'.join(test_module.__file__.split('/')[:-1]))
 
             try:
-                exec(code_to_run, {})
+                exec(code_to_run, test_module.__dict__)
             finally:
                 os.chdir(save_dir)
 
@@ -749,6 +709,7 @@ def get_and_run_test(method_path):
             failed = True
 
     except Exception as err:
+        # FIXME:  this isn't right
         if 'SkipTest' in code_to_run:
             txt1 = code_to_run.split('SkipTest(')[1]
             run_outputs = txt1.split(')')[0]
@@ -777,7 +738,7 @@ def get_and_run_test(method_path):
         #####################
         ### 5. Split method_source up into groups of "In" blocks -> input_blocks ###
         #####################
-        input_blocks = split_source_into_input_blocks(source_with_output_start_stop_indicators)
+        input_blocks = split_source_into_input_blocks(method_source)
 
         #####################
         ### 6. Extract from run_outputs, the Out blocks -> output_blocks ###

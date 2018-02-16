@@ -90,7 +90,6 @@ class EmbedTestDirective(Directive):
     # must have at least one arg (embedded test) for this to work
     required_arguments = 1
     optional_arguments = 1
-    has_content = False
 
     option_spec = {
         'no-split': unchanged

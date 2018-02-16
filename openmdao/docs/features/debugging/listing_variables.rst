@@ -14,6 +14,7 @@ output variables. Several methods are provided for this purpose.
     :noindex:
 
 
+
 Example
 -------
 
@@ -25,6 +26,19 @@ as shown here.
 
 .. embed-code::
     openmdao.core.tests.test_impl_comp.QuadraticComp
+
+
+
+The following is an image using the image directive
+
+.. image:: examples/bezier_plot.py
+
+
+The following is an image using embed-code
+
+.. embed-code::
+    examples/bezier_plot.py
+    :layout: plot
 
 
 These two components are placed in a :code:`Group` with inputs provided by
