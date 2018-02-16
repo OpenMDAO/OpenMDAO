@@ -9,12 +9,12 @@ import numpy as np
 from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NonlinearRunOnce, \
                          ImplicitComponent, NonlinearBlockGS, LinearBlockGS, ParallelGroup, \
                          ExecComp
-from openmdao.utils.assert_utils import assert_rel_error
-from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
+from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.mpi import MPI
 
 if MPI:
     from openmdao.api import PETScVector
