@@ -143,8 +143,6 @@ class BalanceComp(ImplicitComponent):
         """
         Define the independent variables, output variables, and partials.
         """
-        self.declare_partials(of='*', wrt='*', dependent=False)
-
         for name, options in iteritems(self._state_vars):
 
             for s in ('lhs', 'rhs', 'mult'):
@@ -197,17 +195,8 @@ class BalanceComp(ImplicitComponent):
             unscaled, dimensional residuals written to via residuals[key]
         """
         for name, options in iteritems(self._state_vars):
-            lhs_name = options['lhs_name']
-            rhs_name = options['rhs_name']
-
-            lhs = inputs[lhs_name]
-            rhs = inputs[rhs_name]
-
-            if options['use_mult']:
-                mult_name = options['mult_name']
-                mult = inputs[mult_name]
-            else:
-                mult = 1.0
+            lhs = inputs[options['lhs_name']]
+            rhs = inputs[options['rhs_name']]
 
             # Indices where the rhs is near zero or not near zero
             idxs_nz = np.where(np.abs(rhs) < 2)[0]
@@ -218,7 +207,10 @@ class BalanceComp(ImplicitComponent):
             self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
             self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
 
-            residuals[name] = (mult * lhs - rhs) * self._scale_factor
+            if options['use_mult']:
+                residuals[name] = (inputs[options['mult_name']] * lhs - rhs) * self._scale_factor
+            else:
+                residuals[name] = (lhs - rhs) * self._scale_factor
 
     def linearize(self, inputs, outputs, jacobian):
         """
@@ -240,12 +232,6 @@ class BalanceComp(ImplicitComponent):
             lhs = inputs[lhs_name]
             rhs = inputs[rhs_name]
 
-            if options['use_mult']:
-                mult_name = options['mult_name']
-                mult = inputs[mult_name]
-            else:
-                mult = 1.0
-
             # Indices where the rhs is near zero or not near zero
             idxs_nz = np.where(np.abs(rhs) < 2)[0]
             idxs_nnz = np.where(np.abs(rhs) >= 2)[0]
@@ -257,15 +243,20 @@ class BalanceComp(ImplicitComponent):
             self._dscale_drhs[idxs_nnz] = -np.sign(rhs[idxs_nnz]) / rhs[idxs_nnz]**2
             self._dscale_drhs[idxs_nz] = -.5 * rhs[idxs_nz] / (.25 * rhs[idxs_nz] ** 2 + 1) ** 2
 
+            if options['use_mult']:
+                mult_name = options['mult_name']
+                mult = inputs[mult_name]
+
+                # Partials of residual wrt mult
+                jacobian[name, mult_name] = lhs * self._scale_factor
+            else:
+                mult = 1.0
+
             # Partials of residual wrt rhs
             jacobian[name, rhs_name] = (mult * lhs - rhs) * self._dscale_drhs - self._scale_factor
 
             # Partials of residual wrt lhs
             jacobian[name, lhs_name] = mult * self._scale_factor
-
-            # Partials of residual wrt mult
-            if options['use_mult']:
-                jacobian[name, mult_name] = lhs * self._scale_factor
 
     def guess_nonlinear(self, inputs, outputs, residuals):
         """

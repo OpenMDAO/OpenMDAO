@@ -1086,8 +1086,9 @@ class Group(System):
                     # 2. Compute the input indices
                     iproc = self.comm.rank
                     ind1 = ind2 = np.sum(sizes_in[:iproc, :])
-                    ind1 += np.sum(sizes_in[iproc, :idx_byset_in])
-                    ind2 += np.sum(sizes_in[iproc, :idx_byset_in + 1])
+                    delta = np.sum(sizes_in[iproc, :idx_byset_in])
+                    ind1 += delta
+                    ind2 += (delta + sizes_in[iproc, idx_byset_in])
                     input_inds = np.arange(ind1, ind2)
 
                     # Now the indices are ready - input_inds, output_inds
@@ -1616,52 +1617,46 @@ class Group(System):
 
             from openmdao.core.indepvarcomp import IndepVarComp
             wrt = set()
-            ivc = []
+            ivc = set()
             for var in candidate_wrt:
-                src = self._conn_abs_in2out.get(var)
-
-                if src is None:
-                    wrt.add(var)
 
                 # Weed out inputs connected to anything inside our system unless the source is an
                 # indepvarcomp.
-                else:
+                if var in self._conn_abs_in2out:
+                    src = self._conn_abs_in2out[var]
                     compname = src.rsplit('.', 1)[0]
                     comp = self._get_subsystem(compname)
                     if isinstance(comp, IndepVarComp):
                         wrt.add(src)
-                        ivc.append(src)
+                        ivc.add(src)
+                else:
+                    wrt.add(var)
 
             with self.jacobian_context() as J:
                 for key in product(of, wrt.union(of)):
-                    meta_changes = {
-                        'method': method,
-                    }
-
-                    if key[0] == key[1]:
-                        size = self._var_allprocs_abs2meta[key[0]]['size']
-                        meta_changes['rows'] = np.arange(size)
-                        meta_changes['cols'] = np.arange(size)
-                        meta_changes['value'] = np.ones(size)
-
-                    # This suppports desvar and constraint indices.
-                    if key[0] in self._owns_approx_of_idx:
-                        meta_changes['idx_of'] = self._owns_approx_of_idx[key[0]]
-
-                    if key[1] in self._owns_approx_wrt_idx:
-                        meta_changes['idx_wrt'] = self._owns_approx_wrt_idx[key[1]]
-
                     if key in self._subjacs_info:
                         meta = self._subjacs_info[key]
                     else:
                         meta = SUBJAC_META_DEFAULTS.copy()
+
+                    meta['method'] = method
+                    if key[0] == key[1]:
+                        size = self._var_allprocs_abs2meta[key[0]]['size']
+                        meta['rows'] = meta['cols'] = np.arange(size)
+                        meta['value'] = np.ones(size)
+
+                    # This suppports desvar and constraint indices.
+                    if key[0] in self._owns_approx_of_idx:
+                        meta['idx_of'] = self._owns_approx_of_idx[key[0]]
+
+                    if key[1] in self._owns_approx_wrt_idx:
+                        meta['idx_wrt'] = self._owns_approx_wrt_idx[key[1]]
 
                     # A group under approximation needs all keys from below, so set dependent to
                     # True.
                     # TODO: Maybe just need a subset of keys (those that go to the boundaries.)
                     meta['dependent'] = True
 
-                    meta.update(meta_changes)
                     meta.update(self._owns_approx_jac_meta)
                     self._subjacs_info[key] = meta
 

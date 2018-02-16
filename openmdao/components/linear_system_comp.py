@@ -138,19 +138,19 @@ class LinearSystemComp(ImplicitComponent):
         size = self.metadata['size']
         if partial_type == "dense":
             dx_dA = np.zeros((size, size**2))
+
             for i in range(size):
                 dx_dA[i, i * size:(i + 1) * size] = x
-            J['x', 'A'] = dx_dA
 
+            J['x', 'A'] = dx_dA
             J['x', 'x'] = inputs['A']
 
             # constant, defined int setup
             # J['x', 'b'] = -np.eye()
 
-        elif partial_type == "sparse":
+        else:  # sparse
 
             J['x', 'A'] = np.tile(x, size)
-            # J['x', 'A'].set_data(np.tile(x, size))
             J['x', 'x'] = inputs['A']
 
             # constant, defined int setup
@@ -216,11 +216,6 @@ class LinearSystemComp(ImplicitComponent):
             either 'fwd' or 'rev'
         """
         if mode == 'fwd':
-            sol_vec, rhs_vec = d_outputs, d_residuals
-            t = 0
-        else:
-            sol_vec, rhs_vec = d_residuals, d_outputs
-            t = 1
-
-        # print("foobar", rhs_vec['x'])
-        sol_vec['x'] = linalg.lu_solve(self._lup, rhs_vec['x'], trans=t)
+            d_outputs['x'] = linalg.lu_solve(self._lup, d_residuals['x'], trans=0)
+        else:  # rev
+            d_residuals['x'] = linalg.lu_solve(self._lup, d_outputs['x'], trans=1)
