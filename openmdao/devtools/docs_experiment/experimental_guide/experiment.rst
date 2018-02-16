@@ -28,9 +28,3 @@ Take a look at the full run script first, then we'll break it down part by part 
 
 .. embed-code::
     openmdao.test_suite.components.paraboloid_feature
-
-
-Next, let's break this script down and understand each section:
-
-
-.. tags:: experimental
