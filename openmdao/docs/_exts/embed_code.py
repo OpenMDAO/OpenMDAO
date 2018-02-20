@@ -153,7 +153,8 @@ class EmbedCodeDirective(Directive):
                 # locate plot file
                 plot_files = fnmatch.filter(os.listdir(plot_dir), 'foobar.*')
                 if len(plot_files) > 1:
-                    pass  # TODO: handle this
+                    raise SphinxError("Multiple plot files found %s for embedded code '%s'." %
+                    (plot_files, path))
                 elif not plot_files:
                     raise SphinxError("No plot files found for embedded code '%s'." % path)
 
