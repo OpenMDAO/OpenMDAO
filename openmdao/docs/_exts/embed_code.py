@@ -179,7 +179,7 @@ class EmbedCodeDirective(Directive):
                 doc_nodes.append(body)
             elif opt == 'output':
                 if io_nodes is None:
-                    doc_nodes.extend(get_output_block_node(output_blocks))
+                    doc_nodes.append(get_output_block_node(output_blocks))
                 else:
                     doc_nodes.extend(io_nodes)
             else:  # plot

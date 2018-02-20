@@ -835,7 +835,4 @@ def get_interleaved_io_nodes(input_blocks, output_blocks):
 
 def get_output_block_node(output_blocks):
     output_block = '\n'.join([cgiesc.escape(ob) for ob in output_blocks])
-    print("OUTPUT")
-    print(output_block)
-    quit()
     return in_or_out_node(kind="Out", number=1, text=output_block)
