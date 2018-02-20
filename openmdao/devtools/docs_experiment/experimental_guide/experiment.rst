@@ -34,24 +34,35 @@ Take a look at the full run script first, then we'll break it down part by part 
 Next, let's break this script down and understand each section:
 
 
-The following is an image using the figure directive
-
-.. figure::
-   examples/decoupled_model.png
-   :alt: some Figure
-   :align: left
-
-
-
-The following is an image using embed-code
+The following is using embed-code with interleaved output and a plot (75% scale)
 
 .. embed-code::
     experimental_guide/examples/bezier_plot.py
-    :layout: plot
+    :layout: interleave, plot
     :align: center
     :scale: 75
 
-    This is a dynamically embedded plot
+    This is a dynamically embedded plot with interleaved output
+
+
+The following is using embed-code with block output and a plot (100% scale)
+
+.. embed-code::
+    experimental_guide/examples/bezier_plot.py
+    :layout: output, plot
+    :align: center
+
+    This is a dynamically embedded plot with block output
+
+
+The following is using embed-code with just a plot (100% scale)
+
+.. embed-code::
+    experimental_guide/examples/bezier_plot.py
+    :layout: code, plot
+    :align: center
+
+    This is a dynamically embedded plot with no output
 
 
 Here's a test with default layout:
@@ -78,6 +89,3 @@ This test should be skipped
 .. embed-code::
     openmdao.core.tests.test_connections.TestConnections.test_diff_conn_input_units
     :layout: code, output
-
-
-.. tags:: experimental

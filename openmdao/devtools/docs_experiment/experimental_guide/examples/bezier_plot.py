@@ -10,9 +10,14 @@ pp1 = mpatches.PathPatch(
          [Path.MOVETO, Path.CURVE3, Path.CURVE3, Path.CLOSEPOLY]),
     fc="none", transform=ax.transData)
 
+print("Here's some output.")
+
 ax.add_patch(pp1)
 ax.plot([0.75], [0.25], "ro")
+
+print("Here's more output.")
 ax.set_title('The red point should be on the path')
 
 plt.show()
 
+print("Some output\nat the end.")

@@ -115,28 +115,23 @@ class EmbedCodeDirective(Directive):
         if 'interleave' in layout:
             code_to_run = insert_output_start_stop_indicators(code_to_run)
 
-        if 'plot' in layout:
-            # insert lines to generate the plot file
-            code_to_run = '\n'.join(['import matplotlib', 'matplotlib.use("Agg")', code_to_run,
-                                     'matplotlib.pyplot.savefig("foobar")'])
-
         # Run the source (if necessary)
         skipped = failed = False
-        if is_test:
+        if 'plot' in layout:
+            # insert lines to generate the plot file
+            pltcode_to_run = '\n'.join(['import matplotlib', 'matplotlib.use("Agg")', code_to_run,
+                                        'matplotlib.pyplot.savefig("foobar")'])
             skipped, failed, use_mpi, run_outputs = \
-                run_code(code_to_run, self.arguments[0], module=module, cls=class_)
-        elif 'output' in layout or 'interleave' in layout or 'plot' in layout:
-            # run as plain python code
+                run_code(pltcode_to_run, path, module=module, cls=class_)
+        elif is_test or 'output' in layout or 'interleave' in layout:
             skipped, failed, use_mpi, run_outputs = \
-                run_code(code_to_run, self.arguments[0], module=module, cls=class_)
+                run_code(code_to_run, path, module=module, cls=class_)
 
         if failed:
             io_nodes = [get_skip_output_node(run_outputs, "failed")]
         elif skipped:
             io_nodes = [get_skip_output_node(run_outputs, "skipped")]
         else:
-            io_nodes = None
-
             if 'output' in layout:
                 output_blocks = [run_outputs]
             elif 'interleave' in layout:
@@ -158,7 +153,8 @@ class EmbedCodeDirective(Directive):
                 # locate plot file
                 plot_files = fnmatch.filter(os.listdir(plot_dir), 'foobar.*')
                 if len(plot_files) > 1:
-                    pass  # TODO: handle this
+                    raise SphinxError("Multiple plot files found %s for embedded code '%s'." %
+                    (plot_files, path))
                 elif not plot_files:
                     raise SphinxError("No plot files found for embedded code '%s'." % path)
 
@@ -170,24 +166,24 @@ class EmbedCodeDirective(Directive):
 
         # create a list of document nodes to return based on layout
         doc_nodes = []
+        skip_fail_shown = False
         for opt in layout:
-            if opt == 'interleave':
-                if io_nodes is None:
-                    doc_nodes.extend(get_interleaved_io_nodes(input_blocks, output_blocks))
-                else:
-                    doc_nodes.extend(io_nodes)
-            elif opt == 'code':
+            if opt == 'code':
                 # we want the body of code to be formatted and code highlighted
                 body = nodes.literal_block(source, source)
                 body['language'] = 'python'
                 doc_nodes.append(body)
-            elif opt == 'output':
-                if io_nodes is None:
-                    doc_nodes.append(get_output_block_node(output_blocks))
-                else:
+            elif skipped or failed:
+                if not skip_fail_shown:
                     doc_nodes.extend(io_nodes)
-            else:  # plot
-                doc_nodes.extend(plot_nodes)
+                    skip_fail_shown = True
+            else:
+                if opt == 'interleave':
+                    doc_nodes.extend(get_interleaved_io_nodes(input_blocks, output_blocks))
+                elif opt == 'output':
+                    doc_nodes.append(get_output_block_node(output_blocks))
+                else:  # plot
+                    doc_nodes.extend(plot_nodes)
 
         return doc_nodes
 
