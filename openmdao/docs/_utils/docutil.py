@@ -760,18 +760,23 @@ def get_and_run_test(method_path):
                 (module_path, class_name, class_name, method_name)
 
     # get setUp and tearDown but don't duplicate if it is the method being tested
-    setup_code = '' if method_name == 'setUp' else \
-        dedent(strip_header(inspect.getsource(getattr(cls, 'setUp'))))
+    setup_code = '' if method_name == 'setUp' else dedent(strip_header(remove_docstrings(
+        inspect.getsource(getattr(cls, 'setUp')))))
+    if setup_code.strip() == 'pass':
+        setup_code = ''
 
-    teardown_code = '' if method_name == 'tearDown' else \
-        dedent(strip_header(inspect.getsource(getattr(cls, 'tearDown'))))
+    teardown_code = '' if method_name == 'tearDown' else dedent(strip_header(
+        remove_docstrings(inspect.getsource(getattr(cls, 'tearDown')))))
+    if teardown_code.strip() == 'pass':
+        teardown_code = ''
 
     code_to_run = '\n'.join([self_code, setup_code, method_source, teardown_code])
+    code_to_display = '\n'.join([setup_code, method_source, teardown_code])
 
     skipped, failed, use_mpi, run_outputs = run_code(code_to_run, module_path, module, cls)
 
     skipped_output, input_blocks, output_blocks = \
-        process_output(code_to_run, skipped, failed, use_mpi, run_outputs)
+        process_output(code_to_display, skipped, failed, use_mpi, run_outputs)
 
     return code_to_run, skipped_output, input_blocks, output_blocks, skipped
 
