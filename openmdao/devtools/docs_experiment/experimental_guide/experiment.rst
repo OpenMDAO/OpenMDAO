@@ -26,11 +26,40 @@ printing the results to the console when it's done.
 Take a look at the full run script first, then we'll break it down part by part to explain what each one does.
 
 
+
+
+
 .. embed-code::
     openmdao.test_suite.components.paraboloid_feature
 
 
 Next, let's break this script down and understand each section:
+
+
+The following is an image using the figure directive
+
+.. figure::
+   examples/decoupled_model.png
+   :alt: some Figure
+   :align: left
+
+
+
+The following is an image using embed-code
+
+.. embed-code::
+    experimental_guide/examples/bezier_plot.py
+    :layout: plot
+    :align: center
+    :scale: 75
+
+    This is a dynamically embedded plot
+
+
+Here's a test:
+
+.. embed-test::
+    openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source
 
 
 .. tags:: experimental

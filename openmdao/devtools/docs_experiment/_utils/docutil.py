@@ -631,6 +631,7 @@ def get_and_run_test(method_path):
     method = getattr(cls, method_name)
     method_source = inspect.getsource(method)
     method_source = strip_header(method_source)
+    method_source = dedent(method_source)
     method_source = remove_docstrings(method_source)
     method_source = replace_asserts_with_prints(method_source)
     method_source = remove_initial_empty_lines(method_source)
@@ -652,10 +653,10 @@ def get_and_run_test(method_path):
 
     # get setUp and tearDown but don't duplicate if it is the method being tested
     setup_code = '' if method_name == 'setUp' else \
-        get_method_body(inspect.getsource(getattr(cls, 'setUp')))
+        dedent(strip_header(inspect.getsource(getattr(cls, 'setUp'))))
 
     teardown_code = '' if method_name == 'tearDown' else \
-        get_method_body(inspect.getsource(getattr(cls, 'tearDown')))
+        dedent(strip_header(inspect.getsource(getattr(cls, 'tearDown'))))
 
     code_to_run = '\n'.join([global_imports,
                              self_code,
