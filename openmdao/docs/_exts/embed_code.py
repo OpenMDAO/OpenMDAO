@@ -16,6 +16,10 @@ from openmdao.docs._utils.docutil import get_source_code, remove_docstrings, \
     split_source_into_input_blocks, extract_output_blocks, clean_up_empty_output_blocks
 
 
+class skipped_or_failed_node(nodes.Element):
+    pass
+
+
 class EmbedCodeDirective(Directive):
     """EmbedCodeDirective is a custom directive to allow blocks of
      python code to be shown in feature docs.  An example usage would look like this:
@@ -127,9 +131,9 @@ class EmbedCodeDirective(Directive):
                 run_code(code_to_run, self.arguments[0], module=module, cls=class_)
 
         if failed:
-            io_nodes = [get_skip_output_node(skipped_output, "failed")]
+            io_nodes = [get_skip_output_node(run_outputs, "failed")]
         elif skipped:
-            io_nodes = [get_skip_output_node(skipped_output, "skipped")]
+            io_nodes = [get_skip_output_node(run_outputs, "skipped")]
         else:
             io_nodes = None
 

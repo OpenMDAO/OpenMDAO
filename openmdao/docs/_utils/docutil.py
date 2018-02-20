@@ -807,15 +807,19 @@ def process_output(code_to_run, skipped, failed, use_mpi, run_outputs):
     return skipped_output, input_blocks, output_blocks
 
 
-def get_skip_output_node(ext_txt, skip_type):
-    if skip_type == "skipped":
-        output = "Test skipped because " + exc_txt
-
-    return skipped_or_failed_node(text=output, number=n, kind=skip_type)
+class skipped_or_failed_node(nodes.Element):
+    pass
 
 
 class in_or_out_node(nodes.Element):
     pass
+
+
+def get_skip_output_node(output, skip_type):
+    if skip_type == "skipped":
+        output = "Test skipped because " + output
+
+    return skipped_or_failed_node(text=output, number=1, kind=skip_type)
 
 
 def get_interleaved_io_nodes(input_blocks, output_blocks):

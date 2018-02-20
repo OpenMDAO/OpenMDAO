@@ -27,8 +27,6 @@ Take a look at the full run script first, then we'll break it down part by part 
 
 
 
-
-
 .. embed-code::
     openmdao.test_suite.components.paraboloid_feature
 
@@ -69,6 +67,17 @@ Now same test with layout of ['code', 'output']
     openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source
     :layout: code, output
 
+
+.. embed-code::
+    openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source
+    :layout: output, code
+
+
+This test should be skipped
+
+.. embed-code::
+    openmdao.core.tests.test_connections.TestConnections.test_diff_conn_input_units
+    :layout: code, output
 
 
 .. tags:: experimental
