@@ -56,10 +56,19 @@ The following is an image using embed-code
     This is a dynamically embedded plot
 
 
-Here's a test:
+Here's a test with default layout:
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source
+
+
+Now same test with layout of ['code', 'output']
+
+
+.. embed-code::
+    openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source
+    :layout: code, output
+
 
 
 .. tags:: experimental

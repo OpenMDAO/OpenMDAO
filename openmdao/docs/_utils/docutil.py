@@ -11,6 +11,7 @@ import sqlite3
 import subprocess
 import tempfile
 import unittest
+from docutils import nodes
 
 import numpy as np
 
@@ -19,6 +20,11 @@ from six.moves import range, cStringIO as cStringIO
 
 from sphinx.errors import SphinxError
 from redbaron import RedBaron
+
+if sys.version_info[0] == 2:
+    import cgi as cgiesc
+else:
+    import html as cgiesc
 
 sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
 table_name = 'feature_unit_tests'   # name of the table to be queried
@@ -520,22 +526,25 @@ def strip_header(src):
     """
     Directly manipulating function text to strip header.
 
+    This function assumes that the docstring and header, if any, have already been removed.
+
     Parameters
     ----------
     src : str
         sourec code for method
     """
     lines = src.split('\n')
-    for counter, line in enumerate(lines):
+    first_len = None
+    for i, line in enumerate(lines):
         n1 = len(line)
         newline = line.lstrip()
         tab = n1 - len(newline)
-        if counter == 0:
+        if first_len is None:
             first_len = tab
         elif n1 == 0:
             continue
         if tab != first_len:
-            return '\n'.join(lines[counter:])
+            return '\n'.join(lines[i:])
 
     return ''
 
@@ -551,13 +560,14 @@ def dedent(src):
     """
 
     lines = src.split('\n')
+    start = 0
     if lines:
-        n1 = len(lines[0])
-        newline = lines[0].lstrip()
-        tab = n1 - len(newline)
-
-    return '\n'.join(l[tab:] for l in lines)
-
+        for i, line in enumerate(lines):
+            lstrip = line.lstrip()
+            if lstrip: # keep going if first line(s) are blank.
+                tab = len(line) - len(lstrip)
+                return '\n'.join(l[tab:] for l in lines[i:])
+    return ''
 
 def run_code(code_to_run, path, module=None, cls=None):
     """
@@ -795,3 +805,37 @@ def process_output(code_to_run, skipped, failed, use_mpi, run_outputs):
         skipped_output = None
 
     return skipped_output, input_blocks, output_blocks
+
+
+def get_skip_output_node(ext_txt, skip_type):
+    if skip_type == "skipped":
+        output = "Test skipped because " + exc_txt
+
+    return skipped_or_failed_node(text=output, number=n, kind=skip_type)
+
+
+class in_or_out_node(nodes.Element):
+    pass
+
+
+def get_interleaved_io_nodes(input_blocks, output_blocks):
+    nodelist = []
+    n = 1
+    output_blocks = [cgiesc.escape(ob) for ob in output_blocks]
+    for input_block, output_block in zip(input_blocks, output_blocks):
+        input_node = nodes.literal_block(input_block, input_block)
+        input_node['language'] = 'python'
+        nodelist.append(input_node)
+        if len(output_block) > 0:
+            output_node = in_or_out_node(kind="Out", number=n, text=output_block)
+            nodelist.append(output_node)
+        n += 1
+    return nodelist
+
+
+def get_output_block_node(output_blocks):
+    output_block = '\n'.join([cgiesc.escape(ob) for ob in output_blocks])
+    print("OUTPUT")
+    print(output_block)
+    quit()
+    return in_or_out_node(kind="Out", number=1, text=output_block)
