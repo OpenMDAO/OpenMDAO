@@ -10,6 +10,8 @@ import inspect
 import sqlite3
 import subprocess
 import tempfile
+import unittest
+from docutils import nodes
 
 import numpy as np
 
@@ -18,6 +20,11 @@ from six.moves import range, cStringIO as cStringIO
 
 from sphinx.errors import SphinxError
 from redbaron import RedBaron
+
+if sys.version_info[0] == 2:
+    import cgi as cgiesc
+else:
+    import html as cgiesc
 
 sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
 table_name = 'feature_unit_tests'   # name of the table to be queried
@@ -155,18 +162,18 @@ def replace_asserts_with_prints(source_code):
     return source_code_with_prints
 
 
-def get_method_body(method_code):
-    '''Using the RedBaron module, get the body of a method.
-
-    Do not want the definition signature line
-    '''
-
-    method_code = '\n' + method_code  # For some reason RedBaron has problems with this if
-    #                                                     if it does not start with an empty line
-    rb = RedBaron(method_code)
-    def_node = rb.findAll("DefNode")[0]  # Look for the 'def' node. Should only be one!
-    def_node.value.decrease_indentation(8)  # so that the code is all the way to the left
-    return def_node.value.dumps()
+# def get_method_body(method_code):
+#     '''Using the RedBaron module, get the body of a method.
+#
+#     Do not want the definition signature line
+#     '''
+#
+#     method_code = '\n' + method_code  # For some reason RedBaron has problems with this if
+#     #                                                     if it does not start with an empty line
+#     rb = RedBaron(method_code)
+#     def_node = rb.findAll("DefNode")[0]  # Look for the 'def' node. Should only be one!
+#     def_node.value.decrease_indentation(8)  # so that the code is all the way to the left
+#     return def_node.value.dumps()
 
 
 def remove_initial_empty_lines(source):
@@ -180,85 +187,104 @@ def remove_initial_empty_lines(source):
     return source[idx:]
 
 
-def get_source_code_of_class_or_method(class_or_method_path, remove_docstring=True):
+def get_source_code(path):
     """
     Return source code as a text string.
 
     Parameters
     ----------
-    class_or_method_path : str
-        Package path to the class or function.
-    remove_docstring : bool
-        Set to False to keep docstrings in the text.
+    path : str
+        Path to a file, module, function, class, or class method.
+
+    Returns
+    -------
+    str
+        The source code.
+    int
+        Indentation level.
+    module or None
+        The imported module.
+    class or None
+        The class specified by path.
     """
 
-    # First, assume module path since we want to support loading a full module as well.
-    try:
-        module = importlib.import_module(class_or_method_path)
-        source = inspect.getsource(module)
+    indent = 0
+    cls = None
 
-    except ImportError:
-
-        # Second, assume class and see if it works
+    if path.endswith('.py'):
+        if not os.path.isfile(path):
+            raise SphinxError("Can't find file '%s' cwd='%s'" % (path, os.getcwd()))
+        with open(path, 'r') as f:
+            source = f.read()
+        module = None
+    else:
+        # First, assume module path since we want to support loading a full module as well.
         try:
-            module_path = '.'.join(class_or_method_path.split('.')[:-1])
-            module_with_class = importlib.import_module(module_path)
-            class_name = class_or_method_path.split('.')[-1]
-            cls = getattr(module_with_class, class_name)
-            source = inspect.getsource(cls)
+            module = importlib.import_module(path)
+            source = inspect.getsource(module)
 
         except ImportError:
 
-            # else assume it is a path to a method
-            module_path = '.'.join(class_or_method_path.split('.')[:-2])
-            module_with_method = importlib.import_module(module_path)
-            class_name = class_or_method_path.split('.')[-2]
-            method_name = class_or_method_path.split('.')[-1]
-            cls = getattr(module_with_method, class_name)
-            meth = getattr(cls, method_name)
-            source = inspect.getsource(meth)
+            # Second, assume class and see if it works
+            try:
+                parts = path.split('.')
 
-    # Remove docstring from source code
-    if remove_docstring:
-        source = remove_docstrings(source)
+                module_path = '.'.join(parts[:-1])
+                module = importlib.import_module(module_path)
+                class_name = parts[-1]
+                cls = getattr(module, class_name)
+                source = inspect.getsource(cls)
+                indent = 1
 
-    return remove_leading_trailing_whitespace_lines(source)
+            except ImportError:
 
+                # else assume it is a path to a method
+                module_path = '.'.join(parts[:-2])
+                module = importlib.import_module(module_path)
+                class_name = parts[-2]
+                method_name = parts[-1]
+                cls = getattr(module, class_name)
+                meth = getattr(cls, method_name)
+                source = inspect.getsource(meth)
+                indent = 2
 
-def get_test_source_code_for_feature(feature_name):
-    '''The function to be called from the custom Sphinx directive code
-    that includes relevant unit test code(s).
-
-    It gets the test source from the unit tests that have been
-    marked to indicate that they are associated with the "feature_name"'''
-
-    # get the:
-    #
-    #   1. title of the test
-    #   2. test source code
-    #   3. output of running the test
-    #
-    # from from the database that was created during an earlier
-    # phase of the doc build process using the
-    # devtools/create_feature_docs_unit_test_db.py script
-
-    conn = sqlite3.connect(sqlite_file)
-    cur = conn.cursor()
-    cur.execute('SELECT title, unit_test_source, run_outputs FROM {tn} WHERE feature="{fn}"'.
-                format(tn=table_name, fn=feature_name))
-    all_rows = cur.fetchall()
-    conn.close()
-
-    test_source_code_for_feature = []
-
-    # Loop through all the unit tests that are relevant to this feature name
-    for title, unit_test_source, run_outputs in all_rows:
-        # add to the list that will be returned
-        test_source_code_for_feature.append((title, unit_test_source, run_outputs))
-
-    return test_source_code_for_feature
+    return remove_leading_trailing_whitespace_lines(source), indent, module, cls
 
 
+# def get_test_source_code_for_feature(feature_name):
+#     '''The function to be called from the custom Sphinx directive code
+#     that includes relevant unit test code(s).
+#
+#     It gets the test source from the unit tests that have been
+#     marked to indicate that they are associated with the "feature_name"'''
+#
+#     # get the:
+#     #
+#     #   1. title of the test
+#     #   2. test source code
+#     #   3. output of running the test
+#     #
+#     # from from the database that was created during an earlier
+#     # phase of the doc build process using the
+#     # devtools/create_feature_docs_unit_test_db.py script
+#
+#     conn = sqlite3.connect(sqlite_file)
+#     cur = conn.cursor()
+#     cur.execute('SELECT title, unit_test_source, run_outputs FROM {tn} WHERE feature="{fn}"'.
+#                 format(tn=table_name, fn=feature_name))
+#     all_rows = cur.fetchall()
+#     conn.close()
+#
+#     test_source_code_for_feature = []
+#
+#     # Loop through all the unit tests that are relevant to this feature name
+#     for title, unit_test_source, run_outputs in all_rows:
+#         # add to the list that will be returned
+#         test_source_code_for_feature.append((title, unit_test_source, run_outputs))
+#
+#     return test_source_code_for_feature
+#
+#
 def remove_raise_skip_tests(src):
     """
     Remove from the code any raise unittest.SkipTest lines since we don't want those in
@@ -496,92 +522,176 @@ def extract_output_blocks(run_output):
     return output_blocks
 
 
-def globals_for_imports(src):
-    """
-    Generate text that creates a global for each imported class, method, or module.
-
-    It appears that sphinx royally screws up something in python, so that when exec-ing
-    code with imports, they aren't always available inside of classes or methods. This
-    can be solved by issuing a global for each class, method, or module.
-
-    Parameters
-    ----------
-    src : str
-        Source code to be tested.
-
-    Returns
-    -------
-    str
-        New code string with global statements
-    """
-    # HACK: A test had problems loading this specific user-defined class under exec+sphinx, so
-    # hacking it in.
-    new_txt = ['from __future__ import print_function',
-               'global Sub',
-               'global ImplSimple']
-
-    continuation = False
-    for line in src.split('\n'):
-        if continuation or 'import ' in line:
-
-            if continuation:
-                tail = line
-            elif ' as ' in line:
-                tail = line.split(' as ')[1]
-            else:
-                tail = line.split('import ')[1]
-
-            if ', \\' in tail:
-                continuation = True
-                tail = tail.replace(', \\', '')
-            else:
-                continuation = False
-
-            modules = tail.split(',')
-            for module in modules:
-                new_txt.append('global %s' % module.strip())
-
-    return '\n'.join(new_txt)
-
-
 def strip_header(src):
     """
-    Directly manipulating function text to strip header and remove leading whitespace.
+    Directly manipulating function text to strip header.
 
-    Should be faster than redbaron.
+    This function assumes that the docstring and header, if any, have already been removed.
 
     Parameters
     ----------
     src : str
         sourec code for method
     """
-    meth_lines = src.split('\n')
-    counter = 0
-    past_header = False
-    new_lines = []
-    for line in meth_lines:
-        if not past_header:
-            n1 = len(line)
-            newline = line.lstrip()
-            n2 = len(newline)
-            tab = n1-n2
-            if counter == 0:
-                first_len = tab
-            elif n1 == 0:
-                continue
-            if tab == first_len:
-                counter += 1
-                newline = line[tab:]
-            else:
-                past_header = True
+    lines = src.split('\n')
+    first_len = None
+    for i, line in enumerate(lines):
+        n1 = len(line)
+        newline = line.lstrip()
+        tab = n1 - len(newline)
+        if first_len is None:
+            first_len = tab
+        elif n1 == 0:
+            continue
+        if tab != first_len:
+            return '\n'.join(lines[i:])
+
+    return ''
+
+
+def dedent(src):
+    """
+    Directly manipulating function text to remove leading whitespace.
+
+    Parameters
+    ----------
+    src : str
+        sourec code for method
+    """
+
+    lines = src.split('\n')
+    start = 0
+    if lines:
+        for i, line in enumerate(lines):
+            lstrip = line.lstrip()
+            if lstrip: # keep going if first line(s) are blank.
+                tab = len(line) - len(lstrip)
+                return '\n'.join(l[tab:] for l in lines[i:])
+    return ''
+
+def run_code(code_to_run, path, module=None, cls=None):
+    """
+    Run the test using source_with_out_start_stop_indicators -> run_outputs
+    """
+
+    skipped = False
+    failed = False
+
+    if cls is None:
+        use_mpi = False
+    else:
+        try:
+            import mpi4py
+        except ImportError:
+            use_mpi = False
         else:
-            newline = line[tab:]
+            N_PROCS = getattr(cls, 'N_PROCS', 1)
+            use_mpi =  N_PROCS > 1
 
-        # exclude 'global' directives, not needed the way we are running things
-        if not newline.startswith("global "):
-            new_lines.append(newline)
+    # TODO: remove this line after debugging
+    use_mpi = False
 
-    return '\n'.join(new_lines[counter:])
+    try:
+        if use_mpi:
+            # use subprocess to run test with `mpirun`
+
+            # write code to a file so we can run it.
+            fd, code_to_run_path = tempfile.mkstemp()
+            with os.fdopen(fd, 'w') as tmp:
+                tmp.write(code_to_run)
+
+            # output will be written to one file per process
+            env = os.environ.copy()
+            env['USE_PROC_FILES'] = '1'
+
+            p = subprocess.Popen(['mpirun', '-n', str(N_PROCS), 'python', code_to_run_path],
+                                 env=env)
+            p.wait()
+
+            # extract output blocks from all output files & merge them
+            multi_out_blocks = []
+            for i in range(N_PROCS):
+                with open('%d.out' % i) as f:
+                    multi_out_blocks.append(extract_output_blocks(f.read()))
+                os.remove('%d.out' % i)
+
+            output_blocks = []
+            for i in range(len(multi_out_blocks[0])):
+                output_blocks.append('\n'.join(["(rank %d) %s" %
+                                     (j, m[i]) for j, m in enumerate(multi_out_blocks) if m[i]]))
+        else:
+            # just exec() the code for serial tests.
+
+            # capture all output
+            stdout = sys.stdout
+            stderr = sys.stderr
+            strout = cStringIO()
+            sys.stdout = strout
+            sys.stderr = strout
+
+            # set all the loggers to write to our captured stream
+            from openmdao.utils.logger_utils import _loggers
+            for name in _loggers:
+                _loggers[name]['logger'].handlers[0].stream = strout
+
+            # We need more precision from numpy
+            save_opts = np.get_printoptions()
+            np.set_printoptions(precision=8)
+
+            # Move to the test directory in case there are files to read.
+            save_dir = os.getcwd()
+
+            if module is None:
+                code_dir = os.path.dirname(path)
+            else:
+                code_dir = '/'.join(module.__file__.split('/')[:-1])
+            os.chdir(code_dir)
+
+            if module is None:
+                globals_dict = {}
+            else:
+                globals_dict = module.__dict__
+
+            try:
+                exec(code_to_run, globals_dict)
+            finally:
+                os.chdir(save_dir)
+
+            np.set_printoptions(precision=save_opts['precision'])
+            run_outputs = strout.getvalue()
+
+    except subprocess.CalledProcessError as e:
+        # Get a traceback.
+        if 'raise unittest.SkipTest' in e.output.decode('utf-8'):
+            reason_for_skip = e.output.splitlines()[-1][len('unittest.case.SkipTest: '):]
+            run_outputs = reason_for_skip
+            skipped = True
+        else:
+            run_outputs = "Running of embedded test {} in docs failed due to: \n\n{}".format(path, e.output.decode('utf-8'))
+            failed = True
+
+    except Exception as err:
+        # FIXME:  this isn't right
+        if 'SkipTest' in code_to_run:
+            txt1 = code_to_run.split('SkipTest(')[1]
+            run_outputs = txt1.split(')')[0]
+            skipped = True
+        else:
+            msg = "Running of embedded test {} in docs failed due to: \n\n{}"
+            run_outputs = msg.format(path, str(err))
+            failed = True
+
+    finally:
+        if use_mpi:
+            os.remove(code_to_run_path)
+        else:
+            sys.stdout = stdout
+            sys.stderr = stderr
+
+    if PY3 and not use_mpi and not isinstance(run_outputs, str):
+        run_outputs = "".join(map(chr, run_outputs))  # in Python 3, run_outputs is of type bytes!
+
+    return skipped, failed, use_mpi, run_outputs
 
 
 def get_and_run_test(method_path):
@@ -625,20 +735,13 @@ def get_and_run_test(method_path):
     class_name = method_path.split('.')[-2]
     method_name = method_path.split('.')[-1]
 
-    test_module = importlib.import_module(module_path)
-    cls = getattr(test_module, class_name)
-
-    try:
-        import mpi4py
-    except ImportError:
-        use_mpi = False
-    else:
-        N_PROCS = getattr(cls, 'N_PROCS', 1)
-        use_mpi =  N_PROCS > 1
+    module = importlib.import_module(module_path)
+    cls = getattr(module, class_name)
 
     method = getattr(cls, method_name)
     method_source = inspect.getsource(method)
     method_source = strip_header(method_source)
+    method_source = dedent(method_source)
     method_source = remove_docstrings(method_source)
     method_source = replace_asserts_with_prints(method_source)
     method_source = remove_initial_empty_lines(method_source)
@@ -646,13 +749,11 @@ def get_and_run_test(method_path):
     #-----------------------------------------------------------------------------------
     # 3. Insert extra print statements to indicate start and end of print Out blocks
     #-----------------------------------------------------------------------------------
-    source_with_output_start_stop_indicators = insert_output_start_stop_indicators(method_source)
+    method_source = insert_output_start_stop_indicators(method_source)
 
     #------------------------------------------------------------------------------------
     # Get all the pieces of code needed to run the unit test method
     #-----------------------------------------------------------------------------------
-
-    global_imports = globals_for_imports(method_source)
 
     # make 'self' available to test code (as an instance of the test case)
     self_code = "from %s import %s\nself = %s('%s')\n" % \
@@ -660,114 +761,22 @@ def get_and_run_test(method_path):
 
     # get setUp and tearDown but don't duplicate if it is the method being tested
     setup_code = '' if method_name == 'setUp' else \
-        get_method_body(inspect.getsource(getattr(cls, 'setUp')))
+        dedent(strip_header(inspect.getsource(getattr(cls, 'setUp'))))
 
     teardown_code = '' if method_name == 'tearDown' else \
-        get_method_body(inspect.getsource(getattr(cls, 'tearDown')))
+        dedent(strip_header(inspect.getsource(getattr(cls, 'tearDown'))))
 
-    code_to_run = '\n'.join([global_imports,
-                             self_code,
-                             setup_code,
-                             source_with_output_start_stop_indicators,
-                             teardown_code])
+    code_to_run = '\n'.join([self_code, setup_code, method_source, teardown_code])
 
-    #-----------------------------------------------------------------------------------
-    # 4. Run the test using source_with_out_start_stop_indicators -> run_outputs
-    #-----------------------------------------------------------------------------------
+    skipped, failed, use_mpi, run_outputs = run_code(code_to_run, module_path, module, cls)
 
-    skipped = False
-    failed = False
+    skipped_output, input_blocks, output_blocks = \
+        process_output(code_to_run, skipped, failed, use_mpi, run_outputs)
 
-    try:
-        if use_mpi:
-            # use subprocess to run test with `mpirun`
+    return code_to_run, skipped_output, input_blocks, output_blocks, skipped
 
-            # write code to a file so we can run it.
-            fd, code_to_run_path = tempfile.mkstemp()
-            with os.fdopen(fd, 'w') as tmp:
-                tmp.write(code_to_run)
-                tmp.close()
 
-            # output will be written to one file per process
-            env = os.environ.copy()
-            env['USE_PROC_FILES'] = '1'
-
-            p = subprocess.Popen(['mpirun', '-n', str(N_PROCS), 'python', code_to_run_path],
-                                 env=env)
-            p.wait()
-
-            # extract output blocks from all output files & merge them
-            multi_out_blocks = []
-            for i in range(N_PROCS):
-                with open('%d.out' % i) as f:
-                    multi_out_blocks.append(extract_output_blocks(f.read()))
-                os.remove('%d.out' % i)
-
-            output_blocks = []
-            for i in range(len(multi_out_blocks[0])):
-                output_blocks.append('\n'.join(["(rank %d) %s" %
-                                     (j, m[i]) for j, m in enumerate(multi_out_blocks) if m[i]]))
-        else:
-            # just exec() the code for serial tests.
-
-            # capture all output
-            stdout = sys.stdout
-            stderr = sys.stderr
-            strout = cStringIO()
-            sys.stdout = strout
-            sys.stderr = strout
-
-            # set all the loggers to write to our captured stream
-            from openmdao.utils.logger_utils import _loggers
-            for name in _loggers:
-                _loggers[name]['logger'].handlers[0].stream = strout
-
-            # We need more precision from numpy
-            save_opts = np.get_printoptions()
-            np.set_printoptions(precision=8)
-
-            # Move to the test directory in case there are files to read.
-            save_dir = os.getcwd()
-            os.chdir('/'.join(test_module.__file__.split('/')[:-1]))
-
-            try:
-                exec(code_to_run, {})
-            finally:
-                os.chdir(save_dir)
-
-            np.set_printoptions(precision=save_opts['precision'])
-            run_outputs = strout.getvalue()
-
-    except subprocess.CalledProcessError as e:
-        # Get a traceback.
-        if 'raise unittest.SkipTest' in e.output.decode('utf-8'):
-            reason_for_skip = e.output.splitlines()[-1][len('unittest.case.SkipTest: '):]
-            run_outputs = reason_for_skip
-            skipped = True
-        else:
-            run_outputs = "Running of embedded test {} in docs failed due to: \n\n{}".format(method_path, e.output.decode('utf-8'))
-            failed = True
-
-    except Exception as err:
-        if 'SkipTest' in code_to_run:
-            txt1 = code_to_run.split('SkipTest(')[1]
-            run_outputs = txt1.split(')')[0]
-            skipped = True
-        else:
-            msg = "Running of embedded test {} in docs failed due to: \n\n{}"
-            run_outputs = msg.format(method_path, str(err))
-            failed = True
-
-    finally:
-        if use_mpi:
-            os.remove(code_to_run_path)
-        else:
-            sys.stdout = stdout
-            sys.stderr = stderr
-
-    if PY3 and not use_mpi and not isinstance(run_outputs, str):
-        run_outputs = "".join(map(chr, run_outputs))  # in Python 3, run_outputs is of type bytes!
-
+def process_output(code_to_run, skipped, failed, use_mpi, run_outputs):
     if skipped:
         input_blocks = output_blocks = None
         skipped_output = run_outputs
@@ -775,9 +784,9 @@ def get_and_run_test(method_path):
         raise SphinxError(run_outputs)
     else:
         #####################
-        ### 5. Split method_source up into groups of "In" blocks -> input_blocks ###
+        ### 5. Split source up into groups of "In" blocks -> input_blocks ###
         #####################
-        input_blocks = split_source_into_input_blocks(source_with_output_start_stop_indicators)
+        input_blocks = split_source_into_input_blocks(code_to_run)
 
         #####################
         ### 6. Extract from run_outputs, the Out blocks -> output_blocks ###
@@ -795,4 +804,39 @@ def get_and_run_test(method_path):
 
         skipped_output = None
 
-    return method_source, skipped_output, input_blocks, output_blocks, skipped
+    return skipped_output, input_blocks, output_blocks
+
+
+class skipped_or_failed_node(nodes.Element):
+    pass
+
+
+class in_or_out_node(nodes.Element):
+    pass
+
+
+def get_skip_output_node(output, skip_type):
+    if skip_type == "skipped":
+        output = "Test skipped because " + output
+
+    return skipped_or_failed_node(text=output, number=1, kind=skip_type)
+
+
+def get_interleaved_io_nodes(input_blocks, output_blocks):
+    nodelist = []
+    n = 1
+    output_blocks = [cgiesc.escape(ob) for ob in output_blocks]
+    for input_block, output_block in zip(input_blocks, output_blocks):
+        input_node = nodes.literal_block(input_block, input_block)
+        input_node['language'] = 'python'
+        nodelist.append(input_node)
+        if len(output_block) > 0:
+            output_node = in_or_out_node(kind="Out", number=n, text=output_block)
+            nodelist.append(output_node)
+        n += 1
+    return nodelist
+
+
+def get_output_block_node(output_blocks):
+    output_block = '\n'.join([cgiesc.escape(ob) for ob in output_blocks])
+    return in_or_out_node(kind="Out", number=1, text=output_block)
