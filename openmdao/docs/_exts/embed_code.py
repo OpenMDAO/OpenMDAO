@@ -160,8 +160,12 @@ class EmbedCodeDirective(Directive):
 
                 # create plot node
                 # this is a hack to strip of the top level directory else figure can't find file
-                self.arguments[0] = os.path.join(plot_dir.split('/', 1)[1], plot_files[0])
-                plot_nodes = images.Figure.run(self)
+                arguments = [os.path.join(plot_dir.split('/', 1)[1], plot_files[0])]
+
+                fig = images.Figure(self.name, arguments, self.options, self.content, self.lineno,
+                                    self.content_offset, self.block_text, self.state,
+                                    self.state_machine)
+                plot_nodes = fig.run()
 
 
         # create a list of document nodes to return based on layout
