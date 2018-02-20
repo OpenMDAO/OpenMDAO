@@ -34,20 +34,11 @@ Take a look at the full run script first, then we'll break it down part by part 
 Next, let's break this script down and understand each section:
 
 
-The following is an image using the figure directive
-
-.. figure::
-   examples/decoupled_model.png
-   :alt: some Figure
-   :align: left
-
-
-
 The following is an image using embed-code
 
 .. embed-code::
     experimental_guide/examples/bezier_plot.py
-    :layout: plot
+    :layout: interleave, plot
     :align: center
     :scale: 75
 
@@ -78,6 +69,3 @@ This test should be skipped
 .. embed-code::
     openmdao.core.tests.test_connections.TestConnections.test_diff_conn_input_units
     :layout: code, output
-
-
-.. tags:: experimental
