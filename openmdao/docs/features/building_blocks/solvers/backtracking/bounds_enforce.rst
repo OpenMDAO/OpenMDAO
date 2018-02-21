@@ -6,6 +6,12 @@ BoundsEnforceLS
 
 The BoundsEnforceLS only backtracks until variables violate their upper and lower bounds.
 
+Here is a simple example where BoundsEnforceLS is used to backtrack during the Newton solver's iteration on
+a system that contains an implicit component with 3 states that are confined to a small range of values.
+
+.. embed-test::
+    openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_boundscheck_basic
+
 BoundsEnforceLS Options
 -----------------------
 

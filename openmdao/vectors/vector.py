@@ -312,16 +312,10 @@ class Vector(object):
         listiterator
             iterator over the variable names.
         """
-        system = self._system
-        type_ = self._typ
-        idx = len(system.pathname) + 1 if system.pathname else 0
+        path = self._system.pathname
+        idx = len(path) + 1 if path else 0
 
-        iter_list = []
-        for abs_name in system._var_abs_names[type_]:
-            if abs_name in self._names:
-                rel_name = abs_name[idx:]
-                iter_list.append(rel_name)
-        return iter(iter_list)
+        return (n[idx:] for n in self._system._var_abs_names[self._typ] if n in self._names)
 
     def __contains__(self, name):
         """
@@ -337,8 +331,7 @@ class Vector(object):
         boolean
             True or False.
         """
-        abs_name = name2abs_name(self._system, name, self._names, self._typ)
-        return abs_name is not None
+        return name2abs_name(self._system, name, self._names, self._typ) is not None
 
     def __getitem__(self, name):
         """
@@ -398,9 +391,16 @@ class Vector(object):
         if abs_name is not None:
             if self._icol is None:
                 slc = _full_slice
+                oldval = self._views[abs_name]
             else:
                 slc = (_full_slice, self._icol)
-            value, _ = ensure_compatible(name, value, self._views[abs_name][slc].shape)
+                oldval = self._views[abs_name][slc]
+
+            value = np.asarray(value)
+            if value.shape != () and value.shape != (1,) and oldval.shape != value.shape:
+                raise ValueError("Incompatible shape for '%s': "
+                                 "Expected %s but got %s." %
+                                 (name, oldval.shape, value.shape))
             if self._vector_info._under_complex_step:
 
                 # setitem overwrites anything you may have done with numpy indexing

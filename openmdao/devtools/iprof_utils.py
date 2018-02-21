@@ -118,6 +118,7 @@ def _setup_func_group():
         'dataflow': [
             ('*compute*', (System,)),
             ('*linear*', (System,)),
+            ('_transfer', (System,)),
             ('*', (Transfer,)),
         ],
         'linear': [
@@ -173,7 +174,7 @@ def _collect_methods(method_patterns):
         if len(lst) == 1:
             matches[name] = lst[0]
         else:
-            matches[name] = tuple(matches[name])
+            matches[name] = tuple(lst)
 
     return matches
 

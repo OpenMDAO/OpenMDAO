@@ -132,11 +132,11 @@ class DefaultVector(Vector):
 
                 idx_byset = allprocs_abs2idx_byset_t[abs_name]
                 ind_byset1 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset])
-                ind_byset2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1])
+                ind_byset2 = ind_byset1 + sizes_byset_t[set_name][iproc, idx_byset]
 
                 idx = allprocs_abs2idx_t[abs_name]
                 ind1 = np.sum(sizes_t[iproc, :idx])
-                ind2 = np.sum(sizes_t[iproc, :idx + 1])
+                ind2 = ind1 + sizes_t[iproc, idx]
 
                 indices[set_name][ind_byset1:ind_byset2] = np.arange(ind1, ind2)
 
@@ -336,7 +336,7 @@ class DefaultVector(Vector):
             factors = system._scale_factors
             scaling = self._scaling
 
-        self._views = self._names = views = {}
+        self._views = views = {}
         self._views_flat = views_flat = {}
 
         alloc_complex = self._alloc_complex
@@ -351,7 +351,7 @@ class DefaultVector(Vector):
             set_name = abs2meta[abs_name]['var_set']
 
             ind_byset1 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset])
-            ind_byset2 = np.sum(sizes_byset_t[set_name][iproc, :idx_byset + 1])
+            ind_byset2 = ind_byset1 + sizes_byset_t[set_name][iproc, idx_byset]
             shape = abs2meta[abs_name]['shape']
             if ncol > 1:
                 if not isinstance(shape, tuple):
@@ -378,6 +378,8 @@ class DefaultVector(Vector):
                     if vec[0] is not None:
                         vec[0][ind_byset1:ind_byset2] = scale0
                     vec[1][ind_byset1:ind_byset2] = scale1
+
+        self._names = frozenset(views)
 
     def _clone_data(self):
         """
@@ -574,33 +576,37 @@ class DefaultVector(Vector):
         # Loop over varsets and find the largest amount a bound is violated
         # where positive means a bound is violated - i.e. the required d_alpha.
         for u_data, du_data, lower_data, upper_data in zip(
-                u._data.values(), du._data.values(),
-                lower_bounds._data.values(), upper_bounds._data.values()):
+                itervalues(u._data), itervalues(du._data),
+                itervalues(lower_bounds._data), itervalues(upper_bounds._data)):
 
             mask = du_data != 0
             if mask.any():
                 abs_du_mask = np.abs(du_data[mask])
+                u_mask = u_data[mask]
 
                 # Check lower bound
-                max_d_alpha = np.amax((lower_data[mask] - u_data[mask]) / abs_du_mask)
-                d_alpha = max(d_alpha, max_d_alpha)
+                max_d_alpha = np.amax((lower_data[mask] - u_mask) / abs_du_mask)
+                if max_d_alpha > d_alpha:
+                    d_alpha = max_d_alpha
 
                 # Check upper bound
-                max_d_alpha = np.amax((u_data[mask] - upper_data[mask]) / abs_du_mask)
-                d_alpha = max(d_alpha, max_d_alpha)
+                max_d_alpha = np.amax((u_mask - upper_data[mask]) / abs_du_mask)
+                if max_d_alpha > d_alpha:
+                    d_alpha = max_d_alpha
 
-        # d_alpha will not be negative because it was initialized to be 0
-        # and we've only done max operations.
-        # d_alpha will not be greater than alpha because the assumption is that
-        # the original point was valid - i.e., no bounds were violated.
-        # Therefore 0 <= d_alpha <= alpha.
+        if d_alpha > 0:
+            # d_alpha will not be negative because it was initialized to be 0
+            # and we've only done max operations.
+            # d_alpha will not be greater than alpha because the assumption is that
+            # the original point was valid - i.e., no bounds were violated.
+            # Therefore 0 <= d_alpha <= alpha.
 
-        # We first update u to reflect the required change to du.
-        u.add_scal_vec(-d_alpha, du)
+            # We first update u to reflect the required change to du.
+            u.add_scal_vec(-d_alpha, du)
 
-        # At this point, we normalize d_alpha by alpha to figure out the relative
-        # amount that the du vector has to be reduced, then apply the reduction.
-        du *= 1 - d_alpha / alpha
+            # At this point, we normalize d_alpha by alpha to figure out the relative
+            # amount that the du vector has to be reduced, then apply the reduction.
+            du *= 1 - d_alpha / alpha
 
     def _enforce_bounds_scalar(self, du, alpha, lower_bounds, upper_bounds):
         """
@@ -629,21 +635,22 @@ class DefaultVector(Vector):
 
         # Loop over varsets and enforce bounds on step in-place.
         for u_data, du_data, lower_data, upper_data in zip(
-                u._data.values(), du._data.values(),
-                lower_bounds._data.values(), upper_bounds._data.values()):
+                itervalues(u._data), itervalues(du._data),
+                itervalues(lower_bounds._data), itervalues(upper_bounds._data)):
 
             # If u > lower, we're just adding zero. Otherwise, we're adding
             # the step required to get up to the lower bound.
             # For du, we normalize by alpha since du eventually gets
             # multiplied by alpha.
-            change = np.maximum(u_data, lower_data) - u_data
-            u_data += change
-            du_data += change / alpha
+            change_lower = np.maximum(u_data, lower_data) - u_data
 
             # If u < upper, we're just adding zero. Otherwise, we're adding
             # the step required to get down to the upper bound, but normalized
             # by alpha since du eventually gets multiplied by alpha.
-            change = np.minimum(u_data, upper_data) - u_data
+            change_upper = np.minimum(u_data, upper_data) - u_data
+
+            change = change_lower + change_upper
+
             u_data += change
             du_data += change / alpha
 
@@ -674,27 +681,28 @@ class DefaultVector(Vector):
 
         # Loop over varsets and enforce bounds on step in-place.
         for u_data, du_data, lower_data, upper_data in zip(
-                u._data.values(), du._data.values(),
-                lower_bounds._data.values(), upper_bounds._data.values()):
+                itervalues(u._data), itervalues(du._data),
+                itervalues(lower_bounds._data), itervalues(upper_bounds._data)):
 
             # If u > lower, we're just adding zero. Otherwise, we're adding
             # the step required to get up to the lower bound.
             # For du, we normalize by alpha since du eventually gets
             # multiplied by alpha.
             change_lower = np.maximum(u_data, lower_data) - u_data
-            u_data += change_lower
-            du_data += change_lower / alpha
 
             # If u < upper, we're just adding zero. Otherwise, we're adding
             # the step required to get down to the upper bound, but normalized
             # by alpha since du eventually gets multiplied by alpha.
             change_upper = np.minimum(u_data, upper_data) - u_data
-            u_data += change_upper
-            du_data += change_upper / alpha
+
+            change = change_lower + change_upper
+
+            u_data += change
+            du_data += change / alpha
 
             # Now we ensure that we will backtrack along the wall during the
             # line search by setting the entries of du at the bounds to zero.
-            changed_either = change_lower.astype(bool) + change_upper.astype(bool)
+            changed_either = change.astype(bool)
             du_data[changed_either] = 0.
 
     def __getstate__(self):

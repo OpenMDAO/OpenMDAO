@@ -115,51 +115,67 @@ def remove_redbaron_node(node, index):
             raise
 
 
-def replace_asserts_with_prints(source_code):
+def replace_asserts_with_prints(src):
     """
     Replace asserts with print statements.
 
     Using RedBaron, replace some assert calls with print statements that print the actual
-    value given in the asserts.
-
-    Depending on the calls, the actual value can be the first or second
+    value given in the asserts. Depending on the calls, the actual value can be the first or second
     argument.
+
+    Parameters
+    ----------
+    src : str
+        String containing source lines.
+
+    Returns
+    -------
+    str
+        String containing source with asserts replaced by prints.
     """
+    rb = RedBaron(src)  # convert to RedBaron internal structure
 
-    rb = RedBaron(source_code)  # convert to RedBaron internal structure
+    # findAll is slow, so only check the ones that are present.
+    base_assert = ['assertAlmostEqual', 'assertLess', 'assertGreater', 'assertEqual',
+                   'assert_equal_arrays', 'assertTrue', 'assertFalse']
+    used_assert = [item for item in base_assert if item in src]
 
-    for assert_type in ['assertAlmostEqual', 'assertLess', 'assertGreater', 'assertEqual',
-                        'assert_equal_arrays', 'assertTrue', 'assertFalse']:
+    for assert_type in used_assert:
         assert_nodes = rb.findAll("NameNode", value=assert_type)
         for assert_node in assert_nodes:
             assert_node = assert_node.parent
             remove_redbaron_node(assert_node, 0)  # remove 'self' from the call
             assert_node.value[0].replace('print')
             if assert_type not in ['assertTrue', 'assertFalse']:
-                remove_redbaron_node(assert_node.value[1], 1)  # remove the expected value argument
+                # remove the expected value argument
+                remove_redbaron_node(assert_node.value[1], 1)
 
-    assert_nodes = rb.findAll("NameNode", value='assert_rel_error')
-    for assert_node in assert_nodes:
-        assert_node = assert_node.parent
-        # If relative error tolerance is specified, there are 4 arguments
-        if len(assert_node.value[1]) == 4:
-            remove_redbaron_node(assert_node.value[1], -1)  # remove the relative error tolerance
-        remove_redbaron_node(assert_node.value[1], -1)  # remove the expected value
-        remove_redbaron_node(assert_node.value[1], 0)  # remove the first argument which is
-        #                                                  the TestCase
-        assert_node.value[0].replace("print")
+    if 'assert_rel_error' in src:
+        assert_nodes = rb.findAll("NameNode", value='assert_rel_error')
+        for assert_node in assert_nodes:
+            assert_node = assert_node.parent
+            # If relative error tolerance is specified, there are 4 arguments
+            if len(assert_node.value[1]) == 4:
+                # remove the relative error tolerance
+                remove_redbaron_node(assert_node.value[1], -1)
+            remove_redbaron_node(assert_node.value[1], -1)  # remove the expected value
+            # remove the first argument which is the TestCase
+            remove_redbaron_node(assert_node.value[1], 0)
+            #
+            assert_node.value[0].replace("print")
 
-    assert_nodes = rb.findAll("NameNode", value='assert_almost_equal')
-    for assert_node in assert_nodes:
-        assert_node = assert_node.parent
-        # If relative error tolerance is specified, there are 3 arguments
-        if len(assert_node.value[1]) == 3:
-            remove_redbaron_node(assert_node.value[1], -1)  # remove the relative error tolerance
-        remove_redbaron_node(assert_node.value[1], -1)  # remove the expected value
-        assert_node.value[0].replace("print")
+    if 'assert_almost_equal' in src:
+        assert_nodes = rb.findAll("NameNode", value='assert_almost_equal')
+        for assert_node in assert_nodes:
+            assert_node = assert_node.parent
+            # If relative error tolerance is specified, there are 3 arguments
+            if len(assert_node.value[1]) == 3:
+                # remove the relative error tolerance
+                remove_redbaron_node(assert_node.value[1], -1)
+            remove_redbaron_node(assert_node.value[1], -1)  # remove the expected value
+            assert_node.value[0].replace("print")
 
-    source_code_with_prints = rb.dumps()  # get back the string representation of the code
-    return source_code_with_prints
+    return rb.dumps()
 
 
 # def get_method_body(method_code):
@@ -409,52 +425,63 @@ def insert_output_start_stop_indicators(src):
     str
         String with output demarked.
     """
-    rb = RedBaron(src)
+    lines = src.split('\n')
+    print_producing = ['.setup(',
+                       'print(',
+                       '.run_model(',
+                       '.run_driver(',
+                       '.check_partials(',
+                       '.check_totals(',
+                       '.list_inputs(',
+                       '.list_outputs(',
+                       ]
 
-    # find lines with trailing comments so we can preserve them properly
-    lines_with_comments = {}
-    comments = rb.findAll('comment')
-    for c in comments:
-        if c.previous and c.previous.type != 'endl':
-            lines_with_comments[c.previous] = c
-
+    newlines = []
     input_block_number = 0
+    in_try = False
+    in_continuation = False
+    head_indent = ''
+    for line in lines:
+        newlines.append(line)
 
-    # find all nodes that might produce output
-    nodes = rb.findAll(lambda identifier: identifier in ['print', 'atomtrailers'])
-    for r in nodes:
-        # assume that whatever is in the try block will fail and produce no output
-        # this way we can properly handle display of error messages in the except
-        if hasattr(r.parent, 'type') and r.parent.type == 'try':
+        # Check if we are concluding a continuation line.
+        if in_continuation:
+            line = line.rstrip()
+            if not (line.endswith(',') or line.endswith('\\') or line.endswith('(')):
+                newlines.append('%sprint(">>>>>%d")' % (head_indent, input_block_number))
+                input_block_number += 1
+                in_continuation = False
+
+        # Don't print if we are in a try block.
+        if in_try:
+            if 'except' in line:
+                in_try = False
             continue
 
-        # Output within if/else statements is not a good idea for docs, because
-        # we don't know which branch execution will follow and thus where to put
-        # the output block. Regardless of which branch is taken, though, the
-        # output blocks must start with the same block number.
-        if hasattr(r.parent, 'type') and r.parent.type == 'if':
-            if_block_number = input_block_number
-        if hasattr(r.parent, 'type') and r.parent.type in ['elif', 'else']:
-            input_block_number = if_block_number
+        if 'try:' in line:
+            in_try = True
+            continue
 
-        if is_output_node(r):
-            # if there was a trailing comment on this line, output goes after it
-            if r in lines_with_comments:
-                r = lines_with_comments[r]  # r is now the comment
+        # Searching for 'print(' is a little ambiguous.
+        if 'set_solver_print(' in line:
+            continue
 
-            # find the correct node to 'insert_after'
-            while hasattr(r, 'parent') and not hasattr(r.parent, 'insert'):
-                r = r.parent
+        for item in print_producing:
+            if item in line:
+                indent = '' * (len(line) - len(line.lstrip()))
 
-            r.insert_after('print(">>>>>%d")\n' % input_block_number)
-            input_block_number += 1
+                # Line continuations are a litle tricky.
+                line = line.rstrip()
+                if line.endswith(',') or line.endswith('\\') or line.endswith('('):
+                    in_continuation = True
+                    head_indent = indent
+                    break
 
-    # curse you, redbaron! stop inserting endl before trailing comments!
-    for l, c in lines_with_comments.items():
-        if c.previous and c.previous.type == 'endl':
-            c.previous.value = ''
+                newlines.append('%sprint(">>>>>%d")' % (indent, input_block_number))
+                input_block_number += 1
+                break
 
-    return rb.dumps()
+    return '\n'.join(newlines)
 
 
 def clean_up_empty_output_blocks(input_blocks, output_blocks):
