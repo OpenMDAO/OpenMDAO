@@ -54,6 +54,7 @@ class EmbedCodeDirective(Directive):
         allowed_layouts = set(['code', 'output', 'interleave', 'plot'])
 
         path = self.arguments[0]
+        is_script = path.endswith('.py')
 
         try:
             source, indent, module, class_ = get_source_code(path)

@@ -468,7 +468,7 @@ def insert_output_start_stop_indicators(src):
 
         for item in print_producing:
             if item in line:
-                indent = '' * (len(line) - len(line.lstrip()))
+                indent = ' ' * (len(line) - len(line.lstrip()))
 
                 # Line continuations are a litle tricky.
                 line = line.rstrip()
@@ -675,7 +675,12 @@ def run_code(code_to_run, path, module=None, cls=None):
             os.chdir(code_dir)
 
             if module is None:
-                globals_dict = {}
+                globals_dict = {
+                        '__file__': path,
+                        '__name__': '__main__',
+                        '__package__': None,
+                        '__cached__': None,
+                }
             else:
                 globals_dict = module.__dict__
 

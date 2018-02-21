@@ -1,43 +1,29 @@
 
+====================
+Tests for embed-code
+====================
 
-In the previous tutorial, we discussed the three basic kinds of Components in the OpenMDAO framework.
-This tutorial focuses on using one of those,ExplicitComponent, to build a simple analysis of a paraboloid function.
-We'll explain the basic structure of a run file, show you how to set inputs, run the model, and check the output files.
+.. code-block:: rst
 
-**************************************
-Paraboloid - A Single-Discipline Model
-**************************************
-
-Consider a paraboloid, defined by the explicit function
-
-.. math::
-
-  f(x,y) = (x-3.0)^2 + x \times y + (y+4.0)^2 - 3.0 ,
-
-where :math:`x` and :math:`y` are the inputs to the function.
-The minimum of this function is located at
-
-.. math::
-
-  x = \frac{20}{3} \quad , \quad y = -\frac{22}{3} .
-
-
-Here is a complete script that defines this equation as a component and then executes it
-with different input values,
-printing the results to the console when it's done.
-Take a look at the full run script first, then we'll break it down part by part to
-explain what each one does.
-
+    .. embed-code::
+        openmdao.test_suite.components.paraboloid_feature
 
 
 .. embed-code::
     openmdao.test_suite.components.paraboloid_feature
 
 
-Next, let's break this script down and understand each section:
 
+.. code-block:: rst
 
-The following is using embed-code with interleaved output and a plot (75% scale)
+    .. embed-code::
+        experimental_guide/examples/bezier_plot.py
+        :layout: interleave, plot
+        :align: center
+        :scale: 75
+
+        This is a dynamically embedded plot with interleaved output
+
 
 .. embed-code::
     experimental_guide/examples/bezier_plot.py
@@ -48,7 +34,15 @@ The following is using embed-code with interleaved output and a plot (75% scale)
     This is a dynamically embedded plot with interleaved output
 
 
-The following is using embed-code with block output and a plot (100% scale)
+.. code-block:: rst
+
+    .. embed-code::
+        experimental_guide/examples/bezier_plot.py
+        :layout: output, plot
+        :align: center
+
+        This is a dynamically embedded plot with block output
+
 
 .. embed-code::
     experimental_guide/examples/bezier_plot.py
@@ -58,7 +52,7 @@ The following is using embed-code with block output and a plot (100% scale)
     This is a dynamically embedded plot with block output
 
 
-The following is using embed-code with just a plot (100% scale)
+embed-code with just code and a plot (100% scale)
 
 .. embed-code::
     experimental_guide/examples/bezier_plot.py
@@ -68,7 +62,7 @@ The following is using embed-code with just a plot (100% scale)
     This is a dynamically embedded plot with no output
 
 
-The following is using embed-code with no plot (100% scale)
+embed-code of a script with interleave only
 
 .. embed-code::
     experimental_guide/examples/bezier_plot.py
