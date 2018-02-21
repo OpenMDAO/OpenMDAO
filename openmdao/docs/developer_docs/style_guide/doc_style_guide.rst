@@ -341,7 +341,7 @@ Embedding More Than Just Code
     .. code-block:: rst
 
         .. embed-code::
-            openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_feature_simple
+            openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_input_input
             :layout: interleave
 
 
@@ -349,8 +349,9 @@ Embedding More Than Just Code
 
 
     .. embed-code::
-        openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_feature_simple
+        openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_input_input
         :layout: interleave
+
 
 There are many permutations of these four layout values that can help you customize the look of your code embedding to fit
 your specific purposes.  While doing :code:`:layout: output` might not really make any sense to do, you have the power
@@ -371,7 +372,7 @@ embed-test
         .. code-block:: rst
 
           .. embed-test::
-            openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_feature_simple
+              openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_input_input
 
 
         The output from the above syntax should just look like a normal code block,
@@ -379,7 +380,7 @@ embed-test
 
 
         .. embed-test::
-          openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_feature_simple
+            openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_input_input
 
 
 embed-options
