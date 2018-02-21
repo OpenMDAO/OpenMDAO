@@ -52,7 +52,16 @@ Tests for embed-code
     This is a dynamically embedded plot with block output
 
 
-embed-code with just code and a plot (100% scale)
+
+.. code-block:: rst
+
+    .. embed-code::
+        experimental_guide/examples/bezier_plot.py
+        :layout: code, plot
+        :align: center
+
+        This is a dynamically embedded plot with no output
+
 
 .. embed-code::
     experimental_guide/examples/bezier_plot.py
@@ -62,40 +71,74 @@ embed-code with just code and a plot (100% scale)
     This is a dynamically embedded plot with no output
 
 
-embed-code of a script with interleave only
+
+.. code-block:: rst
+
+    .. embed-code::
+        experimental_guide/examples/bezier_plot.py
+        :layout: interleave
+
 
 .. embed-code::
     experimental_guide/examples/bezier_plot.py
     :layout: interleave
 
 
-Here's a test with default layout:
+
+.. code-block:: rst
+
+    .. embed-code::
+        openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source
+
 
 .. embed-code::
     openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source
 
 
-Now same test with layout of ['code', 'output']
 
+.. code-block:: rst
 
 .. embed-code::
     openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source
     :layout: code, output
 
+
+    .. embed-code::
+        openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source
+        :layout: code, output
+
+
+.. code-block:: rst
 
 .. embed-code::
     openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source
     :layout: output, code
 
 
-This test should be skipped
+    .. embed-code::
+        openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source
+        :layout: output, code
+
+
+
+.. code-block:: rst
 
 .. embed-code::
     openmdao.core.tests.test_connections.TestConnections.test_diff_conn_input_units
     :layout: code, output
 
 
+    .. embed-code::
+        openmdao.core.tests.test_connections.TestConnections.test_diff_conn_input_units
+        :layout: code, output
+
+
 Old embed-test:
+
+.. code-block:: rst
+
+    .. embed-test::
+        openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source
 
 .. embed-test::
     openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source

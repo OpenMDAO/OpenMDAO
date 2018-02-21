@@ -58,8 +58,8 @@ class EmbedCodeDirective(Directive):
 
         try:
             source, indent, module, class_ = get_source_code(path)
-        except:
-            print(traceback.format_exc())
+        except Exception as err:
+            raise SphinxError(str(err))
 
         is_test = class_ is not None and issubclass(class_, unittest.TestCase)
 
