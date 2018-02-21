@@ -309,7 +309,7 @@ Embedding More Than Just Code
         :layout: code, output, plot
 
 4.  Embed a piece of code, run it, plot it. Show the plot first, then show the code with interleaved output, after that.
-    (Remember, that :code:`show()` function needs to be in there for this to work.
+    (Remember, that :code:`show()` function needs to be in the embedded code for a plot embed to work.)
 
     .. code-block:: rst
 
@@ -322,6 +322,21 @@ Embedding More Than Just Code
         ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
         :layout: plot, interleave
 
+5.  Use this directive to embed a test (it can do the same things as `embed-test` now, with better layout options, so
+    `embed-test` may be deprecated). Just use a dotted python path, as shown here:
+
+    .. code-block:: rst
+
+        .. embed-code::
+            openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_feature_simple
+            :layout: interleave
+
+        This should embed the test with its output nicely interleaved.
+
+        .. embed-code::
+            openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_feature_simple
+            :layout: interleave
+
 There are many permutations of these four layout components that can help you customize the look of your code embedding to fit
 your specific purposes.  While doing :code:`:layout: output` might not really make any sense to do, you have the power
 to make nonsensical layouts.
@@ -329,6 +344,9 @@ to make nonsensical layouts.
 
 embed-test
 ++++++++++
+
+        .. note:: The functionality of `embed_test` has been included in the more general `embed_code`, above.
+          It is suggested you go use that directive, as embed-test may soon be eliminated.
 
         `embed-test` is a custom directive that lets a developer drop a specific single test
         directly into a feature doc by including that test's full, dotted python
