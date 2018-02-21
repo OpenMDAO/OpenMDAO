@@ -292,13 +292,13 @@ Embedding More Than Just Code
     .. code-block:: rst
 
         .. embed-code::
-          ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+          ../devtools/docs_experiment/experimental_guide/examples/sin_plot.py
           :layout: code, output
 
     The resulting embed would look like this:
 
     .. embed-code::
-        ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+        ../devtools/docs_experiment/experimental_guide/examples/sin_plot.py
         :layout: code, output
 
 
@@ -323,7 +323,7 @@ Embedding More Than Just Code
     .. code-block:: rst
 
         .. embed-code::
-          ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+          ../devtools/docs_experiment/experimental_guide/examples/sin_plot.py
           :layout: plot, interleave
 
 
@@ -331,7 +331,7 @@ Embedding More Than Just Code
 
 
     .. embed-code::
-        ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+        ../devtools/docs_experiment/experimental_guide/examples/sin_plot.py
         :layout: plot, interleave
 
 

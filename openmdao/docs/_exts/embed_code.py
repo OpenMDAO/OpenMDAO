@@ -22,6 +22,8 @@ class skipped_or_failed_node(nodes.Element):
     pass
 
 
+_plot_count = 0
+
 class EmbedCodeDirective(Directive):
     """EmbedCodeDirective is a custom directive to allow blocks of
      python code to be shown in feature docs.  An example usage would look like this:
@@ -84,6 +86,18 @@ class EmbedCodeDirective(Directive):
         remove_docstring = 'strip-docstrings' in self.options
         do_run = 'output' in layout or 'interleave' in layout or 'plot' in layout
 
+        if 'plot' in layout:
+            global _plot_count
+            _plot_count += 1
+            plot_dir = os.path.dirname(path)
+            plot_fname = 'doc_plot_%d.png' % _plot_count
+            print("PLOT_FNAME:", plot_fname)
+            plot_file_abs = os.path.join(os.path.abspath(plot_dir), plot_fname)
+            if os.path.isfile(plot_file_abs):
+                # remove any existing plot file
+                print("REMOVING", plot_file_abs)
+                os.remove(plot_file_abs)
+
         # Modify the source prior to running
         if remove_docstring:
             source = remove_docstrings(source)
@@ -126,7 +140,7 @@ class EmbedCodeDirective(Directive):
                 # insert lines to generate the plot file
                 parts = ['import matplotlib', 'matplotlib.use("Agg")', code_to_run]
                 if 'plot' in layout:
-                    parts.append('matplotlib.pyplot.savefig("foobar.png")')
+                    parts.append('matplotlib.pyplot.savefig("%s")' % plot_fname)
                 skipped, failed, use_mpi, run_outputs = \
                     run_code('\n'.join(parts), path, module=module, cls=class_)
             else:
@@ -154,20 +168,14 @@ class EmbedCodeDirective(Directive):
                                                                            output_blocks)
 
             if 'plot' in layout:
-                plot_dir = os.path.dirname(path)
-                file_abs = os.path.join(os.path.abspath(plot_dir), 'foobar.png')
+                if not os.path.isfile(plot_file_abs):
+                    raise SphinxError("Can't find plot file '%s'" % plot_file_abs)
 
-                if not os.path.isfile(file_abs):
-                    raise SphinxError("Can't find plot file '%s'" % file_abs)
-
-                directive_dir = os.path.relpath(os.getcwd(), os.path.dirname(self.state.document.settings._source))
-                plot_file = os.path.join(directive_dir, plot_dir, 'foobar.png')
+                directive_dir = os.path.relpath(os.getcwd(),
+                                                os.path.dirname(self.state.document.settings._source))
+                plot_file = os.path.join(directive_dir, plot_dir, plot_fname)
                 # create plot node
-                # this is a hack to strip of the top level directory else figure can't find file
-                #arguments = [os.path.join(plot_dir.split('/', 1)[1], 'foobar.png')]
-                arguments = [plot_file]
-
-                fig = images.Figure(self.name, arguments, self.options, self.content, self.lineno,
+                fig = images.Figure(self.name, [plot_file], self.options, self.content, self.lineno,
                                     self.content_offset, self.block_text, self.state,
                                     self.state_machine)
                 plot_nodes = fig.run()
