@@ -49,7 +49,6 @@ class EmbedCodeDirective(Directive):
         'align': unchanged,
     }
 
-
     def run(self):
         allowed_layouts = set(['code', 'output', 'interleave', 'plot'])
 
@@ -62,6 +61,7 @@ class EmbedCodeDirective(Directive):
             raise SphinxError(str(err))
 
         is_test = class_ is not None and issubclass(class_, unittest.TestCase)
+        shows_plot = '.show(' in source
 
         if 'layout' in self.options:
             layout = [s.strip() for s in self.options['layout'].split(',')]
@@ -80,6 +80,7 @@ class EmbedCodeDirective(Directive):
                               "and print options.")
 
         remove_docstring = is_test and 'keep-docstrings' not in self.options
+        do_run = 'output' in layout or 'interleave' in layout or 'plot' in layout
 
         # Modify the source prior to running
         if remove_docstring:
@@ -118,15 +119,17 @@ class EmbedCodeDirective(Directive):
 
         # Run the source (if necessary)
         skipped = failed = False
-        if 'plot' in layout:
-            # insert lines to generate the plot file
-            pltcode_to_run = '\n'.join(['import matplotlib', 'matplotlib.use("Agg")', code_to_run,
-                                        'matplotlib.pyplot.savefig("foobar")'])
-            skipped, failed, use_mpi, run_outputs = \
-                run_code(pltcode_to_run, path, module=module, cls=class_)
-        elif is_test or 'output' in layout or 'interleave' in layout:
-            skipped, failed, use_mpi, run_outputs = \
-                run_code(code_to_run, path, module=module, cls=class_)
+        if do_run:
+            if shows_plot:
+                # insert lines to generate the plot file
+                parts = ['import matplotlib', 'matplotlib.use("Agg")', code_to_run]
+                if 'plot' in layout:
+                    parts.append('matplotlib.pyplot.savefig("foobar.png")')
+                skipped, failed, use_mpi, run_outputs = \
+                    run_code('\n'.join(parts), path, module=module, cls=class_)
+            else:
+                skipped, failed, use_mpi, run_outputs = \
+                    run_code(code_to_run, path, module=module, cls=class_)
 
         if failed:
             io_nodes = [get_skip_output_node(run_outputs, "failed")]
@@ -149,25 +152,21 @@ class EmbedCodeDirective(Directive):
                                                                            output_blocks)
 
             if 'plot' in layout:
-                plot_dir = os.path.dirname(path)
+                plot_dir = os.path.dirname(os.path.abspath(path))
+                plot_file = os.path.join(plot_dir, 'foobar.png')
 
-                # locate plot file
-                plot_files = fnmatch.filter(os.listdir(plot_dir), 'foobar.*')
-                if len(plot_files) > 1:
-                    raise SphinxError("Multiple plot files found %s for embedded code '%s'." %
-                    (plot_files, path))
-                elif not plot_files:
-                    raise SphinxError("No plot files found for embedded code '%s'." % path)
+                if not os.path.isfile(plot_file):
+                    raise SphinxError("Can't find plot file '%s'" % plot_file)
 
                 # create plot node
                 # this is a hack to strip of the top level directory else figure can't find file
-                arguments = [os.path.join(plot_dir.split('/', 1)[1], plot_files[0])]
+                #arguments = [os.path.join(plot_dir.split('/', 1)[1], 'foobar.png')]
+                arguments = [plot_file]
 
                 fig = images.Figure(self.name, arguments, self.options, self.content, self.lineno,
                                     self.content_offset, self.block_text, self.state,
                                     self.state_machine)
                 plot_nodes = fig.run()
-
 
         # create a list of document nodes to return based on layout
         doc_nodes = []
