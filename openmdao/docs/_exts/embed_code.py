@@ -2,6 +2,8 @@
 import unittest
 from docutils import nodes
 from sphinx.util.compat import Directive
+from sphinx.errors import SphinxError
+
 import traceback
 import fnmatch
 import inspect
@@ -30,12 +32,12 @@ class EmbedCodeDirective(Directive):
     What the above will do is replace the directive and its args with the block of code
     for the class or method desired.
 
-    By default, docstrings will be removed from the embedded code. There is an option
-    to the directive to keep the docstrings:
+    By default, docstrings will be kept in the embedded code. There is an option
+    to the directive to strip the docstrings:
 
     .. embed-code::
         openmdao.test.whatever.method
-        :keep-docstrings:
+        :strip-docstrings:
     """
 
     # must have at least one directive for this to work
@@ -43,7 +45,7 @@ class EmbedCodeDirective(Directive):
     has_content = True
 
     option_spec = {
-        'keep-docstrings': unchanged,
+        'strip-docstrings': unchanged,
         'layout': unchanged,
         'scale': unchanged,
         'align': unchanged,
@@ -79,7 +81,7 @@ class EmbedCodeDirective(Directive):
             raise SphinxError("The interleave option is mutually exclusive to the code "
                               "and print options.")
 
-        remove_docstring = is_test and 'keep-docstrings' not in self.options
+        remove_docstring = 'strip-docstrings' in self.options
         do_run = 'output' in layout or 'interleave' in layout or 'plot' in layout
 
         # Modify the source prior to running
@@ -152,12 +154,14 @@ class EmbedCodeDirective(Directive):
                                                                            output_blocks)
 
             if 'plot' in layout:
-                plot_dir = os.path.dirname(os.path.abspath(path))
-                plot_file = os.path.join(plot_dir, 'foobar.png')
+                plot_dir = os.path.dirname(path)
+                file_abs = os.path.join(os.path.abspath(plot_dir), 'foobar.png')
 
-                if not os.path.isfile(plot_file):
-                    raise SphinxError("Can't find plot file '%s'" % plot_file)
+                if not os.path.isfile(file_abs):
+                    raise SphinxError("Can't find plot file '%s'" % file_abs)
 
+                directive_dir = os.path.relpath(os.getcwd(), os.path.dirname(self.state.document.settings._source))
+                plot_file = os.path.join(directive_dir, plot_dir, 'foobar.png')
                 # create plot node
                 # this is a hack to strip of the top level directory else figure can't find file
                 #arguments = [os.path.join(plot_dir.split('/', 1)[1], 'foobar.png')]
