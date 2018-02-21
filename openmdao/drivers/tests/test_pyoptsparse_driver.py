@@ -1483,14 +1483,18 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertTrue(len([s for s in output if s.startswith('comp.f_xy')]) > 1,
                         "Should be more than one comp.f_xy printed")
 
+
+@unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 class TestPyoptSparseFeature(unittest.TestCase):
 
     def setUp(self):
+        from openmdao.utils.general_utils import set_pyoptsparse_opt
+        OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
         if OPT is None:
             raise unittest.SkipTest("pyoptsparse is not installed")
 
         if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
+            raise unittest.SkipTest("pyoptsparse is not providing SNOPT")
 
     def test_basic(self):
         import numpy as np
