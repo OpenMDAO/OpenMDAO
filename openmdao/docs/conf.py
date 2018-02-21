@@ -175,6 +175,7 @@ packages = [
     'solvers.nonlinear',
     'solvers.linesearch',
     'test_suite',
+    'test_suite.components',
     'vectors',
 ]
 from openmdao.docs._utils.generate_sourcedocs import generate_docs
