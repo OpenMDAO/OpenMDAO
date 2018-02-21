@@ -289,6 +289,10 @@ In your .rst file, you'd insert this:
 2. Embed a piece of code, run it, show a single block of output afterwards.
 In your .rst file, you'd insert this:
 
+        .. embed-code::
+          ../devtools/docs_experiment/experimental_guide/examples/sin_plot.py
+          :layout: code, output
+
   .. code-block:: rst
 
     .. embed-code::
@@ -356,7 +360,7 @@ In your .rst file, you'd insert this:
           :scale: 50
           :align: center
 
-          This is where you would put a caption.
+          This is where you would put a caption, after a blank line.
 
     This should embed the plot, scale it down by half, and align it center, with a caption.
 
@@ -366,8 +370,7 @@ In your .rst file, you'd insert this:
       :scale: 50
       :align: center
 
-      This is where you would put a caption.
-
+      This is where you would put a caption, after a blank line.
 
 
 6.  Use this directive to embed a test (it can do the same things as `embed-test` now, with better layout options, so
