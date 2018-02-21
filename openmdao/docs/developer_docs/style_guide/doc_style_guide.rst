@@ -357,8 +357,10 @@ embed-test
           .. embed-test::
             openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_feature_simple
 
+
         The output from the above syntax should just look like a normal code block,
         with the test code and the results of the test run (output) reported separately:
+
 
         .. embed-test::
           openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_feature_simple
