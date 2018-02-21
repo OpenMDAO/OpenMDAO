@@ -2,22 +2,24 @@ import matplotlib.path as mpath
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 
-Path = mpath.Path
+if __name__ == '__main__':
 
-fig, ax = plt.subplots()
-pp1 = mpatches.PathPatch(
-    Path([(0, 0), (1, 0), (1, 1), (0, 0)],
-         [Path.MOVETO, Path.CURVE3, Path.CURVE3, Path.CLOSEPOLY]),
-    fc="none", transform=ax.transData)
+    Path = mpath.Path
 
-print("Here's some output.")
+    fig, ax = plt.subplots()
+    pp1 = mpatches.PathPatch(
+        Path([(0, 0), (1, 0), (1, 1), (0, 0)],
+             [Path.MOVETO, Path.CURVE3, Path.CURVE3, Path.CLOSEPOLY]),
+        fc="none", transform=ax.transData)
 
-ax.add_patch(pp1)
-ax.plot([0.75], [0.25], "ro")
+    print("Here's some output.")
 
-print("Here's more output.")
-ax.set_title('The red point should be on the path')
+    ax.add_patch(pp1)
+    ax.plot([0.75], [0.25], "ro")
 
-plt.show()
+    print("Here's more output.")
+    ax.set_title('The red point should be on the path')
 
-print("Some output\nat the end.")
+    plt.show()
+
+    print("Some output\nat the end.")

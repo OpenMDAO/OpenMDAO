@@ -186,13 +186,13 @@ the user with an easy way to link to the autodoc for quick reference.
 
 We'll do this with a `:ref:` tag.  The basic syntax looks like this:
 
-  .. code-block:: python
+  .. code-block:: rst
 
     :ref:`LinkText <openmdao.path.to.file.py>`
 
 note the path to the file in which the class lives. Here's a specific, working example:
 
-  .. code-block:: python
+  .. code-block:: rst
 
     :ref:`Direct <openmdao.solvers.linear.direct.py>`
 
@@ -211,7 +211,7 @@ embed-code
         class method directly into a document by including that class or method's
         full, dotted python path.  The syntax for invoking the directive looks like this:
 
-        .. code-block:: python
+        .. code-block:: rst
 
             .. embed-code::
               openmdao.core.tests.test_expl_comp.RectangleComp
@@ -231,7 +231,7 @@ embed-code
         By default, docstrings will be removed from the embedded code. There is an option
         to the directive to keep the docstrings:
 
-        .. code-block:: python
+        .. code-block:: rst
 
           .. embed-code::
               openmdao.core.tests.test_expl_comp.RectangleComp
@@ -251,7 +251,7 @@ embed-test
         directly into a feature doc by including that test's full, dotted python
         path.  The syntax for invoking the directive looks like this:
 
-        .. code-block:: python
+        .. code-block:: rst
 
           .. embed-test::
             openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_feature_simple
@@ -270,7 +270,7 @@ embed-options
         directly into a feature doc by including the module, classname, and the options dictionary name.
         The syntax for invoking the directive looks like this:
 
-        .. code-block:: python
+        .. code-block:: rst
 
             .. embed-options::
                 openmdao.solvers.linear.linear_block_jac
@@ -294,7 +294,7 @@ embed-shell-cmd
     and optionally the directory where the command will run.  Also, setting the `show_cmd`
     option to `false` will hide the shell command and show only the output resulting from it.
 
-    .. code-block:: none
+    .. code-block:: rst
 
         .. embed-shell-cmd::
             :cmd: openmdao tree circuit.py
@@ -315,7 +315,7 @@ embed-bibtex
     class (or the name of a function that returns an instance of the desired class when
     called with no arguments).
 
-    .. code-block:: none
+    .. code-block:: rst
 
         .. embed-bibtex::
             openmdao.drivers.scipy_optimizer
