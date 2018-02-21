@@ -230,7 +230,7 @@ embed-code
         a feature doc that may, for example, illustrate a usage example. Another great benefit of this
         method is that now your embedded example changes along with the code, so the docs maintain themselves.
 
-        By default, docstrings will be kept the embedded code. There is an option
+        By default, docstrings will be kept in the embedded code. There is an option
         to the directive to strip the docstrings:
 
         .. code-block:: rst
