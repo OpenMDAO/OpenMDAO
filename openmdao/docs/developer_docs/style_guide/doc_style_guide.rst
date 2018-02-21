@@ -277,13 +277,15 @@ Embedding More Than Just Code
     .. code-block:: rst
 
         .. embed-code::
-          ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+            ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
 
-    Note that as mentioned above, the default value of :code:`layout` is just "code," so the layout is not specified here.
-    The resulting embed looks like this:
+
+   Note that as mentioned above, the default value of :code:`layout` is just "code," so the layout is not specified here.
+   The resulting embed looks like this:
+
 
     .. embed-code::
-      ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+        ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
 
 
 2. Embed a piece of code, run it, show a single block of output afterwards.
@@ -292,27 +294,28 @@ Embedding More Than Just Code
     .. code-block:: rst
 
         .. embed-code::
-          ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
-          :layout: code, output
+            ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+            :layout: code, output
 
-    The resulting embed would look like this:
+
+   The resulting embed would look like this:
 
     .. embed-code::
         ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
         :layout: code, output
 
-
-3.  Embed a piece of code, run it, show a single block of output afterwards, then show a plot after that.
-    (Remember, that :code:`show()` function needs to be in there for this to work.)
+3. Embed a piece of code, run it, show a single block of output afterwards, then show a plot after that.
+   (Remember, that :code:`show()` function needs to be in there for this to work.)
 
     .. code-block:: rst
 
         .. embed-code::
-          ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
-          :layout: code, output, plot
+            ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+            :layout: code, output, plot
 
+   The resulting embed would look like this:
 
-    .. embed-code::
+   .. embed-code::
         ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
         :layout: code, output, plot
 
@@ -323,12 +326,10 @@ Embedding More Than Just Code
     .. code-block:: rst
 
         .. embed-code::
-          ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
-          :layout: plot, interleave
-
+            ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+            :layout: plot, interleave
 
     This should embed the plot, and then the code with its output nicely interleaved.
-
 
     .. embed-code::
         ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
@@ -401,8 +402,8 @@ embed-options
 
         .. embed-options::
             openmdao.solvers.linear.linear_block_jac
-                LinearBlockJac
-                options
+            LinearBlockJac
+            options
 
 
 embed-shell-cmd
