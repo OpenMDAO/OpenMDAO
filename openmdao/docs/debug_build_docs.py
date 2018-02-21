@@ -3,7 +3,7 @@ if __name__ == '__main__':
     import sys
     import os
     import sphinx
-    os.system('make clean')
+    #os.system('make clean')
     testargs = '-b html -d _build/doctrees . _build/html -t "usr"'.split(' ')
     sys.argv.extend(testargs)
 
