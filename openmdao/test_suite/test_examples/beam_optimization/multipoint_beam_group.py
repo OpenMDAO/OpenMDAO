@@ -1,3 +1,9 @@
+"""
+This is a multipoint implementation of the beam optimization problem.
+
+
+"""
+
 from __future__ import division
 import numpy as np
 
@@ -65,10 +71,10 @@ class MultipointBeamGroup(Group):
             if num_load_cases > 1:
                 end += j * 0.5 * np.pi / (num_load_cases - 1)
 
-            x = np.linspace(0, end, num_elements)
+            x = np.linspace(0, end, num_nodes)
             f = - np.sin(x)
             force_vector = np.zeros(2 * num_nodes)
-            force_vector[0:-2:2] = f
+            force_vector[0:-1:2] = f
 
             comp = StatesComp(num_elements=num_elements, force_vector=force_vector)
             sub.add_subsystem('states_comp', comp)
@@ -100,6 +106,7 @@ class MultipointBeamGroup(Group):
         for j in range(num_load_cases):
             self.connect('parallel.sub_%d.compliance_comp.compliance' % j,
                          'obj_sum.compliance_%d' % j)
+
         self.connect('inputs_comp.h_cp', 'interp.h_cp')
         self.connect('interp.h', 'I_comp.h')
         self.connect('I_comp.I', 'local_stiffness_matrix_comp.I')
