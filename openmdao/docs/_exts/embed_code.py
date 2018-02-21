@@ -49,7 +49,6 @@ class EmbedCodeDirective(Directive):
         'align': unchanged,
     }
 
-
     def run(self):
         allowed_layouts = set(['code', 'output', 'interleave', 'plot'])
 
