@@ -20,8 +20,9 @@ executed.
 Here, we choose NonlinearBlockJac to solve the Sellar problem, which has two components with a
 cyclic dependency, has no implicit states, and works very well with Jacobi.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.nonlinear.tests.test_nonlinear_block_jac.TestNLBlockJacobi.test_feature_basic
+    :layout: interleave
 
 This solver runs all of the subsystems each iteration, but just passes the data along all connections
 simultaneously once per iteration. After each iteration, the iteration count and the residual norm are
@@ -46,8 +47,9 @@ NonlinearBlockJac Option Examples
   cut it back from the default, ten, down to two, so that it terminates a few iterations earlier and doesn't
   reach the specified absolute or relative tolerance.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.nonlinear.tests.test_nonlinear_block_jac.TestNLBlockJacobi.test_feature_maxiter
+      :layout: interleave
 
 **atol**
 
@@ -56,8 +58,9 @@ NonlinearBlockJac Option Examples
   components and `evaluate` on explicit components. If this norm value is lower than the absolute
   tolerance `atol`, the iteration will terminate.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.nonlinear.tests.test_nonlinear_block_jac.TestNLBlockJacobi.test_feature_atol
+      :layout: interleave
 
 **rtol**
 
@@ -66,7 +69,8 @@ NonlinearBlockJac Option Examples
   components and `evaluate` on explicit components. If the ratio of the currently calculated norm to the
   initial residual norm is lower than the relative tolerance `rtol`, the iteration will terminate.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.nonlinear.tests.test_nonlinear_block_jac.TestNLBlockJacobi.test_feature_rtol
+      :layout: interleave
 
 .. tags:: Solver, NonlinearSolver

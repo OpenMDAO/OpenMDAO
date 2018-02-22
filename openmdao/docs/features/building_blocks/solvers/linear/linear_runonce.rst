@@ -18,8 +18,9 @@ solver such as :ref:`ScipyKrylov <openmdao.solvers.linear.scipy_iter_solver.py>`
 Here is an example of using LinearRunOnce to calculate the derivatives across a simple model with
 the `Paraboloid` component.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.linear.tests.test_linear_runonce.TestLinearRunOnceSolver.test_feature_solver
+    :layout: interleave
 
 
 LinearRunOnce Options

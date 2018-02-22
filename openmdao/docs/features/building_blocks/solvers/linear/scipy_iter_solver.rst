@@ -15,8 +15,9 @@ instead.
 
 Here, we calculate the total derivatives across the Sellar system.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyKrylovFeature.test_specify_solver
+    :layout: interleave
 
 ScipyKrylov Options
 -------------------
@@ -41,8 +42,9 @@ ScipyKrylov Option Examples
   This example shows what happens if you set maxiter too low (the derivatives should be nonzero, but it stops too
   soon.)
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyKrylovFeature.test_feature_maxiter
+      :layout: interleave
 
 **atol**
 
@@ -54,8 +56,9 @@ ScipyKrylov Option Examples
 
   You may need to adjust this setting if you have abnormally large or small values in your global Jacobian.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyKrylovFeature.test_feature_atol
+      :layout: interleave
 
 **rtol**
 
@@ -72,8 +75,9 @@ improve the condition number in part or all of the Jacobian.
 Here, we add a Gauss-Seidel preconditioner to the simple Sellar solution with Newton. Note that the number of
 GMRES iterations is lower when using the preconditioner.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyKrylovFeature.test_specify_precon
+    :layout: interleave
 
 **A note on nesting ScipyKrylov under a preconditoner:** The underlying GMRES module is not
 re-entrant, so it cannot be called as a new instance while it is running. If you need to use gmres under
