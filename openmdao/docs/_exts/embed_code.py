@@ -3,6 +3,7 @@ import unittest
 from docutils import nodes
 from docutils.parsers.rst import Directive
 from sphinx.errors import SphinxError
+import sphinx
 
 import inspect
 import os
@@ -13,11 +14,7 @@ from openmdao.docs._utils.docutil import get_source_code, remove_docstrings, \
     remove_initial_empty_lines, replace_asserts_with_prints, \
     strip_header, dedent, insert_output_start_stop_indicators, run_code, process_output, \
     get_skip_output_node, get_interleaved_io_nodes, get_output_block_node, \
-    split_source_into_input_blocks, extract_output_blocks, clean_up_empty_output_blocks
-
-
-class skipped_or_failed_node(nodes.Element):
-    pass
+    split_source_into_input_blocks, extract_output_blocks, clean_up_empty_output_blocks, node_setup
 
 
 _plot_count = 0
@@ -205,7 +202,6 @@ class EmbedCodeDirective(Directive):
 def setup(app):
     """add custom directive into Sphinx so that it is found during document parsing"""
     app.add_directive('embed-code', EmbedCodeDirective)
-    app.add_node(skipped_or_failed_node, html=(visit_skipped_or_failed_node, depart_skipped_or_failed_node))
-    app.add_node(in_or_out_node, html=(visit_in_or_out_node, depart_in_or_out_node))
+    node_setup(app)
 
     return {'version': sphinx.__display_version__, 'parallel_read_safe': True}
