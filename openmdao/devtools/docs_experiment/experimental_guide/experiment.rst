@@ -142,6 +142,22 @@ Test embed with block output followed by source.
     :layout: output, code
 
 
+Test embed with interleaved source and output.
+
+
+.. code-block:: rst
+
+    .. embed-code::
+        openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source
+        :layout: interleave
+
+
+.. embed-code::
+    openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source
+    :layout: interleave
+
+
+
 Test embed with source and a skip.
 
 .. code-block:: rst
@@ -154,3 +170,17 @@ Test embed with source and a skip.
 .. embed-code::
     openmdao.core.tests.test_connections.TestConnections.test_diff_conn_input_units
     :layout: code, output
+
+
+MPI test
+
+.. code-block:: rst
+
+    .. embed-code::
+        openmdao.core.tests.test_parallel_derivatives.ParDerivColorFeatureTestCase.test_fwd_vs_rev
+        :layout: interleave
+
+
+.. embed-code::
+    openmdao.core.tests.test_parallel_derivatives.ParDerivColorFeatureTestCase.test_fwd_vs_rev
+    :layout: interleave

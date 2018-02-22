@@ -725,6 +725,7 @@ def run_code(code_to_run, path, module=None, cls=None):
             for i in range(N_PROCS):
                 with open('%d.out' % i) as f:
                     output.append(f.read())
+                    print("RANK %d" % i, output[-1])
                 os.remove('%d.out' % i)
 
         elif module is None:
@@ -761,93 +762,6 @@ def run_code(code_to_run, path, module=None, cls=None):
         # os.remove(code_to_run_path)
 
     return skipped, failed, output
-
-
-def get_and_run_test(method_path):
-    """
-    Return desired source code for a single feature after testing it.
-
-    Used by embed_test.
-
-    1. Get the source code for a unit test method
-    2. Replace the asserts with prints
-    3. Insert extra print statements to indicate start and end of print Out blocks
-    4. Run the test using source_with_out_start_stop_indicators -> run_outputs
-    5. Split method_source up into groups of "In" blocks -> input_blocks
-    6. Extract from run_outputs, the Out blocks -> output_blocks
-    7. Return method_source, input_blocks, output_blocks, skipped
-
-    Parameters
-    ----------
-    method_path : str
-        Module hiearchy path to the test.
-
-    Returns
-    -------
-    str
-        Cleaned source code, ready for inclusion in doc.
-    str
-        Reason that the test failed or was skipped.
-    list of str
-        List of input code blocks
-    list of str
-        List of Python output blocks
-    bool
-        True if test was skipped
-    """
-
-    #----------------------------------------------------------
-    # 1. Get the source code for a unit test method.
-    #----------------------------------------------------------
-
-    module_path = '.'.join(method_path.split('.')[:-2])
-    class_name = method_path.split('.')[-2]
-    method_name = method_path.split('.')[-1]
-
-    module = importlib.import_module(module_path)
-    cls = getattr(module, class_name)
-
-    method = getattr(cls, method_name)
-    method_source = inspect.getsource(method)
-    method_source = strip_header(method_source)
-    method_source = dedent(method_source)
-    method_source = remove_docstrings(method_source)
-    method_source = replace_asserts_with_prints(method_source)
-    method_source = remove_initial_empty_lines(method_source)
-
-    #-----------------------------------------------------------------------------------
-    # 3. Insert extra print statements to indicate start and end of print Out blocks
-    #-----------------------------------------------------------------------------------
-    method_source = insert_output_start_stop_indicators(method_source)
-
-    #------------------------------------------------------------------------------------
-    # Get all the pieces of code needed to run the unit test method
-    #-----------------------------------------------------------------------------------
-
-    # make 'self' available to test code (as an instance of the test case)
-    self_code = "from %s import %s\nself = %s('%s')\n" % \
-                (module_path, class_name, class_name, method_name)
-
-    # get setUp and tearDown but don't duplicate if it is the method being tested
-    setup_code = '' if method_name == 'setUp' else dedent(strip_header(remove_docstrings(
-        inspect.getsource(getattr(cls, 'setUp')))))
-    if setup_code.strip() == 'pass':
-        setup_code = ''
-
-    teardown_code = '' if method_name == 'tearDown' else dedent(strip_header(
-        remove_docstrings(inspect.getsource(getattr(cls, 'tearDown')))))
-    if teardown_code.strip() == 'pass':
-        teardown_code = ''
-
-    code_to_run = '\n'.join([self_code, setup_code, method_source, teardown_code])
-    code_to_display = '\n'.join([setup_code, method_source, teardown_code])
-
-    skipped, failed, run_outputs = run_code(code_to_run, module_path, module, cls)
-
-    skipped_output, input_blocks, output_blocks = \
-        process_output(code_to_display, skipped, failed, run_outputs)
-
-    return code_to_run, skipped_output, input_blocks, output_blocks, skipped
 
 
 def process_output(code_to_run, skipped, failed, run_outputs):

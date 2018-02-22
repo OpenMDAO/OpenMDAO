@@ -23,6 +23,10 @@ if __name__ == '__main__':
 
     sys.stdout = stdout_save
 
+    if os.environ.get("USE_PROC_FILES"):
+        from openmdao.utils.mpi import use_proc_files
+        use_proc_files()
+
     code_to_run = os.environ.get("OPENMDAO_CODE_TO_RUN", "").strip()
     if not code_to_run:
         raise RuntimeError("OPENMDAO_CODE_TO_RUN has not been set")
