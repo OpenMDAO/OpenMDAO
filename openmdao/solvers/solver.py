@@ -495,7 +495,7 @@ class Solver(object):
         if 'out' in self._filtered_vars_to_record:
             for out in self._filtered_vars_to_record['out']:
                 if out in outputs._names:
-                    data['o'][out] = outputs._names[out]
+                    data['o'][out] = outputs._views[out]
         else:
             data['o'] = outputs
 
@@ -510,7 +510,7 @@ class Solver(object):
             if 'res' in self._filtered_vars_to_record:
                 for res in self._filtered_vars_to_record['res']:
                     if res in residuals._names:
-                        data['r'][res] = residuals._names[res]
+                        data['r'][res] = residuals._views[res]
             else:
                 data['r'] = residuals
         else:

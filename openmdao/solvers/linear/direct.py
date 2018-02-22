@@ -28,7 +28,7 @@ def format_singluar_error(err, system, mtx):
     err : Exception
         Exception object
     system : <System>
-        OpenMDAO system containing the Directsolver.
+        System containing the Directsolver.
     mtx : ndarray
         Matrix of interest.
 
@@ -51,6 +51,45 @@ def format_singluar_error(err, system, mtx):
         loc_txt = "row"
     else:
         loc_txt = "column"
+
+    n = 0
+    varname = "Unknown"
+    for name in system._var_allprocs_abs_names['output']:
+        relname = system._var_abs2prom['output'][name]
+        n += len(system._outputs[relname])
+        if loc <= n:
+            varname = relname
+            break
+
+    msg = "Singular entry found in '{}' for {} associated with state/residual '{}'."
+    return msg.format(system.pathname, loc_txt, varname)
+
+
+def format_singluar_csc_error(system, matrix):
+    """
+    Format a coherent error message when the CSC matrix is singular.
+
+    Parameters
+    ----------
+    system : <System>
+        System containing the Directsolver.
+    matrix : ndarray
+        Matrix of interest.
+
+    Returns
+    -------
+    str
+        New error string.
+    """
+    dense = matrix.toarray()
+    zero_rows = np.where(~dense.any(axis=1))[0]
+    zero_cols = np.where(~dense.any(axis=0))[0]
+    if zero_cols.size <= zero_rows.size:
+        loc_txt = "row"
+        loc = zero_rows[0]
+    else:
+        loc_txt = "column"
+        loc = zero_cols[0]
 
     n = 0
     varname = "Unknown"
@@ -91,7 +130,6 @@ class DirectSolver(LinearSolver):
             if isinstance(mtx, DenseMatrix):
                 ranges = system._jacobian._view_ranges[system.pathname]
                 matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
-                # np.set_printoptions(precision=3)
 
                 # During LU decomposition, detect singularities and warn user.
                 with warnings.catch_warnings():
@@ -106,7 +144,17 @@ class DirectSolver(LinearSolver):
                         raise RuntimeError(format_singluar_error(err, system, matrix))
 
             elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
-                self._lu = scipy.sparse.linalg.splu(mtx._matrix)
+                ranges = system._jacobian._view_ranges[system.pathname]
+                matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
+                try:
+                    self._lu = scipy.sparse.linalg.splu(matrix)
+                except RuntimeError as err:
+                    if 'exactly singular' in str(err):
+                        ranges = system._jacobian._view_ranges[system.pathname]
+                        matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
+                        raise RuntimeError(format_singluar_csc_error(system, matrix))
+                    else:
+                        reraise(*sys.exc_info())
 
             elif isinstance(mtx, COOMatrix):
                 # calling scipy.sparse.linalg.splu on a COO actually transposes

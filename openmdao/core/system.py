@@ -1369,21 +1369,20 @@ class System(object):
         self._views_assembled_jac = False
 
         if jacobian is not None:
-            # this means that somewhere above us is an AssembledJacobian. If
-            # we have a nonlinear solver that uses derivatives, this is
-            # currently an error if the AssembledJacobian is not a DenseJacobian.
-            # In a future story we'll add support for sparse AssembledJacobians.
             if self._nonlinear_solver is not None and self._nonlinear_solver.supports['gradients']:
-                if not isinstance(jacobian, DenseJacobian):
-                    raise RuntimeError("System '%s' has a solver of type '%s'"
-                                       "but a sparse AssembledJacobian has been set in a "
-                                       "higher level system." %
-                                       (self.pathname,
-                                        self._nonlinear_solver.__class__.__name__))
                 self._views_assembled_jac = True
-            self._owns_assembled_jac = False
 
         if self._owns_assembled_jac:
+
+            # if we have an assembled jac at this level and an assembled jac above us, then
+            # our jacs (and any of our children's assembled jacs) will share their internal
+            # subjac dicts.  Each will maintain its own internal Matrix objects though.
+            if jacobian is not None:
+                jacobian._subjacs.update(self._jacobian._subjacs)
+                jacobian._subjacs_info.update(self._jacobian._subjacs_info)
+                self._jacobian._subjacs = jacobian._subjacs
+                self._jacobian._subjacs_info = jacobian._subjacs_info
+                self._jacobian._keymap = jacobian._keymap
 
             # At present, we don't support a AssembledJacobian in a group
             # if any subcomponents are matrix-free.
@@ -1417,7 +1416,7 @@ class System(object):
             self._jacobian._initialize()
 
             for s in self.system_iter(recurse=True):
-                if s._views_assembled_jac:
+                if s._jacobian is self._jacobian and s._views_assembled_jac:
                     self._jacobian._init_view(s)
 
     def set_initial_values(self):
@@ -1568,20 +1567,22 @@ class System(object):
         return maps
 
     def _get_scope(self, excl_sub=None):
-        if excl_sub in self._scope_cache:
+        try:
             return self._scope_cache[excl_sub]
+        except KeyError:
+            pass
 
         if excl_sub is None:
             # All myproc outputs
-            scope_out = set(self._var_abs_names['output'])
+            scope_out = frozenset(self._var_abs_names['output'])
 
             # All myproc inputs connected to an output in this system
-            scope_in = set(self._conn_global_abs_in2out).intersection(
+            scope_in = frozenset(self._conn_global_abs_in2out).intersection(
                 self._var_abs_names['input'])
 
         else:
             # All myproc outputs not in excl_sub
-            scope_out = set(self._var_abs_names['output']).difference(
+            scope_out = frozenset(self._var_abs_names['output']).difference(
                 excl_sub._var_abs_names['output'])
 
             # All myproc inputs connected to an output in this system but not in excl_sub
@@ -1592,6 +1593,7 @@ class System(object):
 
                     if abs_out not in excl_sub._var_allprocs_abs2idx['linear']:
                         scope_in.add(abs_in)
+            scope_in = frozenset(scope_in)
 
         self._scope_cache[excl_sub] = (scope_out, scope_in)
         return scope_out, scope_in
@@ -1710,10 +1712,10 @@ class System(object):
         ----------
         vec_name : str
             Name of the vector to use.
-        scope_out : set or None
+        scope_out : frozenset or None
             Set of absolute output names in the scope of this mat-vec product.
             If None, all are in the scope.
-        scope_in : set or None
+        scope_in : frozenset or None
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         mode : str
@@ -1744,6 +1746,9 @@ class System(object):
         if scope_out is None and scope_in is None:
             yield d_inputs, d_outputs, d_residuals
         else:
+            old_ins = d_inputs._names
+            old_outs = d_outputs._names
+
             if scope_out is not None:
                 d_outputs._names = scope_out.intersection(d_outputs._views)
             if scope_in is not None:
@@ -1752,8 +1757,8 @@ class System(object):
             yield d_inputs, d_outputs, d_residuals
 
             # reset _names so users will see full vector contents
-            d_inputs._names = d_inputs._views
-            d_outputs._names = d_outputs._views
+            d_inputs._names = old_ins
+            d_outputs._names = old_outs
 
     def get_nonlinear_vectors(self):
         """
@@ -3157,7 +3162,7 @@ class System(object):
                     # use filtered inputs
                     for inp in self._filtered_vars_to_record['i']:
                         if inp in inputs._names:
-                            data['i'][inp] = inputs._names[inp]
+                            data['i'][inp] = inputs._views[inp]
                 else:
                     # use all the inputs
                     data['i'] = inputs._names
@@ -3171,7 +3176,7 @@ class System(object):
                     # use outputs from filtered list.
                     for out in self._filtered_vars_to_record['o']:
                         if out in outputs._names:
-                            data['o'][out] = outputs._names[out]
+                            data['o'][out] = outputs._views[out]
                 else:
                     # use all the outputs
                     data['o'] = outputs._names
@@ -3185,7 +3190,7 @@ class System(object):
                     # use filtered residuals
                     for res in self._filtered_vars_to_record['r']:
                         if res in residuals._names:
-                            data['r'][res] = residuals._names[res]
+                            data['r'][res] = residuals._views[res]
                 else:
                     # use all the residuals
                     data['r'] = residuals._names

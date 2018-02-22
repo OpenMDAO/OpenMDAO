@@ -1,4 +1,5 @@
 """Define the CSCmatrix class."""
+from __future__ import print_function
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -50,10 +51,11 @@ class CSCMatrix(COOMatrix):
         # data array for the CSC should be the same as for the COO since
         # it was already in sorted order.
         coo = coo_matrix((data, (rows, cols)), shape=(num_rows, num_cols))
+        coo_data_size = coo.data.size
         self._matrix = coo.tocsc()
 
         # make sure data size is the same between coo and csr, else indexing is
         # messed up
-        if coo.data.size != self._matrix.data.size:
+        if coo_data_size != self._matrix.data.size:
             raise ValueError("CSC matrix data contains duplicate row/col entries. "
                              "This would break internal indexing.")
