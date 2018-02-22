@@ -29,6 +29,7 @@ else:
 sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
 table_name = 'feature_unit_tests'   # name of the table to be queried
 
+_sub_runner = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'run_sub.py')
 
 def remove_docstrings(source):
     """
@@ -396,17 +397,17 @@ def split_source_into_input_blocks(src):
     """
     input_blocks = []
 
-    current_block = ""
+    current_block = []
 
     for line in src.split('\n'):
         if 'print(">>>>>' in line:
-            input_blocks.append(current_block)
-            current_block = ""
+            input_blocks.append('\n'.join(current_block))
+            current_block = []
         else:
-            current_block += line + '\n'
+            current_block.append(line)
 
-    if current_block.strip():
-        input_blocks.append(current_block)
+    if current_block and current_block[0]:
+        input_blocks.append('\n'.join(current_block))
 
     return input_blocks
 
@@ -518,7 +519,7 @@ def extract_output_blocks(run_output):
 
     Parameters
     ----------
-    run_output : str
+    run_output : str or list of str
         Source code with outputs.
 
     Returns
@@ -531,13 +532,16 @@ def extract_output_blocks(run_output):
     #  <<<<<4
     #  >>>>>4
 
+    if isinstance(run_output, list):
+        return sync_multi_output_blocks(run_output)
+
     output_blocks = []
     output_block = None
 
     for line in run_output.splitlines():
         if output_block is None:
             output_block = []
-        if line.startswith('>>>>>'):
+        if line[:5] == '>>>>>':  # line.startswith('>>>>>'):
             output_blocks.append('\n'.join(output_block))
             output_block = None
         else:
@@ -596,9 +600,36 @@ def dedent(src):
                 return '\n'.join(l[tab:] for l in lines[i:])
     return ''
 
+
+def sync_multi_output_blocks(blocks):
+    """
+    Combine output from different procs into the same output blocks.
+
+    Parameters
+    ----------
+    blocks : list of str
+        List of outputs from individual procs.
+
+    Returns
+    -------
+    list of list of str
+        List of synced output blocks from all procs.
+    """
+    if blocks:
+        split_blocks = [extract_output_blocks(b) for b in blocks]
+        n_out_blocks = len(split_blocks[0])
+        synced_blocks = []
+        for i in range(n_out_blocks):
+            synced_blocks.append('\n'.join(["(rank %d) %s" % (j, m[i])
+                for j, m in enumerate(split_blocks) if m[i]]))
+        return synced_blocks
+    else:
+        return []
+
+
 def run_code(code_to_run, path, module=None, cls=None):
     """
-    Run the test using source_with_out_start_stop_indicators -> run_outputs
+    Run the given code chunk and collect the output.
     """
 
     skipped = False
@@ -615,115 +646,74 @@ def run_code(code_to_run, path, module=None, cls=None):
             N_PROCS = getattr(cls, 'N_PROCS', 1)
             use_mpi =  N_PROCS > 1
 
-    # TODO: remove this line after debugging
-    use_mpi = False
-
     try:
-        if use_mpi:
-            # use subprocess to run test with `mpirun`
+        env = os.environ.copy()
 
-            # write code to a file so we can run it.
-            fd, code_to_run_path = tempfile.mkstemp()
-            with os.fdopen(fd, 'w') as tmp:
-                tmp.write(code_to_run)
+        # use subprocess to run code to avoid any nasty interactions between codes
+
+        # Move to the test directory in case there are files to read.
+        save_dir = os.getcwd()
+
+        if module is None:
+            code_dir = os.path.dirname(path)
+        else:
+            code_dir = '/'.join(module.__file__.split('/')[:-1])
+            env['OPENMDAO_CURRENT_MODULE'] = module.__name__
+            env['OPENMDAO_CODE_TO_RUN'] = code_to_run
+            print("CODE:\n", code_to_run)
+
+        os.chdir(code_dir)
+
+        if use_mpi:
 
             # output will be written to one file per process
-            env = os.environ.copy()
             env['USE_PROC_FILES'] = '1'
 
-            p = subprocess.Popen(['mpirun', '-n', str(N_PROCS), 'python', code_to_run_path],
+            p = subprocess.Popen(['mpirun', '-n', str(N_PROCS), 'python', _sub_runner],
                                  env=env)
             p.wait()
 
             # extract output blocks from all output files & merge them
-            multi_out_blocks = []
+            output = []
             for i in range(N_PROCS):
                 with open('%d.out' % i) as f:
-                    multi_out_blocks.append(extract_output_blocks(f.read()))
+                    output.append(f.read())
                 os.remove('%d.out' % i)
 
-            output_blocks = []
-            for i in range(len(multi_out_blocks[0])):
-                output_blocks.append('\n'.join(["(rank %d) %s" %
-                                     (j, m[i]) for j, m in enumerate(multi_out_blocks) if m[i]]))
-        else:
-            # just exec() the code for serial tests.
-
-            # capture all output
-            stdout = sys.stdout
-            stderr = sys.stderr
-            strout = cStringIO()
-            sys.stdout = strout
-            sys.stderr = strout
-
-            # set all the loggers to write to our captured stream
-            from openmdao.utils.logger_utils import _loggers
-            for name in _loggers:
-                _loggers[name]['logger'].handlers[0].stream = strout
-
-            # We need more precision from numpy
-            save_opts = np.get_printoptions()
-            np.set_printoptions(precision=8)
-
-            # Move to the test directory in case there are files to read.
-            save_dir = os.getcwd()
-
-            if module is None:
-                code_dir = os.path.dirname(path)
-            else:
-                code_dir = '/'.join(module.__file__.split('/')[:-1])
-            os.chdir(code_dir)
-
-            if module is None:
-                globals_dict = {
-                        '__file__': path,
-                        '__name__': '__main__',
-                        '__package__': None,
-                        '__cached__': None,
-                }
-            else:
-                globals_dict = module.__dict__
+        elif module is None:
+            # write modified code to a file so we can run it.
+            fd, code_to_run_path = tempfile.mkstemp()
+            with os.fdopen(fd, 'w') as tmp:
+                tmp.write(code_to_run)
 
             try:
-                exec(code_to_run, globals_dict)
+                output = subprocess.check_output(['python', code_to_run_path],
+                                                 stderr=subprocess.STDOUT).decode('utf-8', 'ignore')
             finally:
-                os.chdir(save_dir)
-
-            np.set_printoptions(precision=save_opts['precision'])
-            run_outputs = strout.getvalue()
+                os.remove(code_to_run_path)
+        else:
+            p = subprocess.Popen(['python', _sub_runner],
+                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
+            output, _ = p.communicate()
+            output = output.decode('utf-8', 'ignore')
+            # output = subprocess.check_output(['python', _sub_runner],
+            #                                  stderr=subprocess.STDOUT).decode('utf-8', 'ignore')
 
     except subprocess.CalledProcessError as e:
+        output = e.output.decode('utf-8', 'ignore')
         # Get a traceback.
-        if 'raise unittest.SkipTest' in e.output.decode('utf-8'):
-            reason_for_skip = e.output.splitlines()[-1][len('unittest.case.SkipTest: '):]
-            run_outputs = reason_for_skip
+        if 'raise unittest.SkipTest' in output:
+            reason_for_skip = output.splitlines()[-1][len('unittest.case.SkipTest: '):]
+            output = reason_for_skip
             skipped = True
         else:
-            run_outputs = "Running of embedded test {} in docs failed due to: \n\n{}".format(path, e.output.decode('utf-8'))
+            output = "Running of embedded test {} in docs failed due to: \n\n{}".format(path, output)
             failed = True
-
-    except Exception as err:
-        # FIXME:  this isn't right
-        if 'SkipTest' in code_to_run:
-            txt1 = code_to_run.split('SkipTest(')[1]
-            run_outputs = txt1.split(')')[0]
-            skipped = True
-        else:
-            msg = "Running of embedded test {} in docs failed due to: \n\n{}"
-            run_outputs = msg.format(path, str(err))
-            failed = True
-
     finally:
-        if use_mpi:
-            os.remove(code_to_run_path)
-        else:
-            sys.stdout = stdout
-            sys.stderr = stderr
+        os.chdir(save_dir)
+        # os.remove(code_to_run_path)
 
-    if PY3 and not use_mpi and not isinstance(run_outputs, str):
-        run_outputs = "".join(map(chr, run_outputs))  # in Python 3, run_outputs is of type bytes!
-
-    return skipped, failed, use_mpi, run_outputs
+    return skipped, failed, output
 
 
 def get_and_run_test(method_path):
@@ -805,15 +795,15 @@ def get_and_run_test(method_path):
     code_to_run = '\n'.join([self_code, setup_code, method_source, teardown_code])
     code_to_display = '\n'.join([setup_code, method_source, teardown_code])
 
-    skipped, failed, use_mpi, run_outputs = run_code(code_to_run, module_path, module, cls)
+    skipped, failed, run_outputs = run_code(code_to_run, module_path, module, cls)
 
     skipped_output, input_blocks, output_blocks = \
-        process_output(code_to_display, skipped, failed, use_mpi, run_outputs)
+        process_output(code_to_display, skipped, failed, run_outputs)
 
     return code_to_run, skipped_output, input_blocks, output_blocks, skipped
 
 
-def process_output(code_to_run, skipped, failed, use_mpi, run_outputs):
+def process_output(code_to_run, skipped, failed, run_outputs):
     if skipped:
         input_blocks = output_blocks = None
         skipped_output = run_outputs
@@ -828,8 +818,7 @@ def process_output(code_to_run, skipped, failed, use_mpi, run_outputs):
         #####################
         ### 6. Extract from run_outputs, the Out blocks -> output_blocks ###
         #####################
-        if not use_mpi:
-            output_blocks = extract_output_blocks(run_outputs)
+        output_blocks = extract_output_blocks(run_outputs)
 
         # the last input block may not produce any output
         if len(output_blocks) == len(input_blocks) - 1:

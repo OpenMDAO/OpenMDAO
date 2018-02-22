@@ -272,69 +272,75 @@ Embedding More Than Just Code
 
 
 1. Embed just a piece of code, just to show it, without running it for output or plots.
-In your .rst file, you'd insert this:
+   In your .rst file, you'd insert this:
 
-  .. code-block:: rst
 
-    .. embed-code::
-      ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+   .. code-block:: rst
 
-  Note that as mentioned above, the default value of :code:`layout` is just "code," so the layout is not specified here.
-  The resulting embed looks like this:
+       .. embed-code::
+           ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
 
-  .. embed-code::
-    ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+
+   Note that as mentioned above, the default value of :code:`layout` is just "code," so the
+   layout is not specified here. The resulting embed looks like this:
+
+   .. embed-code::
+       ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
 
 
 2. Embed a piece of code, run it, show a single block of output afterwards.
-In your .rst file, you'd insert this:
+   In your .rst file, you'd insert this:
 
-        .. embed-code::
-          ../devtools/docs_experiment/experimental_guide/examples/sin_plot.py
-          :layout: code, output
 
-  .. code-block:: rst
+   .. code-block:: rst
 
-    .. embed-code::
-      ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
-      :layout: code, output
+       .. embed-code::
+           ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+           :layout: code, output
 
-  The resulting embed would look like this:
 
-  .. embed-code::
-    ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
-    :layout: code, output
+   The resulting embed would look like this:
+
+
+   .. embed-code::
+       ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+       :layout: code, output
+
 
 3. Embed a piece of code, run it, show a single block of output afterwards, then show a plot after that.
-(Remember, that :code:`show()` function needs to be in there for this to work.)
-
-  .. code-block:: rst
-
-      .. embed-code::
-        ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
-        :layout: code, output, plot
-
-  The resulting embed would look like this:
-
-  .. embed-code::
-    ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
-    :layout: code, output, plot
+   (Remember, that :code:`show()` function needs to be in there for this to work.)
 
 
-4.  Embed a piece of code, run it, plot it. Show the plot first, then show the code with interleaved output, after that.
-(Remember, that :code:`show()` function needs to be in the embedded code for a plot embed to work.)
+   .. code-block:: rst
 
-  .. code-block:: rst
+       .. embed-code::
+           ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+           :layout: code, output, plot
 
-    .. embed-code::
-      ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
-      :layout: plot, interleave
 
-  This should embed the plot, and then the code with its output nicely interleaved.
+   The resulting embed would look like this:
 
-  .. embed-code::
-    ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
-    :layout: plot, interleave
+   .. embed-code::
+       ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+       :layout: code, output, plot
+
+
+4. Embed a piece of code, run it, plot it. Show the plot first, then show the code with interleaved output, after that.
+   (Remember, that :code:`show()` function needs to be in the embedded code for a plot embed to work.)
+
+   .. code-block:: rst
+
+       .. embed-code::
+           ../devtools/docs_experiment/experimental_guide/examples/sin_plot.py
+           :layout: plot, interleave
+
+
+   This should embed the plot, and then the code with its output nicely interleaved.
+
+   .. embed-code::
+       ../devtools/docs_experiment/experimental_guide/examples/sin_plot.py
+       :layout: plot, interleave
+
 
 5.  The way our plot embedding works, if you're embedding a layout that includes a plot, you can also give your
     `embed-code` directive any of the options that work with a Sphinx `image` or `figure` directive, since we inherit from those.
@@ -355,26 +361,29 @@ In your .rst file, you'd insert this:
     .. code-block:: rst
 
         .. embed-code::
-          ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
-          :layout: plot
-          :scale: 50
-          :align: center
+            ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+            :layout: plot
+            :scale: 50
+            :align: center
 
-          This is where you would put a caption, after a blank line.
+            This is where you would put a caption, after a blank line.
+
 
     This should embed the plot, scale it down by half, and align it center, with a caption.
 
-    .. embed-code::
-      ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
-      :layout: plot
-      :scale: 50
-      :align: center
 
-      This is where you would put a caption, after a blank line.
+    .. embed-code::
+        ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+        :layout: plot
+        :scale: 50
+        :align: center
+
+        This is where you would put a caption, after a blank line.
 
 
 6.  Use this directive to embed a test (it can do the same things as `embed-test` now, with better layout options, so
     `embed-test` may be deprecated). Just use a dotted python path, as shown here:
+
 
     .. code-block:: rst
 
@@ -409,8 +418,8 @@ embed-test
 
         .. code-block:: rst
 
-          .. embed-test::
-              openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_input_input
+            .. embed-test::
+                openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_input_input
 
 
         The output from the above syntax should just look like a normal code block,

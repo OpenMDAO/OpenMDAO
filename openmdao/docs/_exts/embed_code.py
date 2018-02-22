@@ -24,6 +24,7 @@ class skipped_or_failed_node(nodes.Element):
 
 _plot_count = 0
 
+
 class EmbedCodeDirective(Directive):
     """EmbedCodeDirective is a custom directive to allow blocks of
      python code to be shown in feature docs.  An example usage would look like this:
@@ -54,6 +55,8 @@ class EmbedCodeDirective(Directive):
     }
 
     def run(self):
+        global _plot_count
+
         allowed_layouts = set(['code', 'output', 'interleave', 'plot'])
 
         path = self.arguments[0]
@@ -69,8 +72,6 @@ class EmbedCodeDirective(Directive):
 
         if 'layout' in self.options:
             layout = [s.strip() for s in self.options['layout'].split(',')]
-        elif is_test:
-            layout = ['interleave']
         else:
             layout = ['code']
 
@@ -87,10 +88,9 @@ class EmbedCodeDirective(Directive):
         do_run = 'output' in layout or 'interleave' in layout or 'plot' in layout
 
         if 'plot' in layout:
-            global _plot_count
-            _plot_count += 1
             plot_dir = os.path.dirname(path)
             plot_fname = 'doc_plot_%d.png' % _plot_count
+            _plot_count += 1
             print("PLOT_FNAME:", plot_fname)
             plot_file_abs = os.path.join(os.path.abspath(plot_dir), plot_fname)
             if os.path.isfile(plot_file_abs):
@@ -125,10 +125,11 @@ class EmbedCodeDirective(Directive):
                 teardown_code = ''
 
             code_to_run = '\n'.join([self_code, setup_code, source, teardown_code])
+            code_to_display = '\n'.join([setup_code, source, teardown_code])
         else:
             if indent > 0:
                 source = dedent(source)
-            code_to_run = source[:]
+            code_to_run = code_to_display = source[:]
 
         if 'interleave' in layout:
             code_to_run = insert_output_start_stop_indicators(code_to_run)
@@ -141,10 +142,10 @@ class EmbedCodeDirective(Directive):
                 parts = ['import matplotlib', 'matplotlib.use("Agg")', code_to_run]
                 if 'plot' in layout:
                     parts.append('matplotlib.pyplot.savefig("%s")' % plot_fname)
-                skipped, failed, use_mpi, run_outputs = \
+                skipped, failed, run_outputs = \
                     run_code('\n'.join(parts), path, module=module, cls=class_)
             else:
-                skipped, failed, use_mpi, run_outputs = \
+                skipped, failed, run_outputs = \
                     run_code(code_to_run, path, module=module, cls=class_)
 
         if failed:
@@ -153,7 +154,7 @@ class EmbedCodeDirective(Directive):
             io_nodes = [get_skip_output_node(run_outputs, "skipped")]
         else:
             if 'output' in layout:
-                output_blocks = [run_outputs]
+                output_blocks = run_outputs if isinstance(run_outputs, list) else [run_outputs]
             elif 'interleave' in layout:
                 input_blocks = split_source_into_input_blocks(code_to_run)
                 output_blocks = extract_output_blocks(run_outputs)
