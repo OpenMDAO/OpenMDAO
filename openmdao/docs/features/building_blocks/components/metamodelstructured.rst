@@ -32,9 +32,9 @@ Examples
 A simple quick-start example is fitting the exclusive-or ("XOR") operator between
 two inputs, `x` and `y`:
 
-.. embed-test::
+.. embed-code::
     openmdao.components.tests.test_meta_model_structured.TestMetaModelStructuredMapFeature.test_xor
-    :no-split:
+    :layout: code, output
 
 
 An important consideration for multi-dimensional input is that the order in which
@@ -46,9 +46,9 @@ with shape (5, 12, 20).
 
 This is illustrated by the example:
 
-.. embed-test::
+.. embed-code::
     openmdao.components.tests.test_meta_model_structured.TestMetaModelStructuredMapFeature.test_shape
-    :no-split:
+    :layout: code, output
 
 Finally, it is possible to compute gradients with respect to the given
 output training data. These gradients are not computed by default, but 
@@ -64,6 +64,6 @@ to `True`. This automatically creates an input named `f_train` when the output
 `f` was added. The gradient of `f` with respect to `f_train` is also seen to 
 match the finite difference estimate in the `check_partials` output.
 
-.. embed-test::
+.. embed-code::
     openmdao.components.tests.test_meta_model_structured.TestMetaModelStructuredMapFeature.test_training_derivatives
-    :no-split:
+    :layout: code, output

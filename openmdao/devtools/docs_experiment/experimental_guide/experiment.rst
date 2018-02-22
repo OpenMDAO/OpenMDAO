@@ -154,15 +154,3 @@ Test embed with source and a skip.
 .. embed-code::
     openmdao.core.tests.test_connections.TestConnections.test_diff_conn_input_units
     :layout: code, output
-
-
-Old embed-test:
-
-.. code-block:: rst
-
-    .. embed-test::
-        openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source
-
-
-.. embed-test::
-    openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source

@@ -19,36 +19,41 @@ Examples
 
 You can check specific combinations of variables by specifying them manually:
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_problem.TestProblem.test_feature_check_totals_manual
+    :layout: interleave
 
 ----
 
 Check all the derivatives that the driver will need:
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_problem.TestProblem.test_feature_check_totals_from_driver
+    :layout: interleave
 
 ----
 
 Display the results in a compact format:
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_problem.TestProblem.test_feature_check_totals_from_driver_compact
+    :layout: interleave
 
 ----
 
 Use complex step instead of finite difference for a more accurate check. We also change to a larger
 step size to trigger the nonlinear Gauss-Seidel solver to try to converge after the step.
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_problem.TestProblem.test_feature_check_totals_cs
+    :layout: interleave
 
 ----
 
 Turn off standard output and just view the derivatives in the return:
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_problem.TestProblem.test_feature_check_totals_suppress
+    :layout: interleave
 
 .. tags:: Derivatives
