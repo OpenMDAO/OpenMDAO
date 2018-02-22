@@ -381,8 +381,8 @@ Embedding More Than Just Code
         This is where you would put a caption, after a blank line.
 
 
-6.  Use this directive to embed a test (it can do the same things as `embed-test` now, with better layout options, so
-    `embed-test` may be deprecated). Just use a dotted python path, as shown here:
+6.  Use this directive to embed a test (it can do the same things as former directive `embed-test`, with better layout options, so
+    `embed-test` was removed). Just use a dotted python path, as shown here:
 
 
     .. code-block:: rst
@@ -403,31 +403,6 @@ Embedding More Than Just Code
 There are many permutations of these four layout values that can help you customize the look of your code embedding to fit
 your specific purposes.  While doing :code:`:layout: output` might not really make any sense to do, you have the power
 to make nonsensical layouts, so use that power wisely.
-
-
-embed-test
-++++++++++
-
-        .. note:: The functionality of `embed_test` has been included in the more general `embed_code`, above.
-          It is suggested you go use that directive, as embed-test may soon be eliminated.
-
-
-        `embed-test` is a custom directive that lets a developer drop a specific single test
-        directly into a feature doc by including that test's full, dotted python
-        path.  The syntax for invoking the directive looks like this:
-
-        .. code-block:: rst
-
-            .. embed-test::
-                openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_input_input
-
-
-        The output from the above syntax should just look like a normal code block,
-        with the test code and the results of the test run (output) reported separately:
-
-
-        .. embed-test::
-            openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_input_input
 
 
 embed-options

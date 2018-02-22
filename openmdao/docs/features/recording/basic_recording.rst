@@ -69,5 +69,6 @@ A recorder can be attached to more than one object.  Also, more than one recorde
 A More Comprehensive Example
 ++++++++++++++++++++++++++++
 
-.. embed-test::
+.. embed-code::
     openmdao.recorders.tests.test_sqlite_recorder.TestSqliteRecorder.test_feature_simple_driver_recording
+    :layout: interleave
