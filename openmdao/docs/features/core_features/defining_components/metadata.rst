@@ -31,14 +31,15 @@ instantiated.
 A Simple Example
 ----------------
 
-Metadata is commonly used to specify the shape or size of the component's input and output 
+Metadata is commonly used to specify the shape or size of the component's input and output
 variables, such as in this simple example.
 
 .. embed-code::
     openmdao.test_suite.components.metadata_feature_vector
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_options_dictionary_feature.TestOptionsDictionaryFeature.test_simple
+    :layout: interleave
 
 
 Not setting a default value when declaring a metadata parameter implies that the value must be set by the user.
@@ -49,8 +50,9 @@ In this example, 'size' is required; We would have gotten an error if we:
 2. Did not set its value in the code for *VectorDoublingComp*.
 
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_options_dictionary_feature.TestOptionsDictionaryFeature.test_simple_fail
+    :layout: interleave
 
 
 Metadata Types
@@ -63,8 +65,9 @@ component takes a `Numpy` array as metadata:
 .. embed-code::
     openmdao.test_suite.components.metadata_feature_array
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_options_dictionary_feature.TestOptionsDictionaryFeature.test_simple_array
+    :layout: interleave
 
 
 It is even possible to provide a function as metadata:
@@ -73,8 +76,9 @@ It is even possible to provide a function as metadata:
 .. embed-code::
     openmdao.test_suite.components.metadata_feature_function
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_options_dictionary_feature.TestOptionsDictionaryFeature.test_simple_function
+    :layout: interleave
 
 Providing Default Values
 ------------------------
@@ -85,8 +89,9 @@ making it optional to pass the value in during component instantiation.
 .. embed-code::
     openmdao.test_suite.components.metadata_feature_lincomb
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_options_dictionary_feature.TestOptionsDictionaryFeature.test_with_default
+    :layout: interleave
 
 In this example, both 'a' and 'b' are optional, so it is valid to pass in 'a', but not 'b'.
 

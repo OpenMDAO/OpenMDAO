@@ -383,6 +383,7 @@ Embedding More Than Just Code
 
 6.  Use this directive to embed a test. Just use a dotted python path, as shown here:
 
+
     .. code-block:: rst
 
         .. embed-code::
