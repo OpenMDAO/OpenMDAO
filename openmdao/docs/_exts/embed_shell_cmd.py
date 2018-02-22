@@ -12,7 +12,7 @@ from docutils.parsers.rst.directives import unchanged
 import subprocess
 
 import sphinx
-from sphinx.util.compat import Directive
+from docutils.parsers.rst import Directive
 from sphinx.writers.html import HTMLTranslator
 from sphinx.errors import SphinxError
 
