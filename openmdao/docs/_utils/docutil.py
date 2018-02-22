@@ -725,7 +725,6 @@ def run_code(code_to_run, path, module=None, cls=None):
             for i in range(N_PROCS):
                 with open('%d.out' % i) as f:
                     output.append(f.read())
-                    print("RANK %d" % i, output[-1])
                 os.remove('%d.out' % i)
 
         elif module is None:
