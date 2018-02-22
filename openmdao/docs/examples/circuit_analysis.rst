@@ -15,6 +15,6 @@ Our goal is to solve for the steady-state voltages at node 1 and node 2.
 In order to find the voltages, we'll employ  `Kirchoff's voltage law <https://en.wikipedia.org/wiki/Kirchhoff%27s_circuit_laws>`_,
 and solve for the voltages needed at each node to drive the net-current to 0.
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.test_circuit_analysis_derivs.TestNonlinearCircuit.test_nonlinear_circuit_analysis
-    :no-split:
+    :layout: code, output

@@ -381,9 +381,7 @@ Embedding More Than Just Code
         This is where you would put a caption, after a blank line.
 
 
-6.  Use this directive to embed a test (it can do the same things as former directive `embed-test`, with better layout options, so
-    `embed-test` was removed). Just use a dotted python path, as shown here:
-
+6.  Use this directive to embed a test. Just use a dotted python path, as shown here:
 
     .. code-block:: rst
 

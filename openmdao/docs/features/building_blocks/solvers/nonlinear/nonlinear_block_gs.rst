@@ -20,8 +20,9 @@ NonlinearBlockGS doesn't work, then you will need to use :ref:`NewtonSolver <ope
 Here, we choose NonlinearBlockGS to solve the Sellar problem, which has two components with a
 cyclic dependency, has no implicit states, and works very well with Gauss-Seidel.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.nonlinear.tests.test_nonlinear_block_gs.TestNLBGaussSeidel.test_feature_basic
+    :layout: interleave
 
 This solver runs all of the subsystems each iteration, passing data along all connections
 including the cyclic ones. After each iteration, the iteration count and the residual norm are
@@ -46,8 +47,9 @@ NonlinearBlockGS Option Examples
   cut it back from the default, ten, down to two, so that it terminates a few iterations earlier and doesn't
   reach the specified absolute or relative tolerance.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.nonlinear.tests.test_nonlinear_block_gs.TestNLBGaussSeidel.test_feature_maxiter
+      :layout: interleave
 
 **atol**
 
@@ -56,8 +58,9 @@ NonlinearBlockGS Option Examples
   components and `evaluate` on explicit components. If this norm value is lower than the absolute
   tolerance `atol`, the iteration will terminate.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.nonlinear.tests.test_nonlinear_block_gs.TestNLBGaussSeidel.test_feature_atol
+      :layout: interleave
 
 **rtol**
 
@@ -66,7 +69,8 @@ NonlinearBlockGS Option Examples
   components and `evaluate` on explicit components. If the ratio of the currently calculated norm to the
   initial residual norm is lower than the relative tolerance `rtol`, the iteration will terminate.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.nonlinear.tests.test_nonlinear_block_gs.TestNLBGaussSeidel.test_feature_rtol
+      :layout: interleave
 
 .. tags:: Solver, NonlinearSolver
