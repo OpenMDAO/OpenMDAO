@@ -19,6 +19,7 @@ from six import StringIO, PY3
 from six.moves import range, cStringIO as cStringIO
 
 from sphinx.errors import SphinxError
+from sphinx.writers.html import HTMLTranslator
 from redbaron import RedBaron
 
 if sys.version_info[0] == 2:
@@ -30,6 +31,53 @@ sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite databas
 table_name = 'feature_unit_tests'   # name of the table to be queried
 
 _sub_runner = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'run_sub.py')
+
+
+class skipped_or_failed_node(nodes.Element):
+    pass
+
+
+def visit_skipped_or_failed_node(self, node):
+    pass
+
+
+def depart_skipped_or_failed_node(self, node):
+    if not isinstance(self, HTMLTranslator):
+        self.body.append("output only available for HTML\n")
+        return
+
+    html = '<div class="cell border-box-sizing code_cell rendered"><div class="output"><div class="inner_cell"><div class="{}"><pre>{}</pre></div></div></div></div>'.format(node["kind"], node["text"])
+    self.body.append(html)
+
+
+class in_or_out_node(nodes.Element):
+    pass
+
+
+def visit_in_or_out_node(self, node):
+    pass
+
+
+def depart_in_or_out_node(self, node):
+    """
+    This function creates the formatting that sets up the look of the blocks.
+    The look of the formatting is controlled by _theme/static/style.css
+    """
+    if not isinstance(self, HTMLTranslator):
+        self.body.append("output only available for HTML\n")
+        return
+    if node["kind"] == "In":
+        html = '<div class="highlight-python"><div class="highlight"><pre>{}</pre></div></div>'.format(node["text"])
+    elif node["kind"] == "Out":
+        html = '<div class="cell border-box-sizing code_cell rendered"><div class="output_area"><pre>{}</pre></div></div>'.format(node["text"])
+
+    self.body.append(html)
+
+
+def node_setup(app):
+    app.add_node(skipped_or_failed_node, html=(visit_skipped_or_failed_node, depart_skipped_or_failed_node))
+    app.add_node(in_or_out_node, html=(visit_in_or_out_node, depart_in_or_out_node))
+
 
 def remove_docstrings(source):
     """
@@ -830,14 +878,6 @@ def process_output(code_to_run, skipped, failed, run_outputs):
         skipped_output = None
 
     return skipped_output, input_blocks, output_blocks
-
-
-class skipped_or_failed_node(nodes.Element):
-    pass
-
-
-class in_or_out_node(nodes.Element):
-    pass
 
 
 def get_skip_output_node(output, skip_type):
