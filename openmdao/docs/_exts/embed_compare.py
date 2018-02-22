@@ -3,9 +3,7 @@
 from docutils import nodes
 
 import sphinx
-from sphinx.util.compat import Directive
-from sphinx.writers.html import HTMLTranslator
-
+from docutils.parsers.rst import Directive
 from openmdao.docs._utils.docutil import get_source_code
 
 

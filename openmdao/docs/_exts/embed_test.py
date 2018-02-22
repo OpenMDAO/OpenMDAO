@@ -9,7 +9,8 @@ from docutils import nodes
 from docutils.parsers.rst.directives import unchanged
 
 import sphinx
-from sphinx.util.compat import Directive
+from docutils.parsers.rst import Directive
+
 from sphinx.writers.html import HTMLTranslator
 
 from openmdao.docs._utils.docutil import get_and_run_test

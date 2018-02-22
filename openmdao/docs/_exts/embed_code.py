@@ -1,11 +1,9 @@
 
 import unittest
 from docutils import nodes
-from sphinx.util.compat import Directive
+from docutils.parsers.rst import Directive
 from sphinx.errors import SphinxError
 
-import traceback
-import fnmatch
 import inspect
 import os
 
@@ -91,11 +89,9 @@ class EmbedCodeDirective(Directive):
             _plot_count += 1
             plot_dir = os.path.dirname(path)
             plot_fname = 'doc_plot_%d.png' % _plot_count
-            print("PLOT_FNAME:", plot_fname)
             plot_file_abs = os.path.join(os.path.abspath(plot_dir), plot_fname)
             if os.path.isfile(plot_file_abs):
                 # remove any existing plot file
-                print("REMOVING", plot_file_abs)
                 os.remove(plot_file_abs)
 
         # Modify the source prior to running
