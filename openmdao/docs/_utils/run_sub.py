@@ -30,4 +30,3 @@ if __name__ == '__main__':
     np.set_printoptions(precision=8)
 
     exec(code_to_run, mod.__dict__)
-

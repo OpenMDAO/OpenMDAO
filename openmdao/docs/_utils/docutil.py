@@ -660,7 +660,6 @@ def run_code(code_to_run, path, module=None, cls=None):
             code_dir = '/'.join(module.__file__.split('/')[:-1])
             env['OPENMDAO_CURRENT_MODULE'] = module.__name__
             env['OPENMDAO_CODE_TO_RUN'] = code_to_run
-            print("CODE:\n", code_to_run)
 
         os.chdir(code_dir)
 
