@@ -3,20 +3,53 @@ This is a multipoint implementation of the beam optimization problem.
 
 
 """
-
 from __future__ import division
+from six.moves import range
+
 import numpy as np
 
 from openmdao.api import Group, IndepVarComp, ParallelGroup, ExecComp
 
-from openmdao.test_suite.test_examples.beam_optimization.components.compliance_comp import ComplianceComp
-from openmdao.test_suite.test_examples.beam_optimization.components.displacements_comp import DisplacementsComp
+from openmdao.test_suite.test_examples.beam_optimization.components.compliance_comp import MultiComplianceComp
+from openmdao.test_suite.test_examples.beam_optimization.components.displacements_comp import MultiDisplacementsComp
 from openmdao.test_suite.test_examples.beam_optimization.components.global_stiffness_matrix_comp import GlobalStiffnessMatrixComp
 from openmdao.test_suite.test_examples.beam_optimization.components.interp import BsplinesComp
 from openmdao.test_suite.test_examples.beam_optimization.components.local_stiffness_matrix_comp import LocalStiffnessMatrixComp
 from openmdao.test_suite.test_examples.beam_optimization.components.moment_comp import MomentOfInertiaComp
-from openmdao.test_suite.test_examples.beam_optimization.components.states_comp import StatesComp
+from openmdao.test_suite.test_examples.beam_optimization.components.states_comp import MultiStatesComp
 from openmdao.test_suite.test_examples.beam_optimization.components.volume_comp import VolumeComp
+
+
+def divide_cases(ncases, nprocs):
+    """
+    Divide up load cases among available procs.
+
+    Parameters
+    ----------
+    ncases : int
+        Number of load cases.
+    nprocs : int
+        Number of processors.
+
+    Returns
+    -------
+    list of list of int
+        Integer case numbers for each proc.
+    """
+    data = []
+    for j in range(nprocs):
+        data.append([])
+
+    wrap = 0
+    for j in range(ncases):
+        idx = j - wrap
+        if idx >= nprocs:
+            idx = 0
+            wrap = j
+
+        data[idx].append(j)
+
+    return data
 
 
 class MultipointBeamGroup(Group):
@@ -60,52 +93,62 @@ class MultipointBeamGroup(Group):
         # Parallel Subsystem for load cases.
         par = self.add_subsystem('parallel', ParallelGroup())
 
-        obj_terms = []
-        for j in range(num_load_cases):
+        # Determine how to split cases up over the available procs.
+        nprocs = self.comm.size
+        divide = divide_cases(num_load_cases, nprocs)
+
+        obj_srcs = []
+        for j, this_proc in enumerate(divide):
+            num_rhs = len(this_proc)
 
             name = 'sub_%d' % j
             sub = par.add_subsystem(name, Group())
 
             # Load is a sinusoidal distributed force of varying spatial frequency.
-            end = 1.5 * np.pi
-            if num_load_cases > 1:
-                end += j * 0.5 * np.pi / (num_load_cases - 1)
+            force_vector = np.zeros((2 * num_nodes, num_rhs))
+            for k in this_proc:
 
-            x = np.linspace(0, end, num_nodes)
-            f = - np.sin(x)
-            force_vector = np.zeros(2 * num_nodes)
-            force_vector[0:-1:2] = f
+                end = 1.5 * np.pi
+                if num_load_cases > 1:
+                    end += k * 0.5 * np.pi / (num_load_cases - 1)
 
-            comp = StatesComp(num_elements=num_elements, force_vector=force_vector)
+                x = np.linspace(0, end, num_nodes)
+                f = - np.sin(x)
+                force_vector[0:-1:2, k] = f
+
+            comp = MultiStatesComp(num_elements=num_elements, force_vector=force_vector,
+                                   num_rhs=num_rhs)
             sub.add_subsystem('states_comp', comp)
 
-            comp = DisplacementsComp(num_elements=num_elements)
+            comp = MultiDisplacementsComp(num_elements=num_elements, num_rhs=num_rhs)
             sub.add_subsystem('displacements_comp', comp)
 
-            comp = ComplianceComp(num_elements=num_elements, force_vector=force_vector)
+            comp = MultiComplianceComp(num_elements=num_elements, force_vector=force_vector,
+                                       num_rhs=num_rhs)
             sub.add_subsystem('compliance_comp', comp)
 
             self.connect(
                 'global_stiffness_matrix_comp.K',
                 'parallel.%s.states_comp.K' % name)
-            sub.connect(
-                'states_comp.d',
-                'displacements_comp.d')
-            sub.connect(
-                'displacements_comp.displacements',
-                'compliance_comp.displacements')
 
-            obj_terms.append('compliance_%d' % j)
+            for k in this_proc:
+                sub.connect(
+                    'states_comp.d_%d' % k,
+                    'displacements_comp.d_%d' % k)
+                sub.connect(
+                    'displacements_comp.displacements_%d' % k,
+                    'compliance_comp.displacements_%d' % k)
+
+                obj_srcs.append('parallel.%s.compliance_comp.compliance_%d' % (name, k))
 
         comp = VolumeComp(num_elements=num_elements, b=b, L=L)
         self.add_subsystem('volume_comp', comp)
 
-        comp = ExecComp(['obj = ' + ' + '.join(obj_terms)])
+        comp = ExecComp(['obj = ' + ' + '.join(['compliance_%d' % i for i in range(num_load_cases)])])
         self.add_subsystem('obj_sum', comp)
 
-        for j in range(num_load_cases):
-            self.connect('parallel.sub_%d.compliance_comp.compliance' % j,
-                         'obj_sum.compliance_%d' % j)
+        for j, src in enumerate(obj_srcs):
+            self.connect(src, 'obj_sum.compliance_%d' % j)
 
         self.connect('inputs_comp.h_cp', 'interp.h_cp')
         self.connect('interp.h', 'I_comp.h')
