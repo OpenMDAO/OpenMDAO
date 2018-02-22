@@ -205,3 +205,7 @@ class EmbedCodeDirective(Directive):
 def setup(app):
     """add custom directive into Sphinx so that it is found during document parsing"""
     app.add_directive('embed-code', EmbedCodeDirective)
+    app.add_node(skipped_or_failed_node, html=(visit_skipped_or_failed_node, depart_skipped_or_failed_node))
+    app.add_node(in_or_out_node, html=(visit_in_or_out_node, depart_in_or_out_node))
+
+    return {'version': sphinx.__display_version__, 'parallel_read_safe': True}
