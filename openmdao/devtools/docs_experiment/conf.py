@@ -91,7 +91,6 @@ extensions = [
     'numpydoc',
     'embed_code',
     'embed_options',
-    'embed_test',
     'embed_compare',
     'embed_shell_cmd',
     'embed_bibtex',

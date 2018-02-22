@@ -119,11 +119,10 @@ class EmbedCodeDirective(Directive):
                 teardown_code = ''
 
             code_to_run = '\n'.join([self_code, setup_code, source, teardown_code])
-            code_to_display = '\n'.join([setup_code, source, teardown_code])
         else:
             if indent > 0:
                 source = dedent(source)
-            code_to_run = code_to_display = source[:]
+            code_to_run = source[:]
 
         if 'interleave' in layout:
             code_to_run = insert_output_start_stop_indicators(code_to_run)
@@ -150,7 +149,10 @@ class EmbedCodeDirective(Directive):
             if 'output' in layout:
                 output_blocks = run_outputs if isinstance(run_outputs, list) else [run_outputs]
             elif 'interleave' in layout:
-                input_blocks = split_source_into_input_blocks(code_to_run)
+                if is_test:
+                    input_blocks = split_source_into_input_blocks(code_to_run[len(self_code)+1:])
+                else:
+                    input_blocks = split_source_into_input_blocks(code_to_run)
                 output_blocks = extract_output_blocks(run_outputs)
 
                 # the last input block may not produce any output
