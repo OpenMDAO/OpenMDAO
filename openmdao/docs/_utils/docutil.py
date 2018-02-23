@@ -589,7 +589,7 @@ def extract_output_blocks(run_output):
     for line in run_output.splitlines():
         if output_block is None:
             output_block = []
-        if line[:5] == '>>>>>':  # line.startswith('>>>>>'):
+        if line[:5] == '>>>>>':
             output_blocks.append('\n'.join(output_block))
             output_block = None
         else:
@@ -675,7 +675,7 @@ def sync_multi_output_blocks(blocks):
         return []
 
 
-def run_code(code_to_run, path, module=None, cls=None):
+def run_code(code_to_run, path, module=None, cls=None, shows_plot=False):
     """
     Run the given code chunk and collect the output.
     """
@@ -695,26 +695,26 @@ def run_code(code_to_run, path, module=None, cls=None):
             use_mpi =  N_PROCS > 1
 
     try:
-        env = os.environ.copy()
-
         # use subprocess to run code to avoid any nasty interactions between codes
 
         # Move to the test directory in case there are files to read.
         save_dir = os.getcwd()
 
         if module is None:
-            code_dir = os.path.dirname(path)
+            code_dir = os.path.dirname(os.path.abspath(path))
         else:
-            code_dir = '/'.join(module.__file__.split('/')[:-1])
-            env['OPENMDAO_CURRENT_MODULE'] = module.__name__
-            env['OPENMDAO_CODE_TO_RUN'] = code_to_run
+            code_dir = os.path.dirname(os.path.abspath(module.__file__))
 
         os.chdir(code_dir)
 
         if use_mpi:
+            env = os.environ.copy()
 
             # output will be written to one file per process
             env['USE_PROC_FILES'] = '1'
+
+            env['OPENMDAO_CURRENT_MODULE'] = module.__name__
+            env['OPENMDAO_CODE_TO_RUN'] = code_to_run
 
             p = subprocess.Popen(['mpirun', '-n', str(N_PROCS), 'python', _sub_runner],
                                  env=env)
@@ -727,24 +727,56 @@ def run_code(code_to_run, path, module=None, cls=None):
                     output.append(f.read())
                 os.remove('%d.out' % i)
 
-        elif module is None:
-            # write modified code to a file so we can run it.
-            fd, code_to_run_path = tempfile.mkstemp()
-            with os.fdopen(fd, 'w') as tmp:
-                tmp.write(code_to_run)
+        elif shows_plot:
+            if module is None:
+                # write code to a file so we can run it.
+                fd, code_to_run_path = tempfile.mkstemp()
+                with os.fdopen(fd, 'w') as tmp:
+                    tmp.write(code_to_run)
+                try:
+                    p = subprocess.Popen(['python', code_to_run_path],
+                                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=os.environ)
+                    output, _ = p.communicate()
+                finally:
+                    os.remove(code_to_run_path)
+            else:
+                env = os.environ.copy()
 
-            try:
-                output = subprocess.check_output(['python', code_to_run_path],
-                                                 stderr=subprocess.STDOUT).decode('utf-8', 'ignore')
-            finally:
-                os.remove(code_to_run_path)
-        else:
-            p = subprocess.Popen(['python', _sub_runner],
-                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
-            output, _ = p.communicate()
+                env['OPENMDAO_CURRENT_MODULE'] = module.__name__
+                env['OPENMDAO_CODE_TO_RUN'] = code_to_run
+
+                p = subprocess.Popen(['python', _sub_runner],
+                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
+                output, _ = p.communicate()
             output = output.decode('utf-8', 'ignore')
-            # output = subprocess.check_output(['python', _sub_runner],
-            #                                  stderr=subprocess.STDOUT).decode('utf-8', 'ignore')
+        else:
+            # just exec() the code for serial tests.
+
+            # capture all output
+            stdout = sys.stdout
+            stderr = sys.stderr
+            strout = cStringIO()
+            sys.stdout = strout
+            sys.stderr = strout
+
+            # We need more precision from numpy
+            save_opts = np.get_printoptions()
+            np.set_printoptions(precision=8)
+
+            if module is None:
+                globals_dict = {
+                        '__file__': path,
+                        '__name__': '__main__',
+                        '__package__': None,
+                        '__cached__': None,
+                }
+            else:
+                globals_dict = module.__dict__
+
+            exec(code_to_run, globals_dict)
+
+            np.set_printoptions(precision=save_opts['precision'])
+            output = strout.getvalue()
 
     except subprocess.CalledProcessError as e:
         output = e.output.decode('utf-8', 'ignore')
@@ -756,9 +788,14 @@ def run_code(code_to_run, path, module=None, cls=None):
         else:
             output = "Running of embedded test {} in docs failed due to: \n\n{}".format(path, output)
             failed = True
+    except unittest.SkipTest as skip:
+        output = str(skip)
+        skipped = True
+    except Exception as exc:
+        output = "Running of embedded test {} in docs failed due to: \n\n{}".format(path, str(exc))
+        failed = True
     finally:
         os.chdir(save_dir)
-        # os.remove(code_to_run_path)
 
     return skipped, failed, output
 

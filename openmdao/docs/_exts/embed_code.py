@@ -83,7 +83,7 @@ class EmbedCodeDirective(Directive):
         do_run = 'output' in layout or 'interleave' in layout or 'plot' in layout
 
         if 'plot' in layout:
-            plot_dir = os.path.dirname(path)
+            plot_dir = os.getcwd()
             plot_fname = 'doc_plot_%d.png' % _plot_count
             _plot_count += 1
 
@@ -134,9 +134,10 @@ class EmbedCodeDirective(Directive):
                 # insert lines to generate the plot file
                 parts = ['import matplotlib', 'matplotlib.use("Agg")', code_to_run]
                 if 'plot' in layout:
-                    parts.append('matplotlib.pyplot.savefig("%s")' % plot_fname)
+                    parts.append('matplotlib.pyplot.savefig("%s")' % plot_file_abs)
                 skipped, failed, run_outputs = \
-                    run_code('\n'.join(parts), path, module=module, cls=class_)
+                    run_code('\n'.join(parts), path, module=module, cls=class_,
+                             shows_plot=True)
             else:
                 skipped, failed, run_outputs = \
                     run_code(code_to_run, path, module=module, cls=class_)
@@ -170,7 +171,10 @@ class EmbedCodeDirective(Directive):
 
                 directive_dir = os.path.relpath(os.getcwd(),
                                                 os.path.dirname(self.state.document.settings._source))
-                plot_file = os.path.join(directive_dir, plot_dir, plot_fname)
+                # this filename must NOT contain an absolute path, else the Figure will not
+                # be able to find the image file in the genearted html dir.
+                plot_file = os.path.join(directive_dir, plot_fname)
+
                 # create plot node
                 fig = images.Figure(self.name, [plot_file], self.options, self.content, self.lineno,
                                     self.content_offset, self.block_text, self.state,

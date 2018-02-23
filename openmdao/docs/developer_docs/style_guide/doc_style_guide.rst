@@ -216,7 +216,7 @@ embed-code
         .. code-block:: rst
 
             .. embed-code::
-              openmdao.core.tests.test_expl_comp.RectangleComp
+                openmdao.core.tests.test_expl_comp.RectangleComp
 
 
         What the above directive will do is replace the directive and its arg with the class
@@ -224,7 +224,7 @@ embed-code
         The resulting output will look like this:
 
         .. embed-code::
-          openmdao.core.tests.test_expl_comp.RectangleComp
+            openmdao.core.tests.test_expl_comp.RectangleComp
 
         Embedding in this fashion has the benefit of allowing you to drop entire code blocks into
         a feature doc that may, for example, illustrate a usage example. Another great benefit of this
@@ -242,8 +242,8 @@ embed-code
         The resulting output with the docstring looks like this:
 
         .. embed-code::
-          openmdao.core.tests.test_expl_comp.RectangleComp
-          :strip-docstrings:
+            openmdao.core.tests.test_expl_comp.RectangleComp
+            :strip-docstrings:
 
 
 Embedding More Than Just Code
