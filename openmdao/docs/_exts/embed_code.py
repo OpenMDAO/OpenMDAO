@@ -143,9 +143,9 @@ class EmbedCodeDirective(Directive):
                     run_code(code_to_run, path, module=module, cls=class_)
 
         if failed:
-            io_nodes = [get_skip_output_node(run_outputs, "failed")]
+            raise SphinxError(run_outputs)
         elif skipped:
-            io_nodes = [get_skip_output_node(run_outputs, "skipped")]
+            io_nodes = [get_skip_output_node(run_outputs)]
         else:
             if 'output' in layout:
                 output_blocks = run_outputs if isinstance(run_outputs, list) else [run_outputs]

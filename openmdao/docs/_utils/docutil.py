@@ -744,13 +744,13 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False):
             output = reason_for_skip
             skipped = True
         else:
-            output = "Running of embedded test {} in docs failed due to: \n\n{}".format(path, output)
+            output = "Running of embedded code {} in docs failed due to: \n\n{}".format(path, output)
             failed = True
     except unittest.SkipTest as skip:
         output = str(skip)
         skipped = True
     except Exception as exc:
-        output = "Running of embedded test {} in docs failed due to: \n\n{}".format(path, str(exc))
+        output = "Running of embedded code {} in docs failed due to: \n\n{}".format(path, str(exc))
         failed = True
     finally:
         os.chdir(save_dir)
@@ -758,10 +758,8 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False):
     return skipped, failed, output
 
 
-def get_skip_output_node(output, skip_type):
-    if skip_type == "skipped":
-        output = "Test skipped because " + output
-
+def get_skip_output_node(output):
+    output = "Test skipped because " + output
     return skipped_or_failed_node(text=output, number=1, kind=skip_type)
 
 
