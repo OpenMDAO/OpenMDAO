@@ -106,7 +106,7 @@ class MultipointBeamGroup(Group):
 
             # Load is a sinusoidal distributed force of varying spatial frequency.
             force_vector = np.zeros((2 * num_nodes, num_rhs))
-            for k in this_proc:
+            for i, k in enumerate(this_proc):
 
                 end = 1.5 * np.pi
                 if num_load_cases > 1:
@@ -114,7 +114,7 @@ class MultipointBeamGroup(Group):
 
                 x = np.linspace(0, end, num_nodes)
                 f = - np.sin(x)
-                force_vector[0:-1:2, k] = f
+                force_vector[0:-1:2, i] = f
 
             comp = MultiStatesComp(num_elements=num_elements, force_vector=force_vector,
                                    num_rhs=num_rhs)
@@ -131,7 +131,7 @@ class MultipointBeamGroup(Group):
                 'global_stiffness_matrix_comp.K',
                 'parallel.%s.states_comp.K' % name)
 
-            for k in this_proc:
+            for k in range(num_rhs):
                 sub.connect(
                     'states_comp.d_%d' % k,
                     'displacements_comp.d_%d' % k)
