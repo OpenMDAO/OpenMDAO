@@ -98,8 +98,7 @@ install:
 
 - if [ "$MPI" ]; then
     pip install mpi4py;
-    pip install git+https://bitbucket.org/petsc/petsc4py
-    #@3.7.0;
+    pip install git+https://bitbucket.org/petsc/petsc4py@master;
   fi
 
 - pip install redbaron
