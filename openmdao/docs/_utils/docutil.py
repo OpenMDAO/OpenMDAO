@@ -689,6 +689,9 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False):
                     p = subprocess.Popen(['python', code_to_run_path],
                                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=os.environ)
                     output, _ = p.communicate()
+                    if p.returncode != 0:
+                        failed = True
+
                 finally:
                     os.remove(code_to_run_path)
             else:
@@ -700,6 +703,9 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False):
                 p = subprocess.Popen(['python', _sub_runner],
                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
                 output, _ = p.communicate()
+                if p.returncode != 0:
+                    failed = True
+
             output = output.decode('utf-8', 'ignore')
         else:
             # just exec() the code for serial tests.
