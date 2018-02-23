@@ -10,18 +10,18 @@ import numpy as np
 
 if __name__ == '__main__':
     module_path = os.environ.get("OPENMDAO_CURRENT_MODULE", "").strip()
-    if not module_path:
-        raise RuntimeError("OPENMDAO_CURRENT_MODULE has not been set.")
+    if module_path:
+        stdout_save = sys.stdout
 
-    stdout_save = sys.stdout
+        # send any output to dev/null during the import so it doesn't clutter our embedded code output
+        with open(os.devnull, "w") as f:
+            sys.stdout = f
 
-    # send any output to dev/null during the import so it doesn't clutter our embedded code output
-    with open(os.devnull, "w") as f:
-        sys.stdout = f
+            mod = importlib.import_module(module_path)
 
-        mod = importlib.import_module(module_path)
-
-    sys.stdout = stdout_save
+        sys.stdout = stdout_save
+    else:
+        raise RuntimeError("OPENMDAO_CURRENT_MODULE was no specified")
 
     if os.environ.get("USE_PROC_FILES"):
         from openmdao.utils.mpi import use_proc_files

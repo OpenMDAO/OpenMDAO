@@ -47,7 +47,7 @@ Code embed with block output followed by a plot.
 .. code-block:: rst
 
     .. embed-code::
-        experimental_guide/examples/bezier_plot.py
+        experimental_guide/examples/sin_plot.py
         :layout: output, plot
         :align: center
 
@@ -55,7 +55,7 @@ Code embed with block output followed by a plot.
 
 
 .. embed-code::
-    experimental_guide/examples/bezier_plot.py
+    experimental_guide/examples/sin_plot.py
     :layout: output, plot
     :align: center
 
