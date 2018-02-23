@@ -239,7 +239,7 @@ embed-code
               openmdao.core.tests.test_expl_comp.RectangleComp
               :strip-docstrings:
 
-        The resulting output with the docstring looks like this:
+        The resulting output without the docstring looks like this:
 
         .. embed-code::
             openmdao.core.tests.test_expl_comp.RectangleComp

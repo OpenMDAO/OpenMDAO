@@ -172,7 +172,7 @@ class EmbedCodeDirective(Directive):
                 directive_dir = os.path.relpath(os.getcwd(),
                                                 os.path.dirname(self.state.document.settings._source))
                 # this filename must NOT contain an absolute path, else the Figure will not
-                # be able to find the image file in the genearted html dir.
+                # be able to find the image file in the generated html dir.
                 plot_file = os.path.join(directive_dir, plot_fname)
 
                 # create plot node

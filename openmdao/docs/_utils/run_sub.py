@@ -21,7 +21,7 @@ if __name__ == '__main__':
 
         sys.stdout = stdout_save
     else:
-        raise RuntimeError("OPENMDAO_CURRENT_MODULE was no specified")
+        raise RuntimeError("OPENMDAO_CURRENT_MODULE was not specified")
 
     if os.environ.get("USE_PROC_FILES"):
         from openmdao.utils.mpi import use_proc_files
