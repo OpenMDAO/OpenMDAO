@@ -227,20 +227,6 @@ def replace_asserts_with_prints(src):
     return rb.dumps()
 
 
-# def get_method_body(method_code):
-#     '''Using the RedBaron module, get the body of a method.
-#
-#     Do not want the definition signature line
-#     '''
-#
-#     method_code = '\n' + method_code  # For some reason RedBaron has problems with this if
-#     #                                                     if it does not start with an empty line
-#     rb = RedBaron(method_code)
-#     def_node = rb.findAll("DefNode")[0]  # Look for the 'def' node. Should only be one!
-#     def_node.value.decrease_indentation(8)  # so that the code is all the way to the left
-#     return def_node.value.dumps()
-
-
 def remove_initial_empty_lines(source):
     """
     Some initial empty lines were added to keep RedBaron happy.
@@ -316,40 +302,6 @@ def get_source_code(path):
     return remove_leading_trailing_whitespace_lines(source), indent, module, cls
 
 
-# def get_test_source_code_for_feature(feature_name):
-#     '''The function to be called from the custom Sphinx directive code
-#     that includes relevant unit test code(s).
-#
-#     It gets the test source from the unit tests that have been
-#     marked to indicate that they are associated with the "feature_name"'''
-#
-#     # get the:
-#     #
-#     #   1. title of the test
-#     #   2. test source code
-#     #   3. output of running the test
-#     #
-#     # from from the database that was created during an earlier
-#     # phase of the doc build process using the
-#     # devtools/create_feature_docs_unit_test_db.py script
-#
-#     conn = sqlite3.connect(sqlite_file)
-#     cur = conn.cursor()
-#     cur.execute('SELECT title, unit_test_source, run_outputs FROM {tn} WHERE feature="{fn}"'.
-#                 format(tn=table_name, fn=feature_name))
-#     all_rows = cur.fetchall()
-#     conn.close()
-#
-#     test_source_code_for_feature = []
-#
-#     # Loop through all the unit tests that are relevant to this feature name
-#     for title, unit_test_source, run_outputs in all_rows:
-#         # add to the list that will be returned
-#         test_source_code_for_feature.append((title, unit_test_source, run_outputs))
-#
-#     return test_source_code_for_feature
-#
-#
 def remove_raise_skip_tests(src):
     """
     Remove from the code any raise unittest.SkipTest lines since we don't want those in
@@ -798,36 +750,6 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False):
         os.chdir(save_dir)
 
     return skipped, failed, output
-
-
-def process_output(code_to_run, skipped, failed, run_outputs):
-    if skipped:
-        input_blocks = output_blocks = None
-        skipped_output = run_outputs
-    elif failed:
-        raise SphinxError(run_outputs)
-    else:
-        #####################
-        ### 5. Split source up into groups of "In" blocks -> input_blocks ###
-        #####################
-        input_blocks = split_source_into_input_blocks(code_to_run)
-
-        #####################
-        ### 6. Extract from run_outputs, the Out blocks -> output_blocks ###
-        #####################
-        output_blocks = extract_output_blocks(run_outputs)
-
-        # the last input block may not produce any output
-        if len(output_blocks) == len(input_blocks) - 1:
-            output_blocks.append('')
-
-        # Need to deal with the cases when there is no output for a given input block
-        # Merge an input block with the previous block and throw away the output block
-        input_blocks, output_blocks = clean_up_empty_output_blocks(input_blocks, output_blocks)
-
-        skipped_output = None
-
-    return skipped_output, input_blocks, output_blocks
 
 
 def get_skip_output_node(output, skip_type):
