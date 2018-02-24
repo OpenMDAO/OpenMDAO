@@ -211,6 +211,13 @@ def set_pyoptsparse_opt(optname):
                     OPTIMIZER = 'SLSQP'
                 except Exception:
                     pass
+        else:
+            if isinstance(opt, Mock):
+                try:
+                    opt = OPT('SLSQP')
+                    OPTIMIZER = 'SLSQP'
+                except Exception:
+                    pass
     except Exception:
         pass
 

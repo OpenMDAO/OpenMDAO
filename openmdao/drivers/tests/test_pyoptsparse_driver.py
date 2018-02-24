@@ -1602,8 +1602,9 @@ class TestPyoptSparseFeature(unittest.TestCase):
 
         assert_rel_error(self, prob['z'][0], 1.98337708, 1e-3)
 
-    @unittest.skipIf(OPTIMIZER != "SNOPT", "pyoptsparse is not providing SNOPT")
     def test_snopt_atol(self):
+        if OPTIMIZER != "SNOPT":
+            raise unittest.SkipTest("pyoptsparse is not providing SNOPT")
         import numpy as np
 
         from openmdao.api import Problem, pyOptSparseDriver
