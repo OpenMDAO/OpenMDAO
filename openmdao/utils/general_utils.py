@@ -4,6 +4,7 @@ from __future__ import division
 import os
 import sys
 import warnings
+from mock import Mock
 from fnmatch import fnmatchcase
 from six import string_types
 from six.moves import range
@@ -192,6 +193,7 @@ def set_pyoptsparse_opt(optname):
         Pyoptsparse optimizer string
     """
     OPT = None
+    opt = None
     OPTIMIZER = None
     force = os.environ.get('OPENMDAO_FORCE_PYOPTSPARSE_OPT')
     if force:
@@ -200,17 +202,20 @@ def set_pyoptsparse_opt(optname):
     try:
         from pyoptsparse import OPT
         try:
-            OPT(optname)
+            opt = OPT(optname)
             OPTIMIZER = optname
         except Exception:
             if optname != 'SLSQP':
                 try:
-                    OPT('SLSQP')
+                    opt = OPT('SLSQP')
                     OPTIMIZER = 'SLSQP'
                 except Exception:
                     pass
     except Exception:
         pass
+
+    if isinstance(opt, Mock):
+        OPT = OPTIMIZER = None
 
     return OPT, OPTIMIZER
 

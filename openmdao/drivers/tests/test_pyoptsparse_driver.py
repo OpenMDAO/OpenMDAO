@@ -1602,7 +1602,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
 
         assert_rel_error(self, prob['z'][0], 1.98337708, 1e-3)
 
-    @unittest.skipIf(OPTIMIZER in [None, "SLSQP"], "pyoptsparse is not providing SNOPT")
+    @unittest.skipIf(OPTIMIZER != "SNOPT", "pyoptsparse is not providing SNOPT")
     def test_snopt_atol(self):
         import numpy as np
 

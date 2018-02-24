@@ -11,6 +11,7 @@ import sqlite3
 import subprocess
 import tempfile
 import unittest
+import traceback
 from docutils import nodes
 
 import numpy as np
@@ -750,7 +751,7 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False):
         output = str(skip)
         skipped = True
     except Exception as exc:
-        output = "Running of embedded code {} in docs failed due to: \n\n{}".format(path, str(exc))
+        output = "Running of embedded code {} in docs failed due to: \n\n{}".format(path, traceback.format_exc())
         failed = True
     finally:
         os.chdir(save_dir)
@@ -760,7 +761,7 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False):
 
 def get_skip_output_node(output):
     output = "Test skipped because " + output
-    return skipped_or_failed_node(text=output, number=1, kind=skip_type)
+    return skipped_or_failed_node(text=output, number=1, kind="skipped")
 
 
 def get_interleaved_io_nodes(input_blocks, output_blocks):

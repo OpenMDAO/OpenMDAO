@@ -184,3 +184,10 @@ MPI test
 .. embed-code::
     openmdao.core.tests.test_parallel_derivatives.ParDerivColorFeatureTestCase.test_fwd_vs_rev
     :layout: interleave
+
+
+SNOPT test
+
+.. embed-code::
+    openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseFeature.test_snopt_atol
+    :layout: interleave
