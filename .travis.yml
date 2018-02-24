@@ -80,7 +80,7 @@ install:
 # keeping numpy pinned at 1.12 because pySNOPT dies with 1.13 because numpy broke callback
 #- conda install --yes nomkl
 - conda install --yes python=$PY
-- conda install --yes numpy==1.12 scipy=0.19.1 nose sphinx mock swig pip matplotlib
+- conda install --yes numpy==1.12 scipy=0.19.1 nose sphinx mock swig pip
 - pip install --upgrade pip
 
 # install pyoptsparse
@@ -106,6 +106,9 @@ install:
 - pip install coverage
 - pip install git+https://github.com/swryan/coveralls-python@work
 - pip install .  # Not using -e on purpose here, to catch pkging errors
+
+# do this after petsc install to avoid weird petsc install failure
+- conda install --yes matplotlib
 
 script:
 # make docs first
