@@ -108,11 +108,10 @@ def parametric_suite(*args, **kwargs):
     """
     Decorator used for testing a range of different options for a particular
     ParametericTestGroup. If args is present, must only be the value '*',
-    indicating running all available groups/parameters. Otherwise, use kwargs to set the options
-    like so:
-        arg=value will specify that option,
-        arg='*' will vary over all default options,
-        arg=iterable will iterate over the given options.
+    indicating running all available groups/parameters. Otherwise, use kwargs to set the options like so:
+    arg=value will specify that option,
+    arg='*' will vary over all default options,
+    arg=iterable will iterate over the given options.
     Arguments that are not specified will have a reasonable default chosen."""
     run_by_default = kwargs.pop('run_by_default', False)
     test_cases = _test_suite(*args, **kwargs)
@@ -143,7 +142,6 @@ class ParameterizedInstance(object):
         Linear solver to be instantiated at the problem level.
     linear_solver_options : dict
         Options to pass into the constructor for `linear_solver_class`.
-
     """
     def __init__(self, group_type, **kwargs):
 

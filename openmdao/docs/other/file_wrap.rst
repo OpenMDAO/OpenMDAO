@@ -87,8 +87,9 @@ Let's say you want to replace the second integer in the input file above
 with a 7. The code would look like this.
 
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_file_wrap.FileGenFeature.test_transfer
+    :layout: interleave
 
 
 .. index:: mark_anchor
@@ -103,8 +104,9 @@ after the second ``INPUT`` statement. An additional argument can be passed to th
 ``mark_anchor`` method to tell it to start at the second instance of the text
 fragment ``"INPUT"``.
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_file_wrap.FileGenFeature.test_transfer_2
+    :layout: interleave
 
 
 Note that you are able to pass a floating point value to ``transfer_var`` and still
@@ -121,16 +123,18 @@ You can also count backwards from the bottom of the file by passing a negative
 number. Here, the second instance of ``"INPUT"`` from the bottom brings you
 back to the first one.
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_file_wrap.FileGenFeature.test_transfer_minus2
+    :layout: interleave
 
 
 There is also a method for replacing an entire array of values. Try
 replacing the set of three integers as follows:
 
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_file_wrap.FileGenFeature.test_transfer_array
+    :layout: interleave
 
 
 .. index:: transfer_array
@@ -144,8 +148,9 @@ block of fields spanned by the starting field and the ending field.
 You can also use the ``transfer_array`` method to `stretch` an existing
 array in a template to add more terms.
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_file_wrap.FileGenFeature.test_transfer_stretch
+    :layout: interleave
 
 
 The named argument ``sep`` defines which separator to include between the
@@ -206,8 +211,9 @@ output file. (Note that this code must be placed in your component's
 Say you want to extract the first ``STRESS`` value from each load case in the file
 snippet shown above. The code would look like this.
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_file_wrap.FileParserFeature.test_parse_output
+    :layout: interleave
 
 
 The method ``mark_anchor`` is used to define an anchor, which becomes the
@@ -222,23 +228,26 @@ underflows, etc., and take action. NumPy includes the functions ``isnan`` and
 ``isinf`` to test for `nan` and `inf` respectively.  In the following example,
 we extract that `nan` value:
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_file_wrap.FileParserFeature.test_parse_nan
+    :layout: interleave
 
 
 When the data is not a number, it is recognized as a string. For example, we can
 extract the word ``DISPLACEMENT``.
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_file_wrap.FileParserFeature.test_parse_string
+    :layout: interleave
 
 
 Now, what if you want to extract the value of stress from the second load case? An
 additional argument can be passed to the ``mark_anchor`` method telling it to
 start at the second instance of the text fragment ``"LOAD CASE"``.
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_file_wrap.FileParserFeature.test_parse_output_2
+    :layout: interleave
 
 
 Note also that we used the method ``reset_anchor`` to return the anchor to the
@@ -251,8 +260,9 @@ You can also count backwards from the bottom of the file by passing a negative
 number. Here, the second instance of ``"LOAD CASE"`` from the bottom brings us
 back to the first one.
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_file_wrap.FileParserFeature.test_parse_output_minus2
+    :layout: interleave
 
 
 There is a shortcut for extracting data that is stored as ``Key Value`` or
@@ -265,8 +275,9 @@ arguments to ``transfer_keyvar``. The first lets you specify the `nth` occurrenc
 of the key, and the second lets you specify a number of lines to offset from
 the line where the key is found (negative numbers are allowed).
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_file_wrap.FileParserFeature.test_parse_keyvar
+    :layout: interleave
 
 
 *Array Extraction*
@@ -287,8 +298,9 @@ text file output:
 This time, extract all of the displacements in one read and store
 them as an array. You can do this with the ``transfer_array`` method.
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_file_wrap.FileParserFeature.test_parse_array
+    :layout: interleave
 
 
 The ``transfer_array`` method takes four arguments: *starting row*, *starting field*,
@@ -298,8 +310,9 @@ These values are all placed in a 1D array. When extracting multiple lines, if
 a line break is hit, the parser continues reading from the next line until the
 last line is hit. The following extraction illustrates this:
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_file_wrap.FileParserFeature.test_parse_array_multiline
+    :layout: interleave
 
 
 With the inclusion of ``'DISPLACEMENT'``, this is returned as an array of strings,
@@ -323,8 +336,9 @@ labeled "50 Hz" through "100 Hz." We would like to save these values in a
 two-dimensional numpy array. This can be accomplished using the
 ``transfer_2Darray`` method.
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_file_wrap.FileParser2dFeature.test_parse_array_2d
+    :layout: interleave
 
 
 The arguments to ``transfer_2Darray`` are the *starting row*, *starting field*,
@@ -349,16 +363,18 @@ general white space characters space (``" "``) and tab (``"\t"``). The newline c
 One common case that will require a change in the default delimiter is comma
 separated values (i.e. `csv`). Here's an example of such an output file:
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_file_wrap.FileParserDelimFeature.test_parse_default_delim
+    :layout: interleave
 
 
 What happened here is slightly confusing, but the main point is that the parser
 did not handle this as expected because commas were not in the set of
 delimiters. Now specify commas as your delimiter.
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_file_wrap.FileParserDelimFeature.test_parse_comma_delim
+    :layout: interleave
 
 
 With the correct delimiter set, you extract the second integer as expected.
@@ -400,8 +416,9 @@ field and the ending field as its second and third arguments. Since we just
 want one column for the boolean flag, the starting field and ending field are
 the same. For the floating point values, we provide the appropriate column ranges:
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_file_wrap.FileParserColumnsFeature.test_parse_columns
+    :layout: interleave
 
 
 
@@ -423,8 +440,9 @@ inside of the box are parsed assuming standard separator characters (``" \t"``).
 So here we call ``transfer_array`` with four arguments: *starting row*,
 *starting column*, *ending row*, and *ending column*:
 
-.. embed-test::
+.. embed-code::
     openmdao.utils.tests.test_file_wrap.FileParserArrayColumnsFeature.test_parse_columns
+    :layout: interleave
 
 
 Note that, in this case, we exit column mode and return to normal delimiter

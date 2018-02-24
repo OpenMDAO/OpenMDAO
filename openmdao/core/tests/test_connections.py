@@ -12,7 +12,10 @@ from openmdao.utils.assert_utils import assert_rel_error
 
 class TestConnections(unittest.TestCase):
 
-    def setUp(self, c1meta=None, c3meta=None):
+    def setUp(self):
+        self.setup_model(None, None)
+
+    def setup_model(self, c1meta=None, c3meta=None):
         self.p = Problem(model=Group())
         root = self.p.model
 
@@ -205,7 +208,7 @@ class TestConnections(unittest.TestCase):
         raise unittest.SkipTest("no compatability checking of connected inputs yet")
 
         # set different but compatible units
-        self.setUp(c1meta={'x': {'units': 'ft'}}, c3meta={'x': {'units': 'inch'}})
+        self.setup_model(c1meta={'x': {'units': 'ft'}}, c3meta={'x': {'units': 'inch'}})
 
         # connect two inputs
         self.p.model.connect('G1.G2.C1.x', 'G3.G4.C3.x')
@@ -222,7 +225,7 @@ class TestConnections(unittest.TestCase):
         raise unittest.SkipTest("no compatability checking of connected inputs yet")
 
         # set different but compatible units
-        self.setUp(c1meta={'x': {'units': 'ft'}}, c3meta={'x': {'units': 'inch'}})
+        self.setup_model(c1meta={'x': {'units': 'ft'}}, c3meta={'x': {'units': 'inch'}})
 
         # connect two inputs
         self.p.model.connect('G3.G4.C3.x', 'G1.G2.C1.x')
