@@ -4,6 +4,7 @@ from __future__ import division
 import os
 import sys
 import warnings
+import unittest
 from mock import Mock
 from fnmatch import fnmatchcase
 from six import string_types
