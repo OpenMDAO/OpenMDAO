@@ -68,13 +68,13 @@ SNOPT has many customizable settings. Here we show two common ones.
 Setting the convergence tolerance:
 
 .. embed-code::
-    openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseFeature.test_snopt_atol
+    openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseSnoptFeature.test_snopt_atol
     :layout: interleave
 
 Setting a limit on the number of major iterations. Here, we set it to just a few iterations, and don't quite reach the optimum.
 
 .. embed-code::
-    openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseFeature.test_snopt_maxit
+    openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseSnoptFeature.test_snopt_maxit
     :layout: interleave
 
 You can learn more about the available options in the SNOPT_Manual_.

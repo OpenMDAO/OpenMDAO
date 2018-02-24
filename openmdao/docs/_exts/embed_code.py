@@ -110,13 +110,9 @@ class EmbedCodeDirective(Directive):
             # get setUp and tearDown but don't duplicate if it is the method being tested
             setup_code = '' if method_name == 'setUp' else dedent(strip_header(remove_docstrings(
                 inspect.getsource(getattr(class_, 'setUp')))))
-            if setup_code.strip() == 'pass':
-                setup_code = ''
 
             teardown_code = '' if method_name == 'tearDown' else dedent(strip_header(
                 remove_docstrings(inspect.getsource(getattr(class_, 'tearDown')))))
-            if teardown_code.strip() == 'pass':
-                teardown_code = ''
 
             code_to_run = '\n'.join([self_code, setup_code, source, teardown_code])
         else:
@@ -151,7 +147,9 @@ class EmbedCodeDirective(Directive):
                 output_blocks = run_outputs if isinstance(run_outputs, list) else [run_outputs]
             elif 'interleave' in layout:
                 if is_test:
-                    input_blocks = split_source_into_input_blocks(code_to_run[len(self_code)+1:])
+                    start = len(self_code) + len(setup_code) + 1
+                    end = len(code_to_run) - len(teardown_code)
+                    input_blocks = split_source_into_input_blocks(code_to_run[start:end])
                 else:
                     input_blocks = split_source_into_input_blocks(code_to_run)
                 output_blocks = extract_output_blocks(run_outputs)

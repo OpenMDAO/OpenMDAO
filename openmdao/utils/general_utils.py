@@ -171,7 +171,7 @@ def determine_adder_scaler(ref0, ref, adder, scaler):
     return adder, scaler
 
 
-def set_pyoptsparse_opt(optname):
+def set_pyoptsparse_opt(optname, fallback=True):
     """
     For testing, sets the pyoptsparse optimizer using the given optimizer name.
 
@@ -184,6 +184,8 @@ def set_pyoptsparse_opt(optname):
     ----------
     optname : str
         Name of pyoptsparse optimizer that is requested by the test.
+    fallback : bool
+        If True, fall back to SLSQP if optname can't be found
 
     Returns
     -------
@@ -205,14 +207,14 @@ def set_pyoptsparse_opt(optname):
             opt = OPT(optname)
             OPTIMIZER = optname
         except Exception:
-            if optname != 'SLSQP':
+            if fallback and optname != 'SLSQP':
                 try:
                     opt = OPT('SLSQP')
                     OPTIMIZER = 'SLSQP'
                 except Exception:
                     pass
         else:
-            if isinstance(opt, Mock):
+            if fallback and isinstance(opt, Mock):
                 try:
                     opt = OPT('SLSQP')
                     OPTIMIZER = 'SLSQP'
@@ -223,6 +225,9 @@ def set_pyoptsparse_opt(optname):
 
     if isinstance(opt, Mock):
         OPT = OPTIMIZER = None
+
+    if not fallback and OPTIMIZER != optname:
+        raise unittest.SkipTest("pyoptsparse is not providing %s" % optname)
 
     return OPT, OPTIMIZER
 
