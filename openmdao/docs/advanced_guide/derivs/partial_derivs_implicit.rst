@@ -19,7 +19,6 @@ Here is a simple example to consider:
 
 .. embed-code::
     openmdao.test_suite.components.quad_implicit.QuadraticComp
-    :keep-docstrings:
 
 In this component, :code:`x` is an output, and you take derivatives with respect to it.
 This might seem a bit strange to you if you're used to thinking about things from an :ref:`ExplicitComponent <advanced_guide_partial_derivs_explicit>` perspective.

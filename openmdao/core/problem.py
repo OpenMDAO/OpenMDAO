@@ -17,10 +17,7 @@ from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_
 from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver
-from openmdao.solvers.linear.linear_runonce import LinearRunOnce
-from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
@@ -28,7 +25,6 @@ from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
-from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.vectors.default_vector import DefaultVector
 
 try:
@@ -416,7 +412,6 @@ class Problem(object):
         self._vector_class = vector_class
         self._check = check
         self._logger = logger
-
         self._force_alloc_complex = force_alloc_complex
 
         self._setup_status = 1

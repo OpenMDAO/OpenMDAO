@@ -11,6 +11,8 @@ import numpy as np
 
 from openmdao.core.group import Group
 from openmdao.core.component import Component
+from openmdao.core.implicitcomponent import ImplicitComponent
+from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.logger_utils import get_logger
 
@@ -205,7 +207,7 @@ def _check_system_configs(problem, logger):
         system.check_config(logger)
 
 
-def _check_solvers(problem):
+def _check_solvers(problem, logger):
     """
     Search over all solvers and raise an error for unsupported configurations.
 
@@ -245,7 +247,7 @@ def _check_solvers(problem):
     has_iter_ln = {'': False}
     has_iter_nl = {'': False}
 
-    for group in self.model.system_iter(include_self=True, recurse=True, typ=Group):
+    for group in problem.model.system_iter(include_self=True, recurse=True, typ=Group):
         path = group.pathname
 
         # determine if this group requires derivatives
@@ -283,12 +285,12 @@ def _check_solvers(problem):
             if not is_iter_nl:
                 msg = ("Group '%s' contains cycles %s, but does not have an iterative "
                        "nonlinear solver." % (group.pathname, has_cycles[path]))
-                self._setup_errors.append(msg)
+                logger.warning(msg)
             if derivs_needed and not is_iter_ln:
                 msg = ("Group '%s' contains cycles %s and uses derivatives, but does "
                        "not have an iterative linear solver."
                        % (group.pathname, has_cycles[path]))
-                self._setup_errors.append(msg)
+                logger.warning(msg)
 
         # if you have implicit components and you use derivatives, then you
         # need a better linear solver than LinearRunOnce
@@ -296,7 +298,7 @@ def _check_solvers(problem):
             msg = ("Group '%s' contains implicit components %s and uses "
                    "derivatives, but does not have an iterative linear solver."
                    % (group.pathname, has_states[path]))
-            self._setup_errors.append(msg)
+            logger.warning(msg)
 
         # look for nonlinear solvers that require derivs under complex step.
         if 'cs' in group._approx_schemes:
@@ -305,7 +307,7 @@ def _check_solvers(problem):
                     msg = ("The solver in '%s' requires derivatives. We "
                            "currently do not support complex step around it."
                            % sub.name)
-                    self._setup_errors.append(msg)
+                    logger.warning(msg)
 
 
 # Dict of all checks by name, mapped to the corresponding function that performs the check
