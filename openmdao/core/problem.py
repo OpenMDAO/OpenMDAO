@@ -3,6 +3,7 @@
 from __future__ import division, print_function
 
 import sys
+from copy import deepcopy
 
 from collections import OrderedDict, defaultdict, namedtuple
 from itertools import product
@@ -86,7 +87,7 @@ class Problem(object):
         1 -- The `setup` method has been called, but vectors not initialized.
         2 -- The `final_setup` has been run, everything ready to run.
     _lin_sol_cache : dict
-        Dict of variable names keyed to a dict of indeices keyed to solution vectors
+        Dict of indices keyed to solution vectors
     cite : str
         Listing of relevant citataions that should be referenced when
         publishing work that uses this class.
@@ -1353,6 +1354,7 @@ class Problem(object):
                                    "parallel color group (%s) is not supported." %
                                    [name for _, name, _, _, _ in vois])
             simul_coloring = vois[0][4] if not has_lin_constraints else None
+            cache_lin_sol = any(cache for _, _, _, _, _, cache in vois)
 
             if use_rel_reduction:
                 rel_systems = set()
@@ -1394,7 +1396,7 @@ class Problem(object):
             for i in idx_iter:
                 if simul_coloring is not None:
                     color, i = i
-                    do_color_iter = isinstance(i, np.ndarray) and i.size > 1
+                    do_color_iter = isinstance(i, np.ndarray)
                 else:
                     do_color_iter = False
 
@@ -1409,7 +1411,7 @@ class Problem(object):
                     if use_rel_reduction:
                         vec_dinput['linear'].set_const(0.0)
 
-                for input_name, old_input_name, pd_color, matmat, simul, cache_lin_sol in vois:
+                for input_name, _, _, matmat, simul, _ in vois:
                     dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
                         voi_info[input_name]
 
@@ -1439,7 +1441,22 @@ class Problem(object):
                             # need a vector for clean code, so use _views_flat.
                             dinputs._views_flat[input_name][idx - start] = 1.0
 
+                if cache_lin_sol:
+                    idx = (color,) if do_color_iter else i
+                    if idx in self._lin_sol_cache:
+                        save_vec = self._lin_sol_cache[idx]
+                        for vs in doutputs._data:
+                            doutput._data[vs][:] = save_vec[vs]
+                    else:
+                        self._lin_sol_cache[idx] = deepcopy(doutputs._data)
+
                 model._solve_linear(lin_vec_names, mode, rel_systems)
+
+                if cache_lin_sol:
+                    idx = (color,) if do_color_iter else i
+                    save_vec = self._lin_sol_cache[idx]
+                    for vs in doutputs._data:
+                        save_vec[vs][:] = doutputs._data[vs]
 
                 for input_name, old_input_name, _, matmat, simul, cache_lin_sol in vois:
                     dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
