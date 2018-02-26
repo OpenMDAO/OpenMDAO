@@ -5,8 +5,6 @@ from __future__ import print_function
 import sys
 import os
 
-from resource import getrusage, RUSAGE_SELF, RUSAGE_CHILDREN
-
 from six.moves import zip_longest
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group, System
@@ -119,7 +117,8 @@ def _get_color_printer(stream=sys.stdout, colors=True):
     return color_print, Fore, Back, Style
 
 
-def tree(top, show_solvers=True, show_colors=True, filter=None, max_depth=0, stream=sys.stdout):
+def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
+         filter=None, max_depth=0, stream=sys.stdout):
     """
     Dump the model tree structure to the given stream.
 
@@ -131,7 +130,9 @@ def tree(top, show_solvers=True, show_colors=True, filter=None, max_depth=0, str
     top : System or Problem
         The top object in the tree.
     show_solvers : bool
-        If True, include solvers in the tree.
+        If True, include solver types in the tree.
+    show_jacs : bool
+        If True, include jacobian types in the tree.
     show_colors : bool
         If True and stream is a terminal that supports it, display in color.
     filter : function(System)
@@ -153,6 +154,7 @@ def tree(top, show_solvers=True, show_colors=True, filter=None, max_depth=0, str
             tab += 1
         top = top.model
 
+    seenJacs = set()
     for s in top.system_iter(include_self=True, recurse=True):
         if filter is None:
             ret = ()
@@ -186,6 +188,15 @@ def tree(top, show_solvers=True, show_colors=True, filter=None, max_depth=0, str
             if s.nonlinear_solver is not None and nlsolver != "NonlinearRunOnce":
                 cprint("  NL: ")
                 cprint(nlsolver, color=Fore.MAGENTA + Style.BRIGHT)
+
+        if show_jacs:
+            jactype = type(s._jacobian).__name__ if s._jacobian is not None else None
+            if (s._jacobian is not None and s._jacobian not in seenJacs and
+                    jactype != 'DictionaryJacobian'):
+                seenJacs.add(s._jacobian)
+                cprint("  Jac: ")
+                cprint(jactype, color=Fore.MAGENTA + Style.BRIGHT)
+
         print(file=stream)
 
         vindent = indent + '  '
@@ -262,19 +273,23 @@ def config_summary(problem, stream=sys.stdout):
                                                          allgroups)),
           file=stream)
 
+try:
+    import resource
 
-def max_mem_usage():
-    """
-    Returns
-    -------
-    The max memory used by this process and its children, in MB.
-    """
-    denom = 1024.
-    if sys.platform == 'darwin':
-        denom *= denom
-    total = getrusage(RUSAGE_SELF).ru_maxrss / denom
-    total += getrusage(RUSAGE_CHILDREN).ru_maxrss / denom
-    return total
+    def max_mem_usage():
+        """
+        Returns
+        -------
+        The max memory used by this process and its children, in MB.
+        """
+        denom = 1024.
+        if sys.platform == 'darwin':
+            denom *= denom
+        total = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / denom
+        total += resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / denom
+        return total
+except ImportError:
+    pass
 
 try:
     import psutil

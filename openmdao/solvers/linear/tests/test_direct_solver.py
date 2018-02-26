@@ -34,7 +34,6 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         g1 = model.add_subsystem('g1', TestImplicitGroup(lnSolverClass=DirectSolver))
 
-        p.model.linear_solver.options['maxiter'] = 1
         p.setup(check=False)
 
         p.set_solver_print(level=0)

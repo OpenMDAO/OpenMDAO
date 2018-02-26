@@ -82,8 +82,8 @@ class TestCheckConfig(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
         self.assertEqual(len(info), 1)
 
-        self.assertEqual(info[0], "Group '' has the following cycles: [['C1', 'C2', 'C4']]")
-        self.assertEqual(warnings[0], "System 'C3' executes out-of-order with respect to its source systems ['C4']")
+        self.assertEqual(info[0], "The following groups contain cycles:\n   Group '' has the following cycles: [['C1', 'C2', 'C4']]\n")
+        self.assertEqual(warnings[0], "The following systems are executed out-of-order:\n   System 'C3' executes out-of-order with respect to its source systems ['C4']\n")
 
     def test_dataflow_multi_level(self):
 
@@ -118,19 +118,18 @@ class TestCheckConfig(unittest.TestCase):
         p.final_setup()
 
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 2)
+        self.assertEqual(len(warnings), 1)
         info = testlogger.get('info')
 
-        self.assertEqual(info[0], "Group '' has the following cycles: [['G1', 'C4']]")
-        self.assertEqual(warnings[0], "System 'C3' executes out-of-order with respect to its source systems ['C4']")
-        self.assertEqual(warnings[1], "System 'G1.C1' executes out-of-order with respect to its source systems ['G1.C2']")
+        self.assertEqual(info[0], "The following groups contain cycles:\n   Group '' has the following cycles: [['G1', 'C4']]\n")
+        self.assertEqual(warnings[0], "The following systems are executed out-of-order:\n   System 'C3' executes out-of-order with respect to its source systems ['C4']\n   System 'G1.C1' executes out-of-order with respect to its source systems ['G1.C2']\n")
 
         # test comps_only cycle check
         graph = root.compute_sys_graph(comps_only=True)
         sccs = [sorted(s) for s in get_sccs_topo(graph) if len(s) > 1]
         self.assertEqual([['C4', 'G1.C1', 'G1.C2']], sccs)
 
-    def test_out_of_order_repeat_bug(self):
+    def test_out_of_order_repeat_bug_and_dup_inputs(self):
         p = Problem(model=Group())
         indep = p.model.add_subsystem("indep", IndepVarComp('x', 1.0))
         C1 = p.model.add_subsystem("C1", ExecComp(["y = 2.0*a", "z = 3.0*b"]))
@@ -150,9 +149,10 @@ class TestCheckConfig(unittest.TestCase):
         p.final_setup()
 
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 1)
+        self.assertEqual(len(warnings), 2)
 
-        self.assertEqual(warnings[0], "System 'C1' executes out-of-order with respect to its source systems ['C2']")
+        self.assertEqual(warnings[0], "The following systems are executed out-of-order:\n   System 'C1' executes out-of-order with respect to its source systems ['C2']\n")
+        self.assertEqual(warnings[1], "The following components have multiple inputs connected to the same source, which can introduce unnecessary data transfer overhead:\n   C1 has inputs ['a', 'b'] connected to C2.y\n")
 
     def test_multi_cycles(self):
         p = Problem(model=Group())
@@ -198,15 +198,14 @@ class TestCheckConfig(unittest.TestCase):
         p.final_setup()
 
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 3)
+        self.assertEqual(len(warnings), 2)
 
         info = testlogger.get('info')
         self.assertEqual(len(info), 1)
 
-        self.assertEqual(info[0], "Group 'G1' has the following cycles: [['C13', 'C12', 'C11'], ['C23', 'C22', 'C21'], ['C3', 'C2', 'C1']]")
-        self.assertEqual(warnings[0], "System 'G1.C2' executes out-of-order with respect to its source systems ['G1.N3']")
-        self.assertEqual(warnings[1], "System 'G1.C3' executes out-of-order with respect to its source systems ['G1.C11']")
-        self.assertTrue("The following inputs are not connected:" in warnings[2])
+        self.assertEqual(info[0], "The following groups contain cycles:\n   Group 'G1' has the following cycles: [['C13', 'C12', 'C11'], ['C23', 'C22', 'C21'], ['C3', 'C2', 'C1']]\n")
+        self.assertEqual(warnings[0], "The following systems are executed out-of-order:\n   System 'G1.C2' executes out-of-order with respect to its source systems ['G1.N3']\n   System 'G1.C3' executes out-of-order with respect to its source systems ['G1.C11']\n")
+        self.assertTrue("The following inputs are not connected:" in warnings[1])
 
 
 if __name__ == "__main__":

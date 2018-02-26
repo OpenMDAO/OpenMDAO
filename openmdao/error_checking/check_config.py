@@ -15,17 +15,18 @@ from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.logger_utils import get_logger
 
 
-def _check_dataflow(group, logger):
+def _check_dataflow(group, infos, warnings):
     """
     Report any cycles and out of order Systems to the logger.
 
     Parameters
     ----------
     group : <Group>
-        The Group being checked for dataflow issues.
-
-    logger : object
-        The object that manages logging output.
+        The Group being checked for dataflow issues
+    infos : list
+        List to collect informational messages.
+    warnings : list
+        List to collect warning messages.
     """
     graph = group.compute_sys_graph(comps_only=False)
     sccs = get_sccs_topo(graph)
@@ -34,7 +35,7 @@ def _check_dataflow(group, logger):
     cycle_idxs = {}
 
     if cycles:
-        logger.info("Group '%s' has the following cycles: %s" % (group.pathname, cycles))
+        infos.append("   Group '%s' has the following cycles: %s\n" % (group.pathname, cycles))
         for i, cycle in enumerate(cycles):
             # keep track of cycles so we can detect when a system in
             # one cycle is out of order with a system in a different cycle.
@@ -55,9 +56,9 @@ def _check_dataflow(group, logger):
                 keep_srcs.append(src_system)
 
         if keep_srcs:
-            logger.warning("System '%s' executes out-of-order with "
-                           "respect to its source systems %s" %
-                           (tgt_system, sorted(keep_srcs)))
+            warnings.append("   System '%s' executes out-of-order with "
+                            "respect to its source systems %s\n" %
+                            (tgt_system, sorted(keep_srcs)))
 
 
 def _check_dataflow_prob(prob, logger):
@@ -72,8 +73,16 @@ def _check_dataflow_prob(prob, logger):
         The object that manages logging output.
 
     """
+    infos = ["The following groups contain cycles:\n"]
+    warnings = ["The following systems are executed out-of-order:\n"]
     for group in prob.model.system_iter(include_self=True, recurse=True, typ=Group):
-        _check_dataflow(group, logger)
+        _check_dataflow(group, infos, warnings)
+
+    if len(infos) > 1:
+        logger.info(''.join(infos[:1] + sorted(infos[1:])))
+
+    if len(warnings) > 1:
+        logger.warning(''.join(warnings[:1] + sorted(warnings[1:])))
 
 
 def _get_out_of_order_subs(group, input_srcs):
@@ -111,6 +120,41 @@ def _get_out_of_order_subs(group, input_srcs):
                 ubcs['.'.join(iparts[:glen + 1])].add('.'.join(oparts[:glen + 1]))
 
     return ubcs
+
+
+def _check_dup_comp_inputs(problem, logger):
+    """
+    Issue a logger warning if any components have multiple inputs that share the same source.
+
+    Parameters
+    ----------
+    problem : <Problem>
+        The problem being checked.
+    logger : object
+        The object that managers logging output.
+    """
+    input_srcs = problem.model._conn_global_abs_in2out
+    src2inps = defaultdict(list)
+    for inp, src in iteritems(input_srcs):
+        src2inps[src].append(inp)
+
+    msgs = []
+    for src, inps in iteritems(src2inps):
+        comps = defaultdict(list)
+        for inp in inps:
+            comp, vname = inp.rsplit('.', 1)
+            comps[comp].append(vname)
+
+        dups = sorted([(c, v) for c, v in iteritems(comps) if len(v) > 1], key=lambda x: x[0])
+        if dups:
+            for comp, vnames in dups:
+                msgs.append("   %s has inputs %s connected to %s\n" % (comp, sorted(vnames), src))
+
+    if msgs:
+        msg = ["The following components have multiple inputs connected to the same source, ",
+               "which can introduce unnecessary data transfer overhead:\n"]
+        msg += sorted(msgs)
+        logger.warning(''.join(msg))
 
 
 def _check_hanging_inputs(problem, logger):
@@ -205,8 +249,8 @@ def _check_solvers(problem):
         path = group.pathname
 
         # determine if this group requires derivatives
-        derivs_needed = uses_deriv[path] = 'fd' not in group._approx_schemes and \
-                                           'cs' not in group._approx_schemes
+        derivs_needed = uses_deriv[path] = ('fd' not in group._approx_schemes and
+                                            'cs' not in group._approx_schemes)
 
         # determine if this group has cycles
         graph = group.compute_sys_graph(comps_only=False)
@@ -222,8 +266,8 @@ def _check_solvers(problem):
         # determine if the current group has appropriate solvers for
         # handling cycles, derivatives and implicit components
         is_iter_nl = has_iter_nl[path] = group.nonlinear_solver.options['maxiter'] > 1
-        is_iter_ln = has_iter_ln[path] = group.linear_solver.options['maxiter'] > 1 or \
-                                         isinstance(group.linear_solver, DirectSolver)
+        is_iter_ln = has_iter_ln[path] = (group.linear_solver.options['maxiter'] > 1 or
+                                          isinstance(group.linear_solver, DirectSolver))
 
         # check upstream groups for iterative solvers and derivative requirements
         parts = path.split('.')
@@ -270,7 +314,8 @@ _checks = {
     'hanging_inputs': _check_hanging_inputs,
     'cycles': _check_dataflow_prob,
     'system': _check_system_configs,
-    'solvers': _check_solvers,
+    # 'solvers': _check_solvers,
+    'dup_inputs': _check_dup_comp_inputs,
 }
 
 
@@ -290,10 +335,10 @@ def check_config(problem, logger=None):
     for c in sorted(_checks.keys()):
         _checks[c](problem, logger)
 
+
 #
 # Command line interface functions
 #
-
 
 def _check_config_setup_parser(parser):
     """

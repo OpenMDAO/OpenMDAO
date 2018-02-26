@@ -19,6 +19,12 @@ from openmdao.utils.general_utils import format_as_float_or_array, ensure_compat
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 
 
+# Suppored methods for derivatives
+_supported_methods = {'fd': FiniteDifference,
+                      'cs': ComplexStep,
+                      'exact': None}
+
+
 class Component(System):
     """
     Base Component class; not to be directly instantiated.
@@ -209,7 +215,7 @@ class Component(System):
                 for set_name, nvars in iteritems(self._num_var_byset[vec_name][type_]):
                     sizes_byset[vec_name][type_][set_name] = np.zeros((nproc, nvars), int)
 
-            allprocs_abs2idx_byset_t = self._var_allprocs_abs2idx_byset[vec_name]
+            allprocs_abs2idx_byset = self._var_allprocs_abs2idx_byset[vec_name]
 
             # Compute _var_sizes and _var_sizes_byset
             abs2meta = self._var_abs2meta
@@ -220,7 +226,7 @@ class Component(System):
                     meta = abs2meta[abs_name]
                     set_name = meta['var_set']
                     size = meta['size']
-                    idx_byset = allprocs_abs2idx_byset_t[abs_name]
+                    idx_byset = allprocs_abs2idx_byset[abs_name]
 
                     sz[iproc, idx] = size
                     sz_byset[set_name][iproc, idx_byset] = size
@@ -601,16 +607,14 @@ class Component(System):
         **kwargs : dict
             Keyword arguments for controlling the behavior of the approximation.
         """
-        supported_methods = {'fd': FiniteDifference,
-                             'cs': ComplexStep,
-                             'exact': None}
-
-        if method not in supported_methods:
+        try:
+            method_func = _supported_methods[method]
+        except KeyError:
             msg = 'Method "{}" is not supported, method must be one of {}'
             raise ValueError(msg.format(method, supported_methods.keys()))
 
         # Analytic Derivative for this jacobian pair
-        if method == 'exact':
+        if method_func is None:  # exact
 
             # If only one of rows/cols is specified
             if (rows is None) ^ (cols is None):
@@ -622,7 +626,7 @@ class Component(System):
         else:
 
             if method not in self._approx_schemes:
-                self._approx_schemes[method] = supported_methods[method]()
+                self._approx_schemes[method] = method_func()
 
             # If rows/cols is specified
             if rows is not None or cols is not None:
@@ -775,17 +779,14 @@ class Component(System):
                         del self._subjacs_info[abs_key]
                     continue
 
-                meta_changes = {
-                    'rows': rows,
-                    'cols': cols,
-                    'value': deepcopy(val) if make_copies else val,
-                    'dependent': dependent
-                }
                 if abs_key in self._subjacs_info:
                     meta = self._subjacs_info[abs_key]
                 else:
                     meta = SUBJAC_META_DEFAULTS.copy()
-                meta.update(meta_changes)
+                meta['rows'] = rows
+                meta['cols'] = cols
+                meta['value'] = deepcopy(val) if make_copies else val
+                meta['dependent'] = dependent
                 self._check_partials_meta(abs_key, meta)
                 self._subjacs_info[abs_key] = meta
 

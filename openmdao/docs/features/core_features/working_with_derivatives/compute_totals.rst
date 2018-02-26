@@ -17,7 +17,8 @@ Usage
 
 Here is a simple example of using :code:`compute_totals`:
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_compute_totals
+    :layout: interleave
 
 .. tags:: Derivatives

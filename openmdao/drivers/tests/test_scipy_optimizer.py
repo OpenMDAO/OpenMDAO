@@ -19,7 +19,7 @@ from openmdao.test_suite.groups.sin_fitter import SineFitter
 
 class TestScipyOptimizeDriver(unittest.TestCase):
 
-    def test_scipyoptimizer_deprecation(self): 
+    def test_scipyoptimizer_deprecation(self):
 
         msg = "'ScipyOptimizer' provides backwards compatibility " \
             + "with OpenMDAO <= 2.2 ; use 'ScipyOptimizeDriver' instead."
@@ -992,10 +992,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
-
-        self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+        prob.run_driver()
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
@@ -1021,10 +1018,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         prob.setup(check=False)
 
-        failed = prob.run_driver()
-
-        self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+        prob.run_driver()
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
@@ -1049,10 +1043,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         prob.setup(check=False)
 
-        failed = prob.run_driver()
-
-        self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+        prob.run_driver()
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
@@ -1077,10 +1068,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         prob.setup(check=False)
 
-        failed = prob.run_driver()
-
-        self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+        prob.run_driver()
 
         assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['y'], -7.3333333, 1e-6)

@@ -9,12 +9,12 @@ import numpy as np
 from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NonlinearRunOnce, \
                          ImplicitComponent, NonlinearBlockGS, LinearBlockGS, ParallelGroup, \
                          ExecComp
-from openmdao.utils.assert_utils import assert_rel_error
-from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
+from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.mpi import MPI
 
 if MPI:
     from openmdao.api import PETScVector
@@ -881,6 +881,139 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertTrue('cs' in lines[6], msg='Did you change the format for printing check derivs?')
         self.assertTrue('fd' in lines[28], msg='Did you change the format for printing check derivs?')
 
+    def test_compact_print_formatting(self):
+        class MyCompShortVarNames(ExplicitComponent):
+            def setup(self):
+                self.add_input('x1', 3.0)
+                self.add_input('x2', 5.0)
+                self.add_output('y', 5.5)
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                """ Doesn't do much. """
+                outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
+
+            def compute_partials(self, inputs, partials):
+                """Intentionally incorrect derivative."""
+                J = partials
+                J['y', 'x1'] = np.array([4.0])
+                J['y', 'x2'] = np.array([40])
+
+        class MyCompLongVarNames(ExplicitComponent):
+            def setup(self):
+                self.add_input('really_long_variable_name_x1', 3.0)
+                self.add_input('x2', 5.0)
+                self.add_output('really_long_variable_name_y', 5.5)
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                """ Doesn't do much. """
+                outputs['really_long_variable_name_y'] = 3.0*inputs['really_long_variable_name_x1'] + 4.0*inputs['x2']
+
+            def compute_partials(self, inputs, partials):
+                """Intentionally incorrect derivative."""
+                J = partials
+                J['really_long_variable_name_y', 'really_long_variable_name_x1'] = np.array([4.0])
+                J['really_long_variable_name_y', 'x2'] = np.array([40])
+
+        # First short var names
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('p1', IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('x2', 5.0))
+        prob.model.add_subsystem('comp', MyCompShortVarNames())
+        prob.model.connect('p1.x1', 'comp.x1')
+        prob.model.connect('p2.x2', 'comp.x2')
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+        prob.run_model()
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=True)
+        lines = stream.getvalue().splitlines()
+        # Check to make sure all the header and value lines have their columns lined up
+        header_locations_of_bars = None
+        sep = '|'
+        for line in lines:
+            if sep in line:
+                if header_locations_of_bars:
+                    value_locations_of_bars = [i for i, ltr in enumerate(line) if ltr == sep]
+                    self.assertEqual(value_locations_of_bars, header_locations_of_bars,
+                                     msg="Column separators should all be aligned")
+                else:
+                    header_locations_of_bars = [i for i, ltr in enumerate(line) if ltr == sep]
+
+        # Then long var names
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('p1', IndepVarComp('really_long_variable_name_x1', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('x2', 5.0))
+        prob.model.add_subsystem('comp', MyCompLongVarNames())
+        prob.model.connect('p1.really_long_variable_name_x1', 'comp.really_long_variable_name_x1')
+        prob.model.connect('p2.x2', 'comp.x2')
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+        prob.run_model()
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=True)
+        lines = stream.getvalue().splitlines()
+        # Check to make sure all the header and value lines have their columns lined up
+        header_locations_of_bars = None
+        sep = '|'
+        for line in lines:
+            if sep in line:
+                if header_locations_of_bars:
+                    value_locations_of_bars = [i for i, ltr in enumerate(line) if ltr == sep]
+                    self.assertEqual(value_locations_of_bars, header_locations_of_bars,
+                                     msg="Column separators should all be aligned")
+                else:
+                    header_locations_of_bars = [i for i, ltr in enumerate(line) if ltr == sep]
+
+    def test_compact_print_exceed_tol(self):
+        class MyCompGoodPartials(ExplicitComponent):
+            def setup(self):
+                self.add_input('x1', 3.0)
+                self.add_input('x2', 5.0)
+                self.add_output('y', 5.5)
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                """ Doesn't do much. """
+                outputs['y'] = 3.0 * inputs['x1'] + 4.0 * inputs['x2']
+
+            def compute_partials(self, inputs,     partials):
+                """Correct derivative."""
+                J = partials
+                J['y', 'x1'] = np.array([3.0])
+                J['y', 'x2'] = np.array([4.0])
+
+        class MyCompBadPartials(MyCompGoodPartials):
+            def compute_partials(self, inputs, partials):
+                """Intentionally incorrect derivative."""
+                J = partials
+                J['y', 'x1'] = np.array([4.0])
+                J['y', 'x2'] = np.array([40])
+
+
+        prob = Problem()
+        prob.model = MyCompGoodPartials()
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+        prob.run_model()
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=True)
+        self.assertEqual(stream.getvalue().count('>ABS_TOL'),0)
+        self.assertEqual(stream.getvalue().count('>REL_TOL'),0)
+
+        prob = Problem()
+        prob.model = MyCompBadPartials()
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+        prob.run_model()
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=True)
+        self.assertEqual(stream.getvalue().count('>ABS_TOL'),2)
+        self.assertEqual(stream.getvalue().count('>REL_TOL'),2)
+
 
 class TestCheckPartialsFeature(unittest.TestCase):
 
@@ -1174,6 +1307,38 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob.check_partials(step_calc='rel')
 
+    def test_feature_compact_print_formatting(self):
+        import numpy as np
+        from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem
+
+        class MyComp(ExplicitComponent):
+            def setup(self):
+                self.add_input('x1', 3.0)
+                self.add_input('x2', 5.0)
+                self.add_output('y', 5.5)
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                """ Doesn't do much. """
+                outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
+
+            def compute_partials(self, inputs, partials):
+                """Intentionally incorrect derivative."""
+                J = partials
+                J['y', 'x1'] = np.array([4.0])
+                J['y', 'x2'] = np.array([40])
+
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('p1', IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('x2', 5.0))
+        prob.model.add_subsystem('comp', MyComp())
+        prob.model.connect('p1.x1', 'comp.x1')
+        prob.model.connect('p2.x2', 'comp.x2')
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+        prob.run_model()
+        prob.check_partials(compact_print=True)
 
 class TestProblemCheckTotals(unittest.TestCase):
 

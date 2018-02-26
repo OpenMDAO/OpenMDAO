@@ -1,5 +1,5 @@
 """Define the AssembledJacobian class."""
-from __future__ import division
+from __future__ import division, print_function
 
 import sys
 from collections import defaultdict
@@ -102,7 +102,7 @@ class AssembledJacobian(Jacobian):
         idx = system._var_allprocs_abs2idx['nonlinear'][abs_name]
 
         ind1 = np.sum(sizes[iproc, :idx])
-        ind2 = np.sum(sizes[iproc, :idx + 1])
+        ind2 = ind1 + sizes[iproc, idx]
 
         return ind1, ind2
 
@@ -112,6 +112,7 @@ class AssembledJacobian(Jacobian):
         """
         # var_indices are the *global* indices for variables on this proc
         system = self._system
+        is_top = system.pathname == ''
 
         abs2meta = system._var_abs2meta
 
@@ -123,48 +124,57 @@ class AssembledJacobian(Jacobian):
                 system._var_allprocs_abs_names['output']
         }
 
-        in_ranges = {}
-        for abs_name in system._var_allprocs_abs_names['input']:
-            in_ranges[abs_name] = self._get_var_range(abs_name, 'input')
+        in_ranges = {
+            abs_name: self._get_var_range(abs_name, 'input') for abs_name in
+                system._var_allprocs_abs_names['input']
+        }
 
         # set up view ranges for all subsystems
         for s in system.system_iter(recurse=True, include_self=True):
-            min_res_offset = sys.maxsize
-            max_res_offset = 0
-            min_in_offset = sys.maxsize
-            max_in_offset = 0
+            input_names = s._var_abs_names['input']
+            if input_names:
+                min_in_offset = in_ranges[input_names[0]][0]
+                max_in_offset = in_ranges[input_names[-1]][1]
+            else:
+                min_in_offset = sys.maxsize
+                max_in_offset = 0
 
-            for in_abs_name in s._var_abs_names['input']:
-                in_offset, in_end = in_ranges[in_abs_name]
-                if in_end > max_in_offset:
-                    max_in_offset = in_end
-                if in_offset < min_in_offset:
-                    min_in_offset = in_offset
-
-            for res_abs_name in s._var_abs_names['output']:
-                res_offset, res_end = out_ranges[res_abs_name]
-                if res_end > max_res_offset:
-                    max_res_offset = res_end
-                if res_offset < min_res_offset:
-                    min_res_offset = res_offset
+            output_names = s._var_abs_names['output']
+            if output_names:
+                min_res_offset = out_ranges[output_names[0]][0]
+                max_res_offset = out_ranges[output_names[-1]][1]
+            else:
+                min_res_offset = sys.maxsize
+                max_res_offset = 0
 
             self._view_ranges[s.pathname] = (
                 min_res_offset, max_res_offset, min_in_offset, max_in_offset)
 
+        # # keep track of mapped keys to check for corner case where one source connects to
+        # # multiple inputs using src_indices on the same component.
+        # mapped_keys = {}
+
         abs2prom_out = system._var_abs2prom['output']
         conns = system._conn_global_abs_in2out
+        keymap = self._keymap
+        abs_key2shape = self._abs_key2shape
 
         # create the matrix subjacs
         for abs_key, (info, shape) in iteritems(self._subjacs_info):
             if not info['dependent']:
                 continue
             res_abs_name, wrt_abs_name = abs_key
+            # because self._subjacs_info is shared among all 'related' assembled jacs,
+            # we use out_ranges (and later in_ranges) to weed out keys outside of this jac
+            if res_abs_name not in out_ranges:
+                continue
             res_offset, _ = out_ranges[res_abs_name]
+
             if wrt_abs_name in abs2prom_out:
                 out_offset, _ = out_ranges[wrt_abs_name]
-                int_mtx._add_submat(
-                    abs_key, info, res_offset, out_offset, None, shape)
-            else:
+                int_mtx._add_submat(abs_key, info, res_offset, out_offset, None, shape)
+                keymap[abs_key] = abs_key
+            elif wrt_abs_name in in_ranges:
                 if wrt_abs_name in conns:  # connected input
                     out_abs_name = conns[wrt_abs_name]
                     # calculate unit conversion
@@ -179,27 +189,20 @@ class AssembledJacobian(Jacobian):
 
                     out_offset, _ = out_ranges[out_abs_name]
                     src_indices = abs2meta[wrt_abs_name]['src_indices']
-                    if src_indices is None:
-                        int_mtx._add_submat(
-                            abs_key, info, res_offset, out_offset, None, shape,
-                            factor)
-                    else:
-                        # need to add an entry for d(output)/d(source)
-                        # instead of d(output)/d(input) when we have
-                        # src_indices
-                        abs_key2 = (res_abs_name, out_abs_name)
-                        self._keymap[abs_key] = abs_key2
-                        int_mtx._add_submat(
-                            abs_key2, info, res_offset, out_offset,
-                            src_indices, shape, factor)
 
-                else:  # input connected to src outside current system
-                    ext_mtx._add_submat(
-                        abs_key, info, res_offset, in_ranges[wrt_abs_name][0],
-                        None, shape)
+                    # need to add an entry for d(output)/d(source)
+                    # instead of d(output)/d(input)
+                    abs_key2 = (res_abs_name, out_abs_name)
+                    keymap[abs_key] = abs_key2
 
-                if abs_key not in self._keymap:
-                    self._keymap[abs_key] = abs_key
+                    shape = abs_key2shape(abs_key2)
+
+                    int_mtx._add_submat(abs_key, info, res_offset, out_offset,
+                                        src_indices, shape, factor)
+
+                elif not is_top:  # input is connected to something outside current system
+                    ext_mtx._add_submat(abs_key, info, res_offset,
+                                        in_ranges[wrt_abs_name][0], None, shape)
 
         sizes = system._var_sizes
         iproc = system.comm.rank
@@ -228,12 +231,10 @@ class AssembledJacobian(Jacobian):
 
         ext_mtx = self.options['matrix_class'](system.comm)
 
-        in_ranges = {}
-        src_indices_dict = {}
-        for abs_name in system._var_allprocs_abs_names['input']:
-            in_ranges[abs_name] = self._get_var_range(abs_name, 'input')[0]
-            src_indices_dict[abs_name] = \
-                system._var_abs2meta[abs_name]['src_indices']
+        in_ranges = {n: self._get_var_range(n, 'input')[0] for n in
+                     system._var_allprocs_abs_names['input']}
+
+        subjacs_info = self._subjacs_info
 
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
             for res_abs_name in s._var_abs_names['output']:
@@ -244,17 +245,15 @@ class AssembledJacobian(Jacobian):
                     if in_abs_name not in system._conn_global_abs_in2out:
                         abs_key = (res_abs_name, in_abs_name)
 
-                        if abs_key in self._subjacs_info:
-                            info, shape = self._subjacs_info[abs_key]
+                        if abs_key in subjacs_info:
+                            info, shape = subjacs_info[abs_key]
                             if not info['dependent']:
                                 continue
                         else:
                             continue
 
-                        ext_mtx._add_submat(
-                            abs_key, info, res_offset - ranges[0],
-                            in_ranges[in_abs_name] - ranges[2],
-                            None, shape)
+                        ext_mtx._add_submat(abs_key, info, res_offset - ranges[0],
+                                            in_ranges[in_abs_name] - ranges[2], None, shape)
 
         sizes = system._var_sizes
         iproc = system.comm.rank
@@ -280,6 +279,7 @@ class AssembledJacobian(Jacobian):
         subjac_iters = self._subjac_iters[system.pathname]
         if subjac_iters is None:
             keymap = self._keymap
+            seen = set()
             global_conns = system._conn_global_abs_in2out
             output_names = system._var_abs_names['output']
             input_names = system._var_abs_names['input']
@@ -295,21 +295,26 @@ class AssembledJacobian(Jacobian):
                     abs_key = (res_abs_name, out_abs_name)
                     if abs_key in subjacs:
                         if abs_key in int_mtx._submats:
-                            iters.append((abs_key, abs_key))
+                            iters.append((abs_key, abs_key, False))
                         else:
                             # This happens when the src is an indepvarcomp that is
                             # contained in the system.
                             of, wrt = abs_key
                             for tgt, src in iteritems(global_conns):
                                 if src == wrt and (of, tgt) in int_mtx._submats:
-                                    iters.append((of, tgt), abs_key)
+                                    iters.append((of, tgt), abs_key, False)
                                     break
 
                 for in_abs_name in input_names:
                     abs_key = (res_abs_name, in_abs_name)
                     if abs_key in subjacs:
                         if in_abs_name in global_conns:
-                            iters.append((keymap[abs_key], abs_key))
+                            mapped = keymap[abs_key]
+                            if mapped in seen:
+                                iters.append((mapped, abs_key, True))
+                            else:
+                                iters.append((mapped, abs_key, False))
+                                seen.add(mapped)
                         elif ext_mtx is not None:
                             iters_in_ext.append(abs_key)
 
@@ -317,8 +322,11 @@ class AssembledJacobian(Jacobian):
         else:
             iters, iters_in_ext = subjac_iters
 
-        for key1, key2 in iters:
-            int_mtx._update_submat(key1, subjacs[key2])
+        for key1, key2, do_add in iters:
+            if do_add:
+                int_mtx._update_add_submat(key2, subjacs[key2])
+            else:
+                int_mtx._update_submat(key2, subjacs[key2])
 
         for key in iters_in_ext:
             ext_mtx._update_submat(key, subjacs[key])
@@ -361,11 +369,12 @@ class AssembledJacobian(Jacobian):
                 if ext_mtx is not None and d_inputs._names and d_residuals._names:
 
                     # Masking
-                    cache_key = tuple(d_inputs._names)
-                    if cache_key not in self._mask_caches:
-                        self._create_mask_cache(d_inputs, cache_key, ext_mtx)
+                    try:
+                        mask = self._mask_caches[d_inputs._names]
+                    except KeyError:
+                        mask = _create_mask_cache(d_inputs, ext_mtx)
+                        self._mask_caches[d_inputs._names] = mask
 
-                    mask = self._mask_caches.get(cache_key)
                     if mask is not None:
                         inputs_masked = np.ma.array(d_inputs.get_data(), mask=mask)
 
@@ -385,13 +394,13 @@ class AssembledJacobian(Jacobian):
                 if ext_mtx is not None and d_inputs._names and d_residuals._names:
 
                     # Masking
-                    cache_key = tuple(d_inputs._names)
-                    if cache_key not in self._mask_caches:
-                        self._create_mask_cache(d_inputs, cache_key, ext_mtx)
+                    try:
+                        mask_cols = self._mask_caches[d_inputs._names]
+                    except KeyError:
+                        mask_cols = _create_mask_cache(d_inputs, ext_mtx)
+                        self._mask_caches[d_inputs._names] = mask_cols
 
-                    mask_cols = self._mask_caches.get(cache_key)
                     if mask_cols is not None:
-
                         # Mask need to be applied to ext_mtx so that we can ignore multiplication
                         # by certain columns.
                         mask = np.zeros(ext_mtx._matrix.T.shape, dtype=np.bool)
@@ -406,24 +415,28 @@ class AssembledJacobian(Jacobian):
                     else:
                         d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None))
 
-    def _create_mask_cache(self, d_inputs, cache_key, ext_mtx):
-        """
-        Create masking array for d_inputs vector.
 
-        Parameters
-        ----------
-        d_inputs : Vector
-            The inputs linear vector.
-        cache_key : tuple
-            Hashable unique key, from d_inputs._names
-        ext_mtx : Matrix
-            External matrix
-        """
-        masked = [name for name in d_inputs._views if name not in cache_key]
-        if masked:
-            mask = np.zeros(d_inputs._data[0].shape, dtype=np.bool)
-            for name in masked:
+def _create_mask_cache(d_inputs, ext_mtx):
+    """
+    Create masking array for d_inputs vector.
 
+    Parameters
+    ----------
+    d_inputs : Vector
+        The inputs linear vector.
+    ext_mtx : Matrix
+        External matrix.
+
+    Returns
+    -------
+    ndarray or None
+        The mask array or None.
+    """
+    if len(d_inputs._views) > len(d_inputs._names):
+        mask = np.zeros(d_inputs._data[0].shape, dtype=np.bool)
+        sub = d_inputs._names
+        for name in d_inputs._views:
+            if name not in sub:
                 # TODO: For now, we figure out where each variable in the matrix is using
                 # the matrix metadata, but this is not ideal. The framework does not provide
                 # this information cleanly, but an upcoming refactor will address this.
@@ -431,11 +444,7 @@ class AssembledJacobian(Jacobian):
                     if key[1] == name:
                         mask[val[1]] = True
                         continue
-
-            self._mask_caches[cache_key] = mask
-
-        else:
-            self._mask_caches[cache_key] = None
+        return mask
 
 
 class DenseJacobian(AssembledJacobian):

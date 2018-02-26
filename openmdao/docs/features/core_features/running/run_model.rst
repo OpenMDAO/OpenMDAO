@@ -14,12 +14,14 @@ Examples
 
 A basic :code:`setup()` using numpy vectors for the framework data handling, and executing a single pass through the model.
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_problem.TestProblem.test_feature_numpyvec_setup
+    :layout: interleave
 
 ----
 
 To use any of the PETSc linear solvers and/or to run in parallel under MPI, the framework data handling should be done with the :code:`PETScVector`.
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_problem.TestProblem.test_feature_petsc_setup
+    :layout: interleave

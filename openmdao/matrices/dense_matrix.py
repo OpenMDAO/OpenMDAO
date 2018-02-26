@@ -26,7 +26,8 @@ class DenseMatrix(Matrix):
         metadata = self._metadata
 
         for key in submats:
-            info, irow, icol, src_indices, shape, factor = submats[key]
+            info, loc, src_indices, shape, factor = submats[key]
+            irow, icol = loc
             rows = info['rows']
 
             if rows is None:
@@ -94,6 +95,35 @@ class DenseMatrix(Matrix):
 
         if factor is not None:
             self._matrix[irows, icols] *= factor
+
+    def _update_add_submat(self, key, jac):
+        """
+        Add the subjac values to an existing  sub-jacobian.
+
+        Parameters
+        ----------
+        key : (str, str)
+            the global output and input variable names.
+        jac : ndarray or scipy.sparse or tuple
+            the sub-jacobian, the same format with which it was declared.
+        """
+        irows, icols, jac_type, factor = self._metadata[key]
+        if not isinstance(jac, jac_type):
+            raise TypeError("Jacobian entry for %s is of different type (%s) than "
+                            "the type (%s) used at init time." % (key,
+                                                                  type(jac).__name__,
+                                                                  jac_type.__name__))
+        if isinstance(jac, np.ndarray):
+            val = jac
+        elif isinstance(jac, list):
+            val = jac[0]
+        else:  # sparse
+            val = jac.data
+
+        if factor is not None:
+            self._matrix[irows, icols] += val * factor
+        else:
+            self._matrix[irows, icols] += val
 
     def _prod(self, in_vec, mode, ranges):
         """

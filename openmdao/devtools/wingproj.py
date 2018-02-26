@@ -110,7 +110,7 @@ def run_wing():
                       dest="projpath", default='',
                       help="location of WingIDE project file")
     parser.add_option("-v", "--version", action="store", type="string",
-                      dest="version", default='5.0',
+                      dest="version", default='6.0',
                       help="version of WingIDE")
     (options, args) = parser.parse_args(sys.argv[1:])
 

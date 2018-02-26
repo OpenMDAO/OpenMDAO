@@ -63,5 +63,6 @@ And here we see that rev mode with parallel derivatives is roughly twice as fast
 as fwd mode when our 'slow' components have a delay of .1 seconds.  Without parallel
 derivatives, the fwd and rev speeds are roughly equivalent.
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_parallel_derivatives.ParDerivColorFeatureTestCase.test_fwd_vs_rev
+    :layout: interleave
