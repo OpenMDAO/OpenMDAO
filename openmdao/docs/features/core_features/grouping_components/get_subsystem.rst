@@ -16,5 +16,6 @@ The class :code:`BranchGroup`, seen here, is used in the example that follows.
 
 This example shows accessing components that are two nested branches from the top.
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_group.TestGroup.test_group_getsystem_top
+    :layout: interleave

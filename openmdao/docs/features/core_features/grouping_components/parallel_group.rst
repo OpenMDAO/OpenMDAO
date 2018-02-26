@@ -7,8 +7,9 @@ given an MPI communicator of sufficient size.  Adding subsystems to a ParallelGr
 to a normal Group.  For example:
 
 
-.. embed-test::
+.. embed-code::
   openmdao.core.tests.test_parallel_groups.TestParallelGroups.test_fan_in_grouped_feature
+  :layout: interleave
 
 
 In this example, components *c1* and *c2* will be executed in parallel, provided that the :code:`ParallelGroup` is given two

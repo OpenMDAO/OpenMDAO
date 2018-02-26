@@ -4,6 +4,8 @@ from __future__ import division
 import os
 import sys
 import warnings
+import unittest
+from mock import Mock
 from fnmatch import fnmatchcase
 from six import string_types
 from six.moves import range
@@ -170,7 +172,7 @@ def determine_adder_scaler(ref0, ref, adder, scaler):
     return adder, scaler
 
 
-def set_pyoptsparse_opt(optname):
+def set_pyoptsparse_opt(optname, fallback=True):
     """
     For testing, sets the pyoptsparse optimizer using the given optimizer name.
 
@@ -183,6 +185,8 @@ def set_pyoptsparse_opt(optname):
     ----------
     optname : str
         Name of pyoptsparse optimizer that is requested by the test.
+    fallback : bool
+        If True, fall back to SLSQP if optname can't be found
 
     Returns
     -------
@@ -192,6 +196,7 @@ def set_pyoptsparse_opt(optname):
         Pyoptsparse optimizer string
     """
     OPT = None
+    opt = None
     OPTIMIZER = None
     force = os.environ.get('OPENMDAO_FORCE_PYOPTSPARSE_OPT')
     if force:
@@ -200,17 +205,30 @@ def set_pyoptsparse_opt(optname):
     try:
         from pyoptsparse import OPT
         try:
-            OPT(optname)
+            opt = OPT(optname)
             OPTIMIZER = optname
         except Exception:
-            if optname != 'SLSQP':
+            if fallback and optname != 'SLSQP':
                 try:
-                    OPT('SLSQP')
+                    opt = OPT('SLSQP')
+                    OPTIMIZER = 'SLSQP'
+                except Exception:
+                    pass
+        else:
+            if fallback and isinstance(opt, Mock):
+                try:
+                    opt = OPT('SLSQP')
                     OPTIMIZER = 'SLSQP'
                 except Exception:
                     pass
     except Exception:
         pass
+
+    if isinstance(opt, Mock):
+        OPT = OPTIMIZER = None
+
+    if not fallback and OPTIMIZER != optname:
+        raise unittest.SkipTest("pyoptsparse is not providing %s" % optname)
 
     return OPT, OPTIMIZER
 

@@ -14,7 +14,6 @@ This example shows how to use the :code:`Driver` debug printing options. The :co
 The only valid strings are 'desvars','ln_cons','nl_cons',and 'objs'.
 
 
-  .. embed-test::
+  .. embed-code::
       openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizeDriverFeatures.test_debug_print_option
-
-
+      :layout: interleave
