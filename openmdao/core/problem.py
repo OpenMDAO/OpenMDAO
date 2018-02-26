@@ -85,6 +85,8 @@ class Problem(object):
         0 -- Newly initialized problem or newly added model.
         1 -- The `setup` method has been called, but vectors not initialized.
         2 -- The `final_setup` has been run, everything ready to run.
+    _lin_sol_cache : dict
+        Dict of variable names keyed to a dict of indeices keyed to solution vectors
     cite : str
         Listing of relevant citataions that should be referenced when
         publishing work that uses this class.
@@ -147,6 +149,8 @@ class Problem(object):
         # 1 -- The `setup` method has been called, but vectors not initialized.
         # 2 -- The `final_setup` has been run, everything ready to run.
         self._setup_status = 0
+
+        self._lin_sol_cache = {}
 
     def __getitem__(self, name):
         """
@@ -1099,7 +1103,7 @@ class Problem(object):
         iproc = model.comm.rank
 
         for vois in itervalues(voi_lists):
-            for input_name, old_input_name, _, _, _ in vois:
+            for input_name, old_input_name, _, _, _, _ in vois:
                 vecname = inp2rhs_name[input_name]
                 if vecname not in input_vec:
                     continue
@@ -1300,10 +1304,12 @@ class Problem(object):
                 parallel_deriv_color = meta['parallel_deriv_color']
                 simul_coloring = meta['simul_deriv_color']
                 matmat = meta['vectorize_derivs']
+                cache = meta['cache_linear_solution']
             else:
                 parallel_deriv_color = simul_coloring = None
                 use_rel_reduction = False
                 matmat = False
+                cache = False
 
             if simul_coloring is not None:
                 if parallel_deriv_color:
@@ -1322,14 +1328,14 @@ class Problem(object):
                     # can be either promoted or absolute depending on the value
                     # of the 'global_names' flag.
                     voi_lists[name] = [(name, old_input_list[i], parallel_deriv_color, matmat,
-                                        simul_coloring)]
+                                        simul_coloring, cache)]
                     inp2rhs_name[name] = name if matmat else 'linear'
             else:
                 if parallel_deriv_color not in voi_lists:
                     voi_lists[parallel_deriv_color] = []
                 voi_lists[parallel_deriv_color].append((name, old_input_list[i],
                                                         parallel_deriv_color, matmat,
-                                                        simul_coloring))
+                                                        simul_coloring, cache))
                 inp2rhs_name[name] = name
 
         lin_vec_names = sorted(set(inp2rhs_name.values()))
@@ -1340,7 +1346,7 @@ class Problem(object):
             # If Forward mode, solve linear system for each 'wrt'
             # If Adjoint mode, solve linear system for each 'of'
 
-            matmats = [m for _, _, _, m, _ in vois]
+            matmats = [m for _, _, _, m, _, _ in vois]
             matmat = matmats[0]
             if any(matmats) and not all(matmats):
                 raise RuntimeError("Mixing of vectorized and non-vectorized derivs in the same "
@@ -1350,7 +1356,7 @@ class Problem(object):
 
             if use_rel_reduction:
                 rel_systems = set()
-                for voi, _, _, _, _ in vois:
+                for voi, _, _, _, _, _ in vois:
                     rel_systems.update(relevant[voi]['@all'][1])
             else:
                 rel_systems = _contains_all
@@ -1382,7 +1388,7 @@ class Problem(object):
                 idx_iter = idx_iter()
             else:
                 loc_idx_dict = defaultdict(lambda: -1)
-                max_len = max(len(voi_info[name][2]) for name, _, _, _, _ in vois)
+                max_len = max(len(voi_info[name][2]) for name, _, _, _, _, _ in vois)
                 idx_iter = range(max_len)
 
             for i in idx_iter:
@@ -1403,7 +1409,7 @@ class Problem(object):
                     if use_rel_reduction:
                         vec_dinput['linear'].set_const(0.0)
 
-                for input_name, old_input_name, pd_color, matmat, simul in vois:
+                for input_name, old_input_name, pd_color, matmat, simul, cache_lin_sol in vois:
                     dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
                         voi_info[input_name]
 
@@ -1435,7 +1441,7 @@ class Problem(object):
 
                 model._solve_linear(lin_vec_names, mode, rel_systems)
 
-                for input_name, old_input_name, _, matmat, simul in vois:
+                for input_name, old_input_name, _, matmat, simul, cache_lin_sol in vois:
                     dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
                         dup, store = voi_info[input_name]
                     ncol = dinputs._ncol
