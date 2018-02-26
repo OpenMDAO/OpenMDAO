@@ -20,6 +20,7 @@ Here is a simple example to consider:
 .. embed-code::
     openmdao.test_suite.components.quad_implicit.QuadraticComp
 
+
 In this component, :code:`x` is an output, and you take derivatives with respect to it.
 This might seem a bit strange to you if you're used to thinking about things from an :ref:`ExplicitComponent <advanced_guide_partial_derivs_explicit>` perspective.
 But for implicit components it is necessary, because the values of those outputs are determined by a solver, like :ref:`NewtonSolver <nlnewton>`, which will need to know those derivatives.

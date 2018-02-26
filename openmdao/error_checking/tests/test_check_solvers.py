@@ -1,10 +1,9 @@
 
 import unittest
 
-import numpy as np
-
 from openmdao.api import ImplicitComponent, Problem, Group, IndepVarComp, ExecComp, \
-    LinearBlockGS, ScipyKrylov, NewtonSolver
+    LinearBlockGS, NonlinearBlockGS, ScipyKrylov, NewtonSolver
+from openmdao.utils.logger_utils import TestLogger
 from openmdao.test_suite.components.sellar import StateConnection, SellarDerivativesGrouped
 
 
@@ -13,36 +12,55 @@ class StateConnWithSolveLinear(StateConnection):
         pass
 
 
-class TestProblemCheckSolvers(unittest.TestCase):
+class TestCheckSolvers(unittest.TestCase):
 
     def test_state_single(self):
         prob = Problem()
+        model = prob.model
 
-        prob.model.add_subsystem('statecomp', StateConnection())
+        model.add_subsystem('indep', IndepVarComp('y', 1.0))
+        model.add_subsystem('statecomp', StateConnection())
 
-        prob.setup()
+        model.connect('indep.y', 'statecomp.y2_actual')
 
-        with self.assertRaises(RuntimeError) as cm:
-            prob.final_setup()
+        # perform setup with checks but don't run model
+        testlogger = TestLogger()
+        prob.setup(check=True, logger=testlogger)
+        prob.final_setup()
 
-        self.assertTrue("Group '' contains implicit components ['statecomp'] "
+        # should trigger a warning due to having states without an iterative solver
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 1)
+
+        self.assertEqual(warnings[0],
+                        "Group '' contains implicit components ['statecomp'] "
                         "and uses derivatives, but does not have an iterative "
-                        "linear solver."
-                        in str(cm.exception))
+                        "linear solver.")
 
     def test_state_single_w_ancestor_iter(self):
         prob = Problem()
         model = prob.model
 
-        model.add_subsystem("G1", Group())
-        model.G1.add_subsystem('statecomp', StateConnection())
+        model.add_subsystem('indep', IndepVarComp('y', 1.0))
 
+        model.add_subsystem("G1", Group())
+        model.G1.add_subsystem('statecomp', StateConnection(),
+                               promotes_inputs=['y2_actual'])
+
+        model.connect('indep.y', 'G1.y2_actual')
+
+        # provide iterative linear solver for implicit group
         model.linear_solver = LinearBlockGS()
         model.linear_solver.options['maxiter'] = 5
 
-        # should be no exception here since top level solver has maxiter > 1
-        prob.setup()
+        # perform setup with checks but don't run model
+        testlogger = TestLogger()
+        prob.setup(check=True, logger=testlogger)
         prob.final_setup()
+
+        # should not trigger any solver warnings because maxiter > 1
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
 
     def test_state_not_single(self):
         prob = Problem()
@@ -50,25 +68,41 @@ class TestProblemCheckSolvers(unittest.TestCase):
 
         model.linear_solver = ScipyKrylov()
 
+        model.add_subsystem('indep', IndepVarComp('y', 1.0))
         model.add_subsystem('statecomp', StateConnection())
-        model.add_subsystem('C1', ExecComp('y=2.0*x'))
 
-        # should be no exception here
-        prob.setup()  
+        model.connect('indep.y', 'statecomp.y2_actual')
+
+        # perform setup with checks but don't run model
+        testlogger = TestLogger()
+        prob.setup(check=True, logger=testlogger)
         prob.final_setup()
+
+        # should not trigger any solver warnings
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
 
     def test_state_single_maxiter_gt_1(self):
         prob = Problem()
         model = prob.model
 
+        model.add_subsystem('indep', IndepVarComp('y', 1.0))
+        model.add_subsystem('statecomp', StateConnection())
+
+        model.connect('indep.y', 'statecomp.y2_actual')
+
+        # provide iterative linear solver for implicit group
         model.linear_solver = LinearBlockGS()
         model.linear_solver.options['maxiter'] = 2
 
-        model.add_subsystem('statecomp', StateConnection())
-
-        # this should not raise an exception because maxiter > 1
-        prob.setup()
+        # perform setup with checks but don't run model
+        testlogger = TestLogger()
+        prob.setup(check=True, logger=testlogger)
         prob.final_setup()
+
+        # should not trigger any solver warnings because maxiter > 1
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
 
     def test_cycle(self):
         prob = Problem()
@@ -82,26 +116,27 @@ class TestProblemCheckSolvers(unittest.TestCase):
         model.connect('C2.y','C3.x')
         model.connect('C3.y','C1.x')
 
-        prob.setup()
+        # perform setup with checks but don't run model
+        testlogger = TestLogger()
+        prob.setup(check=True, logger=testlogger)
+        prob.final_setup()
 
-        with self.assertRaises(RuntimeError) as cm:
-            prob.final_setup()
+        # should trigger warnings because cycle requires iterative solvers
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 2)
 
-        self.assertTrue("Group '' contains cycles [['C1', 'C2', 'C3']], but "
-                        "does not have an iterative nonlinear solver."
-                        in str(cm.exception))
+        self.assertEqual(warnings[0],
+                        "Group '' contains cycles [['C1', 'C2', 'C3']], but "
+                        "does not have an iterative nonlinear solver.")
 
-        self.assertTrue("Group '' contains cycles [['C1', 'C2', 'C3']] and "
+        self.assertEqual(warnings[1],
+                        "Group '' contains cycles [['C1', 'C2', 'C3']] and "
                         "uses derivatives, but does not have an iterative "
-                        "linear solver."
-                        in str(cm.exception))
+                        "linear solver.")
 
     def test_cycle_maxiter_gt_1(self):
         prob = Problem()
         model = prob.model
-
-        model.linear_solver = LinearBlockGS()
-        model.linear_solver.options['maxiter'] = 2
 
         C1 = model.add_subsystem("C1", ExecComp('y=2.0*x'))
         C2 = model.add_subsystem("C2", ExecComp('y=2.0*x'))
@@ -111,15 +146,25 @@ class TestProblemCheckSolvers(unittest.TestCase):
         model.connect('C2.y','C3.x')
         model.connect('C3.y','C1.x')
 
-        # this should not raise an exception because maxiter > 1
-        prob.setup()  
+        # provide iterative solvers to handle cycle
+        model.linear_solver = LinearBlockGS()
+        model.linear_solver.options['maxiter'] = 2
+
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver.options['maxiter'] = 2
+
+        # perform setup with checks but don't run model
+        testlogger = TestLogger()
+        prob.setup(check=True, logger=testlogger)
         prob.final_setup()
+
+        # should not trigger any solver warnings because maxiter > 1
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
 
     def test_cycle_maxiter_gt_1_subgroup(self):
         prob = Problem()
         model = prob.model
-
-        model.linear_solver = LinearBlockGS()  # maxiter = 10
 
         G1 = model.add_subsystem("G1", Group())
         C1 = G1.add_subsystem("C1", ExecComp('y=2.0*x'))
@@ -130,25 +175,37 @@ class TestProblemCheckSolvers(unittest.TestCase):
         G1.connect('C2.y','C3.x')
         G1.connect('C3.y','C1.x')
 
-        # this should not raise an exception because maxiter > 1 in an ancestor group
-        prob.setup()  
+        # provide iterative solvers to handle cycle (default maxiter = 10)
+        model.linear_solver = LinearBlockGS()
+        model.nonlinear_solver = NonlinearBlockGS()
+
+        # perform setup with checks but don't run model
+        testlogger = TestLogger()
+        prob.setup(check=True, logger=testlogger)
         prob.final_setup()
+
+        # should not trigger solver warning because maxiter > 1 in ancestor group
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
 
     def test_complex_step_around_newton_error(self):
         prob = Problem(SellarDerivativesGrouped())
-
         prob.model.approx_totals(method='cs')
 
-        prob.setup()
+        testlogger = TestLogger()
+        prob.setup(check=True, logger=testlogger)
 
+        # insert Newton solver before final setup
         prob.model.mda.nonlinear_solver = NewtonSolver()
 
-        with self.assertRaises(RuntimeError) as cm:
-            prob.final_setup()
+        prob.final_setup()
 
-        self.assertTrue("The solver in 'mda' requires derivatives. We "
-                        "currently do not support complex step around it."
-                        in str(cm.exception))
+        # should trigger a warning due to using CS around Newton
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 1)
+        self.assertEqual(warnings[0],
+                        "The solver in 'mda' requires derivatives. We "
+                        "currently do not support complex step around it.")
 
 
 if __name__ == "__main__":

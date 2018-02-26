@@ -316,7 +316,7 @@ _checks = {
     'hanging_inputs': _check_hanging_inputs,
     'cycles': _check_dataflow_prob,
     'system': _check_system_configs,
-    # 'solvers': _check_solvers,
+    'solvers': _check_solvers,
     'dup_inputs': _check_dup_comp_inputs,
 }
 
