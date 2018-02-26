@@ -286,8 +286,7 @@ class ExplCompTestCase(unittest.TestCase):
         inputs = prob.model.list_inputs(units=True)
         print(inputs)
 
-        outputs = prob.model.list_outputs(
-                                          implicit=False,
+        outputs = prob.model.list_outputs(implicit=False,
                                           values=True,
                                           units=True,
                                           shape=True,
@@ -295,8 +294,8 @@ class ExplCompTestCase(unittest.TestCase):
                                           residuals=True,
                                           scaling=True,
                                           hierarchical=False,
-                                          print_arrays=False
-                                          )
+                                          print_arrays=False)
+
         self.assertEqual(sorted(outputs), [
             ('comp.z', {'value': [ 24.], 'resids': [ 0.], 'units': 'inch', 'shape': (1,),
                         'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0} ),

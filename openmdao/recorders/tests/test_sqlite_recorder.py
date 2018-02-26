@@ -54,17 +54,22 @@ class TestSqliteRecorder(unittest.TestCase):
         from tempfile import mkdtemp
         from openmdao.api import SqliteRecorder
         from openmdao.recorders.recording_iteration_stack import recording_iteration
+
         recording_iteration.stack = []
         self.dir = mkdtemp()
-        self.filename = os.path.join(self.dir, "sqlite_test")
-        self.recorder = SqliteRecorder(self.filename)
-        # print(self.filename)  # comment out to make filename printout go away.
+        self.startdir = os.getcwd()
+        self.filename = "sqlite_test"
         self.eps = 1e-3
-        self.savedir = os.getcwd()
+
         os.chdir(self.dir)
 
+        self.recorder = SqliteRecorder(self.filename)
+        # print(self.filename)  # comment out to make filename printout go away.
+
+        self.eps = 1e-3
+
     def tearDown(self):
-        os.chdir(self.savedir)
+        os.chdir(self.startdir)
 
         # return  # comment out to allow db file to be removed.
         try:

@@ -66,8 +66,10 @@ Here, our LHS is connected to a computed value for :math:`x^2`, the multiplier i
 is 4.  The expected solution is :math:`x=\sqrt{2}`.  We initialize :math:`x` with a value of 1 so that
 it finds the positive root.
 
-.. embed-test::
+.. embed-code::
     openmdao.components.tests.test_balance_comp.TestBalanceComp.test_feature_scalar
+    :layout: interleave
+
 
 Example:  Vectorized Root Finding
 ---------------------------------
@@ -82,7 +84,9 @@ for various values of :math:`b`, and :math:`c`.  Here, our LHS is connected to a
 the linear equation.  The multiplier is one and the RHS is zero (the defaults), and thus
 they need not be connected.
 
-.. embed-test::
+.. embed-code::
     openmdao.components.tests.test_balance_comp.TestBalanceComp.test_feature_vector
+    :layout: interleave
+
 
 .. tags:: BalanceComp

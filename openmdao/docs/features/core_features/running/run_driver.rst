@@ -13,6 +13,6 @@ Examples
 
 Set up a simple optimization problem and run it, by calling :code:`run_driver`.
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_problem.TestProblem.test_feature_run_driver
-
+    :layout: interleave

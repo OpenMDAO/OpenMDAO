@@ -67,8 +67,9 @@ Nothing else will screw up the convergence of your analysis or optimization more
 OpenMDAO provides a helper function to make it easier to verify your partial derivatives.
 Any time you implement analytic derivatives, or change the nonlinear equations of your analysis, you should check your partial derivatives this way.
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.test_betz_limit.TestBetzLimit.test_betz_derivatives
+    :layout: interleave
 
 .. note::
 
@@ -81,4 +82,3 @@ If you've taken our advice and stuck with the :code:`compute_partials` method, t
 For now, just take a look at the *r(fwd-chk)* column, which shows the norm of the relative difference between the analytic derivatives Jacobian and one that was approximated using finite difference.
 Here, all the numbers are really small, and that's what you want to see.
 It's rare, except for linear functions, that the finite difference and analytic derivatives will match exactly, but they should be pretty close.
-

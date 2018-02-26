@@ -40,9 +40,9 @@ The first time a `MetaModelUnStructured` runs, it will train the surrogates usin
 training data that has been provided, and then it will predict the output
 values. This training step only occurs on the first run.
 
-.. embed-test::
+.. embed-code::
     openmdao.components.tests.test_meta_model_unstructured.MetaModelTestCase.test_metamodel_feature
-    :no-split:
+    :layout: code, output
 
 The inputs and outputs of a `MetaModelUnStructured` are not limited to scalar values. The
 following modified version of the example uses an array to predict sine and
@@ -50,9 +50,9 @@ cosine as a single output array of two values.  You will also note that the defa
 surrogate can be passed as an argument to the `MetaModelUnStructured` constructor, as an
 alternative to specifying it later.
 
-.. embed-test::
+.. embed-code::
     openmdao.components.tests.test_meta_model_unstructured.MetaModelTestCase.test_metamodel_feature2d
-    :no-split:
+    :layout: code, output
 
 In addition, it's possible to vectorize the input and output variables so that you can
 make multiple predictions for the inputs and outputs in a single execution of the
@@ -64,8 +64,8 @@ for the sine and cosine functions at those three points.  Note that a vectorized
 `MetaModelUnStructured` component requires the first dimension of all input and output variables
 to be the same size as specified in the ``vectorize`` argument.
 
-.. embed-test::
+.. embed-code::
     openmdao.components.tests.test_meta_model_unstructured.MetaModelTestCase.test_metamodel_feature_vector2d
-    :no-split:
+    :layout: code, output
 
 .. tags:: MetaModel, Examples

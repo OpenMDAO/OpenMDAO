@@ -30,5 +30,6 @@ different one on the other processors.  In this case we are only using 2
 processes.
 
 
-.. embed-test::
+.. embed-code::
   openmdao.core.tests.test_distribcomp.MPIFeatureTests.test_distribcomp_feature
+  :layout: interleave

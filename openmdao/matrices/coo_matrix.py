@@ -1,11 +1,12 @@
 """Define the COOmatrix class."""
-from __future__ import division
+from __future__ import division, print_function
 
 import numpy as np
 from numpy import ndarray
 from scipy.sparse import coo_matrix, csr_matrix
 
 from six import iteritems
+from collections import OrderedDict, Counter, defaultdict
 
 from openmdao.matrices.matrix import Matrix, _compute_index_map, sparse_types
 
@@ -35,22 +36,43 @@ class COOMatrix(Matrix):
 
         submats = self._submats
         metadata = self._metadata
-        pre_metadata = {}
-        for key, (info, irow, icol, src_indices, shape, factor) in iteritems(submats):
+        pre_metadata = OrderedDict()
+        locations = {}
+
+        for key, (info, loc, src_indices, shape, factor) in iteritems(submats):
             if not info['dependent']:
                 continue
             val = info['value']
             rows = info['rows']
             dense = (rows is None and (val is None or
                      isinstance(val, ndarray)))
-            ind1 = counter
+
+            full_size = np.prod(shape)
             if dense:
-                counter += np.prod(shape)
+                if src_indices is None:
+                    delta = full_size
+                else:
+                    delta = shape[0] * len(src_indices)
             elif rows is None:
-                counter += val.data.size
+                delta = val.data.size
             else:
-                counter += len(rows)
-            ind2 = counter
+                delta = len(rows)
+
+            if loc in locations:
+                ind1, ind2, otherkey = locations[loc]
+                if not (src_indices is None and (ind2 - ind1) == delta == full_size):
+                    raise RuntimeError("Keys %s map to the same sub-jacobian of a CSC or "
+                                       "CSR partial jacobian and at least one of them is either "
+                                       "not dense or uses src_indices.  This can occur when "
+                                       "multiple inputs on the same "
+                                       "component are connected to the same output." %
+                                       sorted((key, otherkey)))
+            else:
+                ind1 = counter
+                counter += delta
+                ind2 = counter
+                locations[loc] = (ind1, ind2, key)
+
             pre_metadata[key] = (ind1, ind2, None)
 
         data = np.zeros(counter)
@@ -58,7 +80,8 @@ class COOMatrix(Matrix):
         cols = -np.ones(counter, int)
 
         for key, (ind1, ind2, idxs) in iteritems(pre_metadata):
-            info, irow, icol, src_indices, shape, factor = submats[key]
+            info, loc, src_indices, shape, factor = submats[key]
+            irow, icol = loc
             val = info['value']
             dense = (info['rows'] is None and (val is None or
                      isinstance(val, ndarray)))
@@ -159,6 +182,35 @@ class COOMatrix(Matrix):
 
         if factor is not None:
             self._matrix.data[idxs] *= factor
+
+    def _update_add_submat(self, key, jac):
+        """
+        Add the subjac values to an existing  sub-jacobian.
+
+        Parameters
+        ----------
+        key : (str, str)
+            the global output and input variable names.
+        jac : ndarray or scipy.sparse or tuple
+            the sub-jacobian, the same format with which it was declared.
+        """
+        idxs, jac_type, factor = self._metadata[key]
+        if not isinstance(jac, jac_type):
+            raise TypeError("Jacobian entry for %s is of different type (%s) than "
+                            "the type (%s) used at init time." % (key,
+                                                                  type(jac).__name__,
+                                                                  jac_type.__name__))
+        if isinstance(jac, ndarray):
+            val = jac.flatten()
+        elif isinstance(jac, sparse_types):
+            val = jac.data
+        else:  # list format  [data, rows, cols]
+            val = jac[0]
+
+        if factor is not None:
+            self._matrix.data[idxs] += val * factor
+        else:
+            self._matrix.data[idxs] += val
 
     def _prod(self, in_vec, mode, ranges):
         """

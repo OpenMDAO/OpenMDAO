@@ -14,7 +14,7 @@ from openmdao.api import IndepVarComp, Group, Problem, \
                          ExplicitComponent, ImplicitComponent, ExecComp, \
                          NewtonSolver, ScipyKrylov, \
                          DenseJacobian, CSRJacobian, CSCJacobian, COOJacobian, \
-                         LinearBlockGS
+                         LinearBlockGS, DirectSolver
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
@@ -448,7 +448,9 @@ class TestJacobian(unittest.TestCase):
         sup.linear_solver = LinearBlockGS()
 
         sub1.jacobian = DenseJacobian()
+        sub1.linear_solver = DirectSolver()
         sub2.jacobian = DenseJacobian()
+        sub2.linear_solver = DirectSolver()
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='rev')
@@ -555,6 +557,7 @@ class TestJacobian(unittest.TestCase):
 
         prob.model.nonlinear_solver = NewtonSolver()
         G1.jacobian = DenseJacobian()
+        G1.linear_solver = DirectSolver()
 
         # before the fix, we got bad offsets into the _ext_mtx matrix.
         # to get entries in _ext_mtx, there must be at least one connection
@@ -595,28 +598,6 @@ class TestJacobian(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['y'], 2 * np.ones(2))
-
-    def test_sparse_jac_with_subsolver_error(self):
-        prob = Problem()
-        indeps = prob.model.add_subsystem('indeps', IndepVarComp('x', 1.0))
-
-        G1 = prob.model.add_subsystem('G1', Group())
-        G1.add_subsystem('C1', ExecComp('y=2.0*x'))
-        G1.add_subsystem('C2', ExecComp('y=3.0*x'))
-
-        G1.nonlinear_solver = NewtonSolver()
-        prob.model.jacobian = CSRJacobian()
-
-        prob.model.connect('indeps.x', 'G1.C1.x')
-        prob.model.connect('indeps.x', 'G1.C2.x')
-
-        prob.setup(check=False)
-
-        with self.assertRaises(Exception) as context:
-            prob.run_model()
-        self.assertEqual(str(context.exception),
-                         "System 'G1' has a solver of type 'NewtonSolver'but a sparse "
-                         "AssembledJacobian has been set in a higher level system.")
 
     def test_assembled_jacobian_unsupported_cases(self):
 
@@ -777,6 +758,84 @@ class TestJacobian(unittest.TestCase):
         msg = 'Variable name pair \("{}", "{}"\) must first be declared.'
         with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
             J = prob.compute_totals(of=['comp.y'], wrt=['p.x'])
+
+    def test_one_src_2_tgts_with_src_indices_densejac(self):
+        size = 4
+        prob = Problem()
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)))
+
+        G1 = prob.model.add_subsystem('G1', Group())
+        G1.add_subsystem('C1', ExecComp('z=2.0*y+3.0*x', x=np.zeros(size//2), y=np.zeros(size//2),
+                                        z=np.zeros(size//2)))
+
+        prob.model.jacobian = DenseJacobian()
+        prob.model.linear_solver = DirectSolver()
+
+        prob.model.add_objective('G1.C1.z')
+        prob.model.add_design_var('indeps.x')
+
+        prob.model.connect('indeps.x', 'G1.C1.x', src_indices=[0,1])
+        prob.model.connect('indeps.x', 'G1.C1.y', src_indices=[2,3])
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        J = prob.compute_totals(of=['G1.C1.z'], wrt=['indeps.x'])
+        assert_rel_error(self, J['G1.C1.z', 'indeps.x'], np.array([[ 3.,  0.,  2.,  0.],
+                                                                   [-0.,  3.,  0.,  2.]]), .0001)
+
+    def test_one_src_2_tgts_with_src_indices_cscjac_error(self):
+        size = 4
+        prob = Problem()
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)))
+
+        G1 = prob.model.add_subsystem('G1', Group())
+        G1.add_subsystem('C1', ExecComp('z=2.0*y+3.0*x', x=np.zeros(size//2), y=np.zeros(size//2),
+                                        z=np.zeros(size//2)))
+
+        prob.model.jacobian = CSCJacobian()
+        prob.model.linear_solver = DirectSolver()
+
+        prob.model.add_objective('G1.C1.z')
+        prob.model.add_design_var('indeps.x')
+
+        prob.model.connect('indeps.x', 'G1.C1.x', src_indices=[0,1])
+        prob.model.connect('indeps.x', 'G1.C1.y', src_indices=[2,3])
+
+        prob.setup()
+
+        with self.assertRaises(Exception) as context:
+            prob.final_setup()
+        self.assertEqual(str(context.exception),
+                         "Keys [('G1.C1.z', 'G1.C1.x'), ('G1.C1.z', 'G1.C1.y')] map to the same "
+                         "sub-jacobian of a CSC or CSR partial jacobian and at least one of them "
+                         "is either not dense or uses src_indices.  This can occur when multiple "
+                         "inputs on the same component are connected to the same output.")
+
+    def test_one_src_2_tgts_csc_error(self):
+        size = 10
+        prob = Problem()
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)))
+
+        G1 = prob.model.add_subsystem('G1', Group())
+        G1.add_subsystem('C1', ExecComp('z=2.0*y+3.0*x', x=np.zeros(size), y=np.zeros(size),
+                                        z=np.zeros(size)))
+
+        prob.model.jacobian = CSCJacobian()
+        prob.model.linear_solver = DirectSolver()
+
+        prob.model.add_objective('G1.C1.z')
+        prob.model.add_design_var('indeps.x')
+
+        prob.model.connect('indeps.x', 'G1.C1.x')
+        prob.model.connect('indeps.x', 'G1.C1.y')
+
+        prob.setup(mode='fwd')
+        prob.run_model()
+
+        J = prob.compute_totals(of=['G1.C1.z'], wrt=['indeps.x'])
+        assert_rel_error(self, J['G1.C1.z', 'indeps.x'], np.eye(10)*5.0, .0001)
+
 
 if __name__ == '__main__':
     unittest.main()

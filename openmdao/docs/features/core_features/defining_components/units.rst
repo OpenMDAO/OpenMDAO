@@ -63,5 +63,6 @@ In the overall problem, the first component, :code:`c1`, defines distance and ti
 OpenMDAO handles the unit conversions when passing these two variables into :code:`c2`, our 'SpeedComp'.
 There is a further unit conversion from :code:`c2` to :code:`c3` since speed must be converted now to :code:`m/s`.
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_units.TestUnitConversion.test_speed
+    :layout: interleave

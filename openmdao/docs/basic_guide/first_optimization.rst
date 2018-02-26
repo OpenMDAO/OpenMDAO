@@ -28,9 +28,9 @@ Every problem has a single driver associated with it; similarly, every problem h
 The Run Script
 **************
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.basic_opt_paraboloid.BasicOptParaboloid.test_constrained
-    :no-split:
+    :layout: code, output
 
 Although we defined the :code:`Paraboloid` component in a :ref:`previous tutorial <tutorial_paraboloid_analysis>`, we wanted to add an additional equation to our model.
 Since it was a very simple equation, we used the :ref:`ExecComp <feature_exec_comp>` to quickly add the new output to our model, so that we can constrain it.
