@@ -33,9 +33,8 @@ class TestCheckSolvers(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
 
         self.assertEqual(warnings[0],
-                        "Group '' contains implicit components ['statecomp'] "
-                        "and uses derivatives, but does not have an iterative "
-                        "linear solver.")
+                         "Group '' contains implicit components ['statecomp'], "
+                         "but does not have an iterative linear solver.")
 
     def test_state_single_w_ancestor_iter(self):
         prob = Problem()
@@ -126,13 +125,12 @@ class TestCheckSolvers(unittest.TestCase):
         self.assertEqual(len(warnings), 2)
 
         self.assertEqual(warnings[0],
-                        "Group '' contains cycles [['C1', 'C2', 'C3']], but "
-                        "does not have an iterative nonlinear solver.")
+                         "Group '' contains cycles [['C1', 'C2', 'C3']], but "
+                         "does not have an iterative nonlinear solver.")
 
         self.assertEqual(warnings[1],
-                        "Group '' contains cycles [['C1', 'C2', 'C3']] and "
-                        "uses derivatives, but does not have an iterative "
-                        "linear solver.")
+                         "Group '' contains cycles [['C1', 'C2', 'C3']], but "
+                         "does not have an iterative linear solver.")
 
     def test_cycle_maxiter_gt_1(self):
         prob = Problem()
@@ -187,25 +185,6 @@ class TestCheckSolvers(unittest.TestCase):
         # should not trigger solver warning because maxiter > 1 in ancestor group
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 0)
-
-    def test_complex_step_around_newton_error(self):
-        prob = Problem(SellarDerivativesGrouped())
-        prob.model.approx_totals(method='cs')
-
-        testlogger = TestLogger()
-        prob.setup(check=True, logger=testlogger)
-
-        # insert Newton solver before final setup
-        prob.model.mda.nonlinear_solver = NewtonSolver()
-
-        prob.final_setup()
-
-        # should trigger a warning due to using CS around Newton
-        warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 1)
-        self.assertEqual(warnings[0],
-                        "The solver in 'mda' requires derivatives. We "
-                        "currently do not support complex step around it.")
 
 
 if __name__ == "__main__":

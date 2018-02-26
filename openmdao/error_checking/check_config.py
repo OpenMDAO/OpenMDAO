@@ -224,22 +224,9 @@ def _check_solvers(problem, logger):
     logger : object
         The object that managers logging output.
     """
-    # TODO: This will be an warning in check_setup (not a hard error)
-
-    # if you don't have any cycles or implicit comps, but driver requests derivs,
-    # then you are fine with LRO everywhere
-
     # TODO: if you have a (nonlinear) Newton solver in a group, you either need a
     #       linear_solver in that group, or slotted in the Newton solver.
 
-    # nonlinear: cycle
-    # linear:    (cycle or implicit) and derivs
-
-    # all states that have some maxiter>1 linear solver above them in the tree
-    # iterated_states = set()
-    # group_states = []
-
-    uses_deriv = {}
     has_cycles = {}
     has_states = {}
 
@@ -249,10 +236,6 @@ def _check_solvers(problem, logger):
 
     for group in problem.model.system_iter(include_self=True, recurse=True, typ=Group):
         path = group.pathname
-
-        # determine if this group requires derivatives
-        derivs_needed = uses_deriv[path] = ('fd' not in group._approx_schemes and
-                                            'cs' not in group._approx_schemes)
 
         # determine if this group has cycles
         graph = group.compute_sys_graph(comps_only=False)
@@ -265,49 +248,35 @@ def _check_solvers(problem, logger):
             comp.pathname for comp in group.system_iter(recurse=True, typ=ImplicitComponent)
         ]
 
-        # determine if the current group has appropriate solvers for
-        # handling cycles, derivatives and implicit components
+        # determine if the current group has appropriate solvers for handling cycles
+        # and implicit components
         is_iter_nl = has_iter_nl[path] = group.nonlinear_solver.options['maxiter'] > 1
         is_iter_ln = has_iter_ln[path] = (group.linear_solver.options['maxiter'] > 1 or
                                           isinstance(group.linear_solver, DirectSolver))
 
-        # check upstream groups for iterative solvers and derivative requirements
+        # check upstream groups for iterative solvers
         parts = path.split('.')
         for i in range(len(parts)):
             gname = '.'.join(parts[:i])
             is_iter_nl = is_iter_nl or has_iter_nl[gname]
             is_iter_ln = is_iter_ln or has_iter_ln[gname]
-            derivs_needed = derivs_needed and uses_deriv[gname]
 
-        # if you have a cycle, then you need a nonlinear solver with maxiter > 1
-        # if you also are asking for derivatives up above, you need a linear solver too
+        # if you have a cycle, then you need iterative nonlinear and linear solvers
         if has_cycles[path]:
             if not is_iter_nl:
                 msg = ("Group '%s' contains cycles %s, but does not have an iterative "
                        "nonlinear solver." % (group.pathname, has_cycles[path]))
                 logger.warning(msg)
-            if derivs_needed and not is_iter_ln:
-                msg = ("Group '%s' contains cycles %s and uses derivatives, but does "
-                       "not have an iterative linear solver."
-                       % (group.pathname, has_cycles[path]))
+            if not is_iter_ln:
+                msg = ("Group '%s' contains cycles %s, but does not have an iterative "
+                       "linear solver." % (group.pathname, has_cycles[path]))
                 logger.warning(msg)
 
-        # if you have implicit components and you use derivatives, then you
-        # need a better linear solver than LinearRunOnce
-        if derivs_needed and has_states[path] and not is_iter_ln:
-            msg = ("Group '%s' contains implicit components %s and uses "
-                   "derivatives, but does not have an iterative linear solver."
-                   % (group.pathname, has_states[path]))
+        # if you have implicit components, then you need an iterative linear solver
+        if has_states[path] and not is_iter_ln:
+            msg = ("Group '%s' contains implicit components %s, but does not have an "
+                   "iterative linear solver." % (group.pathname, has_states[path]))
             logger.warning(msg)
-
-        # look for nonlinear solvers that require derivs under complex step.
-        if 'cs' in group._approx_schemes:
-            for sub in group.system_iter(include_self=True, recurse=True, typ=Group):
-                if hasattr(sub.nonlinear_solver, 'linear_solver'):
-                    msg = ("The solver in '%s' requires derivatives. We "
-                           "currently do not support complex step around it."
-                           % sub.name)
-                    logger.warning(msg)
 
 
 # Dict of all checks by name, mapped to the corresponding function that performs the check
