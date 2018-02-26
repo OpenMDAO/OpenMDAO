@@ -28,13 +28,19 @@ class TestCheckSolvers(unittest.TestCase):
         prob.setup(check=True, logger=testlogger)
         prob.final_setup()
 
-        # should trigger a warning due to having states without an iterative solver
+        # should trigger a warning due to having states without iterative solvers
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 1)
+        self.assertEqual(len(warnings), 2)
 
         self.assertEqual(warnings[0],
-                         "Group '' contains implicit components ['statecomp'], "
-                         "but does not have an iterative linear solver.")
+                         "StateConnection 'statecomp' contains implicit variables, "
+                         "but does not have an iterative nonlinear solver and does not "
+                         "implement 'solve_nonlinear'.")
+
+        self.assertEqual(warnings[1],
+                         "StateConnection 'statecomp' contains implicit variables, "
+                         "but does not have an iterative linear solver and does not "
+                         "implement 'solve_linear'.")
 
     def test_state_single_w_ancestor_iter(self):
         prob = Problem()
