@@ -134,7 +134,7 @@ def _check_dup_comp_inputs(problem, logger):
     problem : <Problem>
         The problem being checked.
     logger : object
-        The object that managers logging output.
+        The object that manages logging output.
     """
     input_srcs = problem.model._conn_global_abs_in2out
     src2inps = defaultdict(list)
@@ -171,7 +171,7 @@ def _check_hanging_inputs(problem, logger):
     problem : <Problem>
         The problem being checked.
     logger : object
-        The object that managers logging output.
+        The object that manages logging output.
     """
     input_srcs = problem.model._conn_global_abs_in2out
 
@@ -202,7 +202,7 @@ def _check_system_configs(problem, logger):
     problem : <Problem>
         The problem being checked.
     logger : object
-        The object that managers logging output.
+        The object that manages logging output.
     """
     for system in problem.model.system_iter(include_self=True, recurse=True):
         system.check_config(logger)
@@ -223,7 +223,7 @@ def _check_solvers(problem, logger):
     problem : <Problem>
         The problem being checked.
     logger : object
-        The object that managers logging output.
+        The object that manages logging output.
     """
     iter_nl_depth = iter_ln_depth = np.inf
 
