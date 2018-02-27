@@ -1443,18 +1443,18 @@ class Problem(object):
 
                 if cache_lin_sol:
                     idx = (color,) if do_color_iter else i
-                    if idx in self._lin_sol_cache:
-                        save_vec = self._lin_sol_cache[idx]
+                    ikey = (vois[0][0], idx)
+                    if ikey in self._lin_sol_cache:
+                        save_vec = self._lin_sol_cache[ikey]
                         for vs in doutputs._data:
                             doutputs._data[vs][:] = save_vec[vs]
                     else:
-                        self._lin_sol_cache[idx] = deepcopy(doutputs._data)
+                        self._lin_sol_cache[ikey] = deepcopy(doutputs._data)
 
                 model._solve_linear(lin_vec_names, mode, rel_systems)
 
                 if cache_lin_sol:
-                    idx = (color,) if do_color_iter else i
-                    save_vec = self._lin_sol_cache[idx]
+                    save_vec = self._lin_sol_cache[ikey]
                     for vs in doutputs._data:
                         save_vec[vs][:] = doutputs._data[vs]
 
