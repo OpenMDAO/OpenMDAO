@@ -7,14 +7,17 @@ from openmdao.utils.logger_utils import TestLogger
 from openmdao.test_suite.components.sellar import StateConnection, SellarDerivativesGrouped
 
 
-class StateConnWithSolveLinear(StateConnection):
-    def solve_linear(self, dumat, drmat, vois, mode=None):
+class StateConnWithSolve(StateConnection):
+    def solve_linear(self, inputs, outputs):
+        pass
+
+    def solve_nonlinear(self, inputs, outputs):
         pass
 
 
 class TestCheckSolvers(unittest.TestCase):
 
-    def test_state_single(self):
+    def test_implicit(self):
         prob = Problem()
         model = prob.model
 
@@ -28,7 +31,7 @@ class TestCheckSolvers(unittest.TestCase):
         prob.setup(check=True, logger=testlogger)
         prob.final_setup()
 
-        # should trigger a warning due to having states without iterative solvers
+        # should trigger warnings due to having states without solves
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 2)
 
@@ -42,7 +45,47 @@ class TestCheckSolvers(unittest.TestCase):
                          "but does not have an iterative linear solver and does not "
                          "implement 'solve_linear'.")
 
-    def test_state_single_w_ancestor_iter(self):
+    def test_implicit_with_solve(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('indep', IndepVarComp('y', 1.0))
+        model.add_subsystem('statecomp', StateConnWithSolve())
+
+        model.connect('indep.y', 'statecomp.y2_actual')
+
+        # perform setup with checks but don't run model
+        testlogger = TestLogger()
+        prob.setup(check=True, logger=testlogger)
+        prob.final_setup()
+
+        # should not trigger any solver warnings because solve methods are implemented
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
+
+    def test_implicit_iter(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('indep', IndepVarComp('y', 1.0))
+        model.add_subsystem('statecomp', StateConnection())
+
+        model.connect('indep.y', 'statecomp.y2_actual')
+
+        # provide iterative solvers for implicit group
+        model.linear_solver = LinearBlockGS()
+        model.nonlinear_solver = NonlinearBlockGS()
+
+        # perform setup with checks but don't run model
+        testlogger = TestLogger()
+        prob.setup(check=True, logger=testlogger)
+        prob.final_setup()
+
+        # should not trigger any solver warnings
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
+
+    def test_implicit_iter_subgroup(self):
         prob = Problem()
         model = prob.model
 
@@ -54,58 +97,16 @@ class TestCheckSolvers(unittest.TestCase):
 
         model.connect('indep.y', 'G1.y2_actual')
 
-        # provide iterative linear solver for implicit group
+        # provide iterative solvers for implicit group
         model.linear_solver = LinearBlockGS()
-        model.linear_solver.options['maxiter'] = 5
+        model.nonlinear_solver = NonlinearBlockGS()
 
         # perform setup with checks but don't run model
         testlogger = TestLogger()
         prob.setup(check=True, logger=testlogger)
         prob.final_setup()
 
-        # should not trigger any solver warnings because maxiter > 1
-        warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 0)
-
-    def test_state_not_single(self):
-        prob = Problem()
-        model = prob.model
-
-        model.linear_solver = ScipyKrylov()
-
-        model.add_subsystem('indep', IndepVarComp('y', 1.0))
-        model.add_subsystem('statecomp', StateConnection())
-
-        model.connect('indep.y', 'statecomp.y2_actual')
-
-        # perform setup with checks but don't run model
-        testlogger = TestLogger()
-        prob.setup(check=True, logger=testlogger)
-        prob.final_setup()
-
-        # should not trigger any solver warnings
-        warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 0)
-
-    def test_state_single_maxiter_gt_1(self):
-        prob = Problem()
-        model = prob.model
-
-        model.add_subsystem('indep', IndepVarComp('y', 1.0))
-        model.add_subsystem('statecomp', StateConnection())
-
-        model.connect('indep.y', 'statecomp.y2_actual')
-
-        # provide iterative linear solver for implicit group
-        model.linear_solver = LinearBlockGS()
-        model.linear_solver.options['maxiter'] = 2
-
-        # perform setup with checks but don't run model
-        testlogger = TestLogger()
-        prob.setup(check=True, logger=testlogger)
-        prob.final_setup()
-
-        # should not trigger any solver warnings because maxiter > 1
+        # should not trigger solver warning because iterates in parent group
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 0)
 
@@ -138,7 +139,7 @@ class TestCheckSolvers(unittest.TestCase):
                          "Group '' contains cycles [['C1', 'C2', 'C3']], but "
                          "does not have an iterative linear solver.")
 
-    def test_cycle_maxiter_gt_1(self):
+    def test_cycle_iter(self):
         prob = Problem()
         model = prob.model
 
@@ -152,21 +153,18 @@ class TestCheckSolvers(unittest.TestCase):
 
         # provide iterative solvers to handle cycle
         model.linear_solver = LinearBlockGS()
-        model.linear_solver.options['maxiter'] = 2
-
         model.nonlinear_solver = NonlinearBlockGS()
-        model.nonlinear_solver.options['maxiter'] = 2
 
         # perform setup with checks but don't run model
         testlogger = TestLogger()
         prob.setup(check=True, logger=testlogger)
         prob.final_setup()
 
-        # should not trigger any solver warnings because maxiter > 1
+        # should not trigger any solver warnings
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 0)
 
-    def test_cycle_maxiter_gt_1_subgroup(self):
+    def test_cycle_iter_subgroup(self):
         prob = Problem()
         model = prob.model
 
@@ -179,7 +177,7 @@ class TestCheckSolvers(unittest.TestCase):
         G1.connect('C2.y','C3.x')
         G1.connect('C3.y','C1.x')
 
-        # provide iterative solvers to handle cycle (default maxiter = 10)
+        # provide iterative solvers to handle cycle
         model.linear_solver = LinearBlockGS()
         model.nonlinear_solver = NonlinearBlockGS()
 
@@ -188,7 +186,7 @@ class TestCheckSolvers(unittest.TestCase):
         prob.setup(check=True, logger=testlogger)
         prob.final_setup()
 
-        # should not trigger solver warning because maxiter > 1 in ancestor group
+        # should not trigger solver warning because iterates in parent group
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 0)
 
