@@ -182,27 +182,22 @@ class TestCheckSolvers(unittest.TestCase):
 
         model.connect('indep.y', ['G1.y2_actual', 'G2.y2_actual'])
 
-        # provide iterative solvers for G1 but not G2
+        # do not provide iterative linear solver for G2
+        model.nonlinear_solver = NonlinearBlockGS()
         model.G1.linear_solver = LinearBlockGS()
-        model.G1.nonlinear_solver = NonlinearBlockGS()
 
         # perform setup with checks but don't run model
         testlogger = TestLogger()
         prob.setup(check=True, logger=testlogger)
         prob.final_setup()
 
-        # should trigger solver warnings only for group 2
+        # should trigger a linear solver warning only for group 2
         warnings = testlogger.get('warning')
         from pprint import pprint
         pprint(warnings)
-        self.assertEqual(len(warnings), 2)
+        self.assertEqual(len(warnings), 1)
 
         self.assertEqual(warnings[0],
-                         "StateConnection 'G2.statecomp2' contains implicit "
-                         "variables, but does not have an iterative nonlinear solver "
-                         "and does not implement 'solve_nonlinear'.")
-
-        self.assertEqual(warnings[1],
                          "StateConnection 'G2.statecomp2' contains implicit "
                          "variables, but does not have an iterative linear solver "
                          "and does not implement 'solve_linear'.")
