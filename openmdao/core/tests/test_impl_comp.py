@@ -774,23 +774,35 @@ class CacheUsingComp(ImplicitComponent):
 
 
 class CacheLinSolutionTestCase(unittest.TestCase):
-    def test_caching(self):
+    def test_caching_fwd(self):
         p = Problem()
         p.model.add_subsystem('indeps', IndepVarComp('x', val=np.arange(10, dtype=float)))
         p.model.add_subsystem('C1', CacheUsingComp())
         p.model.connect('indeps.x', 'C1.x')
         p.model.add_design_var('indeps.x', cache_linear_solution=True)
+        p.model.add_objective('C1.y')
+        p.setup(mode='fwd')
+        p.run_model()
+
+        for i in range(10):
+            p['indeps.x'] += np.arange(10, dtype=float)
+            p.run_model()
+            J = p.compute_totals(of=['C1.y'], wrt=['indeps.x'])
+
+    def test_caching_rev(self):
+        p = Problem()
+        p.model.add_subsystem('indeps', IndepVarComp('x', val=np.arange(10, dtype=float)))
+        p.model.add_subsystem('C1', CacheUsingComp())
+        p.model.connect('indeps.x', 'C1.x')
+        p.model.add_design_var('indeps.x')
         p.model.add_objective('C1.y', cache_linear_solution=True)
         p.setup(mode='rev')
         p.run_model()
 
-        x = 1.0
         for i in range(10):
             p['indeps.x'] += np.arange(10, dtype=float)
             p.run_model()
-            print("compute_totals")
             J = p.compute_totals(of=['C1.y'], wrt=['indeps.x'])
-            x += 1.0
 
 
 if __name__ == '__main__':
