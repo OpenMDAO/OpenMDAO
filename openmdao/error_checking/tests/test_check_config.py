@@ -82,8 +82,6 @@ class TestCheckConfig(unittest.TestCase):
         p.final_setup()
 
         warnings = testlogger.get('warning')
-        from pprint import pprint
-        pprint(warnings)
         info = testlogger.get('info')
         self.assertEqual(len(warnings), 1)
         self.assertEqual(len(info), 1)

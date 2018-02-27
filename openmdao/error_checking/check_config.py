@@ -225,9 +225,6 @@ def _check_solvers(problem, logger):
     logger : object
         The object that managers logging output.
     """
-    # TODO: if you have a (nonlinear) Newton solver in a group, you either need a
-    #       linear_solver in that group, or slotted in the Newton solver.
-
     has_cycles = {}
     has_states = {}
 
