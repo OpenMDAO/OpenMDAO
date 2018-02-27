@@ -1200,9 +1200,16 @@ class Problem(object):
 
         if wrt is None:
             wrt = list(self.driver._designvars)
+            global_wrt = True
+        else:
+            global_wrt = global_names
+
         if of is None:
             of = list(self.driver._objs)
             of.extend(self.driver._cons)
+            global_of = True
+        else:
+            global_of = global_names
 
         # A number of features will need to be supported here as development
         # goes forward.
@@ -1243,8 +1250,9 @@ class Problem(object):
         # Convert of and wrt names from promoted to unpromoted
         # (which is absolute path since we're at the top)
         oldwrt, oldof = wrt, of
-        if not global_names:
+        if not global_of:
             of = [prom2abs[name][0] for name in oldof]
+        if not global_wrt:
             wrt = [prom2abs[name][0] for name in oldwrt]
 
         owning_ranks = self.model._owning_rank['output']
