@@ -7,7 +7,17 @@ from openmdao.utils.logger_utils import TestLogger
 from openmdao.test_suite.components.sellar import StateConnection
 
 
-class StateConnWithSolve(StateConnection):
+class StateConnWithSolveNonlinear(StateConnection):
+    def solve_nonlinear(self, inputs, outputs):
+        pass
+
+
+class StateConnWithSolveLinear(StateConnection):
+    def solve_linear(self, inputs, outputs):
+        pass
+
+
+class StateConnWithSolves(StateConnection):
     def solve_linear(self, inputs, outputs):
         pass
 
@@ -45,12 +55,58 @@ class TestCheckSolvers(unittest.TestCase):
                          "but does not have an iterative linear solver and does not "
                          "implement 'solve_linear'.")
 
-    def test_implicit_with_solve(self):
+    def test_implicit_without_solve_linear(self):
         prob = Problem()
         model = prob.model
 
         model.add_subsystem('indep', IndepVarComp('y', 1.0))
-        model.add_subsystem('statecomp', StateConnWithSolve())
+        model.add_subsystem('statecomp', StateConnWithSolveNonlinear())
+
+        model.connect('indep.y', 'statecomp.y2_actual')
+
+        # perform setup with checks but don't run model
+        testlogger = TestLogger()
+        prob.setup(check=True, logger=testlogger)
+        prob.final_setup()
+
+        # should trigger solver warning because there is no linear solve
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 1)
+
+        self.assertEqual(warnings[0],
+                         "StateConnWithSolveNonlinear 'statecomp' contains implicit "
+                         "variables, but does not have an iterative linear solver "
+                         "and does not implement 'solve_linear'.")
+
+    def test_implicit_without_solve_nonlinear(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('indep', IndepVarComp('y', 1.0))
+        model.add_subsystem('statecomp', StateConnWithSolveLinear())
+
+        model.connect('indep.y', 'statecomp.y2_actual')
+
+        # perform setup with checks but don't run model
+        testlogger = TestLogger()
+        prob.setup(check=True, logger=testlogger)
+        prob.final_setup()
+
+        # should trigger solver warning because there is no nonlinear solve
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 1)
+
+        self.assertEqual(warnings[0],
+                         "StateConnWithSolveLinear 'statecomp' contains implicit "
+                         "variables, but does not have an iterative nonlinear solver "
+                         "and does not implement 'solve_nonlinear'.")
+
+    def test_implicit_with_solves(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('indep', IndepVarComp('y', 1.0))
+        model.add_subsystem('statecomp', StateConnWithSolves())
 
         model.connect('indep.y', 'statecomp.y2_actual')
 
