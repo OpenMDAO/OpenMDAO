@@ -586,8 +586,8 @@ class Problem(object):
 
         # Analytic Jacobians
         for mode in ('fwd', 'rev'):
-            if mode == 'rev' and _all_comps_provide_jacs: # No need to compute revs
-                continue
+            # if mode == 'rev' and _all_comps_provide_jacs: # No need to compute revs
+            #     continue
             model._inputs.set_vec(input_cache)
             model._outputs.set_vec(output_cache)
             # Make sure we're in a valid state
@@ -1646,7 +1646,7 @@ class Problem(object):
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               # compact_print, system_list, global_options, compact_display_rev, totals=False,
                               compact_print, system_list, global_options, totals=False,
-                              suppress_output=False, indep_key=None, all_comps_provide_jacs=None):
+                              suppress_output=False, indep_key=None, all_comps_provide_jacs=False):
     """
     Compute the relative and absolute errors in the given derivatives and print to the out_stream.
 
@@ -1774,8 +1774,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             derivative_info = derivatives[of, wrt]
             forward = derivative_info['J_fwd']
             if not totals:
-                if not all_comps_provide_jacs:
-                    reverse = derivative_info.get('J_rev')
+                reverse = derivative_info.get('J_rev')
             fd = derivative_info['J_fd']
 
             fwd_error = np.linalg.norm(forward - fd)
@@ -1792,12 +1791,14 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             if totals:
                 rev_error = fwd_rev_error = None
             else:
-                if all_comps_provide_jacs:
-                    rev_error = 0.0
-                    fwd_rev_error = 0.0
-                else:
-                    rev_error = np.linalg.norm(reverse - fd)
-                    fwd_rev_error = np.linalg.norm(forward - reverse)
+                rev_error = np.linalg.norm(reverse - fd)
+                fwd_rev_error = np.linalg.norm(forward - reverse)
+                # if all_comps_provide_jacs:
+                #     rev_error = 0.0
+                #     fwd_rev_error = 0.0
+                # else:
+                #     rev_error = np.linalg.norm(reverse - fd)
+                #     fwd_rev_error = np.linalg.norm(forward - reverse)
 
 
 
@@ -1817,10 +1818,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             if totals:
                 rev_norm = None
             else:
-                if all_comps_provide_jacs:
-                    rev_norm = 0.0
-                else:
-                    rev_norm = np.linalg.norm(reverse)
+                rev_norm = np.linalg.norm(reverse)
+                # if all_comps_provide_jacs:
+                #     rev_norm = 0.0
+                # else:
+                #     rev_norm = np.linalg.norm(reverse)
 
 
 
