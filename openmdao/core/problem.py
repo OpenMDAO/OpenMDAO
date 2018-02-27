@@ -1446,7 +1446,7 @@ class Problem(object):
                     if idx in self._lin_sol_cache:
                         save_vec = self._lin_sol_cache[idx]
                         for vs in doutputs._data:
-                            doutput._data[vs][:] = save_vec[vs]
+                            doutputs._data[vs][:] = save_vec[vs]
                     else:
                         self._lin_sol_cache[idx] = deepcopy(doutputs._data)
 

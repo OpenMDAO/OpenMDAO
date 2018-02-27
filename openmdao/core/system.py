@@ -2293,11 +2293,13 @@ class System(object):
                           ref0=ref0, indices=indices, linear=linear,
                           parallel_deriv_color=parallel_deriv_color,
                           vectorize_derivs=vectorize_derivs,
-                          simul_coloring=simul_coloring, simul_map=simul_map)
+                          simul_coloring=simul_coloring, simul_map=simul_map,
+                          cache_linear_solution=cache_linear_solution)
 
     def add_objective(self, name, ref=None, ref0=None, index=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
-                      vectorize_derivs=False, simul_coloring=None, simul_map=None):
+                      vectorize_derivs=False, simul_coloring=None, simul_map=None,
+                      cache_linear_solution=False):
         r"""
         Add a response variable to this system.
 
@@ -2331,6 +2333,9 @@ class System(object):
             Mapping of this response to each design variable where simultaneous derivs will
             be used.  Each design variable entry is another dict keyed on color, and the values
             in the color dict are tuples of the form (resp_idxs, color_idxs).
+        cache_linear_solution : bool
+            If True, store the linear solution vectors for this variable so they can
+            be reloaded during future linear solves.
 
         Notes
         -----
@@ -2363,7 +2368,8 @@ class System(object):
                           ref=ref, ref0=ref0, index=index,
                           parallel_deriv_color=parallel_deriv_color,
                           vectorize_derivs=vectorize_derivs,
-                          simul_coloring=simul_coloring, simul_map=simul_map)
+                          simul_coloring=simul_coloring, simul_map=simul_map,
+                          cache_linear_solution=cache_linear_solution)
 
     def get_design_vars(self, recurse=True, get_sizes=True):
         """
