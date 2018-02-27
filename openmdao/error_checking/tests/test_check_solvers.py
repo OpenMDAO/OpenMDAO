@@ -193,8 +193,6 @@ class TestCheckSolvers(unittest.TestCase):
 
         # should trigger a linear solver warning only for group 2
         warnings = testlogger.get('warning')
-        from pprint import pprint
-        pprint(warnings)
         self.assertEqual(len(warnings), 1)
 
         self.assertEqual(warnings[0],
