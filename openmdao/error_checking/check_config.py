@@ -212,11 +212,11 @@ def _check_solvers(problem, logger):
     """
     Search over all solvers and raise an error for unsupported configurations.
 
-    Report any implicit component that does not have an appropriate nonlinear
-    and linear solver (i.e. not the default solvers) upstream of it. Note that
-    a linear solver is only required when doing a gradient-based optimization
-    with analytic derivatives, so we need to determine if the derivatives are
-    being approximated.
+    Report any implicit component that does not implement solve_nonlinear and
+    solve_linear or have an iterative nonlinear and linear solver upstream of it.
+
+    Report any cycles that do not have an iterative nonlinear solver and either
+    an iterative linear solver or a DirectSolver upstream of it.
 
     Parameters
     ----------
