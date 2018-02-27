@@ -254,7 +254,6 @@ class TestProblem(unittest.TestCase):
         p.model.add_objective('calc.y')
 
         p.setup()
-
         p.run_model()
 
         derivs = p.compute_totals()
@@ -273,7 +272,6 @@ class TestProblem(unittest.TestCase):
         p.model.add_objective('y')
 
         p.setup()
-
         p.run_model()
 
         derivs = p.compute_totals()
