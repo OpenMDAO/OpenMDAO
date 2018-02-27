@@ -1014,6 +1014,285 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('>ABS_TOL'),2)
         self.assertEqual(stream.getvalue().count('>REL_TOL'),2)
 
+    def test_check_partials_compute_rev(self):
+        class MyComp(ExplicitComponent):
+            def setup(self):
+                self.add_input('x1', 3.0)
+                self.add_input('x2', 5.0)
+                self.add_output('z', 5.5)
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                """ Doesn't do much. """
+                outputs['z'] = 3.0 * inputs['x1'] + -4444.0 * inputs['x2']
+
+            def compute_partials(self, inputs, partials):
+                """Correct derivative."""
+                J = partials
+                J['z', 'x1'] = np.array([3.0])
+                J['z', 'x2'] = np.array([-4444.0])
+
+        # 1: All components define Jacobians
+        prob = Problem()
+        prob.model = MyComp()
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+        prob.run_model()
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=True)
+        print(stream.getvalue())
+        self.assertEqual(stream.getvalue().count('rev'),0)
+
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=False)
+        print(stream.getvalue())
+        self.assertEqual(stream.getvalue().count('Reverse'),0)
+        self.assertEqual(stream.getvalue().count('Jrev'),0)
+
+        # Should be 10 Reverse
+        # 4 Jrev
+
+        # check partials will only show fwd check when all components provide their jacobians
+        # So for this case, they do all provide them, so rev should not be shown
+        # self.assertEqual(stream.getvalue().count('rev'),5)
+
+        # # 2: All components define Jacobians but force it to display rev checks
+        # prob = Problem()
+        # prob.model = MyComp()
+        # prob.set_solver_print(level=0)
+        # prob.setup(check=False)
+        # prob.run_model()
+        # stream = cStringIO()
+        # # prob.check_partials(out_stream=stream, compact_print=True, compute_rev=True)
+        # prob.check_partials(out_stream=stream, compact_print=True)
+        # # check partials will only show fwd check when all components provide their jacobians
+        # # So for this case, they do all provide them, so rev should not be shown
+        # self.assertEqual(stream.getvalue().count('rev'),5)
+
+        # Need to also test for non-compact. Need to make sure it shows up !!!!!!!!!!!!!!
+
+        # from openmdao.test_suite.components.paraboloid import Paraboloid
+        # 3: Not all components define Jacobians because one defines compute_jacvec_product
+        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('comp', ParaboloidMatVec())
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+        prob.run_model()
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=True)
+        self.assertEqual(stream.getvalue().count('rev'),5)
+        print(stream.getvalue())
+
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=False)
+        print(stream.getvalue())
+        self.assertEqual(stream.getvalue().count('Reverse'),4)
+        self.assertEqual(stream.getvalue().count('Jrev'),8)
+
+
+        # 4: Mixed comps. Some with jacobians. Some not
+        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('c0', MyComp()) # in x1,x2, out is z
+        # prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('comp', ParaboloidMatVec())
+        # prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('c0.z', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+        prob.run_model()
+
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=True)
+        self.assertEqual(stream.getvalue().count('n/a'),10)
+        self.assertEqual(stream.getvalue().count('rev'),10)
+        self.assertEqual(stream.getvalue().count('Component'),2)
+        self.assertEqual(stream.getvalue().count('wrt'),6)
+        print(stream.getvalue())
+
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=False)
+        print(stream.getvalue())
+        self.assertEqual(stream.getvalue().count('Forward Magnitude'),4)
+        self.assertEqual(stream.getvalue().count('Reverse Magnitude'),2)
+        self.assertEqual(stream.getvalue().count('Absolute Error'),8)
+        self.assertEqual(stream.getvalue().count('Relative Error'),8)
+        self.assertEqual(stream.getvalue().count('Raw Forward Derivative'),4)
+        self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'),2)
+        self.assertEqual(stream.getvalue().count('Raw FD Derivative'),4)
+
+
+
+
+
+
+        # # one of the Components is matrix-free because it defines compute_jacvec_product
+        # class ParaboloidJacVec(Paraboloid):
+        #
+        #     def linearize(self, inputs, outputs, jacobian):
+        #         return
+        #
+        #     # def compute_jacvec_product(self, inputs, d_inputs, d_outputs, d_residuals, mode):
+        #     #     d_residuals['x'] += (np.exp(outputs['x']) - 2*inputs['a']**2 * outputs['x'])*d_outputs['x']
+        #     #     d_residuals['x'] += (-2 * inputs['a'] * outputs['x']**2)*d_inputs['a']
+        #     def compute_jacvec_product(self, inputs, d_inputs, d_residuals, mode):
+        #         d_residuals['x'] += (np.exp(outputs['x']) - 2*inputs['a']**2 * outputs['x'])*d_residuals['x']
+        #         d_residuals['x'] += (-2 * inputs['a'] * outputs['x']**2)*d_inputs['a']
+        #
+        # prob = Problem()
+        # model = prob.model = Group()
+        # model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        # model.add_subsystem('p2', IndepVarComp('y', val=1.0))
+        # model.add_subsystem('comp', ParaboloidJacVec())
+        # model.connect('p1.x', 'comp.x')
+        # model.connect('p2.y', 'comp.y')
+        # prob.setup(check=False)
+        # prob.run_model()
+        # check partials will only show fwd check when all components provide their jacobians
+        # So for this case, they do not all provide them, so rev should be shown
+
+        # prob = Problem()
+        # prob.model = Group()
+        # prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        # prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        # prob.model.add_subsystem('comp', ParaboloidMatVec())
+        # prob.model.connect('p1.x', 'comp.x')
+        # prob.model.connect('p2.y', 'comp.y')
+        # prob.set_solver_print(level=0)
+        # prob.setup(check=False)
+        # prob.run_model()
+        # stream = cStringIO()
+        # prob.check_partials(out_stream=stream, compact_print=True, compute_rev=True)
+        # self.assertEqual(stream.getvalue().count('rev'),5)
+
+        # prob = Problem()
+        # model = prob.model = Group()
+        # model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        # model.add_subsystem('p2', IndepVarComp('y', val=1.0))
+        # model.add_subsystem('comp', ParaboloidJacVec())
+        # model.connect('p1.x', 'comp.x')
+        # model.connect('p2.y', 'comp.y')
+        # prob.setup(check=False)
+        # prob.run_model()
+        # stream = cStringIO()
+        # prob.check_partials(out_stream=stream, compact_print=True, compute_rev=True)
+        # # check partials will only show fwd check when all components provide their jacobians
+        # # So for this case, they do not all provide them, so rev should be shown
+        # self.assertEqual(stream.getvalue().count('rev'),0)
+
+        # one of the Components is matrix-free because it defines compute_multi_jacvec_product
+        # 4: Not all components define Jacobians because one defines compute_multi_jacvec_product
+        class JacVec(ExplicitComponent):
+
+            def __init__(self, size):
+                super(JacVec, self).__init__()
+                self.size = size
+
+            def setup(self):
+                size = self.size
+                self.add_input('x', val=np.zeros(size))
+                self.add_input('y', val=np.zeros(size))
+                self.add_output('f_xy', val=np.zeros(size))
+
+            def compute(self, inputs, outputs):
+                outputs['f_xy'] = inputs['x'] * inputs['y']
+
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                if mode == 'fwd':
+                    if 'x' in d_inputs:
+                        d_outputs['f_xy'] += d_inputs['x'] * inputs['y']
+                    if 'y' in d_inputs:
+                        d_outputs['f_xy'] += d_inputs['y'] * inputs['x']
+                else:
+                    d_fxy = d_outputs['f_xy']
+                    if 'x' in d_inputs:
+                        d_inputs['x'] += d_fxy * inputs['y']
+                    if 'y' in d_inputs:
+                        d_inputs['y'] += d_fxy * inputs['x']
+
+        class MultiJacVec(JacVec):
+            def compute_multi_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                # same as compute_jacvec_product in this case
+                self.compute_jacvec_product(inputs, d_inputs, d_outputs, mode)
+
+        size = 5
+        vectorize = False
+        p = Problem()
+        model = p.model
+        model.add_subsystem('px', IndepVarComp('x', val=(np.arange(5, dtype=float) + 1.) * 3.0))
+        model.add_subsystem('py', IndepVarComp('y', val=(np.arange(5, dtype=float) + 1.) * 2.0))
+        model.add_subsystem('comp', MultiJacVec(size))
+
+        model.connect('px.x', 'comp.x')
+        model.connect('py.y', 'comp.y')
+
+        model.add_design_var('px.x', vectorize_derivs=vectorize)
+        model.add_design_var('py.y', vectorize_derivs=vectorize)
+        model.add_constraint('comp.f_xy', vectorize_derivs=vectorize)
+
+        p.setup(check=False)
+        p.run_model()
+        stream = cStringIO()
+        p.check_partials(out_stream=stream, compact_print=True)
+        self.assertEqual(stream.getvalue().count('rev'),5)
+        print(stream.getvalue())
+
+        #
+        # from openmdao.test_suite.components.paraboloid import Paraboloid
+        #
+        # class ParaboloidJacVec(Paraboloid):
+        #
+        #     def linearize(self, inputs, outputs, jacobian):
+        #         return
+        #
+        #     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, d_residuals, mode):
+        #         d_residuals['x'] += (np.exp(outputs['x']) - 2*inputs['a']**2 * outputs['x'])*d_outputs['x']
+        #         d_residuals['x'] += (-2 * inputs['a'] * outputs['x']**2)*d_inputs['a']
+        #
+        # prob = Problem()
+        # model = prob.model = Group()
+        # model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        # model.add_subsystem('p2', IndepVarComp('y', val=1.0))
+        # model.add_subsystem('comp', ParaboloidJacVec())
+        # model.connect('p1.x', 'comp.x')
+        # model.connect('p2.y', 'comp.y')
+        # prob.setup(check=False)
+        # prob.run_model()
+        # stream = cStringIO()
+        # prob.check_partials(out_stream=stream, compact_print=True)
+        # # check partials will only show fwd check when all components provide their jacobians
+        # # So for this case, they do not all provide them, so rev should be shown
+        # self.assertEqual(stream.getvalue().count('rev'),0)
+        #
+
+
+        # ---------------
+        # Component: ''
+        # ---------------
+        # < output > wrt < variable > | fwd
+        # mag. | rev
+        # mag. | check
+        # mag. | a(fwd - chk) | a(rev - chk) | a(fwd - rev) | r(fwd - chk) | r(rev - chk) | r(
+        #     fwd - rev)
+        # --------------------------------------------------------------------------------------------------------------------------------------------
+        #
+        # 'y'
+        # wrt
+        # 'x1' | 3.0000e+00 | 3.0000e+00 | 3.0000e+00 | 4.6884e-10 | 4.6884e-10 | 0.0000e+00 | 1.5628e-10 | 1.5628e-10 | 0.0000e+00
+        # 'y'
+        # wrt
+        # 'x2' | 4.0000e+00 | 4.0000e+00 | 4.0000e+00 | 5.5911e-10 | 5.5911e-10 | 0.0000e+00 | 1.3978e-10 | 1.3978e-10 | 0.0000e+00
+
+
 
 class TestCheckPartialsFeature(unittest.TestCase):
 
