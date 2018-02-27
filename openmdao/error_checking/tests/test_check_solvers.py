@@ -1,10 +1,10 @@
 
 import unittest
 
-from openmdao.api import ImplicitComponent, Problem, Group, IndepVarComp, ExecComp, \
-    LinearBlockGS, NonlinearBlockGS, ScipyKrylov, NewtonSolver
+from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecComp, \
+    LinearBlockGS, NonlinearBlockGS
 from openmdao.utils.logger_utils import TestLogger
-from openmdao.test_suite.components.sellar import StateConnection, SellarDerivativesGrouped
+from openmdao.test_suite.components.sellar import StateConnection
 
 
 class StateConnWithSolve(StateConnection):
