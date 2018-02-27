@@ -294,7 +294,6 @@ def _check_solvers(problem, logger):
                 logger.warning(msg)
 
 
-
 # Dict of all checks by name, mapped to the corresponding function that performs the check
 # Each function must be of the form  f(problem, logger).
 _checks = {
