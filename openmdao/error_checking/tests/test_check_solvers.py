@@ -166,6 +166,47 @@ class TestCheckSolvers(unittest.TestCase):
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 0)
 
+    def test_implicit_iter_subgroups(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('indep', IndepVarComp('y', 1.0))
+
+        model.add_subsystem("G1", Group())
+        model.G1.add_subsystem('statecomp1', StateConnection(),
+                               promotes_inputs=['y2_actual'])
+
+        model.add_subsystem("G2", Group())
+        model.G2.add_subsystem('statecomp2', StateConnection(),
+                               promotes_inputs=['y2_actual'])
+
+        model.connect('indep.y', ['G1.y2_actual', 'G2.y2_actual'])
+
+        # provide iterative solvers for G1 but not G2
+        model.G1.linear_solver = LinearBlockGS()
+        model.G1.nonlinear_solver = NonlinearBlockGS()
+
+        # perform setup with checks but don't run model
+        testlogger = TestLogger()
+        prob.setup(check=True, logger=testlogger)
+        prob.final_setup()
+
+        # should trigger solver warnings only for group 2
+        warnings = testlogger.get('warning')
+        from pprint import pprint
+        pprint(warnings)
+        self.assertEqual(len(warnings), 2)
+
+        self.assertEqual(warnings[0],
+                         "StateConnection 'G2.statecomp2' contains implicit "
+                         "variables, but does not have an iterative nonlinear solver "
+                         "and does not implement 'solve_nonlinear'.")
+
+        self.assertEqual(warnings[1],
+                         "StateConnection 'G2.statecomp2' contains implicit "
+                         "variables, but does not have an iterative linear solver "
+                         "and does not implement 'solve_linear'.")
+
     def test_cycle(self):
         prob = Problem()
         model = prob.model

@@ -225,17 +225,17 @@ def _check_solvers(problem, logger):
     logger : object
         The object that managers logging output.
     """
-    has_cycles = []
-    has_states = False
-
-    # put entry for '' into has_iter_solver just in case we're a subproblem
-    has_iter_ln = {'': False}
-    has_iter_nl = {'': False}
+    iter_nl_depth = iter_ln_depth = np.inf
 
     for sys in problem.model.system_iter(include_self=True, recurse=True):
         path = sys.pathname
+        depth = 0 if path == '' else len(path.split('.'))
 
-        # determine if this is a group and has cycles
+        # if this system is below both a nonlinear and linear solver, then skip checks
+        if (depth > iter_nl_depth) and (depth > iter_ln_depth):
+            continue
+
+        # determine if this system is a group and has cycles
         if isinstance(sys, Group):
             graph = sys.compute_sys_graph(comps_only=False)
             sccs = get_sccs_topo(graph)
@@ -247,39 +247,40 @@ def _check_solvers(problem, logger):
         # determine if this system has states (is an implicit component)
         has_states = isinstance(sys, ImplicitComponent)
 
-        # determine if the current system has appropriate solvers or methods for handling
-        # cycles and implicit components
-        is_iter_nl = has_iter_nl[path] = (
-            (sys.nonlinear_solver and sys.nonlinear_solver.options['maxiter'] > 1) or
-            (has_states and overrides_method('solve_nonlinear', sys, ImplicitComponent))
-        )
+        # determine if this system has iterative solvers or implements the solve methods
+        # for handling cycles and implicit components
+        if depth > iter_nl_depth:
+            is_iter_nl = True
+        else:
+            is_iter_nl = (
+                (sys.nonlinear_solver and sys.nonlinear_solver.options['maxiter'] > 1) or
+                (has_states and overrides_method('solve_nonlinear', sys, ImplicitComponent))
+            )
+            iter_nl_depth = depth if is_iter_nl else np.inf
 
-        is_iter_ln = has_iter_ln[path] = (
-            (sys.linear_solver and (sys.linear_solver.options['maxiter'] > 1 or
-             isinstance(sys.linear_solver, DirectSolver))) or
-            (has_states and overrides_method('solve_linear', sys, ImplicitComponent))
-        )
+        if depth > iter_ln_depth:
+            is_iter_ln = True
+        else:
+            is_iter_ln = (
+                (sys.linear_solver and (sys.linear_solver.options['maxiter'] > 1 or
+                 isinstance(sys.linear_solver, DirectSolver))) or
+                (has_states and overrides_method('solve_linear', sys, ImplicitComponent))
+            )
+            iter_ln_depth = depth if is_iter_ln else np.inf
 
-        # check upstream groups for iterative solvers
-        parts = path.split('.')
-        for i in range(len(parts)):
-            gname = '.'.join(parts[:i])
-            is_iter_nl = is_iter_nl or has_iter_nl[gname]
-            is_iter_ln = is_iter_ln or has_iter_ln[gname]
-
-        # if you have a cycle, then you need iterative nonlinear and linear solvers
+        # if there are cycles, then check for iterative nonlinear and linear solvers
         if has_cycles:
             if not is_iter_nl:
                 msg = ("Group '%s' contains cycles %s, but does not have an iterative "
-                       "nonlinear solver." % (sys.pathname, has_cycles))
+                       "nonlinear solver." % (path, has_cycles))
                 logger.warning(msg)
             if not is_iter_ln:
                 msg = ("Group '%s' contains cycles %s, but does not have an iterative "
-                       "linear solver." % (sys.pathname, has_cycles))
+                       "linear solver." % (path, has_cycles))
                 logger.warning(msg)
 
-        # implicit components need iterative solvers or need to implement the appropriate
-        # solve method
+        # if there are implicit components, check for iterative solvers or the appropriate
+        # solve methods
         if has_states:
             if not is_iter_nl:
                 msg = ("%s '%s' contains implicit variables, but does not have an "
@@ -291,6 +292,7 @@ def _check_solvers(problem, logger):
                        "iterative linear solver and does not implement 'solve_linear'." %
                        (sys.__class__.__name__, path))
                 logger.warning(msg)
+
 
 
 # Dict of all checks by name, mapped to the corresponding function that performs the check
