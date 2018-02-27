@@ -579,15 +579,15 @@ class Problem(object):
 
         # _compact_display_rev = True
 
-
+        _all_comps_provide_jacs = self._all_components_provide_jacobians()
 
 
 
 
         # Analytic Jacobians
         for mode in ('fwd', 'rev'):
-            # if mode == 'rev' and not _compact_display_rev:
-            #     continue
+            if mode == 'rev' and _all_comps_provide_jacs: # No need to compute revs
+                continue
             model._inputs.set_vec(input_cache)
             model._outputs.set_vec(output_cache)
             # Make sure we're in a valid state
@@ -846,8 +846,10 @@ class Problem(object):
             out_stream = sys.stdout
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
-                                  compact_print, comps, all_fd_options, _compact_display_rev,
-                                  suppress_output=suppress_output, indep_key=indep_key)
+                                  # compact_print, comps, all_fd_options, _compact_display_rev,
+                                  compact_print, comps, all_fd_options,
+                                  suppress_output=suppress_output, indep_key=indep_key,
+                                  all_comps_provide_jacs=_all_comps_provide_jacs)
 
         return partials_data
 
@@ -1642,8 +1644,9 @@ class Problem(object):
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
-                              compact_print, system_list, global_options, compact_display_rev, totals=False,
-                              suppress_output=False, indep_key=None):
+                              # compact_print, system_list, global_options, compact_display_rev, totals=False,
+                              compact_print, system_list, global_options, totals=False,
+                              suppress_output=False, indep_key=None, all_comps_provide_jacs=None):
     """
     Compute the relative and absolute errors in the given derivatives and print to the out_stream.
 
@@ -1680,7 +1683,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             # ?????????????????????????????????????
             deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
         else:
-            if compact_display_rev:
+            if not all_comps_provide_jacs:
                 # deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e} | {6:.4e} | {7:.4e}"\
                 #              " | {8:.4e} | {9:.4e} | {10:.4e}"
                 deriv_line = "{0} wrt {1} | {2:.4e} | {3} | {4:.4e} | {5:.4e} | {6} | {7}" \
@@ -1737,7 +1740,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         max_width_of = max(max_width_of, len(of))
                         max_width_wrt = max(max_width_wrt, len(wrt))
 
-                    if compact_display_rev:
+                    if not all_comps_provide_jacs:
                         header = "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}" \
                             .format(
                             _pad_name('<output>', max_width_of, True),
@@ -1770,30 +1773,57 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
             derivative_info = derivatives[of, wrt]
             forward = derivative_info['J_fwd']
-            if compact_display_rev:
-                if not totals:
+            if not totals:
+                if not all_comps_provide_jacs:
                     reverse = derivative_info.get('J_rev')
             fd = derivative_info['J_fd']
 
             fwd_error = np.linalg.norm(forward - fd)
-            if compact_display_rev:
-                if totals:
-                    rev_error = fwd_rev_error = None
+            # if compact_display_rev:
+            #     if totals:
+            #         rev_error = fwd_rev_error = None
+            #     else:
+            #         rev_error = np.linalg.norm(reverse - fd)
+            #         fwd_rev_error = np.linalg.norm(forward - reverse)
+            # else:
+            #     rev_error = 0.0
+            #     fwd_rev_error = 0.0
+
+            if totals:
+                rev_error = fwd_rev_error = None
+            else:
+                if all_comps_provide_jacs:
+                    rev_error = 0.0
+                    fwd_rev_error = 0.0
                 else:
                     rev_error = np.linalg.norm(reverse - fd)
                     fwd_rev_error = np.linalg.norm(forward - reverse)
-            else:
-                rev_error = 0.0
-                fwd_rev_error = 0.0
 
+
+
+            #
+            #
             fwd_norm = np.linalg.norm(forward)
-            if compact_display_rev:
-                if totals:
-                    rev_norm = None
+            # if compact_display_rev:
+            #     if totals:
+            #         rev_norm = None
+            #     else:
+            #         rev_norm = np.linalg.norm(reverse)
+            # else:
+            #     rev_norm = 0.0
+
+
+
+            if totals:
+                rev_norm = None
+            else:
+                if all_comps_provide_jacs:
+                    rev_norm = 0.0
                 else:
                     rev_norm = np.linalg.norm(reverse)
-            else:
-                rev_norm = 0.0
+
+
+
 
             fd_norm = np.linalg.norm(fd)
 
@@ -1851,7 +1881,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 return _pad_name('n/a')
 
                         if out_stream:
-                            if compact_display_rev:
+                            if not all_comps_provide_jacs:
                                 # system.matrix_free is true of no jacobian defined. For MyComp, it is false
                                 out_stream.write(deriv_line.format(
                                     _pad_name(of, max_width_of, True),
