@@ -189,7 +189,7 @@ def stop():
 
 
 @contextmanager
-def tracing(methods=None, verbose=False):
+def tracing(methods=None, verbose=False, memory=False):
     """
     Turn on call tracing within a certain context.
 
@@ -200,8 +200,10 @@ def tracing(methods=None, verbose=False):
         is a string, use that string to lookup a 'canned' method list by name.
     verbose : bool
         If True, show function locals and return values.
+    memory : bool
+        If True, show functions that increase memory usage.
     """
-    setup(methods=methods, verbose=verbose)
+    setup(methods=methods, verbose=verbose, memory=memory)
     start()
     yield
     stop()
@@ -217,9 +219,11 @@ class tracedfunc(object):
         Methods to be traced, based on glob patterns and isinstance checks.
     verbose : bool
         If True, show function locals and return values.
+    memory : bool
+        If True, show functions that increase memory usage.
     """
-    def __init__(self, methods=None, verbose=False):
-        self.options = _Options(methods=methods, verbose=verbose)
+    def __init__(self, methods=None, verbose=False, memory=False):
+        self.options = _Options(methods=methods, verbose=verbose, memory=memory)
         self._call_setup = True
 
     def __call__(self, func):
