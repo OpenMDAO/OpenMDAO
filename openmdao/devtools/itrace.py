@@ -155,7 +155,7 @@ def _setup(options):
                                                          class_counts, verbose, memory))
 
 
-def setup(methods=None, verbose=None):
+def setup(methods=None, verbose=None, memory=None):
     """
     Setup call tracing.
 
@@ -166,7 +166,7 @@ def setup(methods=None, verbose=None):
     verbose : bool
         If True, show function locals and return values.
     """
-    _setup(_Options(methods=methods, verbose=verbose))
+    _setup(_Options(methods=methods, verbose=verbose, memory=memory))
 
 
 def start():
