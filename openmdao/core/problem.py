@@ -562,32 +562,8 @@ class Problem(object):
         # unless they are in error.
         indep_key = {}
 
-        # check partials will only show fwd check when all components provide their jacobians
-        # if compact_display_rev:
-        #     _compact_display_rev = True
-        # else:
-        #     if self._all_components_provide_jacobians():
-        #         _compact_display_rev = False
-        #     else:
-        #         _compact_display_rev = True
-        if self._all_components_provide_jacobians():
-            _compact_display_rev = False
-        else:
-            _compact_display_rev = True
-
-
-
-        # _compact_display_rev = True
-
-        _all_comps_provide_jacs = self._all_components_provide_jacobians()
-
-
-
-
         # Analytic Jacobians
         for mode in ('fwd', 'rev'):
-            # if mode == 'rev' and _all_comps_provide_jacs: # No need to compute revs
-            #     continue
             model._inputs.set_vec(input_cache)
             model._outputs.set_vec(output_cache)
             # Make sure we're in a valid state
@@ -849,7 +825,7 @@ class Problem(object):
                                   # compact_print, comps, all_fd_options, _compact_display_rev,
                                   compact_print, comps, all_fd_options,
                                   suppress_output=suppress_output, indep_key=indep_key,
-                                  all_comps_provide_jacs=_all_comps_provide_jacs)
+                                  all_comps_provide_jacs=self._all_components_provide_jacobians())
 
         return partials_data
 
@@ -1644,7 +1620,6 @@ class Problem(object):
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
-                              # compact_print, system_list, global_options, compact_display_rev, totals=False,
                               compact_print, system_list, global_options, totals=False,
                               suppress_output=False, indep_key=None, all_comps_provide_jacs=False):
     """
@@ -1667,25 +1642,22 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         The systems (in the proper order) that were checked.0
     global_options : dict
         Dictionary containing the options for the approximation.
-    compact_display_rev : bool
-        Set to True to check and force the display of reverse partial info.
     totals : bool
         Set to True if we are doing check_totals to skip a bunch of stuff.
     suppress_output : bool
         Set to True to suppress all output. Just calculate errors and add the keys.
     indep_key : dict of sets, optional
         Keyed by component name, contains the of/wrt keys that are declared not dependent.
+    all_comps_provide_jacs : bool
+        Set to True if all components provide a Jacobian (are not matrix-free).
     """
     nan = float('nan')
 
     if compact_print:
         if totals:
-            # ?????????????????????????????????????
             deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
         else:
             if not all_comps_provide_jacs:
-                # deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e} | {6:.4e} | {7:.4e}"\
-                #              " | {8:.4e} | {9:.4e} | {10:.4e}"
                 deriv_line = "{0} wrt {1} | {2:.4e} | {3} | {4:.4e} | {5:.4e} | {6} | {7}" \
                              " | {8:.4e} | {9} | {10}"
             else:
@@ -1736,7 +1708,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     #
                     max_width_of = len('<output>')
                     max_width_wrt = len('<variable>')
-                    for of, wrt in sorted_keys: # ????????
+                    for of, wrt in sorted_keys:
                         max_width_of = max(max_width_of, len(of))
                         max_width_wrt = max(max_width_wrt, len(wrt))
 
@@ -1778,54 +1750,19 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             fd = derivative_info['J_fd']
 
             fwd_error = np.linalg.norm(forward - fd)
-            # if compact_display_rev:
-            #     if totals:
-            #         rev_error = fwd_rev_error = None
-            #     else:
-            #         rev_error = np.linalg.norm(reverse - fd)
-            #         fwd_rev_error = np.linalg.norm(forward - reverse)
-            # else:
-            #     rev_error = 0.0
-            #     fwd_rev_error = 0.0
 
             if totals:
                 rev_error = fwd_rev_error = None
             else:
                 rev_error = np.linalg.norm(reverse - fd)
                 fwd_rev_error = np.linalg.norm(forward - reverse)
-                # if all_comps_provide_jacs:
-                #     rev_error = 0.0
-                #     fwd_rev_error = 0.0
-                # else:
-                #     rev_error = np.linalg.norm(reverse - fd)
-                #     fwd_rev_error = np.linalg.norm(forward - reverse)
 
-
-
-            #
-            #
             fwd_norm = np.linalg.norm(forward)
-            # if compact_display_rev:
-            #     if totals:
-            #         rev_norm = None
-            #     else:
-            #         rev_norm = np.linalg.norm(reverse)
-            # else:
-            #     rev_norm = 0.0
-
-
 
             if totals:
                 rev_norm = None
             else:
                 rev_norm = np.linalg.norm(reverse)
-                # if all_comps_provide_jacs:
-                #     rev_norm = 0.0
-                # else:
-                #     rev_norm = np.linalg.norm(reverse)
-
-
-
 
             fd_norm = np.linalg.norm(fd)
 
@@ -1864,8 +1801,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 rel_err.forward,
                             ) + '\n')
                     else:
-                        # ??????????????????? since rev errors were set to 0.0, this still works
-                        #   ???? could I use nan?
                         error_string = ''
                         for error in abs_err:
                             if not np.isnan(error) and error >= abs_error_tol:
@@ -1875,12 +1810,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             if not np.isnan(error) and error >= rel_error_tol:
                                 error_string += ' >REL_TOL'
                                 break
-
-                        def _na_if_not_matrix_free(matrix_free,val):
-                            if matrix_free:
-                                return '{0:.4e}'.format(val)
-                            else:
-                                return _pad_name('n/a')
 
                         if out_stream:
                             if not all_comps_provide_jacs:
@@ -1916,12 +1845,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     else:
                         fd_desc = "{}:{}".format(global_options[sys_name][wrt]['method'],
                                                  global_options[sys_name][wrt]['form'])
-
-                    # Does not seem to be used anywhere!!!!!!
-                    # if compact_print:
-                    #     check_desc = "    (Check Type: {})".format(fd_desc)
-                    # else:
-                    #     check_desc = ""
 
                     # Magnitudes
                     if out_stream:
@@ -1980,6 +1903,27 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     if out_stream:
                         out_stream.write(' -' * 30 + '\n')
 
+
+def _na_if_not_matrix_free(matrix_free,val):
+    """
+    Return string to represent deriv check value in compact display.
+
+    Parameters
+    ----------
+    matrix_free : bool
+        If True, then the associated Component is matrix-free.
+    val : float
+        The deriv check value.
+
+    Returns
+    -------
+    str
+        String which is the actual value if matrix-free, otherwise 'n/a'
+    """
+    if matrix_free:
+        return '{0:.4e}'.format(val)
+    else:
+        return _pad_name('n/a')
 
 def _pad_name(name, pad_num=10, quotes=False):
     """
