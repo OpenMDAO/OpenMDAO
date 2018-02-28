@@ -124,6 +124,7 @@ def _setup_func_group():
         'linear': [
             ('*linear*', (System,)),
             ('*solve*', (Solver,)),
+            ('*compute*', (System,))
         ],
         'solve': [
             ('*solve*', (System, Solver)),
