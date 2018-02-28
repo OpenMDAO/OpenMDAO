@@ -133,7 +133,7 @@ For a more compact display, set :code:`compact_print` to True. Notice that if an
 exceeded, `>ABS_TOL` is printed at the end of the line. Similarly, if any of the relative tolerances are
 exceeded, `>REL_TOL` is printed at the end of the line.
 
-Also notice that in the compact form, if the reverse derivative values are only shown for matrix-free components.
+In the compact form, the reverse derivative values are only shown for matrix-free components.
 
 .. embed-code::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_compact_print_formatting
