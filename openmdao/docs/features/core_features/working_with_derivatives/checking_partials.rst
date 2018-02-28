@@ -48,16 +48,12 @@ This allows custom tailoring of the approximation settings on a variable basis.
 Here, we show how to set the step size. In this case, the TrickyParaboloid requires a higher step size because the values and derivatives
 are fairly large, so we give it a higher stepsize.
 
-<<<<<<< HEAD
 Notice that in the output, for components that provide a Jacobian, only information about the forward derivatives are
 shown. For components that are matrix-free, both forward and reverse derivative information is shown. Implicit
 components are matrix-free if they define a :code:`apply linear` method. Explicit components are matrix-free if they
 define either :code:`compute_jacvec_product` or :code:`compute_multi_jacvec_product` methods.
 
-.. embed-test::
-=======
 .. embed-code::
->>>>>>> d7c437aad96331c08551cae2e94a32bc0d774c55
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_step_on_comp
     :layout: interleave
 
@@ -137,13 +133,9 @@ For a more compact display, set :code:`compact_print` to True. Notice that if an
 exceeded, `>ABS_TOL` is printed at the end of the line. Similarly, if any of the relative tolerances are
 exceeded, `>REL_TOL` is printed at the end of the line.
 
-<<<<<<< HEAD
 Also notice that in the compact form, if the reverse derivative values are only shown for matrix-free components.
 
-.. embed-test::
-=======
 .. embed-code::
->>>>>>> d7c437aad96331c08551cae2e94a32bc0d774c55
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_compact_print_formatting
     :layout: interleave
 
