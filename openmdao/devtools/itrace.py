@@ -4,6 +4,7 @@ import os
 import sys
 import re
 import argparse
+import warnings
 from contextlib import contextmanager
 from collections import defaultdict, OrderedDict
 
@@ -146,6 +147,9 @@ def _setup(options):
             do_ret = None
         if memory:
             memory = []
+            if mem_usage is None:
+                warnings.warn("Memory tracing requires the 'psutil' package.  "
+                              "Install it using 'pip install psutil'.")
         else:
             memory = None
         _trace_calls = _create_profile_callback(call_stack, _collect_methods(methods),
