@@ -283,7 +283,7 @@ class TestNewton(unittest.TestCase):
         # That way, we test that we are really using Newton's Lin Solver
         # instead.
         sub.linear_solver = ScipyKrylov()
-        model.linear_solver.options['maxiter'] = 1
+        sub.linear_solver.options['maxiter'] = 1
 
         # The good solver
         model.nonlinear_solver.linear_solver = DirectSolver()

@@ -106,12 +106,10 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         y_wrt_x1_line = lines.index("  comp: 'y' wrt 'x1'")
 
-        print(lines)
         self.assertTrue(lines[y_wrt_x1_line+3].endswith('*'),
                         msg='Error flag expected in output but not displayed')
         self.assertTrue(lines[y_wrt_x1_line+5].endswith('*'),
                         msg='Error flag expected in output but not displayed')
-
         y_wrt_x2_line = lines.index("  comp: 'y' wrt 'x2'")
         self.assertTrue(lines[y_wrt_x2_line+3].endswith('*'),
                          msg='Error flag not expected in output but displayed')
@@ -151,16 +149,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         lines = stream.getvalue().splitlines()
 
         y_wrt_x1_line = lines.index("  : 'y' wrt 'x1'")
-
-
-        print(lines)
-
         self.assertTrue(lines[y_wrt_x1_line+3].endswith('*'),
                         msg='Error flag expected in output but not displayed')
         self.assertTrue(lines[y_wrt_x1_line+5].endswith('*'),
                         msg='Error flag expected in output but not displayed')
-        # self.assertFalse(lines[y_wrt_x1_line+6].endswith('*'),
-        #                  msg='Error flag not expected in output but displayed')
 
     def test_component_only_suppress(self):
         class MyComp(ExplicitComponent):
@@ -886,7 +878,6 @@ class TestProblemCheckPartials(unittest.TestCase):
         totals = prob.check_partials(out_stream=stream)
 
         lines = stream.getvalue().splitlines()
-        print(lines)
         self.assertTrue('cs' in lines[5], msg='Did you change the format for printing check derivs?')
         self.assertTrue('fd' in lines[19], msg='Did you change the format for printing check derivs?')
 
@@ -1531,40 +1522,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.run_model()
 
         prob.check_partials(step_calc='rel')
-
-    def test_feature_compact_print_formatting(self):
-        import numpy as np
-        from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem
-
-        class MyComp(ExplicitComponent):
-            def setup(self):
-                self.add_input('x1', 3.0)
-                self.add_input('x2', 5.0)
-                self.add_output('y', 5.5)
-                self.declare_partials(of='*', wrt='*')
-
-            def compute(self, inputs, outputs):
-                """ Doesn't do much. """
-                outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
-
-            def compute_partials(self, inputs, partials):
-                """Intentionally incorrect derivative."""
-                J = partials
-                J['y', 'x1'] = np.array([4.0])
-                J['y', 'x2'] = np.array([40])
-
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('p1', IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('x2', 5.0))
-        prob.model.add_subsystem('comp', MyComp())
-        prob.model.connect('p1.x1', 'comp.x1')
-        prob.model.connect('p2.x2', 'comp.x2')
-        prob.set_solver_print(level=0)
-        prob.setup(check=False)
-        prob.run_model()
-        prob.check_partials(compact_print=True)
-
 
     def test_feature_compact_print_formatting(self):
         from openmdao.api import Problem, Group, IndepVarComp

@@ -17,8 +17,9 @@ Usage
 
 1. You may use glob patterns as arguments to :code:`to` and :code:`wrt`.
 
-.. embed-test::
+.. embed-code::
     openmdao.jacobians.tests.test_jacobian_features.TestJacobianForDocs.test_fd_glob
+    :layout: interleave
 
 2. For finite difference approximations (:code:`method='fd'`), we have three (optional) parameters: the :code:`form`, :code:`step size`, and the :code:`step_calc`. The form should be one of the following:
         - :code:`form='forward'` (default): Approximates the derivative as :math:`\displaystyle\frac{\partial f}{\partial x} \approx \frac{f(x+\delta, y) - f(x,y)}{||\delta||}`. Error scales like :math:`||\delta||`.
@@ -28,8 +29,9 @@ Usage
 The step size can be any nonzero number, but should be positive (one can change the form to perform backwards finite difference formulas), small enough to reduce truncation error, but large enough to avoid round-off error. Choosing a step size can be highly problem dependent, but for double precision floating point numbers and reasonably bounded derivatives, :math:`10^{-6}` can be a good place to start.
 The step_calc can be either 'abs' for absoluate or 'rel' for relative. It determines whether the stepsize ie absolute or a percentage of the input value.
 
-.. embed-test::
+.. embed-code::
     openmdao.jacobians.tests.test_jacobian_features.TestJacobianForDocs.test_fd_options
+    :layout: interleave
 
 Complex Step
 ------------

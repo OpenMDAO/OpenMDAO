@@ -67,8 +67,9 @@ Next we need to build the OpenMDAO component that makes use of this external cod
 
 We include this component in a model and run the model.
 
-.. embed-test::
+.. embed-code::
     openmdao.components.tests.test_external_code.TestExternalCodeFeature.test_main
+    :layout: interleave
 
 
 Next, we will go through each section and explain how this code works.

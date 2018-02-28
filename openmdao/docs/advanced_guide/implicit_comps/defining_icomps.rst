@@ -105,9 +105,9 @@ The Newton solver's use of that Jacobian information is why we need to declare a
     We recommend you stick with :ref:`DirectSolver <directsolver>` unless you have a good reason to switch.
 
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_plain_newton
-    :no-split:
+    :layout: code, output
 
 
 Modifying Solver Settings in Your Run Script
@@ -123,9 +123,9 @@ It also converges much more slowly, so although we gave it more than twice the n
 close to a converged answer.
 
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_plain_newton_many_iter
-    :no-split:
+    :layout: code, output
 
 
 .. note::
@@ -155,9 +155,9 @@ but you need to be careful about the :ref:`execution order <feature_set_order>` 
     For many problems you might want to use :ref:`BoundsEnforceLS <feature_bounds_enforce>` instead, which only activates the
     line search to enforce upper and lower bounds on the outputs in the model.
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_advanced_newton
-    :no-split:
+    :layout: code, output
 
 
 .. note::

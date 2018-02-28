@@ -21,24 +21,28 @@ Usage
 
 1. Connect an output variable to an input variable, with an automatic unit conversion.
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_group.TestGroup.test_basic_connect_units
+    :layout: interleave
 
 
 2. Connect one output to many inputs.
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_group.TestGroup.test_connect_1_to_many
+    :layout: interleave
 
 
 3. Connect only part of an array output to an input of a smaller size.
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_group.TestGroup.test_connect_src_indices
+    :layout: interleave
 
 4. Connect only part of a non-flat array output to a non-flat array
 input.
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_group.TestGroup.test_connect_src_indices_noflat
-    
+    :layout: interleave
+

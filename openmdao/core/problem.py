@@ -471,7 +471,6 @@ class Problem(object):
         return True
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, comps=None, compact_print=False,
-                       # compact_display_rev=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6,
                        method='fd', step=None, form=DEFAULT_FD_OPTIONS['form'],
                        step_calc=DEFAULT_FD_OPTIONS['step_calc'],
@@ -489,8 +488,6 @@ class Problem(object):
              None (default) to run all components.
         compact_print : bool
             Set to True to just print the essentials, one line per unknown-param pair.
-        # compact_display_rev : bool
-        #     Set to True to check and force the display of reverse partials. Default is False
         abs_err_tol : float
             Threshold value for absolute error.  Errors about this value will have a '*' displayed
             next to them in output, making them easy to search for. Default is 1.0E-6.
@@ -548,7 +545,6 @@ class Problem(object):
                 raise ValueError(msg)
             comps = [model._get_subsystem(c_name) for c_name in comps]
 
-        # current_mode = self._mode
         self.set_solver_print(level=0)
 
         # This is a defaultdict of (defaultdict of dicts).
@@ -822,7 +818,6 @@ class Problem(object):
             out_stream = sys.stdout
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
-                                  # compact_print, comps, all_fd_options, _compact_display_rev,
                                   compact_print, comps, all_fd_options,
                                   suppress_output=suppress_output, indep_key=indep_key,
                                   all_comps_provide_jacs=self._all_components_provide_jacobians())
@@ -1220,9 +1215,16 @@ class Problem(object):
 
         if wrt is None:
             wrt = list(self.driver._designvars)
+            global_wrt = True
+        else:
+            global_wrt = global_names
+
         if of is None:
             of = list(self.driver._objs)
             of.extend(self.driver._cons)
+            global_of = True
+        else:
+            global_of = global_names
 
         # A number of features will need to be supported here as development
         # goes forward.
@@ -1263,8 +1265,9 @@ class Problem(object):
         # Convert of and wrt names from promoted to unpromoted
         # (which is absolute path since we're at the top)
         oldwrt, oldof = wrt, of
-        if not global_names:
+        if not global_of:
             of = [prom2abs[name][0] for name in oldof]
+        if not global_wrt:
             wrt = [prom2abs[name][0] for name in oldwrt]
 
         owning_ranks = self.model._owning_rank['output']
@@ -1648,7 +1651,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         Set to True to suppress all output. Just calculate errors and add the keys.
     indep_key : dict of sets, optional
         Keyed by component name, contains the of/wrt keys that are declared not dependent.
-    all_comps_provide_jacs : bool
+    all_comps_provide_jacs : bool, optional
         Set to True if all components provide a Jacobian (are not matrix-free).
     """
     nan = float('nan')
@@ -1750,7 +1753,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             fd = derivative_info['J_fd']
 
             fwd_error = np.linalg.norm(forward - fd)
-
             if totals:
                 rev_error = fwd_rev_error = None
             else:
@@ -1758,12 +1760,10 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 fwd_rev_error = np.linalg.norm(forward - reverse)
 
             fwd_norm = np.linalg.norm(forward)
-
             if totals:
                 rev_norm = None
             else:
                 rev_norm = np.linalg.norm(reverse)
-
             fd_norm = np.linalg.norm(fd)
 
             derivative_info['abs error'] = abs_err = ErrorTuple(fwd_error, rev_error, fwd_rev_error)
@@ -1818,14 +1818,14 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                     _pad_name(of, max_width_of, True),
                                     _pad_name(wrt, max_width_wrt, True),
                                     magnitude.forward,
-                                    _na_if_not_matrix_free(system.matrix_free,magnitude.reverse),
+                                    _format_if_not_matrix_free(system.matrix_free,magnitude.reverse),
                                     magnitude.fd,
                                     abs_err.forward,
-                                    _na_if_not_matrix_free(system.matrix_free,abs_err.reverse),
-                                    _na_if_not_matrix_free(system.matrix_free,abs_err.forward_reverse),
+                                    _format_if_not_matrix_free(system.matrix_free,abs_err.reverse),
+                                    _format_if_not_matrix_free(system.matrix_free,abs_err.forward_reverse),
                                     rel_err.forward,
-                                    _na_if_not_matrix_free(system.matrix_free,rel_err.reverse),
-                                    _na_if_not_matrix_free(system.matrix_free,rel_err.forward_reverse),
+                                    _format_if_not_matrix_free(system.matrix_free,rel_err.reverse),
+                                    _format_if_not_matrix_free(system.matrix_free,rel_err.forward_reverse),
                                 ) + error_string + '\n')
                             else:
                                 out_stream.write(deriv_line.format(
@@ -1851,7 +1851,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         out_stream.write("  {}: '{}' wrt '{}'".format(sys_name, of, wrt) + '\n')
                         out_stream.write('    Forward Magnitude : {:.6e}'.format(magnitude.forward)
                                          + '\n')
-                    # if not totals and compact_display_rev:
                     if not totals and system.matrix_free:
                         txt = '    Reverse Magnitude : {:.6e}'
                         if out_stream:
@@ -1889,7 +1888,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         out_stream.write('\n')
 
                     if not totals and system.matrix_free:
-                    # if not totals and compact_display_rev:
                         if out_stream:
                             out_stream.write('    Raw Reverse Derivative (Jfor)\n')
                             out_stream.write(str(reverse) + '\n')
@@ -1904,7 +1902,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         out_stream.write(' -' * 30 + '\n')
 
 
-def _na_if_not_matrix_free(matrix_free,val):
+def _format_if_not_matrix_free(matrix_free,val):
     """
     Return string to represent deriv check value in compact display.
 
