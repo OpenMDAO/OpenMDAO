@@ -14,6 +14,7 @@ from numpy import ndarray
 from openmdao.devtools.iprof_utils import _create_profile_callback, find_qualified_name, \
                                          func_group, _collect_methods, _Options, _setup_func_group,\
                                          _get_methods
+from openmdao.devtools.debug import mem_usage
 
 _trace_calls = None  # pointer to function that implements the trace
 _registered = False  # prevents multiple atexit registrations
@@ -53,30 +54,35 @@ def _trace_call(frame, arg, stack, context):
     """
     This is called after we have matched based on glob pattern and isinstance check.
     """
-    qual_cache, method_counts, class_counts, verbose = context
-    funcname = find_qualified_name(frame.f_code.co_filename,
-                                   frame.f_code.co_firstlineno, qual_cache)
+    qual_cache, method_counts, class_counts, verbose, memory = context
 
-    self = frame.f_locals['self']
-    try:
-        pname = "(%s)" % self.pathname
-    except AttributeError:
-        pname = ""
+    if memory is None or verbose:
+        funcname = find_qualified_name(frame.f_code.co_filename,
+                                       frame.f_code.co_firstlineno, qual_cache)
 
-    cname = self.__class__.__name__
-    class_counts[cname].add(id(self))
-    sname = "%s#%d%s" % (self.__class__.__name__, len(class_counts[cname]), pname)
+        self = frame.f_locals['self']
+        try:
+            pname = "(%s)" % self.pathname
+        except AttributeError:
+            pname = ""
 
-    fullname = '.'.join((sname, funcname))
-    method_counts[fullname] += 1
+        cname = self.__class__.__name__
+        class_counts[cname].add(id(self))
+        sname = "%s#%d%s" % (self.__class__.__name__, len(class_counts[cname]), pname)
 
-    indent = tab * (len(stack)-1)
-    if verbose:
-        print("%s%s (%d)" % (indent, fullname, method_counts[fullname]))
-        _indented_print(frame.f_locals, frame.f_locals, len(stack)-1)
-    else:
-        print("%s%s" % (indent, fullname))
-    sys.stdout.flush()
+        fullname = '.'.join((sname, funcname))
+        method_counts[fullname] += 1
+
+        indent = tab * (len(stack)-1)
+        if verbose:
+            print("%s%s (%d)" % (indent, fullname, method_counts[fullname]))
+            _indented_print(frame.f_locals, frame.f_locals, len(stack)-1)
+        else:
+            print("%s%s" % (indent, fullname))
+        sys.stdout.flush()
+
+    if memory is not None and mem_usage:
+        memory.append(mem_usage())
 
 
 def _trace_return(frame, arg, stack, context):
@@ -85,7 +91,7 @@ def _trace_return(frame, arg, stack, context):
 
     This only happens if show_return is True when setup() is called.
     """
-    qual_cache, method_counts, class_counts, _ = context
+    qual_cache, method_counts, class_counts, verbose, memory = context
     funcname = find_qualified_name(frame.f_code.co_filename,
                                    frame.f_code.co_firstlineno, qual_cache)
 
@@ -100,12 +106,21 @@ def _trace_return(frame, arg, stack, context):
     sname = "%s#%d%s" % (self.__class__.__name__, len(class_counts[cname]), pname)
 
     indent = tab * (len(stack)-1)
-    print("%s<-- %s" % (indent, '.'.join((sname, funcname))))
-    if arg is not None:
-        s = "%s     %s" % (indent, arg)
-        if ' object at ' in s:
-            s = addr_regex.sub('', s)
-        print(s)
+    if memory is not None and mem_usage:
+        current_mem = mem_usage()
+        last_mem = memory.pop()
+        if current_mem > last_mem:
+            print("%s<-- %s (%6.3f KB)" % (indent, '.'.join((sname, funcname)),
+                                           (current_mem - last_mem) * 1024.))
+    else:
+        print("%s<-- %s" % (indent, '.'.join((sname, funcname))))
+
+    if verbose:
+        if arg is not None:
+            s = "%s     %s" % (indent, arg)
+            if ' object at ' in s:
+                s = addr_regex.sub('', s)
+            print(s)
 
     sys.stdout.flush()
 
@@ -116,7 +131,8 @@ def _setup(options):
 
     global _registered, _trace_calls
 
-    verbose=options.verbose
+    verbose = options.verbose
+    memory = options.memory
     if not _registered:
         methods = _get_methods(options, default='openmdao')
 
@@ -124,15 +140,19 @@ def _setup(options):
         qual_cache = {}
         method_counts = defaultdict(int)
         class_counts = defaultdict(set)
-        if verbose:
+        if verbose or memory:
             do_ret = _trace_return
         else:
             do_ret = None
+        if memory:
+            memory = []
+        else:
+            memory = None
         _trace_calls = _create_profile_callback(call_stack, _collect_methods(methods),
                                                 do_call=_trace_call,
                                                 do_ret=do_ret,
                                                 context=(qual_cache, method_counts,
-                                                         class_counts, verbose))
+                                                         class_counts, verbose, memory))
 
 
 def setup(methods=None, verbose=None):
@@ -224,6 +244,8 @@ def _itrace_setup_parser(parser):
                               ' Options are: %s' % sorted(func_group.keys()))
     parser.add_argument('-v', '--verbose', action='store_true', dest='verbose',
                         help="Show function locals and return values.")
+    parser.add_argument('-m', '--memory', action='store_true', dest='memory',
+                        help="Show memory usage.")
 
 
 def _itrace_exec(options):

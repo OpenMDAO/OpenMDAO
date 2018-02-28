@@ -289,7 +289,7 @@ try:
         total += resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / denom
         return total
 except ImportError:
-    pass
+    resource = None
 
 try:
     import psutil
@@ -327,4 +327,4 @@ try:
             return ret
         return wrapper
 except ImportError:
-    pass
+    mem_usage = diff_mem = None
