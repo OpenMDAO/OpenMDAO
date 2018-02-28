@@ -7,18 +7,15 @@ from six.moves import cStringIO
 import numpy as np
 
 from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NonlinearRunOnce, \
-                         ImplicitComponent, NonlinearBlockGS, LinearBlockGS, ParallelGroup, \
-                         ExecComp
+                         ImplicitComponent, NonlinearBlockGS
 from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
-from openmdao.core.tests.test_matmat import JacVec, MultiJacVec
+from openmdao.core.tests.test_matmat import MultiJacVec
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
-
-from collections import OrderedDict
 
 if MPI:
     from openmdao.api import PETScVector
