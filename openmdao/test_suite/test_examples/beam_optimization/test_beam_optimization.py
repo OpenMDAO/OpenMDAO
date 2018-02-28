@@ -85,7 +85,7 @@ class TestParallelGroups(unittest.TestCase):
 
         from openmdao.api import Problem, ScipyOptimizeDriver
 
-        from openmdao.test_suite.test_examples.beam_optimization.beam_group import BeamGroup
+        from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 
         E = 1.
         L = 1.
