@@ -3,6 +3,7 @@ from __future__ import print_function
 import os
 import sys
 import re
+import time
 import argparse
 import warnings
 from contextlib import contextmanager
@@ -112,10 +113,15 @@ def _trace_return(frame, arg, stack, context):
         last_mem = memory.pop()
         if current_mem > last_mem:
             delta = current_mem - last_mem
-            print("%s<-- %s (diff: %6.3f KB) (total: %6.3f MB)" %
-                  (indent, '.'.join((sname, funcname)), delta * 1024., current_mem))
+            print("%s<-- %s (diff: %6.3f KB) (total: %6.3f MB) (time: %s)" %
+                  (indent, '.'.join((sname, funcname)), delta * 1024., current_mem, time.time()))
+
+            # add this delta to all callers so when they calculate their own delta, this
+            # delta won't be included
             for i in range(len(memory) - 1, -1, -1):
                 memory[i] += delta
+        else:
+            print("%s<-- %s" % (indent, '.'.join((sname, funcname))))
     else:
         print("%s<-- %s" % (indent, '.'.join((sname, funcname))))
 
