@@ -58,30 +58,29 @@ def _trace_call(frame, arg, stack, context):
     """
     qual_cache, method_counts, class_counts, verbose, memory = context
 
-    if memory is None or verbose:
-        funcname = find_qualified_name(frame.f_code.co_filename,
-                                       frame.f_code.co_firstlineno, qual_cache)
+    funcname = find_qualified_name(frame.f_code.co_filename,
+                                   frame.f_code.co_firstlineno, qual_cache)
 
-        self = frame.f_locals['self']
-        try:
-            pname = "(%s)" % self.pathname
-        except AttributeError:
-            pname = ""
+    self = frame.f_locals['self']
+    try:
+        pname = "(%s)" % self.pathname
+    except AttributeError:
+        pname = ""
 
-        cname = self.__class__.__name__
-        class_counts[cname].add(id(self))
-        sname = "%s#%d%s" % (self.__class__.__name__, len(class_counts[cname]), pname)
+    cname = self.__class__.__name__
+    class_counts[cname].add(id(self))
+    sname = "%s#%d%s" % (self.__class__.__name__, len(class_counts[cname]), pname)
 
-        fullname = '.'.join((sname, funcname))
-        method_counts[fullname] += 1
+    fullname = '.'.join((sname, funcname))
+    method_counts[fullname] += 1
 
-        indent = tab * (len(stack)-1)
-        if verbose:
-            print("%s%s (%d)" % (indent, fullname, method_counts[fullname]))
-            _indented_print(frame.f_locals, frame.f_locals, len(stack)-1)
-        else:
-            print("%s%s" % (indent, fullname))
-        sys.stdout.flush()
+    indent = tab * (len(stack)-1)
+    if verbose:
+        print("%s%s (%d)" % (indent, fullname, method_counts[fullname]))
+        _indented_print(frame.f_locals, frame.f_locals, len(stack)-1)
+    else:
+        print("%s%s" % (indent, fullname))
+    sys.stdout.flush()
 
     if memory is not None and mem_usage:
         memory.append(mem_usage())
