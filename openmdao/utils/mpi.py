@@ -49,7 +49,7 @@ def use_proc_files():
     """
     if MPI is not None:
         working_dir = os.environ.get('PROC_FILES_DIR')
-        if working_dir is None:
+        if not working_dir:
             ofile = open("%d.out" % MPI.COMM_WORLD.rank, 'wb')
         else:
             if not os.path.isdir(working_dir):

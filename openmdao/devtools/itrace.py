@@ -56,7 +56,7 @@ def _trace_call(frame, arg, stack, context):
     """
     This is called after we have matched based on glob pattern and isinstance check.
     """
-    qual_cache, method_counts, class_counts, verbose, memory = context
+    qual_cache, method_counts, class_counts, id2count, verbose, memory = context
 
     funcname = find_qualified_name(frame.f_code.co_filename,
                                    frame.f_code.co_firstlineno, qual_cache)
@@ -68,8 +68,14 @@ def _trace_call(frame, arg, stack, context):
         pname = ""
 
     cname = self.__class__.__name__
-    class_counts[cname].add(id(self))
-    sname = "%s#%d%s" % (self.__class__.__name__, len(class_counts[cname]), pname)
+    my_id = id(self)
+    if my_id in id2count:
+        id_count = id2count[my_id]
+    else:
+        class_counts[cname] += 1
+        id2count[my_id] = id_count = class_counts[cname]
+
+    sname = "%s#%d%s" % (self.__class__.__name__, id_count, pname)
 
     fullname = '.'.join((sname, funcname))
     method_counts[fullname] += 1
@@ -92,7 +98,7 @@ def _trace_return(frame, arg, stack, context):
 
     This only happens if show_return is True when setup() is called.
     """
-    qual_cache, method_counts, class_counts, verbose, memory = context
+    qual_cache, method_counts, class_counts, id2count, verbose, memory = context
     funcname = find_qualified_name(frame.f_code.co_filename,
                                    frame.f_code.co_firstlineno, qual_cache)
 
@@ -102,9 +108,7 @@ def _trace_return(frame, arg, stack, context):
     except AttributeError:
         pname = ""
 
-    cname = self.__class__.__name__
-    class_counts[cname].add(id(self))
-    sname = "%s#%d%s" % (self.__class__.__name__, len(class_counts[cname]), pname)
+    sname = "%s#%d%s" % (self.__class__.__name__, id2count[id(self)], pname)
 
     indent = tab * (len(stack)-1)
     if memory is not None and mem_usage:
@@ -148,7 +152,8 @@ def _setup(options):
         call_stack = []
         qual_cache = {}
         method_counts = defaultdict(int)
-        class_counts = defaultdict(set)
+        class_counts = defaultdict(lambda: -1)
+        id2count = {}
         if verbose or memory:
             do_ret = _trace_return
         else:
@@ -164,7 +169,7 @@ def _setup(options):
                                                 do_call=_trace_call,
                                                 do_ret=do_ret,
                                                 context=(qual_cache, method_counts,
-                                                         class_counts, verbose, memory))
+                                                         class_counts, id2count, verbose, memory))
 
 
 def setup(methods=None, verbose=None, memory=None):
