@@ -1987,7 +1987,8 @@ class System(object):
             design variable.
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
-            be reloaded during future linear solves.
+            be used to start the next linear solution with an initial guess equal to the
+            solution from the previous linear solve.
 
         Notes
         -----
@@ -2123,7 +2124,8 @@ class System(object):
             in the color dict are tuples of the form (resp_idxs, color_idxs).
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
-            be reloaded during future linear solves.
+            be used to start the next linear solution with an initial guess equal to the
+            solution from the previous linear solve.
         """
         # Name must be a string
         if not isinstance(name, string_types):
@@ -2280,7 +2282,8 @@ class System(object):
             in the color dict are tuples of the form (resp_idxs, color_idxs).
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
-            be reloaded during future linear solves.
+            be used to start the next linear solution with an initial guess equal to the
+            solution from the previous linear solve.
 
         Notes
         -----
@@ -2335,7 +2338,8 @@ class System(object):
             in the color dict are tuples of the form (resp_idxs, color_idxs).
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
-            be reloaded during future linear solves.
+            be used to start the next linear solution with an initial guess equal to the
+            solution from the previous linear solve.
 
         Notes
         -----
