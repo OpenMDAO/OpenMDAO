@@ -94,6 +94,7 @@ class MultiStatesComp(ImplicitComponent):
         self.lu = lu_factor(inputs['K'])
 
         for j in range(num_rhs):
+
             force_vector = np.concatenate([self.metadata['force_vector'][:, j], np.zeros(2)])
             outputs['d_%d' % j] = lu_solve(self.lu, force_vector)
 
