@@ -116,15 +116,16 @@ def _trace_return(frame, arg, stack, context):
         last_mem = memory.pop()
         if current_mem > last_mem:
             delta = current_mem - last_mem
-            print("%s<-- %s (diff: %6.3f KB) (total: %6.3f MB) (time: %s)" %
-                  (indent, '.'.join((sname, funcname)), delta * 1024., current_mem, time.time()))
+            print("%s<-- %s (time: %s) (total: %6.3f MB) (diff: %6.3f KB)" %
+                  (indent, '.'.join((sname, funcname)), time.time(), current_mem, delta * 1024.))
 
             # add this delta to all callers so when they calculate their own delta, this
             # delta won't be included
             for i in range(len(memory) - 1, -1, -1):
                 memory[i] += delta
         else:
-            print("%s<-- %s" % (indent, '.'.join((sname, funcname))))
+            print("%s<-- %s (time: %s) (total: %6.3f MB)" % (indent, '.'.join((sname, funcname)),
+                                                             time.time(), current_mem))
     else:
         print("%s<-- %s" % (indent, '.'.join((sname, funcname))))
 
