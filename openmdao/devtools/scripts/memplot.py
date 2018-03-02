@@ -8,6 +8,7 @@ if __name__ == '__main__':
     import argparse
     import matplotlib.pyplot as plt
     import numpy as np
+    from collections import defaultdict
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', '--func', action='store', dest='func',
@@ -18,6 +19,8 @@ if __name__ == '__main__':
     options = parser.parse_args()
 
     fig, ax = plt.subplots()
+
+    changes = []
 
     for i, arg in enumerate(options.file):
         delta = []
@@ -33,17 +36,27 @@ if __name__ == '__main__':
                     parts = line.split()
                     timestamp = float(parts[3].split(')')[0])
 
+                    fullname = parts[1]
                     fname = parts[1].rsplit('.', 1)[-1]
 
                     if len(parts) > 7:
                         delta.append(float(parts[8]))
                         total.append(float(parts[5]))
                         elapsed.append(timestamp)
+                        changes.append((delta[-1], elapsed[-1], fullname, arg))
                     elif fname == options.func:
                         calls.append(float(parts[5]))
                         call_times.append(timestamp)
 
         ax.plot(elapsed, total, label=arg.rsplit('.', 1)[0])
+
+    changes = sorted(changes, key=lambda t: t[0], reverse=True)
+    nresults = 50
+
+    for i in range(nresults):
+        change, ctime, func, fname = changes[i]
+        print("Change of %+9.2f KB at %8.5f sec in file %s in %s." %
+              (change, ctime, fname, func))
 
     if options.func:
         # apparently if a label starts with '_' matplotlib ignores it

@@ -12,6 +12,10 @@ from collections import defaultdict, OrderedDict
 from six import string_types
 from six.moves import cStringIO
 from numpy import ndarray
+try:
+    import objgraph
+except ImportError:
+    objgraph = None
 
 from openmdao.devtools.iprof_utils import _create_profile_callback, find_qualified_name, \
                                          func_group, _collect_methods, _Options, _setup_func_group,\
