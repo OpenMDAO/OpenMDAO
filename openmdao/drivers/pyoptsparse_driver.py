@@ -389,6 +389,9 @@ class pyOptSparseDriver(Driver):
             # optimizers other than pySNOPT may not populate this dict
             pass
 
+        self.opt_prob = None
+        self.opt = None
+
         return self.fail
 
     def _objfunc(self, dv_dict):

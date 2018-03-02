@@ -65,7 +65,7 @@ def _trace_call(frame, arg, stack, context):
     if time0 is None:
         time0 = time.time()
 
-    qual_cache, method_counts, class_counts, id2count, verbose, memory = context
+    qual_cache, method_counts, class_counts, id2count, verbose, memory, leaks = context
 
     funcname = find_qualified_name(frame.f_code.co_filename,
                                    frame.f_code.co_firstlineno, qual_cache)
@@ -97,8 +97,11 @@ def _trace_call(frame, arg, stack, context):
         print("%s%s" % (indent, fullname))
     sys.stdout.flush()
 
-    if memory is not None and mem_usage:
+    if memory is not None:
         memory.append(mem_usage())
+
+    if leaks is not None:
+        leaks.append(objgraph.typestats())
 
 
 def _trace_return(frame, arg, stack, context):
@@ -109,7 +112,7 @@ def _trace_return(frame, arg, stack, context):
     """
     global time0
 
-    qual_cache, method_counts, class_counts, id2count, verbose, memory = context
+    qual_cache, method_counts, class_counts, id2count, verbose, memory, leaks = context
     funcname = find_qualified_name(frame.f_code.co_filename,
                                    frame.f_code.co_firstlineno, qual_cache)
 
@@ -121,8 +124,8 @@ def _trace_return(frame, arg, stack, context):
 
     sname = "%s#%d%s" % (self.__class__.__name__, id2count[id(self)], pname)
 
-    indent = tab * (len(stack)-1)
-    if memory is not None and mem_usage:
+    indent = tab * len(stack)
+    if memory is not None:
         current_mem = mem_usage()
         last_mem = memory.pop()
         if current_mem != last_mem:
@@ -148,6 +151,11 @@ def _trace_return(frame, arg, stack, context):
                 s = addr_regex.sub('', s)
             print(s)
 
+    if leaks is not None:
+        last_objs = leaks.pop()
+        for name, _, delta_objs in objgraph.growth(peak_stats=last_objs):
+            print("%s   %s %+d" % (indent, name, delta_objs))
+
     sys.stdout.flush()
 
 
@@ -159,6 +167,8 @@ def _setup(options):
 
     verbose = options.verbose
     memory = options.memory
+    leaks = options.leaks
+
     if not _registered:
         methods = _get_methods(options, default='openmdao')
 
@@ -171,18 +181,29 @@ def _setup(options):
             do_ret = _trace_return
         else:
             do_ret = None
+
         if memory:
-            memory = []
             if mem_usage is None:
-                warnings.warn("Memory tracing requires the 'psutil' package.  "
-                              "Install it using 'pip install psutil'.")
+                raise RuntimeError("Memory tracing requires the 'psutil' package.  "
+                                   "Install it using 'pip install psutil'.")
+            memory = []
         else:
             memory = None
+
+        if leaks:
+            if objgraph is None:
+                raise RuntimeError("Leak detection requires the 'objgraph' package. "
+                                   "Install it using 'pip install objgraph'.")
+            leaks = []
+        else:
+            leaks = None
+
         _trace_calls = _create_profile_callback(call_stack, _collect_methods(methods),
                                                 do_call=_trace_call,
                                                 do_ret=do_ret,
                                                 context=(qual_cache, method_counts,
-                                                         class_counts, id2count, verbose, memory))
+                                                         class_counts, id2count, verbose, memory,
+                                                         leaks))
 
 
 def setup(methods=None, verbose=None, memory=None, leaks=False):
@@ -200,7 +221,7 @@ def setup(methods=None, verbose=None, memory=None, leaks=False):
     leaks : bool
         If True, show objects that are created within a function and not garbage collected.
     """
-    _setup(_Options(methods=methods, verbose=verbose, memory=memory))
+    _setup(_Options(methods=methods, verbose=verbose, memory=memory, leaks=leaks))
 
 
 def start():

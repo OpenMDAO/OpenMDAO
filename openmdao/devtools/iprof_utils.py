@@ -196,14 +196,15 @@ def _create_profile_callback(stack, matches, do_call=None, do_ret=None, context=
         if event == 'call':
             if 'self' in frame.f_locals and frame.f_code.co_name in matches and \
                     isinstance(frame.f_locals['self'], matches[frame.f_code.co_name]):
-                stack.append(frame)
+                stack.append(id(frame))
                 if do_call is not None:
                    return do_call(frame, arg, stack, context)
         elif event == 'return' and stack:
-            if frame is stack[-1]:
+            if id(frame) == stack[-1]:
+                stack.pop()
                 if do_ret is not None:
                     do_ret(frame, arg, stack, context)
-                stack.pop()
+                #stack.pop()
 
     return _wrapped
 
