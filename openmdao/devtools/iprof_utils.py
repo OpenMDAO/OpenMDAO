@@ -126,9 +126,8 @@ def _setup_func_group():
             ('*solve*', (Solver,)),
             ('*compute*', (System,))
         ],
-        'solve': [
-            ('*solve*', (System, Solver)),
-            ('*', (Driver,))
+        'solver': [
+            ('*', (Solver,))
         ],
         'driver': [
             ('*', (Driver,))

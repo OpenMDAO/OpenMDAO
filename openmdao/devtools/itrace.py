@@ -101,7 +101,11 @@ def _trace_call(frame, arg, stack, context):
         memory.append(mem_usage())
 
     if leaks is not None:
-        leaks.append(objgraph.typestats())
+        stats = objgraph.typestats()
+        stats['frame'] += 1
+        stats['cell'] += 1
+        stats['list'] += 1
+        leaks.append(stats)
 
 
 def _trace_return(frame, arg, stack, context):
