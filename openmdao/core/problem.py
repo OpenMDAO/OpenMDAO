@@ -455,6 +455,20 @@ class Problem(object):
         if Problem._post_setup_func is not None:
             Problem._post_setup_func(self)
 
+    def _all_components_provide_jacobians(self):
+        """
+        Are all components providing jacobians.
+
+        Returns
+        -------
+        boolean
+            True if all Components use jacobian-free linear operators; False otherwise.
+        """
+        for comp in self.model.system_iter(typ=Component, include_self=True):
+            if comp.matrix_free:
+                return False
+        return True
+
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6,
                        method='fd', step=None, form=DEFAULT_FD_OPTIONS['form'],
@@ -530,7 +544,6 @@ class Problem(object):
                 raise ValueError(msg)
             comps = [model._get_subsystem(c_name) for c_name in comps]
 
-        current_mode = self._mode
         self.set_solver_print(level=0)
 
         # This is a defaultdict of (defaultdict of dicts).
@@ -805,7 +818,8 @@ class Problem(object):
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, all_fd_options,
-                                  suppress_output=suppress_output, indep_key=indep_key)
+                                  suppress_output=suppress_output, indep_key=indep_key,
+                                  all_comps_provide_jacs=self._all_components_provide_jacobians())
 
         return partials_data
 
@@ -1609,7 +1623,7 @@ class Problem(object):
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,
-                              suppress_output=False, indep_key=None):
+                              suppress_output=False, indep_key=None, all_comps_provide_jacs=False):
     """
     Compute the relative and absolute errors in the given derivatives and print to the out_stream.
 
@@ -1636,6 +1650,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         Set to True to suppress all output. Just calculate errors and add the keys.
     indep_key : dict of sets, optional
         Keyed by component name, contains the of/wrt keys that are declared not dependent.
+    all_comps_provide_jacs : bool, optional
+        Set to True if all components provide a Jacobian (are not matrix-free).
     """
     nan = float('nan')
 
@@ -1643,8 +1659,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         if totals:
             deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
         else:
-            deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e} | {6:.4e} | {7:.4e}"\
-                         " | {8:.4e} | {9:.4e} | {10:.4e}"
+            if not all_comps_provide_jacs:
+                deriv_line = "{0} wrt {1} | {2:.4e} | {3} | {4:.4e} | {5:.4e} | {6} | {7}" \
+                             " | {8:.4e} | {9} | {10}"
+            else:
+                deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
 
     for system in system_list:
         # No need to see derivatives of IndepVarComps
@@ -1695,20 +1714,32 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         max_width_of = max(max_width_of, len(of))
                         max_width_wrt = max(max_width_wrt, len(wrt))
 
-                    header = "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}"\
-                        .format(
-                            _pad_name('<output>', max_width_of, True),
-                            _pad_name('<variable>', max_width_wrt, True),
-                            _pad_name('fwd mag.'),
-                            _pad_name('rev mag.'),
-                            _pad_name('check mag.'),
-                            _pad_name('a(fwd-chk)'),
-                            _pad_name('a(rev-chk)'),
-                            _pad_name('a(fwd-rev)'),
-                            _pad_name('r(fwd-chk)'),
-                            _pad_name('r(rev-chk)'),
-                            _pad_name('r(fwd-rev)')
-                        )
+                    if not all_comps_provide_jacs:
+                        header = \
+                            "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}" \
+                            .format(
+                                _pad_name('<output>', max_width_of, True),
+                                _pad_name('<variable>', max_width_wrt, True),
+                                _pad_name('fwd mag.'),
+                                _pad_name('rev mag.'),
+                                _pad_name('check mag.'),
+                                _pad_name('a(fwd-chk)'),
+                                _pad_name('a(rev-chk)'),
+                                _pad_name('a(fwd-rev)'),
+                                _pad_name('r(fwd-chk)'),
+                                _pad_name('r(rev-chk)'),
+                                _pad_name('r(fwd-rev)')
+                            )
+                    else:
+                        header = "{0} wrt {1} | {2} | {3} | {4} | {5}"\
+                            .format(
+                                _pad_name('<output>', max_width_of, True),
+                                _pad_name('<variable>', max_width_wrt, True),
+                                _pad_name('fwd mag.'),
+                                _pad_name('check mag.'),
+                                _pad_name('a(fwd-chk)'),
+                                _pad_name('r(fwd-chk)'),
+                            )
                 if out_stream:
                     out_stream.write(header + '\n')
                     out_stream.write('-' * len(header) + '\n' + '\n')
@@ -1781,20 +1812,33 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 break
 
                         if out_stream:
-                            out_stream.write(deriv_line.format(
-                                _pad_name(of, max_width_of, True),
-                                _pad_name(wrt, max_width_wrt, True),
-                                magnitude.forward,
-                                magnitude.reverse,
-                                magnitude.fd,
-                                abs_err.forward,
-                                abs_err.reverse,
-                                abs_err.forward_reverse,
-                                rel_err.forward,
-                                rel_err.reverse,
-                                rel_err.forward_reverse,
-                            ) + error_string + '\n')
-                else:
+                            if not all_comps_provide_jacs:
+                                out_stream.write(deriv_line.format(
+                                    _pad_name(of, max_width_of, True),
+                                    _pad_name(wrt, max_width_wrt, True),
+                                    magnitude.forward,
+                                    _format_if_not_matrix_free(
+                                        system.matrix_free, magnitude.reverse),
+                                    magnitude.fd,
+                                    abs_err.forward,
+                                    _format_if_not_matrix_free(system.matrix_free, abs_err.reverse),
+                                    _format_if_not_matrix_free(
+                                        system.matrix_free, abs_err.forward_reverse),
+                                    rel_err.forward,
+                                    _format_if_not_matrix_free(system.matrix_free, rel_err.reverse),
+                                    _format_if_not_matrix_free(
+                                        system.matrix_free, rel_err.forward_reverse),
+                                ) + error_string + '\n')
+                            else:
+                                out_stream.write(deriv_line.format(
+                                    _pad_name(of, max_width_of, True),
+                                    _pad_name(wrt, max_width_wrt, True),
+                                    magnitude.forward,
+                                    magnitude.fd,
+                                    abs_err.forward,
+                                    rel_err.forward,
+                                ) + error_string + '\n')
+                else:  # not compact print
 
                     if totals:
                         fd_desc = "{}:{}".format(global_options['']['method'],
@@ -1804,17 +1848,12 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         fd_desc = "{}:{}".format(global_options[sys_name][wrt]['method'],
                                                  global_options[sys_name][wrt]['form'])
 
-                    if compact_print:
-                        check_desc = "    (Check Type: {})".format(fd_desc)
-                    else:
-                        check_desc = ""
-
                     # Magnitudes
                     if out_stream:
                         out_stream.write("  {}: '{}' wrt '{}'".format(sys_name, of, wrt) + '\n')
                         out_stream.write('    Forward Magnitude : {:.6e}'.format(magnitude.forward)
                                          + '\n')
-                    if not totals:
+                    if not totals and system.matrix_free:
                         txt = '    Reverse Magnitude : {:.6e}'
                         if out_stream:
                             out_stream.write(txt.format(magnitude.reverse) + '\n')
@@ -1822,7 +1861,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         out_stream.write('         Fd Magnitude : {:.6e} ({})'.format(magnitude.fd,
                                          fd_desc) + '\n')
                     # Absolute Errors
-                    if totals:
+                    if totals or not system.matrix_free:
                         error_descs = ('(Jfor  - Jfd) ', )
                     else:
                         error_descs = ('(Jfor  - Jfd) ', '(Jrev  - Jfd) ', '(Jfor  - Jrev)')
@@ -1849,7 +1888,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         out_stream.write(str(forward) + '\n')
                         out_stream.write('\n')
 
-                    if not totals:
+                    if not totals and system.matrix_free:
                         if out_stream:
                             out_stream.write('    Raw Reverse Derivative (Jfor)\n')
                             out_stream.write(str(reverse) + '\n')
@@ -1862,6 +1901,28 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
                     if out_stream:
                         out_stream.write(' -' * 30 + '\n')
+
+
+def _format_if_not_matrix_free(matrix_free, val):
+    """
+    Return string to represent deriv check value in compact display.
+
+    Parameters
+    ----------
+    matrix_free : bool
+        If True, then the associated Component is matrix-free.
+    val : float
+        The deriv check value.
+
+    Returns
+    -------
+    str
+        String which is the actual value if matrix-free, otherwise 'n/a'
+    """
+    if matrix_free:
+        return '{0:.4e}'.format(val)
+    else:
+        return _pad_name('n/a')
 
 
 def _pad_name(name, pad_num=10, quotes=False):
