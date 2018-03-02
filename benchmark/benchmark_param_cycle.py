@@ -78,6 +78,7 @@ class BM(unittest.TestCase):
     def benchmark_comp200_var5_newton_direct_assembled(self):
         suite = _build(
             solver_class=NewtonSolver, linear_solver_class=DirectSolver,
+            linear_solver_options={'maxiter': 0},
             vector_class='default',
             assembled_jac=True,
             jacobian_type='dense',
@@ -93,6 +94,7 @@ class BM(unittest.TestCase):
     def benchmark_comp50_var5_newton_direct_assembled_fd(self):
         suite = _build(
             solver_class=NewtonSolver, linear_solver_class=DirectSolver,
+            linear_solver_options={'maxiter': 0},
             vector_class='default',
             assembled_jac=True,
             jacobian_type='dense',
