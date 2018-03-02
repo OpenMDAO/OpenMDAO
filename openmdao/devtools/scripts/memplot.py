@@ -50,13 +50,18 @@ if __name__ == '__main__':
 
         ax.plot(elapsed, total, label=arg.rsplit('.', 1)[0])
 
+        # ax.plot(elapsed, total[0] + np.cumsum(delta) / 1024.,
+        #         label="%s sum of deltas" % arg.rsplit('.', 1)[0],
+        #         linestyle='-.')
+
     changes = sorted(changes, key=lambda t: t[0], reverse=True)
     nresults = 50
 
-    for i in range(nresults):
-        change, ctime, func, fname = changes[i]
+    for i, (change, ctime, func, fname) in enumerate(changes):
         print("Change of %+9.2f KB at %8.5f sec in file %s in %s." %
               (change, ctime, fname, func))
+        if i == nresults:
+            break
 
     if options.func:
         # apparently if a label starts with '_' matplotlib ignores it
