@@ -125,9 +125,9 @@ def _trace_return(frame, arg, stack, context):
     if memory is not None and mem_usage:
         current_mem = mem_usage()
         last_mem = memory.pop()
-        if current_mem > last_mem:
+        if current_mem != last_mem:
             delta = current_mem - last_mem
-            print("%s<-- %s (time: %8.5f) (total: %6.3f MB) (diff: %6.3f KB)" %
+            print("%s<-- %s (time: %8.5f) (total: %6.3f MB) (diff: %+.0f KB)" %
                   (indent, '.'.join((sname, funcname)), time.time() - time0, current_mem,
                    delta * 1024.))
 
@@ -185,7 +185,7 @@ def _setup(options):
                                                          class_counts, id2count, verbose, memory))
 
 
-def setup(methods=None, verbose=None, memory=None):
+def setup(methods=None, verbose=None, memory=None, leaks=False):
     """
     Setup call tracing.
 
@@ -195,6 +195,10 @@ def setup(methods=None, verbose=None, memory=None):
         Methods to be traced, based on glob patterns and isinstance checks.
     verbose : bool
         If True, show function locals and return values.
+    memory : bool
+        If True, show functions that increase memory usage.
+    leaks : bool
+        If True, show objects that are created within a function and not garbage collected.
     """
     _setup(_Options(methods=methods, verbose=verbose, memory=memory))
 
@@ -219,7 +223,7 @@ def stop():
 
 
 @contextmanager
-def tracing(methods=None, verbose=False, memory=False):
+def tracing(methods=None, verbose=False, memory=False, leaks=False):
     """
     Turn on call tracing within a certain context.
 
@@ -232,8 +236,10 @@ def tracing(methods=None, verbose=False, memory=False):
         If True, show function locals and return values.
     memory : bool
         If True, show functions that increase memory usage.
+    leaks : bool
+        If True, show objects that are created within a function and not garbage collected.
     """
-    setup(methods=methods, verbose=verbose, memory=memory)
+    setup(methods=methods, verbose=verbose, memory=memory, leaks=leaks)
     start()
     yield
     stop()
@@ -251,9 +257,11 @@ class tracedfunc(object):
         If True, show function locals and return values.
     memory : bool
         If True, show functions that increase memory usage.
+    leaks : bool
+        If True, show objects that are created within a function and not garbage collected.
     """
-    def __init__(self, methods=None, verbose=False, memory=False):
-        self.options = _Options(methods=methods, verbose=verbose, memory=memory)
+    def __init__(self, methods=None, verbose=False, memory=False, leaks=False):
+        self.options = _Options(methods=methods, verbose=verbose, memory=memory, leaks=leaks)
         self._call_setup = True
 
     def __call__(self, func):
@@ -280,6 +288,8 @@ def _itrace_setup_parser(parser):
                         help="Show function locals and return values.")
     parser.add_argument('-m', '--memory', action='store_true', dest='memory',
                         help="Show memory usage.")
+    parser.add_argument('-l', '--leaks', action='store_true', dest='leaks',
+                        help="Show objects that are not garbage collected after each function call.")
 
 
 def _itrace_exec(options):
