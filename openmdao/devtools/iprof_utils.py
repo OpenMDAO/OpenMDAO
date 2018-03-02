@@ -103,14 +103,14 @@ def _setup_func_group():
     from openmdao.solvers.solver import Solver
     from openmdao.jacobians.jacobian import Jacobian
     from openmdao.matrices.matrix import Matrix
-    from openmdao.vectors.vector import Vector, Transfer
+    from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
 
     func_group.update({
         'openmdao': [
             ("*", (System, Jacobian, Matrix, Solver, Driver, Problem)),
         ],
         'openmdao_all': [
-            ("*", (System, Vector, Transfer, Jacobian, Matrix, Solver, Driver, Problem)),
+            ("*", (System, DefaultVector, DefaultTransfer, Jacobian, Matrix, Solver, Driver, Problem)),
         ],
         'setup': [
             ("*setup*", (System, Solver, Driver, Problem)),
@@ -119,7 +119,7 @@ def _setup_func_group():
             ('*compute*', (System,)),
             ('*linear*', (System,)),
             ('_transfer', (System,)),
-            ('*', (Transfer,)),
+            ('*', (DefaultTransfer,)),
         ],
         'linear': [
             ('*linear*', (System,)),
@@ -131,6 +131,10 @@ def _setup_func_group():
         ],
         'driver': [
             ('*', (Driver,))
+        ],
+        'transfer': [
+            ('*', (DefaultTransfer,)),
+            ('_transfer', (System,))
         ]
     })
 
