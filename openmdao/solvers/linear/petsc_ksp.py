@@ -378,6 +378,8 @@ class PETScKrylov(LinearSolver):
             # stuff the result into the x vector
             x_vec.set_data(sol_array)
 
+            sol_petsc_vec = rhs_petsc_vec = None
+
         return False, 0., 0.
 
     def apply(self, mat, in_vec, result):
