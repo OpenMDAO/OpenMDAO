@@ -84,7 +84,7 @@ class pyOptSparseDriver(Driver):
     Options
     -------
     options['optimizer'] :  str('SLSQP')
-        Name of optimizers to use
+        Name of optimizers to use.
     options['print_results'] :  bool(True)
         Print pyOpt results if True
     options['gradient method'] :  str('openmdao', 'pyopt_fd', 'snopt_fd')
