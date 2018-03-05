@@ -28,13 +28,6 @@ from openmdao.utils.array_utils import array_viz
 _use_simul_coloring = True
 
 
-def _find_var_from_range(idx, ranges):
-    # TODO: use bisection
-    for start, end, name in ranges:
-        if start <= idx <= end:
-            return name, idx - start
-
-
 class _SubjacRandomizer(object):
     """
     A replacement for Jacobian._set_abs that replaces subjac with random numbers.
@@ -94,8 +87,55 @@ class _SubjacRandomizer(object):
 
         self._orig_set_abs(key, subjac)
 
+def _get_full_disjoint(J, start, end):
+    """
+    Find sets of disjoint columns between start and end in J and their corresponding rows.
 
-def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
+    Parameters
+    ----------
+    J : ndarray
+        The total jacobian.
+    start : int
+        The starting column.
+    end : int
+        The ending column.
+    """
+    # skip desvars of size 1 since simul derivs will give no improvement
+    if (end - start) == 0:
+        return {}, {}
+
+    disjoints = defaultdict(set)
+    rows = {}
+    for c1, c2 in combinations(range(start, end + 1), 2):  # loop over column pairs
+        # 'and' two columns together. If we get all False, then columns have disjoint row sets
+        if not np.any(J[:, c1] & J[:, c2]):
+            disjoints[c1].add(c2)
+            disjoints[c2].add(c1)
+            if c1 not in rows:
+                rows[c1] = np.nonzero(J[:, c1])[0]
+            if c2 not in rows:
+                rows[c2] = np.nonzero(J[:, c2])[0]
+
+    full_disjoint = OrderedDict()
+    seen = set()
+    allrows = {}
+
+    # sort largest to smallest disjoint column sets
+    for col, colset in sorted(disjoints.items(), key=lambda x: len(x[1]), reverse=True):
+        if col in seen:
+            continue
+        seen.add(col)
+        allrows[col] = J[:, col].copy()
+        full_disjoint[col] = [col]
+        for other_col in colset:
+            if other_col not in seen and not np.any(allrows[col] & J[:, other_col]):
+                seen.add(other_col)
+                full_disjoint[col].append(other_col)
+                allrows[col] |= J[:, other_col]
+
+    return full_disjoint, rows
+
+def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30, byvar=True):
     """
     Find sets of disjoint columns in the total jac and their corresponding rows.
 
@@ -110,6 +150,9 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     tol : float
         Tolerance on values in jacobian.  Anything smaller in magnitude will be
         set to 0.0.
+    byvar : bool
+        If True, find disjoint column sets per design variable instead of for the
+        entire jacobian.
 
     Returns
     -------
@@ -117,6 +160,7 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
         Tuple of the form (total_dv_offsets, total_res_offsets, final_jac)
     """
     # TODO: fix this to work in rev mode as well
+    assert mode == 'fwd', "Only fwd mode is supported."
 
     # clear out any old simul coloring info
     prob.driver._simul_coloring_info = None
@@ -170,70 +214,47 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30):
     end = -1
     for name in wrt:
         end += prob.driver._designvars[name]['size']
-        dv_offsets.append((start, end, name))
+        tup = (start, end, name)
+        dv_offsets.extend([tup] * (end - start + 1))
         start = end + 1
+
+    full_end = end
 
     res_offsets = []
     start = 0
     end = -1
     for name in of:
         end += responses[name]['size']
-        res_offsets.append((start, end, name))
+        tup = (start, end, name)
+        res_offsets.extend([tup] * (end - start + 1))
         start = end + 1
 
     total_dv_offsets = OrderedDict()
     total_res_offsets = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [[], []])))
 
-    # loop over each desvar and find disjoint column sets for all columns of that desvar
-    for start, end, dv in dv_offsets:
-        # skip desvars of size 1 since simul derivs will give no improvement
-        if (end - start) == 0:
-            continue
+    if byvar:
+        # loop over each desvar and find disjoint column sets for all columns of that desvar
+        for start, end, dv in dv_offsets:
+            full_disjoint, rows = _get_full_disjoint(J, start, end)
 
-        disjoints = defaultdict(set)
-        rows = {}
-        for c1, c2 in combinations(range(start, end + 1), 2):  # loop over column pairs
-            # 'and' two columns together. If we get all False, then columns have disjoint row sets
-            if not np.any(J[:, c1] & J[:, c2]):
-                disjoints[c1].add(c2)
-                disjoints[c2].add(c1)
-                if c1 not in rows:
-                    rows[c1] = np.nonzero(J[:, c1])[0]
-                if c2 not in rows:
-                    rows[c2] = np.nonzero(J[:, c2])[0]
+            total_dv_offsets[dv] = tot_dv = OrderedDict()
 
-        full_disjoint = OrderedDict()
-        seen = set()
-        allrows = {}
-
-        # sort largest to smallest disjoint column sets
-        discols = sorted(disjoints.items(), key=lambda x: len(x[1]), reverse=True)
-
-        for col, colset in discols:
-            if col in seen:
-                continue
-            seen.add(col)
-            allrows[col] = J[:, col].copy()
-            full_disjoint[col] = [col]
-            for other_col in colset:
-                if other_col not in seen and not np.any(allrows[col] & J[:, other_col]):
-                    seen.add(other_col)
-                    full_disjoint[col].append(other_col)
-                    allrows[col] |= J[:, other_col]
-
-        total_dv_offsets[dv] = tot_dv = OrderedDict()
-
-        for color, cols in enumerate(full_disjoint.values()):
-            tot_dv[color] = tot_dv_columns = []
-            for c in sorted(cols):
-                dvoffset = c - start
-                tot_dv_columns.append(dvoffset)
-                for crow in rows[c]:
-                    res, resoffset = _find_var_from_range(crow, res_offsets)
-                    dct = total_res_offsets[res][dv][color]
-                    # need to convert these to int to avoid error during JSON serialization
-                    dct[0].append(int(resoffset))
-                    dct[1].append(int(dvoffset))
+            for color, cols in enumerate(itervalues(full_disjoint)):
+                tot_dv[color] = tot_dv_columns = []
+                for c in sorted(cols):
+                    dvoffset = c - start
+                    tot_dv_columns.append(dvoffset)
+                    for crow in rows[c]:
+                        res, startcol, endcol = res_offsets[crow]
+                        resoffset = crow - startcol
+                        dct = total_res_offsets[res][dv][color]
+                        # need to convert these to int to avoid error during JSON serialization
+                        dct[0].append(int(resoffset))
+                        dct[1].append(int(dvoffset))
+    else:  # global
+        full_disjoint, rows = _get_full_disjoint(J, 0, full_end)
+        for color, cols in enumerate(itervalues(full_disjoint)):
+            print("color", color, "cols", len(cols))
 
     prob.driver._simul_coloring_info = None
     prob.driver._res_jacs = {}
@@ -269,7 +290,7 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, show_jac=False, s
     """
     driver = problem.driver
 
-    dv_idxs, res_idxs, J = _find_disjoint(problem, mode=mode, tol=tol, repeats=repeats)
+    dv_idxs, res_idxs, J = _find_disjoint(problem, mode=mode, tol=tol, repeats=repeats, byvar=True)
     all_colors = set()
 
     simul_colorings = {}

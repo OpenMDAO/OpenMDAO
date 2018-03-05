@@ -42,6 +42,7 @@ ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 _contains_all = ContainsAll()
+_full_slice = slice(None)
 
 
 CITATION = """@inproceedings{2014_openmdao_derivs,
@@ -1598,6 +1599,94 @@ class Problem(object):
 
         return totals
 
+    def _compute_totals_new(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
+        """
+        Compute derivatives of desired quantities with respect to desired inputs.
+
+        Parameters
+        ----------
+        of : list of variable name strings or None
+            Variables whose derivatives will be computed. Default is None, which
+            uses the driver's objectives and constraints.
+        wrt : list of variable name strings or None
+            Variables with respect to which the derivatives will be computed.
+            Default is None, which uses the driver's desvars.
+        return_format : string
+            Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
+            Default is a 'flat_dict', which returns them in a dictionary whose keys are
+            tuples of form (of, wrt).
+        global_names : bool
+            Set to True when passing in global names to skip some translation steps.
+
+        Returns
+        -------
+        derivs : object
+            Derivatives in form requested by 'return_format'.
+        """
+        recording_iteration.stack.append(('_compute_totals', 0))
+        model = self.model
+        mode = self._mode
+        vec_dinput = model._vectors['input']
+        vec_doutput = model._vectors['output']
+        vec_dresid = model._vectors['residual']
+        nproc = self.comm.size
+        iproc = model.comm.rank
+        sizes = model._var_sizes['nonlinear']['output']
+        relevant = model._relevant
+        fwd = (mode == 'fwd')
+        prom2abs = model._var_allprocs_prom2abs_list['output']
+        abs2idx = model._var_allprocs_abs2idx['linear']
+
+        if wrt is None:
+            wrt = list(self.driver._designvars)
+            global_wrt = True
+        else:
+            global_wrt = global_names
+
+        if of is None:
+            of = list(self.driver._objs)
+            of.extend(self.driver._cons)
+            global_of = True
+        else:
+            global_of = global_names
+
+        # Prepare model for calculation by cleaning out the derivatives
+        # vectors.
+        matmat = False
+        for vec_name in model._lin_vec_names:
+            vec_dinput[vec_name].set_const(0.0)
+            vec_doutput[vec_name].set_const(0.0)
+            vec_dresid[vec_name].set_const(0.0)
+
+        # Convert of and wrt names from promoted to unpromoted
+        # (which is absolute path since we're at the top)
+        oldwrt, oldof = wrt, of
+        if not global_of:
+            of = [prom2abs[name][0] for name in oldof]
+        if not global_wrt:
+            wrt = [prom2abs[name][0] for name in oldwrt]
+
+        # create an array such that a given column index maps to a tuple of the
+        # form (name, start, end), providing the name and column range for the
+        # design variable corresponding to the indexed column.
+        dv_idx_map, total_dv_size = _create_idx_map(wrt, self.driver._designvars,
+                                                    model._var_allprocs_abs2meta,
+                                                    mode == 'fwd')
+        res_idx_map, total_res_size = _create_idx_map(of, self.driver._responses,
+                                                      model._var_allprocs_abs2meta,
+                                                      mode == 'rev')
+
+        # always allocate a 2D dense array and we can assign views to dict keys later if
+        # return format is 'dict' or 'flat_dict'.
+        J = np.zeros((total_res_size, total_dv_size))
+
+        # Linearize Model
+        model._linearize()
+
+
+
+
+
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
         Control printing for solvers and subsolvers in the model.
@@ -1619,6 +1708,48 @@ class Problem(object):
             self._solver_print_cache.append((level, depth, type_))
 
         self.model._set_solver_print(level=level, depth=depth, type_=type_)
+
+
+def _create_idx_map(names, vois, abs2meta, vois_are_inputs):
+    """
+    Create a list that maps a col or row index to a name, col/row range, and other data.
+
+    Parameters
+    ----------
+    names : iter of str
+        Names of the variables making up the rows or columns of the jacobian.
+    vois : dict
+        Mapping of variable of interest (desvar or response) name to its metadata.
+    abs2meta : dict
+        Mapping of variable name to its metadata.
+    vois_are_inputs : bool
+        If True, the given vois are 'inputs' based on the derivative direction, i.e., design vars
+        are inputs when direction is 'fwd' and reponses are inputs when direction is 'rev'.
+    """
+    idx_map = []
+    start = 0
+    end = -1
+    for name in names:
+        parallel_deriv_color = simul_coloring = None
+        use_rel_reduction = matmat = False
+
+        if name in vois:
+            meta = vois[name]
+            end += meta['size']
+            if vois_are_inputs:
+                parallel_deriv_color = meta['parallel_deriv_color']
+                simul_coloring = meta['simul_coloring']
+                matmat = meta['vectorize_derivs']
+        else:
+            end += abs2meta[name]['size']
+
+        tup = (start, end, name, parallel_deriv_color, simul_coloring, use_rel_reduction, matmat)
+        idx_map.extend([tup] * (end - start + 1))
+        start = end + 1
+
+    total_size = start
+
+    return idx_map, total_size
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
