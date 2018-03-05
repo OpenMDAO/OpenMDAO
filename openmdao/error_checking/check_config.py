@@ -11,21 +11,25 @@ import numpy as np
 
 from openmdao.core.group import Group
 from openmdao.core.component import Component
+from openmdao.core.implicitcomponent import ImplicitComponent
+from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.logger_utils import get_logger
+from openmdao.utils.class_util import overrides_method
 
 
-def _check_dataflow(group, logger):
+def _check_dataflow(group, infos, warnings):
     """
     Report any cycles and out of order Systems to the logger.
 
     Parameters
     ----------
     group : <Group>
-        The Group being checked for dataflow issues.
-
-    logger : object
-        The object that manages logging output.
+        The Group being checked for dataflow issues
+    infos : list
+        List to collect informational messages.
+    warnings : list
+        List to collect warning messages.
     """
     graph = group.compute_sys_graph(comps_only=False)
     sccs = get_sccs_topo(graph)
@@ -34,7 +38,7 @@ def _check_dataflow(group, logger):
     cycle_idxs = {}
 
     if cycles:
-        logger.info("Group '%s' has the following cycles: %s" % (group.pathname, cycles))
+        infos.append("   Group '%s' has the following cycles: %s\n" % (group.pathname, cycles))
         for i, cycle in enumerate(cycles):
             # keep track of cycles so we can detect when a system in
             # one cycle is out of order with a system in a different cycle.
@@ -55,9 +59,9 @@ def _check_dataflow(group, logger):
                 keep_srcs.append(src_system)
 
         if keep_srcs:
-            logger.warning("System '%s' executes out-of-order with "
-                           "respect to its source systems %s" %
-                           (tgt_system, sorted(keep_srcs)))
+            warnings.append("   System '%s' executes out-of-order with "
+                            "respect to its source systems %s\n" %
+                            (tgt_system, sorted(keep_srcs)))
 
 
 def _check_dataflow_prob(prob, logger):
@@ -72,8 +76,16 @@ def _check_dataflow_prob(prob, logger):
         The object that manages logging output.
 
     """
+    infos = ["The following groups contain cycles:\n"]
+    warnings = ["The following systems are executed out-of-order:\n"]
     for group in prob.model.system_iter(include_self=True, recurse=True, typ=Group):
-        _check_dataflow(group, logger)
+        _check_dataflow(group, infos, warnings)
+
+    if len(infos) > 1:
+        logger.info(''.join(infos[:1] + sorted(infos[1:])))
+
+    if len(warnings) > 1:
+        logger.warning(''.join(warnings[:1] + sorted(warnings[1:])))
 
 
 def _get_out_of_order_subs(group, input_srcs):
@@ -113,6 +125,41 @@ def _get_out_of_order_subs(group, input_srcs):
     return ubcs
 
 
+def _check_dup_comp_inputs(problem, logger):
+    """
+    Issue a logger warning if any components have multiple inputs that share the same source.
+
+    Parameters
+    ----------
+    problem : <Problem>
+        The problem being checked.
+    logger : object
+        The object that manages logging output.
+    """
+    input_srcs = problem.model._conn_global_abs_in2out
+    src2inps = defaultdict(list)
+    for inp, src in iteritems(input_srcs):
+        src2inps[src].append(inp)
+
+    msgs = []
+    for src, inps in iteritems(src2inps):
+        comps = defaultdict(list)
+        for inp in inps:
+            comp, vname = inp.rsplit('.', 1)
+            comps[comp].append(vname)
+
+        dups = sorted([(c, v) for c, v in iteritems(comps) if len(v) > 1], key=lambda x: x[0])
+        if dups:
+            for comp, vnames in dups:
+                msgs.append("   %s has inputs %s connected to %s\n" % (comp, sorted(vnames), src))
+
+    if msgs:
+        msg = ["The following components have multiple inputs connected to the same source, ",
+               "which can introduce unnecessary data transfer overhead:\n"]
+        msg += sorted(msgs)
+        logger.warning(''.join(msg))
+
+
 def _check_hanging_inputs(problem, logger):
     """
     Issue a logger warning if any inputs are not connected.
@@ -124,7 +171,7 @@ def _check_hanging_inputs(problem, logger):
     problem : <Problem>
         The problem being checked.
     logger : object
-        The object that managers logging output.
+        The object that manages logging output.
     """
     input_srcs = problem.model._conn_global_abs_in2out
 
@@ -155,10 +202,96 @@ def _check_system_configs(problem, logger):
     problem : <Problem>
         The problem being checked.
     logger : object
-        The object that managers logging output.
+        The object that manages logging output.
     """
     for system in problem.model.system_iter(include_self=True, recurse=True):
         system.check_config(logger)
+
+
+def _check_solvers(problem, logger):
+    """
+    Search over all solvers and raise an error for unsupported configurations.
+
+    Report any implicit component that does not implement solve_nonlinear and
+    solve_linear or have an iterative nonlinear and linear solver upstream of it.
+
+    Report any cycles that do not have an iterative nonlinear solver and either
+    an iterative linear solver or a DirectSolver upstream of it.
+
+    Parameters
+    ----------
+    problem : <Problem>
+        The problem being checked.
+    logger : object
+        The object that manages logging output.
+    """
+    iter_nl_depth = iter_ln_depth = np.inf
+
+    for sys in problem.model.system_iter(include_self=True, recurse=True):
+        path = sys.pathname
+        depth = 0 if path == '' else len(path.split('.'))
+
+        # if this system is below both a nonlinear and linear solver, then skip checks
+        if (depth > iter_nl_depth) and (depth > iter_ln_depth):
+            continue
+
+        # determine if this system is a group and has cycles
+        if isinstance(sys, Group):
+            graph = sys.compute_sys_graph(comps_only=False)
+            sccs = get_sccs_topo(graph)
+            sub2i = {sub.name: i for i, sub in enumerate(sys._subsystems_allprocs)}
+            has_cycles = [sorted(s, key=lambda n: sub2i[n]) for s in sccs if len(s) > 1]
+        else:
+            has_cycles = []
+
+        # determine if this system has states (is an implicit component)
+        has_states = isinstance(sys, ImplicitComponent)
+
+        # determine if this system has iterative solvers or implements the solve methods
+        # for handling cycles and implicit components
+        if depth > iter_nl_depth:
+            is_iter_nl = True
+        else:
+            is_iter_nl = (
+                (sys.nonlinear_solver and sys.nonlinear_solver.options['maxiter'] > 1) or
+                (has_states and overrides_method('solve_nonlinear', sys, ImplicitComponent))
+            )
+            iter_nl_depth = depth if is_iter_nl else np.inf
+
+        if depth > iter_ln_depth:
+            is_iter_ln = True
+        else:
+            is_iter_ln = (
+                (sys.linear_solver and (sys.linear_solver.options['maxiter'] > 1 or
+                 isinstance(sys.linear_solver, DirectSolver))) or
+                (has_states and overrides_method('solve_linear', sys, ImplicitComponent))
+            )
+            iter_ln_depth = depth if is_iter_ln else np.inf
+
+        # if there are cycles, then check for iterative nonlinear and linear solvers
+        if has_cycles:
+            if not is_iter_nl:
+                msg = ("Group '%s' contains cycles %s, but does not have an iterative "
+                       "nonlinear solver." % (path, has_cycles))
+                logger.warning(msg)
+            if not is_iter_ln:
+                msg = ("Group '%s' contains cycles %s, but does not have an iterative "
+                       "linear solver." % (path, has_cycles))
+                logger.warning(msg)
+
+        # if there are implicit components, check for iterative solvers or the appropriate
+        # solve methods
+        if has_states:
+            if not is_iter_nl:
+                msg = ("%s '%s' contains implicit variables, but does not have an "
+                       "iterative nonlinear solver and does not implement 'solve_nonlinear'." %
+                       (sys.__class__.__name__, path))
+                logger.warning(msg)
+            if not is_iter_ln:
+                msg = ("%s '%s' contains implicit variables, but does not have an "
+                       "iterative linear solver and does not implement 'solve_linear'." %
+                       (sys.__class__.__name__, path))
+                logger.warning(msg)
 
 
 # Dict of all checks by name, mapped to the corresponding function that performs the check
@@ -167,6 +300,8 @@ _checks = {
     'hanging_inputs': _check_hanging_inputs,
     'cycles': _check_dataflow_prob,
     'system': _check_system_configs,
+    'solvers': _check_solvers,
+    'dup_inputs': _check_dup_comp_inputs,
 }
 
 
@@ -186,10 +321,10 @@ def check_config(problem, logger=None):
     for c in sorted(_checks.keys()):
         _checks[c](problem, logger)
 
+
 #
 # Command line interface functions
 #
-
 
 def _check_config_setup_parser(parser):
     """

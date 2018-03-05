@@ -1,6 +1,7 @@
 """Define the LinearRunOnce class."""
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 
 
 class LinearRunOnce(LinearBlockGS):
@@ -37,6 +38,11 @@ class LinearRunOnce(LinearBlockGS):
         self._rel_systems = rel_systems
         system = self._system
 
+        if isinstance(system._jacobian, AssembledJacobian):
+            raise RuntimeError("A block linear solver '%s' is being used with "
+                               "an AssembledJacobian in system '%s'" %
+                               (self.SOLVER, self._system.pathname))
+
         # Pre-processing
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']
@@ -55,3 +61,12 @@ class LinearRunOnce(LinearBlockGS):
             rec.rel = 0.0
 
         return False, 0.0, 0.0
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        # changing the default maxiter from the base class
+        self.options.declare('maxiter', default=0, values=(0,),
+                             desc='maximum number of iterations '
+                                  '(this solver does not iterate)')

@@ -24,8 +24,9 @@ The Sellar Problem has two components with a cyclic dependency, so the appropria
 We'll use the :ref:`Newton <openmdao.solvers.nonlinear.newton.py>` nonlinear solver,
 which requires derivatives, so we'll also use the :ref:`Direct <openmdao.solvers.linear.direct.py>` linear solver.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.tests.test_solver_features.TestSolverFeatures.test_specify_solver
+    :layout: interleave
 
 ----
 
@@ -33,8 +34,9 @@ Some models have more complex coupling. There could be top-level cycles between 
 lower-level groups that have cycles of their own. The openmdao.test_suite.components.double_sellar.DoubleSellar (TODO: Link to problem page)
 is a simple example of this kind of model structure. In these problems, you might want to specify a more complex hierarchical solver structure for both nonlinear and linear solvers.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.tests.test_solver_features.TestSolverFeatures.test_specify_subgroup_solvers
+    :layout: interleave
 
 
 .. note::
@@ -52,5 +54,6 @@ You can also specify solvers as part of the initialization of a Group
 
 .. embed-code::
     openmdao.test_suite.components.double_sellar.DoubleSellar
+    :layout: interleave
 
 .. tags:: Solver

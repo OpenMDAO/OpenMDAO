@@ -18,9 +18,9 @@ system in the hierarchy takes precedence over all lower ones for any modificatio
 Here is a simple example where a lower system sets a solver, but we want to change it to a different one in the top-most
 system.
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_problem.TestProblem.test_feature_system_configure
-    :no-split:
+    :layout: code, output
 
 
 Uses of setup vs. configure

@@ -28,7 +28,7 @@ I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
 .PHONY: help clean html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest coverage gettext
 
 #first item in makefile is default action of "make"
-html-update: mock redbaron
+html-update: mock redbaron matplotlib
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS)  $(BUILDDIR)/html
 
 single:
@@ -50,7 +50,11 @@ redbaron:
 	@(python -c "import redbaron" >/dev/null 2>&1) || (echo "The 'redbaron' package \
 	is required to build the docs. Install with:\n pip install redbaron"; exit 1)
 
-all: mock redbaron
+matplotlib:
+	@(python -c "import matplotlib" >/dev/null 2>&1) || (echo "The 'matplotlib' package \
+	is required to build the docs. Install with:\n pip install matplotlib"; exit 1)
+
+all: mock redbaron matplotlib
 	# Cleaning up previously-generated files before docbuild
 	rm -rf _srcdocs/*
 

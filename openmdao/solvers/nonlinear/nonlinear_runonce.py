@@ -55,6 +55,15 @@ class NonlinearRunOnce(NonlinearSolver):
 
         return False, 0.0, 0.0
 
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        # changing the default maxiter from the base class
+        self.options.declare('maxiter', default=0, values=(0,),
+                             desc='maximum number of iterations '
+                                  '(this solver does not iterate)')
+
 
 class NonLinearRunOnce(NonlinearRunOnce):
     """

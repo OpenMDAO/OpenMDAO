@@ -214,8 +214,9 @@ To run the model, we provide values for the design variables and invoke `run_mod
 To find the optimal solution for the model, we invoke `run_driver`, where we have
 defined the driver of the problem to be the :ref:`ScipyOptimizeDriver <scipy_optimize_driver>`.
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.test_hohmann_transfer.TestHohmannTransfer.test_dv_at_apogee
+    :layout: interleave
 
 ~~~~~~~
 Summary

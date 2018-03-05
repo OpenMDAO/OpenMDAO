@@ -294,14 +294,14 @@ class TestPETScKrylov(unittest.TestCase):
         """solve an implicit system with KSP attached anywhere but the root"""
 
         p = Problem()
-        model = p.model = Group()
+        model = p.model
+
         dv = model.add_subsystem('des_vars', IndepVarComp())
         # just need a dummy variable so the sizes don't match between root and g1
         dv.add_output('dummy', val=1.0, shape=10)
 
         g1 = model.add_subsystem('g1', TestImplicitGroup(lnSolverClass=PETScKrylov))
 
-        p.model.linear_solver.options['maxiter'] = 1
         p.setup(vector_class=PETScVector, check=False)
 
         p.set_solver_print(level=0)

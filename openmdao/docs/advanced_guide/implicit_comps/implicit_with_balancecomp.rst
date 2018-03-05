@@ -50,9 +50,9 @@ Lastly, since we added an :ref:`ImplicitComponent <comp-type-3-implicitcomp>` at
     BalanceComp can handle more than just :math:`lhs-rhs=0`. It has a number of inputs that let you tweak that behavior.
     It can support multiple residuals and array variables as well. Check out the :ref:`documentation <balancecomp_feature>` on it for details.
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_voltage_source
-    :no-split:
+    :layout: code, output
 
 
 Understanding How Everything Is Connected in This Model

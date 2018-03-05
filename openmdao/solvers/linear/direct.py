@@ -28,7 +28,7 @@ def format_singluar_error(err, system, mtx):
     err : Exception
         Exception object
     system : <System>
-        OpenMDAO system containing the Directsolver.
+        System containing the Directsolver.
     mtx : ndarray
         Matrix of interest.
 
@@ -72,7 +72,7 @@ def format_singluar_csc_error(system, matrix):
     Parameters
     ----------
     system : <System>
-        OpenMDAO system containing the Directsolver.
+        System containing the Directsolver.
     matrix : ndarray
         Matrix of interest.
 
@@ -117,6 +117,11 @@ class DirectSolver(LinearSolver):
         """
         self.options.declare('err_on_singular', default=True,
                              desc="Raise an error if LU decomposition is singular.")
+
+        # changing the default maxiter from the base class
+        self.options.declare('maxiter', default=0, values=(0,),
+                             desc='maximum number of iterations '
+                                  '(this solver does not iterate)')
 
     def _linearize(self):
         """

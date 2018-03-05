@@ -18,8 +18,9 @@ Note that systems without cycles or implicit states will converge in one iterati
 
 Here, we calculate the total derivatives across the Sellar system.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.linear.tests.test_linear_block_gs.TestBGSSolverFeature.test_specify_solver
+    :layout: interleave
 
 
 LinearBlockGS Options
@@ -39,8 +40,9 @@ LinearBlockGS Option Examples
   cut it back from the default, ten, down to two, so that it terminates a few iterations earlier and doesn't
   reach either of the specified absolute or relative tolerances.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.linear.tests.test_linear_block_gs.TestBGSSolverFeature.test_feature_maxiter
+      :layout: interleave
 
 **atol**
 
@@ -48,8 +50,9 @@ LinearBlockGS Option Examples
   each iteration, the norm of the linear residuals is calculated by calling `apply_linear`. If this norm value is lower than the absolute
   tolerance `atol`, the iteration will terminate.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.linear.tests.test_linear_block_gs.TestBGSSolverFeature.test_feature_atol
+      :layout: interleave
 
 **rtol**
 
@@ -57,7 +60,8 @@ LinearBlockGS Option Examples
   each iteration, the norm of the linear residuals is calculated by calling `apply_linear`. If the ratio of the currently calculated norm to the
   initial residual norm is lower than the relative tolerance `rtol`, the iteration will terminate.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.linear.tests.test_linear_block_gs.TestBGSSolverFeature.test_feature_rtol
+      :layout: interleave
 
 .. tags:: Solver, LinearSolver
