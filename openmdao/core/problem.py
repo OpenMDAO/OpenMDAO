@@ -1471,15 +1471,13 @@ class Problem(object):
                         if simul is None:
                             if i >= len(idxs):
                                 idx = idxs[-1]  # reuse the last index
-                                delta_loc_idx = 0  # don't increment local_idx
                             else:
                                 idx = idxs[i]
-                                delta_loc_idx = 1
-                            # totals to zeros instead of None in those cases when none
-                            # of the specified indices are within the range of interest
-                            # for this proc.
-                            if store:
-                                loc_idx_dict[input_name] += delta_loc_idx
+                                # totals to zeros instead of None in those cases when none
+                                # of the specified indices are within the range of interest
+                                # for this proc.
+                                if store:
+                                    loc_idx_dict[input_name] += 1
                             loc_idx = loc_idx_dict[input_name]
                         else:
                             idx = loc_idx = i
@@ -1634,9 +1632,11 @@ class Problem(object):
         fwd = (mode == 'fwd')
         prom2abs = model._var_allprocs_prom2abs_list['output']
         abs2idx = model._var_allprocs_abs2idx['linear']
+        design_vars = self.driver._designvars
+        responses = self.driver._responses
 
         if wrt is None:
-            wrt = list(self.driver._designvars)
+            wrt = list(design_vars)
             global_wrt = True
         else:
             global_wrt = global_names
@@ -1667,21 +1667,117 @@ class Problem(object):
         # create an array such that a given column index maps to a tuple of the
         # form (name, start, end, meta), providing the name and range for the
         # voi corresponding to the indexed column or row.
-        dv_idx_map, total_dv_size = _create_idx_map(wrt, self.driver._designvars,
-                                                    model._var_allprocs_abs2meta, fwd)
-        res_idx_map, total_res_size = _create_idx_map(of, self.driver._responses,
-                                                      model._var_allprocs_abs2meta, not fwd)
+        dv_idx_map = self._create_idx_map(wrt, design_vars, model._var_allprocs_abs2meta, fwd)
+        res_idx_map = self._create_idx_map(of, self.driver._responses,
+                                           model._var_allprocs_abs2meta, not fwd)
+
+        # always allocate a 2D dense array and we can assign views to dict keys later if
+        # return format is 'dict' or 'flat_dict'.
+        J = np.zeros((len(res_idx_map), len(dv_idx_map)))
 
         # Linearize Model
         model._linearize()
 
-        # always allocate a 2D dense array and we can assign views to dict keys later if
-        # return format is 'dict' or 'flat_dict'.
-        J = np.zeros((total_res_size, total_dv_size))
+        if fwd:
+            input_idx_map = dv_idx_map
+            output_idx_map = res_idx_map
+            names, meta = wrt, design_vars
+        else:  # rev
+            input_idx_map = res_idx_map
+            output_idx_map = dv_idx_map
+            name, meta = of, responses
 
+        # if not all inputs are VOIs, then this is a test where most likely
+        # design vars, constraints, and objectives were not specified, so
+        # don't do relevance checking (because we only want to analyze the
+        # dependency graph for VOIs rather than for every input/output
+        # in the model)
+        use_rel_reduction = True
+        for name in names:
+            if name not in meta:
+                use_rel_reduction = False
+                break
 
+        for i, tup in enumerate(input_idx_map):
+            input_name, start, end, meta, abs2meta = tup
 
+    def _create_idx_map(self, names, vois, abs2meta, vois_are_inputs):
+        """
+        Create a list that maps a col or row index to a name, col/row range, and other data.
 
+        Parameters
+        ----------
+        names : iter of str
+            Names of the variables making up the rows or columns of the jacobian.
+        vois : dict
+            Mapping of variable of interest (desvar or response) name to its metadata.
+        abs2meta : dict
+            Mapping of variable name to its metadata.
+        vois_are_inputs : bool
+            If True, the given names are input vois (design vars in fwd mode, responses in rev).
+
+        Returns
+        -------
+        list
+            List of (name, start, end, rhsname, meta, abs2meta) tuples.
+        """
+        idx_map = []
+        start = 0
+        end = -1
+
+        for name in names:
+            rhsname = 'linear'
+            if name in vois:
+                meta = vois[name]
+                end += meta['size']
+                if vois_are_inputs:
+                    parallel_deriv_color = meta['parallel_deriv_color']
+                    matmat = meta['vectorize_derivs']
+                    simul_coloring = meta['simul_deriv_color']
+                    self._check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring)
+                    if matmat or parallel_deriv_color:
+                        rhsname = name
+            else:
+                end += abs2meta[name]['size']
+                meta = None
+
+            tup = (name, start, end, rhsname, meta, abs2meta)
+            # duplicate the tuple (end - start + 1) times
+            idx_map.extend([tup] * (end - start + 1))
+            start = end + 1
+
+        return idx_map
+
+    def _check_voi_meta(self, name, parallel_deriv_color, matmat, simul_coloring):
+        """
+        Check the contents of the given metadata for incompatible options.
+
+        An exception will be raised if options are incompatible.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        parallel_deriv_color : str
+            Color of parallel deriv grouping.
+        matmat : bool
+            If True, vectorize derivatives for this variable.
+        simul_coloring : ndarray
+            Array of colors. Each entry corresponds to a column or row of the total jacobian.
+        """
+        if len(self.driver._simul_coloring_info) == 3:  # global coloring
+            if simul_coloring is not None or parallel_deriv_color is not None or matmat:
+                raise RuntimeError("Global coloring is active, so variable '%s' cannot use "
+                                   "per-variable coloring, parallel derivatives, or vectorized "
+                                   "derivatives." % name)
+
+        if simul_coloring is not None:
+            if parallel_deriv_color:
+                raise RuntimeError("Using both simul_coloring and parallel_deriv_color with "
+                                   "variable '%s' is not supported." % name)
+            if matmat:
+                raise RuntimeError("Using both simul_coloring and vectorize_derivs with "
+                                   "variable '%s' is not supported." % name)
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
@@ -1704,44 +1800,6 @@ class Problem(object):
             self._solver_print_cache.append((level, depth, type_))
 
         self.model._set_solver_print(level=level, depth=depth, type_=type_)
-
-
-def _create_idx_map(names, vois, abs2meta):
-    """
-    Create a list that maps a col or row index to a name, col/row range, and other data.
-
-    Parameters
-    ----------
-    names : iter of str
-        Names of the variables making up the rows or columns of the jacobian.
-    vois : dict
-        Mapping of variable of interest (desvar or response) name to its metadata.
-    abs2meta : dict
-        Mapping of variable name to its metadata.
-
-    Returns
-    -------
-    (list, int)
-        List of (name, start, end, meta, abs2meta) tuples, and the total number of rows or columns.
-    """
-    idx_map = []
-    start = 0
-    end = -1
-    for name in names:
-        if name in vois:
-            meta = vois[name]
-            end += meta['size']
-        else:
-            end += abs2meta[name]['size']
-            meta = None
-
-        tup = (name, start, end, meta, abs2meta)
-        idx_map.extend([tup] * (end - start + 1))
-        start = end + 1
-
-    total_size = start
-
-    return idx_map, total_size
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
