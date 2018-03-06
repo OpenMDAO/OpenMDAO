@@ -87,6 +87,7 @@ class _SubjacRandomizer(object):
 
         self._orig_set_abs(key, subjac)
 
+
 def _get_full_disjoint(J, start, end):
     """
     Find sets of disjoint columns between start and end in J and their corresponding rows.
@@ -134,6 +135,7 @@ def _get_full_disjoint(J, start, end):
                 allrows[col] |= J[:, other_col]
 
     return full_disjoint, rows
+
 
 def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30, byvar=True):
     """

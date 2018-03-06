@@ -1493,11 +1493,10 @@ class Problem(object):
                         if use_rel_reduction and output_name not in relevant[input_name]:
                             # irrelevant output, just give zeros
                             if out_idxs is None:
-                                out_var_idx = abs2idx[output_name]
                                 if output_name in remote_outputs:
                                     _, sz = remote_outputs[output_name]
                                 else:
-                                    sz = sizes[iproc, out_var_idx]
+                                    sz = sizes[iproc, abs2idx[output_name]]
                                 if ncol > 1:
                                     deriv_val = np.zeros((sz, ncol))
                                 else:
@@ -1519,13 +1518,12 @@ class Problem(object):
                                     deriv_val = deriv_val[out_idxs]
 
                             if dup and nproc > 1:
-                                out_var_idx = abs2idx[output_name]
                                 root = owning_ranks[output_name]
                                 if deriv_val is None:
                                     if out_idxs is not None:
                                         sz = size
                                     else:
-                                        sz = sizes[root, out_var_idx]
+                                        sz = sizes[root, abs2idx[output_name]]
                                     if ncol > 1:
                                         deriv_val = np.empty((sz, ncol))
                                     else:
