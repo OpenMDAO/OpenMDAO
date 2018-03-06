@@ -87,6 +87,9 @@ class MultipointBeamGroup(Group):
         comp = LocalStiffnessMatrixComp(num_elements=num_elements, E=E, L=L)
         self.add_subsystem('local_stiffness_matrix_comp', comp)
 
+        comp = GlobalStiffnessMatrixComp(num_elements=num_elements)
+        self.add_subsystem('global_stiffness_matrix_comp', comp)
+
         # Parallel Subsystem for load cases.
         par = self.add_subsystem('parallel', ParallelGroup())
 
@@ -113,10 +116,8 @@ class MultipointBeamGroup(Group):
                 f = - np.sin(x)
                 force_vector[0:-1:2, i] = f
 
-            comp = GlobalStiffnessMatrixComp(num_elements=num_elements)
-            sub.add_subsystem('global_stiffness_matrix_comp', comp)
-
-            comp = MultiStatesComp(num_elements=num_elements, force_vector=force_vector, num_rhs=num_rhs)
+            comp = MultiStatesComp(num_elements=num_elements, force_vector=force_vector,
+                                   num_rhs=num_rhs)
             sub.add_subsystem('states_comp', comp)
 
             comp = MultiDisplacementsComp(num_elements=num_elements, num_rhs=num_rhs)
@@ -127,12 +128,8 @@ class MultipointBeamGroup(Group):
             sub.add_subsystem('compliance_comp', comp)
 
             self.connect(
-                'local_stiffness_matrix_comp.K_local',
-                'parallel.%s.global_stiffness_matrix_comp.K_local' % name)
-
-            sub.connect(
                 'global_stiffness_matrix_comp.K',
-                'states_comp.K')
+                'parallel.%s.states_comp.K' % name)
 
             for k in range(num_rhs):
                 sub.connect(
@@ -156,7 +153,12 @@ class MultipointBeamGroup(Group):
         self.connect('inputs_comp.h_cp', 'interp.h_cp')
         self.connect('interp.h', 'I_comp.h')
         self.connect('I_comp.I', 'local_stiffness_matrix_comp.I')
-        self.connect('interp.h', 'volume_comp.h')
+        self.connect(
+            'local_stiffness_matrix_comp.K_local',
+            'global_stiffness_matrix_comp.K_local')
+        self.connect(
+            'interp.h',
+            'volume_comp.h')
 
         self.add_design_var('inputs_comp.h_cp', lower=1e-2, upper=10.)
         self.add_constraint('volume_comp.volume', equals=volume)
