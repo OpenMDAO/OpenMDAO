@@ -1678,6 +1678,9 @@ class Problem(object):
         # Linearize Model
         model._linearize()
 
+        if len(self.driver._simul_coloring_info) == 3:  # global coloring
+            input_entry_groups, output_entry_groups, _ = self.driver._simul_coloring_info
+
         if fwd:
             input_idx_map = dv_idx_map
             output_idx_map = res_idx_map

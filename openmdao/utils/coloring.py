@@ -239,7 +239,65 @@ def _compute_ranges(names, vois):
     return ranges
 
 
-def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30, byvar=True):
+def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30,):
+    """
+    Find sets of disjoint columns by variable in the total jac and their corresponding rows.
+
+    Parameters
+    ----------
+    prob : Problem
+        The Problem being analyzed.
+    mode : str
+        Derivative direction.
+    repeats : int
+        Number of times to repeat total jacobian computation.
+    tol : float
+        Tolerance on values in jacobian.  Anything smaller in magnitude will be
+        set to 0.0.
+
+    Returns
+    -------
+    tuple
+        Tuple of the form (total_dv_offsets, total_res_offsets, final_jac)
+    """
+    # TODO: fix this to work in rev mode as well
+    assert mode == 'fwd', "Only fwd mode is supported."
+
+    J = _get_bool_jac(prob, mode=mode, repeats=repeats, tol=tol)
+
+    # find column and row ranges (inclusive) for dvs and responses respectively
+    dv_offsets = _compute_ranges(wrt, prob.driver._designvars)
+    res_offsets = _compute_ranges(of, prob.driver._responses)
+
+    total_dv_offsets = OrderedDict()
+    total_res_offsets = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [[], []])))
+
+    # loop over each desvar and find disjoint column sets for all columns of that desvar
+    for start, end, dv in dv_offsets:
+        full_disjoint, rows = _get_full_disjoint(J, start, end)
+
+        total_dv_offsets[dv] = tot_dv = OrderedDict()
+
+        for color, cols in enumerate(itervalues(full_disjoint)):
+            tot_dv[color] = tot_dv_columns = []
+            for c in sorted(cols):
+                dvoffset = c - start
+                tot_dv_columns.append(dvoffset)
+                for crow in rows[c]:
+                    startcol, endcol, res = res_offsets[crow]
+                    resoffset = crow - startcol
+                    dct = total_res_offsets[res][dv][color]
+                    # need to convert these to int to avoid error during JSON serialization
+                    dct[0].append(int(resoffset))
+                    dct[1].append(int(dvoffset))
+
+    prob.driver._simul_coloring_info = None
+    prob.driver._res_jacs = {}
+
+    return total_dv_offsets, total_res_offsets, J
+
+
+def _find_global_disjoint(prob, mode='fwd', repeats=1, tol=1e-30,):
     """
     Find sets of disjoint columns in the total jac and their corresponding rows.
 
@@ -254,52 +312,27 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30, byvar=True):
     tol : float
         Tolerance on values in jacobian.  Anything smaller in magnitude will be
         set to 0.0.
-    byvar : bool
-        If True, find disjoint column sets per design variable instead of for the
-        entire jacobian.
 
     Returns
     -------
     tuple
-        Tuple of the form (total_dv_offsets, total_res_offsets, final_jac)
+        Tuple of the form (disjoint_col_sets, rows_per_col)
     """
+    # TODO: fix this to work in rev mode as well
+    assert mode == 'fwd', "Only fwd mode is supported."
+
     J = _get_bool_jac(prob, mode=mode, repeats=repeats, tol=tol)
 
     # find column and row ranges (inclusive) for dvs and responses respectively
-    dv_offsets = _compute_ranges(wrt, prob.driver._designvars)
-    res_offsets = _compute_ranges(of, prob.driver._responses)
+    dv_ranges = _compute_ranges(wrt, prob.driver._designvars)
+    res_ranges = _compute_ranges(of, prob.driver._responses)
 
-    total_dv_offsets = OrderedDict()
-    total_res_offsets = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [[], []])))
+    full_disjoint, rows = _get_full_disjoint(J, 0, len(dv_ranges))
 
-    if byvar:
-        # loop over each desvar and find disjoint column sets for all columns of that desvar
-        for start, end, dv in dv_offsets:
-            full_disjoint, rows = _get_full_disjoint(J, start, end)
+    for color, cols in enumerate(itervalues(full_disjoint)):
+        print("color", color, "cols", len(cols))
 
-            total_dv_offsets[dv] = tot_dv = OrderedDict()
-
-            for color, cols in enumerate(itervalues(full_disjoint)):
-                tot_dv[color] = tot_dv_columns = []
-                for c in sorted(cols):
-                    dvoffset = c - start
-                    tot_dv_columns.append(dvoffset)
-                    for crow in rows[c]:
-                        startcol, endcol, res = res_offsets[crow]
-                        resoffset = crow - startcol
-                        dct = total_res_offsets[res][dv][color]
-                        # need to convert these to int to avoid error during JSON serialization
-                        dct[0].append(int(resoffset))
-                        dct[1].append(int(dvoffset))
-    else:  # global
-        full_disjoint, rows = _get_full_disjoint(J, 0, len(dv_offsets))
-        for color, cols in enumerate(itervalues(full_disjoint)):
-            print("color", color, "cols", len(cols))
-
-    prob.driver._simul_coloring_info = None
-    prob.driver._res_jacs = {}
-
-    return total_dv_offsets, total_res_offsets, J
+    return full_disjoint, rows, J
 
 
 def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, show_jac=False, stream=sys.stdout):
@@ -330,7 +363,7 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, show_jac=False, s
     """
     driver = problem.driver
 
-    dv_idxs, res_idxs, J = _find_disjoint(problem, mode=mode, tol=tol, repeats=repeats, byvar=True)
+    dv_idxs, res_idxs, J = _find_disjoint(problem, mode=mode, tol=tol, repeats=repeats)
     all_colors = set()
 
     simul_colorings = {}
