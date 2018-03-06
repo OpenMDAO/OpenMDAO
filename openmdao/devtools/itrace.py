@@ -20,7 +20,7 @@ except ImportError:
 from openmdao.devtools.iprof_utils import _create_profile_callback, find_qualified_name, \
                                          func_group, _collect_methods, _Options, _setup_func_group,\
                                          _get_methods
-from openmdao.devtools.debug import mem_usage
+from openmdao.devtools.memory import mem_usage
 
 _trace_calls = None  # pointer to function that implements the trace
 _registered = False  # prevents multiple atexit registrations
