@@ -21,8 +21,11 @@ try:
         total = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / denom
         total += resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / denom
         return total
+
 except ImportError:
     resource = None
+    def max_mem_usage(fn):
+        raise RuntimeError("The 'max_mem_usage' function requires the 'resource' package.")
 
 try:
     import psutil
@@ -61,5 +64,39 @@ try:
                       (fn.__name__, diff * 1024., maxmem))
             return ret
         return wrapper
+
 except ImportError:
-    mem_usage = diff_mem = None
+    psutil = None
+    def mem_usage(fn):
+        raise RuntimeError("The 'mem_usage' function requires the 'psutil' package.  You can "
+                           "install it using 'pip install psutil'.")
+    def diff_mem(fn):
+        raise RuntimeError("The 'diff_mem' function requires the 'psutil' package.  You can "
+                           "install it using 'pip install psutil'.")
+
+
+try:
+    import objgraph
+
+    def new_objects(fn):
+        """
+        This performs garbage collection before and after the function call and prints any
+        new objects that have not been garbage collected after the function returns.  This
+        MAY indicate a memory leak, but not necessarily.
+        """
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            start_objs = objgraph.typestats()
+            start_objs['frame'] += 1
+            start_objs['cell'] += 1
+            ret = fn(*args, **kwargs)
+            for obj, _, delta_objs in objgraph.growth(peak_stats=start_objs):
+                print(str(fn), "added %s %+d" % (obj, delta_objs))
+            return ret
+        return wrapper
+
+except ImportError:
+    objgraph = None
+    def new_objects(fn):
+        raise RuntimeError("The 'new_objects' decorator requires the 'objgraph' package.  You can "
+                           "install it using 'pip install objgraph'.")

@@ -16,6 +16,10 @@ try:
     import objgraph
 except ImportError:
     objgraph = None
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 from openmdao.devtools.iprof_utils import _create_profile_callback, find_qualified_name, \
                                          func_group, _collect_methods, _Options, _setup_func_group,\
@@ -187,7 +191,7 @@ def _setup(options):
             do_ret = None
 
         if memory:
-            if mem_usage is None:
+            if psutil is None:
                 raise RuntimeError("Memory tracing requires the 'psutil' package.  "
                                    "Install it using 'pip install psutil'.")
             memory = []
