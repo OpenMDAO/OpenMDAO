@@ -18,7 +18,6 @@ from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.recorders.recording_iteration_stack import Recording
 
-from openmdao.devtools.memory import new_objects
 
 def format_singluar_error(err, system, mtx):
     """
@@ -124,7 +123,6 @@ class DirectSolver(LinearSolver):
                              desc='maximum number of iterations '
                                   '(this solver does not iterate)')
 
-    @new_objects
     def _linearize(self):
         """
         Perform factorization.
