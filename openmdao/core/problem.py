@@ -1706,7 +1706,7 @@ class Problem(object):
         self.model._set_solver_print(level=level, depth=depth, type_=type_)
 
 
-def _create_idx_map(names, vois, abs2meta, vois_are_inputs):
+def _create_idx_map(names, vois, abs2meta):
     """
     Create a list that maps a col or row index to a name, col/row range, and other data.
 
@@ -1718,9 +1718,11 @@ def _create_idx_map(names, vois, abs2meta, vois_are_inputs):
         Mapping of variable of interest (desvar or response) name to its metadata.
     abs2meta : dict
         Mapping of variable name to its metadata.
-    vois_are_inputs : bool
-        If True, the given vois are 'inputs' based on the derivative direction, i.e., design vars
-        are inputs when direction is 'fwd' and reponses are inputs when direction is 'rev'.
+
+    Returns
+    -------
+    (list, int)
+        List of (name, start, end, meta, abs2meta) tuples, and the total number of rows or columns.
     """
     idx_map = []
     start = 0
@@ -1729,15 +1731,11 @@ def _create_idx_map(names, vois, abs2meta, vois_are_inputs):
         if name in vois:
             meta = vois[name]
             end += meta['size']
-            if vois_are_inputs:
-                parallel_deriv_color = meta['parallel_deriv_color']
-                simul_coloring = meta['simul_coloring']
-                matmat = meta['vectorize_derivs']
         else:
             end += abs2meta[name]['size']
             meta = None
 
-        tup = (start, end, name, meta)
+        tup = (name, start, end, meta, abs2meta)
         idx_map.extend([tup] * (end - start + 1))
         start = end + 1
 

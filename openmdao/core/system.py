@@ -1080,7 +1080,7 @@ class System(object):
                 self._var_relevant_names[vec_name][type_].extend(
                     v for v in self._var_abs_names[type_] if v in rel[type_])
 
-        self._rel_vec_names = set(self._rel_vec_name_list)
+        self._rel_vec_names = frozenset(self._rel_vec_name_list)
         self._lin_rel_vec_name_list = self._rel_vec_name_list[1:]
 
         for s in self._subsystems_myproc:

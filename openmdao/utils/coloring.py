@@ -100,6 +100,11 @@ def _get_full_disjoint(J, start, end):
         The starting column.
     end : int
         The ending column.
+
+    Returns
+    -------
+    (OrderedDict, dict)
+        Dict of disjoint columns keyed to column and dict of nonzero rows keyed to column.
     """
     # skip desvars of size 1 since simul derivs will give no improvement
     if (end - start) == 0:
@@ -137,9 +142,9 @@ def _get_full_disjoint(J, start, end):
     return full_disjoint, rows
 
 
-def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30, byvar=True):
+def _get_bool_jac(prob, mode='fwd', repeats=1, tol=1e-30, byvar=True):
     """
-    Find sets of disjoint columns in the total jac and their corresponding rows.
+    Return a boolean version of the total jacobian.
 
     Parameters
     ----------
@@ -152,14 +157,11 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30, byvar=True):
     tol : float
         Tolerance on values in jacobian.  Anything smaller in magnitude will be
         set to 0.0.
-    byvar : bool
-        If True, find disjoint column sets per design variable instead of for the
-        entire jacobian.
 
     Returns
     -------
-    tuple
-        Tuple of the form (total_dv_offsets, total_res_offsets, final_jac)
+    ndarray
+        A boolean composite of 'repeats' total jacobians.
     """
     # TODO: fix this to work in rev mode as well
     assert mode == 'fwd', "Only fwd mode is supported."
@@ -186,9 +188,7 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30, byvar=True):
 
     # remove linear constraints from consideration
     of = list(prob.driver._objs)
-    for n, meta in iteritems(prob.driver._cons):
-        if not ('linear' in meta and meta['linear']):
-            of.append(n)
+    of.extend(n for n, m in iteritems(prob.driver._cons) if not ('linear' in m and m['linear']))
 
     if not of or not wrt:
         raise RuntimeError("Sparsity structure cannot be computed without declaration of design "
@@ -208,28 +208,66 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30, byvar=True):
     boolJ = np.zeros(fullJ.shape, dtype=bool)
     boolJ[fullJ > tol] = True
 
-    J = boolJ
+    return boolJ
+
+
+def _compute_ranges(names, vois):
+    """
+    Get a list of varible ranges with one entry per row or column in the jacobian.
+
+    Parameters
+    ----------
+    names : iter of str
+        Names of vois.
+    vois : dict
+        Metadata of vois.
+
+    Returns
+    -------
+    list
+        List of size total_voi_size containing tuples of the form (start, end, name).
+    """
+    ranges = []
+    start = 0
+    end = -1
+    for name in names:
+        end += vois[name]['size']
+        tup = (start, end, name)
+        ranges.extend([tup] * (end - start + 1))
+        start = end + 1
+
+    return ranges
+
+
+def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30, byvar=True):
+    """
+    Find sets of disjoint columns in the total jac and their corresponding rows.
+
+    Parameters
+    ----------
+    prob : Problem
+        The Problem being analyzed.
+    mode : str
+        Derivative direction.
+    repeats : int
+        Number of times to repeat total jacobian computation.
+    tol : float
+        Tolerance on values in jacobian.  Anything smaller in magnitude will be
+        set to 0.0.
+    byvar : bool
+        If True, find disjoint column sets per design variable instead of for the
+        entire jacobian.
+
+    Returns
+    -------
+    tuple
+        Tuple of the form (total_dv_offsets, total_res_offsets, final_jac)
+    """
+    J = _get_bool_jac(prob, mode=mode, repeats=repeats, tol=tol)
 
     # find column and row ranges (inclusive) for dvs and responses respectively
-    dv_offsets = []
-    start = 0
-    end = -1
-    for name in wrt:
-        end += prob.driver._designvars[name]['size']
-        tup = (start, end, name)
-        dv_offsets.extend([tup] * (end - start + 1))
-        start = end + 1
-
-    full_end = end
-
-    res_offsets = []
-    start = 0
-    end = -1
-    for name in of:
-        end += responses[name]['size']
-        tup = (start, end, name)
-        res_offsets.extend([tup] * (end - start + 1))
-        start = end + 1
+    dv_offsets = _compute_ranges(wrt, prob.driver._designvars)
+    res_offsets = _compute_ranges(of, prob.driver._responses)
 
     total_dv_offsets = OrderedDict()
     total_res_offsets = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [[], []])))
@@ -247,14 +285,14 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30, byvar=True):
                     dvoffset = c - start
                     tot_dv_columns.append(dvoffset)
                     for crow in rows[c]:
-                        res, startcol, endcol = res_offsets[crow]
+                        startcol, endcol, res = res_offsets[crow]
                         resoffset = crow - startcol
                         dct = total_res_offsets[res][dv][color]
                         # need to convert these to int to avoid error during JSON serialization
                         dct[0].append(int(resoffset))
                         dct[1].append(int(dvoffset))
     else:  # global
-        full_disjoint, rows = _get_full_disjoint(J, 0, full_end)
+        full_disjoint, rows = _get_full_disjoint(J, 0, len(dv_offsets))
         for color, cols in enumerate(itervalues(full_disjoint)):
             print("color", color, "cols", len(cols))
 
