@@ -1665,14 +1665,12 @@ class Problem(object):
             wrt = [prom2abs[name][0] for name in oldwrt]
 
         # create an array such that a given column index maps to a tuple of the
-        # form (name, start, end), providing the name and column range for the
-        # design variable corresponding to the indexed column.
+        # form (name, start, end, meta), providing the name and range for the
+        # voi corresponding to the indexed column or row.
         dv_idx_map, total_dv_size = _create_idx_map(wrt, self.driver._designvars,
-                                                    model._var_allprocs_abs2meta,
-                                                    mode == 'fwd')
+                                                    model._var_allprocs_abs2meta, fwd)
         res_idx_map, total_res_size = _create_idx_map(of, self.driver._responses,
-                                                      model._var_allprocs_abs2meta,
-                                                      mode == 'rev')
+                                                      model._var_allprocs_abs2meta, not fwd)
 
         # Linearize Model
         model._linearize()
