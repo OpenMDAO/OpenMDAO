@@ -1676,12 +1676,12 @@ class Problem(object):
                                                       model._var_allprocs_abs2meta,
                                                       mode == 'rev')
 
+        # Linearize Model
+        model._linearize()
+
         # always allocate a 2D dense array and we can assign views to dict keys later if
         # return format is 'dict' or 'flat_dict'.
         J = np.zeros((total_res_size, total_dv_size))
-
-        # Linearize Model
-        model._linearize()
 
 
 
@@ -1730,9 +1730,6 @@ def _create_idx_map(names, vois, abs2meta, vois_are_inputs):
     start = 0
     end = -1
     for name in names:
-        parallel_deriv_color = simul_coloring = None
-        use_rel_reduction = matmat = False
-
         if name in vois:
             meta = vois[name]
             end += meta['size']
@@ -1742,8 +1739,9 @@ def _create_idx_map(names, vois, abs2meta, vois_are_inputs):
                 matmat = meta['vectorize_derivs']
         else:
             end += abs2meta[name]['size']
+            meta = None
 
-        tup = (start, end, name, parallel_deriv_color, simul_coloring, use_rel_reduction, matmat)
+        tup = (start, end, name, meta)
         idx_map.extend([tup] * (end - start + 1))
         start = end + 1
 
