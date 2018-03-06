@@ -3,6 +3,7 @@
 from __future__ import division, print_function
 
 import sys
+from copy import deepcopy
 
 from collections import OrderedDict, defaultdict, namedtuple
 from itertools import product
@@ -85,6 +86,8 @@ class Problem(object):
         0 -- Newly initialized problem or newly added model.
         1 -- The `setup` method has been called, but vectors not initialized.
         2 -- The `final_setup` has been run, everything ready to run.
+    _lin_sol_cache : dict
+        Dict of indices keyed to solution vectors
     cite : str
         Listing of relevant citataions that should be referenced when
         publishing work that uses this class.
@@ -147,6 +150,8 @@ class Problem(object):
         # 1 -- The `setup` method has been called, but vectors not initialized.
         # 2 -- The `final_setup` has been run, everything ready to run.
         self._setup_status = 0
+
+        self._lin_sol_cache = {}
 
     def __getitem__(self, name):
         """
@@ -455,6 +460,20 @@ class Problem(object):
         if Problem._post_setup_func is not None:
             Problem._post_setup_func(self)
 
+    def _all_components_provide_jacobians(self):
+        """
+        Are all components providing jacobians.
+
+        Returns
+        -------
+        boolean
+            True if all Components use jacobian-free linear operators; False otherwise.
+        """
+        for comp in self.model.system_iter(typ=Component, include_self=True):
+            if comp.matrix_free:
+                return False
+        return True
+
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6,
                        method='fd', step=None, form=DEFAULT_FD_OPTIONS['form'],
@@ -530,7 +549,6 @@ class Problem(object):
                 raise ValueError(msg)
             comps = [model._get_subsystem(c_name) for c_name in comps]
 
-        current_mode = self._mode
         self.set_solver_print(level=0)
 
         # This is a defaultdict of (defaultdict of dicts).
@@ -805,7 +823,8 @@ class Problem(object):
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, all_fd_options,
-                                  suppress_output=suppress_output, indep_key=indep_key)
+                                  suppress_output=suppress_output, indep_key=indep_key,
+                                  all_comps_provide_jacs=self._all_components_provide_jacobians())
 
         return partials_data
 
@@ -1099,7 +1118,7 @@ class Problem(object):
         iproc = model.comm.rank
 
         for vois in itervalues(voi_lists):
-            for input_name, old_input_name, _, _, _ in vois:
+            for input_name, old_input_name, _, _, _, _ in vois:
                 vecname = inp2rhs_name[input_name]
                 if vecname not in input_vec:
                     continue
@@ -1200,9 +1219,16 @@ class Problem(object):
 
         if wrt is None:
             wrt = list(self.driver._designvars)
+            global_wrt = True
+        else:
+            global_wrt = global_names
+
         if of is None:
             of = list(self.driver._objs)
             of.extend(self.driver._cons)
+            global_of = True
+        else:
+            global_of = global_names
 
         # A number of features will need to be supported here as development
         # goes forward.
@@ -1243,8 +1269,9 @@ class Problem(object):
         # Convert of and wrt names from promoted to unpromoted
         # (which is absolute path since we're at the top)
         oldwrt, oldof = wrt, of
-        if not global_names:
+        if not global_of:
             of = [prom2abs[name][0] for name in oldof]
+        if not global_wrt:
             wrt = [prom2abs[name][0] for name in oldwrt]
 
         owning_ranks = self.model._owning_rank['output']
@@ -1300,10 +1327,12 @@ class Problem(object):
                 parallel_deriv_color = meta['parallel_deriv_color']
                 simul_coloring = meta['simul_deriv_color']
                 matmat = meta['vectorize_derivs']
+                cache = meta['cache_linear_solution']
             else:
                 parallel_deriv_color = simul_coloring = None
                 use_rel_reduction = False
                 matmat = False
+                cache = False
 
             if simul_coloring is not None:
                 if parallel_deriv_color:
@@ -1322,14 +1351,14 @@ class Problem(object):
                     # can be either promoted or absolute depending on the value
                     # of the 'global_names' flag.
                     voi_lists[name] = [(name, old_input_list[i], parallel_deriv_color, matmat,
-                                        simul_coloring)]
+                                        simul_coloring, cache)]
                     inp2rhs_name[name] = name if matmat else 'linear'
             else:
                 if parallel_deriv_color not in voi_lists:
                     voi_lists[parallel_deriv_color] = []
                 voi_lists[parallel_deriv_color].append((name, old_input_list[i],
                                                         parallel_deriv_color, matmat,
-                                                        simul_coloring))
+                                                        simul_coloring, cache))
                 inp2rhs_name[name] = name
 
         lin_vec_names = sorted(set(inp2rhs_name.values()))
@@ -1340,17 +1369,18 @@ class Problem(object):
             # If Forward mode, solve linear system for each 'wrt'
             # If Adjoint mode, solve linear system for each 'of'
 
-            matmats = [m for _, _, _, m, _ in vois]
+            matmats = [m for _, _, _, m, _, _ in vois]
             matmat = matmats[0]
             if any(matmats) and not all(matmats):
                 raise RuntimeError("Mixing of vectorized and non-vectorized derivs in the same "
                                    "parallel color group (%s) is not supported." %
                                    [name for _, name, _, _, _ in vois])
             simul_coloring = vois[0][4] if not has_lin_constraints else None
+            cache_lin_sol = any(cache for _, _, _, _, _, cache in vois)
 
             if use_rel_reduction:
                 rel_systems = set()
-                for voi, _, _, _, _ in vois:
+                for voi, _, _, _, _, _ in vois:
                     rel_systems.update(relevant[voi]['@all'][1])
             else:
                 rel_systems = _contains_all
@@ -1382,13 +1412,13 @@ class Problem(object):
                 idx_iter = idx_iter()
             else:
                 loc_idx_dict = defaultdict(lambda: -1)
-                max_len = max(len(voi_info[name][2]) for name, _, _, _, _ in vois)
+                max_len = max(len(voi_info[name][2]) for name, _, _, _, _, _ in vois)
                 idx_iter = range(max_len)
 
             for i in idx_iter:
                 if simul_coloring is not None:
                     color, i = i
-                    do_color_iter = isinstance(i, np.ndarray) and i.size > 1
+                    do_color_iter = isinstance(i, np.ndarray)
                 else:
                     do_color_iter = False
 
@@ -1403,7 +1433,7 @@ class Problem(object):
                     if use_rel_reduction:
                         vec_dinput['linear'].set_const(0.0)
 
-                for input_name, old_input_name, pd_color, matmat, simul in vois:
+                for input_name, _, _, matmat, simul, _ in vois:
                     dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
                         voi_info[input_name]
 
@@ -1433,9 +1463,24 @@ class Problem(object):
                             # need a vector for clean code, so use _views_flat.
                             dinputs._views_flat[input_name][idx - start] = 1.0
 
+                if cache_lin_sol:
+                    idx = (color,) if do_color_iter else i
+                    ikey = (vois[0][0], idx)
+                    if ikey in self._lin_sol_cache:
+                        save_vec = self._lin_sol_cache[ikey]
+                        for vs in doutputs._data:
+                            doutputs._data[vs][:] = save_vec[vs]
+                    else:
+                        self._lin_sol_cache[ikey] = deepcopy(doutputs._data)
+
                 model._solve_linear(lin_vec_names, mode, rel_systems)
 
-                for input_name, old_input_name, _, matmat, simul in vois:
+                if cache_lin_sol:
+                    save_vec = self._lin_sol_cache[ikey]
+                    for vs in doutputs._data:
+                        save_vec[vs][:] = doutputs._data[vs]
+
+                for input_name, old_input_name, _, matmat, simul, cache_lin_sol in vois:
                     dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
                         dup, store = voi_info[input_name]
                     ncol = dinputs._ncol
@@ -1601,7 +1646,7 @@ class Problem(object):
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,
-                              suppress_output=False, indep_key=None):
+                              suppress_output=False, indep_key=None, all_comps_provide_jacs=False):
     """
     Compute the relative and absolute errors in the given derivatives and print to the out_stream.
 
@@ -1628,6 +1673,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         Set to True to suppress all output. Just calculate errors and add the keys.
     indep_key : dict of sets, optional
         Keyed by component name, contains the of/wrt keys that are declared not dependent.
+    all_comps_provide_jacs : bool, optional
+        Set to True if all components provide a Jacobian (are not matrix-free).
     """
     nan = float('nan')
 
@@ -1635,8 +1682,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         if totals:
             deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
         else:
-            deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e} | {6:.4e} | {7:.4e}"\
-                         " | {8:.4e} | {9:.4e} | {10:.4e}"
+            if not all_comps_provide_jacs:
+                deriv_line = "{0} wrt {1} | {2:.4e} | {3} | {4:.4e} | {5:.4e} | {6} | {7}" \
+                             " | {8:.4e} | {9} | {10}"
+            else:
+                deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
 
     for system in system_list:
         # No need to see derivatives of IndepVarComps
@@ -1687,20 +1737,32 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         max_width_of = max(max_width_of, len(of))
                         max_width_wrt = max(max_width_wrt, len(wrt))
 
-                    header = "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}"\
-                        .format(
-                            _pad_name('<output>', max_width_of, True),
-                            _pad_name('<variable>', max_width_wrt, True),
-                            _pad_name('fwd mag.'),
-                            _pad_name('rev mag.'),
-                            _pad_name('check mag.'),
-                            _pad_name('a(fwd-chk)'),
-                            _pad_name('a(rev-chk)'),
-                            _pad_name('a(fwd-rev)'),
-                            _pad_name('r(fwd-chk)'),
-                            _pad_name('r(rev-chk)'),
-                            _pad_name('r(fwd-rev)')
-                        )
+                    if not all_comps_provide_jacs:
+                        header = \
+                            "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}" \
+                            .format(
+                                _pad_name('<output>', max_width_of, True),
+                                _pad_name('<variable>', max_width_wrt, True),
+                                _pad_name('fwd mag.'),
+                                _pad_name('rev mag.'),
+                                _pad_name('check mag.'),
+                                _pad_name('a(fwd-chk)'),
+                                _pad_name('a(rev-chk)'),
+                                _pad_name('a(fwd-rev)'),
+                                _pad_name('r(fwd-chk)'),
+                                _pad_name('r(rev-chk)'),
+                                _pad_name('r(fwd-rev)')
+                            )
+                    else:
+                        header = "{0} wrt {1} | {2} | {3} | {4} | {5}"\
+                            .format(
+                                _pad_name('<output>', max_width_of, True),
+                                _pad_name('<variable>', max_width_wrt, True),
+                                _pad_name('fwd mag.'),
+                                _pad_name('check mag.'),
+                                _pad_name('a(fwd-chk)'),
+                                _pad_name('r(fwd-chk)'),
+                            )
                 if out_stream:
                     out_stream.write(header + '\n')
                     out_stream.write('-' * len(header) + '\n' + '\n')
@@ -1773,20 +1835,33 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 break
 
                         if out_stream:
-                            out_stream.write(deriv_line.format(
-                                _pad_name(of, max_width_of, True),
-                                _pad_name(wrt, max_width_wrt, True),
-                                magnitude.forward,
-                                magnitude.reverse,
-                                magnitude.fd,
-                                abs_err.forward,
-                                abs_err.reverse,
-                                abs_err.forward_reverse,
-                                rel_err.forward,
-                                rel_err.reverse,
-                                rel_err.forward_reverse,
-                            ) + error_string + '\n')
-                else:
+                            if not all_comps_provide_jacs:
+                                out_stream.write(deriv_line.format(
+                                    _pad_name(of, max_width_of, True),
+                                    _pad_name(wrt, max_width_wrt, True),
+                                    magnitude.forward,
+                                    _format_if_not_matrix_free(
+                                        system.matrix_free, magnitude.reverse),
+                                    magnitude.fd,
+                                    abs_err.forward,
+                                    _format_if_not_matrix_free(system.matrix_free, abs_err.reverse),
+                                    _format_if_not_matrix_free(
+                                        system.matrix_free, abs_err.forward_reverse),
+                                    rel_err.forward,
+                                    _format_if_not_matrix_free(system.matrix_free, rel_err.reverse),
+                                    _format_if_not_matrix_free(
+                                        system.matrix_free, rel_err.forward_reverse),
+                                ) + error_string + '\n')
+                            else:
+                                out_stream.write(deriv_line.format(
+                                    _pad_name(of, max_width_of, True),
+                                    _pad_name(wrt, max_width_wrt, True),
+                                    magnitude.forward,
+                                    magnitude.fd,
+                                    abs_err.forward,
+                                    rel_err.forward,
+                                ) + error_string + '\n')
+                else:  # not compact print
 
                     if totals:
                         fd_desc = "{}:{}".format(global_options['']['method'],
@@ -1796,17 +1871,12 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         fd_desc = "{}:{}".format(global_options[sys_name][wrt]['method'],
                                                  global_options[sys_name][wrt]['form'])
 
-                    if compact_print:
-                        check_desc = "    (Check Type: {})".format(fd_desc)
-                    else:
-                        check_desc = ""
-
                     # Magnitudes
                     if out_stream:
                         out_stream.write("  {}: '{}' wrt '{}'".format(sys_name, of, wrt) + '\n')
                         out_stream.write('    Forward Magnitude : {:.6e}'.format(magnitude.forward)
                                          + '\n')
-                    if not totals:
+                    if not totals and system.matrix_free:
                         txt = '    Reverse Magnitude : {:.6e}'
                         if out_stream:
                             out_stream.write(txt.format(magnitude.reverse) + '\n')
@@ -1814,7 +1884,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         out_stream.write('         Fd Magnitude : {:.6e} ({})'.format(magnitude.fd,
                                          fd_desc) + '\n')
                     # Absolute Errors
-                    if totals:
+                    if totals or not system.matrix_free:
                         error_descs = ('(Jfor  - Jfd) ', )
                     else:
                         error_descs = ('(Jfor  - Jfd) ', '(Jrev  - Jfd) ', '(Jfor  - Jrev)')
@@ -1841,7 +1911,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         out_stream.write(str(forward) + '\n')
                         out_stream.write('\n')
 
-                    if not totals:
+                    if not totals and system.matrix_free:
                         if out_stream:
                             out_stream.write('    Raw Reverse Derivative (Jfor)\n')
                             out_stream.write(str(reverse) + '\n')
@@ -1854,6 +1924,28 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
                     if out_stream:
                         out_stream.write(' -' * 30 + '\n')
+
+
+def _format_if_not_matrix_free(matrix_free, val):
+    """
+    Return string to represent deriv check value in compact display.
+
+    Parameters
+    ----------
+    matrix_free : bool
+        If True, then the associated Component is matrix-free.
+    val : float
+        The deriv check value.
+
+    Returns
+    -------
+    str
+        String which is the actual value if matrix-free, otherwise 'n/a'
+    """
+    if matrix_free:
+        return '{0:.4e}'.format(val)
+    else:
+        return _pad_name('n/a')
 
 
 def _pad_name(name, pad_num=10, quotes=False):

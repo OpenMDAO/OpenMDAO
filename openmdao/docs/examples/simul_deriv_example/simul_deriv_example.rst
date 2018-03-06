@@ -10,8 +10,9 @@ distributed within a unit circle centered about the origin.  The locations of ou
 determined by the values of the *x* and *y* arrays defined in our problem.
 
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_coloring.SimulColoringScipyTestCase.test_simul_coloring_example
+    :layout: interleave
 
 
 Total derivatives with respect to *x* and *y* will be solved for simultaneously based on the

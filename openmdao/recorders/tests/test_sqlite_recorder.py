@@ -66,14 +66,14 @@ class TestSqliteRecorder(unittest.TestCase):
         self.recorder = SqliteRecorder(self.filename)
         # print(self.filename)  # comment out to make filename printout go away.
 
+        self.eps = 1e-3
+
     def tearDown(self):
-        from shutil import rmtree
         os.chdir(self.startdir)
 
         # return  # comment out to allow db file to be removed.
         try:
             rmtree(self.dir)
-            pass
         except OSError as e:
             # If directory already deleted, keep going
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):

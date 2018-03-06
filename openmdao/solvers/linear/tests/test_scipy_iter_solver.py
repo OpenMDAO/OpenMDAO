@@ -116,7 +116,6 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         grp = TestImplicitGroup(lnSolverClass=self.linear_solver_class)
         g1 = model.add_subsystem('g1', grp)
 
-        p.model.linear_solver.options['maxiter'] = 1
         p.setup(check=False)
 
         p.set_solver_print(level=0)

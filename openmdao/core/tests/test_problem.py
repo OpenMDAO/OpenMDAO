@@ -240,6 +240,44 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy']['x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy']['y'], [[8.0]], 1e-6)
 
+    def test_compute_totals_no_args(self):
+        p = Problem()
+
+        dv = p.model.add_subsystem('des_vars', IndepVarComp())
+        dv.add_output('x', val=2.)
+
+        p.model.add_subsystem('calc', ExecComp('y=2*x'))
+
+        p.model.connect('des_vars.x', 'calc.x')
+
+        p.model.add_design_var('des_vars.x')
+        p.model.add_objective('calc.y')
+
+        p.setup()
+        p.run_model()
+
+        derivs = p.compute_totals()
+
+        assert_rel_error(self, derivs['calc.y', 'des_vars.x'], [[2.0]], 1e-6)
+
+    def test_compute_totals_no_args_promoted(self):
+        p = Problem()
+
+        dv = p.model.add_subsystem('des_vars', IndepVarComp(), promotes=['*'])
+        dv.add_output('x', val=2.)
+
+        p.model.add_subsystem('calc', ExecComp('y=2*x'), promotes=['*'])
+
+        p.model.add_design_var('x')
+        p.model.add_objective('y')
+
+        p.setup()
+        p.run_model()
+
+        derivs = p.compute_totals()
+
+        assert_rel_error(self, derivs['calc.y', 'des_vars.x'], [[2.0]], 1e-6)
+
     def test_feature_set_indeps(self):
         from openmdao.api import Problem, Group, IndepVarComp
         from openmdao.test_suite.components.paraboloid import Paraboloid

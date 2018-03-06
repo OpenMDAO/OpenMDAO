@@ -83,9 +83,9 @@ Implementation: optimization script
 
 Here is the optimization script:
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.beam_optimization.test_beam_optimization.TestCase.test
-    :no-split:
+    :layout: code, output
 
 The optimized thickness distribution looks like this:
 

@@ -7,8 +7,9 @@ from six.moves import cStringIO
 import numpy as np
 
 from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NonlinearRunOnce, \
-                         ImplicitComponent, NonlinearBlockGS, LinearBlockGS, ParallelGroup, \
-                         ExecComp
+                         ImplicitComponent, NonlinearBlockGS
+from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
+from openmdao.core.tests.test_matmat import MultiJacVec
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 from openmdao.test_suite.components.sellar import SellarDerivatives
@@ -106,11 +107,14 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         y_wrt_x1_line = lines.index("  comp: 'y' wrt 'x1'")
 
-        self.assertTrue(lines[y_wrt_x1_line+4].endswith('*'),
+        self.assertTrue(lines[y_wrt_x1_line+3].endswith('*'),
                         msg='Error flag expected in output but not displayed')
         self.assertTrue(lines[y_wrt_x1_line+5].endswith('*'),
                         msg='Error flag expected in output but not displayed')
-        self.assertFalse(lines[y_wrt_x1_line+6].endswith('*'),
+        y_wrt_x2_line = lines.index("  comp: 'y' wrt 'x2'")
+        self.assertTrue(lines[y_wrt_x2_line+3].endswith('*'),
+                         msg='Error flag not expected in output but displayed')
+        self.assertTrue(lines[y_wrt_x2_line+5].endswith('*'),
                          msg='Error flag not expected in output but displayed')
 
     def test_component_only(self):
@@ -146,13 +150,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         lines = stream.getvalue().splitlines()
 
         y_wrt_x1_line = lines.index("  : 'y' wrt 'x1'")
-
-        self.assertTrue(lines[y_wrt_x1_line+4].endswith('*'),
+        self.assertTrue(lines[y_wrt_x1_line+3].endswith('*'),
                         msg='Error flag expected in output but not displayed')
         self.assertTrue(lines[y_wrt_x1_line+5].endswith('*'),
                         msg='Error flag expected in output but not displayed')
-        self.assertFalse(lines[y_wrt_x1_line+6].endswith('*'),
-                         msg='Error flag not expected in output but displayed')
 
     def test_component_only_suppress(self):
         class MyComp(ExplicitComponent):
@@ -878,8 +879,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         totals = prob.check_partials(out_stream=stream)
 
         lines = stream.getvalue().splitlines()
-        self.assertTrue('cs' in lines[6], msg='Did you change the format for printing check derivs?')
-        self.assertTrue('fd' in lines[28], msg='Did you change the format for printing check derivs?')
+        self.assertTrue('cs' in lines[5], msg='Did you change the format for printing check derivs?')
+        self.assertTrue('fd' in lines[19], msg='Did you change the format for printing check derivs?')
 
     def test_compact_print_formatting(self):
         class MyCompShortVarNames(ExplicitComponent):
@@ -1014,6 +1015,150 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('>ABS_TOL'),2)
         self.assertEqual(stream.getvalue().count('>REL_TOL'),2)
 
+    def test_check_partials_display_rev(self):
+
+        # 1: Check display of revs for implicit comp for compact and non-compact display
+        group = Group()
+        comp1 = group.add_subsystem('comp1', IndepVarComp())
+        comp1.add_output('a', 1.0)
+        comp1.add_output('b', -4.0)
+        comp1.add_output('c', 3.0)
+        group.add_subsystem('comp2', QuadraticLinearize())
+        group.add_subsystem('comp3', QuadraticJacVec())
+        group.connect('comp1.a', 'comp2.a')
+        group.connect('comp1.b', 'comp2.b')
+        group.connect('comp1.c', 'comp2.c')
+        group.connect('comp1.a', 'comp3.a')
+        group.connect('comp1.b', 'comp3.b')
+        group.connect('comp1.c', 'comp3.c')
+        prob = Problem(model=group)
+        prob.setup(check=False)
+
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=True)
+        self.assertEqual(stream.getvalue().count('n/a'),20)
+        self.assertEqual(stream.getvalue().count('rev'),10)
+        self.assertEqual(stream.getvalue().count('Component'),2)
+        self.assertEqual(stream.getvalue().count('wrt'),10)
+
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=False)
+        self.assertEqual(stream.getvalue().count('Reverse Magnitude'),4)
+        self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'),4)
+        self.assertEqual(stream.getvalue().count('Jrev'),16)
+
+        # 2: Explicit comp, all comps define Jacobians for compact and non-compact display
+        class MyComp(ExplicitComponent):
+            def setup(self):
+                self.add_input('x1', 3.0)
+                self.add_input('x2', 5.0)
+                self.add_output('z', 5.5)
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                """ Doesn't do much. """
+                outputs['z'] = 3.0 * inputs['x1'] + -4444.0 * inputs['x2']
+
+            def compute_partials(self, inputs, partials):
+                """Correct derivative."""
+                J = partials
+                J['z', 'x1'] = np.array([3.0])
+                J['z', 'x2'] = np.array([-4444.0])
+
+        prob = Problem()
+        prob.model = MyComp()
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+        prob.run_model()
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=True)
+        self.assertEqual(stream.getvalue().count('rev'),0)
+
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=False)
+        # So for this case, they do all provide them, so rev should not be shown
+        self.assertEqual(stream.getvalue().count('Forward Magnitude'),2)
+        self.assertEqual(stream.getvalue().count('Reverse Magnitude'),0)
+        self.assertEqual(stream.getvalue().count('Absolute Error'),2)
+        self.assertEqual(stream.getvalue().count('Relative Error'),2)
+        self.assertEqual(stream.getvalue().count('Raw Forward Derivative'),2)
+        self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'),0)
+        self.assertEqual(stream.getvalue().count('Raw FD Derivative'),2)
+
+        # 3: Explicit comp that does not define Jacobian. It defines compute_jacvec_product
+        #      For both compact and non-compact display
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('comp', ParaboloidMatVec())
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+        prob.run_model()
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=True)
+        self.assertEqual(stream.getvalue().count('rev'),5)
+
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=False)
+        self.assertEqual(stream.getvalue().count('Reverse'),4)
+        self.assertEqual(stream.getvalue().count('Jrev'),8)
+
+        # 4: Mixed comps. Some with jacobians. Some not
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('p0', IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p1', IndepVarComp('x2', 5.0))
+        prob.model.add_subsystem('c0', MyComp()) # in x1,x2, out is z
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('comp', ParaboloidMatVec())
+        prob.model.connect('p0.x1', 'c0.x1')
+        prob.model.connect('p1.x2', 'c0.x2')
+        prob.model.connect('c0.z', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+        prob.run_model()
+
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=True)
+        self.assertEqual(stream.getvalue().count('n/a'),10)
+        self.assertEqual(stream.getvalue().count('rev'),10)
+        self.assertEqual(stream.getvalue().count('Component'),2)
+        self.assertEqual(stream.getvalue().count('wrt'),6)
+
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=False)
+        self.assertEqual(stream.getvalue().count('Forward Magnitude'),4)
+        self.assertEqual(stream.getvalue().count('Reverse Magnitude'),2)
+        self.assertEqual(stream.getvalue().count('Absolute Error'),8)
+        self.assertEqual(stream.getvalue().count('Relative Error'),8)
+        self.assertEqual(stream.getvalue().count('Raw Forward Derivative'),4)
+        self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'),2)
+        self.assertEqual(stream.getvalue().count('Raw FD Derivative'),4)
+
+        # 5: One comp defines compute_multi_jacvec_product
+        size = 6
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('px', IndepVarComp('x', val=(np.arange(size, dtype=float) + 1.) * 3.0))
+        model.add_subsystem('py', IndepVarComp('y', val=(np.arange(size, dtype=float) + 1.) * 2.0))
+        model.add_subsystem('comp', MultiJacVec(size))
+
+        model.connect('px.x', 'comp.x')
+        model.connect('py.y', 'comp.y')
+
+        model.add_design_var('px.x', vectorize_derivs=False)
+        model.add_design_var('py.y', vectorize_derivs=False)
+        model.add_constraint('comp.f_xy', vectorize_derivs=False)
+
+        prob.setup(check=False)
+        prob.run_model()
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=True)
+        self.assertEqual(stream.getvalue().count('rev'),5)
 
 class TestCheckPartialsFeature(unittest.TestCase):
 
@@ -1308,37 +1453,31 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(step_calc='rel')
 
     def test_feature_compact_print_formatting(self):
-        import numpy as np
-        from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem
-
-        class MyComp(ExplicitComponent):
-            def setup(self):
-                self.add_input('x1', 3.0)
-                self.add_input('x2', 5.0)
-                self.add_output('y', 5.5)
-                self.declare_partials(of='*', wrt='*')
-
-            def compute(self, inputs, outputs):
-                """ Doesn't do much. """
-                outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
-
-            def compute_partials(self, inputs, partials):
-                """Intentionally incorrect derivative."""
-                J = partials
-                J['y', 'x1'] = np.array([4.0])
-                J['y', 'x2'] = np.array([40])
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
+        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
         prob = Problem()
         prob.model = Group()
-        prob.model.add_subsystem('p1', IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('x2', 5.0))
-        prob.model.add_subsystem('comp', MyComp())
-        prob.model.connect('p1.x1', 'comp.x1')
-        prob.model.connect('p2.x2', 'comp.x2')
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+        prob.model.add_subsystem('comp2', ParaboloidMatVec())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+        prob.model.connect('comp.f_xy', 'comp2.x')
+
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+
+        comp.set_check_partial_options(wrt='*', step_calc='rel')
+
+        prob.setup()
         prob.run_model()
+
         prob.check_partials(compact_print=True)
+
 
 class TestProblemCheckTotals(unittest.TestCase):
 
