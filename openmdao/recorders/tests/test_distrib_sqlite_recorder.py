@@ -258,7 +258,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
 
         if prob.comm.rank == 0:
-            coordinate = [0, 'SLSQP', (49,)]
+            coordinate = [0, 'SLSQP', (48,)]
             self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
                                                      expected_objectives, expected_constraints,
                                                      expected_includes),), self.eps)

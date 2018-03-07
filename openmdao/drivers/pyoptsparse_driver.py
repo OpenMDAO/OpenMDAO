@@ -84,7 +84,7 @@ class pyOptSparseDriver(Driver):
     Options
     -------
     options['optimizer'] :  str('SLSQP')
-        Name of optimizers to use
+        Name of optimizers to use.
     options['print_results'] :  bool(True)
         Print pyOpt results if True
     options['gradient method'] :  str('openmdao', 'pyopt_fd', 'snopt_fd')
@@ -213,13 +213,6 @@ class pyOptSparseDriver(Driver):
         # Metadata Setup
         self.metadata = create_local_meta(self.options['optimizer'])
 
-        with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
-            # Initial Run
-            model._solve_nonlinear()
-            rec.abs = 0.0
-            rec.rel = 0.0
-        self.iter_count += 1
-
         opt_prob = Optimization(self.options['title'], self._objfunc)
 
         # Add all design variables
@@ -325,9 +318,6 @@ class pyOptSparseDriver(Driver):
         # Set optimization options
         for option, value in self.opt_settings.items():
             opt.setOption(option, value)
-
-        self.opt_prob = opt_prob
-        self.opt = opt
 
         # Execute the optimization problem
         if self.options['gradient method'] == 'pyopt_fd':

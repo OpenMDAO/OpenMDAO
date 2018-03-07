@@ -18,7 +18,7 @@ except ImportError:
 
 from openmdao.devtools.webview import webview
 from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _collect_methods, \
-     _setup_func_group, _get_methods
+     _setup_func_group, _get_methods, _Options
 
 
 def _prof_node(fpath, parts):
@@ -87,6 +87,8 @@ def setup(methods=None, finalize=True):
         If True, register a function to finalize the profile before exit.
 
     """
+    if not func_group:
+        _setup_func_group()
     _setup(_Options(methods=methods), finalize=finalize)
 
 
