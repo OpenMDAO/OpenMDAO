@@ -69,7 +69,7 @@ def _trace_call(frame, arg, stack, context):
     if time0 is None:
         time0 = time.time()
 
-    qual_cache, method_counts, class_counts, id2count, verbose, memory, leaks = context
+    qual_cache, method_counts, class_counts, id2count, verbose, memory, leaks, stream = context
 
     funcname = find_qualified_name(frame.f_code.co_filename,
                                    frame.f_code.co_firstlineno, qual_cache)
@@ -95,10 +95,10 @@ def _trace_call(frame, arg, stack, context):
 
     indent = tab * (len(stack)-1)
     if verbose:
-        print("%s%s (%d)" % (indent, fullname, method_counts[fullname]))
+        print("%s%s (%d)" % (indent, fullname, method_counts[fullname]), file=stream)
         _indented_print(frame.f_locals, frame.f_locals, len(stack)-1)
     else:
-        print("%s%s" % (indent, fullname))
+        print("%s%s" % (indent, fullname), file=stream)
     sys.stdout.flush()
 
     if memory is not None:
@@ -120,7 +120,7 @@ def _trace_return(frame, arg, stack, context):
     """
     global time0
 
-    qual_cache, method_counts, class_counts, id2count, verbose, memory, leaks = context
+    qual_cache, method_counts, class_counts, id2count, verbose, memory, leaks, stream = context
     funcname = find_qualified_name(frame.f_code.co_filename,
                                    frame.f_code.co_firstlineno, qual_cache)
 
@@ -140,7 +140,7 @@ def _trace_return(frame, arg, stack, context):
             delta = current_mem - last_mem
             print("%s<-- %s (time: %8.5f) (total: %6.3f MB) (diff: %+.0f KB)" %
                   (indent, '.'.join((sname, funcname)), time.time() - time0, current_mem,
-                   delta * 1024.))
+                   delta * 1024.), file=stream)
 
             # add this delta to all callers so when they calculate their own delta, this
             # delta won't be included
@@ -148,9 +148,10 @@ def _trace_return(frame, arg, stack, context):
                 memory[i] += delta
         else:
             print("%s<-- %s (time: %8.5f) (total: %6.3f MB)" % (indent, '.'.join((sname, funcname)),
-                                                                time.time() - time0, current_mem))
+                                                                time.time() - time0, current_mem),
+                                                                file=stream)
     else:
-        print("%s<-- %s" % (indent, '.'.join((sname, funcname))))
+        print("%s<-- %s" % (indent, '.'.join((sname, funcname))), file=stream)
 
     if verbose:
         if arg is not None:
@@ -162,7 +163,7 @@ def _trace_return(frame, arg, stack, context):
     if leaks is not None:
         last_objs = leaks.pop()
         for name, _, delta_objs in objgraph.growth(peak_stats=last_objs):
-            print("%s   %s %+d" % (indent, name, delta_objs))
+            print("%s   %s %+d" % (indent, name, delta_objs), file=stream)
 
     sys.stdout.flush()
 
@@ -206,15 +207,21 @@ def _setup(options):
         else:
             leaks = None
 
+        if options.outfile == 'stdout':
+            stream = sys.stdout
+        elif options.outfile == 'stderr':
+            stream = sys.stderr
+        else:
+            stream = open(options.outfile, 'w')
         _trace_calls = _create_profile_callback(call_stack, _collect_methods(methods),
                                                 do_call=_trace_call,
                                                 do_ret=do_ret,
                                                 context=(qual_cache, method_counts,
                                                          class_counts, id2count, verbose, memory,
-                                                         leaks))
+                                                         leaks, stream))
 
 
-def setup(methods=None, verbose=None, memory=None, leaks=False):
+def setup(methods=None, verbose=None, memory=None, leaks=False, outfile='stdout'):
     """
     Setup call tracing.
 
@@ -229,7 +236,7 @@ def setup(methods=None, verbose=None, memory=None, leaks=False):
     leaks : bool
         If True, show objects that are created within a function and not garbage collected.
     """
-    _setup(_Options(methods=methods, verbose=verbose, memory=memory, leaks=leaks))
+    _setup(_Options(methods=methods, verbose=verbose, memory=memory, leaks=leaks, outfile=outfile))
 
 
 def start():
@@ -319,6 +326,8 @@ def _itrace_setup_parser(parser):
                         help="Show memory usage.")
     parser.add_argument('-l', '--leaks', action='store_true', dest='leaks',
                         help="Show objects that are not garbage collected after each function call.")
+    parser.add_argument('-o', '--outfile', action='store', dest='outfile',
+                        default='stdout', help='Output file.  Defaults to stdout.')
 
 
 def _itrace_exec(options):
