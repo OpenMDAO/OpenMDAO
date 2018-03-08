@@ -10,7 +10,7 @@ from __future__ import print_function
 from collections import OrderedDict
 import traceback
 
-from six import iteritems
+from six import iteritems, itervalues
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -216,7 +216,7 @@ class pyOptSparseDriver(Driver):
 
         # Only need initial run if we have linear constraints.
         con_meta = self._cons
-        if np.any([con['linear'] for name, con in iteritems(self._cons)]):
+        if np.any([con['linear'] for con in itervalues(self._cons)]):
             with RecordingDebugging(optimizer, self.iter_count, self) as rec:
                 # Initial Run
                 model._solve_nonlinear()
