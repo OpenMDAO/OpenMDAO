@@ -1112,6 +1112,7 @@ class TestPyoptSparse(unittest.TestCase):
                 self.linear_solver = DirectSolver()
                 self.nonlinear_solver = NonlinearBlockGS()
 
+
         prob = Problem()
         model = prob.model = MySellarGroup()
 
