@@ -209,9 +209,20 @@ class pyOptSparseDriver(Driver):
         self.pyopt_solution = None
         self.iter_count = 0
         fwd = problem._mode == 'fwd'
+        optimizer = self.options['optimizer']
 
         # Metadata Setup
-        self.metadata = create_local_meta(self.options['optimizer'])
+        self.metadata = create_local_meta(optimizer)
+
+        # Only need initial run if we have linear constraints.
+        con_meta = self._cons
+        if np.any([con['linear'] for name, con in iteritems(self._cons)]):
+            with RecordingDebugging(optimizer, self.iter_count, self) as rec:
+                # Initial Run
+                model._solve_nonlinear()
+                rec.abs = 0.0
+                rec.rel = 0.0
+            self.iter_count += 1
 
         opt_prob = Optimization(self.options['title'], self._objfunc)
 
@@ -234,7 +245,6 @@ class pyOptSparseDriver(Driver):
             self._quantities.append(name)
 
         # Calculate and save derivatives for any linear constraints.
-        con_meta = self._cons
         lcons = [key for (key, con) in iteritems(con_meta) if con['linear'] is True]
         if len(lcons) > 0:
             _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list, return_format='dict')
@@ -306,7 +316,6 @@ class pyOptSparseDriver(Driver):
                 self._quantities.append(name)
 
         # Instantiate the requested optimizer
-        optimizer = self.options['optimizer']
         try:
             _tmp = __import__('pyoptsparse', globals(), locals(), [optimizer], 0)
             opt = getattr(_tmp, optimizer)()
