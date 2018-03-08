@@ -46,7 +46,7 @@ values. This training step only occurs on the first run.
 Advanced usage
 --------------
 
-You can specify the training data after instantiation if you like, by set the component's :ref:`metadata<component_metadata>`.
+You can specify the training data after instantiation if you like, by setting the component's :ref:`metadata<component_metadata>`.
 Training data is provided as metadata to the ``trig`` component using the variable
 names prefixed with ``train:``.  This can be done anytime before the `MetaModelUnStructured`
 runs for the first time.
