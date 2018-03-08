@@ -1037,21 +1037,15 @@ class TestPyoptSparse(unittest.TestCase):
         assert_rel_error(self, prob['x'], 0.0, 4e-3)
 
     def test_sellar_mdf_linear_con_directsolver(self):
+        # This test makes sure that we call solve_nonlinear first if we have any linear constraints
+        # to cache.
 
         class SellarDis1withDerivatives(ExplicitComponent):
 
             def setup(self):
-
-                # Global Design Variable
                 self.add_input('z', val=np.zeros(2))
-
-                # Local Design Variable
                 self.add_input('x', val=0.)
-
-                # Coupling parameter
                 self.add_input('y2', val=0.0)
-
-                # Coupling output
                 self.add_output('y1', val=0.0)
 
                 self.declare_partials(of='*', wrt='*')
@@ -1073,14 +1067,8 @@ class TestPyoptSparse(unittest.TestCase):
         class SellarDis2withDerivatives(ExplicitComponent):
 
             def setup(self):
-
-                # Global Design Variable
                 self.add_input('z', val=np.zeros(2))
-
-                # Coupling parameter
                 self.add_input('y1', val=0.0)
-
-                # Coupling output
                 self.add_output('y2', val=0.0)
 
                 self.declare_partials(of='*', wrt='*')
@@ -1090,9 +1078,6 @@ class TestPyoptSparse(unittest.TestCase):
                 z2 = inputs['z'][1]
                 y1 = inputs['y1']
 
-                # Note: this may cause some issues. However, y1 is constrained to be
-                # above 3.16, so lets just let it converge, and the optimizer will
-                # throw it out
                 if y1.real < 0.0:
                     y1 *= -1
 
