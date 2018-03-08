@@ -104,6 +104,13 @@ code needed to do all that file writing, reading, and parsing.
 
 `ParaboloidExternalCode` is now complete. All that is left is to actually run it.
 
+.. note:: 
+
+    If you are going to use an ExternalCode component in a gradient based optimization, you'll need to get its partial derivatives somehow. 
+    One way would be just to use :ref:`finite-difference approximations for the partials<feature_declare_partials_approx>`. 
+    If the code you are wrapping happens to have analytic derivatives you could also have those written out to a file and then parse that file in the 
+    :ref:`compute_partials method<comp-type-2-explicitcomp>`
+
 Setting up and running the model
 --------------------------------
 
@@ -130,3 +137,6 @@ Setting up and running the model
         print(top['p.f_xy'],)
 
 .. tags:: ExternalCode, FileWrapping
+
+
+    
