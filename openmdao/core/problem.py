@@ -822,7 +822,8 @@ class Problem(object):
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, all_fd_options,
                                   suppress_output=suppress_output, indep_key=indep_key,
-                                  all_comps_provide_jacs=self._all_components_provide_jacobians())
+                                  all_comps_provide_jacs=self._all_components_provide_jacobians(),
+                                  show_only_incorrect=show_only_incorrect)
 
         return partials_data
 
@@ -1705,10 +1706,15 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         sorted_keys = sorted(iterkeys(derivatives))
 
         if not suppress_output:
+            from six.moves import cStringIO
+            out_buffer = cStringIO()
+
+            num_bad_jacs = 0
             if out_stream:
-                out_stream.write('-' * (len(sys_name) + 15) + '\n')
-                out_stream.write("{}: {} '{}'".format(sys_type, sys_class_name, sys_name) + '\n')
-                out_stream.write('-' * (len(sys_name) + 15) + '\n')
+                header_str = '-' * (len(sys_name) + len(sys_type) + len(sys_class_name) + 5) + '\n'
+                out_buffer.write(header_str)
+                out_buffer.write("{}: {} '{}'".format(sys_type, sys_class_name, sys_name) + '\n')
+                out_buffer.write(header_str)
 
             if compact_print:
                 # Error Header
@@ -1723,12 +1729,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             _pad_name('r(cal-chk)'),
                         )
                 else:
-                    #
-                    max_width_of = len('<output>')
-                    max_width_wrt = len('<variable>')
+                    max_width_of = len("'<output>'")
+                    max_width_wrt = len("'<variable>'")
                     for of, wrt in sorted_keys:
-                        max_width_of = max(max_width_of, len(of))
-                        max_width_wrt = max(max_width_wrt, len(wrt))
+                        max_width_of = max(max_width_of, len(of) + 2) # 2 to include quotes
+                        max_width_wrt = max(max_width_wrt, len(wrt) + 2)
 
                     if not all_comps_provide_jacs:
                         header = \
@@ -1757,8 +1762,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 _pad_name('r(fwd-chk)'),
                             )
                 if out_stream:
-                    out_stream.write(header + '\n')
-                    out_stream.write('-' * len(header) + '\n' + '\n')
+                    out_buffer.write(header + '\n')
+                    out_buffer.write('-' * len(header) + '\n' + '\n')
 
         for of, wrt in sorted_keys:
 
@@ -1823,15 +1828,19 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 error_string += ' >ABS_TOL'
                                 break
                         is_worst_subjac = False
-                        for error in rel_err:
+                        for i, error in enumerate(rel_err):
                             if not np.isnan(error):
-                                if error > worst_subjac_rel_err: ## qqqq We need to limit this to just the 1st and 2d values
+                                if i < 2 and error > worst_subjac_rel_err: #  only 1st and 2d errs
                                     worst_subjac_rel_err = error
                                     worst_subjac = (sys_type, sys_class_name, sys_name)
                                     is_worst_subjac = True
                             if not np.isnan(error) and error >= rel_error_tol:
                                 error_string += ' >REL_TOL'
                                 break
+
+                        if error_string:
+                            num_bad_jacs += 1
+
 
                         if out_stream:
                             if not all_comps_provide_jacs:
@@ -1864,7 +1873,9 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                         abs_err.forward,
                                         rel_err.forward,
                                     )
-                            out_stream.write(deriv_info_line + error_string + '\n')
+                            if not show_only_incorrect or error_string:
+                                out_buffer.write(deriv_info_line + error_string + '\n')
+
                             if is_worst_subjac:
                                 worst_subjac_line = deriv_info_line
                 else:  # not compact print
@@ -1879,15 +1890,15 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
                     # Magnitudes
                     if out_stream:
-                        out_stream.write("  {}: '{}' wrt '{}'".format(sys_name, of, wrt) + '\n')
-                        out_stream.write('    Forward Magnitude : {:.6e}'.format(magnitude.forward)
+                        out_buffer.write("  {}: '{}' wrt '{}'".format(sys_name, of, wrt) + '\n')
+                        out_buffer.write('    Forward Magnitude : {:.6e}'.format(magnitude.forward)
                                          + '\n')
                     if not totals and system.matrix_free:
                         txt = '    Reverse Magnitude : {:.6e}'
                         if out_stream:
-                            out_stream.write(txt.format(magnitude.reverse) + '\n')
+                            out_buffer.write(txt.format(magnitude.reverse) + '\n')
                     if out_stream:
-                        out_stream.write('         Fd Magnitude : {:.6e} ({})'.format(magnitude.fd,
+                        out_buffer.write('         Fd Magnitude : {:.6e} ({})'.format(magnitude.fd,
                                          fd_desc) + '\n')
                     # Absolute Errors
                     if totals or not system.matrix_free:
@@ -1896,41 +1907,48 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         error_descs = ('(Jfor  - Jfd) ', '(Jrev  - Jfd) ', '(Jfor  - Jrev)')
                     for error, desc in zip(abs_err, error_descs):
                         error_str = _format_error(error, abs_error_tol)
+                        if error_str.endswith('*'):
+                            num_bad_jacs += 1
                         if out_stream:
-                            out_stream.write('    Absolute Error {}: {}'.format(desc, error_str) +
+                            out_buffer.write('    Absolute Error {}: {}'.format(desc, error_str) +
                                              '\n')
                     if out_stream:
-                        out_stream.write('\n')
+                        out_buffer.write('\n')
 
                     # Relative Errors
                     for error, desc in zip(rel_err, error_descs):
                         error_str = _format_error(error, rel_error_tol)
+                        if error_str.endswith('*'):
+                            num_bad_jacs += 1
                         if out_stream:
-                            out_stream.write('    Relative Error {}: {}'.format(desc, error_str) +
+                            out_buffer.write('    Relative Error {}: {}'.format(desc, error_str) +
                                              '\n')
                     if out_stream:
-                        out_stream.write('\n')
+                        out_buffer.write('\n')
 
                     # Raw Derivatives
                     if out_stream:
-                        out_stream.write('    Raw Forward Derivative (Jfor)\n')
-                        out_stream.write(str(forward) + '\n')
-                        out_stream.write('\n')
+                        out_buffer.write('    Raw Forward Derivative (Jfor)\n')
+                        out_buffer.write(str(forward) + '\n')
+                        out_buffer.write('\n')
 
                     if not totals and system.matrix_free:
                         if out_stream:
-                            out_stream.write('    Raw Reverse Derivative (Jfor)\n')
-                            out_stream.write(str(reverse) + '\n')
-                            out_stream.write('\n')
+                            out_buffer.write('    Raw Reverse Derivative (Jfor)\n')
+                            out_buffer.write(str(reverse) + '\n')
+                            out_buffer.write('\n')
 
                     if out_stream:
-                        out_stream.write('    Raw FD Derivative (Jfd)\n')
-                        out_stream.write(str(fd) + '\n')
-                        out_stream.write('\n')
+                        out_buffer.write('    Raw FD Derivative (Jfd)\n')
+                        out_buffer.write(str(fd) + '\n')
+                        out_buffer.write('\n')
 
                     if out_stream:
-                        out_stream.write(' -' * 30 + '\n')
+                        out_buffer.write(' -' * 30 + '\n')
 
+        if not show_only_incorrect or num_bad_jacs:
+            if out_stream and not suppress_output:
+                out_stream.write(out_buffer.getvalue())
 
     if not suppress_output and compact_print and not totals:
         worst_subjac_header = "Sub Jacobian with Largest Relative Error: {1} '{2}'".format(*worst_subjac)
@@ -1992,7 +2010,10 @@ def _pad_name(name, pad_num=10, quotes=False):
         pad_name = pad_str.format(name=name, sep='', pad=pad)
         return pad_name
     else:
-        return '{0}'.format(name)
+        if quotes:
+            return "'{0}'".format(name)
+        else:
+            return '{0}'.format(name)
 
 
 def _format_error(error, tol):
