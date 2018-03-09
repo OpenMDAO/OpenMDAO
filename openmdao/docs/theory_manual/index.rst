@@ -13,4 +13,5 @@ It provides information in a more theoretical and mathematical manner to help us
    :maxdepth: 1
 
    implicit_transformation_of_vars.rst
+   total_derivatives.rst
    parallel_color.rst
