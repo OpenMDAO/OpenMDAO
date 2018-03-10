@@ -1,8 +1,8 @@
 .. _simul-derivs-theory:
 
-************************
-Simultaneous Derivatives
-************************
+************************************************
+Simultaneous Derivatives For Separable Problems
+************************************************
 
 When OpenMDAO solves for total derivatives, it loops over either design variables in 'fwd' mode
 or responses in 'rev' mode.  For each of those variables, it performs a linear solve for each

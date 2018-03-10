@@ -1,5 +1,5 @@
 **************************************************************************
-Impact of Model Computational Structure on Linear Solver Strategy
+Selecting Dense, Sparse, or Matrix Free Linear Solver Architecture
 **************************************************************************
 
 Assembled-Jacobian Problems

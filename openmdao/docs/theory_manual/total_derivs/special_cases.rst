@@ -1,24 +1,15 @@
 *****************************************************************************************
-Special Cases: Models Where Special Algorithms Can Reduce the Cost of the Linear Solves
+Algorithms To Reduce the Cost of the Linear Solves for Special Cases
 *****************************************************************************************
 
-
-Understanding Model Structure
---------------------------------
-
-Feed-Forward
+Inexpensive Feed-Forward
 -----------------------------------
     - Vectorized Derivatives 
 
-Coupling
-----------------------------------
-
-
-
-Fan Out (Multi-Point)
+Fan-out Connectivity
 -----------------------------------
-    - Parallel Forward or Reverse Derivatives
+    - Parallel Reverse Derivatives
 
-Separable Structure 
+Separable Constraints
 ------------------------------------
     - Simultaneous Derivatives 
