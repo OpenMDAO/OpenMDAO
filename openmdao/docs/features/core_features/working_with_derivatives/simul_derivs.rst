@@ -1,4 +1,4 @@
-.. _simul-derivs-theory:
+.. _feature_simul_coloring:
 
 ************************************************
 Simultaneous Derivatives For Separable Problems
@@ -12,62 +12,17 @@ there would be *N* solves for an array variable of size *N*.
 
 Certain models have a special kind of sparsity structure in the total derivative Jacobian that
 allows OpenMDAO to solve for multiple derivatives simultaneously. This results in far fewer linear
-solves and much-improved performance. For example, in 'fwd' mode, this requires that there is some
-subset of the design variables that don't affect any of the same responses.  In other words, there
-is some subset of columns of the total Jacobian where none of those columns have nonzero values
-in any of the same rows.
+solves and much-improved performance. 
+These problems are said to have separable variables. 
+The concept of separability is explained in the :ref:`theory manual<theory_separable_variables>`. 
 
 .. note::
 
    While it is possible for problems to exist where simultaneous reverse solves would be possible,
    OpenMDAO does not currently support simultaneous derivatives in reverse mode.
 
-Consider, for example, a hypothetical optimization problem with a constraint that
-:code:`y=10` where :math:`y` is defined by
-
-
-.. math::
-
-  y = 3*x[::2]^2 + 2*x[1::2]^2 ,
-
-
-where :math:`x` is our design variable (size 10) and :math:`y` is our constraint (size 5).
-Our derivative looks like this:
-
-
-.. math::
-
-  dy/dx = 6*x[::2] + 4*x[1::2] ,
-
-
-We can see that each value of our :math:`dy/dx` derivative is determined by only one even
-and one odd value of :math:`x`.  The following diagram shows which entries of :math:`x`
-affect which entries of :math:`y`.
-
-.. figure:: simple_coloring.png
-   :align: center
-   :width: 50%
-   :alt: Dependency of y on x
-
-
-Our total jacobian is shown below, with nonzero entries denoted by a :math:`+` and with
-columns colored such that no columns of the same color share any nonzero rows.
-
-.. figure:: simple_jac.png
-   :align: center
-   :width: 50%
-   :alt: Our total jacobian
-
-
-Looking at the total Jacobian above, it's clear that we can solve for all of the blue columns
-at the same time because none of them affect the same entries of :math:`y`.  We can similarly
-solve all of the red columns at the same time.  So instead of doing ten linear solves to get
-our total Jacobian, we can do only two instead.
-
-
-The way to tell OpenMDAO that you want to make use of simultaneous derivatives is to call the
-:code:`set_simul_deriv_color` method on the driver.
-
+In order to tell OpenMDAO to take advantage of the separable sparsity in your model, you call the 
+:code:`set_simul_deriv_color` method on a :code:`Driver` instance. 
 
 .. automethod:: openmdao.core.driver.Driver.set_simul_deriv_color
     :noindex:

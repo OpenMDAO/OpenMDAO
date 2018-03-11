@@ -46,9 +46,13 @@ Hence, in many cases, selecting between forward and reverse is just a matter of 
 Although the two unified derivatives equations are very simple, solving them efficiently for a range of different kinds of models  requires careful implementation. 
 There are a number of different things that you, as a user of OpenMDAO, can do to control how the linear solutions are performed that will have an impact on both the speed and accuracy of the linear solution. 
 
+
+Setting Up a Model for Efficient Linear Solves
+---------------------------------------------------
+
 A deeper understanding of how OpenMDAO solves this linear system is useful in understanding when to apply certain features 
 and may also help you structure your model to make the most effective use of them. 
-The explanation of OpenMDAO's features for improving linear solver performance are broken up into four broad categories: 
+The explanation of OpenMDAO's features for improving linear solver performance are broken up into three sections below:  
 
 .. _Unified Derivative Equations: http://mdolab.engin.umich.edu/content/review-and-unification-discrete-methods-computing-derivatives-single-and-multi-disciplinary
 
@@ -58,5 +62,19 @@ The explanation of OpenMDAO's features for improving linear solver performance a
     coupled_vs_uncoupled.rst
     assembled_vs_matrixfree.rst
     hierarchical_linear_solver.rst
-    special_cases.rst
+
+Algorithms To Reduce the Cost of the Linear Solves for Special Cases
+----------------------------------------------------------------------
+
+There are certain cases where it is possible to further improve linear solver performance 
+via the application of specialized algorithms. 
+The usage of these algorithms is detailed here. 
+
+.. toctree::
+    :maxdepth: 1
+
+    vectorized.rst
+    fan_out.rst
+    separable.rst
+
 
