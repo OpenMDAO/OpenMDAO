@@ -98,10 +98,9 @@ code needed to do all that file writing, reading, and parsing.
 Using ExternalCode in an Optimization
 -------------------------------------
 
-If you are going to use an ExternalCode component in a gradient based optimization, you'll need to get its partial derivatives somehow.
+If you are going to use an ExternalCode component in a gradient based optimization, you'll need to
+get its :ref:`partial derivatives<advanced_guide_partial_derivs_explicit>` somehow.
 One way would be just to use :ref:`finite-difference approximations<feature_declare_partials_approx>` for the partials.
-If the code you are wrapping happens to have analytic derivatives you could also have those written out to a file and then parse that file in the
-:ref:`compute_partials<comp-type-2-explicitcomp>` method.
 
 In the following example, the `ParaboloidExternalCode` component has been modified to specify
 that partial derivatives are approximiated via finite difference.
@@ -109,11 +108,30 @@ that partial derivatives are approximiated via finite difference.
 .. embed-code::
     openmdao.components.tests.test_external_code.ParaboloidExternalCodeFD
 
-
 Now we can perform an optimization using the external code, as shown here:
 
 .. embed-code::
-    openmdao.components.tests.test_external_code.TestExternalCodeFeature.test_optimize
+    openmdao.components.tests.test_external_code.TestExternalCodeFeature.test_optimize_fd
+    :layout: interleave
+
+Alternatively, if the code you are wrapping happens to provide analytic derivatives you could
+have those written out to a file and then parse that file in the
+:ref:`compute_partials<comp-type-2-explicitcomp>` method.
+
+Here is a version of our external script that writes its derivatives to a second output file:
+
+.. embed-code::
+    openmdao.components.tests.extcode_paraboloid_derivs
+
+And the corresponding the `ParaboloidExternalCodeDerivs` component:
+
+.. embed-code::
+    openmdao.components.tests.test_external_code.ParaboloidExternalCodeDerivs
+
+Again, we can perform an optimization using the external code with derivatives:
+
+.. embed-code::
+    openmdao.components.tests.test_external_code.TestExternalCodeFeature.test_optimize_derivs
     :layout: interleave
 
 

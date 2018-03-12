@@ -233,6 +233,99 @@ class ParaboloidExternalCodeFD(ExternalCode):
         outputs['f_xy'] = f_xy
 
 
+class ParaboloidExternalCodeFD(ExternalCode):
+    def setup(self):
+        self.add_input('x', val=0.0)
+        self.add_input('y', val=0.0)
+
+        self.add_output('f_xy', val=0.0)
+
+        self.input_file = 'paraboloid_input.dat'
+        self.output_file = 'paraboloid_output.dat'
+
+        # providing these is optional; the component will verify that any input
+        # files exist before execution and that the output files exist after.
+        self.options['external_input_files'] = [self.input_file,]
+        self.options['external_output_files'] = [self.output_file,]
+
+        self.options['command'] = [
+            'python', 'extcode_paraboloid.py', self.input_file, self.output_file
+        ]
+
+        # this external code does not provide derivatives, use finite difference
+        self.declare_partials(of='*', wrt='*', method='fd')
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        y = inputs['y']
+
+        # generate the input file for the paraboloid external code
+        with open(self.input_file, 'w') as input_file:
+            input_file.write('%.16f\n%.16f\n' % (x,y))
+
+        # the parent compute function actually runs the external code
+        super(ParaboloidExternalCodeFD, self).compute(inputs, outputs)
+
+        # parse the output file from the external code and set the value of f_xy
+        with open(self.output_file, 'r') as output_file:
+            f_xy = float(output_file.read())
+
+        outputs['f_xy'] = f_xy
+
+
+class ParaboloidExternalCodeDerivs(ExternalCode):
+    def setup(self):
+        self.add_input('x', val=0.0)
+        self.add_input('y', val=0.0)
+
+        self.add_output('f_xy', val=0.0)
+
+        self.input_file = 'paraboloid_input.dat'
+        self.output_file = 'paraboloid_output.dat'
+        self.derivs_file = 'paraboloid_derivs.dat'
+
+        # providing these is optional; the component will verify that any input
+        # files exist before execution and that the output files exist after.
+        self.options['external_input_files'] = [self.input_file,]
+        self.options['external_output_files'] = [self.output_file, self.derivs_file]
+
+        self.options['command'] = [
+            'python', 'extcode_paraboloid_derivs.py',
+            self.input_file, self.output_file, self.derivs_file
+        ]
+
+        # this external code does provide derivatives
+        self.declare_partials(of='*', wrt='*')
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        y = inputs['y']
+
+        # generate the input file for the paraboloid external code
+        with open(self.input_file, 'w') as input_file:
+            input_file.write('%.16f\n%.16f\n' % (x,y))
+
+        # the parent compute function actually runs the external code
+        super(ParaboloidExternalCodeDerivs, self).compute(inputs, outputs)
+
+        # parse the output file from the external code and set the value of f_xy
+        with open(self.output_file, 'r') as output_file:
+            f_xy = float(output_file.read())
+
+        outputs['f_xy'] = f_xy
+
+    def compute_partials(self, inputs, partials):
+        outputs = {}
+
+        # the parent compute function actually runs the external code
+        super(ParaboloidExternalCodeDerivs, self).compute(inputs, outputs)
+
+        # parse the derivs file from the external code and set partials
+        with open(self.derivs_file, 'r') as derivs_file:
+            partials['f_xy', 'x'] = float(derivs_file.readline())
+            partials['f_xy', 'y'] = float(derivs_file.readline())
+
+
 class TestExternalCodeFeature(unittest.TestCase):
 
     def setUp(self):
@@ -250,7 +343,7 @@ class TestExternalCodeFeature(unittest.TestCase):
         os.chdir(self.tempdir)
 
         # copy required files to temp dir
-        files = ['extcode_paraboloid.py']
+        files = ['extcode_paraboloid.py', 'extcode_paraboloid_derivs.py']
         for filename in files:
             shutil.copy(os.path.join(DIRECTORY, filename),
                         os.path.join(self.tempdir, filename))
@@ -285,7 +378,7 @@ class TestExternalCodeFeature(unittest.TestCase):
         # print the output
         self.assertEqual(prob['p.f_xy'], -15.0)
 
-    def test_optimize(self):
+    def test_optimize_fd(self):
         from openmdao.api import Problem, Group, IndepVarComp
         from openmdao.api import ScipyOptimizeDriver
         from openmdao.components.tests.test_external_code import ParaboloidExternalCodeFD
@@ -297,6 +390,41 @@ class TestExternalCodeFeature(unittest.TestCase):
         model.add_subsystem('p1', IndepVarComp('x', 3.0))
         model.add_subsystem('p2', IndepVarComp('y', -4.0))
         model.add_subsystem('p', ParaboloidExternalCodeFD())
+
+        model.connect('p1.x', 'p.x')
+        model.connect('p2.y', 'p.y')
+
+        # find optimal solution with SciPy optimize
+        # solution (minimum): x = 6.6667; y = -7.3333
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+        prob.model.add_design_var('p1.x', lower=-50, upper=50)
+        prob.model.add_design_var('p2.y', lower=-50, upper=50)
+
+        prob.model.add_objective('p.f_xy')
+
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = True
+
+        prob.setup()
+        prob.run_driver()
+
+        assert_rel_error(self, prob['p1.x'], 6.66666667, 1e-6)
+        assert_rel_error(self, prob['p2.y'], -7.3333333, 1e-6)
+
+    def test_optimize_derivs(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.api import ScipyOptimizeDriver
+        from openmdao.components.tests.test_external_code import ParaboloidExternalCodeDerivs
+
+        prob = Problem()
+        model = prob.model
+
+        # create and connect inputs
+        model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        model.add_subsystem('p2', IndepVarComp('y', -4.0))
+        model.add_subsystem('p', ParaboloidExternalCodeDerivs())
 
         model.connect('p1.x', 'p.x')
         model.connect('p2.y', 'p.y')
