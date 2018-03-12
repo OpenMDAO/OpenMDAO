@@ -2,10 +2,13 @@
 
 from __future__ import division, print_function
 
+from six import iteritems, PY3
+
 import os
 
 import numpy as np
 
+from copy import deepcopy
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
@@ -168,6 +171,9 @@ class Solver(object):
                              desc='whether to print output')
         self.options.declare('err_on_maxiter', types=bool, default=False,
                              desc="When True, AnalysisError will be raised if we don't converge.")
+        self.options.declare('err_output_file', types=str, default='',
+                             desc='When specified, file name to which iteration data is written '
+                                  'for debugging purposes.')
         # Case recording options
         self.recording_options.declare('record_abs_error', types=bool, default=True,
                                        desc='Set to True to record absolute error at the \
@@ -183,7 +189,7 @@ class Solver(object):
                                        desc='Patterns for variables to include in recording')
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
-                                       '(processed post-includes)')
+                                            '(processed post-includes)')
         # Case recording related
         self._filtered_vars_to_record = {}
         self._norm0 = 0.0
@@ -196,6 +202,9 @@ class Solver(object):
         self.options.update(kwargs)
 
         self.metadata = {}
+
+        self._err_cache = {}
+
         self._rec_mgr = RecordingManager()
 
         self.cite = ""
@@ -364,6 +373,15 @@ class Solver(object):
                     msg = ' Failed to Converge in {} iterations'.format(self._iter_count)
                     print(prefix + msg)
 
+                if self.options['err_output_file']:
+                    with open(self.options['err_output_file'], 'w') as f:
+                        print('from numpy import array', file=f)
+                        for vec_type, vec in iteritems(self._err_cache):
+                            print('', file=f)
+                            print('# Vector %s, type %s' % (vec._name, vec._typ), file=f)
+                            for abs_name, view in iteritems(vec._views):
+                                print('prob["%s"][:] =' % abs_name, repr(view), file=f)
+
                 # Raise AnalysisError if requested.
                 if self.options['err_on_maxiter']:
                     msg = "Solver '{}' on system '{}' failed to converge."
@@ -387,7 +405,15 @@ class Solver(object):
         float
             error at the first iteration.
         """
-        pass
+        if self.options['err_output_file']:
+            if isinstance(self, NonlinearSolver):
+                self._err_cache['inputs'] = deepcopy(self._system._inputs)
+                self._err_cache['outputs'] = deepcopy(self._system._outputs)
+            else:  # it's a LinearSolver
+                self._err_cache['inputs'] = deepcopy(self._system._vectors['input']['linear'])
+                self._err_cache['outputs'] = deepcopy(self._system._vectors['output']['linear'])
+        else:
+            pass
 
     def _iter_execute(self):
         """
@@ -550,6 +576,8 @@ class NonlinearSolver(Solver):
         float
             error at the first iteration.
         """
+        super(NonlinearSolver, self)._iter_initialize()
+
         if self.options['maxiter'] > 0:
             self._run_apply()
             norm = self._iter_get_norm()
@@ -660,6 +688,8 @@ class LinearSolver(Solver):
         float
             error at the first iteration.
         """
+        super(LinearSolver, self)._iter_initialize()
+
         system = self._system
 
         if self._mode == 'fwd':
