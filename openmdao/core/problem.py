@@ -1471,6 +1471,10 @@ class Problem(object):
                         for vs in doutputs._data:
                             doutputs._data[vs][:] = save_vec[vs]
                     else:
+                        for vs in doutputs._data:
+                            # need to zero out the vector if we've not used it before
+                            doutputs._data[vs][:] = 0
+
                         self._lin_sol_cache[ikey] = deepcopy(doutputs._data)
 
                 model._solve_linear(lin_vec_names, mode, rel_systems)
