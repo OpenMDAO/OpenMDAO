@@ -30,7 +30,6 @@ class TestExternalCode(unittest.TestCase):
 
         self.extcode = ExternalCodeForTesting()
         self.prob = Problem()
-        self.prob.model = Group()
 
         self.prob.model.add_subsystem('extcode', self.extcode)
 
