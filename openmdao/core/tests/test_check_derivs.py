@@ -1166,68 +1166,6 @@ class TestProblemCheckPartials(unittest.TestCase):
         # columns) of the compact_print=True output. We should print the component name, then
         # repeat the full row for the worst-case subjac (i.e., output-input pair).
         # This should only occur in the compact_print=True case.
-        #
-        # -------------------
-        # Component: 'good'
-        # -------------------
-        # < output > wrt < variable > | fwd
-        # mag. | check
-        # mag. | a(fwd - chk) | r(fwd - chk)
-        # ---------------------------------------------------------------------------
-        #
-        # 'y'
-        # wrt
-        # 'x1' | 3.0000e+00 | 3.0000e+00 | 4.6884e-10 | 1.5628e-10
-        # 'y'
-        # wrt
-        # 'x2' | 4.0000e+00 | 4.0000e+00 | 5.5911e-10 | 1.3978e-10
-        # ------------------
-        # Component: 'bad'
-        # ------------------
-        # < output > wrt < variable > | fwd
-        # mag. | check
-        # mag. | a(fwd - chk) | r(fwd - chk)
-        # ---------------------------------------------------------------------------
-        #
-        # 'z'
-        # wrt
-        # 'y1' | 3.0000e+00 | 3.0000e+00 | 6.6366e-09 | 2.2122e-09
-        # 'z'
-        # wrt
-        # 'y2' | 4.0000e+01 | 4.0000e+00 | 3.6000e+01 | 9.0000e+00 > ABS_TOL > REL_TOL
-
-        # -----------------
-        # Component: 'c0'
-        # -----------------
-        # < output > wrt < variable > | fwd
-        # mag. | rev
-        # mag. | check
-        # mag. | a(fwd - chk) | a(rev - chk) | a(fwd - rev) | r(fwd - chk) | r(rev - chk) | r(
-        #     fwd - rev)
-        # --------------------------------------------------------------------------------------------------------------------------------------------
-        #
-        # 'z'
-        # wrt
-        # 'x1' | 3.0000e+00 | n / a | 3.0000e+00 | 1.0156e-06 | n / a | n / a | 3.3854e-07 | n / a | n / a > ABS_TOL
-        # 'z'
-        # wrt
-        # 'x2' | 4.4440e+03 | n / a | 4.4440e+03 | 1.9677e-06 | n / a | n / a | 4.4277e-10 | n / a | n / a > ABS_TOL
-        # -------------------
-        # Component: 'comp'
-        # -------------------
-        # < output > wrt < variable > | fwd
-        # mag. | rev
-        # mag. | check
-        # mag. | a(fwd - chk) | a(rev - chk) | a(fwd - rev) | r(fwd - chk) | r(rev - chk) | r(
-        #     fwd - rev)
-        # --------------------------------------------------------------------------------------------------------------------------------------------
-        #
-        # 'f_xy'
-        # wrt
-        # 'x' | 4.4423e+04 | 4.4423e+04 | 4.4423e+04 | 1.5877e-02 | 1.5877e-02 | 0.0000e+00 | 3.5740e-07 | 3.5740e-07 | 0.0000e+00 > ABS_TOL
-        # 'f_xy'
-        # wrt
-        # 'y' | 2.2193e+04 | 2.2193e+04 | 2.2193e+04 | 1.4622e-02 | 1.4622e-02 | 0.0000e+00 | 6.5884e-07 | 6.5884e-07 | 0.0000e+00 > ABS_TOL
 
         class MyCompGoodPartials(ExplicitComponent):
             def setup(self):
@@ -1283,15 +1221,12 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.check_partials(compact_print=True)
         self.assertEqual(stream.getvalue().count("'z'        wrt 'y1'"),2)
 
+    def test_check_partials_show_only_incorrect(self):
         # The second is adding an option to show only the incorrect subjacs
         # (according to abs_err_tol and rel_err_tol), called
         # show_only_incorrect. This should be False by default, but when True,
         # it should print only the subjacs found to be incorrect. This applies
         # to both compact_print=True and False.
-
-        # prob.check_partials(compact_print=True,show_only_incorrect=True)
-
-    def test_check_partials_show_only_incorrect(self):
         class MyCompGoodPartials(ExplicitComponent):
             def setup(self):
                 self.add_input('x1', 3.0)
@@ -1341,22 +1276,16 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-
-        # The second is adding an option to show only the incorrect subjacs
-        # (according to abs_err_tol and rel_err_tol), called
-        # show_only_incorrect. This should be False by default, but when True,
-        # it should print only the subjacs found to be incorrect. This applies
-        # to both compact_print=True and False.
-
         stream = cStringIO()
+        # prob.check_partials(compact_print=True,show_only_incorrect=False)
         prob.check_partials(out_stream=stream, compact_print=True,show_only_incorrect=True)
         self.assertEqual(stream.getvalue().count("MyCompBadPartials"),2)
         self.assertEqual(stream.getvalue().count("'z'        wrt 'y1'"),2)
         self.assertEqual(stream.getvalue().count("MyCompGoodPartials"),0)
 
         stream = cStringIO()
+        prob.check_partials( compact_print=False,show_only_incorrect=False)
         prob.check_partials( out_stream=stream, compact_print=False,show_only_incorrect=True)
-        # prob.check_partials( compact_print=False,show_only_incorrect=True)
         self.assertEqual(stream.getvalue().count("MyCompGoodPartials"),0)
         self.assertEqual(stream.getvalue().count("MyCompBadPartials"),1)
 
@@ -1678,6 +1607,60 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob.check_partials(compact_print=True)
 
+    def test_feature_check_partials_show_only_incorrect(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
+
+        class MyCompGoodPartials(ExplicitComponent):
+            def setup(self):
+                self.add_input('x1', 3.0)
+                self.add_input('x2', 5.0)
+                self.add_output('y', 5.5)
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                """ Doesn't do much. """
+                outputs['y'] = 3.0 * inputs['x1'] + 4.0 * inputs['x2']
+
+            def compute_partials(self, inputs, partials):
+                """Correct derivative."""
+                J = partials
+                J['y', 'x1'] = np.array([3.0])
+                J['y', 'x2'] = np.array([4.0])
+
+        class MyCompBadPartials(ExplicitComponent):
+            def setup(self):
+                self.add_input('y1', 3.0)
+                self.add_input('y2', 5.0)
+                self.add_output('z', 5.5)
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                """ Doesn't do much. """
+                outputs['z'] = 3.0 * inputs['y1'] + 4.0 * inputs['y2']
+
+            def compute_partials(self, inputs, partials):
+                """Intentionally incorrect derivative."""
+                J = partials
+                J['z', 'y1'] = np.array([33.0])
+                J['z', 'y2'] = np.array([40.0])
+
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('p0', IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p1', IndepVarComp('x2', 5.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y2', 6.0))
+        prob.model.add_subsystem('good', MyCompGoodPartials())
+        prob.model.add_subsystem('bad', MyCompBadPartials())
+        prob.model.connect('p0.x1', 'good.x1')
+        prob.model.connect('p1.x2', 'good.x2')
+        prob.model.connect('good.y', 'bad.y1')
+        prob.model.connect('p2.y2', 'bad.y2')
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+        prob.run_model()
+
+        prob.check_partials(compact_print=True,show_only_incorrect=True)
+        prob.check_partials(compact_print=False,show_only_incorrect=True)
 
 class TestProblemCheckTotals(unittest.TestCase):
 

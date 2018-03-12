@@ -205,6 +205,7 @@ _ufunc_test_data = {'abs': {'str': 'f=abs(x)',
                               'args': {'f': {'value': np.zeros(21)}}}, }
 
 
+
 class TestExecComp(unittest.TestCase):
 
     def test_colon_vars(self):
@@ -676,6 +677,9 @@ class TestExecComp(unittest.TestCase):
     ), testcase_func_name=lambda f, n, p: 'test_exec_comp_jac_' + '_'.join(a for a in p.args)
     )
     def test_exec_comp_jac(self, f):
+
+        # if f != 'isnan':
+        #     return
 
         test_data = _ufunc_test_data[f]
 

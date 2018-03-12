@@ -8,7 +8,7 @@ from collections import OrderedDict, defaultdict, namedtuple
 from itertools import product
 
 from six import iteritems, iterkeys, itervalues
-from six.moves import range
+from six.moves import range, cStringIO
 
 import numpy as np
 import scipy.sparse as sparse
@@ -1673,9 +1673,14 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
 
     # Keep track of the worst subjac in terms of relative error for fwd and rev
-    if not suppress_output and compact_print and not totals:
+    # if not suppress_output and compact_print and not totals:
+    if not suppress_output and not totals:
         worst_subjac_rel_err = 0.0
         worst_subjac = None
+
+    if not suppress_output and not totals and show_only_incorrect:
+        out_stream.write('\n** Only writing information about components with '
+                         'incorrect Jacobians **\n\n')
 
     for system in system_list:
         # No need to see derivatives of IndepVarComps
@@ -1683,6 +1688,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             continue
 
         sys_name = system.pathname
+        sys_class_name = type(system).__name__
 
         # # Match header to appropriate type.
         if isinstance(system, Component):
@@ -1691,11 +1697,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             sys_type = 'Group'
         else:
             sys_type = type(system).__name__
-
-
-        sys_class_name = type(system).__name__
-
-
 
         derivatives = derivative_data[sys_name]
 
@@ -1706,10 +1707,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         sorted_keys = sorted(iterkeys(derivatives))
 
         if not suppress_output:
-            from six.moves import cStringIO
-            out_buffer = cStringIO()
-
-            num_bad_jacs = 0
+            out_buffer = cStringIO() # Need to capture the output of a component's derivative
+                                     # info so that it can be used if that component is the
+                                     # worst subjac. That info is printed at the bottom of all the
+                                     # output
+            num_bad_jacs = 0 # Keep track of number of bad derivative values for each component
             if out_stream:
                 header_str = '-' * (len(sys_name) + len(sys_type) + len(sys_class_name) + 5) + '\n'
                 out_buffer.write(header_str)
@@ -1827,7 +1829,9 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             if not np.isnan(error) and error >= abs_error_tol:
                                 error_string += ' >ABS_TOL'
                                 break
-                        is_worst_subjac = False
+                        is_worst_subjac = False # See if this component has the greater
+                                                # error in the derivative computation
+                                                # compared to the other components so far
                         for i, error in enumerate(rel_err):
                             if not np.isnan(error):
                                 if i < 2 and error > worst_subjac_rel_err: #  only 1st and 2d errs
@@ -1840,7 +1844,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
                         if error_string:
                             num_bad_jacs += 1
-
 
                         if out_stream:
                             if not all_comps_provide_jacs:
@@ -1923,6 +1926,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         if out_stream:
                             out_buffer.write('    Relative Error {}: {}'.format(desc, error_str) +
                                              '\n')
+
                     if out_stream:
                         out_buffer.write('\n')
 
@@ -1946,18 +1950,25 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     if out_stream:
                         out_buffer.write(' -' * 30 + '\n')
 
+                # End of if compact print if/else
+            # End of if not suppress_output
+        # End of for of, wrt in sorted_keys
+    # End of for system in system_list
+
         if not show_only_incorrect or num_bad_jacs:
             if out_stream and not suppress_output:
                 out_stream.write(out_buffer.getvalue())
 
     if not suppress_output and compact_print and not totals:
-        worst_subjac_header = "Sub Jacobian with Largest Relative Error: {1} '{2}'".format(*worst_subjac)
-        out_stream.write('\n' + '#' * len(worst_subjac_header) + '\n')
-        out_stream.write("{}\n".format(worst_subjac_header))
-        out_stream.write('#' * len(worst_subjac_header) + '\n')
-        out_stream.write(header + '\n')
-        out_stream.write('-' * len(header) + '\n')
-        out_stream.write(worst_subjac_line + '\n')
+        if worst_subjac:
+            worst_subjac_header = "Sub Jacobian with Largest Relative Error: {1} '{2}'".format(*worst_subjac)
+            out_stream.write('\n' + '#' * len(worst_subjac_header) + '\n')
+            out_stream.write("{}\n".format(worst_subjac_header))
+            out_stream.write('#' * len(worst_subjac_header) + '\n')
+            out_stream.write(header + '\n')
+            out_stream.write('-' * len(header) + '\n')
+            out_stream.write(worst_subjac_line + '\n')
+
 
 def _format_if_not_matrix_free(matrix_free, val):
     """
