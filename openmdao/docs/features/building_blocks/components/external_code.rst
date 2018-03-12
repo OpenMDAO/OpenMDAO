@@ -123,7 +123,7 @@ Here is a version of our external script that writes its derivatives to a second
 .. embed-code::
     openmdao.components.tests.extcode_paraboloid_derivs
 
-And the corresponding the `ParaboloidExternalCodeDerivs` component:
+And the corresponding `ParaboloidExternalCodeDerivs` component:
 
 .. embed-code::
     openmdao.components.tests.test_external_code.ParaboloidExternalCodeDerivs
