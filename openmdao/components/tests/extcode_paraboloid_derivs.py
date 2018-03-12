@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# usage: extcode_paraboloid_deriv.py input_filename output_filename derivs_filename
+# usage: extcode_paraboloid_derivs.py input_filename output_filename derivs_filename
 #
 # Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
 #
