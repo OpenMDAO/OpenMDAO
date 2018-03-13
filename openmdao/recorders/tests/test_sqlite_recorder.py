@@ -24,6 +24,7 @@ from openmdao.recorders.tests.sqlite_recorder_test_utils import assertDriverIter
     assertSystemIterationDataRecorded, assertSolverIterationDataRecorded, assertMetadataRecorded, \
     assertDriverMetadataRecorded
 from openmdao.recorders.tests.recorder_test_utils import run_driver
+from openmdao.utils.assert_utils import assert_rel_error
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -49,18 +50,30 @@ class TestSqliteRecorder(unittest.TestCase):
     CaseRecorder
     """
     def setUp(self):
+        import os
+        from tempfile import mkdtemp
+        from openmdao.api import SqliteRecorder
+        from openmdao.recorders.recording_iteration_stack import recording_iteration
+
         recording_iteration.stack = []
         self.dir = mkdtemp()
-        self.filename = os.path.join(self.dir, "sqlite_test")
+        self.startdir = os.getcwd()
+        self.filename = "sqlite_test"
+        self.eps = 1e-3
+
+        os.chdir(self.dir)
+
         self.recorder = SqliteRecorder(self.filename)
         # print(self.filename)  # comment out to make filename printout go away.
+
         self.eps = 1e-3
 
     def tearDown(self):
+        os.chdir(self.startdir)
+
         # return  # comment out to allow db file to be removed.
         try:
             rmtree(self.dir)
-            pass
         except OSError as e:
             # If directory already deleted, keep going
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
@@ -324,7 +337,50 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
                                            expected_objectives, expected_constraints, None),), self.eps)
-    
+
+    def test_feature_simple_driver_recording(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, \
+            ScipyOptimizeDriver, SqliteRecorder, CaseReader
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.driver = ScipyOptimizeDriver()
+
+        case_recorder_filename = 'cases.sql'
+        recorder = SqliteRecorder(case_recorder_filename)
+
+        prob.driver.add_recorder(recorder)
+        prob.driver.recording_options['record_desvars'] = True
+        prob.driver.recording_options['record_responses'] = True
+        prob.driver.recording_options['record_objectives'] = True
+        prob.driver.recording_options['record_constraints'] = True
+
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(case_recorder_filename)
+        case = cr.driver_cases.get_case('rank0:SLSQP|3')
+
+        assert_rel_error(self, case.desvars['x'], 7.16666667, 1e-6)
+        assert_rel_error(self, case.desvars['y'], -7.83333333, 1e-6)
+
+
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
     def test_driver_everything_recorded_by_default(self):
@@ -541,7 +597,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.cleanup()
 
-        coordinate = [0, 'SLSQP', (5, )]
+        coordinate = [0, 'SLSQP', (4, )]
 
         expected_desvars = {"p1.x": prob["p1.x"]}
 
@@ -591,7 +647,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.cleanup()
 
-        coordinate = [0, 'SLSQP', (5, )]
+        coordinate = [0, 'SLSQP', (4, )]
 
         expected_desvars = {"p1.x": prob["p1.x"]}
 
@@ -655,8 +711,8 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
                                                  expected_outputs, expected_residuals),), self.eps)
 
-        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
-                      'pz._solve_nonlinear', (2, )]
+        coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (1, ), 'NLRunOnce', (0, ),
+                      'pz._solve_nonlinear', (1, )]
 
         expected_inputs = None
         expected_outputs = {"pz.z": [2.8640616, 0.825643, ], }
@@ -1237,7 +1293,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.cleanup()
 
         # Driver recording test
-        coordinate = [0, 'SLSQP', (7, )]
+        coordinate = [0, 'SLSQP', (6, )]
 
         expected_desvars = {
                             "pz.z": self.prob['pz.z'],
@@ -1255,8 +1311,8 @@ class TestSqliteRecorder(unittest.TestCase):
                                            expected_objectives, expected_constraints, None),), self.eps)
 
         # System recording test
-        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
-                      'pz._solve_nonlinear', (2, )]
+        coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (1, ), 'NLRunOnce', (0, ),
+                      'pz._solve_nonlinear', (1, )]
 
         expected_inputs = None
         expected_outputs = {"pz.z": [2.8640616, 0.825643, ], }
@@ -1265,8 +1321,8 @@ class TestSqliteRecorder(unittest.TestCase):
                                                  expected_residuals), ), self.eps)
 
         # Solver recording test
-        coordinate = [0, 'SLSQP', (6, ), 'root._solve_nonlinear', (6, ), 'NLRunOnce', (0, ),
-                      'mda._solve_nonlinear', (6, ), 'NonlinearBlockGS', (4, )]
+        coordinate = [0, 'SLSQP', (5, ), 'root._solve_nonlinear', (5, ), 'NLRunOnce', (0, ),
+                      'mda._solve_nonlinear', (5, ), 'NonlinearBlockGS', (3, )]
 
         expected_abs_error = 0.0,
 
@@ -1501,7 +1557,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.cleanup()
 
         # Driver recording test
-        coordinate = [0, 'SLSQP', (7, )]
+        coordinate = [0, 'SLSQP', (6, )]
 
         expected_desvars = {
                             "pz.z": self.prob['pz.z'],

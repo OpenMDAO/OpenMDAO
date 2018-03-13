@@ -149,8 +149,8 @@ class DistributedRecorderTest(unittest.TestCase):
             self.fail('RuntimeError expected.')
 
     def test_distrib_record_driver(self):
-        size = 100  # how many items in the array
 
+        size = 100  # how many items in the array
         prob = Problem()
         prob.model = Group()
 
@@ -237,7 +237,7 @@ class DistributedRecorderTest(unittest.TestCase):
         # Get values for vars on this rank
         inputs, outputs, residuals = prob.model.get_nonlinear_vectors()
         #   Potential local sysvars are in this
-        sysvars = outputs._names
+        sysvars = outputs._views
         # Just get the values for the sysincl vars on this rank
         local_vars = {c: sysvars[c] for c in local_inclnames}
         # Gather up the values for all the sysincl vars on all ranks
@@ -258,7 +258,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
 
         if prob.comm.rank == 0:
-            coordinate = [0, 'SLSQP', (49,)]
+            coordinate = [0, 'SLSQP', (48,)]
             self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
                                                      expected_objectives, expected_constraints,
                                                      expected_includes),), self.eps)

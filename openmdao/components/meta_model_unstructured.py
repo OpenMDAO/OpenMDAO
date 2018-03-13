@@ -1,5 +1,7 @@
 """MetaModel provides basic meta modeling capability."""
 
+from six.moves import range
+
 import numpy as np
 from copy import deepcopy
 
@@ -18,11 +20,47 @@ class MetaModelUnStructured(ExplicitComponent):
     'train:' prepended to the corresponding inputeter/output name.
 
     For a Float variable, the training data is an array of length m.
+
+    Attributes
+    ----------
+    _surrogate_input_names : [str, ..]
+        List of inputs that are not the training vars
+    _surrogate_output_names : [str, ..]
+        List of outputs that are not the training vars
+    _vectorize : None or int
+        First dimension of all inputs and outputs for case where data is vectorized
+    warm_restart : bool
+        When set to False (default), the metamodel retrains with the new
+        dataset whenever the training data values are changed. When set to
+        True, the new data is appended to the old data and all of the data
+        is used to train.
+    _surrogate_overrides : set
+        keeps track of which sur_<name> slots are full.
+    _training_input : dict
+        Training data for inputs.
+    _training_output : dict
+        Training data for outputs.
+    _input_size : int
+        Keeps track of the cumulative size of all inputs.
+    default_surrogate : str
+        This surrogate will be used for all outputs that don't have
+        a specific surrogate assigned to them
+    train : bool
+        If True, training will occur on the first execution.
+
+
     """
 
     def __init__(self, default_surrogate=None, vectorize=None):
         """
         Initialize all attributes.
+
+        Parameters
+        ----------
+        default_surrogate : SurrogateModel
+            Default surrogate model to use.
+        vectorize : None or int
+            First dimension of all inputs and outputs for case where data is vectorized, optional.
         """
         super(MetaModelUnStructured, self).__init__()
 
@@ -67,13 +105,18 @@ class MetaModelUnStructured(ExplicitComponent):
         ----------
         name : string
             Name of the input.
-
         val : float or ndarray
             Initial value for the input.
-
         training_data : float or ndarray
             training data for this variable. Optional, can be set
             by the problem later.
+        **kwargs : dict
+            Additional agruments for add_input.
+
+        Returns
+        -------
+        dict
+            metadata for added variable
         """
         metadata = super(MetaModelUnStructured, self).add_input(name, val, **kwargs)
 
@@ -95,7 +138,7 @@ class MetaModelUnStructured(ExplicitComponent):
 
         return metadata
 
-    def add_output(self, name, val=1.0, training_data=None, num_training_points=None, **kwargs):
+    def add_output(self, name, val=1.0, training_data=None, **kwargs):
         """
         Add an output to this component and a corresponding training output.
 
@@ -103,14 +146,19 @@ class MetaModelUnStructured(ExplicitComponent):
         ----------
         name : string
             Name of the variable output.
-
         val : float or ndarray
             Initial value for the output. While the value is overwritten during
             execution, it is useful for inferring size.
-
         training_data : float or ndarray
             training data for this variable. Optional, can be set
             by the problem later.
+        **kwargs : dict
+            Additional arguments for add_output.
+
+        Returns
+        -------
+        dict
+            metadata for added variable
         """
         surrogate = kwargs.pop('surrogate', None)
 
@@ -144,9 +192,14 @@ class MetaModelUnStructured(ExplicitComponent):
 
     def _setup_vars(self, recurse=True):
         """
-        Return our inputs and outputs dictionaries re-keyed to use absolute variable names.
+        Call setup in components and count variables, total and by var_set.
 
         Also instantiates surrogates for the output variables that use the default surrogate.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
         """
         # create an instance of the default surrogate for outputs that
         # did not have a surrogate specified
@@ -160,7 +213,7 @@ class MetaModelUnStructured(ExplicitComponent):
         # training will occur on first execution after setup
         self.train = True
 
-        return super(MetaModelUnStructured, self)._setup_vars()
+        super(MetaModelUnStructured, self)._setup_vars()
 
     def check_config(self, logger):
         """
@@ -197,7 +250,6 @@ class MetaModelUnStructured(ExplicitComponent):
         ----------
         inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
@@ -455,10 +507,21 @@ class MetaModelUnStructured(ExplicitComponent):
 
 
 class MetaModel(MetaModelUnStructured):
-    """Deprecated."""
+    """
+    Deprecated.
+    """
 
     def __init__(self, *args, **kwargs):
-        """Capture Initialize to throw warning."""
+        """
+        Capture Initialize to throw warning.
+
+        Parameters
+        ----------
+        *args : list
+            Deprecated arguments.
+        **kwargs : dict
+            Deprecated arguments.
+        """
         warn_deprecation("'MetaModel' component has been deprecated. Use"
                          "'MetaModelUnStructured' instead.")
         super(Metamodel, self).__init__(*args, **kwargs)

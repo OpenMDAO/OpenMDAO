@@ -96,11 +96,9 @@ class ComplexStep(ApproximationScheme):
         ----------
         system : System
             System on which the execution is run.
-
         jac : None or dict-like
             If None, update system with the approximated sub-Jacobians. Otherwise, store the
             approximations in the given dict-like object.
-
         deriv_type : str
             One of 'total' or 'partial', indicating if total or partial derivatives are
             being approximated.
@@ -137,10 +135,8 @@ class ComplexStep(ApproximationScheme):
                 in_idx = system._owns_approx_wrt_idx[wrt]
                 in_size = len(in_idx)
             else:
-                if wrt in system._var_abs2meta['input']:
-                    in_size = system._var_abs2meta['input'][wrt]['size']
-                elif wrt in system._var_abs2meta['output']:
-                    in_size = system._var_abs2meta['output'][wrt]['size']
+                if wrt in system._var_abs2meta:
+                    in_size = system._var_abs2meta[wrt]['size']
 
                 in_idx = range(in_size)
 
@@ -155,7 +151,7 @@ class ComplexStep(ApproximationScheme):
                     out_idx = system._owns_approx_of_idx[of]
                     out_size = len(out_idx)
                 else:
-                    out_size = system._var_abs2meta['output'][of]['size']
+                    out_size = system._var_abs2meta[of]['size']
 
                 outputs.append((of, np.zeros((out_size, in_size))))
 

@@ -460,22 +460,17 @@ class InputFileGenerator(object):
         ----------
         value : float, integer, bool, str
             Array of values to insert.
-
         row_start : integer
             Starting row for inserting the array. This is relative
             to the anchor, and can be negative.
-
         field_start : integer
             Starting field in the given row_start as denoted by
             delimiter(s).
-
         field_end : integer
             The final field the array uses in row_end.
             We need this to figure out if the template is too small or large
-
         row_end : integer, optional
             Use if the array wraps to cover additional lines.
-
         sep : integer, optional
             Separator to use if we go beyond the template.
         """
@@ -525,18 +520,14 @@ class InputFileGenerator(object):
         ----------
         value : ndarray
             Array of values to insert.
-
         row_start : integer
             Starting row for inserting the array. This is relative
             to the anchor, and can be negative.
-
         row_end : integer
             Final row for the array, relative to the anchor.
-
         field_start : integer
             starting field in the given row_start as denoted by
             delimiter(s).
-
         field_end : integer
             The final field the array uses in row_end.
             We need this to figure out if the template is too small or large.
@@ -702,7 +693,6 @@ class FileParser(object):
         ----------
         anchor : str
             The text you want to search for.
-
         occurrence : integer
             Find nth instance of text; default is 1 (first). Use -1 to
             find last occurrence. Reverse searches always start at the end
@@ -794,11 +784,9 @@ class FileParser(object):
         row : integer
             Number of lines offset from anchor line (0 is anchor line).
             This can be negative.
-
         field : integer
             If the delimiter is a set of chars: which word in line to retrieve.
             If the delimiter is 'columns': character position to start.
-
         fieldend : integer (optional)
             If the delimiter is a set of chars: IGNORED.
             If the delimiter is 'columns': position of last character to return, or if
@@ -844,15 +832,12 @@ class FileParser(object):
         ----------
         key : string
             the key to search for.
-
         field : integer
             Which field to transfer. Field 0 is the key.
-
         occurrence : integer
             Find nth instance of text; default is 1 (first value
             field). Use -1 to find last occurance. Position 0 is the key
             field, so it should not be used as a value for occurrence.
-
         rowoffset : integer (optional)
             Optional row offset from the occurrence of key. This can
             also be negative.
@@ -908,13 +893,10 @@ class FileParser(object):
         ----------
         rowstart : integer
             Row number to start, relative to the current anchor.
-
         fieldstart : integer
             Field number to start.
-
         rowend : integer, optional
             Row number to end. If not set, then only one row is grabbed.
-
         fieldend : integer
             Field number to end.
 
@@ -981,13 +963,10 @@ class FileParser(object):
         ----------
         rowstart : integer
             Row number to start, relative to the current anchor.
-
         fieldstart : integer
             Field number to start.
-
         rowend : integer
             Row number to end relative to current anchor.
-
         fieldend : integer (optional)
             Field number to end. If not specified, grabs all fields up to the
             end of the line.

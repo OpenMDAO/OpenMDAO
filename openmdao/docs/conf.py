@@ -18,10 +18,11 @@ for mod_name in MOCK_MODULES:
     try:
         importlib.import_module(mod_name)
     except ImportError:
-        sys.modules.update({mod_name: Mock()})
+        sys.modules[mod_name]=Mock()
 
 # start off running the monkeypatch to keep options/parameters
 # usable in docstring for autodoc.
+
 
 def __init__(self, docstring, config={}):
     """
@@ -90,11 +91,11 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'numpydoc',
-    'show_unittest_examples',
     'embed_code',
     'embed_options',
-    'embed_test',
     'embed_compare',
+    'embed_shell_cmd',
+    'embed_bibtex',
     'tags'
 ]
 
@@ -153,11 +154,31 @@ language = None
 
 # exclude_patterns is a list of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-from openmdao.docs._utils.generate_sourcedocs import generate_docs
 exclude_patterns = ['_build', '_srcdocs/dev']
 absp = os.path.join('.', '_srcdocs')
 sys.path.insert(0, os.path.abspath(absp))
-generate_docs()
+
+packages = [
+    'approximation_schemes',
+    'core',
+    'components',
+    'drivers',
+    'error_checking',
+    'jacobians',
+    'matrices',
+    'proc_allocators',
+    'recorders',
+    'solvers',
+    'surrogate_models',
+    'solvers.linear',
+    'solvers.nonlinear',
+    'solvers.linesearch',
+    'test_suite',
+    'test_suite.components',
+    'vectors',
+]
+from openmdao.docs._utils.generate_sourcedocs import generate_docs
+generate_docs("..", "../..", packages)
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
@@ -192,7 +213,7 @@ htmlhelp_basename = 'OpenMDAOdoc'
 
 #Customize sidebar
 html_sidebars = {
-   '**': ['globaltoc.html']
+   '**': ['globaltoc.html', 'searchbox.html']
 }
 # -- Options for manual page output ---------------------------------------
 

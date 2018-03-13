@@ -1,16 +1,16 @@
 .. _`beam_optimization_example`:
 
-Optimizing the thickness distribution of a cantilever beam using the adjoint method
+Optimizing the Thickness Distribution of a Cantilever Beam Using the Adjoint Method
 ===================================================================================
 
-In this example, we optimize the thickness (height) distribution of cantilever beam
+In this example, we optimize the thickness (height) distribution of a cantilever beam
 using the adjoint method to compute the gradient.
 We use Euler--Bernoulli beam theory and assume a rectangular section.
 
 Background
 ----------
 
-The optimization problem is
+The optimization problem is:
 
 .. math ::
 
@@ -83,9 +83,9 @@ Implementation: optimization script
 
 Here is the optimization script:
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.beam_optimization.test_beam_optimization.TestCase.test
-    :no-split:
+    :layout: code, output
 
 The optimized thickness distribution looks like this:
 

@@ -186,7 +186,7 @@ class PETScKrylov(LinearSolver):
 
         Parameters
         ----------
-        **kwargs : {}
+        **kwargs : dict
             dictionary of options set by the instantiating class/script.
         """
         if PETSc is None:
@@ -326,6 +326,8 @@ class PETScKrylov(LinearSolver):
             list of vector names.
         mode : string
             Derivative mode, can be 'fwd' or 'rev'.
+        rel_systems : set of str
+            Names of systems relevant to the current solve.
 
         Returns
         -------
@@ -364,19 +366,19 @@ class PETScKrylov(LinearSolver):
             rhs_array = b_vec.get_data()
 
             # create PETSc vectors from numpy arrays
-            self.sol_petsc_vec = PETSc.Vec().createWithArray(sol_array,
-                                                             comm=system.comm)
-            self.rhs_petsc_vec = PETSc.Vec().createWithArray(rhs_array,
-                                                             comm=system.comm)
+            sol_petsc_vec = PETSc.Vec().createWithArray(sol_array, comm=system.comm)
+            rhs_petsc_vec = PETSc.Vec().createWithArray(rhs_array, comm=system.comm)
 
             # run PETSc solver
             self._iter_count = 0
             ksp = self._get_ksp_solver(system, vec_name)
             ksp.setTolerances(max_it=maxiter, atol=atol, rtol=rtol)
-            ksp.solve(self.rhs_petsc_vec, self.sol_petsc_vec)
+            ksp.solve(rhs_petsc_vec, sol_petsc_vec)
 
             # stuff the result into the x vector
             x_vec.set_data(sol_array)
+
+            sol_petsc_vec = rhs_petsc_vec = None
 
         return False, 0., 0.
 
@@ -511,7 +513,7 @@ class PetscKSP(PETScKrylov):
 
         Parameters
         ----------
-        kwargs : dict
+        **kwargs : dict
             Named args.
         """
         super(PetscKSP, self).__init__(**kwargs)

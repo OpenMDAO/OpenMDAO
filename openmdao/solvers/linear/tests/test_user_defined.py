@@ -8,7 +8,7 @@ import numpy as np
 
 from openmdao.api import Group, Problem, ImplicitComponent, PETScKrylov, LinearRunOnce, \
      IndepVarComp
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.solvers.linear.user_defined import LinearUserDefined
 from openmdao.utils.array_utils import evenly_distrib_idxs
 

@@ -3,7 +3,7 @@ import numpy as np
 import unittest
 
 from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, DefaultVector
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -60,7 +60,7 @@ class Test(unittest.TestCase):
     def test_var_indices(self):
         def get_inds(p, sname, type_):
             system = p.model._get_subsystem(sname) if sname else p.model
-            idxs = p.model._var_allprocs_abs2idx['linear'][type_]
+            idxs = p.model._var_allprocs_abs2idx['linear']
             return np.array([
                 idxs[name] for name in system._var_abs_names[type_]
             ])

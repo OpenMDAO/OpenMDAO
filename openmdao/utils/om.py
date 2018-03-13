@@ -1,6 +1,7 @@
 """
 A console script wrapper for multiple openmdao functions.
 """
+from __future__ import print_function
 
 import sys
 import os
@@ -8,6 +9,7 @@ import argparse
 from six import iteritems
 
 from openmdao.core.problem import Problem
+from openmdao.utils.coloring import _simul_coloring_setup_parser, _simul_coloring_cmd
 from openmdao.devtools.problem_viewer.problem_viewer import view_model
 from openmdao.devtools.viewconns import view_connections
 from openmdao.devtools.debug import config_summary, tree, dump_dist_idxs
@@ -15,12 +17,15 @@ from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
 from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setup_parser
 from openmdao.devtools.iprofile import _iprof_totals_exec, _iprof_totals_setup_parser
 from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser
+from openmdao.error_checking.check_config import _check_config_cmd, _check_config_setup_parser
 from openmdao.devtools.iprof_utils import _Options
+
+from openmdao.utils.find_cite import print_citations
 
 
 def _view_model_setup_parser(parser):
     """
-    Set up the openmdaosubparser for the 'openmdaoview_model' command.
+    Set up the openmdao subparser for the 'openmdao view_model' command.
 
     Parameters
     ----------
@@ -41,7 +46,7 @@ def _view_model_setup_parser(parser):
 
 def _view_model_cmd(options):
     """
-    Return the post_setup hook function for 'openmdaoview_model'.
+    Return the post_setup hook function for 'openmdao view_model'.
 
     Parameters
     ----------
@@ -64,7 +69,7 @@ def _view_model_cmd(options):
 
 def _view_connections_setup_parser(parser):
     """
-    Set up the openmdaosubparser for the 'openmdaoview_connections' command.
+    Set up the openmdao subparser for the 'openmdao view_connections' command.
 
     Parameters
     ----------
@@ -80,7 +85,7 @@ def _view_connections_setup_parser(parser):
 
 def _view_connections_cmd(options):
     """
-    Return the post_setup hook function for 'openmdaoview_connections'.
+    Return the post_setup hook function for 'openmdao view_connections'.
 
     Parameters
     ----------
@@ -100,7 +105,7 @@ def _view_connections_cmd(options):
 
 def _config_summary_setup_parser(parser):
     """
-    Set up the openmdaosubparser for the 'openmdaosummary' command.
+    Set up the openmdao subparser for the 'openmdao summary' command.
 
     Parameters
     ----------
@@ -112,7 +117,7 @@ def _config_summary_setup_parser(parser):
 
 def _config_summary_cmd(options):
     """
-    Return the post_setup hook function for 'openmdaosummary'.
+    Return the post_setup hook function for 'openmdao summary'.
 
     Parameters
     ----------
@@ -132,7 +137,7 @@ def _config_summary_cmd(options):
 
 def _tree_setup_parser(parser):
     """
-    Set up the openmdaosubparser for the 'openmdaotree' command.
+    Set up the openmdao subparser for the 'openmdao tree' command.
 
     Parameters
     ----------
@@ -143,7 +148,8 @@ def _tree_setup_parser(parser):
     parser.add_argument('-o', default=None, action='store', dest='outfile',
                         help='Output file name. By default, output goes to stdout.')
     parser.add_argument('-c', '--colors', action='store_true', dest='show_colors',
-                        help="Display colors if the terminal supports it.")
+                        help="Display colors if the terminal supports it.  Requires 'colorama' "
+                             "python package.  Use 'pip install colorama' to install it.")
     parser.add_argument('-d', '--depth', action='store', type=int, dest='depth',
                         default=0, help="Max depth of tree to display.")
     parser.add_argument('-a', '--attr', action='append', default=[], dest='attrs',
@@ -193,7 +199,7 @@ def _get_tree_filter(attrs, vecvars):
 
 def _tree_cmd(options):
     """
-    Return the post_setup hook function for 'openmdaotree'.
+    Return the post_setup hook function for 'openmdao tree'.
 
     Parameters
     ----------
@@ -224,7 +230,7 @@ def _tree_cmd(options):
 
 def _dump_dist_idxs_setup_parser(parser):
     """
-    Set up the openmdaosubparser for the 'openmdaodump_idxs' command.
+    Set up the openmdao subparser for the 'openmdao dump_idxs' command.
 
     Parameters
     ----------
@@ -240,7 +246,7 @@ def _dump_dist_idxs_setup_parser(parser):
 
 def _dump_dist_idxs_cmd(options):
     """
-    Return the post_setup hook function for 'openmdaodump_idxs'.
+    Return the post_setup hook function for 'openmdao dump_idxs'.
 
     Parameters
     ----------
@@ -261,6 +267,51 @@ def _dump_dist_idxs_cmd(options):
         dump_dist_idxs(prob, vec_name=options.vecname, stream=out)
         exit()
     return _dumpdist
+
+
+def _cite_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao cite' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-o', default=None, action='store', dest='outfile',
+                        help='Name of output file.  By default, output goes to stdout.')
+    parser.add_argument('-c', '--class', action='append', default=[], dest='classes',
+                        help='Find citation for this class.')
+
+
+def _cite_cmd(options):
+    """
+    Return the post setup hook function for `openmdao cite`.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
+    if options.outfile is None:
+        out = sys.stdout
+    else:
+        out = open(options.outfile, 'w')
+
+    if not options.classes:
+        options.classes = None
+
+    def _cite(prob):
+        print_citations(prob, classes=options.classes, out_stream=out)
+        exit()
+
+    return _cite
 
 
 def _post_setup_exec(options):
@@ -305,7 +356,11 @@ _post_setup_map = {
     'summary': (_config_summary_setup_parser, _config_summary_cmd),
     'tree': (_tree_setup_parser, _tree_cmd),
     'dump_idxs': (_dump_dist_idxs_setup_parser, _dump_dist_idxs_cmd),
+    'simul_coloring': (_simul_coloring_setup_parser, _simul_coloring_cmd),
+    'cite': (_cite_setup_parser, _cite_cmd),
+    'check': (_check_config_setup_parser, _check_config_cmd),
 }
+
 
 # Other non-post-setup functions go here
 _iprof_map = {
@@ -339,4 +394,7 @@ def openmdao_cmd():
         _post_setup_exec(_Options(file=[args[0]], func=None))
     else:
         options = parser.parse_args()
-        options.executor(options)
+        if hasattr(options, 'executor'):
+            options.executor(options)
+        else:
+            print("\nNothing to do.")

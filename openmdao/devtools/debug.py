@@ -5,8 +5,6 @@ from __future__ import print_function
 import sys
 import os
 
-from resource import getrusage, RUSAGE_SELF, RUSAGE_CHILDREN
-
 from six.moves import zip_longest
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group, System
@@ -56,7 +54,7 @@ def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma:
             set_total = 0
             for rank in range(g.comm.size):
                 for ivar, vname in enumerate(vnames[type_]):
-                    vset = abs2meta[type_][vname]['var_set']
+                    vset = abs2meta[vname]['var_set']
                     if vset == sname:
                         sz = sizes[type_][vset][rank, set_idxs[type_][vname]]
                         if sz > 0:
@@ -119,7 +117,8 @@ def _get_color_printer(stream=sys.stdout, colors=True):
     return color_print, Fore, Back, Style
 
 
-def tree(top, show_solvers=True, show_colors=True, filter=None, max_depth=0, stream=sys.stdout):
+def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
+         filter=None, max_depth=0, stream=sys.stdout):
     """
     Dump the model tree structure to the given stream.
 
@@ -131,7 +130,9 @@ def tree(top, show_solvers=True, show_colors=True, filter=None, max_depth=0, str
     top : System or Problem
         The top object in the tree.
     show_solvers : bool
-        If True, include solvers in the tree.
+        If True, include solver types in the tree.
+    show_jacs : bool
+        If True, include jacobian types in the tree.
     show_colors : bool
         If True and stream is a terminal that supports it, display in color.
     filter : function(System)
@@ -153,6 +154,7 @@ def tree(top, show_solvers=True, show_colors=True, filter=None, max_depth=0, str
             tab += 1
         top = top.model
 
+    seenJacs = set()
     for s in top.system_iter(include_self=True, recurse=True):
         if filter is None:
             ret = ()
@@ -186,6 +188,15 @@ def tree(top, show_solvers=True, show_colors=True, filter=None, max_depth=0, str
             if s.nonlinear_solver is not None and nlsolver != "NonlinearRunOnce":
                 cprint("  NL: ")
                 cprint(nlsolver, color=Fore.MAGENTA + Style.BRIGHT)
+
+        if show_jacs:
+            jactype = type(s._jacobian).__name__ if s._jacobian is not None else None
+            if (s._jacobian is not None and s._jacobian not in seenJacs and
+                    jactype != 'DictionaryJacobian'):
+                seenJacs.add(s._jacobian)
+                cprint("  Jac: ")
+                cprint(jactype, color=Fore.MAGENTA + Style.BRIGHT)
+
         print(file=stream)
 
         vindent = indent + '  '
@@ -204,97 +215,60 @@ def config_summary(problem, stream=sys.stdout):
     stream : File-like
         Where the output will be written.
     """
-    allsystems = list(problem.model.system_iter(recurse=True, include_self=True))
+    model = problem.model
+    allsystems = list(model.system_iter(recurse=True, include_self=True))
+    allgroups = [s for s in allsystems if isinstance(s, Group)]
     sysnames = [s.pathname for s in allsystems]
-    nsystems = len(allsystems)
-    ngroups = len([s for s in allsystems if isinstance(s, Group)])
-    ncomps = nsystems - ngroups
     maxdepth = max([len(name.split('.')) for name in sysnames])
+    setup_done = problem._setup_status == 2
+    meta = model._var_allprocs_abs2meta
 
     print("============== Problem Summary ============", file=stream)
-    print("Groups:           %5d" % ngroups, file=stream)
-    print("Components:       %5d" % ncomps, file=stream)
+    print("Groups:           %5d" % len(allgroups), file=stream)
+    print("Components:       %5d" % (len(allsystems) - len(allgroups)), file=stream)
     print("Max tree depth:   %5d" % maxdepth, file=stream)
-    print()
+    print(file=stream)
 
-    if problem._setup_status == 2:
-        desvars = problem.model.get_design_vars()
+    if setup_done:
+        desvars = model.get_design_vars()
         print("Design variables: %5d   Total size: %8d" %
               (len(desvars), sum(d['size'] for d in desvars.values())), file=stream)
 
         # TODO: give separate info for linear, nonlinear constraints, equality, inequality
-        constraints = problem.model.get_constraints()
+        constraints = model.get_constraints()
         print("Constraints:      %5d   Total size: %8d" %
               (len(constraints), sum(d['size'] for d in constraints.values())), file=stream)
 
-        objs = problem.model.get_objectives()
+        objs = model.get_objectives()
         print("Objectives:       %5d   Total size: %8d" %
               (len(objs), sum(d['size'] for d in objs.values())), file=stream)
 
-    print()
+    print(file=stream)
 
-    ninputs = len(problem.model._var_allprocs_abs_names['input'])
-    if problem._setup_status == 2:
+    ninputs = len(model._var_allprocs_abs_names['input'])
+    if setup_done:
         print("Input variables:  %5d   Total size: %8d" %
-              (ninputs, sum(d.size for d in problem.model._inputs._data.values())), file=stream)
+              (ninputs, sum(d.size for d in model._inputs._data.values())), file=stream)
     else:
         print("Input variables: %5d" % ninputs, file=stream)
 
-    noutputs = len(problem.model._var_allprocs_abs_names['output'])
-    if problem._setup_status == 2:
+    noutputs = len(model._var_allprocs_abs_names['output'])
+    if setup_done:
         print("Output variables: %5d   Total size: %8d" %
-              (noutputs, sum(d.size for d in problem.model._outputs._data.values())), file=stream)
+              (noutputs, sum(d.size for d in model._outputs._data.values())), file=stream)
     else:
         print("Output variables: %5d" % noutputs, file=stream)
 
+    if setup_done:
+        print(file=stream)
+        conns = model._conn_global_abs_in2out
+        print("Total connections: %d   Total transfer data size: %d" %
+              (len(conns), sum(meta[n]['size'] for n in conns)), file=stream)
 
-def max_mem_usage():
-    """
-    Returns
-    -------
-    The max memory used by this process and its children, in MB.
-    """
-    denom = 1024.
-    if sys.platform == 'darwin':
-        denom *= denom
-    total = getrusage(RUSAGE_SELF).ru_maxrss / denom
-    total += getrusage(RUSAGE_CHILDREN).ru_maxrss / denom
-    return total
-
-try:
-    import psutil
-
-    def mem_usage(msg='', out=sys.stdout):
-        """
-        Returns
-        -------
-        The current memory used by this process (and it's children?), in MB.
-        """
-        denom = 1024. * 1024.
-        p = psutil.Process(os.getpid())
-        mem = p.memory_info().rss / denom
-        if msg:
-            print(msg,"%6.3f MB" % mem, file=out)
-        return mem
-
-    def diff_mem(fn):
-        """
-        This gives the difference in memory before and after the
-        decorated function is called. Requires psutil to be installed.
-        """
-        @functools.wraps(fn)
-        def wrapper(*args, **kwargs):
-            startmem = mem_usage()
-            ret = fn(*args, **kwargs)
-            maxmem = mem_usage()
-            diff = maxmem - startmem
-            if diff > 0.0:
-                if args and hasattr(args[0], 'pathname'):
-                    name = args[0].pathname
-                else:
-                    name = ''
-                print(name,"%s added %5.3f MB (total: %6.3f)" % (fn.__name__, diff, maxmem))
-            return ret
-        return wrapper
-except ImportError:
-    pass
+    print(file=stream)
+    print("Driver type: %s" % problem.driver.__class__.__name__, file=stream)
+    print("Linear Solvers: %s" % sorted(set(type(s.linear_solver).__name__ for s in allgroups)),
+          file=stream)
+    print("Nonlinear Solvers: %s" % sorted(set(type(s.nonlinear_solver).__name__ for s in
+                                                         allgroups)),
+          file=stream)

@@ -41,6 +41,11 @@ class SqliteCaseReader(BaseCaseReader):
     def __init__(self, filename):
         """
         Initialize.
+
+        Parameters
+        ----------
+        filename : str
+            The path to the filename containing the recorded data.
         """
         super(SqliteCaseReader, self).__init__(filename)
 
@@ -248,7 +253,7 @@ class SolverCases(BaseCases):
 
         Returns
         -------
-            An instance of a Driver Case populated with data from the
+            An instance of a solver Case populated with data from the
             specified case/iteration.
         """
         iteration_coordinate = self.get_iteration_coordinate(case_id)

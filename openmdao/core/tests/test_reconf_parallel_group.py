@@ -4,7 +4,7 @@ import unittest
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, DefaultVector, ExecComp
 from openmdao.api import NewtonSolver, PETScKrylov, NonlinearBlockGS, LinearBlockGS
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 try:
     from openmdao.parallel_api import PETScVector

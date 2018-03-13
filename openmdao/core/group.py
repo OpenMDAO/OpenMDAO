@@ -25,7 +25,7 @@ from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ancestors
 from openmdao.utils.units import is_compatible
 from openmdao.utils.mpi import MPI
-from openmdao.utils.graph_utils import all_connected_edges
+from openmdao.utils.graph_utils import all_connected_nodes
 
 # regex to check for valid names.
 import re
@@ -135,8 +135,8 @@ class Group(System):
 
         self._subsystems_allprocs = []
         self._manual_connections = {}
-        self._design_vars = {}
-        self._responses = {}
+        self._design_vars = OrderedDict()
+        self._responses = OrderedDict()
 
         self._static_mode = False
         self._subsystems_allprocs.extend(self._static_subsystems_allprocs)
@@ -379,15 +379,15 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             var_maps = subsys._get_maps(subsys._var_allprocs_prom2abs_list)
 
+            # Assemble allprocs_abs2meta and abs2meta
+            allprocs_abs2meta.update(subsys._var_allprocs_abs2meta)
+            abs2meta.update(subsys._var_abs2meta)
+
             for type_ in ['input', 'output']:
 
                 # Assemble abs_names and allprocs_abs_names
                 allprocs_abs_names[type_].extend(subsys._var_allprocs_abs_names[type_])
                 abs_names[type_].extend(subsys._var_abs_names[type_])
-
-                # Assemble allprocs_abs2meta and abs2meta
-                allprocs_abs2meta[type_].update(subsys._var_allprocs_abs2meta[type_])
-                abs2meta[type_].update(subsys._var_abs2meta[type_])
 
                 # Assemble abs2prom
                 for abs_name in subsys._var_abs_names[type_]:
@@ -432,13 +432,13 @@ class Group(System):
                 self._has_output_scaling |= oscale
                 self._has_resid_scaling |= rscale
 
+                # Assemble in parallel allprocs_abs2meta
+                allprocs_abs2meta.update(myproc_abs2meta)
+
                 for type_ in ['input', 'output']:
 
                     # Assemble in parallel allprocs_abs_names
                     allprocs_abs_names[type_].extend(myproc_abs_names[type_])
-
-                    # Assemble in parallel allprocs_abs2meta
-                    allprocs_abs2meta[type_].update(myproc_abs2meta[type_])
 
                     # Assemble in parallel allprocs_prom2abs_list
                     for prom_name, abs_names_list in iteritems(myproc_prom2abs_list[type_]):
@@ -542,8 +542,7 @@ class Group(System):
 
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
         allprocs_prom2abs_list_out = self._var_allprocs_prom2abs_list['output']
-        abs2meta_in = self._var_abs2meta['input']
-        abs2meta_out = self._var_abs2meta['output']
+        abs2meta = self._var_abs2meta
         pathname = self.pathname
 
         abs_in2out = {}
@@ -611,8 +610,8 @@ class Group(System):
                                        "for connection in '%s' from '%s' to '%s'." %
                                        (self.pathname, prom_out, prom_in))
 
-                if src_indices is not None and abs_in in abs2meta_in:
-                    meta = abs2meta_in[abs_in]
+                if src_indices is not None and abs_in in abs2meta:
+                    meta = abs2meta[abs_in]
                     if meta['src_indices'] is not None:
                         raise RuntimeError("%s: src_indices has been defined "
                                            "in both connect('%s', '%s') "
@@ -691,8 +690,7 @@ class Group(System):
         """
         desvars = self.get_design_vars(recurse=True, get_sizes=False)
         responses = self.get_responses(recurse=True, get_sizes=False)
-        sys_graph = self.compute_sys_graph(comps_only=True)
-        return get_relevant_vars(sys_graph, desvars, responses, mode)
+        return get_relevant_vars(self._conn_global_abs_in2out, desvars, responses, mode)
 
     def _setup_connections(self, recurse=True):
         """
@@ -719,8 +717,7 @@ class Group(System):
         else:
             path_len = len(pathname) + 1
 
-        allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
-        allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
+        allprocs_abs2meta = self._var_allprocs_abs2meta
 
         # Check input/output units here, and set _has_input_scaling
         # to True for this Group if units are defined and different, or if
@@ -736,15 +733,15 @@ class Group(System):
 
             # if connected output has scaling then we need input scaling
             if not self._has_input_scaling:
-                out_units = allprocs_abs2meta_out[abs_out]['units']
-                in_units = allprocs_abs2meta_in[abs_in]['units']
+                out_units = allprocs_abs2meta[abs_out]['units']
+                in_units = allprocs_abs2meta[abs_in]['units']
 
                 # if units are defined and different, we need input scaling.
                 needs_input_scaling = (in_units and out_units and in_units != out_units)
 
                 # we also need it if a connected output has any scaling.
                 if not needs_input_scaling:
-                    out_meta = allprocs_abs2meta_out[abs_out]
+                    out_meta = allprocs_abs2meta[abs_out]
 
                     ref = out_meta['ref']
                     if np.isscalar(ref):
@@ -772,13 +769,12 @@ class Group(System):
         # check unit/shape compatibility, but only for connections that are
         # either owned by (implicit) or declared by (explicit) this Group.
         # This way, we don't repeat the error checking in multiple groups.
-        abs2meta_in = self._var_abs2meta['input']
-        abs2meta_out = self._var_abs2meta['output']
+        abs2meta = self._var_abs2meta
 
         for abs_in, abs_out in iteritems(abs_in2out):
             # check unit compatibility
-            out_units = allprocs_abs2meta_out[abs_out]['units']
-            in_units = allprocs_abs2meta_in[abs_in]['units']
+            out_units = allprocs_abs2meta[abs_out]['units']
+            in_units = allprocs_abs2meta[abs_in]['units']
 
             if out_units:
                 if not in_units:
@@ -796,20 +792,20 @@ class Group(System):
                               "no units." % (abs_in, in_units, abs_out))
 
             # check shape compatibility
-            if abs_in in abs2meta_in and abs_out in abs2meta_out:
+            if abs_in in abs2meta and abs_out in abs2meta:
                 # get output shape from allprocs meta dict, since it may
                 # be distributed (we want global shape)
-                out_shape = allprocs_abs2meta_out[abs_out]['global_shape']
+                out_shape = allprocs_abs2meta[abs_out]['global_shape']
                 # get input shape and src_indices from the local meta dict
                 # (input is always local)
-                in_shape = abs2meta_in[abs_in]['shape']
-                src_indices = abs2meta_in[abs_in]['src_indices']
-                flat = abs2meta_in[abs_in]['flat_src_indices']
+                in_shape = abs2meta[abs_in]['shape']
+                src_indices = abs2meta[abs_in]['src_indices']
+                flat = abs2meta[abs_in]['flat_src_indices']
 
                 if src_indices is None and out_shape != in_shape:
                     # out_shape != in_shape is allowed if
                     # there's no ambiguity in storage order
-                    if not (np.prod(out_shape) == abs2meta_in[abs_in]['size']
+                    if not (np.prod(out_shape) == abs2meta[abs_in]['size']
                             == np.max(out_shape) == np.max(in_shape)):
                         msg = ("The source and target shapes do not match or are ambiguous"
                                " for the connection '%s' to '%s'. Expected %s but got %s.")
@@ -865,8 +861,8 @@ class Group(System):
                             raise ValueError(msg % (abs_out, abs_in,
                                              bad_idx, out_size))
                         if src_indices.ndim > 1:
-                            abs2meta_in[abs_in]['src_indices'] = \
-                                abs2meta_in[abs_in]['src_indices'].flatten()
+                            abs2meta[abs_in]['src_indices'] = \
+                                abs2meta[abs_in]['src_indices'].flatten()
                     else:
                         for d in range(source_dimensions):
                             # when running under MPI, there is a value for each proc
@@ -987,8 +983,8 @@ class Group(System):
                 for abs_name in subsys._var_allprocs_abs_names[type_]:
                     abs2isub[type_][abs_name] = isub
 
-        abs2meta_in = self._var_abs2meta['input']
-        allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
+        abs2meta = self._var_abs2meta
+        allprocs_abs2meta = self._var_allprocs_abs2meta
 
         transfers = self._transfers
         vectors = self._vectors
@@ -1014,8 +1010,7 @@ class Group(System):
                         rev_xfer_in[isub][key] = []
                         rev_xfer_out[isub][key] = []
 
-            allprocs_abs2idx_byset_in = self._var_allprocs_abs2idx_byset[vec_name]['input']
-            allprocs_abs2idx_byset_out = self._var_allprocs_abs2idx_byset[vec_name]['output']
+            allprocs_abs2idx_byset = self._var_allprocs_abs2idx_byset[vec_name]
             sizes_byset_in = self._var_sizes_byset[vec_name]['input']
             sizes_byset_out = self._var_sizes_byset[vec_name]['output']
 
@@ -1025,17 +1020,17 @@ class Group(System):
                     continue
 
                 # Only continue if the input exists on this processor
-                if abs_in in abs2meta_in and abs_in in relvars['input']:
+                if abs_in in abs2meta and abs_in in relvars['input']:
 
                     # Get meta
-                    meta_in = abs2meta_in[abs_in]
-                    meta_out = allprocs_abs2meta_out[abs_out]
+                    meta_in = abs2meta[abs_in]
+                    meta_out = allprocs_abs2meta[abs_out]
 
                     # Get varset info
                     set_name_in = meta_in['var_set']
                     set_name_out = meta_out['var_set']
-                    idx_byset_in = allprocs_abs2idx_byset_in[abs_in]
-                    idx_byset_out = allprocs_abs2idx_byset_out[abs_out]
+                    idx_byset_in = allprocs_abs2idx_byset[abs_in]
+                    idx_byset_out = allprocs_abs2idx_byset[abs_out]
 
                     # Get the sizes (byset) array
                     sizes_in = sizes_byset_in[set_name_in]
@@ -1091,8 +1086,9 @@ class Group(System):
                     # 2. Compute the input indices
                     iproc = self.comm.rank
                     ind1 = ind2 = np.sum(sizes_in[:iproc, :])
-                    ind1 += np.sum(sizes_in[iproc, :idx_byset_in])
-                    ind2 += np.sum(sizes_in[iproc, :idx_byset_in + 1])
+                    delta = np.sum(sizes_in[iproc, :idx_byset_in])
+                    ind1 += delta
+                    ind2 += (delta + sizes_in[iproc, idx_byset_in])
                     input_inds = np.arange(ind1, ind2)
 
                     # Now the indices are ready - input_inds, output_inds
@@ -1621,48 +1617,46 @@ class Group(System):
 
             from openmdao.core.indepvarcomp import IndepVarComp
             wrt = set()
-            ivc = []
+            ivc = set()
             for var in candidate_wrt:
-                src = self._conn_abs_in2out.get(var)
-
-                if src is None:
-                    wrt.add(var)
 
                 # Weed out inputs connected to anything inside our system unless the source is an
                 # indepvarcomp.
-                else:
+                if var in self._conn_abs_in2out:
+                    src = self._conn_abs_in2out[var]
                     compname = src.rsplit('.', 1)[0]
                     comp = self._get_subsystem(compname)
                     if isinstance(comp, IndepVarComp):
                         wrt.add(src)
-                        ivc.append(src)
+                        ivc.add(src)
+                else:
+                    wrt.add(var)
 
             with self.jacobian_context() as J:
                 for key in product(of, wrt.union(of)):
-                    meta_changes = {
-                        'method': method,
-                    }
+                    if key in self._subjacs_info:
+                        meta = self._subjacs_info[key]
+                    else:
+                        meta = SUBJAC_META_DEFAULTS.copy()
+
+                    meta['method'] = method
                     if key[0] == key[1]:
-                        size = self._outputs._views_flat[key[0]].shape[0]
-                        meta_changes['rows'] = np.arange(size)
-                        meta_changes['cols'] = np.arange(size)
-                        meta_changes['value'] = np.ones(size)
+                        size = self._var_allprocs_abs2meta[key[0]]['size']
+                        meta['rows'] = meta['cols'] = np.arange(size)
+                        meta['value'] = np.ones(size)
 
                     # This suppports desvar and constraint indices.
                     if key[0] in self._owns_approx_of_idx:
-                        meta_changes['idx_of'] = self._owns_approx_of_idx[key[0]]
+                        meta['idx_of'] = self._owns_approx_of_idx[key[0]]
 
                     if key[1] in self._owns_approx_wrt_idx:
-                        meta_changes['idx_wrt'] = self._owns_approx_wrt_idx[key[1]]
-
-                    meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+                        meta['idx_wrt'] = self._owns_approx_wrt_idx[key[1]]
 
                     # A group under approximation needs all keys from below, so set dependent to
                     # True.
                     # TODO: Maybe just need a subset of keys (those that go to the boundaries.)
                     meta['dependent'] = True
 
-                    meta.update(meta_changes)
                     meta.update(self._owns_approx_jac_meta)
                     self._subjacs_info[key] = meta
 
@@ -1746,7 +1740,7 @@ class Group(System):
         return graph
 
 
-def get_relevant_vars(graph, desvars, responses, mode):
+def get_relevant_vars(connections, desvars, responses, mode):
     """
     Find all relevant vars between desvars and responses.
 
@@ -1754,8 +1748,8 @@ def get_relevant_vars(graph, desvars, responses, mode):
 
     Parameters
     ----------
-    graph : networkx.DiGraph
-        System graph with var connection info on the edges.
+    connections : dict
+        Mapping of inputs and their connected sources.
     desvars : list of str
         Names of design variables.
     responses : list of str
@@ -1770,45 +1764,76 @@ def get_relevant_vars(graph, desvars, responses, mode):
         keyed by design vars and responses.
     """
     relevant = defaultdict(dict)
-    edge_cache = {}
+    cache = {}
     fwd = mode == 'fwd'
 
-    grev = graph.reverse()
+    # Create a hybrid graph with components and all connected vars.  If a var is connected,
+    # also connect it to its corresponding component.
+    graph = nx.DiGraph()
+    for tgt, src in iteritems(connections):
+        if src not in graph:
+            graph.add_node(src, type_='out')
+        graph.add_node(tgt, type_='in')
+
+        src_sys = src.rsplit('.', 1)[0]
+        graph.add_edge(src_sys, src)
+
+        tgt_sys = tgt.rsplit('.', 1)[0]
+        graph.add_edge(tgt, tgt_sys)
+
+        graph.add_edge(src, tgt)
+
+    for dv in desvars:
+        if dv not in graph:
+            graph.add_node(dv, type_='out')
+            system = dv.rsplit('.', 1)[0]
+            graph.add_edge(system, dv)
+
+    for res in responses:
+        if res not in graph:
+            graph.add_node(res, type_='out')
+            system = res.rsplit('.', 1)[0]
+            graph.add_edge(system, res)
+
+    nodes = graph.nodes
+    grev = graph.reverse(copy=False)
 
     for desvar in desvars:
-        start_sys = (desvar.rsplit('.', 1)[0], 'dv')
-        if start_sys not in edge_cache:
-            edge_cache[start_sys] = set(all_connected_edges(graph, start_sys[0]))
-        start_edges = edge_cache[start_sys]
+        dv = (desvar, 'dv')
+        if dv not in cache:
+            cache[dv] = set(all_connected_nodes(graph, desvar))
 
         for response in responses:
-            end_sys = (response.rsplit('.', 1)[0], 'r')
-            if end_sys not in edge_cache:
-                edge_cache[end_sys] = set((v, u) for u, v in
-                                          all_connected_edges(grev, end_sys[0]))
-            end_edges = edge_cache[end_sys]
+            res = (response, 'r')
+            if res not in cache:
+                cache[res] = set(all_connected_nodes(grev, response))
 
-            common_edges = start_edges.intersection(end_edges)
+            common = cache[dv].intersection(cache[res])
 
-            if common_edges:
+            if common:
                 input_deps = set()
                 output_deps = set()
                 sys_deps = set()
-                for edge in common_edges:
-                    sys_deps.update(all_ancestors(edge[0]))
-                    sys_deps.update(all_ancestors(edge[1]))
-                    conns = graph[edge[0]][edge[1]]['conns']
-                    output_deps.update(conns)
-                    for inputs in conns.values():
-                        input_deps.update(inputs)
+                for node in common:
+                    if 'type_' in nodes[node]:
+                        typ = nodes[node]['type_']
+                        if typ == 'in':  # input var
+                            input_deps.add(node)
+                            system = node.rsplit('.', 1)[0]
+                            if system not in sys_deps:
+                                sys_deps.update(all_ancestors(system))
+                        else:  # output var
+                            output_deps.add(node)
+                            system = node.rsplit('.', 1)[0]
+                            if system not in sys_deps:
+                                sys_deps.update(all_ancestors(system))
 
-                output_deps.update((desvar, response))
             elif desvar == response:
                 input_deps = set()
                 output_deps = set([response])
-                sys_deps = set(all_ancestors(start_sys[0]))
+                sys_deps = set(all_ancestors(desvar.rsplit('.', 1)[0]))
 
-            if common_edges or desvar == response:
+            if common or desvar == response:
                 if fwd:
                     relevant[desvar][response] = ({'input': input_deps,
                                                    'output': output_deps}, sys_deps)

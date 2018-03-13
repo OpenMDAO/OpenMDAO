@@ -8,7 +8,7 @@ import warnings
 import numpy as np
 
 from openmdao.api import Group, IndepVarComp, Problem, ExecComp, NonlinearBlockGS
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov, ScipyIterativeSolver
 from openmdao.solvers.nonlinear.newton import NewtonSolver
@@ -116,7 +116,6 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         grp = TestImplicitGroup(lnSolverClass=self.linear_solver_class)
         g1 = model.add_subsystem('g1', grp)
 
-        p.model.linear_solver.options['maxiter'] = 1
         p.setup(check=False)
 
         p.set_solver_print(level=0)

@@ -6,6 +6,7 @@ from collections import OrderedDict, Iterable, defaultdict
 from fnmatch import fnmatchcase
 import sys
 from itertools import product
+from numbers import Integral
 
 from six import iteritems, string_types
 from six.moves import range
@@ -24,7 +25,10 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import get_conversion
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.logger_utils import get_logger
+
+# Use this as a special value to be able to tell if the caller set a value for the optional
+#   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
+_DEFAULT_OUT_STREAM = object()
 
 
 class System(object):
@@ -55,7 +59,9 @@ class System(object):
     iter_count : int
         Int that holds the number of times this system has iterated
         in a recording run.
-    #
+    cite : str
+        Listing of relevant citataions that should be referenced when
+        publishing work that uses this class.
     _subsystems_allprocs : [<System>, ...]
         List of all subsystems (children of this system).
     _subsystems_myproc : [<System>, ...]
@@ -69,14 +75,12 @@ class System(object):
         List of ranges of each myproc subsystem's allprocs variables relative to this system.
     _subsystems_var_range_byset : {<vec_name>: {'input': list of dict, 'output': list of dict}, ...}
         Same as above, but by var_set name.
-    #
     _num_var : {<vec_name>: {'input': int, 'output': int}, ...}
         Number of allprocs variables owned by this system.
     _num_var_byset : {<vec_name>: {'input': dict of int, 'output': dict of int}, ...}
         Same as above, but by var_set name.
     _var_set2iset : {'input': dict, 'output': dict}
         Dictionary mapping the var_set name to the var_set index.
-    #
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
@@ -89,27 +93,24 @@ class System(object):
         For outputs, the list will have length one since promoted output names are unique.
     _var_abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names, on current proc.
-    _var_allprocs_abs2meta : {'input': dict, 'output': dict}
+    _var_allprocs_abs2meta : {}
         Dictionary mapping absolute names to metadata dictionaries for allprocs variables.
         The keys are
-        ('units', 'shape', 'var_set') for inputs and
-        ('units', 'shape', 'var_set', 'ref', 'ref0') for outputs.
-    _var_abs2meta : {'input': dict, 'output': dict}
+        ('units', 'shape', 'size', 'var_set') for inputs and
+        ('units', 'shape', 'size', 'var_set', 'ref', 'ref0', 'res_ref', 'distributed') for outputs.
+    _var_abs2meta : {}
         Dictionary mapping absolute names to metadata dictionaries for myproc variables.
-    #
-    _var_allprocs_abs2idx : {'input': dict, 'output': dict}
+    _var_allprocs_abs2idx : dict
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
-    _var_allprocs_abs2idx_byset : {<vec_name>:{'input': dict of dict, 'output': dict of dict}, ...}
+    _var_allprocs_abs2idx_byset : {<vec_name>: {dict of dict}, ...}
         Same as above, but by var_set name.
-    #
     _var_sizes : {'input': ndarray, 'output': ndarray}
         Array of local sizes of this system's allprocs variables.
         The array has size nproc x num_var where nproc is the number of processors
         owned by this system and num_var is the number of allprocs variables.
     _var_sizes_byset : {'input': dict of ndarray, 'output': dict of ndarray}
         Same as above, but by var_set name.
-    #
     _manual_connections : dict
         Dictionary of input_name: (output_name, src_indices) connections.
     _conn_global_abs_in2out : {'abs_in': 'abs_out'}
@@ -118,7 +119,6 @@ class System(object):
     _conn_abs_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections owned
         by this system only. The data is the same across all processors.
-    #
     _ext_num_vars : {'input': (int, int), 'output': (int, int)}
         Total number of allprocs variables in system before/after this one.
     _ext_num_vars_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
@@ -127,14 +127,12 @@ class System(object):
         Total size of allprocs variables in system before/after this one.
     _ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
         Same as above, but by var_set name.
-    #
     _vec_names : [str, ...]
         List of names of all vectors, including the nonlinear vector.
     _lin_vec_names : [str, ...]
         List of names of the linear vectors (i.e., the right-hand sides).
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         Dictionaries of vectors keyed by vec_name.
-    #
     _inputs : <Vector>
         The inputs vector; points to _vectors['input']['nonlinear'].
     _outputs : <Vector>
@@ -145,20 +143,16 @@ class System(object):
         First key is the vec_name, second key is (mode, isub) where
         mode is 'fwd' or 'rev' and isub is the subsystem index among allprocs subsystems
         or isub can be None for the full, simultaneous transfer.
-    #
     _lower_bounds : <Vector>
         Vector of lower bounds, scaled and dimensionless.
     _upper_bounds : <Vector>
         Vector of upper bounds, scaled and dimensionless.
-    #
     _scaling_vecs : dict of dict of Vectors
         First key indicates vector type and coefficient, second key is vec_name.
-    #
     _nonlinear_solver : <NonlinearSolver>
         Nonlinear solver to be used for solve_nonlinear.
     _linear_solver : <LinearSolver>
         Linear solver to be used for solve_linear; not the Newton system.
-    #
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
     _jacobian : <Jacobian>
@@ -192,14 +186,12 @@ class System(object):
     _subjacs_info : OrderedDict of dict
         Sub-jacobian metadata for each (output, input) pair added using
         declare_partials. Members of each pair may be glob patterns.
-    #
     _design_vars : dict of dict
         dict of all driver design vars added to the system.
     _responses : dict of dict
         dict of all driver responses added to the system.
     _rec_mgr : <RecordingManager>
         object that manages all recorders added to this system.
-    #
     _static_mode : bool
         If true, we are outside of setup.
         In this case, add_input, add_output, and add_subsystem all add to the
@@ -213,14 +205,11 @@ class System(object):
         Driver design variables added outside of setup.
     _static_responses : dict of dict
         Driver responses added outside of setup.
-    #
     _reconfigured : bool
         If True, this system has reconfigured, and the immediate parent should update.
-    #
     supports_multivecs : bool
         If True, this system overrides compute_multi_jacvec_product (if an ExplicitComponent),
         or solve_multi_linear/apply_multi_linear (if an ImplicitComponent).
-    #
     _relevant : dict
         Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
         and dependent systems.
@@ -231,7 +220,6 @@ class System(object):
         Indicates derivative direction for the model, either 'fwd' or 'rev'.
     _scope_cache : dict
         Cache for variables in the scope of various mat-vec products.
-    #
     _has_guess : bool
         True if this system has or contains a system with a `guess_nonlinear` method defined.
     _has_output_scaling : bool
@@ -240,10 +228,8 @@ class System(object):
         True if this system has resid scaling.
     _has_input_scaling : bool
         True if this system has input scaling.
-    #
     _owning_rank : {'input': {}, 'output': {}}
         Dict mapping var name to the lowest rank where that variable is local.
-    #
     options : OptionsDictionary
         options dictionary
     recording_options : OptionsDictionary
@@ -252,6 +238,14 @@ class System(object):
         Dict of list of var names to record
     _norm0: float
         Normalization factor
+    _column_widths : dict
+        widths of the columns
+    _align : str
+        The Python formatting alignment used when writing values into columns
+    _column_spacing: int
+        Number of spaces between columns
+    _indent_inc: int
+        Number of spaces indented in levels of the hierarchy
     """
 
     def __init__(self, **kwargs):
@@ -288,6 +282,8 @@ class System(object):
         # Case recording related
         self.iter_count = 0
 
+        self.cite = ""
+
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
         self._subsystems_myproc_inds = []
@@ -302,10 +298,10 @@ class System(object):
         self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = None
         self._var_abs2prom = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
-        self._var_abs2meta = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2meta = {}
+        self._var_abs2meta = {}
 
-        self._var_allprocs_abs2idx = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2idx = {}
         self._var_allprocs_abs2idx_byset = None
 
         self._var_sizes = None
@@ -354,8 +350,8 @@ class System(object):
         self._static_mode = True
         self._static_subsystems_allprocs = []
         self._static_manual_connections = {}
-        self._static_design_vars = {}
-        self._static_responses = {}
+        self._static_design_vars = OrderedDict()
+        self._static_responses = OrderedDict()
 
         self._reconfigured = False
         self.supports_multivecs = False
@@ -374,6 +370,23 @@ class System(object):
         self._has_output_scaling = False
         self._has_resid_scaling = False
         self._has_input_scaling = False
+
+        # Formatting parameters for _write_outputs and _write_output_row methods
+        #     that are used by list_inputs and list_outputs methods
+        self._column_widths = {
+            'value': 20,
+            'resids': 20,
+            'units': 10,
+            'shape': 10,
+            'lower': 20,
+            'upper': 20,
+            'ref': 20,
+            'ref0': 20,
+            'res_ref': 20,
+        }
+        self._align = ''
+        self._column_spacing = 2
+        self._indent_inc = 2
 
     def _check_reconf(self):
         """
@@ -585,7 +598,7 @@ class System(object):
                                 ncol = voi['size']
                             else:
                                 owner = self._owning_rank['output'][vec_name]
-                                ncol = sizes[owner, abs2idx[vec_name]['output'][vec_name]]
+                                ncol = sizes[owner, abs2idx[vec_name][vec_name]]
                         rdct, _ = relevant[vec_name]['@all']
                         rel = rdct['output']
 
@@ -873,8 +886,8 @@ class System(object):
         self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
         self._var_abs2prom = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
-        self._var_abs2meta = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2meta = {}
+        self._var_abs2meta = {}
 
     def _setup_var_index_maps(self, recurse=True):
         """
@@ -887,19 +900,17 @@ class System(object):
         """
         self._var_allprocs_abs2idx = abs2idx = {}
         self._var_allprocs_abs2idx_byset = abs2idx_byset = {}
+        abs2meta = self._var_allprocs_abs2meta
 
         for vec_name in self._lin_rel_vec_name_list:
-            abs2idx[vec_name] = {'input': {}, 'output': {}}
-            abs2idx_byset[vec_name] = {'input': {}, 'output': {}}
+            abs2idx[vec_name] = abs2idx_t = {}
+            abs2idx_byset[vec_name] = abs2idx_byset_t = {}
             for type_ in ['input', 'output']:
                 counter = defaultdict(int)
-                abs2idx_t = abs2idx[vec_name][type_]
-                abs2idx_byset_t = abs2idx_byset[vec_name][type_]
-                abs2meta_t = self._var_allprocs_abs2meta[type_]
 
                 for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
                     abs2idx_t[abs_name] = i
-                    set_name = abs2meta_t[abs_name]['var_set']
+                    set_name = abs2meta[abs_name]['var_set']
                     abs2idx_byset_t[abs_name] = counter[set_name]
                     counter[set_name] += 1
 
@@ -928,7 +939,7 @@ class System(object):
         """
         Compute the global size and shape of all variables on this system.
         """
-        meta = self._var_allprocs_abs2meta['output']
+        meta = self._var_allprocs_abs2meta
 
         # now set global sizes and shapes into metadata for distributed outputs
         sizes = self._var_sizes['nonlinear']['output']
@@ -1171,7 +1182,9 @@ class System(object):
         self._upper_bounds = upper = vector_class(
             'nonlinear', 'output', self, root_upper, resize=resize)
 
-        for abs_name, meta in iteritems(self._var_abs2meta['output']):
+        abs2meta = self._var_abs2meta
+        for abs_name in self._var_abs_names['output']:
+            meta = abs2meta[abs_name]
             shape = meta['shape']
             ref0 = meta['ref0']
             ref = meta['ref']
@@ -1211,8 +1224,8 @@ class System(object):
             ('input', 'norm'): (0.0, 1.0)
         })
 
-        abs2meta_in = self._var_abs2meta['input']
-        allprocs_meta_out = self._var_allprocs_abs2meta['output']
+        abs2meta_in = self._var_abs2meta
+        allprocs_meta_out = self._var_allprocs_abs2meta
 
         for abs_name in self._var_allprocs_abs_names['output']:
             meta = allprocs_meta_out[abs_name]
@@ -1356,21 +1369,20 @@ class System(object):
         self._views_assembled_jac = False
 
         if jacobian is not None:
-            # this means that somewhere above us is an AssembledJacobian. If
-            # we have a nonlinear solver that uses derivatives, this is
-            # currently an error if the AssembledJacobian is not a DenseJacobian.
-            # In a future story we'll add support for sparse AssembledJacobians.
             if self._nonlinear_solver is not None and self._nonlinear_solver.supports['gradients']:
-                if not isinstance(jacobian, DenseJacobian):
-                    raise RuntimeError("System '%s' has a solver of type '%s'"
-                                       "but a sparse AssembledJacobian has been set in a "
-                                       "higher level system." %
-                                       (self.pathname,
-                                        self._nonlinear_solver.__class__.__name__))
                 self._views_assembled_jac = True
-            self._owns_assembled_jac = False
 
         if self._owns_assembled_jac:
+
+            # if we have an assembled jac at this level and an assembled jac above us, then
+            # our jacs (and any of our children's assembled jacs) will share their internal
+            # subjac dicts.  Each will maintain its own internal Matrix objects though.
+            if jacobian is not None:
+                jacobian._subjacs.update(self._jacobian._subjacs)
+                jacobian._subjacs_info.update(self._jacobian._subjacs_info)
+                self._jacobian._subjacs = jacobian._subjacs
+                self._jacobian._subjacs_info = jacobian._subjacs_info
+                self._jacobian._keymap = jacobian._keymap
 
             # At present, we don't support a AssembledJacobian in a group
             # if any subcomponents are matrix-free.
@@ -1403,19 +1415,20 @@ class System(object):
             self._jacobian._system = self
             self._jacobian._initialize()
 
-            for s in self.system_iter(local=True, recurse=True):
-                if s._views_assembled_jac:
+            for s in self.system_iter(recurse=True):
+                if s._jacobian is self._jacobian and s._views_assembled_jac:
                     self._jacobian._init_view(s)
 
     def set_initial_values(self):
         """
         Set all input and output variables to their declared initial values.
         """
-        for abs_name, meta in iteritems(self._var_abs2meta['input']):
-            self._inputs._views[abs_name][:] = meta['value']
+        abs2meta = self._var_abs2meta
+        for abs_name in self._var_abs_names['input']:
+            self._inputs._views[abs_name][:] = abs2meta[abs_name]['value']
 
-        for abs_name, meta in iteritems(self._var_abs2meta['output']):
-            self._outputs._views[abs_name][:] = meta['value']
+        for abs_name in self._var_abs_names['output']:
+            self._outputs._views[abs_name][:] = abs2meta[abs_name]['value']
 
     def _transfer(self, vec_name, mode, isub=None):
         """
@@ -1554,20 +1567,22 @@ class System(object):
         return maps
 
     def _get_scope(self, excl_sub=None):
-        if excl_sub in self._scope_cache:
+        try:
             return self._scope_cache[excl_sub]
+        except KeyError:
+            pass
 
         if excl_sub is None:
             # All myproc outputs
-            scope_out = set(self._var_abs_names['output'])
+            scope_out = frozenset(self._var_abs_names['output'])
 
             # All myproc inputs connected to an output in this system
-            scope_in = set(self._conn_global_abs_in2out).intersection(
+            scope_in = frozenset(self._conn_global_abs_in2out).intersection(
                 self._var_abs_names['input'])
 
         else:
             # All myproc outputs not in excl_sub
-            scope_out = set(self._var_abs_names['output']).difference(
+            scope_out = frozenset(self._var_abs_names['output']).difference(
                 excl_sub._var_abs_names['output'])
 
             # All myproc inputs connected to an output in this system but not in excl_sub
@@ -1576,8 +1591,9 @@ class System(object):
                 if abs_in in self._conn_global_abs_in2out:
                     abs_out = self._conn_global_abs_in2out[abs_in]
 
-                    if abs_out not in excl_sub._var_allprocs_abs2idx['linear']['output']:
+                    if abs_out not in excl_sub._var_allprocs_abs2idx['linear']:
                         scope_in.add(abs_in)
+            scope_in = frozenset(scope_in)
 
         self._scope_cache[excl_sub] = (scope_out, scope_in)
         return scope_out, scope_in
@@ -1696,10 +1712,10 @@ class System(object):
         ----------
         vec_name : str
             Name of the vector to use.
-        scope_out : set or None
+        scope_out : frozenset or None
             Set of absolute output names in the scope of this mat-vec product.
             If None, all are in the scope.
-        scope_in : set or None
+        scope_in : frozenset or None
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         mode : str
@@ -1730,6 +1746,9 @@ class System(object):
         if scope_out is None and scope_in is None:
             yield d_inputs, d_outputs, d_residuals
         else:
+            old_ins = d_inputs._names
+            old_outs = d_outputs._names
+
             if scope_out is not None:
                 d_outputs._names = scope_out.intersection(d_outputs._views)
             if scope_in is not None:
@@ -1738,8 +1757,8 @@ class System(object):
             yield d_inputs, d_outputs, d_residuals
 
             # reset _names so users will see full vector contents
-            d_inputs._names = d_inputs._views
-            d_outputs._names = d_outputs._views
+            d_inputs._names = old_ins
+            d_outputs._names = old_outs
 
     def get_nonlinear_vectors(self):
         """
@@ -1904,15 +1923,13 @@ class System(object):
         """
         pass
 
-    def system_iter(self, local=True, include_self=False, recurse=True,
+    def system_iter(self, include_self=False, recurse=True,
                     typ=None):
         """
-        Yield a generator of subsystems of this system.
+        Yield a generator of local subsystems of this system.
 
         Parameters
         ----------
-        local : bool
-            If True, only iterate over systems on this proc.
         include_self : bool
             If True, include this system in the iteration.
         recurse : bool
@@ -1921,24 +1938,20 @@ class System(object):
             If not None, only yield Systems that match that are instances of the
             given type.
         """
-        if local:
-            sysiter = self._subsystems_myproc
-        else:
-            sysiter = self._subsystems_allprocs
-
         if include_self and (typ is None or isinstance(self, typ)):
             yield self
 
-        for s in sysiter:
+        for s in self._subsystems_myproc:
             if typ is None or isinstance(s, typ):
                 yield s
             if recurse:
-                for sub in s.system_iter(local=local, recurse=True, typ=typ):
+                for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
 
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
-                       parallel_deriv_color=None, vectorize_derivs=False):
+                       parallel_deriv_color=None, vectorize_derivs=False,
+                       simul_coloring=None, cache_linear_solution=False):
         r"""
         Add a design variable to this system.
 
@@ -1969,6 +1982,13 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
+        simul_coloring : ndarray or list of int
+            An array or list of integer color values.  Must match the size of the
+            design variable.
+        cache_linear_solution : bool
+            If True, store the linear solution vectors for this variable so they can
+            be used to start the next linear solution with an initial guess equal to the
+            solution from the previous linear solve.
 
         Notes
         -----
@@ -2029,7 +2049,14 @@ class System(object):
         dvs['lower'] = lower
         dvs['ref'] = ref
         dvs['ref0'] = ref0
+        dvs['cache_linear_solution'] = cache_linear_solution
+
         if indices is not None:
+            # If given, indices must be a sequence
+            if not (isinstance(indices, Iterable) and
+                    all([isinstance(i, Integral) for i in indices])):
+                raise ValueError("If specified, indices must be a sequence of integers.")
+
             indices = np.atleast_1d(indices)
             dvs['size'] = len(indices)
         dvs['indices'] = indices
@@ -2039,13 +2066,19 @@ class System(object):
         #       makes the flat_earth test run faster on one proc.
         if vectorize_derivs and parallel_deriv_color is None:
             dvs['parallel_deriv_color'] = '@matmat'
+        dvs['simul_deriv_color'] = simul_coloring
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None,
                      adder=None, scaler=None, linear=False, parallel_deriv_color=None,
-                     vectorize_derivs=False):
+                     vectorize_derivs=False, simul_coloring=None,
+                     simul_map=None, cache_linear_solution=False):
         r"""
         Add a response variable to this system.
+
+        The response can be scaled using ref and ref0.
+        The argument :code:`ref0` represents the physical value when the scaled value is 0.
+        The argument :code:`ref` represents the physical value when the scaled value is 1.
 
         Parameters
         ----------
@@ -2082,13 +2115,17 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
-
-        Notes
-        -----
-        The response can be scaled using ref and ref0.
-        The argument :code:`ref0` represents the physical value when the scaled value is 0.
-        The argument :code:`ref` represents the physical value when the scaled value is 1.
-
+        simul_coloring : ndarray or list of int
+            An array or list of integer color values.  Must match the size of the
+            response variable.
+        simul_map : dict
+            Mapping of this response to each design variable where simultaneous derivs will
+            be used.  Each design variable entry is another dict keyed on color, and the values
+            in the color dict are tuples of the form (resp_idxs, color_idxs).
+        cache_linear_solution : bool
+            If True, store the linear solution vectors for this variable so they can
+            be used to start the next linear solution with an initial guess equal to the
+            solution from the previous linear solve.
         """
         # Name must be a string
         if not isinstance(name, string_types):
@@ -2120,19 +2157,9 @@ class System(object):
             raise ValueError(msg.format(name))
 
         # If given, indices must be a sequence
-        err = False
-        if indices is not None:
-            if isinstance(indices, string_types):
-                err = True
-            elif isinstance(indices, Iterable):
-                all_int = all([isinstance(item, int) for item in indices])
-                if not all_int:
-                    err = True
-            else:
-                err = True
-        if err:
-            msg = "If specified, indices must be a sequence of integers."
-            raise ValueError(msg)
+        if (indices is not None and not (
+                isinstance(indices, Iterable) and all([isinstance(i, Integral) for i in indices]))):
+            raise ValueError("If specified, indices must be a sequence of integers.")
 
         if self._static_mode:
             responses = self._static_responses
@@ -2196,18 +2223,22 @@ class System(object):
         resp['ref'] = ref
         resp['ref0'] = ref0
         resp['type'] = type_
+        resp['cache_linear_solution'] = cache_linear_solution
 
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['vectorize_derivs'] = vectorize_derivs
         if vectorize_derivs and parallel_deriv_color is None:
             resp['parallel_deriv_color'] = '@matmat'
+        resp['simul_deriv_color'] = simul_coloring
+        resp['simul_map'] = simul_map
 
         responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
                        indices=None, linear=False, parallel_deriv_color=None,
-                       vectorize_derivs=False):
+                       vectorize_derivs=False, simul_coloring=None, simul_map=None,
+                       cache_linear_solution=False):
         r"""
         Add a constraint variable to this system.
 
@@ -2242,6 +2273,17 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
+        simul_coloring : ndarray or list of int
+            An array or list of integer color values.  Must match the size of the
+            constraint variable.
+        simul_map : dict
+            Mapping of this response to each design variable where simultaneous derivs will
+            be used.  Each design variable entry is another dict keyed on color, and the values
+            in the color dict are tuples of the form (resp_idxs, color_idxs).
+        cache_linear_solution : bool
+            If True, store the linear solution vectors for this variable so they can
+            be used to start the next linear solution with an initial guess equal to the
+            solution from the previous linear solve.
 
         Notes
         -----
@@ -2253,11 +2295,14 @@ class System(object):
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
                           ref0=ref0, indices=indices, linear=linear,
                           parallel_deriv_color=parallel_deriv_color,
-                          vectorize_derivs=vectorize_derivs)
+                          vectorize_derivs=vectorize_derivs,
+                          simul_coloring=simul_coloring, simul_map=simul_map,
+                          cache_linear_solution=cache_linear_solution)
 
     def add_objective(self, name, ref=None, ref0=None, index=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
-                      vectorize_derivs=False):
+                      vectorize_derivs=False, simul_coloring=None, simul_map=None,
+                      cache_linear_solution=False):
         r"""
         Add a response variable to this system.
 
@@ -2270,7 +2315,7 @@ class System(object):
         ref0 : float or ndarray, optional
             Value of response variable that scales to 0.0 in the driver.
         index : int, optional
-            If variable is an array, this indicates which entriy is of
+            If variable is an array, this indicates which entry is of
             interest for this particular response. This may be a positive
             or negative integer.
         adder : float or ndarray, optional
@@ -2284,6 +2329,17 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
+        simul_coloring : ndarray or list of int
+            An array or list of integer color values.  Must match the size of the
+            objective variable.
+        simul_map : dict
+            Mapping of this response to each design variable where simultaneous derivs will
+            be used.  Each design variable entry is another dict keyed on color, and the values
+            in the color dict are tuples of the form (resp_idxs, color_idxs).
+        cache_linear_solution : bool
+            If True, store the linear solution vectors for this variable so they can
+            be used to start the next linear solution with an initial guess equal to the
+            solution from the previous linear solve.
 
         Notes
         -----
@@ -2315,7 +2371,9 @@ class System(object):
         self.add_response(name, type_='obj', scaler=scaler, adder=adder,
                           ref=ref, ref0=ref0, index=index,
                           parallel_deriv_color=parallel_deriv_color,
-                          vectorize_derivs=vectorize_derivs)
+                          vectorize_derivs=vectorize_derivs,
+                          simul_coloring=simul_coloring, simul_map=simul_map,
+                          cache_linear_solution=cache_linear_solution)
 
     def get_design_vars(self, recurse=True, get_sizes=True):
         """
@@ -2352,7 +2410,7 @@ class System(object):
         if get_sizes:
             # Size them all
             sizes = self._var_sizes['nonlinear']['output']
-            abs2idx = self._var_allprocs_abs2idx['nonlinear']['output']
+            abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name in out:
                 if 'size' not in out[name]:
                     out[name]['size'] = sizes[self._owning_rank['output'][name], abs2idx[name]]
@@ -2404,7 +2462,7 @@ class System(object):
         if get_sizes:
             # Size them all
             sizes = self._var_sizes['nonlinear']['output']
-            abs2idx = self._var_allprocs_abs2idx['nonlinear']['output']
+            abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name in out:
                 if 'size' not in out[name]:
                     out[name]['size'] = sizes[self._owning_rank['output'][name], abs2idx[name]]
@@ -2476,96 +2534,167 @@ class System(object):
         with self._scaled_context_all():
             self._apply_nonlinear()
 
-    def list_inputs(self, values=True, out_stream='stdout'):
+    def list_inputs(self,
+                    values=True,
+                    units=False,
+                    hierarchical=True,
+                    print_arrays=False,
+                    out_stream=_DEFAULT_OUT_STREAM):
         """
-        List inputs.
+        Return and optionally log a list of input names and other optional information.
+
+        If the model is parallel, only the local variables are returned to the process.
+        Also optionally logs the information to a user defined output stream. If the model is
+        parallel, the rank 0 process logs information about all variables across all processes.
 
         Parameters
         ----------
         values : bool, optional
-            When True, display/return input values as well as names. Default is True.
-
-        out_stream : 'stdout', 'stderr' or file-like
-            Where to send human readable output. Default is 'stdout'.
+            When True, display/return input values. Default is True.
+        units : bool, optional
+            When True, display/return units. Default is False.
+        hierarchical : bool, optional
+            When True, human readable output shows variables in hierarchical format.
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
+            by the values set with numpy.set_printoptions
+            Default is False.
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
         Returns
         -------
         list
-            list of of input names, or (name, value) if values is True
+            list of input names and other optional information about those inputs
         """
         if self._inputs is None:
             raise RuntimeError("Unable to list inputs until model has been run.")
 
+        meta = self._var_abs2meta
         inputs = []
-        for name, val in iteritems(self._inputs._views):
-            inputs.append((name, val)) if values else inputs.append(name)
+
+        for name, val in iteritems(self._inputs._views):  # This is only over the locals
+            outs = {}
+            if values:
+                outs['value'] = val
+            if units:
+                outs['units'] = meta[name]['units']
+            inputs.append((name, outs))
+
+        if out_stream == _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
 
         if out_stream:
-            logger = get_logger('list_inputs', out_stream=out_stream)
-
-            count = len(inputs)
-
-            pathname = self.pathname if self.pathname else 'model'
-
-            header = "%d Input(s) to Components in '%s'\n" % (count, pathname)
-            logger.info(header)
-
-            if count:
-                logger.info("-" * len(header) + "\n")
-                if isinstance(inputs[0], tuple):
-                    for name, val in sorted(inputs):
-                        logger.info(name)
-                        logger.info("  value:    " + str(val) + "\n")
-                else:
-                    for name in sorted(inputs):
-                        logger.info(name)
-                logger.info('\n')
+            self._write_outputs('input', None, inputs, hierarchical, print_arrays, out_stream)
 
         return inputs
 
-    def list_outputs(self, explicit=True, implicit=True, values=True, out_stream='stdout'):
+    def list_outputs(self,
+                     explicit=True, implicit=True,
+                     values=True,
+                     residuals=False,
+                     residuals_tol=None,
+                     units=False,
+                     shape=False,
+                     bounds=False,
+                     scaling=False,
+                     hierarchical=True,
+                     print_arrays=False,
+                     out_stream=_DEFAULT_OUT_STREAM):
         """
-        List outputs.
+        Return and optionally log a list of output names and other optional information.
+
+        If the model is parallel, only the local variables are returned to the process.
+        Also optionally logs the information to a user defined output stream. If the model is
+        parallel, the rank 0 process logs information about all variables across all processes.
 
         Parameters
         ----------
         explicit : bool, optional
             include outputs from explicit components. Default is True.
-
         implicit : bool, optional
             include outputs from implicit components. Default is True.
-
         values : bool, optional
-            When True, display/return output values as well as names. Default is True.
-
-        out_stream : 'stdout', 'stderr' or file-like
-            Where to send human readable output. Default is 'stdout'.
+            When True, display/return output values. Default is True.
+        residuals : bool, optional
+            When True, display/return residual values. Default is False.
+        residuals_tol : float, optional
+            If set, limits the output of list_outputs to only variables where
+            the norm of the resids array is greater than the given 'residuals_tol'.
+            Default is None.
+        units : bool, optional
+            When True, display/return units. Default is False.
+        shape : bool, optional
+            When True, display/return the shape of the value. Default is False.
+        bounds : bool, optional
+            When True, display/return bounds (lower and upper). Default is False.
+        scaling : bool, optional
+            When True, display/return scaling (ref, ref0, and res_ref). Default is False.
+        hierarchical : bool, optional
+            When True, human readable output shows variables in hierarchical format.
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format  is affected
+            by the values set with numpy.set_printoptions
+            Default is False.
+        out_stream : file-like
+            Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
         Returns
         -------
         list
-            list of of output names, or (name, value) if values is True
+            list of output names and other optional information about those outputs
         """
         if self._outputs is None:
             raise RuntimeError("Unable to list outputs until model has been run.")
 
+        # Only gathering up values and metadata from this proc, if MPI
+        meta = self._var_abs2meta  # This only includes metadata for this process.
         states = self._list_states()
 
+        # Go though the hierarchy. Printing Systems
+        # If the System owns an output directly, show its output
         expl_outputs = []
         impl_outputs = []
         for name, val in iteritems(self._outputs._views):
+            if residuals_tol and np.linalg.norm(self._residuals._views[name]) < residuals_tol:
+                continue
+            outs = {}
+            if values:
+                outs['value'] = val
+            if residuals:
+                outs['resids'] = self._residuals._views[name]
+            if units:
+                outs['units'] = meta[name]['units']
+            if shape:
+                outs['shape'] = val.shape
+            if bounds:
+                outs['lower'] = meta[name]['lower']
+                outs['upper'] = meta[name]['upper']
+            if scaling:
+                outs['ref'] = meta[name]['ref']
+                outs['ref0'] = meta[name]['ref0']
+                outs['res_ref'] = meta[name]['res_ref']
             if name in states:
-                impl_outputs.append((name, val)) if values else impl_outputs.append(name)
+                impl_outputs.append((name, outs))
             else:
-                expl_outputs.append((name, val)) if values else expl_outputs.append(name)
+                expl_outputs.append((name, outs))
+
+        if out_stream == _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
 
         if out_stream:
             if explicit:
-                self._write_outputs('Explicit', expl_outputs, out_stream)
+                self._write_outputs('output', 'Explicit', expl_outputs, hierarchical, print_arrays,
+                                    out_stream)
             if implicit:
-                self._write_outputs('Implicit', impl_outputs, out_stream)
+                self._write_outputs('output', 'Implicit', impl_outputs, hierarchical, print_arrays,
+                                    out_stream)
 
         if explicit and implicit:
             return expl_outputs + impl_outputs
@@ -2576,106 +2705,249 @@ class System(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def list_residuals(self, explicit=True, implicit=True, values=True, out_stream='stdout',
-                       tol=None):
+    def _write_outputs(self, in_or_out, comp_type, outputs, hierarchical, print_arrays,
+                       out_stream):
         """
-        List residuals.
+        Write table of variable names, values, residuals, and metadata to out_stream.
+
+        The output values could actually represent input variables.
+        In this context, outputs refers to the data that is being logged to an output stream.
 
         Parameters
         ----------
-        explicit : bool, optional
-            include outputs from explicit components. Default is True.
-
-        implicit : bool, optional
-            include outputs from implicit components. Default is True.
-
-        values : bool, optional
-            When True, display/return residual values as well as names. Default is True.
-
-        out_stream : 'stdout', 'stderr' or file-like
-            Where to send human readable output. Default is 'stdout'.
-            Set to None to suppress.
-
-        tol : float, optional
-            If set, limits the output of list_residuals to only variables where
-            the norm of the resids array is greater than the given 'tol'.
-            Default is None.
-
-        Returns
-        -------
-        list
-            list of of residual names, or (name, value) if values is True
-        """
-        if self._residuals is None:
-            raise RuntimeError("Unable to list residuals until model has been run.")
-
-        states = self._list_states()
-
-        expl_resids = []
-        impl_resids = []
-        for name, val in iteritems(self._residuals._views):
-            if tol and np.linalg.norm(val) < tol:
-                continue
-            if name in states:
-                impl_resids.append((name, val)) if values else impl_resids.append(name)
-            else:
-                expl_resids.append((name, val)) if values else expl_resids.append(name)
-
-        if out_stream:
-            if explicit:
-                self._write_outputs('Explicit', expl_resids, out_stream)
-            if implicit:
-                self._write_outputs('Implicit', impl_resids, out_stream)
-
-        if explicit and implicit:
-            return expl_resids + impl_resids
-        elif explicit:
-            return expl_resids
-        elif implicit:
-            return impl_resids
-        else:
-            raise RuntimeError('You have excluded both Explicit and Implicit components.')
-
-    def _write_outputs(self, comp_type, outputs, out_stream='stdout'):
-        """
-        Write formatted output values and residuals to out_stream.
-
-        Parameters
-        ----------
+        in_or_out : str, 'input' or 'output'
+            indicates whether the values passed in are from inputs or output variables.
         comp_type : str, 'Explicit' or 'Implicit'
             the type of component with the output values.
-
         outputs : list
-            list of (name, value) tuples.
-
-        out_stream : 'stdout', 'stderr' or file-like
-            Where to send human readable output. Default is 'stdout'.
+            list of (name, dict of vals and metadata) tuples.
+        hierarchical : bool
+            When True, human readable output shows variables in hierarchical format.
+        print_arrays : bool
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format  is affected
+            by the values set with numpy.set_printoptions
+            Default is False.
+        out_stream : file-like object
+            Where to send human readable output.
             Set to None to suppress.
         """
         if out_stream is None:
             return
 
-        logger = get_logger('list_outputs', out_stream=out_stream)
+        # Only local metadata but the most complete
+        meta = self._var_abs2meta
 
-        count = len(outputs)
+        # Make a dict of outputs. Makes it easier to work with in this method
+        dict_of_outputs = OrderedDict()
+        for name, vals in outputs:
+            dict_of_outputs[name] = vals
 
+        # If parallel, gather up the outputs. All procs must call this
+        if MPI:
+            # returns a list, one per proc
+            all_dict_of_outputs = self.comm.gather(dict_of_outputs, root=0)
+
+        if MPI and MPI.COMM_WORLD.rank > 0:  # If MPI, only the root process should print
+            return
+
+        # If MPI, and on rank 0, need to gather up all the variables
+        if MPI:  # rest of this only done on rank 0
+            dict_of_outputs = all_dict_of_outputs[0]  # start with rank 0
+            for proc_outputs in all_dict_of_outputs[1:]:  # In rank order go thru rest of the procs
+                for name, vals in iteritems(proc_outputs):
+                    if name not in dict_of_outputs:  # If not in the merged dict, add it
+                        dict_of_outputs[name] = proc_outputs[name]
+                    else:  # If in there already, only need to deal with it if it is a
+                        # distributed array.
+                        # Checking to see if  distributed depends on if it is an input or output
+                        if in_or_out == 'input':
+                            is_distributed = meta[name]['src_indices'] is not None
+                        else:
+                            is_distributed = meta[name]['distributed']
+                        if is_distributed:
+                            # TODO no support for > 1D arrays
+                            #   meta.src_indices has the info we need to piece together arrays
+                            if 'value' in dict_of_outputs[name]:
+                                dict_of_outputs[name]['value'] = \
+                                    np.append(dict_of_outputs[name]['value'],
+                                              proc_outputs[name]['value'])
+                            if 'shape' in dict_of_outputs[name]:
+                                # TODO might want to use allprocs_abs2meta_out[name]['global_shape']
+                                dict_of_outputs[name]['shape'] = \
+                                    dict_of_outputs[name]['value'].shape
+                            if 'resids' in dict_of_outputs[name]:
+                                dict_of_outputs[name]['resids'] = \
+                                    np.append(dict_of_outputs[name]['resids'],
+                                              proc_outputs[name]['resids'])
+
+        count = len(dict_of_outputs)
+
+        # Write header
         pathname = self.pathname if self.pathname else 'model'
+        header_name = 'Input' if in_or_out == 'input' else 'Output'
+        if in_or_out == 'input':
+            header = "%d %s(s) in '%s'" % (count, header_name, pathname)
+        else:
+            header = "%d %s %s(s) in '%s'" % (count, comp_type, header_name, pathname)
+        out_stream.write(header + '\n')
+        out_stream.write('-' * len(header) + '\n' + '\n')
 
-        header = "%d %s Output(s) in '%s'\n" % (count, comp_type, pathname)
-        logger.info(header)
+        if not count:
+            return
 
-        if count:
-            logger.info("-" * len(header) + "\n")
-            if isinstance(outputs[0], tuple):
-                for name, _ in sorted(outputs):
-                    logger.info("%s" % name)
-                    logger.info("  value:    " + str(self._outputs._views[name]))
-                    logger.info("  residual: " + str(self._residuals._views[name]))
-                    logger.info('\n')
+        # Need an ordered list of possible output values for the two cases: inputs and outputs
+        #  so that we do the column output in the correct order
+        if in_or_out == 'input':
+            out_types = ('value', 'units',)
+        else:
+            out_types = ('value', 'resids', 'units', 'shape', 'lower', 'upper', 'ref',
+                         'ref0', 'res_ref')
+        # Figure out which columns will be displayed
+        # Look at any one of the outputs, they should all be the same
+        outputs = dict_of_outputs[list(dict_of_outputs)[0]]
+        column_names = []
+        for out_type in out_types:
+            if out_type in outputs:
+                column_names.append(out_type)
+
+        top_level_system_name = 'top'
+
+        # Find with width of the first column in the table
+        #    Need to look through all the possible varnames to find the max width
+        max_varname_len = max(len(top_level_system_name), len('varname'))
+        if hierarchical:
+            for name, outs in iteritems(dict_of_outputs):
+                for i, name_part in enumerate(name.split('.')):
+                    total_len = (i + 1) * self._indent_inc + len(name_part)
+                    max_varname_len = max(max_varname_len, total_len)
+        else:
+            for name, outs in iteritems(dict_of_outputs):
+                max_varname_len = max(max_varname_len, len(name))
+
+        # Determine the column widths of the data fields by finding the max width for all rows
+        for column_name in column_names:
+            self._column_widths[column_name] = len(column_name)  # has to be able to display name!
+        for name in self._var_allprocs_abs_names[in_or_out]:
+            if name in dict_of_outputs:
+                for column_name in column_names:
+                    if isinstance(dict_of_outputs[name][column_name], np.ndarray) and \
+                            dict_of_outputs[name][column_name].size > 1:
+                        out = '|{}|'.format(str(np.linalg.norm(dict_of_outputs[name][column_name])))
+                    else:
+                        out = str(dict_of_outputs[name][column_name])
+                    self._column_widths[column_name] = max(self._column_widths[column_name],
+                                                           len(str(out)))
+
+        # Write out the column headers
+        column_header = '{:{align}{width}}'.format('varname', align=self._align,
+                                                   width=max_varname_len)
+        column_dashes = max_varname_len * '-'
+        for column_name in column_names:
+            column_header += self._column_spacing * ' '
+            column_header += '{:{align}{width}}'.format(column_name, align=self._align,
+                                                        width=self._column_widths[column_name])
+            column_dashes += self._column_spacing * ' ' + self._column_widths[column_name] * '-'
+        out_stream.write(column_header + '\n')
+        out_stream.write(column_dashes + '\n')
+
+        # Write out the variable names and optional values and metadata
+        if hierarchical:
+            out_stream.write(top_level_system_name + '\n')
+
+            cur_sys_names = []
+            # _var_allprocs_abs_names has all the vars across all procs in execution order
+            #   But not all the values need to be written since, at least for output vars,
+            #      the output var lists are divided into explicit and implicit
+            for varname in self._var_allprocs_abs_names[in_or_out]:
+                if varname not in dict_of_outputs:
+                    continue
+
+                # For hierarchical, need to display system levels in the rows above the
+                #   actual row containing the var name and values. Want to make use
+                #   of the hierarchies that have been written about this.
+                existing_sys_names = []
+                varname_sys_names = varname.split('.')[:-1]
+                for i, sys_name in enumerate(varname_sys_names):
+                    if varname_sys_names[:i + 1] != cur_sys_names[:i + 1]:
+                        break
+                    else:
+                        existing_sys_names = cur_sys_names[:i + 1]
+
+                # What parts of the hierarchy for this varname need to be written that
+                #   were not already written above this
+                remaining_sys_path_parts = varname_sys_names[len(existing_sys_names):]
+
+                # Write the Systems in the var name path
+                indent = len(existing_sys_names) * self._indent_inc
+                for i, sys_name in enumerate(remaining_sys_path_parts):
+                    indent += self._indent_inc
+                    out_stream.write(indent * ' ' + sys_name + '\n')
+                cur_sys_names = varname_sys_names
+
+                indent += self._indent_inc
+                row = '{:{align}{width}}'.format(indent * ' ' + varname.split('.')[-1],
+                                                 align=self._align, width=max_varname_len)
+                self._write_outputs_rows(out_stream, row, column_names, dict_of_outputs[varname],
+                                         print_arrays)
+        else:
+            for name in self._var_allprocs_abs_names[in_or_out]:
+                if name in dict_of_outputs:
+                    row = '{:{align}{width}}'.format(name, align=self._align, width=max_varname_len)
+                    self._write_outputs_rows(out_stream, row, column_names, dict_of_outputs[name],
+                                             print_arrays)
+        out_stream.write(2 * '\n')
+
+    def _write_outputs_rows(self, out_stream, row, column_names, dict_of_outputs, print_arrays):
+        """
+        For one variable, write name, values, residuals, and metadata to out_stream.
+
+        Parameters
+        ----------
+        out_stream : file-like object
+            Where to send human readable output.
+            Set to None to suppress.
+        row : str
+            The string containing the contents of the beginning of this row output.
+            Contains the name of the System or varname, possibley indented to show hierarchy.
+
+        column_names : list of str
+            Indicates which columns will be written in this row.
+
+        dict_of_outputs : dict
+            Contains the values to be written in this row. Keys are columns names.
+
+        print_arrays : bool
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format  is affected
+            by the values set with numpy.set_printoptions
+            Default is False.
+
+        """
+        if out_stream is None:
+            return
+        left_column_width = len(row)
+        have_array_values = []  # keep track of which values are arrays
+        for column_name in column_names:
+            row += self._column_spacing * ' '
+            if isinstance(dict_of_outputs[column_name], np.ndarray) and \
+                    dict_of_outputs[column_name].size > 1:
+                have_array_values.append(column_name)
+                out = '|{}|'.format(str(np.linalg.norm(dict_of_outputs[column_name])))
             else:
-                for name in sorted(outputs):
-                    logger.info(name)
-                logger.info('\n')
+                out = str(dict_of_outputs[column_name])
+            row += '{:{align}{width}}'.format(out, align=self._align,
+                                              width=self._column_widths[column_name])
+        out_stream.write(row + '\n')
+        if print_arrays:
+            for column_name in have_array_values:
+                out_stream.write("{}  {}:\n".format(left_column_width * ' ', column_name))
+                out_str = str(dict_of_outputs[column_name])
+                indented_lines = [(left_column_width + self._indent_inc) * ' ' +
+                                  s for s in out_str.splitlines()]
+                out_stream.write('\n'.join(indented_lines) + '\n')
 
     def run_solve_nonlinear(self):
         """
@@ -2913,7 +3185,7 @@ class System(object):
                     # use filtered inputs
                     for inp in self._filtered_vars_to_record['i']:
                         if inp in inputs._names:
-                            data['i'][inp] = inputs._names[inp]
+                            data['i'][inp] = inputs._views[inp]
                 else:
                     # use all the inputs
                     data['i'] = inputs._names
@@ -2927,7 +3199,7 @@ class System(object):
                     # use outputs from filtered list.
                     for out in self._filtered_vars_to_record['o']:
                         if out in outputs._names:
-                            data['o'][out] = outputs._names[out]
+                            data['o'][out] = outputs._views[out]
                 else:
                     # use all the outputs
                     data['o'] = outputs._names
@@ -2941,7 +3213,7 @@ class System(object):
                     # use filtered residuals
                     for res in self._filtered_vars_to_record['r']:
                         if res in residuals._names:
-                            data['r'][res] = residuals._names[res]
+                            data['r'][res] = residuals._views[res]
                 else:
                     # use all the residuals
                     data['r'] = residuals._names

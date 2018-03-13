@@ -11,7 +11,6 @@ from openmdao.core.analysis_error import AnalysisError
 
 # Components
 from openmdao.components.balance_comp import BalanceComp
-from openmdao.components.deprecated_component import Component
 from openmdao.components.external_code import ExternalCode
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.linear_system_comp import LinearSystemComp
@@ -45,6 +44,8 @@ from openmdao.surrogate_models.response_surface import ResponseSurface
 from openmdao.surrogate_models.surrogate_model import SurrogateModel, \
     MultiFiSurrogateModel
 
+from openmdao.utils.find_cite import print_citations
+
 # Vectors
 from openmdao.vectors.default_vector import DefaultVector
 try:
@@ -65,7 +66,8 @@ try:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 except ImportError:
     pass
-from openmdao.drivers.scipy_optimizer import ScipyOptimizer
+from openmdao.drivers.scipy_optimizer import ScipyOptimizer, ScipyOptimizeDriver
+from openmdao.drivers.genetic_algorithm_driver import SimpleGADriver
 
 # System-Building Tools
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -74,6 +76,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
 from openmdao.recorders.web_recorder import WebRecorder
 from openmdao.recorders.upload_data import upload
+from openmdao.recorders.case_reader import CaseReader
 
 # set up tracing or memory profiling if env vars are set.
 import os

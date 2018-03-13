@@ -7,12 +7,15 @@ from six.moves import cStringIO, range
 from six import assertRaisesRegex
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestConnections(unittest.TestCase):
 
-    def setUp(self, c1meta=None, c3meta=None):
+    def setUp(self):
+        self.setup_model(None, None)
+
+    def setup_model(self, c1meta=None, c3meta=None):
         self.p = Problem(model=Group())
         root = self.p.model
 
@@ -205,7 +208,7 @@ class TestConnections(unittest.TestCase):
         raise unittest.SkipTest("no compatability checking of connected inputs yet")
 
         # set different but compatible units
-        self.setUp(c1meta={'x': {'units': 'ft'}}, c3meta={'x': {'units': 'inch'}})
+        self.setup_model(c1meta={'x': {'units': 'ft'}}, c3meta={'x': {'units': 'inch'}})
 
         # connect two inputs
         self.p.model.connect('G1.G2.C1.x', 'G3.G4.C3.x')
@@ -222,7 +225,7 @@ class TestConnections(unittest.TestCase):
         raise unittest.SkipTest("no compatability checking of connected inputs yet")
 
         # set different but compatible units
-        self.setUp(c1meta={'x': {'units': 'ft'}}, c3meta={'x': {'units': 'inch'}})
+        self.setup_model(c1meta={'x': {'units': 'ft'}}, c3meta={'x': {'units': 'inch'}})
 
         # connect two inputs
         self.p.model.connect('G3.G4.C3.x', 'G1.G2.C1.x')
@@ -278,7 +281,6 @@ class TestConnections(unittest.TestCase):
 class TestConnectionsPromoted(unittest.TestCase):
 
     def test_inp_inp_promoted_no_src(self):
-        raise unittest.SkipTest("connected inputs w/o src not supported yet")
 
         p = Problem(model=Group())
         root = p.model
@@ -293,12 +295,14 @@ class TestConnectionsPromoted(unittest.TestCase):
         C3 = G4.add_subsystem("C3", ExecComp('y=x*2.0'), promotes=['x'])
         C4 = G4.add_subsystem("C4", ExecComp('y=x*2.0'), promotes=['x'])
 
-        p.setup(check=False)
+        p.setup()
+        p.final_setup()
 
         # setting promoted name should set both inputs mapped to that name
-        p['G3.x'] = 999.
-        self.assertEqual(C3._inputs['x'], 999.)
-        self.assertEqual(C4._inputs['x'], 999.)
+        with self.assertRaises(Exception) as context:
+            p['G3.x'] = 999.
+        self.assertEqual(str(context.exception),
+                         "The promoted name G3.x is invalid because it refers to multiple inputs: [G3.G4.C3.x, G3.G4.C4.x] that are not connected to an output variable.")
 
     def test_inp_inp_promoted_w_prom_src(self):
         p = Problem(model=Group())

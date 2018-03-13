@@ -1,5 +1,7 @@
 """Define the MultiFiMetaModel class."""
 
+from six.moves import range
+
 import numpy as np
 
 from openmdao.components.meta_model_unstructured import MetaModelUnStructured
@@ -14,7 +16,6 @@ def _get_name_fi(name, fi_index):
     ----------
     name : str
         base name
-
     fi_index : int
         fidelity level
 
@@ -70,6 +71,13 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
 
     .. note:: when *nfi* ==1 a :class:`MultiFiMetaModelUnStructured` object behaves as
         a :class:`MetaModelUnStructured` object.
+
+    Attributes
+    ----------
+    _input_sizes : list
+        Stores the size of the inputs at each level.
+    _nfi : float
+        number of levels of fidelity
     """
 
     def __init__(self, nfi=1):
@@ -78,7 +86,8 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
 
         Parameters
         ----------
-        nfi : number of levels of fidelity
+        nfi : float
+            number of levels of fidelity
         """
         super(MultiFiMetaModelUnStructured, self).__init__()
 
@@ -88,7 +97,8 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
         self._training_input = nfi * [np.zeros(0)]
         self._input_sizes = nfi * [0]
 
-    def add_input(self, name, val=1.0, **kwargs):
+    def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
+                  units=None, desc='', var_set=0):
         """
         Add an input variable to the component.
 
@@ -107,6 +117,10 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
             If val is given as an array_like object, the shapes of val and
             src_indices must match. A value of None implies this input depends
             on all entries of source. Default is None.
+        flat_src_indices : bool
+            If True, each entry of src_indices is assumed to be an index into the
+            flattened source.  Otherwise each entry must be a tuple or list of size equal
+            to the number of dimensions of the source.
         units : str or None
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.
@@ -116,7 +130,10 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
             For advanced users only. ID or color for this variable, relevant for
             reconfigurability. Default is 0.
         """
-        metadata = super(MultiFiMetaModelUnStructured, self).add_input(name, val, **kwargs)
+        item = MultiFiMetaModelUnStructured
+        metadata = super(item, self).add_input(name, val, shape=shape, src_indices=src_indices,
+                                               flat_src_indices=flat_src_indices, units=units,
+                                               desc=desc, var_set=var_set)
         input_size = metadata['value'].size
 
         self._input_sizes[0] = self._input_size
@@ -129,7 +146,8 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
                     name_with_fi, default=None, desc='Training data for %s' % name_with_fi)
                 self._input_sizes[fi] += input_size
 
-    def add_output(self, name, val=1.0, **kwargs):
+    def add_output(self, name, val=1.0, surrogate=None, shape=None, units=None, res_units=None,
+                   desc='', lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0):
         """
         Add an output variable to the component.
 
@@ -139,6 +157,8 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
             name of the variable in this component's namespace.
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
+        surrogate : SurrogateModel
+            Surrogate model to use.
         shape : int or tuple or list or None
             Shape of this variable, only required if val is not an array.
             Default is None.
@@ -173,7 +193,11 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
         """
-        super(MultiFiMetaModelUnStructured, self).add_output(name, val, **kwargs)
+        super(MultiFiMetaModelUnStructured, self).add_output(name, val, shape=shape, units=units,
+                                                             res_units=res_units, desc=desc,
+                                                             lower=lower, upper=upper, ref=ref,
+                                                             ref0=ref0, res_ref=res_ref,
+                                                             var_set=var_set, surrogate=surrogate)
         self._training_output[name] = self._nfi * [np.zeros(0)]
 
         # Add train:<outvar>_fi<n>
@@ -293,10 +317,21 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
 
 
 class MultiFiMetaModel(MultiFiMetaModelUnStructured):
-    """Deprecated."""
+    """
+    Deprecated.
+    """
 
     def __init__(self, *args, **kwargs):
-        """Capture Initialize to throw warning."""
+        """
+        Capture Initialize to throw warning.
+
+        Parameters
+        ----------
+        *args : list
+            Deprecated arguments.
+        **kwargs : dict
+            Deprecated arguments.
+        """
         warn_deprecation("'MultiFiMetaModel' component has been deprecated. Use"
                          "'MultiFiMetaModelUnStructured' instead.")
         super(MultiFiMetaModel, self).__init__(*args, **kwargs)

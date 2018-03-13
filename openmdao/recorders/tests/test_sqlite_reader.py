@@ -17,7 +17,7 @@ from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
     SellarDis2withDerivatives
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 try:
@@ -207,12 +207,12 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = CaseReader(self.filename)
 
         # Test to see if we got the correct number of cases
-        self.assertEqual(cr.driver_cases.num_cases, 8)
+        self.assertEqual(cr.driver_cases.num_cases, 7)
         self.assertEqual(cr.system_cases.num_cases, 0)
         self.assertEqual(cr.solver_cases.num_cases, 0)
 
         # Test to see if the access by case keys works:
-        seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|6')
+        seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|5')
         np.testing.assert_almost_equal(seventh_slsqp_iteration_case.desvars['z'], [1.97846296,  -2.21388305e-13],
                                        decimal=2,
                                        err_msg='Case reader gives '
@@ -390,7 +390,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                 sorted(cr.system_metadata.keys()),
                 sorted(['root', 'mda.d1', 'pz'])
         )
-        
+
         assert_rel_error(
             self, cr.system_metadata['pz']['scaling_factors']['output']['nonlinear']['phys'][0][1], [2.0, 2.0], 1.0e-3)
 

@@ -42,7 +42,7 @@ and a method that looks like this and has the decorator applied to it:
 
         pass
 
-The docs will look like this
+The docs will look like this:
 
 .. figure:: images/decorated_method_incorrect_docs.png
    :alt: The Sphinx generated documentation for a method that is decorated but nothing fixing

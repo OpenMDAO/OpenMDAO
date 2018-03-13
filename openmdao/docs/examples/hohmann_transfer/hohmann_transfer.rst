@@ -10,7 +10,7 @@ geostationary orbit (GEO) using a two-impulse *Hohmann Transfer*.
 
 The Hohmann Transfer is a maneuver which minimizes the delta-V for
 transferring a spacecraft from one circular orbit to another.  Hohmann
-transfer's have a practical application in that they can be used
+transfers have a practical application in that they can be used
 to transfer satellites from LEO parking orbits to geostationary orbit.
 
 To do so, the vehicle first imparts a delta-V along the velocity vector
@@ -30,10 +30,10 @@ to the radius of GEO, thus circularizing the orbit.
 
 Simple, right?  The issue is that, unless they launch from the equator,
 launch vehicles do not put satellites in a low Earth parking orbit
-with the same inclination as geostationary orbit.  For instance, a due east launch
+with the same inclination as geostationary orbit.  For instance, a due-east launch
 from Kennedy Space Center will result in a parking orbit with an inclination of
 28.5 degrees.  We therefore need to change the inclination of our satellite during
-it's two impulsive burn maneuvers.  The question is, *what change in inclination
+its two impulsive burn maneuvers.  The question is, *what change in inclination
 at each burn will result in the minimum possible delta-V?*
 
 .. figure:: images/hohmann_transfer.png
@@ -102,7 +102,7 @@ The specific angular momentum can also be computed as:
     h = \sqrt{p \mu}
 
 Where :math:`p` is the semilatus rectum of the orbit and :math:`\mu` is
-the gravitational paramter of the central body.
+the gravitational parameter of the central body.
 
 The semilatus rectum is computed as:
 
@@ -183,7 +183,7 @@ and the angle between them.
 Putting it all together
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Now we assemble the model for our problem
+Now we assemble the model for our problem.
 
 An IndepVarComp provides values for the gravitational parameter, the radii
 of the two circular orbits, and the delta-V to be performed at each of the
@@ -199,7 +199,7 @@ Now we can use the DeltaVComp to provide the magnitude of the delta-V
 at each of the two impulses.
 
 Lastly, we use two ExecComps to provide some simple calculations.  One
-sums the delta-V's of the two impulses to provide the total delta-V of the
+sums the delta-Vs of the two impulses to provide the total delta-V of the
 transfer.  We will use this as the objective for the optimization.
 
 The other ExecComp sums up the inclination change at each impulse.  We
@@ -209,13 +209,14 @@ inclination change meets our requirements.
 We will use the initial and final radii of the orbits, and the inclination
 change at each of the two impulses as our design variables.
 
-To run the model we provide values for the design variables and invoke `run_model`.
+To run the model, we provide values for the design variables and invoke `run_model`.
 
 To find the optimal solution for the model, we invoke `run_driver`, where we have
-defined the driver of the problem to be the ScipyOptimizer.
+defined the driver of the problem to be the :ref:`ScipyOptimizeDriver <scipy_optimize_driver>`.
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.test_hohmann_transfer.TestHohmannTransfer.test_dv_at_apogee
+    :layout: interleave
 
 ~~~~~~~
 Summary
@@ -223,7 +224,7 @@ Summary
 
 We built a model representing a Hohmann transfer with a plane change.  This model
 utilized components with both analytic partial derivatives and approximated partials
-using finite-differencing.  We utilized ExecComps for some simple calculations
+using finite differencing.  We utilized ExecComps for some simple calculations
 to reduce the amount of code we needed to write.  Finally, we used this model
 to demonstrate that performing the necessary plane change entirely at apoapsis is
 somewhat less optimal, from a delta-V standpoint, than performing some of the plane

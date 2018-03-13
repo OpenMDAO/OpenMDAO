@@ -3,7 +3,7 @@
 from __future__ import division, print_function
 
 import unittest
-import numpy
+import numpy as np
 
 from openmdao.api import Problem, Group, ParallelGroup, ExecComp, IndepVarComp, \
                          ExplicitComponent
@@ -19,7 +19,8 @@ except ImportError:
 from openmdao.test_suite.groups.parallel_groups import \
     FanOutGrouped, FanInGrouped2, Diamond, ConvergeDiverge
 
-from openmdao.devtools.testutil import assert_rel_error, TestLogger
+from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.logger_utils import TestLogger
 
 
 
@@ -215,7 +216,7 @@ class TestParallelGroups(unittest.TestCase):
                 outputs['y'] = inputs['x'] * self.mult
 
             def compute_partials(self, inputs, partials):
-                partials['y', 'x'] = numpy.array([self.mult])
+                partials['y', 'x'] = np.array([self.mult])
 
         prob = Problem()
 
@@ -303,6 +304,34 @@ class TestParallelGroups(unittest.TestCase):
             self.assertTrue(msg in testlogger.get('error')[0])
             self.assertTrue(msg in testlogger.get('warning')[0])
             self.assertTrue(msg in testlogger.get('info')[0])
+
+
+@unittest.skipUnless(PETScVector, "PETSc is required.")
+class MatMatParDevTestCase(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_size_1_matmat(self):
+        p = Problem()
+        indeps = p.model.add_subsystem('indeps', IndepVarComp('x', np.ones(2)))
+        indeps.add_output('y', 1.0)
+        par = p.model.add_subsystem('par', ParallelGroup())
+        par.add_subsystem('C1', ExecComp('y=2*x', x=np.zeros(2), y=np.zeros(2)))
+        par.add_subsystem('C2', ExecComp('y=3*x'))
+        p.model.connect("indeps.x", "par.C1.x")
+        p.model.connect("indeps.y", "par.C2.x")
+        p.model.add_design_var('indeps.x', vectorize_derivs=True, parallel_deriv_color='foo')
+        p.model.add_design_var('indeps.y', vectorize_derivs=True, parallel_deriv_color='foo')
+        par.add_objective('C2.y')
+        par.add_constraint('C1.y', lower=0.0)
+        p.setup(vector_class=PETScVector, mode='fwd')
+        p.run_model()
+
+        # prior to bug fix, this would raise an exception
+        J = p._compute_totals()
+        np.testing.assert_array_equal(J['par.C1.y', 'indeps.x'], np.eye(2)*2.)
+        np.testing.assert_array_equal(J['par.C2.y', 'indeps.x'], np.zeros((1,2)))
+        np.testing.assert_array_equal(J['par.C1.y', 'indeps.y'], np.zeros((2,1)))
+        np.testing.assert_array_equal(J['par.C2.y', 'indeps.y'], np.array([[3.]]))
 
 
 if __name__ == "__main__":

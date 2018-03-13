@@ -7,9 +7,9 @@ from six import assertRaisesRegex
 import numpy as np
 
 from openmdao.core.group import get_relevant_vars
-from openmdao.api import Problem, Group, IndepVarComp, PETScVector, NonlinearBlockGS, ScipyOptimizer, \
+from openmdao.api import Problem, Group, IndepVarComp, PETScVector, NonlinearBlockGS, ScipyOptimizeDriver, \
      ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesConnected
@@ -75,9 +75,13 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.f_xy'], -15.0)
+        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'])
+        assert_rel_error(self, totals[('comp.f_xy','p1.x')][0][0], -4.0)
+        assert_rel_error(self, totals[('comp.f_xy','p2.y')][0][0], 3.0)
 
-        prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'])
+        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'], return_format= 'dict')
+        assert_rel_error(self, totals['comp.f_xy']['p1.x'][0][0], -4.0)
+        assert_rel_error(self, totals['comp.f_xy']['p2.y'][0][0], 3.0)
 
     def test_feature_simple_run_once_set_deriv_mode(self):
         from openmdao.api import Problem, Group, IndepVarComp
@@ -235,6 +239,44 @@ class TestProblem(unittest.TestCase):
 
         assert_rel_error(self, derivs['f_xy']['x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy']['y'], [[8.0]], 1e-6)
+
+    def test_compute_totals_no_args(self):
+        p = Problem()
+
+        dv = p.model.add_subsystem('des_vars', IndepVarComp())
+        dv.add_output('x', val=2.)
+
+        p.model.add_subsystem('calc', ExecComp('y=2*x'))
+
+        p.model.connect('des_vars.x', 'calc.x')
+
+        p.model.add_design_var('des_vars.x')
+        p.model.add_objective('calc.y')
+
+        p.setup()
+        p.run_model()
+
+        derivs = p.compute_totals()
+
+        assert_rel_error(self, derivs['calc.y', 'des_vars.x'], [[2.0]], 1e-6)
+
+    def test_compute_totals_no_args_promoted(self):
+        p = Problem()
+
+        dv = p.model.add_subsystem('des_vars', IndepVarComp(), promotes=['*'])
+        dv.add_output('x', val=2.)
+
+        p.model.add_subsystem('calc', ExecComp('y=2*x'), promotes=['*'])
+
+        p.model.add_design_var('x')
+        p.model.add_objective('y')
+
+        p.setup()
+        p.run_model()
+
+        derivs = p.compute_totals()
+
+        assert_rel_error(self, derivs['calc.y', 'des_vars.x'], [[2.0]], 1e-6)
 
     def test_feature_set_indeps(self):
         from openmdao.api import Problem, Group, IndepVarComp
@@ -413,14 +455,14 @@ class TestProblem(unittest.TestCase):
     def test_feature_run_driver(self):
         import numpy as np
 
-        from openmdao.api import Problem, NonlinearBlockGS, ScipyOptimizer
+        from openmdao.api import Problem, NonlinearBlockGS, ScipyOptimizeDriver
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
         model = prob.model = SellarDerivatives()
         model.nonlinear_solver = NonlinearBlockGS()
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
 
@@ -698,9 +740,8 @@ class TestProblem(unittest.TestCase):
 
         p.setup(check=False, mode='rev')
 
-        g = p.model.compute_sys_graph(comps_only=True)
-        relevant = get_relevant_vars(g, ['indep1.x', 'indep2.x'], ['C8.y', 'Unconnected.y'],
-                                     mode='rev')
+        relevant = get_relevant_vars(model._conn_global_abs_in2out, ['indep1.x', 'indep2.x'],
+                                     ['C8.y', 'Unconnected.y'], mode='rev')
 
         indep1_ins = set(['C3.b', 'C3.c', 'C8.b', 'G1.C1.a', 'G2.C5.a', 'G2.C5.b'])
         indep1_outs = set(['C3.y', 'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'])
@@ -961,13 +1002,13 @@ class TestProblem(unittest.TestCase):
             model.add_subsystem('p1', IndepVarComp('x', 3.0))
             model.add_subsystem('p2', IndepVarComp('y', -4.0))
             model.add_subsystem('comp', ExecComp("f_xy=2.0*x+3.0*y"))
-    
+
             model.connect('p1.x', 'comp.x')
             model.connect('p2.y', 'comp.y')
-    
+
             prob.setup()
             prob.run_model()
-    
+
             assert_rel_error(self, prob['p2.y'], 5.0)
             assert_rel_error(self, prob['comp.f_xy'], 21.0)
         finally:

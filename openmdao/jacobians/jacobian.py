@@ -67,11 +67,8 @@ class Jacobian(object):
         in_size : int
             local size of the input variable.
         """
-        abs2meta = self._system._var_abs2meta
-
-        if abs_key[1] in abs2meta['output']:
-            return (abs2meta['output'][abs_key[0]]['size'], abs2meta['output'][abs_key[1]]['size'])
-        return (abs2meta['output'][abs_key[0]]['size'], abs2meta['input'][abs_key[1]]['size'])
+        abs2meta = self._system._var_allprocs_abs2meta
+        return (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
 
     def _multiply_subjac(self, abs_key, val):
         """
@@ -251,8 +248,6 @@ class Jacobian(object):
     def _set_partials_meta(self, abs_key, meta, negate=False):
         """
         Store subjacobian metadata.
-
-        Note: this method MUST be called by a Component because prom_key is otherwise non-unique.
 
         Parameters
         ----------

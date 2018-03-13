@@ -1,12 +1,12 @@
 """Define the Problem class and a FakeComm class for non-MPI users."""
 
-from __future__ import division
+from __future__ import division, print_function
 
 import sys
+from copy import deepcopy
 
 from collections import OrderedDict, defaultdict, namedtuple
 from itertools import product
-import logging
 
 from six import iteritems, iterkeys, itervalues
 from six.moves import range
@@ -16,7 +16,6 @@ import scipy.sparse as sparse
 
 from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
 from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
-from openmdao.components.deprecated_component import Component as DepComponent
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver
 from openmdao.core.explicitcomponent import ExplicitComponent
@@ -25,10 +24,10 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll
-from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.vectors.default_vector import DefaultVector
+
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
@@ -36,10 +35,27 @@ except ImportError:
 
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
+# Use this as a special value to be able to tell if the caller set a value for the optional
+#   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
+_DEFAULT_OUT_STREAM = object()
+
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 _contains_all = ContainsAll()
+
+
+CITATION = """@inproceedings{2014_openmdao_derivs,
+    Author = {Justin S. Gray and Tristan A. Hearn and Kenneth T. Moore
+              and John Hwang and Joaquim Martins and Andrew Ning},
+    Booktitle = {15th AIAA/ISSMO Multidisciplinary Analysis and Optimization Conference},
+    Doi = {doi:10.2514/6.2014-2042},
+    Month = {2014/07/08},
+    Publisher = {American Institute of Aeronautics and Astronautics},
+    Title = {Automatic Evaluation of Multidisciplinary Derivatives Using
+             a Graph-Based Problem Formulation in OpenMDAO},
+    Year = {2014}
+}"""
 
 
 class Problem(object):
@@ -70,6 +86,11 @@ class Problem(object):
         0 -- Newly initialized problem or newly added model.
         1 -- The `setup` method has been called, but vectors not initialized.
         2 -- The `final_setup` has been run, everything ready to run.
+    _lin_sol_cache : dict
+        Dict of indices keyed to solution vectors
+    cite : str
+        Listing of relevant citataions that should be referenced when
+        publishing work that uses this class.
     """
 
     _post_setup_func = None
@@ -89,6 +110,8 @@ class Problem(object):
         root : <System> or None
             Deprecated kwarg for `model`.
         """
+        self.cite = CITATION
+
         if comm is None:
             try:
                 from mpi4py import MPI
@@ -128,6 +151,8 @@ class Problem(object):
         # 2 -- The `final_setup` has been run, everything ready to run.
         self._setup_status = 0
 
+        self._lin_sol_cache = {}
+
     def __getitem__(self, name):
         """
         Get an output/input variable.
@@ -153,15 +178,12 @@ class Problem(object):
             else:
                 proms = self.model._var_allprocs_prom2abs_list
                 meta = self.model._var_abs2meta
-                if name in meta['input']:
+                if name in meta:
                     if name in self.model._conn_abs_in2out:
                         src_name = self.model._conn_abs_in2out[name]
-                        val = meta['input'][src_name]['value']
+                        val = meta[src_name]['value']
                     else:
-                        val = meta['input'][name]['value']
-
-                elif name in meta['output']:
-                    val = meta['output'][name]['value']
+                        val = meta[name]['value']
 
                 elif name in proms['input']:
                     abs_name = proms['input'][name][0]
@@ -174,16 +196,16 @@ class Problem(object):
                             # This triggers a check for unconnected non-unique inputs, and
                             # raises the same error as vector access.
                             abs_name = prom_name2abs_name(self.model, name, 'input')
-                        val = meta['output'][src_name]['value']
+                        val = meta[src_name]['value']
                     else:
                         # This triggers a check for unconnected non-unique inputs, and
                         # raises the same error as vector access.
                         abs_name = prom_name2abs_name(self.model, name, 'input')
-                        val = meta['input'][abs_name]['value']
+                        val = meta[abs_name]['value']
 
                 elif name in proms['output']:
                     abs_name = prom_name2abs_name(self.model, name, 'output')
-                    val = meta['output'][abs_name]['value']
+                    val = meta[abs_name]['value']
 
                 else:
                     msg = 'Variable name "{}" not found.'
@@ -342,7 +364,7 @@ class Problem(object):
         """
         self.driver.cleanup()
 
-    def setup(self, vector_class=DefaultVector, check=True, logger=None, mode='rev',
+    def setup(self, vector_class=DefaultVector, check=False, logger=None, mode='rev',
               force_alloc_complex=False):
         """
         Set up the model hierarchy.
@@ -357,7 +379,7 @@ class Problem(object):
         vector_class : type
             reference to an actual <Vector> class; not an instance.
         check : boolean
-            whether to run error check after setup is complete.
+            whether to run config check after setup is complete.
         logger : object
             Object for logging config checks if check is True.
         mode : string
@@ -398,6 +420,7 @@ class Problem(object):
         self._force_alloc_complex = force_alloc_complex
 
         self._setup_status = 1
+
         return self
 
     def final_setup(self):
@@ -411,16 +434,14 @@ class Problem(object):
         started, and the rest of the framework is prepared for execution.
         """
         vector_class = self._vector_class
-        check = self._check
-        logger = self._logger
         force_alloc_complex = self._force_alloc_complex
 
-        model = self.model
         comm = self.comm
         mode = self._mode
 
         if self._setup_status < 2:
-            model._final_setup(comm, vector_class, 'full', force_alloc_complex=force_alloc_complex)
+            self.model._final_setup(comm, vector_class, 'full',
+                                    force_alloc_complex=force_alloc_complex)
 
         self.driver._setup_driver(self)
 
@@ -428,8 +449,8 @@ class Problem(object):
         for items in self._solver_print_cache:
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
 
-        if check and comm.rank == 0:
-            check_config(self, logger)
+        if self._check and comm.rank == 0:
+            check_config(self, self._logger)
 
         if self._setup_status < 2:
             self._setup_status = 2
@@ -439,7 +460,21 @@ class Problem(object):
         if Problem._post_setup_func is not None:
             Problem._post_setup_func(self)
 
-    def check_partials(self, logger=None, comps=None, compact_print=False,
+    def _all_components_provide_jacobians(self):
+        """
+        Are all components providing jacobians.
+
+        Returns
+        -------
+        boolean
+            True if all Components use jacobian-free linear operators; False otherwise.
+        """
+        for comp in self.model.system_iter(typ=Component, include_self=True):
+            if comp.matrix_free:
+                return False
+        return True
+
+    def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6,
                        method='fd', step=None, form=DEFAULT_FD_OPTIONS['form'],
                        step_calc=DEFAULT_FD_OPTIONS['step_calc'],
@@ -449,8 +484,9 @@ class Problem(object):
 
         Parameters
         ----------
-        logger : object
-            Logging object to capture output. All output is at logging.INFO level.
+        out_stream : file-like object
+            Where to send human readable output. Default is None.
+            Set to None to suppress.
         comps : None or list_like
             List of component names to check the partials of (all others will be skipped). Set to
              None (default) to run all components.
@@ -498,7 +534,6 @@ class Problem(object):
             self.final_setup()
 
         model = self.model
-        logger = logger if logger else get_logger('check_partials')
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -514,7 +549,6 @@ class Problem(object):
                 raise ValueError(msg)
             comps = [model._get_subsystem(c_name) for c_name in comps]
 
-        current_mode = self._mode
         self.set_solver_print(level=0)
 
         # This is a defaultdict of (defaultdict of dicts).
@@ -545,7 +579,6 @@ class Problem(object):
                     continue
 
                 explicit = isinstance(comp, ExplicitComponent)
-                deprecated = isinstance(comp, DepComponent)
                 matrix_free = comp.matrix_free
                 c_name = comp.pathname
                 indep_key[c_name] = set()
@@ -561,9 +594,7 @@ class Problem(object):
                     wrt_list = list(comp._var_allprocs_prom2abs_list['input'].keys())
 
                     # The only outputs in wrt should be implicit states.
-                    if deprecated:
-                        wrt_list.extend(comp._state_names)
-                    elif not explicit:
+                    if not explicit:
                         wrt_list.extend(of_list)
 
                     # Matrix-free components need to calculate their Jacobian by matrix-vector
@@ -598,7 +629,7 @@ class Problem(object):
                                 dstate.set_const(0.0)
 
                                 # TODO - Sort out the minus sign difference.
-                                perturb = 1.0 if (deprecated or not explicit) else -1.0
+                                perturb = 1.0 if not explicit else -1.0
 
                                 # Dictionary access returns a scaler for 1d input, and we
                                 # need a vector for clean code, so use _views_flat.
@@ -660,20 +691,20 @@ class Problem(object):
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
                                 try:
-                                    in_size = comp._var_abs2meta['input'][wrt]['size']
+                                    in_size = comp._var_abs2meta[wrt]['size']
                                 except KeyError:
-                                    in_size = comp._var_abs2meta['output'][wrt]['size']
+                                    in_size = comp._var_abs2meta[wrt]['size']
 
-                                out_size = comp._var_abs2meta['output'][of]['size']
+                                out_size = comp._var_abs2meta[of]['size']
                                 deriv_value = np.zeros((out_size, in_size))
 
                             if force_dense:
                                 if isinstance(deriv_value, list):
                                     try:
-                                        in_size = comp._var_abs2meta['input'][wrt]['size']
+                                        in_size = comp._var_abs2meta[wrt]['size']
                                     except KeyError:
-                                        in_size = comp._var_abs2meta['output'][wrt]['size']
-                                    out_size = comp._var_abs2meta['output'][of]['size']
+                                        in_size = comp._var_abs2meta[wrt]['size']
+                                    out_size = comp._var_abs2meta[of]['size']
                                     tmp_value = np.zeros((out_size, in_size))
                                     jac_val, jac_i, jac_j = deriv_value
                                     # if a scalar value is provided (in declare_partials),
@@ -709,7 +740,6 @@ class Problem(object):
             c_name = comp.pathname
             all_fd_options[c_name] = {}
             explicit = isinstance(comp, ExplicitComponent)
-            deprecated = isinstance(comp, DepComponent)
 
             approximations = {'fd': FiniteDifference(),
                               'cs': ComplexStep()}
@@ -718,9 +748,7 @@ class Problem(object):
             wrt = list(comp._var_allprocs_prom2abs_list['input'].keys())
 
             # The only outputs in wrt should be implicit states.
-            if deprecated:
-                wrt.extend(comp._state_names)
-            elif not explicit:
+            if not explicit:
                 wrt.extend(of)
 
             # Load up approximation objects with the requested settings.
@@ -790,13 +818,18 @@ class Problem(object):
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
 
-        _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, logger, compact_print,
-                                  comps, all_fd_options, suppress_output=suppress_output,
-                                  indep_key=indep_key)
+        if out_stream == _DEFAULT_OUT_STREAM and not suppress_output:
+            out_stream = sys.stdout
+
+        _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
+                                  compact_print, comps, all_fd_options,
+                                  suppress_output=suppress_output, indep_key=indep_key,
+                                  all_comps_provide_jacs=self._all_components_provide_jacobians())
 
         return partials_data
 
-    def check_totals(self, of=None, wrt=None, logger=None, compact_print=False, abs_err_tol=1e-6,
+    def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
+                     abs_err_tol=1e-6,
                      rel_err_tol=1e-6, method='fd', step=1e-6, form='forward', step_calc='abs',
                      suppress_output=False):
         """
@@ -810,8 +843,9 @@ class Problem(object):
         wrt : list of variable name strings or None
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
-        logger : object
-            Logging object to capture output. All output is at logging.INFO level.
+        out_stream : file-like object
+            Where to send human readable output. Default is None.
+            Set to None to suppress.
         compact_print : bool
             Set to True to just print the essentials, one line per unknown-param pair.
         abs_err_tol : float
@@ -849,8 +883,6 @@ class Problem(object):
         model = self.model
         global_names = False
 
-        logger = logger if logger else get_logger('check_totals')
-
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
         if wrt is None:
@@ -885,7 +917,11 @@ class Problem(object):
             data[''][key]['J_fd'] = Jfd[key]
         fd_args['method'] = 'fd'
 
-        _assemble_derivative_data(data, rel_err_tol, abs_err_tol, logger, compact_print, [model],
+        if out_stream == _DEFAULT_OUT_STREAM and not suppress_output:
+            out_stream = sys.stdout
+
+        _assemble_derivative_data(data, rel_err_tol, abs_err_tol, out_stream, compact_print,
+                                  [model],
                                   {'': fd_args}, totals=True, suppress_output=suppress_output)
         return data['']
 
@@ -902,8 +938,9 @@ class Problem(object):
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
         return_format : string
-            Format to return the derivatives. Default is a 'flat_dict', which
-            returns them in a dictionary whose keys are tuples of form (of, wrt).
+            Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
+            Default is a 'flat_dict', which returns them in a dictionary whose keys are
+            tuples of form (of, wrt).
 
         Returns
         -------
@@ -939,8 +976,9 @@ class Problem(object):
         wrt : list of variable name strings or None
             Variables with respect to which the derivatives will be computed.
         return_format : string
-            Format to return the derivatives. Default is a 'flat_dict', which
-            returns them in a dictionary whose keys are tuples of form (of, wrt).
+            Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
+            Default is a 'flat_dict', which returns them in a dictionary whose keys are
+            tuples of form (of, wrt).
         global_names : bool
             Set to True when passing in global names to skip some translation steps.
         initialize : bool
@@ -1080,7 +1118,7 @@ class Problem(object):
         iproc = model.comm.rank
 
         for vois in itervalues(voi_lists):
-            for input_name, old_input_name in vois:
+            for input_name, old_input_name, _, _, _, _ in vois:
                 vecname = inp2rhs_name[input_name]
                 if vecname not in input_vec:
                     continue
@@ -1088,13 +1126,13 @@ class Problem(object):
                 dinputs = input_vec[vecname]
                 doutputs = output_vec[vecname]
 
-                in_var_idx = model._var_allprocs_abs2idx[vecname]['output'][input_name]
-                in_var_meta = model._var_allprocs_abs2meta['output'][input_name]
+                in_var_idx = model._var_allprocs_abs2idx[vecname][input_name]
+                in_var_meta = model._var_allprocs_abs2meta[input_name]
 
                 dup = not in_var_meta['distributed']
 
                 start = np.sum(sizes[:iproc, in_var_idx])
-                end = np.sum(sizes[:iproc + 1, in_var_idx])
+                end = start + sizes[iproc, in_var_idx]
 
                 in_idxs = None
                 if input_name in input_vois:
@@ -1103,7 +1141,10 @@ class Problem(object):
                         in_idxs = in_voi_meta['indices']
 
                 if in_idxs is not None:
+                    neg = in_idxs[in_idxs < 0]
                     irange = in_idxs
+                    if np.any(neg):
+                        irange[neg] += end
                     max_i = np.max(in_idxs)
                     min_i = np.min(in_idxs)
                     loc_size = len(in_idxs)
@@ -1138,143 +1179,6 @@ class Problem(object):
 
         return voi_info
 
-    def _compute_totals_multi(self, totals, vois, voi_info, lin_vec_names, mode,
-                              output_list, old_output_list, output_vois,
-                              use_rel_reduction, rel_systems, return_format):
-        fwd = mode == 'fwd'
-        if fwd:
-            remote_outputs = self.driver._remote_responses
-        else:
-            remote_outputs = self.driver._remote_dvs
-
-        model = self.model
-        nproc = model.comm.size
-        iproc = model.comm.rank
-        sizes = model._var_sizes['nonlinear']['output']
-        owning_ranks = model._owning_rank['output']
-
-        # this sets dinputs for the current parallel_deriv_color to 0
-        voi_info[vois[0][0]][0].set_const(0.0)
-        if use_rel_reduction:
-            if fwd:
-                model._vectors['output']['linear'].set_const(0.0)
-            else:
-                model._vectors['input']['linear'].set_const(0.0)
-
-        for input_name, old_input_name in vois:
-            dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
-                dup, store = voi_info[input_name]
-            if input_name in dinputs:
-                vec = dinputs._views_flat[input_name]
-                for i, idx in enumerate(idxs):
-                    if idx < 0:
-                        idx += end
-
-                    if start <= idx < end:
-                        # not all vars will be matrix-matrix, so we have to check here
-                        if len(vec.shape) > 1:
-                            dinputs._views_flat[input_name][idx - start, i] = 1.0
-                        else:
-                            dinputs._views_flat[input_name][idx - start] = 1.0
-
-        model._solve_linear(lin_vec_names, mode, rel_systems)
-
-        for input_name, old_input_name in vois:
-            dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
-                dup, store = voi_info[input_name]
-            ncol = dinputs._ncol
-
-            # Pull out the answers and pack into our data structure.
-            for ocount, output_name in enumerate(output_list):
-                out_idxs = None
-                if output_name in output_vois:
-                    out_voi_meta = output_vois[output_name]
-                    out_idxs = out_voi_meta['indices']
-
-                if use_rel_reduction and output_name not in model._relevant[input_name]:
-                    # irrelevant output, just give zeros
-                    if out_idxs is None:
-                        out_var_idx = \
-                            model._var_allprocs_abs2idx['nonlinear']['output'][output_name]
-                        if output_name in remote_outputs:
-                            _, sz = remote_outputs[output_name]
-                        else:
-                            sz = sizes[iproc, out_var_idx]
-                        if ncol > 1:
-                            deriv_val = np.zeros((sz, ncol))
-                        else:
-                            deriv_val = np.zeros(sz)
-                    else:
-                        if ncol > 1:
-                            deriv_val = np.zeros((len(out_idxs), ncol))
-                        else:
-                            deriv_val = np.zeros(len(out_idxs))
-                else:  # relevant output
-                    if output_name in doutputs._views_flat:
-                        deriv_val = doutputs._views_flat[output_name]
-                        size = deriv_val.size
-                    else:
-                        deriv_val = None
-
-                    if out_idxs is not None:
-                        size = out_idxs.size
-                        if deriv_val is not None:
-                            deriv_val = deriv_val[out_idxs]
-
-                    if dup and nproc > 1:
-                        out_var_idx = \
-                            model._var_allprocs_abs2idx['nonlinear']['output'][output_name]
-                        root = owning_ranks[output_name]
-                        if deriv_val is None:
-                            if out_idxs is not None:
-                                sz = size
-                            else:
-                                sz = sizes[root, out_var_idx]
-                            if ncol > 1:
-                                deriv_val = np.empty((sz, ncol))
-                            else:
-                                deriv_val = np.empty(sz, dtype=float)
-                        self.comm.Bcast(deriv_val, root=root)
-
-                len_val = len(deriv_val)
-
-                if store and len(deriv_val.shape) == 1:
-                    deriv_val = np.atleast_2d(deriv_val).T
-
-                if return_format == 'flat_dict':
-                    if fwd:
-                        key = (old_output_list[ocount], old_input_name)
-
-                        if totals[key] is None:
-                            totals[key] = np.zeros((len_val, loc_size))
-                        if store:
-                            totals[key][:, loc_idxs] = deriv_val
-                    else:
-                        key = (old_input_name, old_output_list[ocount])
-
-                        if totals[key] is None:
-                            totals[key] = np.zeros((loc_size, len_val))
-                        if store:
-                            totals[key][loc_idxs, :] = deriv_val.T
-
-                elif return_format == 'dict':
-                    if fwd:
-                        okey = old_output_list[ocount]
-
-                        if totals[okey][old_input_name] is None:
-                            totals[okey][old_input_name] = np.zeros((len_val, loc_size))
-                        if store:
-                            totals[okey][old_input_name][:, loc_idxs] = deriv_val
-                    else:
-                        ikey = old_output_list[ocount]
-
-                        if totals[old_input_name][ikey] is None:
-                            totals[old_input_name][ikey] = np.zeros((loc_size, len_val))
-                        if store:
-                            totals[old_input_name][ikey][loc_idxs, :] = deriv_val.T
-                else:
-                    raise RuntimeError("unsupported return format")
-
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
@@ -1288,8 +1192,9 @@ class Problem(object):
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
         return_format : string
-            Format to return the derivatives. Default is a 'flat_dict', which
-            returns them in a dictionary whose keys are tuples of form (of, wrt).
+            Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
+            Default is a 'flat_dict', which returns them in a dictionary whose keys are
+            tuples of form (of, wrt).
         global_names : bool
             Set to True when passing in global names to skip some translation steps.
 
@@ -1310,13 +1215,20 @@ class Problem(object):
         relevant = model._relevant
         fwd = (mode == 'fwd')
         prom2abs = model._var_allprocs_prom2abs_list['output']
-        abs2idx_out = model._var_allprocs_abs2idx['linear']['output']
+        abs2idx = model._var_allprocs_abs2idx['linear']
 
         if wrt is None:
             wrt = list(self.driver._designvars)
+            global_wrt = True
+        else:
+            global_wrt = global_names
+
         if of is None:
             of = list(self.driver._objs)
-            of.extend(list(self.driver._cons))
+            of.extend(self.driver._cons)
+            global_of = True
+        else:
+            global_of = global_names
 
         # A number of features will need to be supported here as development
         # goes forward.
@@ -1330,9 +1242,6 @@ class Problem(object):
         # vectors.
         matmat = False
         for vec_name in model._lin_vec_names:
-
-            # TODO: Do all three deriv vectors have the same keys?
-
             vec_dinput[vec_name].set_const(0.0)
             vec_doutput[vec_name].set_const(0.0)
             vec_dresid[vec_name].set_const(0.0)
@@ -1360,11 +1269,15 @@ class Problem(object):
         # Convert of and wrt names from promoted to unpromoted
         # (which is absolute path since we're at the top)
         oldwrt, oldof = wrt, of
-        if not global_names:
+        if not global_of:
             of = [prom2abs[name][0] for name in oldof]
+        if not global_wrt:
             wrt = [prom2abs[name][0] for name in oldwrt]
 
         owning_ranks = self.model._owning_rank['output']
+
+        # we don't do simultaneous derivatives when compute_totals is called for linear constaints
+        has_lin_constraints = False
 
         if fwd:
             input_list, output_list = wrt, of
@@ -1373,6 +1286,10 @@ class Problem(object):
             input_vois = self.driver._designvars
             output_vois = self.driver._responses
             remote_outputs = self.driver._remote_responses
+            for n in of:
+                if n in output_vois and 'linear' in output_vois[n] and output_vois[n]['linear']:
+                    has_lin_constraints = True
+                    break
         else:  # rev
             input_list, output_list = of, wrt
             old_input_list, old_output_list = oldof, oldwrt
@@ -1383,7 +1300,7 @@ class Problem(object):
 
         # Solve for derivs using linear solver.
 
-        # this maps either an parallel_deriv_color to a list of tuples of (absname, oldname)
+        # this maps either a parallel_deriv_color to a list of tuples of (absname, oldname)
         # of variables in that group, or, for variables that aren't in an
         # parallel_deriv_color, it maps the variable name to a one entry list containing
         # the tuple (absname, oldname) for that variable.  oldname will be
@@ -1404,69 +1321,107 @@ class Problem(object):
         # in the model)
         use_rel_reduction = True
 
-        matmat = False
         for i, name in enumerate(input_list):
-            varmatmat = False
             if name in input_vois:
                 meta = input_vois[name]
                 parallel_deriv_color = meta['parallel_deriv_color']
-                varmatmat |= (meta['vectorize_derivs'] and meta['size'] > 1)
+                simul_coloring = meta['simul_deriv_color']
+                matmat = meta['vectorize_derivs']
+                cache = meta['cache_linear_solution']
             else:
-                parallel_deriv_color = None
+                parallel_deriv_color = simul_coloring = None
                 use_rel_reduction = False
+                matmat = False
+                cache = False
 
-            if parallel_deriv_color is None:  # variable is not in an parallel_deriv_color
+            if simul_coloring is not None:
+                if parallel_deriv_color:
+                    raise RuntimeError("Using both simul_coloring and parallel_deriv_color with "
+                                       "variable '%s' is not supported." % name)
+                if matmat:
+                    raise RuntimeError("Using both simul_coloring and vectorize_derivs with "
+                                       "variable '%s' is not supported." % name)
+
+            if parallel_deriv_color is None:  # variable is not in a parallel_deriv_color
                 if name in voi_lists:
-                    raise RuntimeError("Variable name '%s' matches an parallel_deriv_color name." %
+                    raise RuntimeError("Variable name '%s' matches a parallel_deriv_color name." %
                                        name)
                 else:
                     # store the absolute name along with the original name, which
                     # can be either promoted or absolute depending on the value
                     # of the 'global_names' flag.
-                    voi_lists[name] = [(name, old_input_list[i])]
-                    inp2rhs_name[name] = name if varmatmat else 'linear'
+                    voi_lists[name] = [(name, old_input_list[i], parallel_deriv_color, matmat,
+                                        simul_coloring, cache)]
+                    inp2rhs_name[name] = name if matmat else 'linear'
             else:
                 if parallel_deriv_color not in voi_lists:
                     voi_lists[parallel_deriv_color] = []
-                voi_lists[parallel_deriv_color].append((name, old_input_list[i]))
+                voi_lists[parallel_deriv_color].append((name, old_input_list[i],
+                                                        parallel_deriv_color, matmat,
+                                                        simul_coloring, cache))
                 inp2rhs_name[name] = name
-
-            matmat |= varmatmat
 
         lin_vec_names = sorted(set(inp2rhs_name.values()))
 
         voi_info = self._get_voi_info(voi_lists, inp2rhs_name, input_vec, output_vec, input_vois)
 
-        if matmat:
-            for vois in itervalues(voi_lists):
-                if use_rel_reduction:
-                    rel_systems = set()
-                    for voi, _ in vois:
-                        rel_systems.update(relevant[voi]['@all'][1])
-                else:
-                    rel_systems = _contains_all
-                self._compute_totals_multi(totals, vois, voi_info, lin_vec_names, mode,
-                                           output_list, old_output_list,
-                                           output_vois, use_rel_reduction, rel_systems,
-                                           return_format)
-            recording_iteration.stack.pop()
-            return totals
-
         for vois in itervalues(voi_lists):
             # If Forward mode, solve linear system for each 'wrt'
             # If Adjoint mode, solve linear system for each 'of'
 
+            matmats = [m for _, _, _, m, _, _ in vois]
+            matmat = matmats[0]
+            if any(matmats) and not all(matmats):
+                raise RuntimeError("Mixing of vectorized and non-vectorized derivs in the same "
+                                   "parallel color group (%s) is not supported." %
+                                   [name for _, name, _, _, _ in vois])
+            simul_coloring = vois[0][4] if not has_lin_constraints else None
+            cache_lin_sol = any(cache for _, _, _, _, _, cache in vois)
+
             if use_rel_reduction:
                 rel_systems = set()
-                for voi, _ in vois:
+                for voi, _, _, _, _, _ in vois:
                     rel_systems.update(relevant[voi]['@all'][1])
             else:
                 rel_systems = _contains_all
 
-            loc_idxs = defaultdict(lambda: -1)
+            if matmat:
+                idx_iter = range(1)
+            elif simul_coloring is not None:
+                loc_idx_dict = defaultdict(lambda: -1)
+                # here we're guaranteed that there is only one voi
+                input_name = vois[0][0]
+                info = voi_info[input_name]
+                dinputs = info[0]
+                colors = set(simul_coloring)
+                if not isinstance(simul_coloring, np.ndarray):
+                    simul_coloring = np.array(simul_coloring, dtype=int)
 
-            max_len = max(len(voi_info[name][2]) for name, _ in vois)
-            for i in range(max_len):
+                def idx_iter():
+                    for c in colors:
+                        # iterate over negative colors individually
+                        if c < 0:
+                            for i in np.nonzero(simul_coloring == c)[0]:
+                                yield (c, i)
+                        else:
+                            nzs = np.nonzero(simul_coloring == c)[0]
+                            if nzs.size == 1:
+                                yield (c, nzs[0])
+                            else:
+                                yield (c, nzs)
+                idx_iter = idx_iter()
+            else:
+                loc_idx_dict = defaultdict(lambda: -1)
+                max_len = max(len(voi_info[name][2]) for name, _, _, _, _, _ in vois)
+                idx_iter = range(max_len)
+
+            for i in idx_iter:
+                if simul_coloring is not None:
+                    color, i = i
+                    do_color_iter = isinstance(i, np.ndarray)
+                else:
+                    do_color_iter = False
+
                 # this sets dinputs for the current parallel_deriv_color to 0
                 # dinputs is dresids in fwd, doutouts in rev
                 if fwd:
@@ -1478,59 +1433,99 @@ class Problem(object):
                     if use_rel_reduction:
                         vec_dinput['linear'].set_const(0.0)
 
-                for input_name, old_input_name in vois:
+                for input_name, _, _, matmat, simul, _ in vois:
                     dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
                         voi_info[input_name]
-                    if i >= len(idxs):
-                        # reuse the last index if loop iter is larger than current var size
-                        idx = idxs[-1]
-                    else:
-                        idx = idxs[i]
 
-                    if idx < 0:
-                        idx += end
-                    if start <= idx < end and input_name in dinputs._views_flat:
-                        # Dictionary access returns a scaler for 1d input, and we
-                        # need a vector for clean code, so use _views_flat.
-                        dinputs._views_flat[input_name][idx - start] = 1.0
+                    if matmat:
+                        if input_name in dinputs:
+                            vec = dinputs._views_flat[input_name]
+                            if vec.size == 1:
+                                if start <= idxs[0] < end:
+                                    vec[idxs[0] - start] = 1.0
+                            else:
+                                for ii, idx in enumerate(idxs):
+                                    if start <= idx < end:
+                                        vec[idx - start, ii] = 1.0
+                    elif simul is not None:
+                        ii = idxs[i]
+                        final_idxs = ii[np.logical_and(ii >= start, ii < end)]
+                        vec_dinput['linear'].set_const(0.0)
+                        dinputs._views_flat[input_name][final_idxs] = 1.0
+                    else:
+                        if i >= len(idxs):
+                            # reuse the last index if loop iter is larger than current var size
+                            idx = idxs[-1]
+                        else:
+                            idx = idxs[i]
+                        if start <= idx < end and input_name in dinputs._views_flat:
+                            # Dictionary access returns a scaler for 1d input, and we
+                            # need a vector for clean code, so use _views_flat.
+                            dinputs._views_flat[input_name][idx - start] = 1.0
+
+                if cache_lin_sol:
+                    idx = (color,) if do_color_iter else i
+                    ikey = (vois[0][0], idx)
+                    if ikey in self._lin_sol_cache:
+                        save_vec = self._lin_sol_cache[ikey]
+                        for vs in doutputs._data:
+                            doutputs._data[vs][:] = save_vec[vs]
+                    else:
+                        self._lin_sol_cache[ikey] = deepcopy(doutputs._data)
 
                 model._solve_linear(lin_vec_names, mode, rel_systems)
 
-                for input_name, old_input_name in vois:
-                    dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
-                        voi_info[input_name]
-                    if i >= len(idxs):
-                        idx = idxs[-1]  # reuse the last index
-                        delta_loc_idx = 0  # don't increment local_idx
-                    else:
-                        idx = idxs[i]
-                        delta_loc_idx = 1
+                if cache_lin_sol:
+                    save_vec = self._lin_sol_cache[ikey]
+                    for vs in doutputs._data:
+                        save_vec[vs][:] = doutputs._data[vs]
 
-                    # totals to zeros instead of None in those cases when none
-                    # of the specified indices are within the range of interest
-                    # for this proc.
-                    store = True if start <= idx < end else dup
-                    if store:
-                        loc_idxs[input_name] += delta_loc_idx
-                    loc_idx = loc_idxs[input_name]
+                for input_name, old_input_name, _, matmat, simul, cache_lin_sol in vois:
+                    dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
+                        dup, store = voi_info[input_name]
+                    ncol = dinputs._ncol
+
+                    if matmat:
+                        loc_idx = loc_idxs
+                    elif simul is not None and do_color_iter:
+                        loc_idx = loc_idxs[i - start]
+                    else:
+                        if simul is None:
+                            if i >= len(idxs):
+                                idx = idxs[-1]  # reuse the last index
+                                delta_loc_idx = 0  # don't increment local_idx
+                            else:
+                                idx = idxs[i]
+                                delta_loc_idx = 1
+                            # totals to zeros instead of None in those cases when none
+                            # of the specified indices are within the range of interest
+                            # for this proc.
+                            if store:
+                                loc_idx_dict[input_name] += delta_loc_idx
+                            loc_idx = loc_idx_dict[input_name]
+                        else:
+                            idx = loc_idx = i
 
                     # Pull out the answers and pack into our data structure.
                     for ocount, output_name in enumerate(output_list):
                         out_idxs = None
                         if output_name in output_vois:
-                            out_voi_meta = output_vois[output_name]
-                            if 'indices' in out_voi_meta:
-                                out_idxs = out_voi_meta['indices']
+                            out_idxs = output_vois[output_name]['indices']
 
                         if use_rel_reduction and output_name not in relevant[input_name]:
                             # irrelevant output, just give zeros
                             if out_idxs is None:
-                                out_var_idx = abs2idx_out[output_name]
+                                out_var_idx = abs2idx[output_name]
                                 if output_name in remote_outputs:
                                     _, sz = remote_outputs[output_name]
-                                    deriv_val = np.zeros(sz)
                                 else:
-                                    deriv_val = np.zeros(sizes[iproc, out_var_idx])
+                                    sz = sizes[iproc, out_var_idx]
+                                if ncol > 1:
+                                    deriv_val = np.zeros((sz, ncol))
+                                else:
+                                    deriv_val = np.zeros(sz)
+                            elif ncol > 1:
+                                deriv_val = np.zeros((len(out_idxs), ncol))
                             else:
                                 deriv_val = np.zeros(len(out_idxs))
                         else:  # relevant output
@@ -1546,17 +1541,23 @@ class Problem(object):
                                     deriv_val = deriv_val[out_idxs]
 
                             if dup and nproc > 1:
-                                out_var_idx = abs2idx_out[output_name]
+                                out_var_idx = abs2idx[output_name]
                                 root = owning_ranks[output_name]
                                 if deriv_val is None:
                                     if out_idxs is not None:
                                         sz = size
                                     else:
                                         sz = sizes[root, out_var_idx]
-                                    deriv_val = np.empty(sz, dtype=float)
+                                    if ncol > 1:
+                                        deriv_val = np.empty((sz, ncol))
+                                    else:
+                                        deriv_val = np.empty(sz)
                                 self.comm.Bcast(deriv_val, root=root)
 
                         len_val = len(deriv_val)
+
+                        if store and matmat and len(deriv_val.shape) == 1:
+                            deriv_val = np.atleast_2d(deriv_val).T
 
                         if return_format == 'flat_dict':
                             if fwd:
@@ -1565,14 +1566,26 @@ class Problem(object):
                                 if totals[key] is None:
                                     totals[key] = np.zeros((len_val, loc_size))
                                 if store:
-                                    totals[key][:, loc_idx] = deriv_val
+                                    if simul is not None and do_color_iter:
+                                        smap = output_vois[output_name]['simul_map']
+                                        if (smap is not None and input_name in smap and
+                                                color in smap[input_name]):
+                                            col_idxs = smap[input_name][color][1]
+                                            if col_idxs:
+                                                row_idxs = smap[input_name][color][0]
+                                                mat = totals[key]
+                                                for idx, col in enumerate(col_idxs):
+                                                    mat[row_idxs[idx], col] = \
+                                                        deriv_val[row_idxs[idx]]
+                                    else:
+                                        totals[key][:, loc_idx] = deriv_val
                             else:
                                 key = (old_input_name, old_output_list[ocount])
 
                                 if totals[key] is None:
                                     totals[key] = np.zeros((loc_size, len_val))
                                 if store:
-                                    totals[key][loc_idx, :] = deriv_val
+                                    totals[key][loc_idx, :] = deriv_val.T
 
                         elif return_format == 'dict':
                             if fwd:
@@ -1581,18 +1594,31 @@ class Problem(object):
                                 if totals[okey][old_input_name] is None:
                                     totals[okey][old_input_name] = np.zeros((len_val, loc_size))
                                 if store:
-                                    totals[okey][old_input_name][:, loc_idx] = deriv_val
+                                    if simul is not None and do_color_iter:
+                                        smap = output_vois[output_name]['simul_map']
+                                        if (smap is not None and input_name in smap and
+                                                color in smap[input_name]):
+                                            col_idxs = smap[input_name][color][1]
+                                            if col_idxs:
+                                                row_idxs = smap[input_name][color][0]
+                                                mat = totals[okey][old_input_name]
+                                                for idx, col in enumerate(col_idxs):
+                                                    mat[row_idxs[idx], col] = \
+                                                        deriv_val[row_idxs[idx]]
+                                    else:
+                                        totals[okey][old_input_name][:, loc_idx] = deriv_val
                             else:
                                 ikey = old_output_list[ocount]
 
                                 if totals[old_input_name][ikey] is None:
                                     totals[old_input_name][ikey] = np.zeros((loc_size, len_val))
                                 if store:
-                                    totals[old_input_name][ikey][loc_idx, :] = deriv_val
+                                    totals[old_input_name][ikey][loc_idx, :] = deriv_val.T
                         else:
                             raise RuntimeError("unsupported return format")
 
         recording_iteration.stack.pop()
+
         return totals
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
@@ -1618,11 +1644,11 @@ class Problem(object):
         self.model._set_solver_print(level=level, depth=depth, type_=type_)
 
 
-def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, logger,
+def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,
-                              suppress_output=False, indep_key=None):
+                              suppress_output=False, indep_key=None, all_comps_provide_jacs=False):
     """
-    Compute the relative and absolute errors in the given derivatives and print to the logger.
+    Compute the relative and absolute errors in the given derivatives and print to the out_stream.
 
     Parameters
     ----------
@@ -1632,8 +1658,9 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
         Relative error tolerance.
     abs_error_tol : float
         Absolute error tolerance.
-    logger : object
-        Logging object.
+    out_stream : file-like object
+            Where to send human readable output.
+            Set to None to suppress.
     compact_print : bool
         If results should be printed verbosely or in a table.
     system_list : Iterable
@@ -1646,6 +1673,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
         Set to True to suppress all output. Just calculate errors and add the keys.
     indep_key : dict of sets, optional
         Keyed by component name, contains the of/wrt keys that are declared not dependent.
+    all_comps_provide_jacs : bool, optional
+        Set to True if all components provide a Jacobian (are not matrix-free).
     """
     nan = float('nan')
 
@@ -1653,8 +1682,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
         if totals:
             deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
         else:
-            deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e} | {6:.4e} | {7:.4e}"\
-                         " | {8:.4e} | {9:.4e} | {10:.4e}"
+            if not all_comps_provide_jacs:
+                deriv_line = "{0} wrt {1} | {2:.4e} | {3} | {4:.4e} | {5:.4e} | {6} | {7}" \
+                             " | {8:.4e} | {9} | {10}"
+            else:
+                deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
 
     for system in system_list:
         # No need to see derivatives of IndepVarComps
@@ -1662,12 +1694,10 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
             continue
 
         sys_name = system.pathname
-        explicit = False
 
         # Match header to appropriate type.
         if isinstance(system, Component):
             sys_type = 'Component'
-            explicit = isinstance(system, ExplicitComponent)
         elif isinstance(system, Group):
             sys_type = 'Group'
         else:
@@ -1678,10 +1708,14 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
         if totals:
             sys_name = 'Full Model'
 
+        # Sorted keys ensures deterministic ordering
+        sorted_keys = sorted(iterkeys(derivatives))
+
         if not suppress_output:
-            logger.info('-' * (len(sys_name) + 15))
-            logger.info("{}: '{}'".format(sys_type, sys_name))
-            logger.info('-' * (len(sys_name) + 15))
+            if out_stream:
+                out_stream.write('-' * (len(sys_name) + 15) + '\n')
+                out_stream.write("{}: '{}'".format(sys_type, sys_name) + '\n')
+                out_stream.write('-' * (len(sys_name) + 15) + '\n')
 
             if compact_print:
                 # Error Header
@@ -1696,25 +1730,42 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
                             _pad_name('r(cal-chk)'),
                         )
                 else:
-                    header = "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}"\
-                        .format(
-                            _pad_name('<output>', 13, True),
-                            _pad_name('<variable>', 13, True),
-                            _pad_name('fwd mag.'),
-                            _pad_name('rev mag.'),
-                            _pad_name('check mag.'),
-                            _pad_name('a(fwd-chk)'),
-                            _pad_name('a(rev-chk)'),
-                            _pad_name('a(fwd-rev)'),
-                            _pad_name('r(fwd-chk)'),
-                            _pad_name('r(rev-chk)'),
-                            _pad_name('r(fwd-rev)')
-                        )
-                logger.info(header)
-                logger.info('-' * len(header) + '\n')
+                    #
+                    max_width_of = len('<output>')
+                    max_width_wrt = len('<variable>')
+                    for of, wrt in sorted_keys:
+                        max_width_of = max(max_width_of, len(of))
+                        max_width_wrt = max(max_width_wrt, len(wrt))
 
-        # Sorted keys ensures deterministic ordering
-        sorted_keys = sorted(iterkeys(derivatives))
+                    if not all_comps_provide_jacs:
+                        header = \
+                            "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}" \
+                            .format(
+                                _pad_name('<output>', max_width_of, True),
+                                _pad_name('<variable>', max_width_wrt, True),
+                                _pad_name('fwd mag.'),
+                                _pad_name('rev mag.'),
+                                _pad_name('check mag.'),
+                                _pad_name('a(fwd-chk)'),
+                                _pad_name('a(rev-chk)'),
+                                _pad_name('a(fwd-rev)'),
+                                _pad_name('r(fwd-chk)'),
+                                _pad_name('r(rev-chk)'),
+                                _pad_name('r(fwd-rev)')
+                            )
+                    else:
+                        header = "{0} wrt {1} | {2} | {3} | {4} | {5}"\
+                            .format(
+                                _pad_name('<output>', max_width_of, True),
+                                _pad_name('<variable>', max_width_wrt, True),
+                                _pad_name('fwd mag.'),
+                                _pad_name('check mag.'),
+                                _pad_name('a(fwd-chk)'),
+                                _pad_name('r(fwd-chk)'),
+                            )
+                if out_stream:
+                    out_stream.write(header + '\n')
+                    out_stream.write('-' * len(header) + '\n' + '\n')
 
         for of, wrt in sorted_keys:
 
@@ -1763,29 +1814,54 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
             if not suppress_output:
                 if compact_print:
                     if totals:
-                        logger.info(deriv_line.format(
-                            _pad_name(of, 30, True),
-                            _pad_name(wrt, 30, True),
-                            magnitude.forward,
-                            magnitude.fd,
-                            abs_err.forward,
-                            rel_err.forward,
-                        ))
+                        if out_stream:
+                            out_stream.write(deriv_line.format(
+                                _pad_name(of, 30, True),
+                                _pad_name(wrt, 30, True),
+                                magnitude.forward,
+                                magnitude.fd,
+                                abs_err.forward,
+                                rel_err.forward,
+                            ) + '\n')
                     else:
-                        logger.info(deriv_line.format(
-                            _pad_name(of, 13, True),
-                            _pad_name(wrt, 13, True),
-                            magnitude.forward,
-                            magnitude.reverse,
-                            magnitude.fd,
-                            abs_err.forward,
-                            abs_err.reverse,
-                            abs_err.forward_reverse,
-                            rel_err.forward,
-                            rel_err.reverse,
-                            rel_err.forward_reverse,
-                        ))
-                else:
+                        error_string = ''
+                        for error in abs_err:
+                            if not np.isnan(error) and error >= abs_error_tol:
+                                error_string += ' >ABS_TOL'
+                                break
+                        for error in rel_err:
+                            if not np.isnan(error) and error >= rel_error_tol:
+                                error_string += ' >REL_TOL'
+                                break
+
+                        if out_stream:
+                            if not all_comps_provide_jacs:
+                                out_stream.write(deriv_line.format(
+                                    _pad_name(of, max_width_of, True),
+                                    _pad_name(wrt, max_width_wrt, True),
+                                    magnitude.forward,
+                                    _format_if_not_matrix_free(
+                                        system.matrix_free, magnitude.reverse),
+                                    magnitude.fd,
+                                    abs_err.forward,
+                                    _format_if_not_matrix_free(system.matrix_free, abs_err.reverse),
+                                    _format_if_not_matrix_free(
+                                        system.matrix_free, abs_err.forward_reverse),
+                                    rel_err.forward,
+                                    _format_if_not_matrix_free(system.matrix_free, rel_err.reverse),
+                                    _format_if_not_matrix_free(
+                                        system.matrix_free, rel_err.forward_reverse),
+                                ) + error_string + '\n')
+                            else:
+                                out_stream.write(deriv_line.format(
+                                    _pad_name(of, max_width_of, True),
+                                    _pad_name(wrt, max_width_wrt, True),
+                                    magnitude.forward,
+                                    magnitude.fd,
+                                    abs_err.forward,
+                                    rel_err.forward,
+                                ) + error_string + '\n')
+                else:  # not compact print
 
                     if totals:
                         fd_desc = "{}:{}".format(global_options['']['method'],
@@ -1795,50 +1871,81 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, log
                         fd_desc = "{}:{}".format(global_options[sys_name][wrt]['method'],
                                                  global_options[sys_name][wrt]['form'])
 
-                    if compact_print:
-                        check_desc = "    (Check Type: {})".format(fd_desc)
-                    else:
-                        check_desc = ""
-
                     # Magnitudes
-                    logger.info("  {}: '{}' wrt '{}'\n".format(sys_name, of, wrt))
-                    logger.info('    Forward Magnitude : {:.6e}'.format(magnitude.forward))
-                    if not totals:
+                    if out_stream:
+                        out_stream.write("  {}: '{}' wrt '{}'".format(sys_name, of, wrt) + '\n')
+                        out_stream.write('    Forward Magnitude : {:.6e}'.format(magnitude.forward)
+                                         + '\n')
+                    if not totals and system.matrix_free:
                         txt = '    Reverse Magnitude : {:.6e}'
-                        logger.info(txt.format(magnitude.reverse))
-                    logger.info('         Fd Magnitude : {:.6e} ({})\n'.format(magnitude.fd,
-                                                                               fd_desc))
+                        if out_stream:
+                            out_stream.write(txt.format(magnitude.reverse) + '\n')
+                    if out_stream:
+                        out_stream.write('         Fd Magnitude : {:.6e} ({})'.format(magnitude.fd,
+                                         fd_desc) + '\n')
                     # Absolute Errors
-                    if totals:
+                    if totals or not system.matrix_free:
                         error_descs = ('(Jfor  - Jfd) ', )
                     else:
                         error_descs = ('(Jfor  - Jfd) ', '(Jrev  - Jfd) ', '(Jfor  - Jrev)')
                     for error, desc in zip(abs_err, error_descs):
                         error_str = _format_error(error, abs_error_tol)
-                        logger.info('    Absolute Error {}: {}'.format(desc, error_str))
-                    logger.info('')
+                        if out_stream:
+                            out_stream.write('    Absolute Error {}: {}'.format(desc, error_str) +
+                                             '\n')
+                    if out_stream:
+                        out_stream.write('\n')
 
                     # Relative Errors
                     for error, desc in zip(rel_err, error_descs):
                         error_str = _format_error(error, rel_error_tol)
-                        logger.info('    Relative Error {}: {}'.format(desc, error_str))
-                    logger.info('')
+                        if out_stream:
+                            out_stream.write('    Relative Error {}: {}'.format(desc, error_str) +
+                                             '\n')
+                    if out_stream:
+                        out_stream.write('\n')
 
                     # Raw Derivatives
-                    logger.info('    Raw Forward Derivative (Jfor)\n')
-                    logger.info(str(forward))
-                    logger.info('')
+                    if out_stream:
+                        out_stream.write('    Raw Forward Derivative (Jfor)\n')
+                        out_stream.write(str(forward) + '\n')
+                        out_stream.write('\n')
 
-                    if not totals:
-                        logger.info('    Raw Reverse Derivative (Jfor)\n')
-                        logger.info(str(reverse))
-                        logger.info('')
+                    if not totals and system.matrix_free:
+                        if out_stream:
+                            out_stream.write('    Raw Reverse Derivative (Jfor)\n')
+                            out_stream.write(str(reverse) + '\n')
+                            out_stream.write('\n')
 
-                    logger.info('    Raw FD Derivative (Jfd)\n')
-                    logger.info(str(fd))
-                    logger.info('')
+                    if out_stream:
+                        out_stream.write('    Raw FD Derivative (Jfd)\n')
+                        out_stream.write(str(fd) + '\n')
+                        out_stream.write('\n')
 
-                    logger.info(' -' * 30)
+                    if out_stream:
+                        out_stream.write(' -' * 30 + '\n')
+
+
+def _format_if_not_matrix_free(matrix_free, val):
+    """
+    Return string to represent deriv check value in compact display.
+
+    Parameters
+    ----------
+    matrix_free : bool
+        If True, then the associated Component is matrix-free.
+    val : float
+        The deriv check value.
+
+    Returns
+    -------
+    str
+        String which is the actual value if matrix-free, otherwise 'n/a'
+    """
+    if matrix_free:
+        return '{0:.4e}'.format(val)
+    else:
+        return _pad_name('n/a')
 
 
 def _pad_name(name, pad_num=10, quotes=False):
@@ -1860,8 +1967,9 @@ def _pad_name(name, pad_num=10, quotes=False):
         Padded string
     """
     l_name = len(name)
-    if l_name < pad_num:
-        pad = pad_num - l_name
+    quotes_len = 2 if quotes else 0
+    if l_name + quotes_len < pad_num:
+        pad = pad_num - (l_name + quotes_len)
         if quotes:
             pad_str = "'{name}'{sep:<{pad}}"
         else:

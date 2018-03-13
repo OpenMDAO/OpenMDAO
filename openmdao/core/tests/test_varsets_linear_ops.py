@@ -7,7 +7,7 @@ from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestVarSets(unittest.TestCase):

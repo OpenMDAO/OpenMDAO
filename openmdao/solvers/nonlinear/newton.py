@@ -15,14 +15,14 @@ class NewtonSolver(NonlinearSolver):
 
     Attributes
     ----------
-    linear_solver : <LinearSolver>
+    linear_solver : LinearSolver
         Linear solver to use to find the Newton search direction. The default
         is the parent system's linear solver.
-    linesearch : <NonlinearSolver>
+    linesearch : NonlinearSolver
         Line search algorithm. Default is None for no line search.
-    options : <OptionsDictionary>
+    options : OptionsDictionary
         options dictionary.
-    _system : <System>
+    _system : System
         pointer to the owning system.
     _depth : int
         how many subsolvers deep this solver is (0 means not a subsolver).
@@ -93,7 +93,7 @@ class NewtonSolver(NonlinearSolver):
 
         Parameters
         ----------
-        system : <System>
+        system : System
             pointer to the owning system.
         depth : int
             depth of the current system (already incremented).
@@ -132,7 +132,7 @@ class NewtonSolver(NonlinearSolver):
 
     def _run_apply(self):
         """
-        Run the the apply_nonlinear method on the system.
+        Run the apply_nonlinear method on the system.
         """
         recording_iteration.stack.append(('_run_apply', 0))
 
@@ -196,19 +196,14 @@ class NewtonSolver(NonlinearSolver):
                 # should call the subsystems solve before computing the first residual
                 for isub, subsys in enumerate(system._subsystems_myproc):
                     system._transfer('nonlinear', 'fwd', isub)
-
-                    if subsys in system._subsystems_myproc:
-                        subsys._solve_nonlinear()
-
+                    subsys._solve_nonlinear()
                     system._check_reconf_update()
 
                 self._solver_info.pop()
 
-        if self.options['maxiter'] > 0:
-            self._run_apply()
-            norm = self._iter_get_norm()
-        else:
-            norm = 1.0
+        self._run_apply()
+        norm = self._iter_get_norm()
+
         norm0 = norm if norm != 0.0 else 1.0
         return norm0, norm
 

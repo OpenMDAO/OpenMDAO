@@ -3,9 +3,9 @@ import unittest
 
 from openmdao.api import Group, Problem, MetaModelUnStructured, IndepVarComp, ResponseSurface, \
     FloatKrigingSurrogate, KrigingSurrogate, MultiFiCoKrigingSurrogate
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
-from openmdao.devtools.testutil import TestLogger
+from openmdao.utils.logger_utils import TestLogger
 
 
 class MetaModelTestCase(unittest.TestCase):
@@ -21,7 +21,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         # check that missing surrogate is detected in check_config
         testlogger = TestLogger()
-        prob.setup(logger=testlogger)
+        prob.setup(check=True, logger=testlogger)
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -74,7 +74,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         # check that missing surrogate is detected in check_setup
         testlogger = TestLogger()
-        prob.setup(logger=testlogger)
+        prob.setup(check=True, logger=testlogger)
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -443,16 +443,17 @@ class MetaModelTestCase(unittest.TestCase):
         from openmdao.api import Problem, MetaModelUnStructured, FloatKrigingSurrogate
 
         trig = MetaModelUnStructured()
-        trig.add_input('x', 0.)
-        trig.add_output('sin_x', 0., surrogate=FloatKrigingSurrogate())
-        trig.add_output('cos_x', 0.)
+
+        x_train = np.linspace(0,10,20)
+        
+        trig.add_input('x', 0., training_data=x_train)
+        trig.add_output('sin_x', 0., surrogate=FloatKrigingSurrogate(), 
+                        training_data=.5*np.sin(x_train))
+        trig.add_output('cos_x', 0., training_data=.5*np.cos(x_train))
 
         trig.default_surrogate = FloatKrigingSurrogate()
 
-        # provide training data
-        trig.metadata['train:x'] = np.linspace(0,10,20)
-        trig.metadata['train:sin_x'] = .5*np.sin(trig.metadata['train:x'])
-        trig.metadata['train:cos_x'] = .5*np.cos(trig.metadata['train:x'])
+
 
         # add it to a Problem, run and check the predicted values
         prob = Problem()

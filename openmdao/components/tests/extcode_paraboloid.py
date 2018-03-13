@@ -2,6 +2,8 @@
 #
 # usage: extcode_paraboloid.py input_filename output_filename
 #
+# Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
+#
 # Read the values of `x` and `y` from input file
 # and write the value of `f_xy` to output file.
 
@@ -19,4 +21,4 @@ if __name__ == '__main__':
     f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
 
     with open(output_filename, 'w') as output_file:
-        output_file.write('%f\n' % f_xy)
+        output_file.write('%.16f\n' % f_xy)

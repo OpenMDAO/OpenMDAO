@@ -1,11 +1,11 @@
 .. _`api_translation`:
 
-**************************
+*************************
 Upgrading from OpenMDAO 1
-**************************
+*************************
 
 This guide takes how you did things in OpenMDAO 1 and shows how to do them OpenMDAO 2.
-It is not a comprehensive guide to using OpenMDAO 2, but focus only on the things that have changed in the API.
+It is not a comprehensive guide to using OpenMDAO 2, but focuses only on the things that have changed in the API.
 
 
 Build a Model
@@ -389,7 +389,7 @@ Specify Newton as a Nonlinear Solver in a Group
     model.nl_solver = Newton()
 
 
-Specify Block Gauss Seidel as a Nonlinear Solver in a Group
+Specify Block Gauss-Seidel as a Nonlinear Solver in a Group
 ===========================================================
 
 .. content-container ::
@@ -415,7 +415,7 @@ Specify Scipy GMRES as a Linear Solver in a Group
     model.ln_solver = ScipyGMRES()
 
 
-Specify Linear Block Gauss Seidel as a Linear Solver in a Group
+Specify Linear Block Gauss-Seidel as a Linear Solver in a Group
 ===============================================================
 
 .. content-container ::
@@ -429,11 +429,11 @@ Specify Linear Block Gauss Seidel as a Linear Solver in a Group
 
 
 Total Derivatives
-----------------------------------
+-----------------
 
 
 Computing Total Derivatives
-================================
+===========================
 
 .. content-container ::
 
@@ -445,7 +445,7 @@ Computing Total Derivatives
     prob.calc_gradient(indep_list=['p1.x', 'p2.y'], unknown_list=['comp.f_xy'])
 
 Setting Derivative Computation Mode
-========================================
+===================================
 
 .. content-container ::
 

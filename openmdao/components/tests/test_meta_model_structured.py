@@ -1,9 +1,11 @@
 from __future__ import division, print_function, absolute_import
 
+from six import assertRaisesRegex
+
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 import numpy as np
 import unittest
 
@@ -755,11 +757,9 @@ class TestRegularGridMap(unittest.TestCase):
         x, y, z = params
         outs = mapdata.output_data
         z = outs[0]
-        ivc.add_output('x', x[
-                       'default'], units=x['units'])
+        ivc.add_output('x', x['default'], units=x['units'])
         ivc.add_output('y', y['default'], units=y['units'])
-        ivc.add_output('z', z[
-                       'default'], units=z['units'])
+        ivc.add_output('z', z['default'], units=z['units'])
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
@@ -770,7 +770,7 @@ class TestRegularGridMap(unittest.TestCase):
 
         for out in outs:
             comp.add_output(out['name'], out['default'], out['values'])
-        
+
         model.add_subsystem('comp', comp, promotes=["*"])
         self.prob = Problem(model)
         self.prob.setup()
@@ -806,6 +806,60 @@ class TestRegularGridMap(unittest.TestCase):
         self.prob['y'] = 0.951
         self.prob['z'] = 2.5
         self.run_and_check_derivs(self.prob)
+
+    def test_raise_interp_error(self):
+        # muck with the grid to trigger an error in the interp call
+        self.prob.model.comp.interps['f'].grid = []
+
+        # verify that the error is raised by the meta model comp with
+        # information to help locate the error
+        with self.assertRaises(Exception) as context:
+            self.run_and_check_derivs(self.prob)
+        self.assertEqual(str(context.exception),
+                         "Error interpolating output 'f' in comp:\n"
+                         "The requested sample points xi have dimension 3, "
+                         "but this RegularGridInterp has dimension 0")
+
+    def test_raise_out_of_bounds_error(self):
+        model = Group()
+        ivc = IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        x, y, z = params
+        outs = mapdata.output_data
+        z = outs[0]
+        ivc.add_output('x', x['default'], units=x['units'])
+        ivc.add_output('y', y['default'], units=y['units'])
+        ivc.add_output('z', z['default'], units=z['units'])
+
+        model.add_subsystem('des_vars', ivc, promotes=["*"])
+
+        # Need to make sure extrapolate is False for bounds to be checked
+        comp = MetaModelStructured(method='slinear', extrapolate=False)
+
+        for param in params:
+            comp.add_input(param['name'], param['default'], param['values'])
+
+        for out in outs:
+            comp.add_output(out['name'], out['default'], out['values'])
+
+        model.add_subsystem('comp', comp, promotes=["*"])
+        self.prob = Problem(model)
+        self.prob.setup()
+
+        self.prob['x'] = 1.0
+        self.prob['y'] = 0.75
+        self.prob['z'] = 9.0 # intentionally set to be out of bounds
+
+        # The interpolating output name is given as a regexp because the exception could
+        #   happen with f or g first. The order those are evaluated comes from the keys of
+        #   dict so no guarantee on the order except for Python 3.6 !
+        msg = "Error interpolating output '[f|g]' in 'comp' " + "because input 'comp.z' was " \
+                "out of bounds \('.*', '.*'\) with value '9.0'"
+        with assertRaisesRegex(self, ValueError, msg):
+           self.run_and_check_derivs(self.prob)
 
     def test_training_gradient(self):
         model = Group()
@@ -877,10 +931,10 @@ class TestMetaModelStructuredMapFeature(unittest.TestCase):
         xor_interp = MetaModelStructured(method='slinear')
 
         # set up inputs and outputs
-        xor_interp.add_input('x', 0.0, np.array([0.0, 1.0]), units=None)
-        xor_interp.add_input('y', 1.0, np.array([0.0, 1.0]), units=None)
+        xor_interp.add_input('x', 0.0, training_data=np.array([0.0, 1.0]), units=None)
+        xor_interp.add_input('y', 1.0, training_data=np.array([0.0, 1.0]), units=None)
 
-        xor_interp.add_output('xor', 1.0, np.array([[0.0, 1.0], [1.0, 0.0]]), units=None)
+        xor_interp.add_output('xor', 1.0, training_data=np.array([[0.0, 1.0], [1.0, 0.0]]), units=None)
 
         # Set up the OpenMDAO model
         model = Group()
@@ -927,11 +981,11 @@ class TestMetaModelStructuredMapFeature(unittest.TestCase):
 
         # Create regular grid interpolator instance
         interp = MetaModelStructured(method='cubic')
-        interp.add_input('p1', 0.5, p1)
-        interp.add_input('p2', 0.0, p2)
-        interp.add_input('p3', 3.14, p3)
+        interp.add_input('p1', 0.5, training_data=p1)
+        interp.add_input('p2', 0.0, training_data=p2)
+        interp.add_input('p3', 3.14, training_data=p3)
 
-        interp.add_output('f', 0.0, f)
+        interp.add_output('f', 0.0, training_data=f)
 
 
         # Set up the OpenMDAO model

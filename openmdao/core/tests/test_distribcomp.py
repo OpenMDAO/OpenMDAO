@@ -8,8 +8,8 @@ import numpy as np
 
 from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp, ExecComp
 from openmdao.utils.mpi import MPI
-from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
+from openmdao.utils.assert_utils import assert_rel_error
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -22,22 +22,6 @@ if MPI:
 else:
     rank = 0
     commsize = 1
-
-
-def take_nth(rank, size, seq):
-    """Return an iterator over the sequence that returns every
-    nth element of seq based on the given rank within a group of
-    the given size.  For example, if size = 2, a rank of 0 returns
-    even indexed elements and a rank of 1 returns odd indexed elements.
-    """
-    assert(rank < size)
-    it = iter(seq)
-    while True:
-        for proc in range(size):
-            if rank == proc:
-                yield six.next(it)
-            else:
-                six.next(it)
 
 
 class InOutArrayComp(ExplicitComponent):

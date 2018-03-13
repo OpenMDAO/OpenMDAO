@@ -15,7 +15,7 @@ from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray
 from openmdao.test_suite.components.simple_comps import TestExplCompDeprecated
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestExplicitComponent(unittest.TestCase):
@@ -27,13 +27,13 @@ class TestExplicitComponent(unittest.TestCase):
 
         # check optional metadata (desc)
         self.assertEqual(
-            comp._var_abs2meta['input']['length']['desc'],
+            comp._var_abs2meta['length']['desc'],
             'length of rectangle')
         self.assertEqual(
-            comp._var_abs2meta['input']['width']['desc'],
+            comp._var_abs2meta['width']['desc'],
             'width of rectangle')
         self.assertEqual(
-            comp._var_abs2meta['output']['area']['desc'],
+            comp._var_abs2meta['area']['desc'],
             'area of rectangle')
 
         prob['length'] = 3.

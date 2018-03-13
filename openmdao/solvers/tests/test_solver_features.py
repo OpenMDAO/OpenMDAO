@@ -9,7 +9,7 @@ from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 

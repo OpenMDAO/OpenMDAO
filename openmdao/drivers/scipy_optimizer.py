@@ -4,8 +4,8 @@ OpenMDAO Wrapper for the scipy.optimize.minimize family of local optimizers.
 
 from __future__ import print_function
 from collections import OrderedDict
-import traceback
 import sys
+
 
 from six import itervalues, iteritems, reraise
 from six.moves import range
@@ -13,8 +13,8 @@ from six.moves import range
 import numpy as np
 from scipy.optimize import minimize
 
-from openmdao.core.driver import Driver
-from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.core.driver import Driver, RecordingDebugging
+from openmdao.utils.general_utils import warn_deprecation
 
 
 _optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -31,7 +31,17 @@ _eq_constraint_optimizers = ['SLSQP']
 _unsupported_optimizers = ['dogleg', 'trust-ncg']
 
 
-class ScipyOptimizer(Driver):
+CITATIONS = """
+@phdthesis{hwang_thesis_2015,
+  author       = {John T. Hwang},
+  title        = {A Modular Approach to Large-Scale Design Optimization of Aerospace Systems},
+  school       = {University of Michigan},
+  year         = 2015
+}
+"""
+
+
+class ScipyOptimizeDriver(Driver):
     """
     Driver wrapper for the scipy.optimize.minimize family of local optimizers.
 
@@ -39,7 +49,7 @@ class ScipyOptimizer(Driver):
     but equality constraints are only supported by COBYLA. None of the other
     optimizers support constraints.
 
-    ScipyOptimizer supports the following:
+    ScipyOptimizeDriver supports the following:
         equality_constraints
         inequality_constraints
 
@@ -66,36 +76,44 @@ class ScipyOptimizer(Driver):
         Dictionary of solver-specific options. See the scipy.optimize.minimize documentation.
     _con_cache : OrderedDict
         Cached result of constraint evaluations because scipy asks for them in a separate function.
-    _con_idx : OrderedDict
+    _con_idx : dict
         Used for constraint bookkeeping in the presence of 2-sided constraints.
     _cons : dict
         Contains all constraint info.
     _designvars : dict
         Contains all design variable info.
     _grad_cache : OrderedDict
-        Cached result of constraint derivatives because scipy asks for them in a separate function.
+        Cached result of nonlinear constraint derivatives because scipy asks for them in a separate
+        function.
+    _lincon_grad_cache : OrderedDict
+        Cached result of linear constraint derivatives because scipy asks for them in a separate
+        function.
     _objs : dict
         Contains all objective info.
     _exc_info : 3 item tuple
         Storage for exception and traceback information.
+    _obj_and_nlcons : list
+        List of objective + nonlinear constraints. Used to compute total derivatives
+        for all except linear constraints.
     """
 
     def __init__(self):
         """
-        Initialize the ScipyOptimizer.
+        Initialize the ScipyOptimizeDriver.
         """
-        super(ScipyOptimizer, self).__init__()
+        super(ScipyOptimizeDriver, self).__init__()
 
         # What we support
         self.supports['inequality_constraints'] = True
         self.supports['equality_constraints'] = True
         self.supports['two_sided_constraints'] = True
+        self.supports['linear_constraints'] = True
+        self.supports['simultaneous_derivatives'] = True
 
         # What we don't support
         self.supports['multiple_objectives'] = False
         self.supports['active_set'] = False
         self.supports['integer_design_vars'] = False
-        self.supports['linear_constraints'] = False
 
         # User Options
         self.options.declare('optimizer', 'SLSQP', values=_optimizers,
@@ -114,12 +132,26 @@ class ScipyOptimizer(Driver):
         self.result = None
         self.fail = 0
         self._grad_cache = None
+        self._lincon_grad_cache = None
         self._con_cache = None
-        self._con_idx = OrderedDict()
-        self.objs = None
+        self._con_idx = {}
+        self._obj_and_nlcons = None
         self.fail = False
         self.iter_count = 0
         self._exc_info = None
+
+        self.cite = CITATIONS
+
+    def _get_name(self):
+        """
+        Get name of current optimizer.
+
+        Returns
+        -------
+        str
+            The name of the current optimizer.
+        """
+        return self.options['optimizer']
 
     def _setup_driver(self, problem):
         """
@@ -132,7 +164,7 @@ class ScipyOptimizer(Driver):
         problem : <Problem>
             Pointer
         """
-        super(ScipyOptimizer, self)._setup_driver(problem)
+        super(ScipyOptimizeDriver, self)._setup_driver(problem)
         opt = self.options['optimizer']
 
         self.supports['gradients'] = opt in _gradient_optimizers
@@ -153,7 +185,7 @@ class ScipyOptimizer(Driver):
                     dict['lower'] = lower
                     dict['upper'] = upper
                     dict['equals'] = None
-                    dict['indices'] = None  # qqq really needs to be figured out
+                    dict['indices'] = None
                     dict['adder'] = None
                     dict['scaler'] = None
                     dict['size'] = meta['size']
@@ -175,7 +207,6 @@ class ScipyOptimizer(Driver):
         # Initial Run
         model._solve_nonlinear()
 
-        self.objs = list(self.get_objective_values())
         self._con_cache = self.get_constraint_values()
         desvar_vals = self.get_design_var_values()
 
@@ -206,7 +237,7 @@ class ScipyOptimizer(Driver):
             if use_bounds:
                 meta_low = meta['lower']
                 meta_high = meta['upper']
-                for j in range(0, size):
+                for j in range(size):
 
                     if isinstance(meta_low, np.ndarray):
                         p_low = meta_low[j]
@@ -222,14 +253,28 @@ class ScipyOptimizer(Driver):
 
         # Constraints
         constraints = []
-        i = 0
+        i = 1  # start at 1 since row 0 is the objective.  Constraints start at row 1.
+        lin_i = 0  # counter for linear constraint jacobian
+        lincons = []  # list of linear constraints
+        self._obj_and_nlcons = list(self._objs)
+
         if opt in _constraint_optimizers:
             for name, meta in iteritems(self._cons):
                 size = meta['size']
+                upper = meta['upper']
+                lower = meta['lower']
+                if 'linear' in meta and meta['linear']:
+                    lincons.append(name)
+                    self._con_idx[name] = lin_i
+                    lin_i += size
+                else:
+                    self._obj_and_nlcons.append(name)
+                    self._con_idx[name] = i
+                    i += size
 
                 # Loop over every index separately, because scipy calls each constraint by index.
                 for j in range(0, size):
-                    con_dict = OrderedDict()
+                    con_dict = {}
                     if meta['equals'] is not None:
                         con_dict['type'] = 'eq'
                     else:
@@ -237,14 +282,12 @@ class ScipyOptimizer(Driver):
                     con_dict['fun'] = self._confunc
                     if opt in _constraint_grad_optimizers:
                         con_dict['jac'] = self._congradfunc
-                    con_dict['args'] = [name, j]
+                    con_dict['args'] = [name, False, j]
                     constraints.append(con_dict)
 
-                    upper = meta['upper']
                     if isinstance(upper, np.ndarray):
                         upper = upper[j]
 
-                    lower = meta['lower']
                     if isinstance(lower, np.ndarray):
                         lower = lower[j]
 
@@ -252,17 +295,21 @@ class ScipyOptimizer(Driver):
 
                     # Add extra constraint if double-sided
                     if dblcon:
-                        dblname = '2bl-' + name
-                        con_dict = OrderedDict()
-                        con_dict['type'] = 'ineq'
-                        con_dict['fun'] = self._confunc
+                        dcon_dict = {}
+                        dcon_dict['type'] = 'ineq'
+                        dcon_dict['fun'] = self._confunc
                         if opt in _constraint_grad_optimizers:
-                            con_dict['jac'] = self._congradfunc
-                        con_dict['args'] = [dblname, j]
-                        constraints.append(con_dict)
+                            dcon_dict['jac'] = self._congradfunc
+                        dcon_dict['args'] = [name, True, j]
+                        constraints.append(dcon_dict)
 
-                self._con_idx[name] = i
-                i += size
+            # precalculate gradients of linear constraints
+            if lincons:
+                self._lincongrad_cache = self._compute_totals(of=lincons,
+                                                              wrt=list(self._designvars),
+                                                              return_format='array')
+            else:
+                self._lincongrad_cache = None
 
         # Provide gradients for optimizers that support it
         if opt in _gradient_optimizers:
@@ -307,6 +354,8 @@ class ScipyOptimizer(Driver):
             print('Optimization Complete')
             print('-' * 35)
 
+        return self.fail
+
     def _objfunc(self, x_new):
         """
         Evaluate and return the objective function.
@@ -334,7 +383,7 @@ class ScipyOptimizer(Driver):
                 self.set_design_var(name, x_new[i:i + size])
                 i += size
 
-            with Recording(self.options['optimizer'], self.iter_count, self) as rec:
+            with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
                 self.iter_count += 1
                 model._solve_nonlinear()
 
@@ -355,7 +404,7 @@ class ScipyOptimizer(Driver):
 
         return f_new
 
-    def _confunc(self, x_new, name, idx):
+    def _confunc(self, x_new, name, dbl, idx):
         """
         Return the value of the constraint function requested in args.
 
@@ -368,6 +417,8 @@ class ScipyOptimizer(Driver):
             Array containing parameter values at new design point.
         name : string
             Name of the constraint to be evaluated.
+        dbl : bool
+            True if double sided constraint.
         idx : float
             Contains index into the constraint array.
 
@@ -378,12 +429,6 @@ class ScipyOptimizer(Driver):
         """
         if self._exc_info is not None:
             self._reraise()
-
-        if name.startswith('2bl-'):
-            name = name[4:]
-            dbl_side = True
-        else:
-            dbl_side = False
 
         cons = self._con_cache
         meta = self._cons[name]
@@ -405,14 +450,14 @@ class ScipyOptimizer(Driver):
         if isinstance(lower, np.ndarray):
             lower = lower[idx]
 
-        if (lower == -sys.float_info.max) or dbl_side:
+        if dbl or (lower == -sys.float_info.max):
             return upper - cons[name][idx]
         else:
             return cons[name][idx] - lower
 
     def _gradfunc(self, x_new):
         """
-        Evaluate and return the objective function.
+        Evaluate and return the gradient for the objective.
 
         Gradients for the constraints are also calculated and cached here.
 
@@ -427,8 +472,7 @@ class ScipyOptimizer(Driver):
             Gradient of objective with respect to parameter array.
         """
         try:
-            quantities = list(self._objs) + list(self._cons)
-            grad = self._compute_totals(of=quantities, wrt=list(self._designvars),
+            grad = self._compute_totals(of=self._obj_and_nlcons, wrt=list(self._designvars),
                                         return_format='array')
             self._grad_cache = grad
 
@@ -442,7 +486,7 @@ class ScipyOptimizer(Driver):
 
         return grad[0, :]
 
-    def _congradfunc(self, x_new, name, idx):
+    def _congradfunc(self, x_new, name, dbl, idx):
         """
         Return the cached gradient of the constraint function.
 
@@ -455,6 +499,8 @@ class ScipyOptimizer(Driver):
             Array containing parameter values at new design point.
         name : string
             Name of the constraint to be evaluated.
+        dbl : bool
+            Denotes if a constraint is double-sided or not.
         idx : float
             Contains index into the constraint array.
 
@@ -466,15 +512,13 @@ class ScipyOptimizer(Driver):
         if self._exc_info is not None:
             self._reraise()
 
-        if name.startswith('2bl-'):
-            name = name[4:]
-            dbl_side = True
-        else:
-            dbl_side = False
-
-        grad = self._grad_cache
         meta = self._cons[name]
-        grad_idx = self._con_idx[name] + idx + 1
+
+        if meta['linear']:
+            grad = self._lincongrad_cache
+        else:
+            grad = self._grad_cache
+        grad_idx = self._con_idx[name] + idx
 
         # print("Constraint Gradient returned")
         # print(x_new)
@@ -490,7 +534,7 @@ class ScipyOptimizer(Driver):
         if isinstance(lower, np.ndarray):
             lower = lower[idx]
 
-        if (lower == -sys.float_info.max) or dbl_side:
+        if dbl or (lower == -sys.float_info.max):
             return -grad[grad_idx, :]
         else:
             return grad[grad_idx, :]
@@ -502,3 +546,22 @@ class ScipyOptimizer(Driver):
         exc = self._exc_info
         self._exc_info = None
         reraise(*exc)
+
+
+class ScipyOptimizer(ScipyOptimizeDriver):
+    """
+    Deprecated.  Use ScipyOptimizeDriver.
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Named args.
+        """
+        super(ScipyOptimizeDriver, self).__init__(**kwargs)
+        warn_deprecation("'ScipyOptimizer' provides backwards compatibility "
+                         "with OpenMDAO <= 2.2 ; use 'ScipyOptimizeDriver' instead.")

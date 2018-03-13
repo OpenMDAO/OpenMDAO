@@ -8,7 +8,7 @@ import numpy as np
 
 from openmdao.api import Group, IndepVarComp, Problem, LinearBlockJac, AssembledJacobian, \
     ExecComp, NonlinearBlockGS
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests

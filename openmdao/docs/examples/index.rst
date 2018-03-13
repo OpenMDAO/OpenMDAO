@@ -4,8 +4,8 @@
 Examples
 ********
 
-This document is intended to show run-files that provide
-techniques for using certain features in combination or examples of solving cannonical problems in OpenMDAO.
+This document is intended to show run files that provide
+techniques for using certain features in combination, or examples of solving canonical problems in OpenMDAO.
 If you need to learn the basics of how things work, please see the :ref:`User Guide <UserGuide>`.
 
 
@@ -19,3 +19,4 @@ If you need to learn the basics of how things work, please see the :ref:`User Gu
     keplers_equation/keplers_equation.rst
     circuit_analysis.rst
     beam_optimization/beam_optimization.rst
+    simul_deriv_example/simul_deriv_example.rst

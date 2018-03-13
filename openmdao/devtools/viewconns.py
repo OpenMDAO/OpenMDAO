@@ -62,15 +62,13 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     src2tgts = {}
     units = {n: data.get('units','')
-                for n, data in iteritems(system._var_allprocs_abs2meta['input'])}
-    units.update({n: data.get('units','')
-                for n, data in iteritems(system._var_allprocs_abs2meta['output'])})
+                for n, data in iteritems(system._var_allprocs_abs2meta)}
     vals = {}
 
     with printoptions(precision=precision, suppress=True, threshold=10000):
 
         for t in system._var_abs_names['input']:
-            tmeta = system._var_abs2meta['input'][t]
+            tmeta = system._var_abs2meta[t]
             idxs = tmeta['src_indices']
             flat = tmeta['flat_src_indices']
             if idxs is None:

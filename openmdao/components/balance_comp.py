@@ -13,6 +13,12 @@ from openmdao.core.implicitcomponent import ImplicitComponent
 class BalanceComp(ImplicitComponent):
     """
     A simple equation balance for solving implicit equations.
+
+    Attributes
+    ----------
+    _state_vars : dict
+        Cache the data provided during `add_balance`
+        so everything can be saved until setup is called.
     """
 
     def __init__(self, name=None, eq_units=None, lhs_name=None,
@@ -96,7 +102,6 @@ class BalanceComp(ImplicitComponent):
 
             prob.run_model()
 
-
         Parameters
         ----------
         name : str
@@ -125,7 +130,7 @@ class BalanceComp(ImplicitComponent):
         mult_val : int, float, or np.array
             Default value for the LHS multiplier of the given state.  Must be compatible
             with the shape (optionally) given by the val option in kwargs.
-        kwargs : dict
+        **kwargs : dict
             Additional arguments to be passed for the creation of the implicit state variable.
         """
         super(BalanceComp, self).__init__()
@@ -138,8 +143,6 @@ class BalanceComp(ImplicitComponent):
         """
         Define the independent variables, output variables, and partials.
         """
-        self.declare_partials(of='*', wrt='*', dependent=False)
-
         for name, options in iteritems(self._state_vars):
 
             for s in ('lhs', 'rhs', 'mult'):
@@ -181,19 +184,19 @@ class BalanceComp(ImplicitComponent):
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
         Calculate the residual for each balance.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        residuals : Vector
+            unscaled, dimensional residuals written to via residuals[key]
         """
         for name, options in iteritems(self._state_vars):
-            lhs_name = options['lhs_name']
-            rhs_name = options['rhs_name']
-
-            lhs = inputs[lhs_name]
-            rhs = inputs[rhs_name]
-
-            if options['use_mult']:
-                mult_name = options['mult_name']
-                mult = inputs[mult_name]
-            else:
-                mult = 1.0
+            lhs = inputs[options['lhs_name']]
+            rhs = inputs[options['rhs_name']]
 
             # Indices where the rhs is near zero or not near zero
             idxs_nz = np.where(np.abs(rhs) < 2)[0]
@@ -204,11 +207,23 @@ class BalanceComp(ImplicitComponent):
             self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
             self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
 
-            residuals[name] = (mult * lhs - rhs) * self._scale_factor
+            if options['use_mult']:
+                residuals[name] = (inputs[options['mult_name']] * lhs - rhs) * self._scale_factor
+            else:
+                residuals[name] = (lhs - rhs) * self._scale_factor
 
     def linearize(self, inputs, outputs, jacobian):
         """
         Calculate the partials of the residual for each balance.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        jacobian : Jacobian
+            sub-jac components written to jacobian[output_name, input_name]
         """
         for name, options in iteritems(self._state_vars):
             lhs_name = options['lhs_name']
@@ -216,12 +231,6 @@ class BalanceComp(ImplicitComponent):
 
             lhs = inputs[lhs_name]
             rhs = inputs[rhs_name]
-
-            if options['use_mult']:
-                mult_name = options['mult_name']
-                mult = inputs[mult_name]
-            else:
-                mult = 1.0
 
             # Indices where the rhs is near zero or not near zero
             idxs_nz = np.where(np.abs(rhs) < 2)[0]
@@ -234,19 +243,33 @@ class BalanceComp(ImplicitComponent):
             self._dscale_drhs[idxs_nnz] = -np.sign(rhs[idxs_nnz]) / rhs[idxs_nnz]**2
             self._dscale_drhs[idxs_nz] = -.5 * rhs[idxs_nz] / (.25 * rhs[idxs_nz] ** 2 + 1) ** 2
 
+            if options['use_mult']:
+                mult_name = options['mult_name']
+                mult = inputs[mult_name]
+
+                # Partials of residual wrt mult
+                jacobian[name, mult_name] = lhs * self._scale_factor
+            else:
+                mult = 1.0
+
             # Partials of residual wrt rhs
             jacobian[name, rhs_name] = (mult * lhs - rhs) * self._dscale_drhs - self._scale_factor
 
             # Partials of residual wrt lhs
             jacobian[name, lhs_name] = mult * self._scale_factor
 
-            # Partials of residual wrt mult
-            if options['use_mult']:
-                jacobian[name, mult_name] = lhs * self._scale_factor
-
     def guess_nonlinear(self, inputs, outputs, residuals):
         """
         Provide an "guess" for each output based on the values of the inputs and resids.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        residuals : Vector
+            unscaled, dimensional residuals written to via residuals[key]
         """
         for name, options in iteritems(self._state_vars):
             if options['guess_func'] is not None:
@@ -290,7 +313,7 @@ class BalanceComp(ImplicitComponent):
         mult_val : int, float, or np.array
             Default value for the LHS multiplier.  Must be compatible with the shape (optionally)
             given by the val option in kwargs.
-        kwargs : dict
+        **kwargs : dict
             Additional arguments to be passed for the creation of the implicit state variable.
         """
         if guess_func is not None and not callable(guess_func):

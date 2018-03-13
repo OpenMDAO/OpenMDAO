@@ -120,6 +120,9 @@ class Solver(object):
         object that manages all recorders added to this solver
     _solver_info : <SolverInfo>
         Object to store some formatting for iprint that is shared across all solvers.
+    cite : str
+        Listing of relevant citataions that should be referenced when
+        publishing work that uses this class.
     options : <OptionsDictionary>
         Options dictionary.
     recording_options : <OptionsDictionary>
@@ -164,7 +167,7 @@ class Solver(object):
         self.options.declare('iprint', types=int, default=1,
                              desc='whether to print output')
         self.options.declare('err_on_maxiter', types=bool, default=False,
-                             desc="When True, AnlysisError will be raised if we don't convege.")
+                             desc="When True, AnalysisError will be raised if we don't converge.")
         # Case recording options
         self.recording_options.declare('record_abs_error', types=bool, default=True,
                                        desc='Set to True to record absolute error at the \
@@ -194,6 +197,8 @@ class Solver(object):
 
         self.metadata = {}
         self._rec_mgr = RecordingManager()
+
+        self.cite = ""
 
     def add_recorder(self, recorder):
         """
@@ -490,7 +495,7 @@ class Solver(object):
         if 'out' in self._filtered_vars_to_record:
             for out in self._filtered_vars_to_record['out']:
                 if out in outputs._names:
-                    data['o'][out] = outputs._names[out]
+                    data['o'][out] = outputs._views[out]
         else:
             data['o'] = outputs
 
@@ -505,7 +510,7 @@ class Solver(object):
             if 'res' in self._filtered_vars_to_record:
                 for res in self._filtered_vars_to_record['res']:
                     if res in residuals._names:
-                        data['r'][res] = residuals._names[res]
+                        data['r'][res] = residuals._views[res]
             else:
                 data['r'] = residuals
         else:
@@ -555,7 +560,7 @@ class NonlinearSolver(Solver):
 
     def _run_apply(self):
         """
-        Run the the apply_nonlinear method on the system.
+        Run the apply_nonlinear method on the system.
         """
         recording_iteration.stack.append(('_run_apply', 0))
         self._system._apply_nonlinear()
@@ -594,6 +599,28 @@ class LinearSolver(Solver):
         """
         super(LinearSolver, self).__init__(**kwargs)
         self._rel_systems = None
+
+    def _setup_solvers(self, system, depth):
+        """
+        Assign system instance, set depth, and optionally perform setup.
+
+        Parameters
+        ----------
+        system : <System>
+            pointer to the owning system.
+        depth : int
+            depth of the current system (already incremented).
+        """
+        super(LinearSolver, self)._setup_solvers(system, depth)
+
+        if self._mode == 'fwd':
+            b_vecs = self._system._vectors['residual']
+        else:  # rev
+            b_vecs = self._system._vectors['output']
+
+        self._rhs_vecs = {}
+        for vec_name in self._system._rel_vec_names:
+            self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
 
     def solve(self, vec_names, mode, rel_systems=None):
         """
@@ -635,14 +662,13 @@ class LinearSolver(Solver):
         """
         system = self._system
 
-        self._rhs_vecs = {}
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']
         else:  # rev
             b_vecs = system._vectors['output']
 
         for vec_name in self._vec_names:
-            self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
+            self._rhs_vecs[vec_name].set_vec(b_vecs[vec_name])
 
         if self.options['maxiter'] > 1:
             self._run_apply()
@@ -654,7 +680,7 @@ class LinearSolver(Solver):
 
     def _run_apply(self):
         """
-        Run the the apply_linear method on the system.
+        Run the apply_linear method on the system.
         """
         recording_iteration.stack.append(('_run_apply', 0))
 

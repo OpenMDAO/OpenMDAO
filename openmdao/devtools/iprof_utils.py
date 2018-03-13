@@ -103,14 +103,14 @@ def _setup_func_group():
     from openmdao.solvers.solver import Solver
     from openmdao.jacobians.jacobian import Jacobian
     from openmdao.matrices.matrix import Matrix
-    from openmdao.vectors.vector import Vector, Transfer
+    from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
 
     func_group.update({
         'openmdao': [
             ("*", (System, Jacobian, Matrix, Solver, Driver, Problem)),
         ],
         'openmdao_all': [
-            ("*", (System, Vector, Transfer, Jacobian, Matrix, Solver, Driver, Problem)),
+            ("*", (System, DefaultVector, DefaultTransfer, Jacobian, Matrix, Solver, Driver, Problem)),
         ],
         'setup': [
             ("*setup*", (System, Solver, Driver, Problem)),
@@ -118,11 +118,23 @@ def _setup_func_group():
         'dataflow': [
             ('*compute*', (System,)),
             ('*linear*', (System,)),
-            ('*', (Transfer,)),
+            ('_transfer', (System,)),
+            ('*', (DefaultTransfer,)),
         ],
         'linear': [
             ('*linear*', (System,)),
             ('*solve*', (Solver,)),
+            ('*compute*', (System,))
+        ],
+        'solver': [
+            ('*', (Solver,))
+        ],
+        'driver': [
+            ('*', (Driver,))
+        ],
+        'transfer': [
+            ('*', (DefaultTransfer,)),
+            ('_transfer', (System,))
         ]
     })
 
@@ -173,7 +185,7 @@ def _collect_methods(method_patterns):
         if len(lst) == 1:
             matches[name] = lst[0]
         else:
-            matches[name] = tuple(matches[name])
+            matches[name] = tuple(lst)
 
     return matches
 
@@ -187,14 +199,15 @@ def _create_profile_callback(stack, matches, do_call=None, do_ret=None, context=
         if event == 'call':
             if 'self' in frame.f_locals and frame.f_code.co_name in matches and \
                     isinstance(frame.f_locals['self'], matches[frame.f_code.co_name]):
-                stack.append(frame)
+                stack.append(id(frame))
                 if do_call is not None:
                    return do_call(frame, arg, stack, context)
         elif event == 'return' and stack:
-            if frame is stack[-1]:
+            if id(frame) == stack[-1]:
+                stack.pop()
                 if do_ret is not None:
                     do_ret(frame, arg, stack, context)
-                stack.pop()
+                #stack.pop()
 
     return _wrapped
 
