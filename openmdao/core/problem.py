@@ -1729,11 +1729,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         sorted_keys = sorted(iterkeys(derivatives))
 
         if not suppress_output:
-            out_buffer = cStringIO() # Need to capture the output of a component's derivative
-                                     # info so that it can be used if that component is the
-                                     # worst subjac. That info is printed at the bottom of all the
-                                     # output
-            num_bad_jacs = 0 # Keep track of number of bad derivative values for each component
+            # Need to capture the output of a component's derivative
+            # info so that it can be used if that component is the
+            # worst subjac. That info is printed at the bottom of all the output
+            out_buffer = cStringIO()
+            num_bad_jacs = 0  # Keep track of number of bad derivative values for each component
             if out_stream:
                 header_str = '-' * (len(sys_name) + len(sys_type) + len(sys_class_name) + 5) + '\n'
                 out_buffer.write(header_str)
@@ -1756,7 +1756,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     max_width_of = len("'<output>'")
                     max_width_wrt = len("'<variable>'")
                     for of, wrt in sorted_keys:
-                        max_width_of = max(max_width_of, len(of) + 2) # 2 to include quotes
+                        max_width_of = max(max_width_of, len(of) + 2)  # 2 to include quotes
                         max_width_wrt = max(max_width_wrt, len(wrt) + 2)
 
                     if not all_comps_provide_jacs:
@@ -1851,12 +1851,15 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             if not np.isnan(error) and error >= abs_error_tol:
                                 error_string += ' >ABS_TOL'
                                 break
-                        is_worst_subjac = False # See if this component has the greater
-                                                # error in the derivative computation
-                                                # compared to the other components so far
+
+                        # See if this component has the greater
+                        # error in the derivative computation
+                        # compared to the other components so far
+                        is_worst_subjac = False
                         for i, error in enumerate(rel_err):
                             if not np.isnan(error):
-                                if i < 2 and error > worst_subjac_rel_err: #  only 1st and 2d errs
+                                #  only 1st and 2d errs
+                                if i < 2 and error > worst_subjac_rel_err:
                                     worst_subjac_rel_err = error
                                     worst_subjac = (sys_type, sys_class_name, sys_name)
                                     is_worst_subjac = True
@@ -1864,8 +1867,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 error_string += ' >REL_TOL'
                                 break
 
-                        if error_string: # Any error string indicates that at least one of the
-                                         # derivative calcs is greater than the rel tolerance
+                        if error_string:  # Any error string indicates that at least one of the
+                                            # derivative calcs is greater than the rel tolerance
                             num_bad_jacs += 1
 
                         if out_stream:
@@ -1984,7 +1987,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
     if not suppress_output and compact_print and not totals:
         if worst_subjac:
-            worst_subjac_header = "Sub Jacobian with Largest Relative Error: {1} '{2}'".format(*worst_subjac)
+            worst_subjac_header = \
+                "Sub Jacobian with Largest Relative Error: {1} '{2}'".format(*worst_subjac)
             out_stream.write('\n' + '#' * len(worst_subjac_header) + '\n')
             out_stream.write("{}\n".format(worst_subjac_header))
             out_stream.write('#' * len(worst_subjac_header) + '\n')

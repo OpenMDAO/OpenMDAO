@@ -135,7 +135,7 @@ exceeded, `>REL_TOL` is printed at the end of the line.
 
 In the compact form, the reverse derivative values are only shown for matrix-free components.
 
-Also, notice that at the bottom of the output, the partial derivative calculation with the largest error is given.
+Also, notice that at the bottom of the output, the partial derivative calculation with the largest relative error is given.
 
 .. embed-code::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_compact_print_formatting

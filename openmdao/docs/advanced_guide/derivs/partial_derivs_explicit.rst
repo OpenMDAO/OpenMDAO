@@ -63,7 +63,7 @@ How Do I Know If My Derivatives Are Correct?
 ********************************************
 
 It is really important, if you are going to provide analytic derivatives, that you make sure they are correct.
-It is hard to understate the importance of accurate derivatives in the convergence of the analysis and optimization problems.
+It is hard to understate the importance of accurate derivatives in the convergence of analysis and optimization problems.
 OpenMDAO provides a helper function to make it easier to verify your partial derivatives.
 Any time you implement analytic derivatives, or change the nonlinear equations of your analysis, you should check your partial derivatives this way.
 
@@ -78,6 +78,6 @@ Any time you implement analytic derivatives, or change the nonlinear equations o
     You should look over the complete :ref:`check_partials doc <feature_check_partials>` before you start doing heavy development with derivatives.
 
 There is a lot of information there, but for now, just take a look at the *r(fwd-chk)* column, which shows the norm of the relative difference
-between the analytic derivatives Jacobian and one that was approximated using finite difference.
+between the analytic derivatives Jacobian and one that was approximated using finite differences.
 Here, all the numbers are really small, and that's what you want to see.
 It's rare, except for linear functions, that the finite difference and analytic derivatives will match exactly, but they should be pretty close.
