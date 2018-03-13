@@ -146,6 +146,81 @@ but that can be changed using the `-g` option.  For example, in order to trace o
    openmdao trace -v <your_python_script_here> -g setup
 
 
+The tracer can also display the change in memory usage from the time a function is called to the
+time it returns.  To show memory usage, use the `-m` option, for example:
+
+.. code-block:: none
+
+    openmdao trace -m <your_python_script_here>
+
+
+will result in output like this:
+
+.. code-block:: none
+
+    ...
+
+    Group#1().Group._setup_procs
+        DistribOuptutImplicit#0().System._setup_procs
+            PETScKrylov#0.PETScKrylov.__init__
+                PETScKrylov#0.LinearSolver.__init__
+                    PETScKrylov#0.Solver.__init__
+                        PETScKrylov#0.PETScKrylov._declare_options
+                        <-- PETScKrylov#0.PETScKrylov._declare_options (time:  0.06384) (total: 75.445 MB)
+                    <-- PETScKrylov#0.Solver.__init__ (time:  0.06391) (total: 75.445 MB)
+                <-- PETScKrylov#0.LinearSolver.__init__ (time:  0.06397) (total: 75.445 MB)
+            <-- PETScKrylov#0.PETScKrylov.__init__ (time:  0.06402) (total: 75.445 MB)
+        <-- DistribOuptutImplicit#0(aero.icomp).System._setup_procs (time:  0.06519) (total: 77.371 MB) (diff: +4772 KB)
+        DistribInputExplicit#0().System._setup_procs
+        <-- DistribInputExplicit#0(aero.ecomp).System._setup_procs (time:  0.06738) (total: 79.281 MB) (diff: +1956 KB)
+    <-- Group#1(aero).Group._setup_procs (time:  0.06746) (total: 79.281 MB)
+
+    ...
+
+
+Note that total memory usage and elapsed time is shown on each function return line.  Those function
+returns where a difference in memory was found will display the difference at the end of the line.
+
+
+The tracer can also be used to help track down memory leaks.  Using the `-l` option, it will display
+a list of object types and their counts that were created since the function was called and not
+garbage collected after the function returned.  For example:
+
+.. code-block:: none
+
+    openmdao trace -l <your_python_script_here> -g solver
+
+
+will result in output like this:
+
+
+.. code-block:: none
+
+    ...
+
+    LinearRunOnce#0.LinearRunOnce.solve
+        LinearRunOnce#0.LinearBlockGS._iter_execute
+            LinearRunOnce#1.LinearRunOnce.solve
+                LinearRunOnce#1.LinearBlockGS._iter_execute
+                    PETScKrylov#0.PETScKrylov.solve
+                    <-- PETScKrylov#0.PETScKrylov.solve
+                <-- LinearRunOnce#1.LinearBlockGS._iter_execute
+            <-- LinearRunOnce#1.LinearRunOnce.solve
+               Recording +1
+        <-- LinearRunOnce#0.LinearBlockGS._iter_execute
+    <-- LinearRunOnce#0.LinearRunOnce.solve
+       Recording +1
+
+    ...
+
+
+This output shows that in LinearRunOnce#1.LinearRunOnce.solve, a Recording object was created
+and not garbage collected.  Note that this does not always indicate a memory leak, as there
+are some functions that intentionally create new objects that are intended to last beyond the
+life of the function.  This tool merely gives you a place to look in the code where a memory
+leak *might* exist.
+
+
 To see a list of the available pre-defined sets of functions to trace, look at the usage info
 for the `-g` command that can be obtained as follows:
 
