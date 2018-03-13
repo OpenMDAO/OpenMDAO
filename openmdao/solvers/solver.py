@@ -375,12 +375,12 @@ class Solver(object):
 
                 if self.options['err_output_file']:
                     with open(self.options['err_output_file'], 'w') as f:
-                        print('from numpy import array', file=f)
+                        print('# inputs and outputs at start of %s iteration' % str(self), file=f)
                         for vec_type, vec in iteritems(self._err_cache):
                             print('', file=f)
-                            print('# Vector %s, type %s' % (vec._name, vec._typ), file=f)
-                            for abs_name, view in iteritems(vec._views):
-                                print('prob["%s"][:] =' % abs_name, repr(view), file=f)
+                            print('# %s %s vector' % (vec._name, vec._typ), file=f)
+                            for abs_name in sorted(vec._views.keys()):
+                                print('%s =' % abs_name, repr(vec._views[abs_name]), file=f)
 
                 # Raise AnalysisError if requested.
                 if self.options['err_on_maxiter']:

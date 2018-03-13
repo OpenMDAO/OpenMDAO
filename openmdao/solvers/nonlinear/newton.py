@@ -182,6 +182,8 @@ class NewtonSolver(NonlinearSolver):
         float
             error at the first iteration.
         """
+        super(NewtonSolver, self)._iter_initialize()
+
         system = self._system
 
         # Execute guess_nonlinear if specified.

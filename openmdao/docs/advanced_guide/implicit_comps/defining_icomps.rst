@@ -18,7 +18,8 @@ Our goal is to solve for the steady-state voltages at node 1 and node 2.
    :width: 50%
    :alt: diagram of a simple circuit with two resistors and one diode
 
-In order to find the voltages, we'll employ `Kirchoff's voltage law <https://en.wikipedia.org/wiki/Kirchhoff%27s_circuit_laws>`_, and solve for the voltages needed at each node to drive the net current to 0.
+In order to find the voltages, we'll employ `Kirchoff's current law <https://en.wikipedia.org/wiki/Kirchhoff%27s_circuit_laws>`_,
+and solve for the voltages needed at each node to drive the net current to 0.
 
 This means that the voltages at each node are *state variables* for the analysis.
 In other words, V1 and V2 are defined implicitly by the following residual equation:
@@ -125,7 +126,7 @@ close to a converged answer.
 
 .. embed-code::
     openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_plain_newton_many_iter
-    :layout: code, output
+    :layout: interleave
 
 
 .. note::
