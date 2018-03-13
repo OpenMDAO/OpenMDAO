@@ -1696,8 +1696,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
 
     # Keep track of the worst subjac in terms of relative error for fwd and rev
-    # if not suppress_output and compact_print and not totals:
-    if not suppress_output and not totals:
+    if not suppress_output and compact_print and not totals:
         worst_subjac_rel_err = 0.0
         worst_subjac = None
 
@@ -1713,7 +1712,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         sys_name = system.pathname
         sys_class_name = type(system).__name__
 
-        # # Match header to appropriate type.
+        # Match header to appropriate type.
         if isinstance(system, Component):
             sys_type = 'Component'
         elif isinstance(system, Group):
@@ -1865,7 +1864,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 error_string += ' >REL_TOL'
                                 break
 
-                        if error_string:
+                        if error_string: # Any error string indicates that at least one of the
+                                         # derivative calcs is greater than the rel tolerance
                             num_bad_jacs += 1
 
                         if out_stream:
