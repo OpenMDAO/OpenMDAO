@@ -1745,8 +1745,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 if totals:
                     header = "{0} wrt {1} | {2} | {3} | {4} | {5}"\
                         .format(
-                            _pad_name('<output>', 30, True),
-                            _pad_name('<variable>', 30, True),
+                            _pad_name('<output>', 30, quotes=True),
+                            _pad_name('<variable>', 30, quotes=True),
                             _pad_name('calc mag.'),
                             _pad_name('check mag.'),
                             _pad_name('a(cal-chk)'),
@@ -1763,8 +1763,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         header = \
                             "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}" \
                             .format(
-                                _pad_name('<output>', max_width_of, True),
-                                _pad_name('<variable>', max_width_wrt, True),
+                                _pad_name('<output>', max_width_of, quotes=True),
+                                _pad_name('<variable>', max_width_wrt, quotes=True),
                                 _pad_name('fwd mag.'),
                                 _pad_name('rev mag.'),
                                 _pad_name('check mag.'),
@@ -1778,8 +1778,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     else:
                         header = "{0} wrt {1} | {2} | {3} | {4} | {5}"\
                             .format(
-                                _pad_name('<output>', max_width_of, True),
-                                _pad_name('<variable>', max_width_wrt, True),
+                                _pad_name('<output>', max_width_of, quotes=True),
+                                _pad_name('<variable>', max_width_wrt, quotes=True),
                                 _pad_name('fwd mag.'),
                                 _pad_name('check mag.'),
                                 _pad_name('a(fwd-chk)'),
@@ -1838,8 +1838,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     if totals:
                         if out_stream:
                             out_stream.write(deriv_line.format(
-                                _pad_name(of, 30, True),
-                                _pad_name(wrt, 30, True),
+                                _pad_name(of, 30, quotes=True),
+                                _pad_name(wrt, 30, quotes=True),
                                 magnitude.forward,
                                 magnitude.fd,
                                 abs_err.forward,
@@ -1875,8 +1875,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             if not all_comps_provide_jacs:
                                 deriv_info_line = \
                                     deriv_line.format(
-                                        _pad_name(of, max_width_of, True),
-                                        _pad_name(wrt, max_width_wrt, True),
+                                        _pad_name(of, max_width_of, quotes=True),
+                                        _pad_name(wrt, max_width_wrt, quotes=True),
                                         magnitude.forward,
                                         _format_if_not_matrix_free(
                                             system.matrix_free, magnitude.reverse),
@@ -1895,8 +1895,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             else:
                                 deriv_info_line = \
                                     deriv_line.format(
-                                        _pad_name(of, max_width_of, True),
-                                        _pad_name(wrt, max_width_wrt, True),
+                                        _pad_name(of, max_width_of, quotes=True),
+                                        _pad_name(wrt, max_width_wrt, quotes=True),
                                         magnitude.forward,
                                         magnitude.fd,
                                         abs_err.forward,
@@ -1979,11 +1979,12 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 # End of if compact print if/else
             # End of if not suppress_output
         # End of for of, wrt in sorted_keys
-    # End of for system in system_list
 
         if not show_only_incorrect or num_bad_jacs:
             if out_stream and not suppress_output:
                 out_stream.write(out_buffer.getvalue())
+
+    # End of for system in system_list
 
     if not suppress_output and compact_print and not totals:
         if worst_subjac:

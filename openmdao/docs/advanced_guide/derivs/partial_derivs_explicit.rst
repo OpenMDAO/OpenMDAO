@@ -63,7 +63,7 @@ How Do I Know If My Derivatives Are Correct?
 ********************************************
 
 It is really important, if you are going to provide analytic derivatives, that you make sure they are correct.
-It is hard to understate the importance of accurate derivatives in the convergence of analysis and optimization problems.
+It is hard to overstate the importance of accurate derivatives in the convergence of analysis and optimization problems.
 OpenMDAO provides a helper function to make it easier to verify your partial derivatives.
 Any time you implement analytic derivatives, or change the nonlinear equations of your analysis, you should check your partial derivatives this way.
 
