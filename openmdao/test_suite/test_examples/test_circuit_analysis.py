@@ -183,7 +183,6 @@ class TestCircuit(unittest.TestCase):
         # you can change the NewtonSolver settings in circuit after setup is called
         newton = p.model.circuit.nonlinear_solver
         newton.options['maxiter'] = 50
-        newton.options['err_output_file'] = 'newton.dat'
 
         # set some initial guesses
         p['circuit.n1.V'] = 10.
@@ -196,9 +195,6 @@ class TestCircuit(unittest.TestCase):
 
         # sanity check: should sum to .1 Amps
         assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], 0.09987447, 1e-6)
-
-        # make sure error file is generated
-        print(open('newton.dat').read())
 
     def test_circuit_advanced_newton(self):
         from openmdao.api import ArmijoGoldsteinLS, Problem, IndepVarComp
