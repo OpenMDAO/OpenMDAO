@@ -59,7 +59,7 @@ class KSfunction(object):
         return dKS_dg, dKS_drho
 
 
-class KSComp(ExplicitComponent):
+class KSComponent(ExplicitComponent):
     """
     KS function component.
 
@@ -76,7 +76,7 @@ class KSComp(ExplicitComponent):
         width : dict of keyword arguments
             'Width of constraint vector.
         """
-        super(KSComp, self).__init__(width=width)
+        super(KSComponent, self).__init__(width=width)
 
     def initialize(self):
         """

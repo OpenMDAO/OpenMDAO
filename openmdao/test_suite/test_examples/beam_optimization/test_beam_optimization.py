@@ -7,7 +7,6 @@ from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.api import Problem, ScipyOptimizeDriver
 from openmdao.test_suite.test_examples.beam_optimization.beam_group import BeamGroup
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
-from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_stress import MultipointBeamGroup as MultipointBeamStress
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -49,7 +48,7 @@ class TestCase(unittest.TestCase):
 
         from openmdao.api import Problem, ScipyOptimizeDriver
 
-        from openmdao.test_suite.test_examples.beam_optimization.beam_group import BeamGroup
+        from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 
         E = 1.
         L = 1.
@@ -80,7 +79,7 @@ class TestCase(unittest.TestCase):
 
         from openmdao.api import Problem, ScipyOptimizeDriver
 
-        from openmdao.test_suite.test_examples.beam_optimization.beam_group import BeamGroup
+        from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_stress import MultipointBeamGroup
 
         E = 1.
         L = 1.
@@ -92,9 +91,9 @@ class TestCase(unittest.TestCase):
         num_elements = 25
         num_load_cases = 2
 
-        prob = Problem(model=MultipointBeamStress(E=E, L=L, b=b, volume=volume, max_bending = max_bending,
-                                                  num_elements=num_elements, num_cp=num_cp,
-                                                  num_load_cases=num_load_cases))
+        prob = Problem(model=MultipointBeamGroup(E=E, L=L, b=b, volume=volume, max_bending = max_bending,
+                                                 num_elements=num_elements, num_cp=num_cp,
+                                                 num_load_cases=num_load_cases))
 
         prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'

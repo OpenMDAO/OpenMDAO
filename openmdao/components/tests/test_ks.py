@@ -7,13 +7,13 @@ import numpy as np
 
 from openmdao.api import Problem, IndepVarComp, Group, ExecComp, ScipyOptimizeDriver, \
      ExplicitComponent
-from openmdao.components.ks import KSComp
-from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
+from openmdao.components.ks import KSComponent
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
+from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_stress import MultipointBeamGroup
 from openmdao.utils.assert_utils import assert_rel_error
 
 
-class TestExternalCode(unittest.TestCase):
+class TestKSFunction(unittest.TestCase):
 
     def test_basic_ks(self):
         prob = Problem()
@@ -21,7 +21,7 @@ class TestExternalCode(unittest.TestCase):
 
         model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
         model.add_subsystem('comp', DoubleArrayComp())
-        model.add_subsystem('ks', KSComp(width=2))
+        model.add_subsystem('ks', KSComponent(width=2))
         model.connect('px.x', 'comp.x1')
         model.connect('comp.y2', 'ks.g')
 
@@ -34,48 +34,40 @@ class TestExternalCode(unittest.TestCase):
 
         assert_rel_error(self, max(prob['comp.y2']), prob['ks.KS'])
 
-    def test_ks_opt_sellar(self):
+    def test_beam_stress(self):
+        E = 1.
+        L = 1.
+        b = 0.1
+        volume = 0.01
+        max_bending = 100.0
 
-        class Mux(ExplicitComponent):
+        num_cp = 5
+        num_elements = 25
+        num_load_cases = 2
 
-            def setup(self):
-                self.add_input('g1', 0.0)
-                self.add_input('g2', 0.0)
-                self.add_output('g', np.zeros((2, )))
-
-                self.declare_partials(of='g', wrt='g1', val=np.array([[1.0], [0.0]]))
-                self.declare_partials(of='g', wrt='g2', val=np.array([[0.0], [1.0]]))
-
-            def compute(self, inputs, outputs):
-                outputs['g'][0] = inputs['g1']
-                outputs['g'][1] = inputs['g2']
-
-        prob = Problem()
-        model = prob.model = SellarDerivativesGrouped()
+        prob = Problem(model=MultipointBeamGroup(E=E, L=L, b=b, volume=volume, max_bending = max_bending,
+                                                 num_elements=num_elements, num_cp=num_cp,
+                                                 num_load_cases=num_load_cases))
 
         prob.driver = ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = "SLSQP"
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
 
-        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
-        model.add_design_var('x', lower=0.0, upper=10.0)
-        model.add_objective('obj')
+        prob.setup(mode='rev')
 
-        model.add_subsystem('cons', Mux())
-        model.add_subsystem('ks', KSComp(width=2))
-        model.connect('con1', 'cons.g1')
-        model.connect('con2', 'cons.g2')
-        model.connect('cons.g', 'ks.g')
-
-        #model.add_constraint('ks.KS', upper=0.0)
-        model.add_constraint('con1', upper=0.0)
-        model.add_constraint('con2', upper=0.0)
-
-        prob.set_solver_print(level=0)
-
-        prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_rel_error(self, prob['z'][0], 1.98337708, 1e-3)
+        stress0 = prob['parallel.sub_0.max_stress_0.g_con']
+        stress1 = prob['parallel.sub_0.max_stress_1.g_con']
+
+        # Test that the the maximum constraint prior to aggregation is close to "active".
+        assert_rel_error(self, max(stress0), 0.0, tolerance=5e-2)
+        assert_rel_error(self, max(stress1), 0.0, tolerance=5e-2)
+
+        # Test that no original constraint is violated.
+        self.assertTrue(np.all(stress0 < 100.0))
+        self.assertTrue(np.all(stress1 < 100.0))
 
 if __name__ == "__main__":
     unittest.main()

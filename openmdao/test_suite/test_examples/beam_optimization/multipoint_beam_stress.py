@@ -10,6 +10,7 @@ from six.moves import range
 import numpy as np
 
 from openmdao.api import Group, IndepVarComp, ParallelGroup, ExecComp
+from openmdao.components.ks import KSComponent
 
 from openmdao.test_suite.test_examples.beam_optimization.components.displacements_comp import MultiDisplacementsComp
 from openmdao.test_suite.test_examples.beam_optimization.components.global_stiffness_matrix_comp import GlobalStiffnessMatrixComp
@@ -54,6 +55,9 @@ def divide_cases(ncases, nprocs):
 
 
 class MultipointBeamGroup(Group):
+    """
+    System setup for minimization of volume (i.e., mass) subject to KS aggregated bending stress constraints.
+    """
 
     def initialize(self):
         self.metadata.declare('E')
@@ -120,7 +124,8 @@ class MultipointBeamGroup(Group):
             comp = GlobalStiffnessMatrixComp(num_elements=num_elements)
             sub.add_subsystem('global_stiffness_matrix_comp', comp)
 
-            comp = MultiStatesComp(num_elements=num_elements, force_vector=force_vector, num_rhs=num_rhs)
+            comp = MultiStatesComp(num_elements=num_elements, force_vector=force_vector,
+                                   num_rhs=num_rhs)
             sub.add_subsystem('states_comp', comp)
 
             comp = MultiDisplacementsComp(num_elements=num_elements, num_rhs=num_rhs)
@@ -145,8 +150,25 @@ class MultipointBeamGroup(Group):
                     'displacements_comp.displacements_%d' % k,
                     'stress_comp.displacements_%d' % k)
 
-                sub.add_constraint('stress_comp.stress_%d' % k, lower=-max_bending, upper=max_bending,
-                                   parallel_deriv_color=parallel_deriv_color, vectorize_derivs=True)
+                comp = ExecComp('g_con = (g - %.15f)' % max_bending,
+                                g=np.zeros((num_elements, )),
+                                g_con=np.zeros((num_elements, )))
+                sub.add_subsystem('max_stress_%d' % k, comp)
+
+                comp = KSComponent(width=num_elements)
+                sub.add_subsystem('KS_%d' % k, comp)
+
+                sub.connect(
+                    'stress_comp.stress_%d' % k,
+                    'max_stress_%d.g' % k)
+
+                sub.connect(
+                    'max_stress_%d.g_con' % k,
+                    'KS_%d.g' % k)
+
+                sub.add_constraint('KS_%d.KS' % k, upper=0.0,
+                                   parallel_deriv_color=parallel_deriv_color,
+                                   vectorize_derivs=True)
 
         comp = VolumeComp(num_elements=num_elements, b=b, L=L)
         self.add_subsystem('volume_comp', comp)
