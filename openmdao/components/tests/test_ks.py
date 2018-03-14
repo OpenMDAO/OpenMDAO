@@ -66,7 +66,9 @@ class TestExternalCode(unittest.TestCase):
         model.connect('con2', 'cons.g2')
         model.connect('cons.g', 'ks.g')
 
-        model.add_constraint('ks.KS', upper=0.0)
+        #model.add_constraint('ks.KS', upper=0.0)
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
 
         prob.set_solver_print(level=0)
 

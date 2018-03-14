@@ -126,4 +126,4 @@ class KSComp(ExplicitComponent):
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
-        partials['KS', 'g'] = np.hstack(self._ks.derivatives())
+        partials['KS', 'g'] = self._ks.derivatives()[0]
