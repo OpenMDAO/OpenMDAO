@@ -6,8 +6,8 @@ import numpy as np
 import unittest
 from six import iterkeys
 
-from openmdao.core.group import Group
 from openmdao.core.problem import Problem
+from openmdao.core.indepvarcomp import IndepVarComp
 
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 from openmdao.solvers.linear.linear_block_jac import LinearBlockJac
@@ -23,7 +23,8 @@ from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
 from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 from openmdao.solvers.nonlinear.nonlinear_block_jac import NonlinearBlockJac
 from openmdao.solvers.nonlinear.newton import NewtonSolver
-from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce, NonLinearRunOnce
+
+from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
 
 from openmdao.utils.assert_utils import assert_rel_error
 
@@ -43,8 +44,7 @@ linear_solvers = [
 nonlinear_solvers = [
     NonlinearBlockGS,
     NonlinearBlockJac,
-    NewtonSolver,
-    NonlinearRunOnce, NonLinearRunOnce
+    NewtonSolver
 ]
 
 backtracking_solvers = [
@@ -52,13 +52,20 @@ backtracking_solvers = [
     BoundsEnforceLS
 ]
 
-class TestSolverErrOutput(unittest.TestCase):
-    def test_circuit_plain_newton_many_iter(self):
 
-        from openmdao.api import Problem, IndepVarComp
+class TestLinearSolvers(unittest.TestCase):
+    @parameterized.expand([
+        [solver.__name__, solver] for solver in linear_solvers
+    ])
+    def test_solver(self, name, solver):
+        self.assertEqual(name, solver.__name__)
 
-        from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
 
+class TestNonlinearSolvers(unittest.TestCase):
+    @parameterized.expand([
+        [solver.__name__, solver] for solver in nonlinear_solvers
+    ])
+    def test_solver(self, name, solver):
         p = Problem()
         model = p.model
 
@@ -72,9 +79,10 @@ class TestSolverErrOutput(unittest.TestCase):
         p.setup()
 
         # you can change the NewtonSolver settings in circuit after setup is called
-        newton = p.model.circuit.nonlinear_solver
-        newton.options['maxiter'] = 2
-        newton.options['err_output_file'] = 'newton.dat'
+        nl = p.model.circuit.nonlinear_solver = solver()
+
+        filename = name + '.dat'
+        nl.options['err_output_file'] = filename
 
         # set some poor initial guesses so that we don't converge
         p['circuit.n1.V'] = 10.
@@ -83,7 +91,7 @@ class TestSolverErrOutput(unittest.TestCase):
         p.run_model()
 
         expected_data = [
-            '# inputs and outputs at start of NL: Newton iteration',
+            '# inputs and outputs at start of %s iteration' % solver.SOLVER,
             '',
             '# nonlinear input vector',
             'circuit.D1.V_in = array([ 1.])',
@@ -108,26 +116,10 @@ class TestSolverErrOutput(unittest.TestCase):
 
         # make sure error file is generated as expected
         i = 0
-        with open('newton.dat', 'r') as  f:
+        with open(filename, 'r') as  f:
             for line in f:
                 self.assertEqual(line.strip(), expected_data[i])
                 i += 1
-
-
-class TestLinearSolvers(unittest.TestCase):
-    @parameterized.expand([
-        [solver.__name__, solver] for solver in linear_solvers
-    ])
-    def test_solver(self, name, solver):
-        self.assertEqual(name, solver.__name__)
-
-
-class TestNonlinearSolvers(unittest.TestCase):
-    @parameterized.expand([
-        [solver.__name__, solver] for solver in nonlinear_solvers
-    ])
-    def test_solver(self, name, solver):
-        self.assertEqual(name, solver.__name__)
 
 
 class TestBacktrackingSolvers(unittest.TestCase):
