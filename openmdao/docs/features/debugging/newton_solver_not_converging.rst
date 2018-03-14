@@ -77,6 +77,15 @@ Things to try to help convergence
     - The default value is 10, which is not enough for some models.
     - You might need to use a :ref:`linesearch<feature_line_search>` algorithm to help things behave better.
 
+Use the BoundsEnforceLS line search to enforce upper and lower bounds
+---------------------------------------------------------------------
+
+Sometimes the Newton solver will take bad steps along the way to convergence. 
+For example, you might have a pressure value in your model that needs to stay positive always. 
+In that case you can :ref:`set upper and lower bounds<declaring-variables>` on that specific output value and then add 
+the :ref:`BoundsEnforceLS line search<feature_bounds_enforce>` to the newton solver so it will respect those bounds. 
+
+
 Check if you're running into a variable bound
 ---------------------------------------------
 If you've set the `lower` or `upper` bounds on any output values
@@ -88,3 +97,8 @@ It's also possible that you have set the bound to be too restrictive.
 If you see many iterations where the residual norm isn't changing at all, that is an
 indication that the Newton step is repeatedly bumping into the same bound over and over again.
 You can set :ref:`options['print_bound_enforce']=True<feature_bounds_enforce>` to have the linesearch report which variables are hitting their bounds.
+
+If you see that you are butting up against a variable bound, then you have to consider if that bound is really necessary.
+Sometimes a newton solver needs to pass through that invalid space on the way to finding the answer, and if can't then it won't be able to converge. 
+If you have something like pressure, that really can't be negative ever perhaps because you are taking a log of it, then you have no choice but to make a lower bound of 0. 
+However, if you just set the bounds to be something that is physically realistic, its possible that the bounds are overly constrictive and you need to loosen them up in order to get convergence.

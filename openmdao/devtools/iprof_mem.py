@@ -42,7 +42,7 @@ def _trace_mem_ret(frame, arg, stack, context):
 def _setup(options):
     global _registered, _trace_memory, mem_usage
     if not _registered:
-        from openmdao.devtools.debug import mem_usage
+        from openmdao.devtools.memory import mem_usage
 
         mem_changes = defaultdict(lambda: [0., 0, set()])
         memstack = []

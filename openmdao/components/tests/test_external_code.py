@@ -9,6 +9,8 @@ import unittest
 from openmdao.api import Problem, Group, ExternalCode, AnalysisError
 from openmdao.components.external_code import STDOUT
 
+from openmdao.utils.assert_utils import assert_rel_error
+
 DIRECTORY = os.path.dirname((os.path.abspath(__file__)))
 
 
@@ -27,10 +29,9 @@ class TestExternalCode(unittest.TestCase):
                     os.path.join(self.tempdir, 'extcode_example.py'))
 
         self.extcode = ExternalCodeForTesting()
-        self.top = Problem()
-        self.top.model = Group()
+        self.prob = Problem()
 
-        self.top.model.add_subsystem('extcode', self.extcode)
+        self.prob.model.add_subsystem('extcode', self.extcode)
 
     def tearDown(self):
         os.chdir(self.startdir)
@@ -48,8 +49,8 @@ class TestExternalCode(unittest.TestCase):
         self.extcode.options['external_output_files'] = ['extcode.out',]
 
         dev_null = open(os.devnull, 'w')
-        self.top.setup(check=True)
-        self.top.run_model()
+        self.prob.setup(check=True)
+        self.prob.run_model()
 
     def test_timeout_raise(self):
         self.extcode.options['command'] = [
@@ -60,9 +61,9 @@ class TestExternalCode(unittest.TestCase):
         self.extcode.options['external_input_files'] = ['extcode_example.py', ]
 
         dev_null = open(os.devnull, 'w')
-        self.top.setup(check=True)
+        self.prob.setup(check=True)
         try:
-            self.top.run_model()
+            self.prob.run_model()
         except AnalysisError as exc:
             self.assertEqual(str(exc), 'Timed out after 1.0 sec.')
         else:
@@ -77,9 +78,9 @@ class TestExternalCode(unittest.TestCase):
         self.extcode.options['external_input_files'] = ['extcode_example.py', ]
 
         dev_null = open(os.devnull, 'w')
-        self.top.setup(check=True)
+        self.prob.setup(check=True)
         try:
-            self.top.run_model()
+            self.prob.run_model()
         except RuntimeError as exc:
             self.assertTrue('Traceback' in str(exc),
                             "no traceback found in '%s'" % str(exc))
@@ -97,9 +98,9 @@ class TestExternalCode(unittest.TestCase):
         self.extcode.options['external_input_files'] = ['extcode_example.py', ]
 
         dev_null = open(os.devnull, 'w')
-        self.top.setup(check=True)
+        self.prob.setup(check=True)
         try:
-            self.top.run_model()
+            self.prob.run_model()
         except AnalysisError as err:
             self.assertTrue("delay must be >= 0" in str(err),
                             "expected 'delay must be >= 0' to be in '%s'" % str(err))
@@ -112,9 +113,9 @@ class TestExternalCode(unittest.TestCase):
         # Set command to nonexistant path.
         self.extcode.options['command'] = ['no-such-command', ]
 
-        self.top.setup(check=False)
+        self.prob.setup(check=False)
         try:
-            self.top.run_model()
+            self.prob.run_model()
         except ValueError as exc:
             msg = "The command to be executed, 'no-such-command', cannot be found"
             self.assertEqual(str(exc), msg)
@@ -126,9 +127,9 @@ class TestExternalCode(unittest.TestCase):
         self.extcode.stdout = 'nullcmd.out'
         self.extcode.stderr = STDOUT
 
-        self.top.setup(check=False)
+        self.prob.setup(check=False)
         try:
-            self.top.run_model()
+            self.prob.run_model()
         except ValueError as exc:
             self.assertEqual(str(exc), 'Empty command list')
         else:
@@ -144,8 +145,8 @@ class TestExternalCode(unittest.TestCase):
         ]
 
         dev_null = open(os.devnull, 'w')
-        self.top.setup(check=True)
-        self.top.run_model()
+        self.prob.setup(check=True)
+        self.prob.run_model()
 
         # Check to see if output file contains the env var value
         with open(os.path.join(self.tempdir, 'extcode.out'), 'r') as out:
@@ -179,7 +180,7 @@ class ParaboloidExternalCode(ExternalCode):
 
         # generate the input file for the paraboloid external code
         with open(self.input_file, 'w') as input_file:
-            input_file.write('%f\n%f\n' % (x,y))
+            input_file.write('%.16f\n%.16f\n' % (x,y))
 
         # the parent compute function actually runs the external code
         super(ParaboloidExternalCode, self).compute(inputs, outputs)
@@ -189,6 +190,99 @@ class ParaboloidExternalCode(ExternalCode):
             f_xy = float(output_file.read())
 
         outputs['f_xy'] = f_xy
+
+
+class ParaboloidExternalCodeFD(ExternalCode):
+    def setup(self):
+        self.add_input('x', val=0.0)
+        self.add_input('y', val=0.0)
+
+        self.add_output('f_xy', val=0.0)
+
+        self.input_file = 'paraboloid_input.dat'
+        self.output_file = 'paraboloid_output.dat'
+
+        # providing these is optional; the component will verify that any input
+        # files exist before execution and that the output files exist after.
+        self.options['external_input_files'] = [self.input_file,]
+        self.options['external_output_files'] = [self.output_file,]
+
+        self.options['command'] = [
+            'python', 'extcode_paraboloid.py', self.input_file, self.output_file
+        ]
+
+        # this external code does not provide derivatives, use finite difference
+        self.declare_partials(of='*', wrt='*', method='fd')
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        y = inputs['y']
+
+        # generate the input file for the paraboloid external code
+        with open(self.input_file, 'w') as input_file:
+            input_file.write('%.16f\n%.16f\n' % (x,y))
+
+        # the parent compute function actually runs the external code
+        super(ParaboloidExternalCodeFD, self).compute(inputs, outputs)
+
+        # parse the output file from the external code and set the value of f_xy
+        with open(self.output_file, 'r') as output_file:
+            f_xy = float(output_file.read())
+
+        outputs['f_xy'] = f_xy
+
+
+class ParaboloidExternalCodeDerivs(ExternalCode):
+    def setup(self):
+        self.add_input('x', val=0.0)
+        self.add_input('y', val=0.0)
+
+        self.add_output('f_xy', val=0.0)
+
+        self.input_file = 'paraboloid_input.dat'
+        self.output_file = 'paraboloid_output.dat'
+        self.derivs_file = 'paraboloid_derivs.dat'
+
+        # providing these is optional; the component will verify that any input
+        # files exist before execution and that the output files exist after.
+        self.options['external_input_files'] = [self.input_file,]
+        self.options['external_output_files'] = [self.output_file, self.derivs_file]
+
+        self.options['command'] = [
+            'python', 'extcode_paraboloid_derivs.py',
+            self.input_file, self.output_file, self.derivs_file
+        ]
+
+        # this external code does provide derivatives
+        self.declare_partials(of='*', wrt='*')
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        y = inputs['y']
+
+        # generate the input file for the paraboloid external code
+        with open(self.input_file, 'w') as input_file:
+            input_file.write('%.16f\n%.16f\n' % (x,y))
+
+        # the parent compute function actually runs the external code
+        super(ParaboloidExternalCodeDerivs, self).compute(inputs, outputs)
+
+        # parse the output file from the external code and set the value of f_xy
+        with open(self.output_file, 'r') as output_file:
+            f_xy = float(output_file.read())
+
+        outputs['f_xy'] = f_xy
+
+    def compute_partials(self, inputs, partials):
+        outputs = {}
+
+        # the parent compute function actually runs the external code
+        super(ParaboloidExternalCodeDerivs, self).compute(inputs, outputs)
+
+        # parse the derivs file from the external code and set partials
+        with open(self.derivs_file, 'r') as derivs_file:
+            partials['f_xy', 'x'] = float(derivs_file.readline())
+            partials['f_xy', 'y'] = float(derivs_file.readline())
 
 
 class TestExternalCodeFeature(unittest.TestCase):
@@ -208,7 +302,7 @@ class TestExternalCodeFeature(unittest.TestCase):
         os.chdir(self.tempdir)
 
         # copy required files to temp dir
-        files = ['extcode_paraboloid.py']
+        files = ['extcode_paraboloid.py', 'extcode_paraboloid_derivs.py']
         for filename in files:
             shutil.copy(os.path.join(DIRECTORY, filename),
                         os.path.join(self.tempdir, filename))
@@ -225,8 +319,8 @@ class TestExternalCodeFeature(unittest.TestCase):
         from openmdao.api import Problem, Group, IndepVarComp
         from openmdao.components.tests.test_external_code import ParaboloidExternalCode
 
-        top = Problem()
-        top.model = model = Group()
+        prob = Problem()
+        model = prob.model
 
         # create and connect inputs
         model.add_subsystem('p1', IndepVarComp('x', 3.0))
@@ -237,11 +331,81 @@ class TestExternalCodeFeature(unittest.TestCase):
         model.connect('p2.y', 'p.y')
 
         # run the ExternalCode Component
-        top.setup()
-        top.run_model()
+        prob.setup()
+        prob.run_model()
 
         # print the output
-        self.assertEqual(top['p.f_xy'], -15.0)
+        self.assertEqual(prob['p.f_xy'], -15.0)
+
+    def test_optimize_fd(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.api import ScipyOptimizeDriver
+        from openmdao.components.tests.test_external_code import ParaboloidExternalCodeFD
+
+        prob = Problem()
+        model = prob.model
+
+        # create and connect inputs
+        model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        model.add_subsystem('p2', IndepVarComp('y', -4.0))
+        model.add_subsystem('p', ParaboloidExternalCodeFD())
+
+        model.connect('p1.x', 'p.x')
+        model.connect('p2.y', 'p.y')
+
+        # find optimal solution with SciPy optimize
+        # solution (minimum): x = 6.6667; y = -7.3333
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+        prob.model.add_design_var('p1.x', lower=-50, upper=50)
+        prob.model.add_design_var('p2.y', lower=-50, upper=50)
+
+        prob.model.add_objective('p.f_xy')
+
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = True
+
+        prob.setup()
+        prob.run_driver()
+
+        assert_rel_error(self, prob['p1.x'], 6.66666667, 1e-6)
+        assert_rel_error(self, prob['p2.y'], -7.3333333, 1e-6)
+
+    def test_optimize_derivs(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.api import ScipyOptimizeDriver
+        from openmdao.components.tests.test_external_code import ParaboloidExternalCodeDerivs
+
+        prob = Problem()
+        model = prob.model
+
+        # create and connect inputs
+        model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        model.add_subsystem('p2', IndepVarComp('y', -4.0))
+        model.add_subsystem('p', ParaboloidExternalCodeDerivs())
+
+        model.connect('p1.x', 'p.x')
+        model.connect('p2.y', 'p.y')
+
+        # find optimal solution with SciPy optimize
+        # solution (minimum): x = 6.6667; y = -7.3333
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+        prob.model.add_design_var('p1.x', lower=-50, upper=50)
+        prob.model.add_design_var('p2.y', lower=-50, upper=50)
+
+        prob.model.add_objective('p.f_xy')
+
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = True
+
+        prob.setup()
+        prob.run_driver()
+
+        assert_rel_error(self, prob['p1.x'], 6.66666667, 1e-6)
+        assert_rel_error(self, prob['p2.y'], -7.3333333, 1e-6)
 
 
 if __name__ == "__main__":
