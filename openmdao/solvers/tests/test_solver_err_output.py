@@ -36,9 +36,8 @@ linear_solvers = [
     LinearBlockJac,
     DirectSolver,
     PETScKrylov, PetscKSP,
-    LinearRunOnce,
     ScipyKrylov, ScipyIterativeSolver,
-    LinearUserDefined
+    # LinearUserDefined
 ]
 
 nonlinear_solvers = [
@@ -58,7 +57,60 @@ class TestLinearSolvers(unittest.TestCase):
         [solver.__name__, solver] for solver in linear_solvers
     ])
     def test_solver(self, name, solver):
-        self.assertEqual(name, solver.__name__)
+        p = Problem()
+        model = p.model
+
+        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
+        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('circuit', Circuit())
+
+        model.connect('source.I', 'circuit.I_in')
+        model.connect('ground.V', 'circuit.Vg')
+
+        p.setup()
+
+        ln = p.model.circuit.linear_solver = solver()
+
+        filename = name + '.dat'
+        ln.options['err_output_file'] = filename
+        ln.options['iprint'] = -1
+
+        # set some poor initial guesses so that we don't converge
+        p['circuit.n1.V'] = 10.
+        p['circuit.n2.V'] = 1e-3
+
+        p.run_model()
+
+        expected_data = [
+            '# inputs and outputs at start of %s iteration' % solver.SOLVER,
+            '',
+            '# linear input vector',
+            'circuit.D1.V_in = array([-0.00100391])',
+            'circuit.D1.V_out = array([ 0.])',
+            'circuit.R1.V_in = array([ 0.00121472])',
+            'circuit.R1.V_out = array([ 0.])',
+            'circuit.R2.V_in = array([ 0.00121472])',
+            'circuit.R2.V_out = array([-0.00100391])',
+            'circuit.n1.I_in:0 = array([ 0.])',
+            'circuit.n1.I_out:0 = array([  1.21472102e-05])',
+            'circuit.n1.I_out:1 = array([  2.21863287e-07])',
+            'circuit.n2.I_in:0 = array([  2.21863287e-07])',
+            'circuit.n2.I_out:0 = array([ -7.24256987e-18])',
+            '',
+            '# linear output vector',
+            'circuit.D1.I = array([ -7.24256987e-18])',
+            'circuit.R1.I = array([  1.21472102e-05])',
+            'circuit.R2.I = array([  2.21863287e-07])',
+            'circuit.n1.V = array([ 0.00121472])',
+            'circuit.n2.V = array([-0.00100391])'
+        ]
+
+        # make sure error file is generated as expected
+        i = 0
+        with open(filename, 'r') as  f:
+            for line in f:
+                self.assertEqual(line.strip(), expected_data[i])
+                i += 1
 
 
 class TestNonlinearSolvers(unittest.TestCase):
@@ -78,11 +130,11 @@ class TestNonlinearSolvers(unittest.TestCase):
 
         p.setup()
 
-        # you can change the NewtonSolver settings in circuit after setup is called
         nl = p.model.circuit.nonlinear_solver = solver()
 
         filename = name + '.dat'
         nl.options['err_output_file'] = filename
+        nl.options['iprint'] = -1
 
         # set some poor initial guesses so that we don't converge
         p['circuit.n1.V'] = 10.
