@@ -57,13 +57,14 @@ Looking at the total Jacobian above, it's clear that we can solve for all of the
 at the same time because none of them affect the same entries of :math:`y`.  We can similarly
 solve all of the red columns at the same time.  
 Remember that we've we've stipulated that :math:`x` does not directly impact the objective, 
-so it won't show up in any dense row in the total derivative Jacobian.   
+so create a dense row in the total derivative Jacobian.   
 We can now see that :math:`x` is a separable variable, which can be broken up into two colors. 
 So instead of doing ten linear solves to get our total Jacobian, we can do only two.
 
 .. note:: 
     The use of the term *color* here is not accidental. 
     Determining the separability of an arbitrary problem can be done using a graph-coloring algorithm on the total derivative Jacobian.
+    OpenMDAO provides an :ref:`tool that does this coloring for you<feature_automatic_coloring>`. 
 
 Practically, what this amounts to is combining multiple right hand sides from the :ref:`unified derivative equations<theory_total_derivatives>` into a single vector. 
 Normally, this would result in solving for linear combinations of multiple derivatives: 

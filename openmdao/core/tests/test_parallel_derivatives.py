@@ -607,6 +607,30 @@ class PartialDependGroup(Group):
 class ParDerivColorFeatureTestCase(unittest.TestCase):
     N_PROCS = 2
 
+    def test_feature_rev(self):
+        import time
+
+        import numpy as np
+
+        from openmdao.api import Problem, PETScVector
+        from openmdao.core.tests.test_parallel_derivatives import PartialDependGroup
+
+        size = 4
+
+        of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
+        wrt = ['Indep1.x']
+
+        # run first in fwd mode
+        p = Problem(model=PartialDependGroup())
+        p.setup(vector_class=PETScVector, mode='rev')
+        p.run_model()
+
+        assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
+        assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
+
+        # make sure that rev mode is faster than fwd mode
+        self.assertGreater(elapsed_fwd / elapsed_rev, 1.0)
+
     def test_fwd_vs_rev(self):
         import time
 
@@ -622,7 +646,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
 
         # run first in fwd mode
         p = Problem(model=PartialDependGroup())
-        p.setup(vector_class=PETScVector, check=False, mode='fwd')
+        p.setup(vector_class=PETScVector, mode='fwd')
         p.run_model()
 
         elapsed_fwd = time.time()
@@ -634,7 +658,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
 
         # now run in rev mode and compare times for deriv calculation
         p = Problem(model=PartialDependGroup())
-        p.setup(vector_class=PETScVector, check=False, mode='rev')
+        p.setup(vector_class=PETScVector, mode='rev')
         p.run_model()
 
         elapsed_rev = time.time()

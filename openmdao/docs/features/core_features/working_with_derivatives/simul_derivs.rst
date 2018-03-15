@@ -1,7 +1,7 @@
 .. _feature_simul_coloring:
 
 ************************************************
-Simultaneous Derivatives For Separable Problems
+Simultaneous Coloring For Separable Problems
 ************************************************
 
 When OpenMDAO solves for total derivatives, it loops over either design variables in 'fwd' mode
@@ -68,6 +68,8 @@ You can see a more complete example of setting up an optimization with
 simultaneous derivatives in the :ref:`Simple Optimization using Simultaneous Derivatives <simul_deriv_example>`
 example.
 
+
+.. _feature_automatic_coloring: 
 
 Automatic Generation of Coloring
 ################################
