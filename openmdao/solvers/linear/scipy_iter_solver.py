@@ -141,8 +141,6 @@ class ScipyKrylov(LinearSolver):
         scope_out, scope_in = system._get_scope()
         system._apply_linear([vec_name], self._rel_systems, self._mode, scope_out, scope_in)
 
-        # print('in', in_vec)
-        # print('out', b_vec.get_data())
         return b_vec.get_data()
 
     def _monitor(self, res):
@@ -237,6 +235,9 @@ class ScipyKrylov(LinearSolver):
 
             fail |= (info != 0)
             x_vec.set_data(x)
+
+        if fail and self.options['err_output_file']:
+            self._save_error_cache()
 
         # TODO: implement this properly
 

@@ -376,13 +376,7 @@ class Solver(object):
                     print(prefix + msg)
 
                 if self.options['err_output_file']:
-                    with open(self.options['err_output_file'], 'w') as f:
-                        print('# inputs and outputs at start of %s iteration' % str(self), file=f)
-                        for vec_type, vec in iteritems(self._err_cache):
-                            print('', file=f)
-                            print('# %s %s vector' % (vec._name, vec._typ), file=f)
-                            for abs_name in sorted(vec._views.keys()):
-                                print('%s =' % abs_name, repr(vec._views[abs_name]), file=f)
+                    self._save_error_cache()
 
                 # Raise AnalysisError if requested.
                 if self.options['err_on_maxiter']:
@@ -545,6 +539,16 @@ class Solver(object):
             data['r'] = None
 
         self._rec_mgr.record_iteration(self, data, metadata)
+
+    def _save_error_cache(self):
+        with open(self.options['err_output_file'], 'w') as f:
+            print('# inputs and outputs at start of %s iteration' %
+                  self.SOLVER, file=f)
+            for vec_type, vec in iteritems(self._err_cache):
+                print('', file=f)
+                print('# %s %s vector' % (vec._name, vec._typ), file=f)
+                for abs_name in sorted(vec._views.keys()):
+                    print('%s =' % abs_name, repr(vec._views[abs_name]), file=f)
 
 
 class NonlinearSolver(Solver):
