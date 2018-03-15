@@ -32,7 +32,7 @@ subject to multiple load cases, each one being a distributed force load that var
 
 Constraining the bending stress on each element leads to a more computationally expensive derivative calculation, so we
 will use the KSFunction to reduce the stress vector for each load case to a single scalar value. To do so, we also need
-to insert an `ExecComp` component that converts the stress into a form where negative value means it is satisfied, and
+to insert an `ExecComp` component that converts the stress into a form where a negative value means it is satisfied, and
 a positive value means it is violated.
 
 The problem presented here is also an example of a multi-point implementation, where we create a separate instance of the

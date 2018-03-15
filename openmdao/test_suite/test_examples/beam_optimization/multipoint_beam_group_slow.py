@@ -1,7 +1,8 @@
 """
 This is a multipoint implementation of the beam optimization problem.
 
-
+This version highlights a performance problem. Once that problem is fixed, the multipoint_beam_group model
+should be replaced with this one.
 """
 from __future__ import division
 from six.moves import range
