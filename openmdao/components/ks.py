@@ -24,7 +24,7 @@ class KSfunction(object):
         g : ndarray
             Array of constraint values, where negative means satisfied and positive means violated.
         rho : float
-            Hyperparameter for the KS function.
+            Constraint Aggregation Factor.
 
         Returns
         -------
@@ -67,7 +67,7 @@ class KSComponent(ExplicitComponent):
     Kreisselmeier-Steinhauser Function.
     """
 
-    def __init__(self, width):
+    def __init__(self, width=1):
         """
         Initialize the KS component.
 
@@ -77,6 +77,8 @@ class KSComponent(ExplicitComponent):
             'Width of constraint vector.
         """
         super(KSComponent, self).__init__(width=width)
+
+        self.options.declare('rho', 50.0, desc="Constraint Aggregation Factor.")
 
     def initialize(self):
         """
@@ -95,8 +97,6 @@ class KSComponent(ExplicitComponent):
 
         # Outputs
         self.add_output('KS', 0.0, desc="Value of the aggregate KS function")
-
-        self.options.declare('rho', 50.0, desc="Hyperparameter for the KS function")
 
         self.declare_partials(of='KS', wrt='g')
         self._ks = KSfunction()
