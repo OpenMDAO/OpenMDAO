@@ -625,11 +625,10 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         p.setup(vector_class=PETScVector, mode='rev')
         p.run_model()
 
+        J = p.compute_totals(of, wrt, return_format='dict')
+
         assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
         assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
-
-        # make sure that rev mode is faster than fwd mode
-        self.assertGreater(elapsed_fwd / elapsed_rev, 1.0)
 
     def test_fwd_vs_rev(self):
         import time
