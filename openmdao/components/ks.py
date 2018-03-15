@@ -88,7 +88,7 @@ class KSComponent(ExplicitComponent):
 
     def setup(self):
         """
-        Setup the KS component.
+        Declare inputs, outputs, and derivatives for the KS component.
         """
         width = self.metadata['width']
 
