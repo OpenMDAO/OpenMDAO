@@ -86,9 +86,11 @@ class SqliteRecorder(BaseRecorder):
         Dictionary mapping promoted names to absolute names.
     _open_close_sqlite: bool
         If True, open, write, and close the sqlite file. Needed for when running under MPI.
+    _pickle_version: int
+        The pickle protocol level to use when pickling metadata.
     """
 
-    def __init__(self, filepath, append=False):
+    def __init__(self, filepath, append=False, pickle_level=2):
         """
         Initialize the SqliteRecorder.
 
@@ -109,6 +111,7 @@ class SqliteRecorder(BaseRecorder):
         self.model_viewer_data = None
         self._abs2prom = {'input': {}, 'output': {}}
         self._prom2abs = {'input': {}, 'output': {}}
+        self._pickle_version = pickle_level
 
         if append:
             raise NotImplementedError("Append feature not implemented for SqliteRecorder")
@@ -324,7 +327,7 @@ class SqliteRecorder(BaseRecorder):
         """
         driver_class = type(recording_requester).__name__
         model_viewer_data = pickle.dumps(recording_requester._model_viewer_data,
-                                         pickle.HIGHEST_PROTOCOL)
+                                         self._pickle_version)
         with self.con:
             self.con.execute("INSERT INTO driver_metadata(id, model_viewer_data) VALUES(?,?)",
                              (driver_class, sqlite3.Binary(model_viewer_data)))
@@ -350,7 +353,7 @@ class SqliteRecorder(BaseRecorder):
             for vecname, vec in iteritems(odict):
                 scaling[vecname] = vec._scaling
         scaling_factors = pickle.dumps(scaling_vecs,
-                                       pickle.HIGHEST_PROTOCOL)
+                                       self._pickle_version)
         path = recording_requester.pathname
         if not path:
             path = 'root'
@@ -374,8 +377,7 @@ class SqliteRecorder(BaseRecorder):
             path = 'root'
         id = "{}.{}".format(path, solver_class)
 
-        solver_options = pickle.dumps(recording_requester.options,
-                                      pickle.HIGHEST_PROTOCOL)
+        solver_options = pickle.dumps(recording_requester.options, self._pickle_version)
 
         with self.con:
             self.con.execute(
