@@ -87,10 +87,10 @@ class SqliteRecorder(BaseRecorder):
     _open_close_sqlite: bool
         If True, open, write, and close the sqlite file. Needed for when running under MPI.
     _pickle_version: int
-        The pickle protocol level to use when pickling metadata.
+        The pickle protocol version to use when pickling metadata.
     """
 
-    def __init__(self, filepath, append=False, pickle_level=2):
+    def __init__(self, filepath, append=False, pickle_version=2):
         """
         Initialize the SqliteRecorder.
 
@@ -111,7 +111,7 @@ class SqliteRecorder(BaseRecorder):
         self.model_viewer_data = None
         self._abs2prom = {'input': {}, 'output': {}}
         self._prom2abs = {'input': {}, 'output': {}}
-        self._pickle_version = pickle_level
+        self._pickle_version = pickle_version
 
         if append:
             raise NotImplementedError("Append feature not implemented for SqliteRecorder")
