@@ -573,7 +573,7 @@ class NonlinearSolver(Solver):
         """
         self.options.declare('err_output_file', types=str, default='',
                              desc='When specified, file name to which iteration data is written '
-                                  'for debugging purposes.')
+                                  'after a failure to converge (for debugging purposes).')
 
     def solve(self):
         """
@@ -606,7 +606,7 @@ class NonlinearSolver(Solver):
                         for abs_name in sorted(vec._views.keys()):
                             print('%s =' % abs_name, repr(vec._views[abs_name]), file=f)
 
-                    # notify user of file name
+                    # notify user
                     print(desc + " have been saved to '%s'." % filename)
 
         return fail, abs_err, rel_err

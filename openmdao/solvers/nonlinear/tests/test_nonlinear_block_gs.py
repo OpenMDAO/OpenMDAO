@@ -2,8 +2,6 @@
 
 import unittest
 
-import os
-
 import numpy as np
 
 from openmdao.api import Problem, NonlinearBlockGS, Group, ScipyKrylov, IndepVarComp, \
