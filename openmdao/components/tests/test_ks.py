@@ -1,4 +1,4 @@
-""" Test the ExternalCode. """
+""" Test the KSFunction component. """
 from __future__ import print_function
 
 import unittest

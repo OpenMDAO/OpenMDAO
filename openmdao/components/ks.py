@@ -7,6 +7,18 @@ import numpy as np
 from openmdao.core.explicitcomponent import ExplicitComponent
 
 
+CITATIONS = """
+@conference {Martins:2005:SOU,
+        title = {On Structural Optimization Using Constraint Aggregation},
+        booktitle = {Proceedings of the 6th World Congress on Structural and Multidisciplinary Optimization},
+        year = {2005},
+        month = {May},
+        address = {Rio de Janeiro, Brazil},
+        author = {Joaquim R. R. A. Martins and Nicholas M. K. Poon}
+}
+"""
+
+
 class KSfunction(object):
     """
     Helper class for KS.
@@ -65,6 +77,15 @@ class KSComponent(ExplicitComponent):
 
     Component that aggregates a number of functions to a single value via the
     Kreisselmeier-Steinhauser Function.
+
+    Options
+    -------
+    lower_flag : bool(False)
+        Set to True to turn upper bound into a lower bound for satisfaction.
+    rho : float(50.0)
+        Constraint Aggregation Factor.
+    upper : float(0.0)
+        Upper found for constraint, default is zero.
     """
 
     def __init__(self, width=1):
@@ -78,7 +99,12 @@ class KSComponent(ExplicitComponent):
         """
         super(KSComponent, self).__init__(width=width)
 
+
+        self.options.declare('lower_flag', False, desc="Set to True to turn upper bound into a lower bound for satisfaction.")
         self.options.declare('rho', 50.0, desc="Constraint Aggregation Factor.")
+        self.options.declare('upper', 0.0, desc="Upper found for constraint, default is zero.")
+
+        self.cite = CITATIONS
 
     def initialize(self):
         """
@@ -109,7 +135,6 @@ class KSComponent(ExplicitComponent):
         ----------
         inputs : `Vector`
             `Vector` containing inputs.
-
         outputs : `Vector`
             `Vector` containing outputs.
         """
