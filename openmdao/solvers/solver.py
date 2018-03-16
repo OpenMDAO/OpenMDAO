@@ -2,7 +2,7 @@
 
 from __future__ import division, print_function
 
-from six import iteritems, PY3
+from six import iteritems
 
 import os
 
@@ -200,7 +200,6 @@ class Solver(object):
         self.options.update(kwargs)
 
         self.metadata = {}
-
         self._rec_mgr = RecordingManager()
 
         self.cite = ""
@@ -595,13 +594,19 @@ class NonlinearSolver(Solver):
             filename = self.options['err_output_file']
             if filename:
                 with open(filename, 'w') as f:
-                    desc = '# inputs and outputs at start of %s iteration' % self.SOLVER
-                    print(desc, file=f)
+                    # use same id as would be found in recording metadata
+                    id = "%s.%s" % (self._system.pathname, type(self).__name__)
+                    desc = "Inputs and outputs at start of '%s' iteration" % id
+
+                    # dump cached data to file
+                    print("# %s" % desc, file=f)
                     for vec_type, vec in iteritems(self._err_cache):
                         print('', file=f)
                         print('# %s %s vector' % (vec._name, vec._typ), file=f)
                         for abs_name in sorted(vec._views.keys()):
                             print('%s =' % abs_name, repr(vec._views[abs_name]), file=f)
+
+                    # notify user of file name
                     print(desc + " have been saved to '%s'." % filename)
 
         return fail, abs_err, rel_err
@@ -617,8 +622,6 @@ class NonlinearSolver(Solver):
         float
             error at the first iteration.
         """
-        super(NonlinearSolver, self)._iter_initialize()
-
         if self.options['err_output_file']:
             self._err_cache['inputs'] = deepcopy(self._system._inputs)
             self._err_cache['outputs'] = deepcopy(self._system._outputs)
@@ -733,8 +736,6 @@ class LinearSolver(Solver):
         float
             error at the first iteration.
         """
-        super(LinearSolver, self)._iter_initialize()
-
         system = self._system
 
         if self._mode == 'fwd':

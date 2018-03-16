@@ -2,6 +2,8 @@
 
 from __future__ import print_function
 
+from copy import deepcopy
+
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration
 from openmdao.utils.general_utils import warn_deprecation
@@ -185,7 +187,9 @@ class NewtonSolver(NonlinearSolver):
         float
             error at the first iteration.
         """
-        super(NewtonSolver, self)._iter_initialize()
+        if self.options['err_output_file']:
+            self._err_cache['inputs'] = deepcopy(self._system._inputs)
+            self._err_cache['outputs'] = deepcopy(self._system._outputs)
 
         system = self._system
 

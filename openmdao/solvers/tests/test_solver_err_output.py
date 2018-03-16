@@ -2,8 +2,11 @@
 
 from __future__ import division, print_function
 
+from six.moves import cStringIO as StringIO
+
+import sys
+
 import unittest
-import re
 
 from openmdao.core.problem import Problem
 from openmdao.core.indepvarcomp import IndepVarComp
@@ -24,6 +27,20 @@ nonlinear_solvers = [
     NonlinearBlockJac,
     NewtonSolver
 ]
+
+
+def run_model(prob):
+    """Call `run_model` on problem and capture output."""
+    stdout = sys.stdout
+    strout = StringIO()
+
+    sys.stdout = strout
+    try:
+        prob.run_model()
+    finally:
+        sys.stdout = stdout
+
+    return strout.getvalue()
 
 
 class TestNonlinearSolvers(unittest.TestCase):
@@ -55,30 +72,37 @@ class TestNonlinearSolvers(unittest.TestCase):
         p['circuit.n1.V'] = 10.
         p['circuit.n2.V'] = 1e-3
 
-        p.run_model()
+        # run the model and check for expected output file
+        output = run_model(p)
+
+        nl_id = "%s.%s" % (nl._system.pathname, type(nl).__name__)
+
+        self.assertEqual(output, "Inputs and outputs at start of '%s' "
+                                 "iteration have been saved to '%s'.\n" %
+                                 (nl_id, filename))
 
         expected_data = [
-            '# inputs and outputs at start of %s iteration' % solver.SOLVER,
-            '',
-            '# nonlinear input vector',
-            'circuit.D1.V_in = array([ 1.])',
-            'circuit.D1.V_out = array([ 0.])',
-            'circuit.R1.V_in = array([ 1.])',
-            'circuit.R1.V_out = array([ 0.])',
-            'circuit.R2.V_in = array([ 1.])',
-            'circuit.R2.V_out = array([ 1.])',
-            'circuit.n1.I_in:0 = array([ 0.1])',
-            'circuit.n1.I_out:0 = array([ 1.])',
-            'circuit.n1.I_out:1 = array([ 1.])',
-            'circuit.n2.I_in:0 = array([ 1.])',
-            'circuit.n2.I_out:0 = array([ 1.])',
-            '',
-            '# nonlinear output vector',
-            'circuit.D1.I = array([ 1.])',
-            'circuit.R1.I = array([ 1.])',
-            'circuit.R2.I = array([ 1.])',
-            'circuit.n1.V = array([ 10.])',
-            'circuit.n2.V = array([ 0.001])'
+            "# Inputs and outputs at start of '%s' iteration" % nl_id,
+            "",
+            "# nonlinear input vector",
+            "circuit.D1.V_in = array([ 1.])",
+            "circuit.D1.V_out = array([ 0.])",
+            "circuit.R1.V_in = array([ 1.])",
+            "circuit.R1.V_out = array([ 0.])",
+            "circuit.R2.V_in = array([ 1.])",
+            "circuit.R2.V_out = array([ 1.])",
+            "circuit.n1.I_in:0 = array([ 0.1])",
+            "circuit.n1.I_out:0 = array([ 1.])",
+            "circuit.n1.I_out:1 = array([ 1.])",
+            "circuit.n2.I_in:0 = array([ 1.])",
+            "circuit.n2.I_out:0 = array([ 1.])",
+            "",
+            "# nonlinear output vector",
+            "circuit.D1.I = array([ 1.])",
+            "circuit.R1.I = array([ 1.])",
+            "circuit.R2.I = array([ 1.])",
+            "circuit.n1.V = array([ 10.])",
+            "circuit.n2.V = array([ 0.001])"
         ]
 
         # make sure error file is generated as expected
