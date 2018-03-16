@@ -564,6 +564,14 @@ class NonlinearSolver(Solver):
     """
 
     def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
+        """
         super(NonlinearSolver, self).__init__(**kwargs)
         self._err_cache = {}
 
@@ -599,12 +607,12 @@ class NonlinearSolver(Solver):
                     desc = "Inputs and outputs at start of '%s' iteration" % id
 
                     # dump cached data to file
-                    print("# %s" % desc, file=f)
+                    f.write("# %s\n" % desc)
                     for vec_type, vec in iteritems(self._err_cache):
-                        print('', file=f)
-                        print('# %s %s vector' % (vec._name, vec._typ), file=f)
+                        f.write('\n')
+                        f.write('# %s %s vector\n' % (vec._name, vec._typ))
                         for abs_name in sorted(vec._views.keys()):
-                            print('%s =' % abs_name, repr(vec._views[abs_name]), file=f)
+                            f.write('%s = %s\n' % (abs_name, repr(vec._views[abs_name])))
 
                     # notify user
                     print(desc + " have been saved to '%s'." % filename)
