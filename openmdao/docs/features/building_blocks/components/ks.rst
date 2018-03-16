@@ -7,9 +7,8 @@ KSComponent
 ***********
 
 KSComponent provides a way to aggregate many constraints into a single constraint. This is usually done for performance
-reasons, in particular, to reduce the calculation time needed for the total derivatives of your model, or to enable the
-use of options such as parallel derivatives. The KSComponent implements the Kreisselmeier-Steinhauser Function to aggregate
-constraint vector input "g" into a single scalar output 'KS'.
+reasons, in particular, to reduce the calculation time needed for the total derivatives of your model. The KSComponent
+implements the Kreisselmeier-Steinhauser Function to aggregate constraint vector input "g" into a single scalar output 'KS'.
 
 The constraint vector "g" must be of the form where g<=0 satisfies the constraints.
 
