@@ -81,10 +81,13 @@ class NewtonSolver(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
+        super(NewtonSolver, self)._declare_options()
+
         self.options.declare('solve_subsystems', types=bool, default=False,
                              desc='Set to True to turn on sub-solvers (Hybrid Newton).')
         self.options.declare('max_sub_solves', types=int, default=10,
                              desc='Maximum number of subsystem solves.')
+
         self.supports['gradients'] = True
 
     def _setup_solvers(self, system, depth):

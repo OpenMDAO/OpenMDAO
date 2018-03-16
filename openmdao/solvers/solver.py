@@ -123,8 +123,6 @@ class Solver(object):
         object that manages all recorders added to this solver
     _solver_info : <SolverInfo>
         Object to store some formatting for iprint that is shared across all solvers.
-    _err_cache : dict
-        Dictionary holding input and output vectors at start of iteration, if requested.
     cite : str
         Listing of relevant citataions that should be referenced when
         publishing work that uses this class.
@@ -173,9 +171,7 @@ class Solver(object):
                              desc='whether to print output')
         self.options.declare('err_on_maxiter', types=bool, default=False,
                              desc="When True, AnalysisError will be raised if we don't converge.")
-        self.options.declare('err_output_file', types=str, default='',
-                             desc='When specified, file name to which iteration data is written '
-                                  'for debugging purposes.')
+
         # Case recording options
         self.recording_options.declare('record_abs_error', types=bool, default=True,
                                        desc='Set to True to record absolute error at the \
@@ -204,8 +200,6 @@ class Solver(object):
         self.options.update(kwargs)
 
         self.metadata = {}
-
-        self._err_cache = {}
 
         self._rec_mgr = RecordingManager()
 
@@ -375,9 +369,6 @@ class Solver(object):
                     msg = ' Failed to Converge in {} iterations'.format(self._iter_count)
                     print(prefix + msg)
 
-                if self.options['err_output_file']:
-                    self._save_error_cache()
-
                 # Raise AnalysisError if requested.
                 if self.options['err_on_maxiter']:
                     msg = "Solver '{}' on system '{}' failed to converge."
@@ -401,15 +392,7 @@ class Solver(object):
         float
             error at the first iteration.
         """
-        if self.options['err_output_file']:
-            if isinstance(self, NonlinearSolver):
-                self._err_cache['inputs'] = deepcopy(self._system._inputs)
-                self._err_cache['outputs'] = deepcopy(self._system._outputs)
-            else:  # it's a LinearSolver
-                self._err_cache['inputs'] = deepcopy(self._system._vectors['input']['linear'])
-                self._err_cache['outputs'] = deepcopy(self._system._vectors['output']['linear'])
-        else:
-            pass
+        pass
 
     def _iter_execute(self):
         """
@@ -540,21 +523,58 @@ class Solver(object):
 
         self._rec_mgr.record_iteration(self, data, metadata)
 
-    def _save_error_cache(self):
-        with open(self.options['err_output_file'], 'w') as f:
-            print('# inputs and outputs at start of %s iteration' %
-                  self.SOLVER, file=f)
-            for vec_type, vec in iteritems(self._err_cache):
-                print('', file=f)
-                print('# %s %s vector' % (vec._name, vec._typ), file=f)
-                for abs_name in sorted(vec._views.keys()):
-                    print('%s =' % abs_name, repr(vec._views[abs_name]), file=f)
-
 
 class NonlinearSolver(Solver):
     """
     Base class for nonlinear solvers.
+
+    Attributes
+    ----------
+    _system : <System>
+        Pointer to the owning system.
+    _depth : int
+        How many subsolvers deep this solver is (0 means not a subsolver).
+    _vec_names : [str, ...]
+        List of right-hand-side (RHS) vector names.
+    _mode : str
+        'fwd' or 'rev', applicable to linear solvers only.
+    _iter_count : int
+        Number of iterations for the current invocation of the solver.
+    _rec_mgr : <RecordingManager>
+        object that manages all recorders added to this solver
+    _solver_info : <SolverInfo>
+        Object to store some formatting for iprint that is shared across all solvers.
+    _err_cache : dict
+        Dictionary holding input and output vectors at start of iteration, if requested.
+    cite : str
+        Listing of relevant citataions that should be referenced when
+        publishing work that uses this class.
+    options : <OptionsDictionary>
+        Options dictionary.
+    recording_options : <OptionsDictionary>
+        Recording options dictionary.
+    metadata : dict
+        Dictionary holding data about this solver.
+    supports : <OptionsDictionary>
+        Options dictionary describing what features are supported by this
+        solver.
+    _filtered_vars_to_record: Dict
+        Dict of list of var names to record
+    _norm0: float
+        Normalization factor
     """
+
+    def __init__(self, **kwargs):
+        super(NonlinearSolver, self).__init__(**kwargs)
+        self._err_cache = {}
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        self.options.declare('err_output_file', types=str, default='',
+                             desc='When specified, file name to which iteration data is written '
+                                  'for debugging purposes.')
 
     def solve(self):
         """
@@ -569,7 +589,22 @@ class NonlinearSolver(Solver):
         float
             relative error.
         """
-        return self._run_iterator()
+        fail, abs_err, rel_err = self._run_iterator()
+
+        if fail:
+            filename = self.options['err_output_file']
+            if filename:
+                with open(filename, 'w') as f:
+                    desc = '# inputs and outputs at start of %s iteration' % self.SOLVER
+                    print(desc, file=f)
+                    for vec_type, vec in iteritems(self._err_cache):
+                        print('', file=f)
+                        print('# %s %s vector' % (vec._name, vec._typ), file=f)
+                        for abs_name in sorted(vec._views.keys()):
+                            print('%s =' % abs_name, repr(vec._views[abs_name]), file=f)
+                    print(desc + " have been saved to '%s'." % filename)
+
+        return fail, abs_err, rel_err
 
     def _iter_initialize(self):
         """
@@ -583,6 +618,10 @@ class NonlinearSolver(Solver):
             error at the first iteration.
         """
         super(NonlinearSolver, self)._iter_initialize()
+
+        if self.options['err_output_file']:
+            self._err_cache['inputs'] = deepcopy(self._system._inputs)
+            self._err_cache['outputs'] = deepcopy(self._system._outputs)
 
         if self.options['maxiter'] > 0:
             self._run_apply()

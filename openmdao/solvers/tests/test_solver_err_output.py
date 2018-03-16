@@ -8,17 +8,6 @@ import re
 from openmdao.core.problem import Problem
 from openmdao.core.indepvarcomp import IndepVarComp
 
-from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
-from openmdao.solvers.linear.linear_block_jac import LinearBlockJac
-from openmdao.solvers.linear.direct import DirectSolver
-from openmdao.solvers.linear.petsc_ksp import PETScKrylov, PetscKSP
-from openmdao.solvers.linear.linear_runonce import LinearRunOnce
-from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov, ScipyIterativeSolver
-from openmdao.solvers.linear.user_defined import LinearUserDefined
-
-from openmdao.solvers.linesearch.backtracking import ArmijoGoldsteinLS
-from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
-
 from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 from openmdao.solvers.nonlinear.nonlinear_block_jac import NonlinearBlockJac
 from openmdao.solvers.nonlinear.newton import NewtonSolver
@@ -30,90 +19,11 @@ from openmdao.utils.assert_utils import assert_rel_error
 from nose_parameterized import parameterized
 
 
-linear_solvers = [
-    LinearBlockGS,
-    LinearBlockJac,
-    # DirectSolver,
-    # PETScKrylov, PetscKSP,
-    ScipyKrylov, ScipyIterativeSolver,
-    # LinearUserDefined
-]
-
 nonlinear_solvers = [
     NonlinearBlockGS,
     NonlinearBlockJac,
     NewtonSolver
 ]
-
-backtracking_solvers = [
-    ArmijoGoldsteinLS,
-    BoundsEnforceLS
-]
-
-
-class TestLinearSolvers(unittest.TestCase):
-    @parameterized.expand([
-        [solver.__name__, solver] for solver in linear_solvers
-    ])
-    def test_solver(self, name, solver):
-        p = Problem()
-        model = p.model
-
-        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
-        model.add_subsystem('circuit', Circuit())
-
-        model.connect('source.I', 'circuit.I_in')
-        model.connect('ground.V', 'circuit.Vg')
-
-        p.setup()
-
-        ln = model.circuit.linear_solver = solver()
-
-        filename = name + '.dat'
-        ln.options['err_output_file'] = filename
-
-        # suppress solver output for test
-        ln.options['iprint'] = model.circuit.nonlinear_solver.options['iprint'] = -1
-
-        # set some poor initial guesses so that we don't converge
-        p['circuit.n1.V'] = 10.
-        p['circuit.n2.V'] = 1e-3
-
-        p.run_model()
-
-        expected_data = [
-            '# inputs and outputs at start of %s iteration' % solver.SOLVER,
-            '',
-            '# linear input vector',
-            'circuit.D1.V_in = array([-0.00100391])',
-            'circuit.D1.V_out = array([ 0.])',
-            'circuit.R1.V_in = array([ 0.00121472])',
-            'circuit.R1.V_out = array([ 0.])',
-            'circuit.R2.V_in = array([ 0.00121472])',
-            'circuit.R2.V_out = array([-0.00100391])',
-            'circuit.n1.I_in:0 = array([ 0.])',
-            'circuit.n1.I_out:0 = array([  1.21472102e-05])',
-            'circuit.n1.I_out:1 = array([  2.2186328Xe-07])',
-            'circuit.n2.I_in:0 = array([  2.2186328Xe-07])',
-            'circuit.n2.I_out:0 = array([ -7.24256987e-18])',
-            '',
-            '# linear output vector',
-            'circuit.D1.I = array([ -7.24256987e-18])',
-            'circuit.R1.I = array([  1.21472102e-05])',
-            'circuit.R2.I = array([  2.2186328Xe-07])',
-            'circuit.n1.V = array([ 0.00121472])',
-            'circuit.n2.V = array([-0.00100391])'
-        ]
-
-        # make sure error file is generated as expected
-        i = 0
-        with open(filename, 'r') as f:
-            for line in f:
-                # expected_data uses X as wildcard so we can escape the rest
-                pattern = re.escape(expected_data[i]).replace('X', '.*')
-                self.assertRegexpMatches(line.strip(), pattern)
-                i += 1
 
 
 class TestNonlinearSolvers(unittest.TestCase):
@@ -177,15 +87,6 @@ class TestNonlinearSolvers(unittest.TestCase):
             for line in f:
                 self.assertEqual(line.strip(), expected_data[i])
                 i += 1
-
-
-class TestBacktrackingSolvers(unittest.TestCase):
-    @parameterized.expand([
-        [solver.__name__, solver] for solver in backtracking_solvers
-    ])
-    def test_solver(self, name, solver):
-        # TODO: backtracking example that doesn't converge
-        self.assertEqual(name, solver.__name__)
 
 
 if __name__ == "__main__":

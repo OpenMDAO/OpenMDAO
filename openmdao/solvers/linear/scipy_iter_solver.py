@@ -236,9 +236,6 @@ class ScipyKrylov(LinearSolver):
             fail |= (info != 0)
             x_vec.set_data(x)
 
-        if fail and self.options['err_output_file']:
-            self._save_error_cache()
-
         # TODO: implement this properly
 
         return fail, 0., 0.

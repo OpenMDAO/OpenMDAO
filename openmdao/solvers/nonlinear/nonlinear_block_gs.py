@@ -30,6 +30,8 @@ class NonlinearBlockGS(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
+        super(NonlinearBlockGS, self)._declare_options()
+
         self.options.declare('use_aitken', types=bool, default=False,
                              desc='set to True to use Aitken relaxation')
         self.options.declare('aitken_min_factor', default=0.1,
