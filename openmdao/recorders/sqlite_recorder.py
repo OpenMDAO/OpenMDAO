@@ -100,6 +100,8 @@ class SqliteRecorder(BaseRecorder):
             Path to the recorder file.
         append : bool
             Optional. If True, append to an existing case recorder file.
+        pickle_version : int
+            Optional. The pickle protocol version to use when pickling metadata.
         """
         super(SqliteRecorder, self).__init__()
 
