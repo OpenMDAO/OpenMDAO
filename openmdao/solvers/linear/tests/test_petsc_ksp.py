@@ -8,7 +8,7 @@ import warnings
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, PETScKrylov, LinearBlockGS, DirectSolver, \
-     ExecComp, NewtonSolver, NonlinearBlockGS, PetscKSP
+     ExecComp, NewtonSolver, NonlinearBlockGS, PetscKSP, ImplicitComponent
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
@@ -332,6 +332,84 @@ class TestPETScKrylov(unittest.TestCase):
         output = d_residuals._data
         assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
         assert_rel_error(self, output[5], g1.expected_solution[1], 3e-15)
+
+    def test_linear_solution_cache(self):
+        # Test derivatives across a converged Sellar model.
+
+        class Comp(ImplicitComponent):
+            def setup(self):
+                self.add_input('x', val=1.0)
+                self.add_output('y', val=np.sqrt(3))
+
+                self.declare_partials(of='*', wrt='*')
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                x = inputs['x']
+                y = outputs['y']
+                residuals['y'] = x * y ** 3 - 3.0 * y * x ** 3
+
+            def solve_nonlinear(self, inputs, outputs):
+                # Cheat solution
+                outputs['y'] = np.sqrt(3.0)
+
+            def linearize(self, inputs, outputs, partials):
+                x = inputs['x']
+                y = outputs['y']
+                partials['y', 'x'] = y ** 3 - 9.0 * y * x ** 2
+                partials['y', 'y'] = 3.0 * x * y ** 2 - 3.0 * y * x ** 3
+
+
+        # Forward mode
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('d1', Comp(), promotes=['x', 'y'])
+
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.linear_solver = PETScKrylov()
+
+        model.add_design_var('x', cache_linear_solution=True)
+        model.add_objective('y', cache_linear_solution=True)
+
+        prob.setup(mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        J = prob.compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        icount1 = prob.model.linear_solver._iter_count
+        J = prob.compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        icount2 = prob.model.linear_solver._iter_count
+
+        # Should take less iterations when starting from previous solution.
+        self.assertTrue(icount2 < icount1)
+
+        # Reverse mode
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('d1', Comp(), promotes=['x', 'y'])
+
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.linear_solver = PETScKrylov()
+
+        model.add_design_var('x', cache_linear_solution=True)
+        model.add_objective('y', cache_linear_solution=True)
+
+        prob.setup(mode='rev')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        J = prob.compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        icount1 = prob.model.linear_solver._iter_count
+        J = prob.compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        icount2 = prob.model.linear_solver._iter_count
+
+        # Should take less iterations when starting from previous solution.
+        self.assertTrue(icount2 < icount1)
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")

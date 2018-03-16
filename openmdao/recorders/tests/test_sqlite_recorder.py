@@ -1094,21 +1094,21 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_solver_output = {
             'px.x': [0.],
             'pz.z': [0., 0.],
-            'd1.y1': [-7.86357118e-07],
-            'd2.y2': [0.00177091],
-            'obj_cmp.obj': [0.70719095],
-            'con_cmp1.con1': [-0.70702038],
-            'con_cmp2.con2': [3.93178559e-06]
+            'd1.y1': [5.41157587e-07],
+            'd2.y2': [-0.41168147],
+            'obj_cmp.obj': [-0.48667678],
+            'con_cmp1.con1': [0.770496],
+            'con_cmp2.con2': [-2.70578793e-06]
         }
 
         expected_solver_residuals = {
             'px.x': [0.],
             'pz.z': [0., 0.],
-            'd1.y1': [0.00035339623935061308],
-            'd2.y2': [0.00177099],
-            'obj_cmp.obj': [0.70719175],
-            'con_cmp1.con1': [-0.70702117],
-            'con_cmp2.con2': [-0.00176698]
+            'd1.y1': [-0.08233575],
+            'd2.y2': [-0.41168152],
+            'obj_cmp.obj': [-0.4866797],
+            'con_cmp1.con1': [0.77049654],
+            'con_cmp2.con2': [0.41167877]
         }
         self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
                                                  expected_rel_error, expected_solver_output,
