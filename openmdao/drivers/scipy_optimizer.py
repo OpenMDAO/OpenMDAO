@@ -46,7 +46,7 @@ class ScipyOptimizeDriver(Driver):
     Driver wrapper for the scipy.optimize.minimize family of local optimizers.
 
     Inequality constraints are supported by COBYLA and SLSQP,
-    but equality constraints are only supported by COBYLA. None of the other
+    but equality constraints are only supported by SLSQP. None of the other
     optimizers support constraints.
 
     ScipyOptimizeDriver supports the following:

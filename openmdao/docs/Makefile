@@ -29,6 +29,8 @@ I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
 
 #first item in makefile is default action of "make"
 html-update: mock redbaron matplotlib
+    # Running things before docbuild
+	python _utils/preprocess_tags.py
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS)  $(BUILDDIR)/html
 
 single:
