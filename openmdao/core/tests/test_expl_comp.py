@@ -532,9 +532,16 @@ class ExplCompTestCase(unittest.TestCase):
         #   result in the same format of the output. When running this test from the
         #   top level via testflo, the format comes out different than if the test is
         #   run individually
-        np.set_printoptions(edgeitems=3, infstr='inf',
-                            linewidth = 75, nanstr = 'nan', precision = 8,
-                            suppress = False, threshold = 1000, formatter = None)
+        from distutils.version import LooseVersion
+        # formatting has changed in numpy 1.14 and beyond.
+        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+            np.set_printoptions(edgeitems=3, infstr='inf',
+                                linewidth=75, nanstr='nan', precision=8,
+                                suppress=False, threshold=1000, formatter=None, legacy="1.13")
+        else:
+            np.set_printoptions(edgeitems=3, infstr='inf',
+                                linewidth=75, nanstr='nan', precision=8,
+                                suppress=False, threshold=1000, formatter=None)
         # logging outputs
         # out_stream - not hierarchical - extras - print_arrays
         stream = cStringIO()
