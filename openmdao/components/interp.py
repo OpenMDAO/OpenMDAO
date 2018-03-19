@@ -8,6 +8,19 @@ from scipy.sparse import csc_matrix, csr_matrix
 from openmdao.api import ExplicitComponent
 
 
+CITATIONS = """
+@conference {Hwang2012c,
+	title = {GeoMACH: Geometry-Centric MDAO of Aircraft Configurations with High Fidelity},
+	booktitle = {Proceedings of the 14th AIAA/ISSMO Multidisciplinary Analysis Optimization Conference},
+	year = {2012},
+	note = {<p>AIAA 2012-5605</p>},
+	month = {September},
+	address = {Indianapolis, IN},
+	author = {John T. Hwang and Joaquim R. R. A. Martins}
+}
+"""
+
+
 def get_bspline_mtx(num_cp, num_pt, order=4, distribution='sine'):
     """
     Compute matrix of B-spline coefficients.
@@ -21,7 +34,8 @@ def get_bspline_mtx(num_cp, num_pt, order=4, distribution='sine'):
     order : int(4)
         B-spline order.
     distribution : str
-        Choice of distribution to use, can be 'sine' or 'uniform.
+        Choice of spatial distribution to use for placing the control point. It can be 'sine' or
+        'uniform.
 
     Returns
     -------
@@ -96,6 +110,33 @@ class BsplinesComp(ExplicitComponent):
     Simple B-spline component for interpolation.
     """
 
+    def __init__(self, num_control_points=10, num_points=20, bspline_order=4, in_name='h_cp',
+                 out_name='h', distribution='sine'):
+        """
+        Initialize the BsplinesComp.
+
+        Parameters
+        ----------
+        num_control_points : int
+            Number of control points.
+        num_points : int
+            Number of interpolated points.
+        bspline_order : int(4)
+            B-spline order.
+        in_name : str
+            Name to use for the input variable (control points).
+        out_name : str
+            Name to use for the output variable (interpolated points).
+        distribution : str
+            Choice of spatial distribution to use for placing the control points. It can be 'sine' or
+            'uniform'.
+        """
+        super(BsplinesComp, self).__init__(num_control_points=num_control_points,
+                                           num_points=num_points, bspline_order=bspline_order,
+                                           in_name=in_name, out_name=out_name,
+                                           distribution=distribution)
+        self.cite = CITATIONS
+
     def initialize(self):
         """
         Declare metadata.
@@ -105,7 +146,7 @@ class BsplinesComp(ExplicitComponent):
         self.metadata.declare('bspline_order', 4, types=int)
         self.metadata.declare('in_name', types=str)
         self.metadata.declare('out_name', types=str)
-        self.metadata.declare('distribution', 'sine', values=['sine', 'uniform'])
+        self.metadata.declare('distribution', 'sine', values=['uniform', 'sine'])
 
     def setup(self):
         """
