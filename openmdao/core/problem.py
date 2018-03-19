@@ -1117,6 +1117,7 @@ class Problem(object):
         model = self.model
         nproc = self.comm.size
         iproc = model.comm.rank
+        owning_ranks = model._owning_rank
 
         for vois in itervalues(voi_lists):
             for input_name, old_input_name, _, _, _, _ in vois:
@@ -1142,10 +1143,8 @@ class Problem(object):
                         in_idxs = in_voi_meta['indices']
 
                 if in_idxs is not None:
-                    neg = in_idxs[in_idxs < 0]
                     irange = in_idxs
-                    if np.any(neg):
-                        irange[neg] += end
+                    irange[in_idxs < 0] += end
                     max_i = np.max(in_idxs)
                     min_i = np.min(in_idxs)
                     loc_size = len(in_idxs)
@@ -1157,16 +1156,12 @@ class Problem(object):
 
                 if loc_size == 0:
                     # var is not local. get size of var in owned proc
-                    for rank in range(nproc):
-                        sz = sizes[rank, in_var_idx]
-                        if sz > 0:
-                            loc_size = sz
-                            break
+                    loc_size = sizes[owning_ranks[input_name], in_var_idx]
 
                 # set totals to zeros instead of None in those cases when none
                 # of the specified indices are within the range of interest
                 # for this proc.
-                store = True if ((start <= min_i < end) or (start <= max_i < end)) else dup
+                store = True if dup else ((start <= min_i < end) or (start <= max_i < end))
 
                 if store:
                     loc_idxs = irange
@@ -1175,7 +1170,7 @@ class Problem(object):
                 else:
                     loc_idxs = []
 
-                voi_info[input_name] = (dinputs, doutputs, irange, loc_idxs, max_i, min_i,
+                voi_info[input_name] = (dinputs, doutputs, irange, loc_idxs,
                                         loc_size, start, end, dup, store)
 
         return voi_info
@@ -1435,8 +1430,7 @@ class Problem(object):
                         vec_dinput['linear'].set_const(0.0)
 
                 for input_name, _, _, matmat, simul, _ in vois:
-                    dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
-                        voi_info[input_name]
+                    dinputs, doutputs, idxs, _, loc_size, start, end, dup, _ = voi_info[input_name]
 
                     if matmat:
                         if input_name in dinputs:
@@ -1482,7 +1476,7 @@ class Problem(object):
                         save_vec[vs][:] = doutputs._data[vs]
 
                 for input_name, old_input_name, _, matmat, simul, cache_lin_sol in vois:
-                    dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
+                    dinputs, doutputs, idxs, loc_idxs, loc_size, start, end, \
                         dup, store = voi_info[input_name]
                     ncol = dinputs._ncol
 
@@ -1492,10 +1486,7 @@ class Problem(object):
                         loc_idx = loc_idxs[i - start]
                     else:
                         if simul is None:
-                            if i >= len(idxs):
-                                idx = idxs[-1]  # reuse the last index
-                            else:
-                                idx = idxs[i]
+                            if i < len(idxs):
                                 # totals to zeros instead of None in those cases when none
                                 # of the specified indices are within the range of interest
                                 # for this proc.
@@ -1503,7 +1494,7 @@ class Problem(object):
                                     loc_idx_dict[input_name] += 1
                             loc_idx = loc_idx_dict[input_name]
                         else:
-                            idx = loc_idx = i
+                            loc_idx = i
 
                     # Pull out the answers and pack into our data structure.
                     for ocount, output_name in enumerate(output_list):
@@ -1725,11 +1716,11 @@ class Problem(object):
                 break
 
         for i, tup in enumerate(input_idx_map):
-            input_name, start, end, meta, abs2meta = tup
+            input_name, start, end, global_start, global_end, meta, abs2meta = tup
 
     def _create_idx_map(self, names, vois, abs2meta, vois_are_inputs):
         """
-        Create a list that maps a col or row index to a name, col/row range, and other data.
+        Create a list that maps a global index to a name, col/row range, and other data.
 
         Parameters
         ----------
@@ -1749,9 +1740,15 @@ class Problem(object):
         """
         idx_map = []
         start = 0
-        end = -1
+        end = 0
+        var_sizes = self.model._var_sizes
+        abs2idx = self.model._var_allprocs_abs2idx
+        abs2meta = self.model._var_allprocs_abs2meta
+        iproc = self.model.comm.rank
+        idx_tups = [None] * len(names)
+        tot_idx_size = 0
 
-        for name in names:
+        for i, name in enumerate(names):
             rhsname = 'linear'
             if name in vois:
                 meta = vois[name]
@@ -1763,14 +1760,69 @@ class Problem(object):
                     self._check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring)
                     if matmat or parallel_deriv_color:
                         rhsname = name
+
+                    in_var_idx = abs2idx[rhsname][name]
+                    in_var_meta = abs2meta[name]
+
+                    sizes = var_sizes[rhsname]['output']
+                    gstart = np.sum(sizes[:iproc, in_var_idx])
+                    gend = gstart + sizes[iproc, in_var_idx]
+                    tot_idx_size += (gend - gstart)
+
+                    in_idxs = meta['indices'] if 'indices' in meta else None
+
+                    if in_idxs is None:
+                        irange = np.arange(in_var_meta['global_size'], dtype=int)
+                        max_i = in_var_meta['global_size'] - 1
+                        min_i = 0
+                        loc_size = gend - gstart
+
+                        if loc_size == 0:
+                            # var is not local. get size of var in owned proc
+                            loc_size = sizes[owning_ranks[name], in_var_idx]
+                    else:
+                        irange = in_idxs
+                        irange[in_idxs < 0] += gend
+                        max_i = np.max(irange)
+                        min_i = np.min(irange)
+                        loc_size = len(irange)
+
+                    # set totals to zeros instead of None in those cases when none
+                    # of the specified indices are within the range of interest
+                    # for this proc.
+                    if not in_var_meta['distributed']:
+                        store = True
+                    else:
+                        store = (gstart <= min_i < gend) or (gstart <= max_i < gend)
+
+                    if store:
+                        loc_idxs = irange
+                        if min_i > 0:
+                            loc_idxs = irange - min_i
+                    else:
+                        loc_idxs = []
+
+                else:
+                    tot_idx_size += (end - start)
+                    gstart = start
+                    gend = end
             else:
                 end += abs2meta[name]['size']
                 meta = None
+                tot_idx_size += (end - start)
+                gstart = start
+                gend = end
 
-            tup = (name, start, end, rhsname, meta, abs2meta)
+            idx_tups[i] = (name, start, end, gstart, gend, rhsname, meta, abs2meta)
+            start = end
+
+        idx_map = [None] * tot_idx_size
+
+        for tup in idx_tups:
+            _, start, end, _, _, _, _, _ = tup
             # duplicate the tuple (end - start + 1) times
-            idx_map.extend([tup] * (end - start + 1))
-            start = end + 1
+            for i in range(start, end):
+                idx_map[i] = tup
 
         return idx_map
 

@@ -142,7 +142,7 @@ def _get_full_disjoint(J, start, end):
     return full_disjoint, rows
 
 
-def _get_bool_jac(prob, mode='fwd', repeats=1, tol=1e-30, byvar=True):
+def _get_bool_jac(prob, mode='fwd', repeats=1, tol=1e-15, byvar=True):
     """
     Return a boolean version of the total jacobian.
 
@@ -239,7 +239,7 @@ def _compute_ranges(names, vois):
     return ranges
 
 
-def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30,):
+def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-15):
     """
     Find sets of disjoint columns by variable in the total jac and their corresponding rows.
 
@@ -297,7 +297,7 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-30,):
     return total_dv_offsets, total_res_offsets, J
 
 
-def _find_global_disjoint(prob, mode='fwd', repeats=1, tol=1e-30,):
+def _find_global_disjoint(prob, mode='fwd', repeats=1, tol=1e-15):
     """
     Find sets of disjoint columns in the total jac and their corresponding rows.
 
@@ -335,7 +335,7 @@ def _find_global_disjoint(prob, mode='fwd', repeats=1, tol=1e-30,):
     return full_disjoint, rows, J
 
 
-def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-30, show_jac=False, stream=sys.stdout):
+def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False, stream=sys.stdout):
     """
     Compute simultaneous derivative colorings for the given problem.
 
