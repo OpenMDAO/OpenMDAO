@@ -17,6 +17,8 @@ class TestNonlinearCircuit(unittest.TestCase):
         from openmdao.api import IndepVarComp, Problem, Group
 
         class Resistor(ExplicitComponent):
+            """Computes current across a resistor using Ohm's law."""
+
             def initialize(self):
                 self.metadata.declare('R', default=1., desc='Resistance in Ohms')
 
@@ -34,8 +36,9 @@ class TestNonlinearCircuit(unittest.TestCase):
                 deltaV = inputs['V_in'] - inputs['V_out']
                 outputs['I'] = deltaV / self.metadata['R']
 
-
         class Diode(ExplicitComponent):
+            """Computes current across a diode using the Shockley diode equation."""
+
             def initialize(self):
                 self.metadata.declare('Is', default=1e-15, desc='Saturation current in Amps')
                 self.metadata.declare('Vt', default=.025875, desc='Thermal voltage in Volts')
@@ -65,6 +68,8 @@ class TestNonlinearCircuit(unittest.TestCase):
                 J['I', 'V_out'] = -I/Vt
 
         class Node(ImplicitComponent):
+            """Computes voltage residual across a node based on incoming and outgoing current."""
+
             def initialize(self):
                 self.metadata.declare('n_in', default=1, types=int, desc='number of connections with + assumed in')
                 self.metadata.declare('n_out', default=1, types=int, desc='number of current connections + assumed out')

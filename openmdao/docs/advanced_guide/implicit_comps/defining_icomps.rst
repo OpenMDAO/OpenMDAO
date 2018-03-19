@@ -108,7 +108,7 @@ The Newton solver's use of that Jacobian information is why we need to declare a
 
 .. embed-code::
     openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_plain_newton
-    :layout: code, output
+    :layout: interleave
 
 
 Modifying Solver Settings in Your Run Script
@@ -158,7 +158,7 @@ but you need to be careful about the :ref:`execution order <feature_set_order>` 
 
 .. embed-code::
     openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_advanced_newton
-    :layout: code, output
+    :layout: interleave
 
 
 .. note::
