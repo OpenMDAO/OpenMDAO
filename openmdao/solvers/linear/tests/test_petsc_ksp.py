@@ -8,8 +8,9 @@ import warnings
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, PETScKrylov, LinearBlockGS, DirectSolver, \
-     ExecComp, NewtonSolver, NonlinearBlockGS, PetscKSP, ImplicitComponent
+     ExecComp, NewtonSolver, NonlinearBlockGS, PetscKSP
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
+from openmdao.test_suite.components.misc_components import Comp4LinearCacheTest
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
 try:
@@ -334,30 +335,9 @@ class TestPETScKrylov(unittest.TestCase):
         assert_rel_error(self, output[5], g1.expected_solution[1], 3e-15)
 
     def test_linear_solution_cache(self):
-        # Test derivatives across a converged Sellar model.
-
-        class Comp(ImplicitComponent):
-            def setup(self):
-                self.add_input('x', val=1.0)
-                self.add_output('y', val=np.sqrt(3))
-
-                self.declare_partials(of='*', wrt='*')
-
-            def apply_nonlinear(self, inputs, outputs, residuals):
-                x = inputs['x']
-                y = outputs['y']
-                residuals['y'] = x * y ** 3 - 3.0 * y * x ** 3
-
-            def solve_nonlinear(self, inputs, outputs):
-                # Cheat solution
-                outputs['y'] = np.sqrt(3.0)
-
-            def linearize(self, inputs, outputs, partials):
-                x = inputs['x']
-                y = outputs['y']
-                partials['y', 'x'] = y ** 3 - 9.0 * y * x ** 2
-                partials['y', 'y'] = 3.0 * x * y ** 2 - 3.0 * y * x ** 3
-
+        # Test derivatives across a converged Sellar model. When caching
+        # is performed, the second solve takes less iterations than the
+        # first one.
 
         # Forward mode
 
@@ -365,7 +345,7 @@ class TestPETScKrylov(unittest.TestCase):
         model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('d1', Comp(), promotes=['x', 'y'])
+        model.add_subsystem('d1', Comp4LinearCacheTest(), promotes=['x', 'y'])
 
         model.nonlinear_solver = NonlinearBlockGS()
         model.linear_solver = PETScKrylov()
@@ -391,7 +371,7 @@ class TestPETScKrylov(unittest.TestCase):
         model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('d1', Comp(), promotes=['x', 'y'])
+        model.add_subsystem('d1', Comp4LinearCacheTest(), promotes=['x', 'y'])
 
         model.nonlinear_solver = NonlinearBlockGS()
         model.linear_solver = PETScKrylov()
