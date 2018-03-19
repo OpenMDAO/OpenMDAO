@@ -13,3 +13,4 @@ Components
     metamodelstructured.rst
     metamodelunstructured.rst
     ks.rst
+    interp.rst

@@ -34,7 +34,7 @@ def get_bspline_mtx(num_cp, num_pt, order=4, distribution='sine'):
     order : int(4)
         B-spline order.
     distribution : str
-        Choice of spatial distribution to use for placing the control point. It can be 'sine' or
+        Choice of spatial distribution to use for the interpolated points. It can be 'sine' or
         'uniform.
 
     Returns
@@ -128,7 +128,7 @@ class BsplinesComp(ExplicitComponent):
         out_name : str
             Name to use for the output variable (interpolated points).
         distribution : str
-            Choice of spatial distribution to use for placing the control points. It can be 'sine' or
+            Choice of spatial distribution to use for placing the interpolated points. It can be 'sine' or
             'uniform'.
         """
         super(BsplinesComp, self).__init__(num_control_points=num_control_points,
