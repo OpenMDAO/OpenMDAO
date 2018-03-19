@@ -1,31 +1,18 @@
 """ Unit test for the solver printing behavior. """
 
-from six.moves import cStringIO as StringIO
-
-import sys, os
+import os
+import sys
 import unittest
 
 import numpy as np
 
 from openmdao.api import Problem, NewtonSolver, ScipyKrylov, Group, PETScVector, \
-                         IndepVarComp, NonlinearBlockGS, NonlinearBlockJac, LinearBlockGS
+    IndepVarComp, NonlinearBlockGS, NonlinearBlockJac, LinearBlockGS
 from openmdao.test_suite.components.double_sellar import SubSellar
 from openmdao.test_suite.components.sellar import SellarDerivatives
+
+from openmdao.utils.general_utils import run_model
 from openmdao.utils.mpi import MPI
-
-
-def run_model(prob):
-    """Call `run_model` on problem and capture output."""
-    stdout = sys.stdout
-    strout = StringIO()
-
-    sys.stdout = strout
-    try:
-        prob.run_model()
-    finally:
-        sys.stdout = stdout
-
-    return strout.getvalue()
 
 
 class TestSolverPrint(unittest.TestCase):

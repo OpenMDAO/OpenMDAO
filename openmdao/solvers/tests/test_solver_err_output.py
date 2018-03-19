@@ -2,8 +2,6 @@
 
 from __future__ import division, print_function
 
-from six.moves import cStringIO as StringIO
-
 import sys
 
 import unittest
@@ -18,6 +16,7 @@ from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
 
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.general_utils import run_model
 
 from nose_parameterized import parameterized
 
@@ -27,20 +26,6 @@ nonlinear_solvers = [
     NonlinearBlockJac,
     NewtonSolver
 ]
-
-
-def run_model(prob):
-    """Call `run_model` on problem and capture output."""
-    stdout = sys.stdout
-    strout = StringIO()
-
-    sys.stdout = strout
-    try:
-        prob.run_model()
-    finally:
-        sys.stdout = stdout
-
-    return strout.getvalue()
 
 
 class TestNonlinearSolvers(unittest.TestCase):
