@@ -25,5 +25,5 @@ When this option is set to :code:`True`, the values of the input and output vari
 be displayed and written to a file if the solver fails to converge.
 
   .. embed-code::
-      openmdao.solvers.tests.test_solver_debug_print.TestNonlinearSolvers.test_solver_debug_feature
+      openmdao.solvers.tests.test_solver_debug_print.TestNonlinearSolvers.test_solver_debug_print_feature
       :layout: interleave

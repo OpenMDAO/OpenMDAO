@@ -1,4 +1,4 @@
-"""Runs parametric tests over multiple solvers."""
+"""Tests the `debug_print` option for Nonlinear solvers."""
 
 from __future__ import division, print_function
 
@@ -37,13 +37,13 @@ class TestNonlinearSolvers(unittest.TestCase):
         self.tempdir = tempfile.mkdtemp(prefix='test_solver')
         os.chdir(self.tempdir)
 
-        # iteration coordinate and file name are common for all tests
-        self.coord = 'rank0:root._solve_nonlinear|0|NLRunOnce|0|circuit._solve_nonlinear|0'
-        self.filename = self.coord.replace('._solve_nonlinear', '')+'.dat'
+        # iteration coordinate, file name and variable data are common for all tests
+        coord = 'rank0:root._solve_nonlinear|0|NLRunOnce|0|circuit._solve_nonlinear|0'
+        self.filename = coord.replace('._solve_nonlinear', '')+'.dat'
 
         self.expected_data = '\n'.join([
             "",
-            "# Inputs and outputs at start of iteration '%s':" % self.coord,
+            "# Inputs and outputs at start of iteration '%s':" % coord,
             "",
             "# nonlinear inputs",
             "circuit.D1.V_in = array([ 1.])",
@@ -78,7 +78,7 @@ class TestNonlinearSolvers(unittest.TestCase):
     @parameterized.expand([
         [solver.__name__, solver] for solver in nonlinear_solvers
     ])
-    def test_solver(self, name, solver):
+    def test_solver_debug_print(self, name, solver):
         p = Problem()
         model = p.model
 
@@ -116,7 +116,7 @@ class TestNonlinearSolvers(unittest.TestCase):
         with open(self.filename, 'r') as f:
             self.assertEqual(f.read(), self.expected_data)
 
-    def test_solver_debug_feature(self):
+    def test_solver_debug_print_feature(self):
         from openmdao.api import Problem, IndepVarComp, NewtonSolver
         from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
 
@@ -141,7 +141,7 @@ class TestNonlinearSolvers(unittest.TestCase):
         p['circuit.n1.V'] = 10.
         p['circuit.n2.V'] = 1e-3
 
-        # run the model and check for expected output file
+        # run the model
         p.run_model()
 
         self.assertEqual(open('rank0:root|0|NLRunOnce|0|circuit|0.dat', 'r').read(),
