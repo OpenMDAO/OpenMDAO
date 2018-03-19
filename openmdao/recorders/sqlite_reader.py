@@ -32,6 +32,8 @@ class SqliteCaseReader(BaseCaseReader):
     ----------
     format_version : int
         The version of the format assumed when loading the file.
+    units : {'name': unit}
+        Dictionary mapping absolute names to their units.
     _abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names.
     _prom2abs : {'input': dict, 'output': dict}
@@ -56,18 +58,21 @@ class SqliteCaseReader(BaseCaseReader):
 
         with sqlite3.connect(self.filename) as con:
             cur = con.cursor()
-            cur.execute("SELECT format_version, abs2prom, prom2abs FROM metadata")
+            cur.execute("SELECT format_version, abs2prom, prom2abs, abs2units FROM metadata")
             row = cur.fetchone()
             self.format_version = row[0]
             self._abs2prom = None
             self._prom2abs = None
+            self.units = None
 
             if PY2:
                 self._abs2prom = pickle.loads(str(row[1])) if row[1] is not None else None
                 self._prom2abs = pickle.loads(str(row[2])) if row[2] is not None else None
+                self.units = pickle.loads(str(row[3])) if row[3] is not None else None
             if PY3:
                 self._abs2prom = pickle.loads(row[1]) if row[1] is not None else None
                 self._prom2abs = pickle.loads(row[2]) if row[2] is not None else None
+                self.units = pickle.loads(row[3]) if row[3] is not None else None
         con.close()
 
         self._load()

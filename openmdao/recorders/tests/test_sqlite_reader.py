@@ -139,6 +139,30 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_constraint('con1', upper=0.0)
         model.add_constraint('con2', upper=0.0)
 
+    def setup_sellar_model_with_units(self):
+        self.prob = Problem()
+
+        model = self.prob.model = Group()
+        model.add_subsystem('px', IndepVarComp('x', 1.0, units='m'), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                            z=np.array([0.0, 0.0]), x={'value': 0.0, 'units': 'm'},
+                            y1={'units': 'm'}, y2={'units': 'cm'}),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        self.prob.model.nonlinear_solver = NonlinearBlockGS()
+        self.prob.model.linear_solver = LinearBlockGS()
+
+        self.prob.model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        self.prob.model.add_design_var('x', lower=0.0, upper=10.0)
+        self.prob.model.add_objective('obj')
+        self.prob.model.add_constraint('con1', upper=0.0)
+        self.prob.model.add_constraint('con2', upper=0.0)
+
     def setUp(self):
 
         recording_iteration.stack = []  # reset to avoid problems from earlier tests
@@ -348,6 +372,23 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(len(cr.driver_metadata['connections_list']), 11)
         self.assertEqual(len(cr.driver_metadata['tree']), 4)
+
+    def test_reading_units(self):
+        self.setup_sellar_model_with_units()
+        self.prob.driver.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+        self.prob.run_driver()
+        self.prob.cleanup()
+
+        cr = CaseReader(self.filename)
+
+        self.assertEqual(cr.units['px.x'], 'm')
+        self.assertEqual(cr.units['obj_cmp.y1'], 'm')
+        self.assertEqual(cr.units['obj_cmp.y2'], 'cm')
+        self.assertEqual(cr.units['d1.x'], None)
+        self.assertEqual(cr.units['d1.y1'], None)
+        self.assertEqual(cr.units['d1.y2'], None)
 
     def test_reading_system_metadata(self):
 

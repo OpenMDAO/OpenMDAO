@@ -84,6 +84,8 @@ class SqliteRecorder(BaseRecorder):
         Dictionary mapping absolute names to promoted names.
     _prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
+    _abs2units : {'name': unit}
+        Dictionary mapping absolute names to their units.
     _open_close_sqlite: bool
         If True, open, write, and close the sqlite file. Needed for when running under MPI.
     _pickle_version: int
@@ -113,6 +115,7 @@ class SqliteRecorder(BaseRecorder):
         self.model_viewer_data = None
         self._abs2prom = {'input': {}, 'output': {}}
         self._prom2abs = {'input': {}, 'output': {}}
+        self._abs2units = {}
         self._pickle_version = pickle_version
 
         if append:
@@ -127,7 +130,7 @@ class SqliteRecorder(BaseRecorder):
             with self.con:
                 self.cursor = self.con.cursor()
                 self.cursor.execute("CREATE TABLE metadata( format_version INT, "
-                                    "abs2prom BLOB, prom2abs BLOB)")
+                                    "abs2prom BLOB, prom2abs BLOB, abs2units BLOB)")
                 self.cursor.execute("INSERT INTO metadata(format_version, abs2prom, "
                                     "prom2abs) VALUES(?,?,?)",
                                     (format_version, None, None))
@@ -185,13 +188,18 @@ class SqliteRecorder(BaseRecorder):
                     self._prom2abs[io][v] = list(set(self._prom2abs[io][v]) |
                                                  set(system._var_allprocs_prom2abs_list[io][v]))
 
+        # grab all of the units
+        for name in system._var_abs2meta:
+            self._abs2units[name] = system._var_abs2meta[name]['units']
+
         # store the updated abs2prom and prom2abs
-        abs2prom = pickle.dumps(self._abs2prom)
-        prom2abs = pickle.dumps(self._prom2abs)
+        abs2prom = pickle.dumps(self._abs2prom, self._pickle_version)
+        prom2abs = pickle.dumps(self._prom2abs, self._pickle_version)
+        abs2units = pickle.dumps(self._abs2units, self._pickle_version)
         if self._open_close_sqlite:
             with self.con:
-                self.con.execute("UPDATE metadata SET abs2prom=?, prom2abs=?",
-                                 (abs2prom, prom2abs))
+                self.con.execute("UPDATE metadata SET abs2prom=?, prom2abs=?, abs2units=?",
+                                 (abs2prom, prom2abs, abs2units))
 
     def record_iteration_driver(self, recording_requester, data, metadata):
         """
