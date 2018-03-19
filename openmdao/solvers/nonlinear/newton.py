@@ -187,7 +187,7 @@ class NewtonSolver(NonlinearSolver):
         float
             error at the first iteration.
         """
-        if self.options['err_output_file']:
+        if self.options['debug_print']:
             self._err_cache['inputs'] = deepcopy(self._system._inputs)
             self._err_cache['outputs'] = deepcopy(self._system._outputs)
 

@@ -17,6 +17,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate
 
 
 class SolverInfo(object):
@@ -579,9 +580,10 @@ class NonlinearSolver(Solver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('err_output_file', types=str, default='',
-                             desc='When specified, file name to which iteration data is written '
-                                  'after a failure to converge (for debugging purposes).')
+        self.options.declare('debug_print', types=bool, default=False,
+                             desc='If true, the values of input and output variables at '
+                                  'the start of iteration are printed and written to a file '
+                                  'after a failure to converge.')
 
     def solve(self):
         """
@@ -598,24 +600,23 @@ class NonlinearSolver(Solver):
         """
         fail, abs_err, rel_err = self._run_iterator()
 
-        if fail:
-            filename = self.options['err_output_file']
-            if filename:
-                with open(filename, 'w') as f:
-                    # use same id as would be found in recording metadata
-                    id = "%s.%s" % (self._system.pathname, type(self).__name__)
-                    desc = "Inputs and outputs at start of '%s' iteration" % id
+        if fail and self.options['debug_print']:
+            coord = get_formatted_iteration_coordinate()
 
-                    # dump cached data to file
-                    f.write("# %s\n" % desc)
-                    for vec_type, vec in iteritems(self._err_cache):
-                        f.write('\n')
-                        f.write('# %s %s vector\n' % (vec._name, vec._typ))
-                        for abs_name in sorted(vec._views.keys()):
-                            f.write('%s = %s\n' % (abs_name, repr(vec._views[abs_name])))
+            out_str = "\n# Inputs and outputs at start of iteration '%s':\n" % coord
+            for vec_type, vec in iteritems(self._err_cache):
+                out_str += '\n'
+                out_str += '# %s %ss\n' % (vec._name, vec._typ)
+                for abs_name in sorted(vec._views.keys()):
+                    out_str += '%s = %s\n' % (abs_name, repr(vec._views[abs_name]))
 
-                    # notify user
-                    print(desc + " have been saved to '%s'." % filename)
+            print(out_str)
+
+            filename = coord.replace('._solve_nonlinear', '') + '.dat'
+            with open(filename, 'w') as f:
+                f.write(out_str)
+                print("Inputs and outputs at start of iteration have been "
+                      "saved to '%s'." % filename)
 
         return fail, abs_err, rel_err
 
@@ -630,7 +631,7 @@ class NonlinearSolver(Solver):
         float
             error at the first iteration.
         """
-        if self.options['err_output_file']:
+        if self.options['debug_print']:
             self._err_cache['inputs'] = deepcopy(self._system._inputs)
             self._err_cache['outputs'] = deepcopy(self._system._outputs)
 
