@@ -58,16 +58,99 @@ class TestKSFunction(unittest.TestCase):
 
         prob.run_driver()
 
-        stress0 = prob['parallel.sub_0.max_stress_0.g_con']
-        stress1 = prob['parallel.sub_0.max_stress_1.g_con']
+        stress0 = prob['parallel.sub_0.stress_comp.stress_0']
+        stress1 = prob['parallel.sub_0.stress_comp.stress_1']
 
         # Test that the the maximum constraint prior to aggregation is close to "active".
-        assert_rel_error(self, max(stress0), 0.0, tolerance=5e-2)
-        assert_rel_error(self, max(stress1), 0.0, tolerance=5e-2)
+        assert_rel_error(self, max(stress0), 100.0, tolerance=5e-2)
+        assert_rel_error(self, max(stress1), 100.0, tolerance=5e-2)
 
         # Test that no original constraint is violated.
         self.assertTrue(np.all(stress0 < 100.0))
         self.assertTrue(np.all(stress1 < 100.0))
+
+    def test_upper(self):
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', val=np.array([5.0, 4.0])))
+        model.add_subsystem('comp', ExecComp('y = 3.0*x', x=np.zeros((2, )), y=np.zeros((2, ))))
+        model.add_subsystem('ks', KSComponent(width=2))
+
+        model.connect('px.x', 'comp.x')
+        model.connect('comp.y', 'ks.g')
+
+        model.ks.options['upper'] = 16.0
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['ks.KS'], -1.0)
+
+    def test_lower_flag(self):
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', val=np.array([5.0, 4.0])))
+        model.add_subsystem('comp', ExecComp('y = 3.0*x', x=np.zeros((2, )), y=np.zeros((2, ))))
+        model.add_subsystem('ks', KSComponent(width=2))
+
+        model.connect('px.x', 'comp.x')
+        model.connect('comp.y', 'ks.g')
+
+        model.ks.options['lower_flag'] = True
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['ks.KS'], -12.0)
+
+
+class TestKSFunctionFeatures(unittest.TestCase):
+
+    def test_upper(self):
+        import numpy as np
+
+        from openmdao.api import Problem, IndepVarComp, ExecComp
+        from openmdao.components.ks import KSComponent
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', val=np.array([5.0, 4.0])))
+        model.add_subsystem('comp', ExecComp('y = 3.0*x', x=np.zeros((2, )), y=np.zeros((2, ))))
+        model.add_subsystem('ks', KSComponent(width=2))
+
+        model.connect('px.x', 'comp.x')
+        model.connect('comp.y', 'ks.g')
+
+        model.ks.options['upper'] = 16.0
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['ks.KS'], -1.0)
+
+    def test_lower_flag(self):
+        import numpy as np
+
+        from openmdao.api import Problem, IndepVarComp, ExecComp
+        from openmdao.components.ks import KSComponent
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', val=np.array([5.0, 4.0])))
+        model.add_subsystem('comp', ExecComp('y = 3.0*x', x=np.zeros((2, )), y=np.zeros((2, ))))
+        model.add_subsystem('ks', KSComponent(width=2))
+
+        model.connect('px.x', 'comp.x')
+        model.connect('comp.y', 'ks.g')
+
+        model.ks.options['lower_flag'] = True
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['ks.KS'], -12.0)
 
 if __name__ == "__main__":
     unittest.main()

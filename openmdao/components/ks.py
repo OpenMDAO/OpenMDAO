@@ -10,7 +10,8 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 CITATIONS = """
 @conference {Martins:2005:SOU,
         title = {On Structural Optimization Using Constraint Aggregation},
-        booktitle = {Proceedings of the 6th World Congress on Structural and Multidisciplinary Optimization},
+        booktitle = {Proceedings of the 6th World Congress on Structural and Multidisciplinary
+                     Optimization},
         year = {2005},
         month = {May},
         address = {Rio de Janeiro, Brazil},
@@ -76,7 +77,8 @@ class KSComponent(ExplicitComponent):
     KS function component.
 
     Component that aggregates a number of functions to a single value via the
-    Kreisselmeier-Steinhauser Function.
+    Kreisselmeier-Steinhauser Function. This new constraint is satisfied when it
+    is less than or equal to zero.
 
     Options
     -------
@@ -99,8 +101,8 @@ class KSComponent(ExplicitComponent):
         """
         super(KSComponent, self).__init__(width=width)
 
-
-        self.options.declare('lower_flag', False, desc="Set to True to turn upper bound into a lower bound for satisfaction.")
+        self.options.declare('lower_flag', False,
+                             desc="Set to True to reverse sign of input constraints.")
         self.options.declare('rho', 50.0, desc="Constraint Aggregation Factor.")
         self.options.declare('upper', 0.0, desc="Upper found for constraint, default is zero.")
 
@@ -138,7 +140,11 @@ class KSComponent(ExplicitComponent):
         outputs : `Vector`
             `Vector` containing outputs.
         """
-        outputs['KS'] = self._ks.compute(inputs['g'], self.options['rho'])
+        con_val = inputs['g'] - self.options['upper']
+        if self.options['lower_flag']:
+            con_val = -con_val
+
+        outputs['KS'] = self._ks.compute(con_val, self.options['rho'])
 
     def compute_partials(self, inputs, partials):
         """
@@ -151,4 +157,8 @@ class KSComponent(ExplicitComponent):
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
-        partials['KS', 'g'] = self._ks.derivatives()[0]
+        derivs = self._ks.derivatives()[0]
+        if self.options['lower_flag']:
+            derivs = -derivs
+
+        partials['KS', 'g'] = derivs

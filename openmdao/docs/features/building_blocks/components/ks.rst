@@ -10,7 +10,8 @@ KSComponent provides a way to aggregate many constraints into a single constrain
 reasons, in particular, to reduce the calculation time needed for the total derivatives of your model. The KSComponent
 implements the Kreisselmeier-Steinhauser Function to aggregate constraint vector input "g" into a single scalar output 'KS'.
 
-The constraint vector "g" must be of the form where g<=0 satisfies the constraints.
+By default, the constraint vector "g" is assumed be of the form where g<=0 satisfies the constraints, but other forms can
+be specified using the "upper" and "lower_flag" options.
 
 KSComponent Options
 -------------------
@@ -49,5 +50,33 @@ we print out the design variable, which is the thickness for each element.
 .. embed-code::
     openmdao.test_suite.test_examples.beam_optimization.test_beam_optimization.TestCase.test_multipoint_stress
     :layout: interleave
+
+
+KSComponent Option Examples
+---------------------------
+
+Normally, the input constraint vector is assumed to be of the form g<=0 is satisfied. If you would like to set a
+different upper bound for the constraint, you can declare it in the "upper" option in the options dictionary.
+
+In the following example, we specify a new upper bound of 16 for the constraint vector. Note that the KS output
+is still satisfied if it is less than zero.
+
+**upper**
+
+.. embed-code::
+    openmdao.components.tests.test_ks.TestKSFunctionFeatures.test_upper
+    :layout: interleave
+
+Normally, the input constraint vector is satisfied if it is negative and violated if it is positive. You can
+reverse this behavior by setting the "lower_flag" option to True. In the following example, we turn on the
+"lower_flag" so that positive values of the input constraint are considered satisfied. Note that the KS output
+is still satisfied if it is less than zero.
+
+**lower_flag**
+
+.. embed-code::
+    openmdao.components.tests.test_ks.TestKSFunctionFeatures.test_lower_flag
+    :layout: interleave
+
 
 .. tags:: KSComponent, Constraints, Optimization

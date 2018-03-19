@@ -10,11 +10,11 @@ from six.moves import range
 import numpy as np
 
 from openmdao.api import Group, IndepVarComp, ParallelGroup, ExecComp
+from openmdao.components.interp import BsplinesComp
 
 from openmdao.test_suite.test_examples.beam_optimization.components.compliance_comp import MultiComplianceComp
 from openmdao.test_suite.test_examples.beam_optimization.components.displacements_comp import MultiDisplacementsComp
 from openmdao.test_suite.test_examples.beam_optimization.components.global_stiffness_matrix_comp import GlobalStiffnessMatrixComp
-from openmdao.test_suite.test_examples.beam_optimization.components.interp import BsplinesComp
 from openmdao.test_suite.test_examples.beam_optimization.components.local_stiffness_matrix_comp import LocalStiffnessMatrixComp
 from openmdao.test_suite.test_examples.beam_optimization.components.moment_comp import MomentOfInertiaComp
 from openmdao.test_suite.test_examples.beam_optimization.components.states_comp import MultiStatesComp

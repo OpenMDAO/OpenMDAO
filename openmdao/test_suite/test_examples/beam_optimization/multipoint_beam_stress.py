@@ -10,11 +10,11 @@ from six.moves import range
 import numpy as np
 
 from openmdao.api import Group, IndepVarComp, ParallelGroup, ExecComp
+from openmdao.components.interp import BsplinesComp
 from openmdao.components.ks import KSComponent
 
 from openmdao.test_suite.test_examples.beam_optimization.components.displacements_comp import MultiDisplacementsComp
 from openmdao.test_suite.test_examples.beam_optimization.components.global_stiffness_matrix_comp import GlobalStiffnessMatrixComp
-from openmdao.test_suite.test_examples.beam_optimization.components.interp import BsplinesComp
 from openmdao.test_suite.test_examples.beam_optimization.components.local_stiffness_matrix_comp import LocalStiffnessMatrixComp
 from openmdao.test_suite.test_examples.beam_optimization.components.moment_comp import MomentOfInertiaComp
 from openmdao.test_suite.test_examples.beam_optimization.components.states_comp import MultiStatesComp
@@ -150,20 +150,12 @@ class MultipointBeamGroup(Group):
                     'displacements_comp.displacements_%d' % k,
                     'stress_comp.displacements_%d' % k)
 
-                comp = ExecComp('g_con = (g - %.15f)' % max_bending,
-                                g=np.zeros((num_elements, )),
-                                g_con=np.zeros((num_elements, )))
-                sub.add_subsystem('max_stress_%d' % k, comp)
-
                 comp = KSComponent(width=num_elements)
+                comp.options['upper'] = max_bending
                 sub.add_subsystem('KS_%d' % k, comp)
 
                 sub.connect(
                     'stress_comp.stress_%d' % k,
-                    'max_stress_%d.g' % k)
-
-                sub.connect(
-                    'max_stress_%d.g_con' % k,
                     'KS_%d.g' % k)
 
                 sub.add_constraint('KS_%d.KS' % k, upper=0.0,
