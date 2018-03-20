@@ -151,7 +151,7 @@ class BsplinesComp(ExplicitComponent):
 
     def setup(self):
         """
-        Setup the B-spline component.
+        Set up the B-spline component.
         """
         meta = self.metadata
         num_control_points = meta['num_control_points']
