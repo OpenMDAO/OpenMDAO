@@ -16,11 +16,11 @@ env:
   global:
     - secure: Rx/uHnF0j1Cp/Ume9lQE5Wu2oM6aA41oFI22+oXmw798vmyeqHAocL6hqva0navjqx9FWLdPHn1LTAjLsHop+tavpMR1Qzu3P/5FEcvr/qDi68osWZq3oCs2WRJLo0BFaG8jQvmMd+RxkczVxWj+D2K+ywgkNb1KABP5Xv6lnTtwfTH0lteCMkFcnTnC4jcan1VGdvLyxewzMbdbuvTNVukAdrVxbwZMJrDyPPf7aEZ+t50C/pkRYSVf/2/YyFq5hgywqZZe2RInO7UeyHWhP+giyQsVkL0nWpA5zcgKjvYKnZbAt95uzTmwabs4e6BpipvbcX2M7aMyqMaz6OD36cDScMeOFn/FIQC3UalkvwEH0yvzI3CDncTjWy4xkxnfort7XKeQbrSqrX0AcDu462ke95JHZsIfL402lgtcW4aLcPUPs2MPrin1ENLBK29Jm+5LIM+22ISWd4anhpjE70SgOhsXrHrzL4n4kfxb4rsm483aeXEszlxWu56QNQ5EYCHpLY+aF9XOkFdAMM/FBRwlxhTySscPOANfd4GiZxSPxDOEHoEHKoy/CPo4jkUlFrqZIe+VnHmNPgGH/eU2nCNMhVeH/zJ5kOx7wns0SdorUSuQIywg07BBJtizzSUtzofd8kYRdVMyH4RTAfoBeGPUeFV45N5i07N6ucagL3s=
   matrix:
-    - PY=2.7 MPI=1 NUMPY=1.12
-    - PY=3.6 MPI=1 NUMPY=1.12
-    - PY=2.7 MPI= NUMPY=1.12
-    - PY=3.6 MPI= NUMPY=1.12
-    - PY=3.6 MPI=1 NUMPY=1.14
+    - PY=2.7 NUMPY=1.12
+    - PY=2.7 NUMPY=1.12 MPI=1
+    - PY=3.6 NUMPY=1.12
+    - PY=3.6 NUMPY=1.12 MPI=1 UPLOAD_DOCS=1
+    - PY=3.6 NUMPY=1.14 MPI=1
 
 git:
   depth: 99999
@@ -130,7 +130,7 @@ deploy:
   script:
   # only deploy docs in a build after a PR or merge is accepted
   - if [ "$TRAVIS_PULL_REQUEST" = "false" ] && [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ]; then
-      if [ "$MPI" ] && [ "$PY" = "3.6" ]; then
+      if [ "$UPLOAD_DOCS" ]; then
         python _utils/upload_doc_version.py;
       fi
     fi
