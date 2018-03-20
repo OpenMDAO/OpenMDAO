@@ -9,6 +9,7 @@ import numpy as np
 
 from openmdao.api import Problem, IndepVarComp
 from openmdao.components.interp import BsplinesComp
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestBSplinesComp(unittest.TestCase):
@@ -52,14 +53,14 @@ class TestBSplinesCompFeature(unittest.TestCase):
 
     def setUp(self):
         import matplotlib
-        #matplotlib.use('Agg')
+        matplotlib.use('Agg')
 
     def test_distribution_uniform(self):
         prob = Problem()
         model = prob.model
 
-        n_cp = 80
-        n_point = 160
+        n_cp = 20
+        n_point = 100
 
         t = np.linspace(0, 3.0*np.pi, n_cp)
         x = np.sin(t)
@@ -77,26 +78,34 @@ class TestBSplinesCompFeature(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        import matplotlib.pyplot as plt
-
         xx = prob['interp.h']
         tt = np.linspace(0, 3.0*np.pi, n_point)
 
         x_expected = np.sin(tt)
         delta = xx - x_expected
 
+        import matplotlib.pyplot as plt
+
         plt.plot(tt, xx)
         plt.plot(t, x, "ro")
+        plt.xlabel("Distance along Beam")
+        plt.ylabel('Design Variable')
+        plt.title("Uniform Distribution of Control Points")
+        plt.legend(['Variable', 'Control Points'], loc=4)
+        plt.grid(True)
         plt.show()
+
+        assert_rel_error(self, xx[10], 0.93528587, 1e-4 )
 
     def test_distribution_sine(self):
         prob = Problem()
         model = prob.model
 
-        n_cp = 80
-        n_point = 160
+        n_cp = 20
+        n_point = 100
 
-        t = np.linspace(0, 3.0*np.pi, n_cp)
+        tvec = np.linspace(0, 1.0, n_cp)
+        t = 3.0 * np.pi * 0.5 * (1.0 + np.sin(-0.5 * np.pi + tvec * np.pi))
         x = np.sin(t)
 
         model.add_subsystem('px', IndepVarComp('x', val=x))
@@ -112,8 +121,6 @@ class TestBSplinesCompFeature(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        import matplotlib.pyplot as plt
-
         xx = prob['interp.h']
         ttvec = np.linspace(0, 1.0, n_point)
         tt = 3.0 * np.pi * 0.5 * (1.0 + np.sin(-0.5 * np.pi + ttvec * np.pi))
@@ -121,14 +128,19 @@ class TestBSplinesCompFeature(unittest.TestCase):
         x_expected = np.sin(tt)
         delta = xx - x_expected
 
+        import matplotlib.pyplot as plt
+
         plt.figure(1)
-        plt.plot(tt, xx)
+        plt.plot(tt, xx, "b")
         plt.plot(t, x, "ro")
+        plt.xlabel("Distance along Beam")
+        plt.ylabel('Design Variable')
+        plt.title("Sine Distribution of Control Points")
+        plt.legend(['Variable', 'Control Points'], loc=4)
+        plt.grid(True)
         plt.show()
 
-        plt.figure(2)
-        plt.plot(tt, 'o')
-        plt.show()
+        assert_rel_error(self, xx[10], 0.09568950, 1e-4 )
 
 if __name__ == "__main__":
     unittest.main()
