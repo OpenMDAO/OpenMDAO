@@ -128,7 +128,7 @@ deploy:
   skip_cleanup: true
   script:
   # only deploy docs in a build after a PR or merge is accepted
-  - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+  - if [ "$TRAVIS_PULL_REQUEST" = "false" ] && [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ]; then
       if [ "$MPI" ] && [ "$PY" = "3.6" ]; then
         python _utils/upload_doc_version.py;
       fi
