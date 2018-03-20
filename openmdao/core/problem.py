@@ -1144,24 +1144,22 @@ class Problem(object):
 
                 if in_idxs is not None:
                     irange = in_idxs
-                    irange[in_idxs < 0] += end
-                    max_i = np.max(in_idxs)
-                    min_i = np.min(in_idxs)
+                    # correct for negative indices (if indices are given, they are global)
+                    irange[in_idxs < 0] += in_var_meta['global_size']
+                    store = True if dup else np.any(np.logical_and(in_idxs >= start, in_idxs < end))
+                    if store:
+                        min_i = np.min(in_idxs)
                     loc_size = len(in_idxs)
                 else:
                     irange = np.arange(in_var_meta['global_size'], dtype=int)
                     max_i = in_var_meta['global_size'] - 1
                     min_i = 0
                     loc_size = end - start
+                    store = True if dup else ((start <= min_i < end) or (start <= max_i < end))
 
                 if loc_size == 0:
                     # var is not local. get size of var in owned proc
                     loc_size = sizes[owning_ranks[input_name], in_var_idx]
-
-                # set totals to zeros instead of None in those cases when none
-                # of the specified indices are within the range of interest
-                # for this proc.
-                store = True if dup else ((start <= min_i < end) or (start <= max_i < end))
 
                 if store:
                     loc_idxs = irange
@@ -1745,8 +1743,10 @@ class Problem(object):
         abs2idx = self.model._var_allprocs_abs2idx
         abs2meta = self.model._var_allprocs_abs2meta
         iproc = self.model.comm.rank
+        owning_ranks = self.model._owning_rank
+
         idx_tups = [None] * len(names)
-        tot_idx_size = 0
+        loc_idxs = []
 
         for i, name in enumerate(names):
             rhsname = 'linear'
@@ -1767,33 +1767,23 @@ class Problem(object):
                     sizes = var_sizes[rhsname]['output']
                     gstart = np.sum(sizes[:iproc, in_var_idx])
                     gend = gstart + sizes[iproc, in_var_idx]
-                    tot_idx_size += (gend - gstart)
 
                     in_idxs = meta['indices'] if 'indices' in meta else None
 
                     if in_idxs is None:
                         irange = np.arange(in_var_meta['global_size'], dtype=int)
-                        max_i = in_var_meta['global_size'] - 1
-                        min_i = 0
-                        loc_size = gend - gstart
-
-                        if loc_size == 0:
-                            # var is not local. get size of var in owned proc
-                            loc_size = sizes[owning_ranks[name], in_var_idx]
+                        # if the var is not distributed, convert the indices to global
+                        if not in_var_meta['distributed']:
+                            owner = owning_ranks[name]
+                            if owner == iproc:
+                                irange += gstart
+                            else:
+                                owner_start = np.sum(sizes[:owner, in_var_idx])
+                                irange += owner_start
                     else:
                         irange = in_idxs
+                        # correct for any negative indices
                         irange[in_idxs < 0] += gend
-                        max_i = np.max(irange)
-                        min_i = np.min(irange)
-                        loc_size = len(irange)
-
-                    # set totals to zeros instead of None in those cases when none
-                    # of the specified indices are within the range of interest
-                    # for this proc.
-                    if not in_var_meta['distributed']:
-                        store = True
-                    else:
-                        store = (gstart <= min_i < gend) or (gstart <= max_i < gend)
 
                     if store:
                         loc_idxs = irange
@@ -1801,15 +1791,12 @@ class Problem(object):
                             loc_idxs = irange - min_i
                     else:
                         loc_idxs = []
-
                 else:
-                    tot_idx_size += (end - start)
                     gstart = start
                     gend = end
             else:
                 end += abs2meta[name]['size']
                 meta = None
-                tot_idx_size += (end - start)
                 gstart = start
                 gend = end
 
@@ -1820,7 +1807,7 @@ class Problem(object):
 
         for tup in idx_tups:
             _, start, end, _, _, _, _, _ = tup
-            # duplicate the tuple (end - start + 1) times
+            # reference the same tuple (end - start) times
             for i in range(start, end):
                 idx_map[i] = tup
 

@@ -157,6 +157,8 @@ def _get_bool_jac(prob, mode='fwd', repeats=1, tol=1e-15, byvar=True):
     tol : float
         Tolerance on values in jacobian.  Anything smaller in magnitude will be
         set to 0.0.
+    byvar : bool
+        If True, compute coloring by variable. Otherwise compute global coloring.
 
     Returns
     -------
