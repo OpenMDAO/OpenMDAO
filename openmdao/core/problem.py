@@ -1173,7 +1173,7 @@ class Problem(object):
 
         return voi_info
 
-    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
+    def _compute_totals_old(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1607,7 +1607,7 @@ class Problem(object):
 
         return totals
 
-    def _compute_totals_new(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
+    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1644,8 +1644,10 @@ class Problem(object):
         fwd = (mode == 'fwd')
         prom2abs = model._var_allprocs_prom2abs_list['output']
         abs2idx = model._var_allprocs_abs2idx['linear']
+        abs2meta = model._var_allprocs_abs2meta
         design_vars = self.driver._designvars
         responses = self.driver._responses
+        owning_ranks = self.model._owning_rank
 
         if wrt is None:
             wrt = list(design_vars)
@@ -1676,31 +1678,55 @@ class Problem(object):
         if not global_wrt:
             wrt = [prom2abs[name][0] for name in oldwrt]
 
-        # create an array such that a given column index maps to a tuple of the
-        # form (name, start, end, meta), providing the name and range for the
-        # voi corresponding to the indexed column or row.
-        dv_idx_map = self._create_idx_map(wrt, design_vars, model._var_allprocs_abs2meta, fwd)
-        res_idx_map = self._create_idx_map(of, self.driver._responses,
-                                           model._var_allprocs_abs2meta, not fwd)
-
-        # always allocate a 2D dense array and we can assign views to dict keys later if
-        # return format is 'dict' or 'flat_dict'.
-        J = np.zeros((len(res_idx_map), len(dv_idx_map)))
-
         # Linearize Model
         model._linearize()
 
-        if len(self.driver._simul_coloring_info) == 3:  # global coloring
-            input_entry_groups, output_entry_groups, _ = self.driver._simul_coloring_info
+        # if len(self.driver._simul_coloring_info) == 3:  # global coloring
+        #     input_entry_groups, output_entry_groups, _ = self.driver._simul_coloring_info
 
         if fwd:
-            input_idx_map = dv_idx_map
-            output_idx_map = res_idx_map
-            names, meta = wrt, design_vars
+            input_list, output_list = wrt, of
+            input_meta, output_meta = design_vars, responses
+            input_vec, output_vec = vec_dresid, vec_doutput
         else:  # rev
-            input_idx_map = res_idx_map
-            output_idx_map = dv_idx_map
-            name, meta = of, responses
+            input_list, output_list = of, wrt
+            input_meta, output_meta = responses, design_vars
+            input_vec, output_vec = vec_doutput, vec_dresid
+
+        input_idx_map, input_loc_idxs = self._create_input_idx_map(input_list, input_meta)
+        output_slice_map, out_size = self._create_slice_map(output_list, output_meta)
+
+        lin_vec_names = sorted(set(tup[3] for tup in input_idx_map))
+
+        # always allocate a 2D dense array and we can assign views to dict keys later if
+        # return format is 'dict' or 'flat_dict'.
+        if fwd:
+            J = np.zeros((out_size, input_loc_idxs.size))
+        else:  # rev
+            J = np.zeros((input_loc_idxs.size, out_size))
+
+        # for dict type return formats, map var names to views of the Jacobian array.
+        if return_format != 'array':
+            input_slice_map, in_size = self._create_slice_map(input_list, input_meta)
+            if fwd:
+                slice_map_in, slice_map_out = input_slice_map, output_slice_map
+            else:
+                slice_map_in, slice_map_out = output_slice_map, input_slice_map
+
+            Jmap = OrderedDict()
+            if return_format == 'dict':
+                for i, out in enumerate(of):
+                    Jmap[oldof[i]] = outer = OrderedDict()
+                    out_slice = slice_map_out[out]
+                    for j, inp in enumerate(wrt):
+                        outer[oldwrt[j]] = J[out_slice, slice_map_in[inp]]
+            elif return_format == 'flat_dict':
+                for i, out in enumerate(of):
+                    out_slice = slice_map_out[out]
+                    for j, inp in enumerate(wrt):
+                        Jmap[oldof[i], oldwrt[j]] = J[out_slice, slice_map_in[inp]]
+            else:
+                raise ValueError("'%s' is not a valid jacobian return format." % return_format)
 
         # if not all inputs are VOIs, then this is a test where most likely
         # design vars, constraints, and objectives were not specified, so
@@ -1708,15 +1734,62 @@ class Problem(object):
         # dependency graph for VOIs rather than for every input/output
         # in the model)
         use_rel_reduction = True
-        for name in names:
-            if name not in meta:
+        for name in input_list:
+            if name not in input_meta:
                 use_rel_reduction = False
                 break
 
+        # Main loop over columns (fwd) or rows (rev) of the jacobian
         for i, tup in enumerate(input_idx_map):
-            input_name, start, end, global_start, global_end, meta, abs2meta = tup
+            if fwd:
+                vec_dresid['linear'].set_const(0.0)
+                if use_rel_reduction:
+                    vec_doutput['linear'].set_const(0.0)
+            else:  # rev
+                vec_doutput['linear'].set_const(0.0)
+                if use_rel_reduction:
+                    vec_dinput['linear'].set_const(0.0)
 
-    def _create_idx_map(self, names, vois, abs2meta, vois_are_inputs):
+            input_name, start, end, vecname, rel_systems = tup
+            dinputs = input_vec[vecname]
+            doutputs = output_vec[vecname]
+            distrib = abs2meta[input_name]['distributed']
+
+            loc_idx = input_loc_idxs[i]
+            if loc_idx != -1:
+                dinputs._views_flat[input_name][loc_idx] = 1.0
+
+            model._solve_linear(lin_vec_names, mode, rel_systems)
+
+            for output_name in output_list:
+                slc = output_slice_map[output_name]
+                deriv_val = out_idxs = None
+                if not use_rel_reduction or output_name in relevant[input_name]:
+                    if output_name in doutputs._views_flat:
+                        deriv_val = doutputs._views_flat[output_name]
+                        if output_name in output_meta:
+                            out_idxs = output_meta[output_name]['indices']
+                            if out_idxs is not None:
+                                deriv_val = deriv_val[out_idxs]
+
+                    if nproc > 1 and not distrib:
+                        root = owning_ranks[output_name]
+                        if deriv_val is None:
+                            sz = s.stop - s.start
+                            if dinputs._ncol > 1:
+                                deriv_val = np.empty((sz, dinputs._ncol))
+                            else:
+                                deriv_val = np.empty(sz)
+                        self.comm.Bcast(deriv_val, root=root)
+
+                    if fwd:
+                        J[slc, i] = deriv_val
+                    else:
+                        J[i, slc] = deriv_val.T
+
+        return J if return_format == 'array' else Jmap
+
+    def _create_input_idx_map(self, names, vois):
         """
         Create a list that maps a global index to a name, col/row range, and other data.
 
@@ -1726,15 +1799,11 @@ class Problem(object):
             Names of the variables making up the rows or columns of the jacobian.
         vois : dict
             Mapping of variable of interest (desvar or response) name to its metadata.
-        abs2meta : dict
-            Mapping of variable name to its metadata.
-        vois_are_inputs : bool
-            If True, the given names are input vois (design vars in fwd mode, responses in rev).
 
         Returns
         -------
         list
-            List of (name, start, end, rhsname, meta, abs2meta) tuples.
+            List of (name, start, end, rhsname) tuples.
         """
         idx_map = []
         start = 0
@@ -1744,74 +1813,127 @@ class Problem(object):
         abs2meta = self.model._var_allprocs_abs2meta
         iproc = self.model.comm.rank
         owning_ranks = self.model._owning_rank
+        relevant = self.model._relevant
+        tot_idx_size = 0
 
         idx_tups = [None] * len(names)
         loc_idxs = []
 
         for i, name in enumerate(names):
             rhsname = 'linear'
+            in_var_idx = abs2idx[rhsname][name]
+            in_var_meta = abs2meta[name]
+
             if name in vois:
                 meta = vois[name]
                 end += meta['size']
-                if vois_are_inputs:
-                    parallel_deriv_color = meta['parallel_deriv_color']
-                    matmat = meta['vectorize_derivs']
-                    simul_coloring = meta['simul_deriv_color']
-                    self._check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring)
-                    if matmat or parallel_deriv_color:
-                        rhsname = name
 
-                    in_var_idx = abs2idx[rhsname][name]
-                    in_var_meta = abs2meta[name]
+                parallel_deriv_color = meta['parallel_deriv_color']
+                matmat = meta['vectorize_derivs']
+                simul_coloring = meta['simul_deriv_color']
+                self._check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring)
+                if matmat or parallel_deriv_color:
+                    rhsname = name
 
-                    sizes = var_sizes[rhsname]['output']
-                    gstart = np.sum(sizes[:iproc, in_var_idx])
-                    gend = gstart + sizes[iproc, in_var_idx]
+                in_idxs = meta['indices'] if 'indices' in meta else None
 
-                    in_idxs = meta['indices'] if 'indices' in meta else None
-
-                    if in_idxs is None:
-                        irange = np.arange(in_var_meta['global_size'], dtype=int)
-                        # if the var is not distributed, convert the indices to global
-                        if not in_var_meta['distributed']:
-                            owner = owning_ranks[name]
-                            if owner == iproc:
-                                irange += gstart
-                            else:
-                                owner_start = np.sum(sizes[:owner, in_var_idx])
-                                irange += owner_start
-                    else:
-                        irange = in_idxs
-                        # correct for any negative indices
-                        irange[in_idxs < 0] += gend
-
-                    if store:
-                        loc_idxs = irange
-                        if min_i > 0:
-                            loc_idxs = irange - min_i
-                    else:
-                        loc_idxs = []
+                if in_idxs is None:
+                    # if the var is not distributed, global_size == local size
+                    irange = np.arange(in_var_meta['global_size'], dtype=int)
                 else:
-                    gstart = start
-                    gend = end
-            else:
-                end += abs2meta[name]['size']
-                meta = None
-                gstart = start
-                gend = end
+                    irange = in_idxs
+                    # correct for any negative indices
+                    irange[in_idxs < 0] += in_var_meta['global_size']
 
-            idx_tups[i] = (name, start, end, gstart, gend, rhsname, meta, abs2meta)
+            else:  # name is not a VOI  (should only happen during testing)
+                end += abs2meta[name]['size']
+                irange = np.arange(in_var_meta['global_size'], dtype=int)
+                in_idxs = None
+
+            sizes = var_sizes[rhsname]['output']
+            gstart = np.sum(sizes[:iproc, in_var_idx])
+            gend = gstart + sizes[iproc, in_var_idx]
+
+            if not in_var_meta['distributed']:
+                # if the var is not distributed, convert the indices to global.
+                # We don't iterate over the full distributed size in this case.
+                owner = owning_ranks[name]
+                if owner == iproc:
+                    irange += gstart
+                else:
+                    owner_start = np.sum(sizes[:owner, in_var_idx])
+                    irange += owner_start
+
+            # all local idxs that correspond to vars from other procs will be -1
+            # so each entry of loc_i will either contain a valid local index,
+            # indicating we should set the local vector entry to 1.0 before running
+            # solve_linear, or it will contain -1, indicating we should not set any
+            # value before calling solve_linear.
+            loc_i = np.full(irange.shape, -1, dtype=int)
+            loc = np.logical_and(irange >= gstart, irange < gend)
+            if in_idxs is None:
+                loc_i[loc] = np.arange(0, gend - gstart, dtype=int)
+            else:
+                loc_i[loc] = irange[loc]
+
+            loc_idxs.append(loc_i)
+            tot_idx_size += loc_i.size
+
+            if name in relevant:
+                rel = relevant[name]['@all'][1]
+            else:
+                rel = _contains_all
+
+            idx_tups[i] = (name, start, end, rhsname, rel)
             start = end
 
         idx_map = [None] * tot_idx_size
 
         for tup in idx_tups:
-            _, start, end, _, _, _, _, _ = tup
             # reference the same tuple (end - start) times
-            for i in range(start, end):
+            for i in range(tup[1], tup[2]):
                 idx_map[i] = tup
 
-        return idx_map
+        if loc_idxs:
+            loc_idxs = np.hstack(loc_idxs)
+        else:
+            loc_idxs = None
+
+        return idx_map, loc_idxs
+
+    def _create_slice_map(self, names, vois):
+        """
+        Create a dict that maps var name to a jacobian row or column slice.
+
+        Parameters
+        ----------
+        names : iter of str
+            Names of the variables making up the rows or columns of the jacobian.
+        vois : dict
+            Mapping of variable of interest (desvar or response) name to its metadata.
+
+        Returns
+        -------
+        dict
+            Dict of slice keyed by output name.
+        int
+            Total number of rows or columns.
+        """
+        idx_map = {}
+        start = 0
+        end = 0
+        abs2meta = self.model._var_allprocs_abs2meta
+
+        for name in names:
+            if name in vois:
+                end += vois[name]['size']
+            else:
+                end += abs2meta[name]['size']
+
+            idx_map[name] = slice(start, end)
+            start = end
+
+        return idx_map, end  # after the loop, end is the total size
 
     def _check_voi_meta(self, name, parallel_deriv_color, matmat, simul_coloring):
         """
@@ -1830,7 +1952,7 @@ class Problem(object):
         simul_coloring : ndarray
             Array of colors. Each entry corresponds to a column or row of the total jacobian.
         """
-        if len(self.driver._simul_coloring_info) == 3:  # global coloring
+        if self.driver._simul_coloring_info is not None and len(self.driver._simul_coloring_info) == 3:  # global coloring
             if simul_coloring is not None or parallel_deriv_color is not None or matmat:
                 raise RuntimeError("Global coloring is active, so variable '%s' cannot use "
                                    "per-variable coloring, parallel derivatives, or vectorized "
