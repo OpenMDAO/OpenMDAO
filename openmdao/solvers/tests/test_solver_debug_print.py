@@ -9,6 +9,8 @@ import tempfile
 
 import unittest
 
+import numpy as np
+
 from openmdao.core.problem import Problem
 from openmdao.core.indepvarcomp import IndepVarComp
 
@@ -37,6 +39,9 @@ class TestNonlinearSolvers(unittest.TestCase):
         self.startdir = os.getcwd()
         self.tempdir = tempfile.mkdtemp(prefix='test_solver')
         os.chdir(self.tempdir)
+
+        # for consistent output formatting
+        np.set_printoptions(legacy='1.13')
 
         # iteration coordinate, file name and variable data are common for all tests
         coord = 'rank0:root._solve_nonlinear|0|NLRunOnce|0|circuit._solve_nonlinear|0'
@@ -146,8 +151,8 @@ class TestNonlinearSolvers(unittest.TestCase):
         # run the model
         p.run_model()
 
-        self.assertEqual(open('rank0_root_0_NLRunOnce_0_circuit_0.dat', 'r').read(),
-                         self.expected_data)
+        with open('rank0_root_0_NLRunOnce_0_circuit_0.dat', 'r') as f:
+            self.assertEqual(f.read(), self.expected_data)
 
 
 if __name__ == "__main__":
