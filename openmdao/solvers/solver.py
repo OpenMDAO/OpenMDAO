@@ -125,7 +125,7 @@ class Solver(object):
     _solver_info : <SolverInfo>
         Object to store some formatting for iprint that is shared across all solvers.
     cite : str
-        Listing of relevant citataions that should be referenced when
+        Listing of relevant citations that should be referenced when
         publishing work that uses this class.
     options : <OptionsDictionary>
         Options dictionary.
@@ -547,7 +547,7 @@ class NonlinearSolver(Solver):
     _err_cache : dict
         Dictionary holding input and output vectors at start of iteration, if requested.
     cite : str
-        Listing of relevant citataions that should be referenced when
+        Listing of relevant citations that should be referenced when
         publishing work that uses this class.
     options : <OptionsDictionary>
         Options dictionary.
