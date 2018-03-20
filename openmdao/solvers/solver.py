@@ -5,6 +5,7 @@ from __future__ import division, print_function
 from six import iteritems
 
 import os
+import re
 
 import numpy as np
 
@@ -612,7 +613,8 @@ class NonlinearSolver(Solver):
 
             print(out_str)
 
-            filename = coord.replace('._solve_nonlinear', '') + '.dat'
+            filename = coord.replace('._solve_nonlinear', '')
+            filename = re.sub('[^0-9a-zA-Z]', '_', filename) + '.dat'
             with open(filename, 'w') as f:
                 f.write(out_str)
                 print("Inputs and outputs at start of iteration have been "

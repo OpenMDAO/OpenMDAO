@@ -3,6 +3,7 @@
 from __future__ import division, print_function
 
 import os
+import re
 import shutil
 import tempfile
 
@@ -39,7 +40,8 @@ class TestNonlinearSolvers(unittest.TestCase):
 
         # iteration coordinate, file name and variable data are common for all tests
         coord = 'rank0:root._solve_nonlinear|0|NLRunOnce|0|circuit._solve_nonlinear|0'
-        self.filename = coord.replace('._solve_nonlinear', '')+'.dat'
+        filename = coord.replace('._solve_nonlinear', '')
+        self.filename = re.sub('[^0-9a-zA-Z]', '_', filename) + '.dat'
 
         self.expected_data = '\n'.join([
             "",
@@ -144,7 +146,7 @@ class TestNonlinearSolvers(unittest.TestCase):
         # run the model
         p.run_model()
 
-        self.assertEqual(open('rank0:root|0|NLRunOnce|0|circuit|0.dat', 'r').read(),
+        self.assertEqual(open('rank0_root_0_NLRunOnce_0_circuit_0.dat', 'r').read(),
                          self.expected_data)
 
 
