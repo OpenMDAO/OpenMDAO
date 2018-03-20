@@ -44,7 +44,6 @@ notifications:
 
 before_install:
 #- python -c "import fcntl; fcntl.fcntl(1, fcntl.F_SETFL, 0)"
-- pip install --upgrade pip;
 
 - OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux"; fi)
 
