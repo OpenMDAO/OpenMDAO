@@ -450,7 +450,7 @@ class MatMatTestCase(unittest.TestCase):
 
         p.model.add_design_var('x', lower=.1, upper=10000)
         p.model.add_design_var('y', lower=-1000, upper=10000)
-        p.model.add_constraint('g', upper=0) #, vectorize_derivs=True)
+        p.model.add_constraint('g', upper=0, vectorize_derivs=True)
         p.model.add_objective('f')
 
 

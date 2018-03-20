@@ -1,5 +1,6 @@
 
 import unittest
+import types
 from docutils import nodes
 from docutils.parsers.rst import Directive
 from sphinx.errors import SphinxError
@@ -62,7 +63,7 @@ class EmbedCodeDirective(Directive):
         except Exception as err:
             raise SphinxError(str(err))
 
-        is_test = class_ is not None and issubclass(class_, unittest.TestCase)
+        is_test = class_ is not None and (not isinstance(class_, types.FunctionType)) and issubclass(class_, unittest.TestCase)
         shows_plot = '.show(' in source
 
         if 'layout' in self.options:
