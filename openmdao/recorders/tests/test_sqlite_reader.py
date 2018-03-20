@@ -402,6 +402,10 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.prob.driver = pyOptSparseDriver()
         self.prob.driver.options['optimizer'] = OPTIMIZER
+        self.prob.model.metadata.declare("test1", 1)
+        self.prob.model.mda.d1.metadata.declare("test2", "2")
+        self.prob.model.pz.metadata.declare("test3", True)
+        self.prob.model.pz.recording_options['metadata_excludes'] = ['*']
         if OPTIMIZER == 'SLSQP':
             self.prob.driver.opt_settings['ACC'] = 1e-9
 
@@ -431,6 +435,10 @@ class TestSqliteCaseReader(unittest.TestCase):
                 sorted(cr.system_metadata.keys()),
                 sorted(['root', 'mda.d1', 'pz'])
         )
+
+        self.assertEqual(cr.system_metadata['root']['user_metadata']['test1'], 1)
+        self.assertEqual(cr.system_metadata['mda.d1']['user_metadata']['test2'], "2")
+        self.assertFalse('test3' in cr.system_metadata['pz']['user_metadata'])
 
         assert_rel_error(
             self, cr.system_metadata['pz']['scaling_factors']['output']['nonlinear']['phys'][0][1], [2.0, 2.0], 1.0e-3)

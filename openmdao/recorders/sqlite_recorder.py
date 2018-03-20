@@ -13,7 +13,8 @@ from six.moves import cPickle as pickle
 from openmdao.recorders.base_recorder import BaseRecorder
 from openmdao.utils.mpi import MPI
 
-from openmdao.utils.record_util import values_to_array
+from openmdao.utils.record_util import values_to_array, check_path
+from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.core.driver import Driver
 from openmdao.core.system import System
 
@@ -154,7 +155,7 @@ class SqliteRecorder(BaseRecorder):
                 self.cursor.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
                                     "model_viewer_data BLOB)")
                 self.cursor.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
-                                    "scaling_factors BLOB)")
+                                    "scaling_factors BLOB, user_metadata BLOB)")
                 self.cursor.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
                                     "solver_options BLOB, solver_class TEXT)")
 
@@ -362,15 +363,25 @@ class SqliteRecorder(BaseRecorder):
             scaling_vecs[kind] = scaling = {}
             for vecname, vec in iteritems(odict):
                 scaling[vecname] = vec._scaling
-        scaling_factors = pickle.dumps(scaling_vecs,
-                                       self._pickle_version)
+        scaling_factors = pickle.dumps(scaling_vecs, self._pickle_version)
+
+        # create a copy of the system's metadata excluding what is in 'metadata_excludes'
+        user_metadata = OptionsDictionary()
+        excludes = recording_requester.recording_options['metadata_excludes']
+        for key in recording_requester.metadata._dict:
+            if check_path(key, [], excludes, True):
+                user_metadata._dict[key] = recording_requester.metadata._dict[key]
+        user_metadata._read_only = recording_requester.metadata._read_only
+        pickled_metadata = pickle.dumps(user_metadata, self._pickle_version)
+
         path = recording_requester.pathname
         if not path:
             path = 'root'
         with self.con:
-            self.con.execute("INSERT INTO system_metadata(id, scaling_factors) \
-                              VALUES(?,?)",
-                             (path, sqlite3.Binary(scaling_factors)))
+            self.con.execute("INSERT INTO system_metadata(id, scaling_factors, user_metadata) \
+                              VALUES(?,?, ?)",
+                             (path, sqlite3.Binary(scaling_factors),
+                              sqlite3.Binary(pickled_metadata)))
 
     def record_metadata_solver(self, recording_requester):
         """

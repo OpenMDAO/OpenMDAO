@@ -124,15 +124,17 @@ class SqliteCaseReader(BaseCaseReader):
                     if PY3:
                         self.driver_metadata = pickle.loads(row[0])
 
-                cur.execute("SELECT id, scaling_factors FROM system_metadata")
+                cur.execute("SELECT id, scaling_factors, user_metadata FROM system_metadata")
                 for row in cur:
                     id = row[0]
                     self.system_metadata[id] = {}
 
                     if PY2:
                         self.system_metadata[id]['scaling_factors'] = pickle.loads(str(row[1]))
+                        self.system_metadata[id]['user_metadata'] = pickle.loads(str(row[2]))
                     if PY3:
                         self.system_metadata[id]['scaling_factors'] = pickle.loads(row[1])
+                        self.system_metadata[id]['user_metadata'] = pickle.loads(row[2])
 
                 cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")
                 for row in cur:
