@@ -63,28 +63,63 @@ class ParaboloidTricky(ExplicitComponent):
         partials['f_xy', 'x'] = 2.0*x*sc*sc - 6.0*sc + y*sc*sc
         partials['f_xy', 'y'] = 2.0*y*sc*sc + 8.0*sc + x*sc*sc
 
+class MyCompGoodPartials(ExplicitComponent):
+    def setup(self):
+        self.add_input('x1', 3.0)
+        self.add_input('x2', 5.0)
+        self.add_output('y', 5.5)
+        self.declare_partials(of='*', wrt='*')
+
+    def compute(self, inputs, outputs):
+        """ Doesn't do much. """
+        outputs['y'] = 3.0 * inputs['x1'] + 4.0 * inputs['x2']
+
+    def compute_partials(self, inputs, partials):
+        """Correct derivative."""
+        J = partials
+        J['y', 'x1'] = np.array([3.0])
+        J['y', 'x2'] = np.array([4.0])
+
+class MyCompBadPartials(ExplicitComponent):
+    def setup(self):
+        self.add_input('y1', 3.0)
+        self.add_input('y2', 5.0)
+        self.add_output('z', 5.5)
+        self.declare_partials(of='*', wrt='*')
+
+    def compute(self, inputs, outputs):
+        """ Doesn't do much. """
+        outputs['z'] = 3.0 * inputs['y1'] + 4.0 * inputs['y2']
+
+    def compute_partials(self, inputs, partials):
+        """Intentionally incorrect derivative."""
+        J = partials
+        J['z', 'y1'] = np.array([33.0])
+        J['z', 'y2'] = np.array([40.0])
+
+class MyComp(ExplicitComponent):
+    def setup(self):
+        self.add_input('x1', 3.0)
+        self.add_input('x2', 5.0)
+
+        self.add_output('y', 5.5)
+
+        self.declare_partials(of='*', wrt='*')
+
+    def compute(self, inputs, outputs):
+        """ Doesn't do much. """
+        outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
+
+    def compute_partials(self, inputs, partials):
+        """Intentionally incorrect derivative."""
+        J = partials
+        J['y', 'x1'] = np.array([4.0])
+        J['y', 'x2'] = np.array([40])
+
 
 class TestProblemCheckPartials(unittest.TestCase):
 
     def test_incorrect_jacobian(self):
-        class MyComp(ExplicitComponent):
-            def setup(self):
-                self.add_input('x1', 3.0)
-                self.add_input('x2', 5.0)
-
-                self.add_output('y', 5.5)
-
-                self.declare_partials(of='*', wrt='*')
-
-            def compute(self, inputs, outputs):
-                """ Doesn't do much. """
-                outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
-
-            def compute_partials(self, inputs, partials):
-                """Intentionally incorrect derivative."""
-                J = partials
-                J['y', 'x1'] = np.array([4.0])
-                J['y', 'x2'] = np.array([40])
 
         prob = Problem()
         prob.model = Group()
@@ -118,24 +153,6 @@ class TestProblemCheckPartials(unittest.TestCase):
                          msg='Error flag not expected in output but displayed')
 
     def test_component_only(self):
-        class MyComp(ExplicitComponent):
-            def setup(self):
-                self.add_input('x1', 3.0)
-                self.add_input('x2', 5.0)
-
-                self.add_output('y', 5.5)
-
-                self.declare_partials(of='*', wrt='*')
-
-            def compute(self, inputs, outputs):
-                """ Doesn't do much. """
-                outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
-
-            def compute_partials(self, inputs, partials):
-                """Intentionally incorrect derivative."""
-                J = partials
-                J['y', 'x1'] = np.array([4.0])
-                J['y', 'x2'] = np.array([40])
 
         prob = Problem()
         prob.model = MyComp()
@@ -156,24 +173,6 @@ class TestProblemCheckPartials(unittest.TestCase):
                         msg='Error flag expected in output but not displayed')
 
     def test_component_only_suppress(self):
-        class MyComp(ExplicitComponent):
-            def setup(self):
-                self.add_input('x1', 3.0)
-                self.add_input('x2', 5.0)
-
-                self.add_output('y', 5.5)
-
-                self.declare_partials(of='*', wrt='*')
-
-            def compute(self, inputs, outputs):
-                """ Doesn't do much. """
-                outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
-
-            def compute_partials(self, inputs, partials):
-                """Intentionally incorrect derivative."""
-                J = partials
-                J['y', 'x1'] = np.array([4.0])
-                J['y', 'x2'] = np.array([40])
 
         prob = Problem()
         prob.model = MyComp()
@@ -970,30 +969,6 @@ class TestProblemCheckPartials(unittest.TestCase):
                     header_locations_of_bars = [i for i, ltr in enumerate(line) if ltr == sep]
 
     def test_compact_print_exceed_tol(self):
-        class MyCompGoodPartials(ExplicitComponent):
-            def setup(self):
-                self.add_input('x1', 3.0)
-                self.add_input('x2', 5.0)
-                self.add_output('y', 5.5)
-                self.declare_partials(of='*', wrt='*')
-
-            def compute(self, inputs, outputs):
-                """ Doesn't do much. """
-                outputs['y'] = 3.0 * inputs['x1'] + 4.0 * inputs['x2']
-
-            def compute_partials(self, inputs,     partials):
-                """Correct derivative."""
-                J = partials
-                J['y', 'x1'] = np.array([3.0])
-                J['y', 'x2'] = np.array([4.0])
-
-        class MyCompBadPartials(MyCompGoodPartials):
-            def compute_partials(self, inputs, partials):
-                """Intentionally incorrect derivative."""
-                J = partials
-                J['y', 'x1'] = np.array([4.0])
-                J['y', 'x2'] = np.array([40])
-
 
         prob = Problem()
         prob.model = MyCompGoodPartials()
@@ -1036,10 +1011,10 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = cStringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
-        self.assertEqual(stream.getvalue().count('n/a'),20)
-        self.assertEqual(stream.getvalue().count('rev'),10)
+        self.assertEqual(stream.getvalue().count('n/a'),25)
+        self.assertEqual(stream.getvalue().count('rev'),15)
         self.assertEqual(stream.getvalue().count('Component'),2)
-        self.assertEqual(stream.getvalue().count('wrt'),10)
+        self.assertEqual(stream.getvalue().count('wrt'),12)
 
         stream = cStringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
@@ -1099,7 +1074,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
         stream = cStringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
-        self.assertEqual(stream.getvalue().count('rev'),5)
+        self.assertEqual(stream.getvalue().count('rev'),10)
 
         stream = cStringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
@@ -1125,9 +1100,9 @@ class TestProblemCheckPartials(unittest.TestCase):
         stream = cStringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
         self.assertEqual(stream.getvalue().count('n/a'),10)
-        self.assertEqual(stream.getvalue().count('rev'),10)
+        self.assertEqual(stream.getvalue().count('rev'),15)
         self.assertEqual(stream.getvalue().count('Component'),2)
-        self.assertEqual(stream.getvalue().count('wrt'),6)
+        self.assertEqual(stream.getvalue().count('wrt'),8)
 
         stream = cStringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
@@ -1158,7 +1133,70 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
         stream = cStringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
-        self.assertEqual(stream.getvalue().count('rev'),5)
+        self.assertEqual(stream.getvalue().count('rev'),10)
+
+    def test_check_partials_worst_subjac(self):
+        # The first is printing the worst subjac at the bottom of the output. Worst is defined by
+        # looking at the fwd and rev columns of the relative error (i.e., the 2nd and 3rd last
+        # columns) of the compact_print=True output. We should print the component name, then
+        # repeat the full row for the worst-case subjac (i.e., output-input pair).
+        # This should only occur in the compact_print=True case.
+
+
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('p0', IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p1', IndepVarComp('x2', 5.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y2', 6.0))
+        prob.model.add_subsystem('good', MyCompGoodPartials())
+        prob.model.add_subsystem('bad', MyCompBadPartials())
+        prob.model.connect('p0.x1', 'good.x1')
+        prob.model.connect('p1.x2', 'good.x2')
+        prob.model.connect('good.y', 'bad.y1')
+        prob.model.connect('p2.y2', 'bad.y2')
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+        prob.run_model()
+
+        stream = cStringIO()
+        prob.check_partials(out_stream=stream, compact_print=True)
+        prob.check_partials(compact_print=True)
+        self.assertEqual(stream.getvalue().count("'z'        wrt 'y1'"),2)
+
+    def test_check_partials_show_only_incorrect(self):
+        # The second is adding an option to show only the incorrect subjacs
+        # (according to abs_err_tol and rel_err_tol), called
+        # show_only_incorrect. This should be False by default, but when True,
+        # it should print only the subjacs found to be incorrect. This applies
+        # to both compact_print=True and False.
+
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('p0', IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p1', IndepVarComp('x2', 5.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y2', 6.0))
+        prob.model.add_subsystem('good', MyCompGoodPartials())
+        prob.model.add_subsystem('bad', MyCompBadPartials())
+        prob.model.connect('p0.x1', 'good.x1')
+        prob.model.connect('p1.x2', 'good.x2')
+        prob.model.connect('good.y', 'bad.y1')
+        prob.model.connect('p2.y2', 'bad.y2')
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+        prob.run_model()
+
+        stream = cStringIO()
+        # prob.check_partials(compact_print=True,show_only_incorrect=False)
+        prob.check_partials(out_stream=stream, compact_print=True,show_only_incorrect=True)
+        self.assertEqual(stream.getvalue().count("MyCompBadPartials"),2)
+        self.assertEqual(stream.getvalue().count("'z'        wrt 'y1'"),2)
+        self.assertEqual(stream.getvalue().count("MyCompGoodPartials"),0)
+
+        stream = cStringIO()
+        prob.check_partials( compact_print=False,show_only_incorrect=False)
+        prob.check_partials( out_stream=stream, compact_print=False,show_only_incorrect=True)
+        self.assertEqual(stream.getvalue().count("MyCompGoodPartials"),0)
+        self.assertEqual(stream.getvalue().count("MyCompBadPartials"),1)
 
 class TestCheckPartialsFeature(unittest.TestCase):
 
@@ -1478,6 +1516,60 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob.check_partials(compact_print=True)
 
+    def test_feature_check_partials_show_only_incorrect(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
+
+        class MyCompGoodPartials(ExplicitComponent):
+            def setup(self):
+                self.add_input('x1', 3.0)
+                self.add_input('x2', 5.0)
+                self.add_output('y', 5.5)
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                """ Doesn't do much. """
+                outputs['y'] = 3.0 * inputs['x1'] + 4.0 * inputs['x2']
+
+            def compute_partials(self, inputs, partials):
+                """Correct derivative."""
+                J = partials
+                J['y', 'x1'] = np.array([3.0])
+                J['y', 'x2'] = np.array([4.0])
+
+        class MyCompBadPartials(ExplicitComponent):
+            def setup(self):
+                self.add_input('y1', 3.0)
+                self.add_input('y2', 5.0)
+                self.add_output('z', 5.5)
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                """ Doesn't do much. """
+                outputs['z'] = 3.0 * inputs['y1'] + 4.0 * inputs['y2']
+
+            def compute_partials(self, inputs, partials):
+                """Intentionally incorrect derivative."""
+                J = partials
+                J['z', 'y1'] = np.array([33.0])
+                J['z', 'y2'] = np.array([40.0])
+
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('p0', IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p1', IndepVarComp('x2', 5.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y2', 6.0))
+        prob.model.add_subsystem('good', MyCompGoodPartials())
+        prob.model.add_subsystem('bad', MyCompBadPartials())
+        prob.model.connect('p0.x1', 'good.x1')
+        prob.model.connect('p1.x2', 'good.x2')
+        prob.model.connect('good.y', 'bad.y1')
+        prob.model.connect('p2.y2', 'bad.y2')
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+        prob.run_model()
+
+        prob.check_partials(compact_print=True,show_only_incorrect=True)
+        prob.check_partials(compact_print=False,show_only_incorrect=True)
 
 class TestProblemCheckTotals(unittest.TestCase):
 
