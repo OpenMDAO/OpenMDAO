@@ -19,5 +19,5 @@ Usage
 -----
 
 .. embed-code::
-    openmdao.utils.tests.test_assert_utils.TestAssertUtils.test_assert_check_partials_no_exception_expected
+    openmdao.utils.tests.test_assert_utils.TestAssertUtils.test_feature_assert_check_partials_exception_expected
     :layout: interleave
