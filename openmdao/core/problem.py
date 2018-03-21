@@ -26,6 +26,7 @@ from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
+from openmdao.utils.general_utils import pad_name
 from openmdao.vectors.default_vector import DefaultVector
 
 try:
@@ -1745,12 +1746,12 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 if totals:
                     header = "{0} wrt {1} | {2} | {3} | {4} | {5}"\
                         .format(
-                            _pad_name('<output>', 30, quotes=True),
-                            _pad_name('<variable>', 30, quotes=True),
-                            _pad_name('calc mag.'),
-                            _pad_name('check mag.'),
-                            _pad_name('a(cal-chk)'),
-                            _pad_name('r(cal-chk)'),
+                            pad_name('<output>', 30, quotes=True),
+                            pad_name('<variable>', 30, quotes=True),
+                            pad_name('calc mag.'),
+                            pad_name('check mag.'),
+                            pad_name('a(cal-chk)'),
+                            pad_name('r(cal-chk)'),
                         )
                 else:
                     max_width_of = len("'<output>'")
@@ -1763,27 +1764,27 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         header = \
                             "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}" \
                             .format(
-                                _pad_name('<output>', max_width_of, quotes=True),
-                                _pad_name('<variable>', max_width_wrt, quotes=True),
-                                _pad_name('fwd mag.'),
-                                _pad_name('rev mag.'),
-                                _pad_name('check mag.'),
-                                _pad_name('a(fwd-chk)'),
-                                _pad_name('a(rev-chk)'),
-                                _pad_name('a(fwd-rev)'),
-                                _pad_name('r(fwd-chk)'),
-                                _pad_name('r(rev-chk)'),
-                                _pad_name('r(fwd-rev)')
+                                pad_name('<output>', max_width_of, quotes=True),
+                                pad_name('<variable>', max_width_wrt, quotes=True),
+                                pad_name('fwd mag.'),
+                                pad_name('rev mag.'),
+                                pad_name('check mag.'),
+                                pad_name('a(fwd-chk)'),
+                                pad_name('a(rev-chk)'),
+                                pad_name('a(fwd-rev)'),
+                                pad_name('r(fwd-chk)'),
+                                pad_name('r(rev-chk)'),
+                                pad_name('r(fwd-rev)')
                             )
                     else:
                         header = "{0} wrt {1} | {2} | {3} | {4} | {5}"\
                             .format(
-                                _pad_name('<output>', max_width_of, quotes=True),
-                                _pad_name('<variable>', max_width_wrt, quotes=True),
-                                _pad_name('fwd mag.'),
-                                _pad_name('check mag.'),
-                                _pad_name('a(fwd-chk)'),
-                                _pad_name('r(fwd-chk)'),
+                                pad_name('<output>', max_width_of, quotes=True),
+                                pad_name('<variable>', max_width_wrt, quotes=True),
+                                pad_name('fwd mag.'),
+                                pad_name('check mag.'),
+                                pad_name('a(fwd-chk)'),
+                                pad_name('r(fwd-chk)'),
                             )
                 if out_stream:
                     out_buffer.write(header + '\n')
@@ -1838,8 +1839,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     if totals:
                         if out_stream:
                             out_stream.write(deriv_line.format(
-                                _pad_name(of, 30, quotes=True),
-                                _pad_name(wrt, 30, quotes=True),
+                                pad_name(of, 30, quotes=True),
+                                pad_name(wrt, 30, quotes=True),
                                 magnitude.forward,
                                 magnitude.fd,
                                 abs_err.forward,
@@ -1875,8 +1876,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             if not all_comps_provide_jacs:
                                 deriv_info_line = \
                                     deriv_line.format(
-                                        _pad_name(of, max_width_of, quotes=True),
-                                        _pad_name(wrt, max_width_wrt, quotes=True),
+                                        pad_name(of, max_width_of, quotes=True),
+                                        pad_name(wrt, max_width_wrt, quotes=True),
                                         magnitude.forward,
                                         _format_if_not_matrix_free(
                                             system.matrix_free, magnitude.reverse),
@@ -1895,8 +1896,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             else:
                                 deriv_info_line = \
                                     deriv_line.format(
-                                        _pad_name(of, max_width_of, quotes=True),
-                                        _pad_name(wrt, max_width_wrt, quotes=True),
+                                        pad_name(of, max_width_of, quotes=True),
+                                        pad_name(wrt, max_width_wrt, quotes=True),
                                         magnitude.forward,
                                         magnitude.fd,
                                         abs_err.forward,
@@ -2017,42 +2018,7 @@ def _format_if_not_matrix_free(matrix_free, val):
     if matrix_free:
         return '{0:.4e}'.format(val)
     else:
-        return _pad_name('n/a')
-
-
-def _pad_name(name, pad_num=10, quotes=False):
-    """
-    Pad a string so that they all line up when stacked.
-
-    Parameters
-    ----------
-    name : str
-        The string to pad.
-    pad_num : int
-        The number of total spaces the string should take up.
-    quotes : bool
-        If name should be quoted.
-
-    Returns
-    -------
-    str
-        Padded string
-    """
-    l_name = len(name)
-    quotes_len = 2 if quotes else 0
-    if l_name + quotes_len < pad_num:
-        pad = pad_num - (l_name + quotes_len)
-        if quotes:
-            pad_str = "'{name}'{sep:<{pad}}"
-        else:
-            pad_str = "{name}{sep:<{pad}}"
-        pad_name = pad_str.format(name=name, sep='', pad=pad)
-        return pad_name
-    else:
-        if quotes:
-            return "'{0}'".format(name)
-        else:
-            return '{0}'.format(name)
+        return pad_name('n/a')
 
 
 def _format_error(error, tol):

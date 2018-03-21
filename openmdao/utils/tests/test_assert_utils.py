@@ -82,11 +82,20 @@ class TestAssertUtils(unittest.TestCase):
         rtol = 1.e-6
         try:
             assert_check_partials(data, atol, rtol)
-        except AssertionError as err:
+        except ValueError as err:
+            err_string = str(err)
+            self.assertEqual(err_string.count('Assert Check Partials failed for the following Components'), 1)
+            self.assertEqual(err_string.count('1e-06'), 2)
+            self.assertEqual(err_string.count('Component:'), 1)
+            self.assertEqual(err_string.count('< output > wrt < variable >'), 1)
+            self.assertEqual(err_string.count('norm'), 2)
+            self.assertEqual(err_string.count('y wrt x1'), 4)
+            self.assertEqual(err_string.count('y wrt x2'), 4)
+            self.assertEqual(err_string.count('abs'), 6)
+            self.assertEqual(err_string.count('rel'), 6)
+            self.assertEqual(err_string.count('fwd-fd'), 4)
+            self.assertEqual(err_string.count('rev-fd'), 4)
             expected_str = "error in partial of y wrt x1 in"
-            self.assertTrue(expected_str in str(err),
-                            msg="\n\nActual err msg:\n{} \n\ndoes not contain expected string:\n\n{}".format(str(err),
-                                                                                                     expected_str))
         else:
             self.fail('Exception expected.')
 
