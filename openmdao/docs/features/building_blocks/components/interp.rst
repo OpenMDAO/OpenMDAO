@@ -8,7 +8,7 @@ BsplinesComp
 
 The BsplinesComp allows you to represent a large dimension variable as a smaller dimensional variable via a B-spline function.
 This is useful for reducing the size of an optimization problem by decreasing the number of design variables it solves, and potentially
-ithe number of gradients it computes if you are running in forward mode. You may consider using this when you have spatially
+the number of gradients it computes if you are running in forward mode. You may consider using this when you have spatially
 distributed design variables where you know that the physics gives you smooth designs that can be well approximated by B-splines.
 
 
@@ -23,10 +23,10 @@ subject to multiple load cases, each one being a distributed force load that var
 If we allow the optimizer to vary the thickness of each element, then we have a design variable vector that is as wide as the
 number of elements in the model. This may perform poorly if we have a large number of elements in the beam. If we assume that
 the optimal beam thickness is going to have a smooth continuous variation over the length of the beam, then it is a good
-candidate for using an interpolation component like BSplinesComp.
+candidate for using an interpolation component like BsplinesComp.
 
 For this example, we have 25 elements, but can reduce that to 5 control points for the optimizer's design variables by
-including the BSplinesComp.
+including the BsplinesComp.
 
 
 The code for the top system is this:
@@ -59,7 +59,7 @@ initial value for this variable is roughly a sine wave. When we create the Bspli
 distribution, our control points are evenly spaced over the domain, as seen in the figure below.
 
 .. embed-code::
-    openmdao.components.tests.test_interp.TestBSplinesCompFeature.test_distribution_uniform
+    openmdao.components.tests.test_interp.TestBsplinesCompFeature.test_distribution_uniform
     :layout: interleave, plot
     :scale: 90
     :align: center
@@ -69,7 +69,7 @@ as seen below. This is beneficial if we know that the optimal design will have m
 higher spatial frequency content) near the edges than the middle.
 
 .. embed-code::
-    openmdao.components.tests.test_interp.TestBSplinesCompFeature.test_distribution_sine
+    openmdao.components.tests.test_interp.TestBsplinesCompFeature.test_distribution_sine
     :layout: interleave, plot
     :scale: 90
     :align: center

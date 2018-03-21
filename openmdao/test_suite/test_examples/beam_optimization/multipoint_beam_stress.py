@@ -159,8 +159,7 @@ class MultipointBeamGroup(Group):
                     'KS_%d.g' % k)
 
                 sub.add_constraint('KS_%d.KS' % k, upper=0.0,
-                                   parallel_deriv_color=parallel_deriv_color,
-                                   vectorize_derivs=True)
+                                   parallel_deriv_color=parallel_deriv_color)
 
         comp = VolumeComp(num_elements=num_elements, b=b, L=L)
         self.add_subsystem('volume_comp', comp)

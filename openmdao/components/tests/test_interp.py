@@ -12,7 +12,7 @@ from openmdao.components.interp import BsplinesComp
 from openmdao.utils.assert_utils import assert_rel_error
 
 
-class TestBSplinesComp(unittest.TestCase):
+class TestBsplinesComp(unittest.TestCase):
 
     def test_basic(self):
         prob = Problem()
@@ -49,7 +49,7 @@ class TestBSplinesComp(unittest.TestCase):
         self.assertLess(max(delta[15:-15]), .06)
 
 
-class TestBSplinesCompFeature(unittest.TestCase):
+class TestBsplinesCompFeature(unittest.TestCase):
 
     def setUp(self):
         import matplotlib

@@ -87,7 +87,7 @@ class KSComponent(ExplicitComponent):
     rho : float(50.0)
         Constraint Aggregation Factor.
     upper : float(0.0)
-        Upper found for constraint, default is zero.
+        Upper bound for constraint, default is zero.
     """
 
     def __init__(self, width=1):
@@ -104,7 +104,7 @@ class KSComponent(ExplicitComponent):
         self.options.declare('lower_flag', False,
                              desc="Set to True to reverse sign of input constraints.")
         self.options.declare('rho', 50.0, desc="Constraint Aggregation Factor.")
-        self.options.declare('upper', 0.0, desc="Upper found for constraint, default is zero.")
+        self.options.declare('upper', 0.0, desc="Upper bound for constraint, default is zero.")
 
         self.cite = CITATIONS
 
