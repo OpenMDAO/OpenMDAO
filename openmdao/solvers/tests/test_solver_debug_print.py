@@ -40,8 +40,10 @@ class TestNonlinearSolvers(unittest.TestCase):
         self.tempdir = tempfile.mkdtemp(prefix='test_solver')
         os.chdir(self.tempdir)
 
-        # for consistent output formatting
-        np.set_printoptions(legacy='1.13')
+        # formatting has changed in numpy 1.14 and beyond.
+        from distutils.version import LooseVersion
+        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+            np.set_printoptions(legacy='1.13')
 
         # iteration coordinate, file name and variable data are common for all tests
         coord = 'rank0:root._solve_nonlinear|0|NLRunOnce|0|circuit._solve_nonlinear|0'
