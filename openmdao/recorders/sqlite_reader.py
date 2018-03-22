@@ -3,6 +3,8 @@ Definition of the SqliteCaseReader.
 """
 from __future__ import print_function, absolute_import
 
+import re
+import sys
 import sqlite3
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
@@ -152,6 +154,175 @@ class SqliteCaseReader(BaseCaseReader):
         else:
             raise ValueError('SQliteCaseReader encountered an unhandled '
                              'format version: {0}'.format(self.format_version))
+
+    def get_child_cases(self, parent=None, recursive=False):
+        """
+        Allows one to iterate over the driver and solver cases.
+
+        Parameters
+        ----------
+        parent : DriverCase or SolverCase or str
+            Identifies which case's children to return. None indicates Root. Can pass a
+            driver case, a solver case, or an iteration coordinate identifying a solver
+            or driver case.
+        recursive : bool
+            If True, will enable iterating over all successors in case hierarchy
+            rather than just the direct children.
+
+        Returns
+        -------
+            Generator giving Driver and/or Solver cases in order.
+        """
+        iter_coord = ''
+        if parent is not None:
+            if parent is DriverCase or parent is SolverCase:
+                iter_coord = parent.iteration_coordinate
+            elif parent is str:
+                iter_coord = parent
+            else:
+                raise TypeError("parent parameter can only be DriverCase, SolverCase, or string")
+
+        driver_iter = []
+        solver_iter = []
+        with sqlite3.connect(self.filename) as con:
+            cur = con.cursor()
+            cur.execute("SELECT iteration_coordinate FROM driver_iterations "
+                        "ORDER BY counter ASC")
+            driver_iter = cur.fetchall()
+
+            cur.execute("SELECT iteration_coordinate, counter FROM solver_iterations "
+                        "ORDER BY counter ASC")
+            solver_iter = cur.fetchall()
+        con.close()
+
+        split_iter_coord = self._split_coordinate(iter_coord) if iter_coord is not ''\
+            else []
+
+        # grab an array of possible lengths of coordinates
+        coord_lengths = [1]  # start with 1 because that is the length of driver iteration coords
+        for s in solver_iter:
+            s_len = len(self._split_coordinate(s[0]))
+            if s_len not in coord_lengths:
+                coord_lengths.append(s_len)
+        coord_lengths = sorted(coord_lengths)
+
+        # grab full set of cases to iterate over
+        iter_set = self._find_child_cases(iter_coord, split_iter_coord, driver_iter,
+                                          solver_iter, recursive, coord_lengths)
+
+        # iterate over set of cases
+        for iteration in iter_set:
+            if iteration[1] is 'driver':
+                yield self.driver_cases.get_case(iteration[0])
+            else:
+                yield self.solver_cases.get_case(iteration[0])
+
+    def _find_child_cases(self, parent_iter_coord, split_parent_iter_coord, driver_iter,
+                          solver_iter, recursive, coord_lengths):
+        """
+        Finds all child cases of a given parent.
+
+        Parameters
+        ----------
+        parent_iter_coord : str
+            Iteration coordinate of the parent case. If empty string, assumes root is parent.
+        split_parent_iter_coord : [str]
+            The split parent iteration coordinate.
+        driver_iter : [(str)]
+            The ordered list of driver iteration coordinates.
+        solver_iter : [(str)]
+            The ordered list of solver iteration coordinates.
+        recursive : bool
+            If True, will grab all successors recursively. Otherwise, will only return direct
+            children.
+        coord_lengths : [int]
+            Sorted array of possible coordinate lengths. Used to determine if case is child
+            of another case.
+
+        Returns
+        -------
+            List of tuples of the form ('iteration_coordinate', 'type of iteration')
+        """
+        ret = []
+        par_len = len(split_parent_iter_coord)
+        par_len_idx = coord_lengths.index(par_len if par_len is not 0 else 1)
+        expected_child_length = coord_lengths[par_len_idx + 1] if par_len_idx <\
+            len(coord_lengths) - 1 else -1
+        if parent_iter_coord is '':  # CASE: grabbing children of 'root'
+            if len(driver_iter) > 0:  # grabbing all driver cases
+                for d in driver_iter:
+                    ret.append((d[0], 'driver'))
+                    if recursive:
+                        ret += self._find_child_cases(d[0], self._split_coordinate(d[0]),
+                                                      driver_iter, solver_iter, recursive,
+                                                      coord_lengths)
+            elif len(solver_iter) > 0:  # grabbing first layer of solver iterations
+                # find the iteration coordinate length of the first layer of solver iterations
+                min_iter_len = (0, len(self._split_coordinate(solver_iter[0])))
+                for idx, s in solver_iter:
+                    length = len(self._split_coordinate(s[0]))
+                    if length < min_iter_len[1]:
+                        min_iter_len[0] = idx
+                        min_iter_len[1] = length
+
+                for s in solver_iter:
+                    split_coord = self._split_coordinate(s[0])
+                    if len(split_coord) is min_iter_len[1]:
+                        ret.append((s[0], 'solver'))
+                        if recursive:
+                            ret += self._find_child_cases(s[0], split_coord, driver_iter,
+                                                          solver_iter, recursive, coord_lengths)
+        else:  # CASE: grabbing children of a case
+            for s in solver_iter:
+                if self._is_case_child(parent_iter_coord, s[0], expected_child_length):
+                    ret.append((s[0], 'solver'))
+                    if recursive:
+                        ret += self._find_child_cases(s[0], self._split_coordinate(s[0]),
+                                                      driver_iter, solver_iter, recursive,
+                                                      coord_lengths)
+
+        return ret
+
+    def _is_case_child(self, parent_coordinate, coordinate, expected_child_length):
+        """
+        Tells if the given iteration coordinate indicates that the associated case is a
+        child case of the parent.
+
+        Parameters
+        ----------
+        parent_coordinate : str
+            The iteration coordinate of the potential parent.
+        coordinate : str
+            Iteration coordinate of the case we want to test.
+        expected_child_length : int
+            Expected length of the split child iteration coordinate
+
+        Returns
+        -------
+            True if the given coordinate indicates that the case is a child of the
+            given parent case. False otherwise.
+        """
+        split_coord = self._split_coordinate(coordinate)
+        if coordinate.startswith(parent_coordinate) and\
+           len(split_coord) is expected_child_length:
+            return True
+
+        return False
+
+    def _split_coordinate(self, coordinate):
+        """
+        Splits up an iteration coordinate string based on the iteration index.
+
+        Parameters
+        ----------
+        coordinate : str
+            The iteration coordinate to split.
+
+        Returns
+        -------
+            coordinate as array of strings.
+        """
+        return re.compile('\|\\d+\|').split(coordinate)
 
 
 class DriverCases(BaseCases):
