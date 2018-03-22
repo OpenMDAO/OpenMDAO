@@ -2,6 +2,7 @@
 
 from __future__ import division, print_function
 
+from six import iteritems
 import unittest
 import warnings
 
@@ -14,6 +15,7 @@ from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov, ScipyIterativ
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
+from openmdao.test_suite.components.misc_components import Comp4LinearCacheTest
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 
@@ -170,6 +172,63 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         self.assertEqual(len(w), 1)
         self.assertTrue(issubclass(w[0].category, DeprecationWarning))
         self.assertEqual(str(w[0].message), msg)
+
+    def test_linear_solution_cache(self):
+        # Test derivatives across a converged Sellar model. When caching
+        # is performed, the second solve takes less iterations than the
+        # first one.
+
+        # Forward mode
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('d1', Comp4LinearCacheTest(), promotes=['x', 'y'])
+
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.linear_solver = ScipyKrylov()
+
+        model.add_design_var('x', cache_linear_solution=True)
+        model.add_objective('y', cache_linear_solution=True)
+
+        prob.setup(mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        J = prob.compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        icount1 = prob.model.linear_solver._iter_count
+        J = prob.compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        icount2 = prob.model.linear_solver._iter_count
+
+        # Should take less iterations when starting from previous solution.
+        self.assertTrue(icount2 < icount1)
+
+        # Reverse mode
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('d1', Comp4LinearCacheTest(), promotes=['x', 'y'])
+
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.linear_solver = ScipyKrylov()
+
+        model.add_design_var('x', cache_linear_solution=True)
+        model.add_objective('y', cache_linear_solution=True)
+
+        prob.setup(mode='rev')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        J = prob.compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        icount1 = prob.model.linear_solver._iter_count
+        J = prob.compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        icount2 = prob.model.linear_solver._iter_count
+
+        # Should take less iterations when starting from previous solution.
+        self.assertTrue(icount2 < icount1)
 
 
 # class TestScipyKrylovBICG(TestScipyKrylov):

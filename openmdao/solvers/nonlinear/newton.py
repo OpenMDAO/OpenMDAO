@@ -2,6 +2,8 @@
 
 from __future__ import print_function
 
+from copy import deepcopy
+
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration
 from openmdao.utils.general_utils import warn_deprecation
@@ -81,10 +83,13 @@ class NewtonSolver(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
+        super(NewtonSolver, self)._declare_options()
+
         self.options.declare('solve_subsystems', types=bool, default=False,
                              desc='Set to True to turn on sub-solvers (Hybrid Newton).')
         self.options.declare('max_sub_solves', types=int, default=10,
                              desc='Maximum number of subsystem solves.')
+
         self.supports['gradients'] = True
 
     def _setup_solvers(self, system, depth):
@@ -182,6 +187,10 @@ class NewtonSolver(NonlinearSolver):
         float
             error at the first iteration.
         """
+        if self.options['debug_print']:
+            self._err_cache['inputs'] = deepcopy(self._system._inputs)
+            self._err_cache['outputs'] = deepcopy(self._system._outputs)
+
         system = self._system
 
         # Execute guess_nonlinear if specified.
