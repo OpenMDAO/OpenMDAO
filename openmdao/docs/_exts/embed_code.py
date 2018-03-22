@@ -4,7 +4,7 @@ from docutils import nodes
 from docutils.parsers.rst import Directive
 from sphinx.errors import SphinxError
 import sphinx
-
+import traceback
 import inspect
 import os
 
@@ -97,24 +97,29 @@ class EmbedCodeDirective(Directive):
             source = remove_docstrings(source)
 
         if is_test:
-            source = replace_asserts_with_prints(dedent(strip_header(source)))
-            source = remove_initial_empty_lines(source)
+            try:
+                source = replace_asserts_with_prints(dedent(strip_header(source)))
+                source = remove_initial_empty_lines(source)
 
-            class_name = class_.__name__
-            method_name = path.rsplit('.', 1)[1]
+                class_name = class_.__name__
+                method_name = path.rsplit('.', 1)[1]
 
-            # make 'self' available to test code (as an instance of the test case)
-            self_code = "from %s import %s\nself = %s('%s')\n" % \
-                        (module.__name__, class_name, class_name, method_name)
+                # make 'self' available to test code (as an instance of the test case)
+                self_code = "from %s import %s\nself = %s('%s')\n" % \
+                            (module.__name__, class_name, class_name, method_name)
 
-            # get setUp and tearDown but don't duplicate if it is the method being tested
-            setup_code = '' if method_name == 'setUp' else dedent(strip_header(remove_docstrings(
-                inspect.getsource(getattr(class_, 'setUp')))))
+                # get setUp and tearDown but don't duplicate if it is the method being tested
+                setup_code = '' if method_name == 'setUp' else dedent(strip_header(remove_docstrings(
+                    inspect.getsource(getattr(class_, 'setUp')))))
 
-            teardown_code = '' if method_name == 'tearDown' else dedent(strip_header(
-                remove_docstrings(inspect.getsource(getattr(class_, 'tearDown')))))
+                teardown_code = '' if method_name == 'tearDown' else dedent(strip_header(
+                    remove_docstrings(inspect.getsource(getattr(class_, 'tearDown')))))
 
-            code_to_run = '\n'.join([self_code, setup_code, source, teardown_code])
+                code_to_run = '\n'.join([self_code, setup_code, source, teardown_code])
+
+            except Exception:
+                err = traceback.format_exc()
+                raise SphinxError("Problem with embed of " + path + ": \n" + str(err))
         else:
             if indent > 0:
                 source = dedent(source)
@@ -127,10 +132,28 @@ class EmbedCodeDirective(Directive):
         skipped = failed = False
         if do_run:
             if shows_plot:
-                # insert lines to generate the plot file
-                parts = ['import matplotlib', 'matplotlib.use("Agg")', code_to_run]
+                # fixes problem where the use("Agg") line ends up before the future import.
+                if "from __future__" in code_to_run:
+                    # We will split up code_to_run, insert our plotting lines after __future__ import,
+                    # then put it back together.
+                    new_order = []
+                    lines = code_to_run.split("\n")
+
+                    for line in lines:
+                        new_order.append(line)
+                        if "from __future__" in line:
+                            new_order.append('import matplotlib')
+                            new_order.append('matplotlib.use("Agg")')
+                    new_code_to_run = '\n'.join(new_order)
+                    parts = [new_code_to_run]
+                    
+                else:
+                    # insert lines to generate the plot file
+                    parts = ['import matplotlib', 'matplotlib.use("Agg")', code_to_run]
+
                 if 'plot' in layout:
                     parts.append('matplotlib.pyplot.savefig("%s")' % plot_file_abs)
+
                 skipped, failed, run_outputs = \
                     run_code('\n'.join(parts), path, module=module, cls=class_,
                              shows_plot=True)
