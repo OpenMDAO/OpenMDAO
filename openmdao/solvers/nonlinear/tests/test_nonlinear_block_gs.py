@@ -5,11 +5,11 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, NonlinearBlockGS, Group, ScipyKrylov, IndepVarComp, \
-     ExecComp, AnalysisError
+    ExecComp, AnalysisError
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives, \
-     SellarDis1withDerivatives, SellarDis2withDerivatives
+    SellarDis1withDerivatives, SellarDis2withDerivatives
 
 
 class TestNLBGaussSeidel(unittest.TestCase):
@@ -30,8 +30,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
         model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                               z=np.array([0.0, 0.0]), x=0.0),
-                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
@@ -65,8 +65,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
         model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                               z=np.array([0.0, 0.0]), x=0.0),
-                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
@@ -96,8 +96,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
         model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                               z=np.array([0.0, 0.0]), x=0.0),
-                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
@@ -128,8 +128,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
         model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                               z=np.array([0.0, 0.0]), x=0.0),
-                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
@@ -160,8 +160,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
         model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                               z=np.array([0.0, 0.0]), x=0.0),
-                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
@@ -189,8 +189,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
         model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                               z=np.array([0.0, 0.0]), x=0.0),
-                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
@@ -228,8 +228,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
         model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                               z=np.array([0.0, 0.0]), x=0.0),
-                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])

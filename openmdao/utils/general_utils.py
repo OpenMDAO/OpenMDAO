@@ -8,7 +8,7 @@ import unittest
 from mock import Mock
 from fnmatch import fnmatchcase
 from six import string_types
-from six.moves import range
+from six.moves import range, cStringIO as StringIO
 from collections import Iterable
 import numbers
 
@@ -384,3 +384,29 @@ def pad_name(name, pad_num=10, quotes=False):
             return "'{0}'".format(name)
         else:
             return '{0}'.format(name)
+
+
+def run_model(prob):
+    """
+    Call `run_model` on problem and capture output.
+
+    Parameters
+    ----------
+    prob : Problem
+        an instance of Problem
+
+    Returns
+    -------
+    string
+        output from calling `run_model` on the Problem, captured from stdout
+    """
+    stdout = sys.stdout
+    strout = StringIO()
+
+    sys.stdout = strout
+    try:
+        prob.run_model()
+    finally:
+        sys.stdout = stdout
+
+    return strout.getvalue()
