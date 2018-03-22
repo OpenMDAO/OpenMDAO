@@ -849,30 +849,33 @@ class Driver(object):
         if isinstance(self._simul_coloring_info, string_types):
             with open(self._simul_coloring_info, 'r') as f:
                 self._simul_coloring_info = json.load(f)
+                column_lists, row_map = self._simul_coloring_info
+                row_map = {int(k): v for k, v in iteritems(row_map)}
+                self._simul_coloring_info = column_lists, row_map
 
-        if len(self._simul_coloring_info) == 2:  # per-variable coloring
-            coloring, maps = self._simul_coloring_info
-            for dv, colors in iteritems(coloring):
-                if dv not in self._designvars:
-                    # convert name from promoted to absolute
-                    dv = prom2abs[dv][0]
-                self._designvars[dv]['simul_deriv_color'] = colors
-
-            for res, dvdict in iteritems(maps):
-                if res not in self._responses:
-                    # convert name from promoted to absolute
-                    res = prom2abs[res][0]
-                self._responses[res]['simul_map'] = dvdict
-
-                for dv, col_dict in dvdict.items():
-                    col_dict = {int(k): v for k, v in iteritems(col_dict)}
-                    if dv not in self._designvars:
-                        # convert name from promoted to absolute and replace dictionary key
-                        del dvdict[dv]
-                        dv = prom2abs[dv][0]
-                    dvdict[dv] = col_dict
-        else:  # global coloring
-            pass  # nothing to be done.  We'll just use the data structure as given.
+        # if len(self._simul_coloring_info) == 2:  # per-variable coloring
+        #     coloring, maps = self._simul_coloring_info
+        #     for dv, colors in iteritems(coloring):
+        #         if dv not in self._designvars:
+        #             # convert name from promoted to absolute
+        #             dv = prom2abs[dv][0]
+        #         self._designvars[dv]['simul_deriv_color'] = colors
+        #
+        #     for res, dvdict in iteritems(maps):
+        #         if res not in self._responses:
+        #             # convert name from promoted to absolute
+        #             res = prom2abs[res][0]
+        #         self._responses[res]['simul_map'] = dvdict
+        #
+        #         for dv, col_dict in dvdict.items():
+        #             col_dict = {int(k): v for k, v in iteritems(col_dict)}
+        #             if dv not in self._designvars:
+        #                 # convert name from promoted to absolute and replace dictionary key
+        #                 del dvdict[dv]
+        #                 dv = prom2abs[dv][0]
+        #             dvdict[dv] = col_dict
+        # else:  # global coloring
+        #     pass  # nothing to be done.  We'll just use the data structure as given.
 
     def _pre_run_model_debug_print(self):
         """

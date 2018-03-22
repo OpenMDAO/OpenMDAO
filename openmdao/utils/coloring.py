@@ -117,10 +117,11 @@ def _get_full_disjoint(J, start, end):
         if not np.any(J[:, c1] & J[:, c2]):
             disjoints[c1].add(c2)
             disjoints[c2].add(c1)
+            # ndarrays are converted to lists to be json serializable
             if c1 not in rows:
-                rows[c1] = np.nonzero(J[:, c1])[0]
+                rows[c1] = [int(i) for i in np.nonzero(J[:, c1])[0]]
             if c2 not in rows:
-                rows[c2] = np.nonzero(J[:, c2])[0]
+                rows[c2] = [int(i) for i in np.nonzero(J[:, c2])[0]]
 
     full_disjoint = OrderedDict()
     seen = set()
@@ -139,12 +140,23 @@ def _get_full_disjoint(J, start, end):
                 full_disjoint[col].append(other_col)
                 allrows[col] |= J[:, other_col]
 
+        if len(full_disjoint[col]) == 1:
+            del full_disjoint[col]
+            del rows[col]
+
     return full_disjoint, rows
 
 
-def _get_bool_jac(prob, mode='fwd', repeats=1, tol=1e-15, byvar=True):
+def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15, byvar=True):
     """
     Return a boolean version of the total jacobian.
+
+    The jacobian is computed by calculating a total jacobian using _compute_totals 'repeats'
+    times and adding the absolute values of those together, then dividing by the max value,
+    then converting to a boolean array, specifying all entries below 'tol' as False and all
+    others as True.  Prior to calling _compute_totals, all of the partial jacobians in the
+    model are modified so that when any of their subjacobians are assigned a value, that
+    value is populated with positive random numbers in the range [1.0, 2.0).
 
     Parameters
     ----------
@@ -325,11 +337,7 @@ def _find_global_disjoint(prob, mode='fwd', repeats=1, tol=1e-15):
 
     J = _get_bool_jac(prob, mode=mode, repeats=repeats, tol=tol)
 
-    # find column and row ranges (inclusive) for dvs and responses respectively
-    dv_ranges = _compute_ranges(wrt, prob.driver._designvars)
-    res_ranges = _compute_ranges(of, prob.driver._responses)
-
-    full_disjoint, rows = _get_full_disjoint(J, 0, len(dv_ranges))
+    full_disjoint, rows = _get_full_disjoint(J, 0, J.shape[1] - 1)
 
     for color, cols in enumerate(itervalues(full_disjoint)):
         print("color", color, "cols", len(cols))
@@ -337,7 +345,8 @@ def _find_global_disjoint(prob, mode='fwd', repeats=1, tol=1e-15):
     return full_disjoint, rows, J
 
 
-def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False, stream=sys.stdout):
+def get_simul_meta_old(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
+                       stream=sys.stdout):
     """
     Compute simultaneous derivative colorings for the given problem.
 
@@ -365,7 +374,7 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False, s
     """
     driver = problem.driver
 
-    dv_idxs, res_idxs, J = _find_disjoint(problem, mode=mode, tol=tol, repeats=repeats)
+    dv_idxs, res_idxs, J = _find_disjoint(problem, mode=mode, repeats=repeats, tol=tol)
     all_colors = set()
 
     simul_colorings = {}
@@ -462,6 +471,102 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False, s
     return simul_colorings, simul_maps
 
 
+def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False, stream=sys.stdout):
+    """
+    Compute simultaneous derivative colorings for the given problem.
+
+    Parameters
+    ----------
+    problem : Problem
+        The Problem being analyzed.
+    mode : str
+        Derivative direction.
+    repeats : int
+        Number of times to repeat total jacobian computation.
+    tol : float
+        Tolerance used to determine if an array entry is nonzero.
+    show_jac : bool
+        If True, display a visualiation of the final total jacobian used to compute the coloring.
+    stream : file-like or None
+        Stream where output coloring info will be written.
+
+    Returns
+    -------
+    tuple of the form (simul_colorings, simul_maps)
+        Where simul_colorings is a dict of the form {dvname1: coloring_array, ...} and
+        simul_maps is a dict of the form
+        {resp_name: {dvname: {color: (row_idxs, col_idxs), ...}, ...}, ...}
+    """
+    driver = problem.driver
+
+    full_disjoint, rows, J = _find_global_disjoint(problem, mode=mode, repeats=repeats, tol=tol)
+    allcols = set(range(J.shape[1]))
+    single_cols = list(allcols.difference(rows))
+
+    # the first col_list entry corresponds to all single columns (columns that are not disjoint
+    # wrt any other columns).  The other entries are groups of columns that are disjoint wrt
+    # each other.
+    col_lists = [single_cols]
+    col_lists.extend(full_disjoint.values())
+
+    rows = OrderedDict(sorted(rows.items(), key=lambda x: x[0]))
+
+    if stream is not None:
+        if stream.isatty():
+            stream.write("\n([\n")
+            for n, coloring in enumerate(col_lists):
+                stream.write("   %s,\n" % coloring)
+            stream.write("],")
+
+            stream.write("\n{\n")
+            for col, row_list in iteritems(rows):
+                stream.write("   '%s': %s,\n" % (col, list(row_list)))
+            stream.write("})")
+        else:  # output json format to a file
+            s = json.dumps((col_lists, rows))
+
+            # do a little pretty printing since the built-in json pretty printing stretches
+            # the output vertically WAY too much.
+            s = s.replace(',"', ',\n"')
+            s = s.replace(', "', ',\n"')
+            s = s.replace('{"', '{\n"')
+            s = s.replace(', {', ',\n{')
+            s = s.replace(']}', ']\n}')
+            s = s.replace('{}', '{\n}')
+            s = s.replace('}}', '}\n}')
+            s = s.replace('[{', '[\n{')
+            s = s.replace(' {', '\n{')
+
+            lines = []
+            indent = 0
+            for line in s.split('\n'):
+                start = line[0] if len(line) > 0 else ''
+                if start in ('{', '['):
+                    tab = ' ' * indent
+                    indent += 3
+                elif start in ('}', ']'):
+                    indent -= 3
+                    tab = ' ' * indent
+                else:
+                    tab = ' ' * indent
+
+                lines.append("%s%s" % (tab, line))
+
+            stream.write('\n'.join(lines))
+            stream.write("\n")
+
+    if show_jac and stream is not None:
+        of = list(driver._objs)
+        of.extend([c for c, meta in iteritems(driver._cons)
+                   if not ('linear' in meta and meta['linear'])])
+        wrt = list(driver._designvars)
+
+        stream.write("\n\n")
+        array_viz(J, problem, of, wrt, stream)
+
+    return col_lists, rows
+
+
 def simul_coloring_summary(problem, color_info, stream=sys.stdout):
     """
     Print a summary of simultaneous coloring info for the given problem and coloring metadata.
@@ -470,51 +575,25 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
     ----------
     problem : Problem
         The Problem being analyzed.
-    color_info : tuple of (simul_colorings, simul_maps)
+    color_info : tuple of (column_lists, row_map)
         Coloring metadata.
     stream : file-like
         Where the output will go.
     """
-    simul_colorings, simul_maps = color_info
+    column_lists, row_map = color_info
 
     desvars = problem.driver._designvars
-    constraints = problem.driver._cons
-    responses = problem.driver._responses
 
-    tot_colors = 0
+    tot_colors = len(column_lists[0]) + len(column_lists) - 1
     tot_size = 0
-
-    dvwid = np.max([len(dv) for dv in desvars])
-    dvtitle = "Variable"
-
-    if len(dvtitle) > dvwid:
-        dvwid = len(dvtitle)
-
-    template = "{:<{w0}s}  {:>6d}  {:>6d}\n"
-
-    stream.write("\n\n{:^{w0}s}  {:>6}  {:>6}\n".format(dvtitle, "Size", "Colors", w0=dvwid))
-    stream.write("{:^{w0}s}  {:>6}  {:>6}\n".format('-' * dvwid, "----", "------", w0=dvwid))
 
     if problem._mode == 'fwd':
         for dv in desvars:
-            if dv in simul_colorings:
-                colors = set(simul_colorings[dv])
-                if -1 in colors:
-                    negs = len(np.nonzero(np.array(simul_colorings[dv]) < 0)[0])
-                    ncolors = (negs + len(colors) - 1)
-                else:
-                    ncolors = len(colors)
-            else:
-                ncolors = desvars[dv]['size']
-
-            size = desvars[dv]['size']
-            stream.write(template.format(dv, size, ncolors, w0=dvwid))
-            tot_colors += ncolors
             tot_size += desvars[dv]['size']
     else:  # rev
         raise RuntimeError("rev mode currently not supported for simultaneous derivs.")
 
-    if not simul_colorings:
+    if tot_size == tot_colors:
         stream.write("No simultaneous derivative solves are possible in this configuration.\n")
     else:
         stream.write("\nTotal colors vs. total size: %d vs %d  (%.1f%% improvement)\n" %

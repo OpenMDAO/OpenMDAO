@@ -1607,6 +1607,53 @@ class Problem(object):
 
         return totals
 
+    def _get_dict_J(self, J, wrt, oldwrt, of, oldof, input_meta, output_slice_map, return_format):
+        """
+        Create a dict or flat-dict jacobian that maps to views in the given 2D array jacobian.
+
+        Parameters
+        ----------
+        J : ndarray
+            Array jacobian.
+        wrt : iter of str
+            Absolute names of input vars.
+        oldwrt : iter of str
+            Promoted names of input vars.
+        of : iter of str
+            Absolute names of output vars.
+        oldof : iter of str
+            Promoted names of output vars.
+        input_meta : dict
+            Dict of input voi metadata.
+        output_slice_map : dict
+            Dict mapping output name to array jacobian slice.
+        return_format : str
+            Indicates the desired form of the returned jacobian.
+        """
+        if self._mode == 'fwd':
+            input_slice_map, in_size = self._create_slice_map(wrt, input_meta)
+            slice_map_in, slice_map_out = input_slice_map, output_slice_map
+        else:
+            input_slice_map, in_size = self._create_slice_map(of, input_meta)
+            slice_map_in, slice_map_out = output_slice_map, input_slice_map
+
+        Jmap = OrderedDict()
+        if return_format == 'dict':
+            for i, out in enumerate(of):
+                Jmap[oldof[i]] = outer = OrderedDict()
+                out_slice = slice_map_out[out]
+                for j, inp in enumerate(wrt):
+                    outer[oldwrt[j]] = J[out_slice, slice_map_in[inp]]
+        elif return_format == 'flat_dict':
+            for i, out in enumerate(of):
+                out_slice = slice_map_out[out]
+                for j, inp in enumerate(wrt):
+                    Jmap[oldof[i], oldwrt[j]] = J[out_slice, slice_map_in[inp]]
+        else:
+            raise ValueError("'%s' is not a valid jacobian return format." % return_format)
+
+        return Jmap
+
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
@@ -1647,6 +1694,7 @@ class Problem(object):
         abs2meta = model._var_allprocs_abs2meta
         design_vars = self.driver._designvars
         responses = self.driver._responses
+        constraints = self.driver._cons
         owning_ranks = self.model._owning_rank
 
         if wrt is None:
@@ -1681,9 +1729,6 @@ class Problem(object):
         # Linearize Model
         model._linearize()
 
-        # if len(self.driver._simul_coloring_info) == 3:  # global coloring
-        #     input_entry_groups, output_entry_groups, _ = self.driver._simul_coloring_info
-
         if fwd:
             input_list, output_list = wrt, of
             input_meta, output_meta = design_vars, responses
@@ -1693,103 +1738,115 @@ class Problem(object):
             input_meta, output_meta = responses, design_vars
             input_vec, output_vec = vec_doutput, vec_dresid
 
-        input_idx_map, input_loc_idxs = self._create_input_idx_map(input_list, input_meta)
+        for name in of:
+            if name in constraints and constraints[name]['linear']:
+                has_lin_cons = True
+                break
+        else:
+            has_lin_cons = False
+
+        input_idx_map, input_loc_idxs, idx_iter_dict = self._create_input_idx_map(input_list,
+                                                                                  input_meta,
+                                                                                  has_lin_cons)
         output_slice_map, out_size = self._create_slice_map(output_list, output_meta)
 
-        lin_vec_names = sorted(set(tup[3] for tup in input_idx_map))
+        lin_vec_names = sorted(set(vecname for _, vecname, _ in input_idx_map))
 
         # always allocate a 2D dense array and we can assign views to dict keys later if
         # return format is 'dict' or 'flat_dict'.
         if fwd:
             J = np.zeros((out_size, input_loc_idxs.size))
+            out_size = J.shape[0]
         else:  # rev
             J = np.zeros((input_loc_idxs.size, out_size))
+            out_size = J.shape[1]
 
         # for dict type return formats, map var names to views of the Jacobian array.
         if return_format != 'array':
-            input_slice_map, in_size = self._create_slice_map(input_list, input_meta)
-            if fwd:
-                slice_map_in, slice_map_out = input_slice_map, output_slice_map
-            else:
-                slice_map_in, slice_map_out = output_slice_map, input_slice_map
+            Jmap = self._get_dict_J(J, wrt, oldwrt, of, oldof, input_meta, output_slice_map,
+                                    return_format)
 
-            Jmap = OrderedDict()
-            if return_format == 'dict':
-                for i, out in enumerate(of):
-                    Jmap[oldof[i]] = outer = OrderedDict()
-                    out_slice = slice_map_out[out]
-                    for j, inp in enumerate(wrt):
-                        outer[oldwrt[j]] = J[out_slice, slice_map_in[inp]]
-            elif return_format == 'flat_dict':
-                for i, out in enumerate(of):
-                    out_slice = slice_map_out[out]
-                    for j, inp in enumerate(wrt):
-                        Jmap[oldof[i], oldwrt[j]] = J[out_slice, slice_map_in[inp]]
-            else:
-                raise ValueError("'%s' is not a valid jacobian return format." % return_format)
+        # TODO: J, Jmap, input_idx_map, etc. can all be cached
 
-        # if not all inputs are VOIs, then this is a test where most likely
-        # design vars, constraints, and objectives were not specified, so
-        # don't do relevance checking (because we only want to analyze the
-        # dependency graph for VOIs rather than for every input/output
-        # in the model)
-        use_rel_reduction = True
-        for name in input_list:
-            if name not in input_meta:
-                use_rel_reduction = False
-                break
+        simul_coloring = False
+        if not has_lin_cons and self.driver._simul_coloring_info is not None:
+            column_lists, row_map = self.driver._simul_coloring_info
+            idx2name, idx2local = self._create_idx_maps(output_list, output_meta, out_size)
+            simul_coloring = True
 
         # Main loop over columns (fwd) or rows (rev) of the jacobian
-        for i, tup in enumerate(input_idx_map):
-            if fwd:
-                vec_dresid['linear'].set_const(0.0)
-                if use_rel_reduction:
-                    vec_doutput['linear'].set_const(0.0)
-            else:  # rev
+        for par_deriv_color, matmat, idxs, idx_iter in itervalues(idx_iter_dict):
+            for j, inds in enumerate(idx_iter(idxs)):
+                # this sets dinputs for the current par_deriv_color to 0
+                # dinputs is dresids in fwd, doutouts in rev
                 vec_doutput['linear'].set_const(0.0)
-                if use_rel_reduction:
+                if fwd:
+                    vec_dresid['linear'].set_const(0.0)
+                else:  # rev
                     vec_dinput['linear'].set_const(0.0)
 
-            input_name, start, end, vecname, rel_systems = tup
-            dinputs = input_vec[vecname]
-            doutputs = output_vec[vecname]
-            distrib = abs2meta[input_name]['distributed']
+                for col, i in enumerate(inds):
+                    input_name, vecname, rel_systems = input_idx_map[i]
+                    dinputs = input_vec[vecname]
+                    ncol = dinputs._ncol
 
-            loc_idx = input_loc_idxs[i]
-            if loc_idx != -1:
-                dinputs._views_flat[input_name][loc_idx] = 1.0
+                    loc_idx = input_loc_idxs[i]
+                    if loc_idx != -1:
+                        if ncol > 1:
+                            dinputs._views_flat[input_name][loc_idx, col] = 1.0
+                        else:
+                            dinputs._views_flat[input_name][loc_idx] = 1.0
 
-            model._solve_linear(lin_vec_names, mode, rel_systems)
+                model._solve_linear(lin_vec_names, mode, rel_systems)
 
-            for output_name in output_list:
-                slc = output_slice_map[output_name]
-                deriv_val = out_idxs = None
-                if not use_rel_reduction or output_name in relevant[input_name]:
-                    if output_name in doutputs._views_flat:
-                        deriv_val = doutputs._views_flat[output_name]
-                        if output_name in output_meta:
-                            out_idxs = output_meta[output_name]['indices']
-                            if out_idxs is not None:
-                                deriv_val = deriv_val[out_idxs]
+                for i in inds:
+                    input_name, vecname, _ = input_idx_map[i]
+                    dinputs = input_vec[vecname]
+                    doutputs = output_vec[vecname]
+                    distrib = abs2meta[input_name]['distributed']
 
-                    if nproc > 1 and not distrib:
-                        root = owning_ranks[output_name]
-                        if deriv_val is None:
-                            sz = s.stop - s.start
-                            if dinputs._ncol > 1:
-                                deriv_val = np.empty((sz, dinputs._ncol))
-                            else:
-                                deriv_val = np.empty(sz)
-                        self.comm.Bcast(deriv_val, root=root)
-
-                    if fwd:
-                        J[slc, i] = deriv_val
+                    if simul_coloring and j > 0:
+                        for row in row_map[i]:
+                            output_name = idx2name[row]
+                            deriv_val = out_idxs = None
+                            if input_name not in relevant or output_name in relevant[input_name]:
+                                if output_name in doutputs._views_flat:
+                                    deriv_val = doutputs._views_flat[output_name]
+                                    if output_name in output_meta:
+                                        out_idxs = output_meta[output_name]['indices']
+                                        if out_idxs is not None:
+                                            deriv_val = deriv_val[out_idxs]
+                            J[row, i] = deriv_val[idx2local[row]]
                     else:
-                        J[i, slc] = deriv_val.T
+                        for output_name in output_list:
+                            slc = output_slice_map[output_name]
+                            deriv_val = out_idxs = None
+                            if input_name not in relevant or output_name in relevant[input_name]:
+                                if output_name in doutputs._views_flat:
+                                    deriv_val = doutputs._views_flat[output_name]
+                                    if output_name in output_meta:
+                                        out_idxs = output_meta[output_name]['indices']
+                                        if out_idxs is not None:
+                                            deriv_val = deriv_val[out_idxs]
+
+                                if nproc > 1 and not distrib:
+                                    root = owning_ranks[output_name]
+                                    if deriv_val is None:
+                                        sz = s.stop - s.start
+                                        if dinputs._ncol > 1:
+                                            deriv_val = np.empty((sz, dinputs._ncol))
+                                        else:
+                                            deriv_val = np.empty(sz)
+                                    self.comm.Bcast(deriv_val, root=root)
+
+                                if fwd:
+                                    J[slc, i] = deriv_val
+                                else:
+                                    J[i, slc] = deriv_val.T
 
         return J if return_format == 'array' else Jmap
 
-    def _create_input_idx_map(self, names, vois):
+    def _create_input_idx_map(self, names, vois, has_lin_constraints):
         """
         Create a list that maps a global index to a name, col/row range, and other data.
 
@@ -1803,7 +1860,11 @@ class Problem(object):
         Returns
         -------
         list
-            List of (name, start, end, rhsname) tuples.
+            List of (name, rhsname, rel_systems) tuples.
+        ndarray
+            array of local indices
+        dict
+            dictionary of iterators.
         """
         idx_map = []
         start = 0
@@ -1814,10 +1875,13 @@ class Problem(object):
         iproc = self.model.comm.rank
         owning_ranks = self.model._owning_rank
         relevant = self.model._relevant
-        tot_idx_size = 0
+        has_par_deriv_color = False
 
         idx_tups = [None] * len(names)
         loc_idxs = []
+        idx_iter_dict = {}  # a dict of index iterators
+
+        simul_coloring = not has_lin_constraints and self.driver._simul_coloring_info is not None
 
         for i, name in enumerate(names):
             rhsname = 'linear'
@@ -1830,7 +1894,6 @@ class Problem(object):
 
                 parallel_deriv_color = meta['parallel_deriv_color']
                 matmat = meta['vectorize_derivs']
-                simul_coloring = meta['simul_deriv_color']
                 self._check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring)
                 if matmat or parallel_deriv_color:
                     rhsname = name
@@ -1848,7 +1911,7 @@ class Problem(object):
             else:  # name is not a VOI  (should only happen during testing)
                 end += abs2meta[name]['size']
                 irange = np.arange(in_var_meta['global_size'], dtype=int)
-                in_idxs = None
+                in_idxs = parallel_deriv_color = matmat = None
 
             sizes = var_sizes[rhsname]['output']
             gstart = np.sum(sizes[:iproc, in_var_idx])
@@ -1877,29 +1940,47 @@ class Problem(object):
                 loc_i[loc] = irange[loc]
 
             loc_idxs.append(loc_i)
-            tot_idx_size += loc_i.size
 
             if name in relevant:
                 rel = relevant[name]['@all'][1]
             else:
                 rel = _contains_all
 
-            idx_tups[i] = (name, start, end, rhsname, rel)
+            if parallel_deriv_color:
+                has_par_deriv_color = True
+                if parallel_deriv_color not in idx_iter_dict:
+                    idx_iter_dict[parallel_deriv_color] = (parallel_deriv_color, matmat
+                                                           [(start, end)], par_deriv_iter)
+                else:
+                    _, old_matmat, range_list = idx_iter_dict[parallel_deriv_color]
+                    if old_matmat != matmat:
+                        raise RuntimeError("Mixing of vectorized and non-vectorized derivs in the "
+                                           "same parallel color group (%s) is not supported." %
+                                           parallel_deriv_color)
+                    range_list.append((start, end))
+            elif matmat:
+                if name not in idx_iter_dict:
+                    idx_iter_dict[name] = (parallel_deriv_color, matmat,
+                                           [np.arange(start, end, dtype=int)], matmat_iter)
+                else:
+                    raise RuntimeError("Variable name '%s' matches a parallel_deriv_color name." %
+                                       name)
+            elif not simul_coloring:
+                idx_iter_dict[name] = (parallel_deriv_color, matmat,
+                                       np.arange(start, end, dtype=int), default_iter)
+
+            tup = (name, rhsname, rel)
+            idx_map.extend([tup] * (end - start))
             start = end
 
-        idx_map = [None] * tot_idx_size
+        if has_par_deriv_color:
+            _fix_pdc_lengths(idx_iter_dict)
 
-        for tup in idx_tups:
-            # reference the same tuple (end - start) times
-            for i in range(tup[1], tup[2]):
-                idx_map[i] = tup
+        if simul_coloring:
+            idx_iter_dict['@simul_coloring'] = (False, False, self.driver._simul_coloring_info,
+                                                simul_coloring_iter)
 
-        if loc_idxs:
-            loc_idxs = np.hstack(loc_idxs)
-        else:
-            loc_idxs = None
-
-        return idx_map, loc_idxs
+        return idx_map, np.hstack(loc_idxs), idx_iter_dict
 
     def _create_slice_map(self, names, vois):
         """
@@ -1935,6 +2016,43 @@ class Problem(object):
 
         return idx_map, end  # after the loop, end is the total size
 
+    def _create_idx_maps(self, names, vois, size):
+        """
+        Create a list that maps jacobian row/column index to var name.
+
+        Parameters
+        ----------
+        names : iter of str
+            Names of the variables making up the rows or columns of the jacobian.
+        vois : dict
+            Mapping of variable of interest (desvar or response) name to its metadata.
+        size : int
+            Total number of rows/columns.
+
+        Returns
+        -------
+        list
+            List that maps row/col index to variable name.
+        ndarray
+            Array that maps row/col index to local variable index
+        """
+        idx2name = [None] * size
+        idx2local = np.empty(size, dtype=int)
+        abs2meta = self.model._var_allprocs_abs2meta
+
+        start = end = 0
+        for name in names:
+            if name in vois:
+                end += vois[name]['size']
+            else:
+                end += abs2meta[name]['size']
+
+            idx2name[start:end] = [name] * (end - start)
+            idx2local[start:end] = np.arange(0, end - start, dtype=int)
+            start = end
+
+        return idx2name, idx2local
+
     def _check_voi_meta(self, name, parallel_deriv_color, matmat, simul_coloring):
         """
         Check the contents of the given metadata for incompatible options.
@@ -1952,12 +2070,6 @@ class Problem(object):
         simul_coloring : ndarray
             Array of colors. Each entry corresponds to a column or row of the total jacobian.
         """
-        if self.driver._simul_coloring_info is not None and len(self.driver._simul_coloring_info) == 3:  # global coloring
-            if simul_coloring is not None or parallel_deriv_color is not None or matmat:
-                raise RuntimeError("Global coloring is active, so variable '%s' cannot use "
-                                   "per-variable coloring, parallel derivatives, or vectorized "
-                                   "derivatives." % name)
-
         if simul_coloring is not None:
             if parallel_deriv_color:
                 raise RuntimeError("Using both simul_coloring and parallel_deriv_color with "
@@ -1987,6 +2099,67 @@ class Problem(object):
             self._solver_print_cache.append((level, depth, type_))
 
         self.model._set_solver_print(level=level, depth=depth, type_=type_)
+
+
+def _fix_pdc_lengths(idx_iter_dict):
+    """
+    Take any parallel_deriv_color entries and make sure their index arrays are same length.
+
+    Parameters
+    ----------
+    idx_iter_dict : dict
+        Dict of a name/color mapped to indexing information.
+    """
+    for key, tup in iteritems(idx_iter_dict):
+        par_deriv_color, _, range_list = tup
+        if par_deriv_color is not None:
+            lens = np.array([end - start for start, end in range_list])
+            maxlen = np.max(lens)
+            diffs = lens - maxlen
+            if np.any(diffs):
+                for i, diff in enumerate(diffs):
+                    start, end = range_list[i]
+                    if diff < 0:
+                        range_list[i] = np.empty(maxlen, dtype=int)
+                        range_list[i][:end - start] = np.arange(start, end, dtype=int)
+                        range_list[i][end - start:] = range_list[i][end - start - 1]
+                    else:
+                        range_list[i] = np.arange(start, end, dtype=int)
+            else:
+                # just convert all (start, end) tuples to aranges
+                for i, (start, end) in enumerate(range_list):
+                    range_list[i] = np.arange(start, end, dtype=int)
+
+
+# _compute_totals index iterators
+def simul_coloring_iter(coloring_info):
+    col_lists, _ = coloring_info
+    val = [None]
+
+    for i, ilist in enumerate(col_lists):
+        if i == 0:
+            for j in ilist:
+                val[0] = j
+                yield val  # do all non-colored indices individually
+        else:
+            yield ilist  # yield all indices for a color at once
+
+
+def par_deriv_iter(idxs):
+    for tup in zip(*idxs):
+        yield tup
+
+
+def matmat_iter(idxs):
+    for idx_list in idxs:
+        yield idx_list
+
+
+def default_iter(idxs):
+    val = [None]
+    for i in idxs:
+        val[0] = i
+        yield val
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,

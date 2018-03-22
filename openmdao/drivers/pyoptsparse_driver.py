@@ -540,36 +540,43 @@ class pyOptSparseDriver(Driver):
         """
         super(pyOptSparseDriver, self)._setup_simul_coloring(mode)
 
+        if self._simul_coloring_info is None:
+            return
+
+        column_lists, row_map = self._simul_coloring_info
+
         relevant = self._problem.model._relevant
 
-        for res, meta in iteritems(self._responses):
-            if 'linear' in meta and meta['linear']:
-                continue
-            if 'simul_map' in meta and meta['simul_map']:
-                dv_dict = meta['simul_map']
-                self._res_jacs[res] = {}
-                for dv, col_dict in iteritems(dv_dict):
-                    # don't set the sparsity unless the corresponding desvar coloring is set
-                    if res in relevant[dv] and self._designvars[dv]['simul_deriv_color']:
-                        rows = []
-                        cols = []
-                        for color, (row_idxs, col_idxs) in iteritems(col_dict):
-                            if len(row_idxs) > 0:
-                                rows.append(row_idxs)
-                                cols.append(col_idxs)
+        # FIXME: update using refactored coloring stuff
 
-                        if len(rows) > 0:
-                            row = np.hstack(rows)
-                            col = np.hstack(cols)
-                        elif res in self._objs:
-                            continue
-                        else:
-                            row = col = np.zeros(0, dtype=int)
-
-                        # print("sparsity for %s, %s: %d of %s" % (res, dv, row.size,
-                        #       (self._responses[res]['size'] * self._designvars[dv]['size'],)))
-
-                        self._res_jacs[res][dv] = {
-                            'coo': [row, col, np.zeros(row.size)],
-                            'shape': [self._responses[res]['size'], self._designvars[dv]['size']]
-                        }
+        # for res, meta in iteritems(self._responses):
+        #     if 'linear' in meta and meta['linear']:
+        #         continue
+        #     if 'simul_map' in meta and meta['simul_map']:
+        #         dv_dict = meta['simul_map']
+        #         self._res_jacs[res] = {}
+        #         for dv, col_dict in iteritems(dv_dict):
+        #             # don't set the sparsity unless the corresponding desvar coloring is set
+        #             if res in relevant[dv] and self._designvars[dv]['simul_deriv_color']:
+        #                 rows = []
+        #                 cols = []
+        #                 for color, (row_idxs, col_idxs) in iteritems(col_dict):
+        #                     if len(row_idxs) > 0:
+        #                         rows.append(row_idxs)
+        #                         cols.append(col_idxs)
+        #
+        #                 if len(rows) > 0:
+        #                     row = np.hstack(rows)
+        #                     col = np.hstack(cols)
+        #                 elif res in self._objs:
+        #                     continue
+        #                 else:
+        #                     row = col = np.zeros(0, dtype=int)
+        #
+        #                 # print("sparsity for %s, %s: %d of %s" % (res, dv, row.size,
+        #                 #       (self._responses[res]['size'] * self._designvars[dv]['size'],)))
+        #
+        #                 self._res_jacs[res][dv] = {
+        #                     'coo': [row, col, np.zeros(row.size)],
+        #                     'shape': [self._responses[res]['size'], self._designvars[dv]['size']]
+        #                 }
