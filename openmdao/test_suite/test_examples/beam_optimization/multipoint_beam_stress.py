@@ -68,7 +68,7 @@ class MultipointBeamGroup(Group):
         self.metadata.declare('num_elements', 5)
         self.metadata.declare('num_cp', 50)
         self.metadata.declare('num_load_cases', 1)
-        self.metadata.declare('parallel_deriv_color', None, types=str, allow_none=True)
+        self.metadata.declare('parallel_derivs', False, types=bool, allow_none=True)
 
     def setup(self):
         E = self.metadata['E']
@@ -80,7 +80,7 @@ class MultipointBeamGroup(Group):
         num_nodes = num_elements + 1
         num_cp = self.metadata['num_cp']
         num_load_cases = self.metadata['num_load_cases']
-        parallel_deriv_color = self.metadata['parallel_deriv_color']
+        parallel_derivs = self.metadata['parallel_derivs']
 
         inputs_comp = IndepVarComp()
         inputs_comp.add_output('h_cp', shape=num_cp)
@@ -158,8 +158,13 @@ class MultipointBeamGroup(Group):
                     'stress_comp.stress_%d' % k,
                     'KS_%d.g' % k)
 
+                if parallel_derivs:
+                    color = 'red_%d' % k
+                else:
+                    color = None
+
                 sub.add_constraint('KS_%d.KS' % k, upper=0.0,
-                                   parallel_deriv_color=parallel_deriv_color)
+                                   parallel_deriv_color=color)
 
         comp = VolumeComp(num_elements=num_elements, b=b, L=L)
         self.add_subsystem('volume_comp', comp)
