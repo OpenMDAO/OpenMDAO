@@ -16,11 +16,11 @@ env:
   global:
     - secure: Rx/uHnF0j1Cp/Ume9lQE5Wu2oM6aA41oFI22+oXmw798vmyeqHAocL6hqva0navjqx9FWLdPHn1LTAjLsHop+tavpMR1Qzu3P/5FEcvr/qDi68osWZq3oCs2WRJLo0BFaG8jQvmMd+RxkczVxWj+D2K+ywgkNb1KABP5Xv6lnTtwfTH0lteCMkFcnTnC4jcan1VGdvLyxewzMbdbuvTNVukAdrVxbwZMJrDyPPf7aEZ+t50C/pkRYSVf/2/YyFq5hgywqZZe2RInO7UeyHWhP+giyQsVkL0nWpA5zcgKjvYKnZbAt95uzTmwabs4e6BpipvbcX2M7aMyqMaz6OD36cDScMeOFn/FIQC3UalkvwEH0yvzI3CDncTjWy4xkxnfort7XKeQbrSqrX0AcDu462ke95JHZsIfL402lgtcW4aLcPUPs2MPrin1ENLBK29Jm+5LIM+22ISWd4anhpjE70SgOhsXrHrzL4n4kfxb4rsm483aeXEszlxWu56QNQ5EYCHpLY+aF9XOkFdAMM/FBRwlxhTySscPOANfd4GiZxSPxDOEHoEHKoy/CPo4jkUlFrqZIe+VnHmNPgGH/eU2nCNMhVeH/zJ5kOx7wns0SdorUSuQIywg07BBJtizzSUtzofd8kYRdVMyH4RTAfoBeGPUeFV45N5i07N6ucagL3s=
   matrix:
-    - PY=2.7 MPI=1 NUMPY=1.12
-    - PY=3.6 MPI=1 NUMPY=1.12
-    - PY=2.7 MPI= NUMPY=1.12
-    - PY=3.6 MPI= NUMPY=1.12
-    - PY=3.6 MPI=1 NUMPY=1.14
+    - PY=2.7 NUMPY=1.12
+    - PY=2.7 NUMPY=1.12 MPI=1
+    - PY=3.6 NUMPY=1.12
+    - PY=3.6 NUMPY=1.12 MPI=1 UPLOAD_DOCS=1
+    - PY=3.6 NUMPY=1.14 MPI=1
 
 git:
   depth: 99999
@@ -43,8 +43,6 @@ notifications:
     secure: Dd+tpZkz48Q47Y+PtdL4b+KAs55PsvWjt9ybhip6xljhA5kVsba9oZS+KsAC8RLWSzVJLOSjz3Cu3MsRym4sTd/g4Pbqyh0ldK2Xnl+n2JOgpPFSXtFuH4Ln3uWB6kYtUK6+aGIC8qhbvEt8tukTBT0RduEmdRyVIZ3oN7YjETPSZXvujeiUFLssfpZW2mqoA/tIgJHFSlySAp6J5694t2Z/p8sHOrK8G/Nm+qlk4xqXHvJ3xablcSBG4BZCrpqmMMdTLXBt2E2K9Rc1P2ZBIrSHVWfSLx+4n79U2385+og7miN1Zuf3gY3YuGKIwnBTtEzTu20905idkr4QdKELCBEcU4azdznwjvUkXWkiFAJII9UELTluSQmZX602zWk4AgJNeHxhN3EbBSMezfYVZjprhlAlwnZZv6t4qAkvuzb7KOA4s679xWzWOBOn1wkynfIF8A66APqssveyz/PvZHSjnHQoLgMU+kwzoX759o0Z/HuRlhCcjv0W9DWxU2bFNi/zVh9YyvR8fG15biGthzOyuf+CHjxohw+J6M+YdR1RIf1g/60nGUPHx4j4SN3kEFPmEDxzZT/f349gvaZGOmKXBi0wH8iY/i9RinM9LJB4t6chj2MkKwUA26bYaVaIO6FYPfE7r+tTG6OXdck4voCs/s4aa9VKEX97yhh0i9g=
 
 before_install:
-#- python -c "import fcntl; fcntl.fcntl(1, fcntl.F_SETFL, 0)"
-
 - OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux"; fi)
 
 - if [ "$OS" = "MacOSX" ] && [ "$MPI" ]; then
@@ -131,8 +129,8 @@ deploy:
   skip_cleanup: true
   script:
   # only deploy docs in a build after a PR or merge is accepted
-  - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-      if [ "$MPI" ] && [ "$PY" = "3.6" ]; then
+  - if [ "$TRAVIS_PULL_REQUEST" = "false" ] && [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ]; then
+      if [ "$UPLOAD_DOCS" ]; then
         python _utils/upload_doc_version.py;
       fi
     fi
