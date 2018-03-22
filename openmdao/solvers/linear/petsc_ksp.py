@@ -466,6 +466,7 @@ class PETScKrylov(LinearSolver):
         else:
             ksp.setPCSide(PETSc.PC.Side.RIGHT)
         ksp.setMonitor(Monitor(self))
+        ksp.setInitialGuessNonzero(True)
 
         pc_mat = ksp.getPC()
         pc_mat.setType('python')
