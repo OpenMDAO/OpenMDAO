@@ -48,7 +48,7 @@ before_install:
 - export PATH=/home/travis/miniconda/bin:$PATH
 
 - if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-    MASTER_BUILD=1
+    MASTER_BUILD=1;
   fi
 - export OPENMDAO_TEST_DOCS=1
 
