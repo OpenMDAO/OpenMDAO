@@ -114,7 +114,7 @@ deploy:
   skip_cleanup: true
   script:
   # only deploy docs in a build after a PR or merge is accepted
-  - if [ "$MASTER_BUILD" && "$UPLOAD_DOCS" ]; then
+  - if [ "$MASTER_BUILD" ] && [ "$UPLOAD_DOCS" ]; then
       python _utils/upload_doc_version.py;
     fi
   on:
