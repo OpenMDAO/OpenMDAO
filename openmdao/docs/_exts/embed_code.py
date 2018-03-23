@@ -62,7 +62,7 @@ class EmbedCodeDirective(Directive):
         except Exception as err:
             raise SphinxError(str(err))
 
-        is_test = class_ is not None and issubclass(class_, unittest.TestCase)
+        is_test = class_ is not None and inspect.isclass(class_) and issubclass(class_, unittest.TestCase)
         shows_plot = '.show(' in source
 
         if 'layout' in self.options:
