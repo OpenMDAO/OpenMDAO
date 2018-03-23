@@ -520,7 +520,7 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False, s
 
             stream.write("\n{\n")
             for col, row_list in iteritems(rows):
-                stream.write("   '%s': %s,\n" % (col, list(row_list)))
+                stream.write("   %s: %s,\n" % (col, list(row_list)))
             stream.write("})")
         else:  # output json format to a file
             s = json.dumps((col_lists, rows))
