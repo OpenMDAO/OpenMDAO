@@ -132,23 +132,11 @@ class EmbedCodeDirective(Directive):
         skipped = failed = False
         if do_run:
             if shows_plot:
-                # fixes problem where 'matplotlib.use("Agg")' was inserted before __future__ import.
-                if "from __future__" in code_to_run:
-                    # We will split up code_to_run, insert our plotting lines after __future__ import,
-                    # then put it back together.
-                    new_order = []
-                    lines = code_to_run.split("\n")
-
-                    for line in lines:
-                        new_order.append(line)
-                        if "from __future__" in line:
-                            new_order.append('import matplotlib')
-                            new_order.append('matplotlib.use("Agg")')
-                    parts = ['\n'.join(new_order)]
-                    
-                else:
-                    # insert lines to generate the plot file
-                    parts = ['import matplotlib', 'matplotlib.use("Agg")', code_to_run]
+                mpl_import = "\nimport matplotlib\nmatplotlib.use('Agg')\n"
+                idx = code_to_run.find("from __future__")
+                idx = code_to_run.find('\n', idx) if idx >= 0 else 0
+                code_to_run = code_to_run[:idx] + mpl_import + code_to_run[idx:]
+                parts = [code_to_run]
 
                 if 'plot' in layout:
                     parts.append('matplotlib.pyplot.savefig("%s")' % plot_file_abs)
