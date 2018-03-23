@@ -4,7 +4,6 @@ branches:
 
 group: deprecated-2017Q4
 
-#sudo: false
 filter_secrets: false
 
 os:
@@ -43,31 +42,19 @@ notifications:
     secure: Dd+tpZkz48Q47Y+PtdL4b+KAs55PsvWjt9ybhip6xljhA5kVsba9oZS+KsAC8RLWSzVJLOSjz3Cu3MsRym4sTd/g4Pbqyh0ldK2Xnl+n2JOgpPFSXtFuH4Ln3uWB6kYtUK6+aGIC8qhbvEt8tukTBT0RduEmdRyVIZ3oN7YjETPSZXvujeiUFLssfpZW2mqoA/tIgJHFSlySAp6J5694t2Z/p8sHOrK8G/Nm+qlk4xqXHvJ3xablcSBG4BZCrpqmMMdTLXBt2E2K9Rc1P2ZBIrSHVWfSLx+4n79U2385+og7miN1Zuf3gY3YuGKIwnBTtEzTu20905idkr4QdKELCBEcU4azdznwjvUkXWkiFAJII9UELTluSQmZX602zWk4AgJNeHxhN3EbBSMezfYVZjprhlAlwnZZv6t4qAkvuzb7KOA4s679xWzWOBOn1wkynfIF8A66APqssveyz/PvZHSjnHQoLgMU+kwzoX759o0Z/HuRlhCcjv0W9DWxU2bFNi/zVh9YyvR8fG15biGthzOyuf+CHjxohw+J6M+YdR1RIf1g/60nGUPHx4j4SN3kEFPmEDxzZT/f349gvaZGOmKXBi0wH8iY/i9RinM9LJB4t6chj2MkKwUA26bYaVaIO6FYPfE7r+tTG6OXdck4voCs/s4aa9VKEX97yhh0i9g=
 
 before_install:
-- OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux"; fi)
-
-- if [ "$OS" = "MacOSX" ] && [ "$MPI" ]; then
-    brew install openmpi;
-  fi
-
-- wget "https://repo.continuum.io/miniconda/Miniconda-latest-$OS-x86_64.sh" -O miniconda.sh
+- wget "https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh" -O miniconda.sh
 - chmod +x miniconda.sh
+- ./miniconda.sh -b  -p /home/travis/miniconda;
+- export PATH=/home/travis/miniconda/bin:$PATH
 
-- if [ "$OS" = "Linux" ]; then
-    ./miniconda.sh -b  -p /home/travis/miniconda;
+- if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+    MASTER_BUILD=1;
   fi
-
-- if [ "$OS" = "MacOSX" ]; then
-    ./miniconda.sh -b  -p /Users/travis/miniconda;
-  fi
-
-- PATHPREFIX=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "/Users/travis/miniconda/bin";
-  else echo "/home/travis/miniconda/bin"; fi)
-- export PATH=$PATHPREFIX:$PATH
 - export OPENMDAO_TEST_DOCS=1
 
 install:
 # get key decrypted, placed, chmodded, and added for passwordless access to WebFaction
-- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+- if [ "$MASTER_BUILD" ]; then
     openssl aes-256-cbc -K $encrypted_74d70a284b7d_key -iv $encrypted_74d70a284b7d_iv -in travis_deploy_rsa.enc -out /tmp/travis_deploy_rsa -d;
     eval "$(ssh-agent -s)";
     chmod 600 /tmp/travis_deploy_rsa;
@@ -75,8 +62,6 @@ install:
     echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
   fi
 
-# keeping numpy pinned at 1.12 because pySNOPT dies with 1.13 because numpy broke callback
-#- conda install --yes nomkl
 - conda install --yes python=$PY
 - conda install --yes numpy==$NUMPY scipy=0.19.1 nose sphinx mock swig pip
 - pip install --upgrade pip
@@ -85,7 +70,7 @@ install:
 - git clone https://github.com/mdolab/pyoptsparse.git;
 - cd pyoptsparse;
 # get SNOPT source, securely, if SNOPT_LOCATION is set.
-- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+- if [ "$MASTER_BUILD" ]; then
     cd pyoptsparse/pySNOPT/source;
     scp -r "$SNOPT_LOCATION" .;
     cd ../../..;
@@ -129,10 +114,8 @@ deploy:
   skip_cleanup: true
   script:
   # only deploy docs in a build after a PR or merge is accepted
-  - if [ "$TRAVIS_PULL_REQUEST" = "false" ] && [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ]; then
-      if [ "$UPLOAD_DOCS" ]; then
-        python _utils/upload_doc_version.py;
-      fi
+  - if [ "$MASTER_BUILD" && "$UPLOAD_DOCS" ]; then
+      python _utils/upload_doc_version.py;
     fi
   on:
     branch: master
