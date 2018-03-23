@@ -1776,7 +1776,7 @@ class Problem(object):
 
         # Main loop over columns (fwd) or rows (rev) of the jacobian
         for par_deriv_color, matmat, idxs, idx_iter in itervalues(idx_iter_dict):
-            for j, inds in enumerate(idx_iter(idxs)):
+            for j, (inds, input_setter, jac_setter) in enumerate(idx_iter(idxs)):
                 # this sets dinputs for the current par_deriv_color to 0
                 # dinputs is dresids in fwd, doutouts in rev
                 vec_doutput['linear'].set_const(0.0)
@@ -1785,64 +1785,64 @@ class Problem(object):
                 else:  # rev
                     vec_dinput['linear'].set_const(0.0)
 
-                for col, i in enumerate(inds):
-                    input_name, vecname, rel_systems = input_idx_map[i]
-                    dinputs = input_vec[vecname]
-                    ncol = dinputs._ncol
-
-                    loc_idx = input_loc_idxs[i]
-                    if loc_idx != -1:
-                        if ncol > 1:
-                            dinputs._views_flat[input_name][loc_idx, col] = 1.0
-                        else:
-                            dinputs._views_flat[input_name][loc_idx] = 1.0
+                rel_systems = input_setter(j, inds, input_vec, input_idx_map, input_loc_idxs)
 
                 model._solve_linear(lin_vec_names, mode, rel_systems)
 
-                for i in inds:
-                    input_name, vecname, _ = input_idx_map[i]
-                    dinputs = input_vec[vecname]
-                    doutputs = output_vec[vecname]
-                    distrib = abs2meta[input_name]['distributed']
+                jac_setter(J, inds, input_idx_map, input_vec, output_vec, output_slice_map, relevant,
+                           abs2meta, output_list, output_meta, nproc, fwd, owning_ranks, self.comm)
 
-                    if simul_coloring and j > 0:
-                        for row in row_map[i]:
-                            output_name = idx2name[row]
-                            deriv_val = out_idxs = None
-                            if input_name not in relevant or output_name in relevant[input_name]:
-                                if output_name in doutputs._views_flat:
-                                    deriv_val = doutputs._views_flat[output_name]
-                                    if output_name in output_meta:
-                                        out_idxs = output_meta[output_name]['indices']
-                                        if out_idxs is not None:
-                                            deriv_val = deriv_val[out_idxs]
-                            J[row, i] = deriv_val[idx2local[row]]
-                    else:
-                        for output_name in output_list:
-                            slc = output_slice_map[output_name]
-                            deriv_val = out_idxs = None
-                            if input_name not in relevant or output_name in relevant[input_name]:
-                                if output_name in doutputs._views_flat:
-                                    deriv_val = doutputs._views_flat[output_name]
-                                    if output_name in output_meta:
-                                        out_idxs = output_meta[output_name]['indices']
-                                        if out_idxs is not None:
-                                            deriv_val = deriv_val[out_idxs]
+                #for icount, i in enumerate(inds):
+                    #input_name, vecname, _ = input_idx_map[i]
+                    #dinputs = input_vec[vecname]
+                    #doutputs = output_vec[vecname]
+                    #distrib = abs2meta[input_name]['distributed']
+                    #ncol = dinputs._ncol
 
-                                if nproc > 1 and not distrib:
-                                    root = owning_ranks[output_name]
-                                    if deriv_val is None:
-                                        sz = s.stop - s.start
-                                        if dinputs._ncol > 1:
-                                            deriv_val = np.empty((sz, dinputs._ncol))
-                                        else:
-                                            deriv_val = np.empty(sz)
-                                    self.comm.Bcast(deriv_val, root=root)
+                    #if simul_coloring and j > 0:
+                        #for row in row_map[i]:
+                            #output_name = idx2name[row]
+                            #deriv_val = out_idxs = None
+                            #if input_name not in relevant or output_name in relevant[input_name]:
+                                #if output_name in doutputs._views_flat:
+                                    #deriv_val = doutputs._views_flat[output_name]
+                                    #if output_name in output_meta:
+                                        #out_idxs = output_meta[output_name]['indices']
+                                        #if out_idxs is not None:
+                                            #deriv_val = deriv_val[out_idxs]
+                                    #J[row, i] = deriv_val[idx2local[row]]
+                    #else:
+                        #for output_name in output_list:
+                            #slc = output_slice_map[output_name]
+                            #deriv_val = out_idxs = None
+                            #if input_name not in relevant or output_name in relevant[input_name]:
+                                #if output_name in doutputs._views_flat:
+                                    #deriv_val = doutputs._views_flat[output_name]
+                                    #if output_name in output_meta:
+                                        #out_idxs = output_meta[output_name]['indices']
+                                        #if out_idxs is not None:
+                                            #deriv_val = deriv_val[out_idxs]
 
-                                if fwd:
-                                    J[slc, i] = deriv_val
-                                else:
-                                    J[i, slc] = deriv_val.T
+                                #if nproc > 1 and not distrib:
+                                    #root = owning_ranks[output_name]
+                                    #if deriv_val is None:
+                                        #sz = slc.stop - slc.start
+                                        #if dinputs._ncol > 1:
+                                            #deriv_val = np.empty((sz, dinputs._ncol))
+                                        #else:
+                                            #deriv_val = np.empty(sz)
+                                    #self.comm.Bcast(deriv_val, root=root)
+
+                                #if fwd:
+                                    #if ncol == 1:
+                                        #J[slc, i] = deriv_val
+                                    #elif icount == 0:
+                                        #J[slc, inds] = deriv_val
+                                #else:
+                                    #if ncol == 1:
+                                        #J[i, slc] = deriv_val.T
+                                    #elif icount == 0:
+                                        #J[inds, slc] = deriv_val.T
 
         return J if return_format == 'array' else Jmap
 
@@ -1885,7 +1885,6 @@ class Problem(object):
 
         for i, name in enumerate(names):
             rhsname = 'linear'
-            in_var_idx = abs2idx[rhsname][name]
             in_var_meta = abs2meta[name]
 
             if name in vois:
@@ -1913,6 +1912,7 @@ class Problem(object):
                 irange = np.arange(in_var_meta['global_size'], dtype=int)
                 in_idxs = parallel_deriv_color = matmat = None
 
+            in_var_idx = abs2idx[rhsname][name]
             sizes = var_sizes[rhsname]['output']
             gstart = np.sum(sizes[:iproc, in_var_idx])
             gend = gstart + sizes[iproc, in_var_idx]
@@ -1949,10 +1949,14 @@ class Problem(object):
             if parallel_deriv_color:
                 has_par_deriv_color = True
                 if parallel_deriv_color not in idx_iter_dict:
-                    idx_iter_dict[parallel_deriv_color] = (parallel_deriv_color, matmat
-                                                           [(start, end)], par_deriv_iter)
+                    if matmat:
+                        it = par_deriv_matmat_iter
+                    else:
+                        it = par_deriv_iter
+                    idx_iter_dict[parallel_deriv_color] = (parallel_deriv_color, matmat,
+                                                           [(start, end)], it)
                 else:
-                    _, old_matmat, range_list = idx_iter_dict[parallel_deriv_color]
+                    _, old_matmat, range_list, _ = idx_iter_dict[parallel_deriv_color]
                     if old_matmat != matmat:
                         raise RuntimeError("Mixing of vectorized and non-vectorized derivs in the "
                                            "same parallel color group (%s) is not supported." %
@@ -1967,7 +1971,7 @@ class Problem(object):
                                        name)
             elif not simul_coloring:
                 idx_iter_dict[name] = (parallel_deriv_color, matmat,
-                                       np.arange(start, end, dtype=int), default_iter)
+                                       np.arange(start, end, dtype=int), single_index_iter)
 
             tup = (name, rhsname, rel)
             idx_map.extend([tup] * (end - start))
@@ -2070,7 +2074,7 @@ class Problem(object):
         simul_coloring : ndarray
             Array of colors. Each entry corresponds to a column or row of the total jacobian.
         """
-        if simul_coloring is not None:
+        if simul_coloring:
             if parallel_deriv_color:
                 raise RuntimeError("Using both simul_coloring and parallel_deriv_color with "
                                    "variable '%s' is not supported." % name)
@@ -2111,12 +2115,13 @@ def _fix_pdc_lengths(idx_iter_dict):
         Dict of a name/color mapped to indexing information.
     """
     for key, tup in iteritems(idx_iter_dict):
-        par_deriv_color, _, range_list = tup
-        if par_deriv_color is not None:
-            lens = np.array([end - start for start, end in range_list])
-            maxlen = np.max(lens)
-            diffs = lens - maxlen
-            if np.any(diffs):
+        par_deriv_color, matmat, range_list, _ = tup
+        if par_deriv_color:
+            if not matmat:
+                lens = np.array([end - start for start, end in range_list])
+                maxlen = np.max(lens)
+                diffs = lens - maxlen
+            if not matmat and np.any(diffs):
                 for i, diff in enumerate(diffs):
                     start, end = range_list[i]
                     if diff < 0:
@@ -2132,34 +2137,226 @@ def _fix_pdc_lengths(idx_iter_dict):
 
 
 # _compute_totals index iterators
+def single_index_iter(idxs):
+    """
+    Iterate over indices for the single index (the default) case.
+    """
+    for i in idxs:
+        yield i, single_input_setter, single_jac_setter
+
+
 def simul_coloring_iter(coloring_info):
+    """
+    Iterate over index lists for the simul coloring case.
+    """
     col_lists, _ = coloring_info
-    val = [None]
 
     for i, ilist in enumerate(col_lists):
-        if i == 0:
+        if i == 0:  # first outer loop give all non-colored indices.
             for j in ilist:
-                val[0] = j
-                yield val  # do all non-colored indices individually
+                # do all non-colored indices individually
+                yield j, single_input_setter, single_jac_setter
         else:
-            yield ilist  # yield all indices for a color at once
+            # yield all indices for a color at once
+            yield ilist, array_input_setter, array_jac_setter
 
 
 def par_deriv_iter(idxs):
+    """
+    Iterate over index lists for the parallel deriv case.
+    """
     for tup in zip(*idxs):
-        yield tup
+        yield tup, array_input_setter, array_jac_setter
 
 
 def matmat_iter(idxs):
+    """
+    Iterate over index lists for the matrix matrix case.
+    """
     for idx_list in idxs:
-        yield idx_list
+        yield idx_list, matmat_input_setter, matmat_jac_setter
 
 
-def default_iter(idxs):
-    val = [None]
-    for i in idxs:
-        val[0] = i
-        yield val
+def par_deriv_matmat_iter(idxs):
+    """
+    Iterate over index lists for the combined parallel deriv matrix matrix case.
+    """
+    yield idxs, par_deriv_matmat_input_setter, par_deriv_matmat_jac_setter
+
+
+# _compute_totals input and jacobian setting functions
+def single_input_setter(loop, idx, input_vec, input_idx_map, input_loc_idxs):
+    """
+    Sets 1's into the input vector in the single index case.
+    """
+    input_name, vecname, rel_systems = input_idx_map[idx]
+    dinputs = input_vec[vecname]
+
+    loc_idx = input_loc_idxs[idx]
+    if loc_idx != -1:
+        dinputs._views_flat[input_name][loc_idx] = 1.0
+
+    return rel_systems
+
+
+def single_jac_setter(J, i, input_idx_map, input_vec, output_vec, output_slice_map,
+                      relevant, abs2meta, output_list, output_meta, nproc, fwd, owning_ranks, comm):
+    """
+    Set the appropriate part of the total jacobian for a single input index.
+    """
+    input_name, vecname, _ = input_idx_map[i]
+    dinputs = input_vec[vecname]
+    doutputs = output_vec[vecname]
+    distrib = abs2meta[input_name]['distributed']
+
+    for output_name in output_list:
+        if input_name not in relevant or output_name in relevant[input_name]:
+            slc = output_slice_map[output_name]
+            deriv_val = get_deriv_val(output_name, slc, doutputs, output_meta,
+                                      owning_ranks, relevant, nproc, comm, distrib)
+            if fwd:
+                J[slc, i] = deriv_val
+            else:
+                J[i, slc] = deriv_val
+
+
+def array_jac_setter(J, inds, input_idx_map, input_vec, output_vec, output_slice_map,
+                     relevant, abs2meta, output_list, output_meta, nproc, fwd, owning_ranks, comm):
+    """
+    Set the appropriate part of the total jacobian for multiple input indices.
+    """
+    for i in inds:
+        single_jac_setter(J, i, input_idx_map, input_vec, output_vec, output_slice_map,
+                          relevant, abs2meta, output_list, output_meta, nproc, fwd, owning_ranks, comm)
+
+
+def matmat_jac_setter(J, inds, input_idx_map, input_vec, output_vec, output_slice_map, relevant,
+                      abs2meta, output_list, output_meta, nproc, fwd, owning_ranks, comm):
+    """
+    Set the appropriate part of the total jacobian for matrix matrix input indices.
+    """
+
+    # in plain matmat, all inds are for a single variable for each iteration of the outer loop,
+    # so any relevance can be determined only once.
+    input_name, vecname, _ = input_idx_map[inds[0]]
+    dinputs = input_vec[vecname]
+    doutputs = output_vec[vecname]
+    distrib = abs2meta[input_name]['distributed']
+    ncol = dinputs._ncol
+
+    for output_name in output_list:
+        slc = output_slice_map[output_name]
+        sz = slc.stop - slc.start
+        deriv_val = out_idxs = None
+        if input_name not in relevant or output_name in relevant[input_name]:
+            if output_name in doutputs._views_flat:
+                deriv_val = doutputs._views_flat[output_name]
+                if sz != deriv_val.size // deriv_val.shape[1]:
+                    deriv_val = deriv_val[output_meta[output_name]['indices']]
+
+                if nproc > 1 and not distrib:
+                    root = owning_ranks[output_name]
+                    if deriv_val is None:
+                        deriv_val = np.empty((sz, ncol))
+                    self.comm.Bcast(deriv_val, root=root)
+
+                if fwd:
+                    J[slc, inds] = deriv_val
+                else:
+                    J[inds, slc] = deriv_val.T
+
+
+def par_deriv_matmat_jac_setter(J, inds, input_idx_map, input_vec, output_vec, output_slice_map,
+                                relevant, abs2meta, output_list, output_meta, nproc, fwd, owning_ranks, comm):
+    """
+    Set the appropriate part of the total jacobian for par_deriv matrix matrix input indices.
+    """
+    for matmat_idxs in inds:
+        matmat_jac_setter(J, matmat_idxs, input_idx_map, input_vec, output_vec, output_slice_map,
+                          relevant, abs2meta, output_list, output_meta, nproc, fwd, owning_ranks, comm)
+
+
+def get_deriv_val(output_name, slc, doutputs, output_meta, owning_ranks, relevant,
+                  nproc, comm, distrib):
+    deriv_val = out_idxs = None
+    sz = slc.stop - slc.start
+    if output_name in doutputs._views_flat:
+        deriv_val = doutputs._views_flat[output_name]
+        if sz != deriv_val.size:
+            deriv_val = deriv_val[output_meta[output_name]['indices']]
+
+    if nproc > 1 and not distrib:
+        root = owning_ranks[output_name]
+        if deriv_val is None:
+            deriv_val = np.empty(sz)
+        comm.Bcast(deriv_val, root=root)
+
+    return deriv_val
+
+
+def array_input_setter(loop, inds, input_vec, input_idx_map, input_loc_idxs):
+    """
+    Sets 1's into the input vector in the multiple index case.
+    """
+    all_rel_systems = set()
+
+    for i in inds:
+        input_name, vecname, rel_systems = input_idx_map[i]
+        _update_rel_systems(all_rel_systems, rel_systems)
+
+        dinputs = input_vec[vecname]
+
+        loc_idx = input_loc_idxs[i]
+        if loc_idx != -1:
+            dinputs._views_flat[input_name][loc_idx] = 1.0
+
+    return all_rel_systems
+
+
+def matmat_input_setter(loop, inds, input_vec, input_idx_map, input_loc_idxs):
+    """
+    Sets 1's into the input vector in the matrix matrix case.
+    """
+    input_name, vecname, rel_systems = input_idx_map[inds[0]]
+
+    dinputs = input_vec[vecname]
+
+    for col, i in enumerate(inds):
+        loc_idx = input_loc_idxs[i]
+        if loc_idx != -1:
+            dinputs._views_flat[input_name][loc_idx, col] = 1.0
+
+    return rel_systems
+
+
+def par_deriv_matmat_input_setter(loop, inds, input_vec, input_idx_map, input_loc_idxs):
+    """
+    Sets 1's into the input vector in the matrix matrix with parallel deriv case.
+    """
+    all_rel_systems = set()
+
+    for matmat_idxs in inds:
+        input_name, vecname, rel_systems = input_idx_map[matmat_idxs[0]]
+        _update_rel_systems(all_rel_systems, rel_systems)
+
+        dinputs = input_vec[vecname]
+
+        for col, i in enumerate(matmat_idxs):
+            loc_idx = input_loc_idxs[i]
+            if loc_idx != -1:
+                dinputs._views_flat[input_name][loc_idx, col] = 1.0
+
+    return all_rel_systems
+
+
+def _update_rel_systems(all_rel_systems, rel_systems):
+    """
+    Combine all relevant systems in those cases where we have multiple input variables involved.
+    """
+    if all_rel_systems is _contains_all or rel_systems is _contains_all:
+        all_rel_systems = _contains_all
+    else:
+        all_rel_systems.update(rel_systems)
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
