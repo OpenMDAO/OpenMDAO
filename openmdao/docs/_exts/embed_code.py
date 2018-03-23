@@ -137,13 +137,12 @@ class EmbedCodeDirective(Directive):
                 idx = code_to_run.find("from __future__")
                 idx = code_to_run.find('\n', idx) if idx >= 0 else 0
                 code_to_run = code_to_run[:idx] + mpl_import + code_to_run[idx:]
-                parts = [code_to_run]
 
                 if 'plot' in layout:
-                    parts.append('matplotlib.pyplot.savefig("%s")' % plot_file_abs)
+                    code_to_run = code_to_run + ('\nmatplotlib.pyplot.savefig("%s")' % plot_file_abs)
 
                 skipped, failed, run_outputs = \
-                    run_code('\n'.join(parts), path, module=module, cls=class_,
+                    run_code(code_to_run, path, module=module, cls=class_,
                              shows_plot=True)
             else:
                 skipped, failed, run_outputs = \
