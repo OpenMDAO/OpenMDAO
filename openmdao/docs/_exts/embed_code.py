@@ -132,6 +132,7 @@ class EmbedCodeDirective(Directive):
         skipped = failed = False
         if do_run:
             if shows_plot:
+                # import matplotlib AFTER __future__ (if it's there)
                 mpl_import = "\nimport matplotlib\nmatplotlib.use('Agg')\n"
                 idx = code_to_run.find("from __future__")
                 idx = code_to_run.find('\n', idx) if idx >= 0 else 0
