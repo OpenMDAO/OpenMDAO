@@ -2,15 +2,18 @@ from __future__ import print_function, division
 
 from collections import OrderedDict
 import numpy as np
+from six import iteritems, itervalues
 
 from openmdao.utils.general_utils import ContainsAll
 
 
 _contains_all = ContainsAll()
 
+
 class _TotalJacInfo(object):
     def __init__(self, problem, of, wrt, global_names, return_format):
         model = problem.model
+        self.comm = problem.comm
         self.nproc = problem.comm.size
         self.iproc = model.comm.rank
         self.var_sizes = model._var_sizes
@@ -25,8 +28,8 @@ class _TotalJacInfo(object):
         responses = problem.driver._responses
         constraints = problem.driver._cons
 
-        vec_doutput =  model._vectors['output']
-        vec_dresid =  model._vectors['residual']
+        vec_doutput = model._vectors['output']
+        vec_dresid = model._vectors['residual']
 
         prom2abs = model._var_allprocs_prom2abs_list['output']
 
@@ -37,16 +40,16 @@ class _TotalJacInfo(object):
         else:
             old_wrt = wrt
             if not global_names:
-                wrt = [prom2abs[name][0] for name in oldwrt]
+                wrt = [prom2abs[name][0] for name in old_wrt]
 
         if of is None:
-            of = list(self.driver._objs)
-            of.extend(self.driver._cons)
+            of = list(problem.driver._objs)
+            of.extend(problem.driver._cons)
             old_of = of
         else:
             old_of = of
             if not global_names:
-                of = [prom2abs[name][0] for name in oldof]
+                of = [prom2abs[name][0] for name in old_of]
 
         self.of = of
         self.old_of = old_of
@@ -81,8 +84,6 @@ class _TotalJacInfo(object):
 
         self.input_idx_map, self.input_loc_idxs, self.idx_iter_dict = \
             self._create_input_idx_map(self.input_list, self.input_meta, has_lin_cons)
-
-        #self.lin_vec_names = sorted(set(vecname for _, vecname, _ in self.input_idx_map))
 
         # always allocate a 2D dense array and we can assign views to dict keys later if
         # return format is 'dict' or 'flat_dict'.
@@ -236,7 +237,7 @@ class _TotalJacInfo(object):
             loc_i = np.full(irange.shape, -1, dtype=int)
             loc = np.logical_and(irange >= gstart, irange < gend)
             if in_idxs is None:
-                loc_i[loc] = np.arange(0, gend - gstart, dtype=int)
+                loc_i[loc] = np.arange(0, gend - gstart, dtype=int)[loc]
             else:
                 loc_i[loc] = irange[loc]
 
@@ -370,7 +371,7 @@ class _TotalJacInfo(object):
             root = self.owning_ranks[output_name]
             if deriv_val is None:
                 deriv_val = np.empty(sz)
-            comm.Bcast(deriv_val, root=root)
+            self.comm.Bcast(deriv_val, root=root)
 
         return deriv_val
 
@@ -382,8 +383,7 @@ class _TotalJacInfo(object):
         Iterate over indices for the single index (the default) case.
         """
         for i in idxs:
-            yield i, single_input_setter, self.single_jac_setter
-
+            yield i, self.single_input_setter, self.single_jac_setter
 
     def simul_coloring_iter(self, coloring_info):
         """
@@ -395,33 +395,109 @@ class _TotalJacInfo(object):
             if i == 0:  # first outer loop give all non-colored indices.
                 for j in ilist:
                     # do all non-colored indices individually
-                    yield j, single_input_setter, self.single_jac_setter
+                    yield j, self.single_input_setter, self.single_jac_setter
             else:
                 # yield all indices for a color at once
-                yield ilist, array_input_setter, self.simul_coloring_jac_setter
-
+                yield ilist, self.array_input_setter, self.simul_coloring_jac_setter
 
     def par_deriv_iter(self, idxs):
         """
         Iterate over index lists for the parallel deriv case.
         """
         for tup in zip(*idxs):
-            yield tup, array_input_setter, self.array_jac_setter
-
+            yield tup, self.array_input_setter, self.array_jac_setter
 
     def matmat_iter(self, idxs):
         """
         Iterate over index lists for the matrix matrix case.
         """
         for idx_list in idxs:
-            yield idx_list, matmat_input_setter, self.matmat_jac_setter
-
+            yield idx_list, self.matmat_input_setter, self.matmat_jac_setter
 
     def par_deriv_matmat_iter(self, idxs):
         """
         Iterate over index lists for the combined parallel deriv matrix matrix case.
         """
-        yield idxs, par_deriv_matmat_input_setter, self.par_deriv_matmat_jac_setter
+        yield idxs, self.par_deriv_matmat_input_setter, self.par_deriv_matmat_jac_setter
+
+    #
+    # input setter functions
+    #
+    def single_input_setter(self, idx):
+        """
+        Sets 1's into the input vector in the single index case.
+        """
+        input_vec = self.input_vec
+        input_idx_map = self.input_idx_map
+        input_loc_idxs = self.input_loc_idxs
+
+        input_name, vecname, rel_systems = input_idx_map[idx]
+        dinputs = input_vec[vecname]
+
+        loc_idx = input_loc_idxs[idx]
+        if loc_idx != -1:
+            dinputs._views_flat[input_name][loc_idx] = 1.0
+
+        return rel_systems
+
+    def array_input_setter(self, inds):
+        """
+        Sets 1's into the input vector in the multiple index case.
+        """
+        all_rel_systems = set()
+
+        for i in inds:
+            rel_systems = self.single_input_setter(i)
+            _update_rel_systems(all_rel_systems, rel_systems)
+
+        return all_rel_systems
+
+    def matmat_input_setter(self, inds):
+        """
+        Sets 1's into the input vector in the matrix matrix case.
+        """
+        input_vec = self.input_vec
+        input_idx_map = self.input_idx_map
+        input_loc_idxs = self.input_loc_idxs
+
+        input_name, vecname, rel_systems = input_idx_map[inds[0]]
+
+        dinputs = input_vec[vecname]
+
+        for col, i in enumerate(inds):
+            loc_idx = input_loc_idxs[i]
+            if loc_idx != -1:
+                dinputs._views_flat[input_name][loc_idx, col] = 1.0
+
+        return rel_systems
+
+    def par_deriv_matmat_input_setter(self, inds):
+        """
+        Sets 1's into the input vector in the matrix matrix with parallel deriv case.
+        """
+        input_vec = self.input_vec
+        input_idx_map = self.input_idx_map
+        input_loc_idxs = self.input_loc_idxs
+
+        all_rel_systems = set()
+
+        for matmat_idxs in inds:
+            input_name, vecname, rel_systems = input_idx_map[matmat_idxs[0]]
+            _update_rel_systems(all_rel_systems, rel_systems)
+
+            dinputs = input_vec[vecname]
+            ncol = dinputs._ncol
+
+            for col, i in enumerate(matmat_idxs):
+                loc_idx = input_loc_idxs[i]
+                if loc_idx != -1:
+                    if ncol > 1:
+                        dinputs._views_flat[input_name][loc_idx, col] = 1.0
+                    else:
+                        dinputs._views_flat[input_name][loc_idx] = 1.0
+
+
+        return all_rel_systems
 
     #
     # Jacobian setter functions
@@ -447,14 +523,12 @@ class _TotalJacInfo(object):
                 else:
                     J[i, slc] = deriv_val
 
-
     def array_jac_setter(self, inds):
         """
         Set the appropriate part of the total jacobian for multiple input indices.
         """
         for i in inds:
             self.single_jac_setter(i)
-
 
     def simul_coloring_jac_setter(self, inds):
         """
@@ -481,7 +555,6 @@ class _TotalJacInfo(object):
                                 deriv_val = deriv_val[out_idxs]
                         J[row, i] = deriv_val[idx2local[row]]
 
-
     def matmat_jac_setter(self, inds):
         """
         Set the appropriate part of the total jacobian for matrix matrix input indices.
@@ -489,12 +562,19 @@ class _TotalJacInfo(object):
 
         # in plain matmat, all inds are for a single variable for each iteration of the outer loop,
         # so any relevance can be determined only once.
-        input_name, vecname, _ = input_idx_map[inds[0]]
-        dinputs = input_vec[vecname]
-        doutputs = output_vec[vecname]
+        input_name, vecname, _ = self.input_idx_map[inds[0]]
+        dinputs = self.input_vec[vecname]
+        doutputs = self.output_vec[vecname]
         ncol = dinputs._ncol
+        output_slice_map = self.output_slice_map
+        relevant = self.relevant
+        nproc = self.nproc
+        abs2meta = self.abs2meta
+        fwd = self.fwd
+        J = self.J
+        owning_ranks = self.owning_ranks
 
-        for output_name in output_list:
+        for output_name in self.output_list:
             slc = output_slice_map[output_name]
             sz = slc.stop - slc.start
             deriv_val = out_idxs = None
@@ -552,6 +632,7 @@ def _check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring):
             raise RuntimeError("Using both simul_coloring and vectorize_derivs with "
                                "variable '%s' is not supported." % name)
 
+
 def _fix_pdc_lengths(idx_iter_dict):
     """
     Take any parallel_deriv_color entries and make sure their index arrays are same length.
@@ -581,83 +662,6 @@ def _fix_pdc_lengths(idx_iter_dict):
                 # just convert all (start, end) tuples to aranges
                 for i, (start, end) in enumerate(range_list):
                     range_list[i] = np.arange(start, end, dtype=int)
-
-
-
-
-# _compute_totals input and jacobian setting functions
-def single_input_setter(loop, idx, input_vec, input_idx_map, input_loc_idxs):
-    """
-    Sets 1's into the input vector in the single index case.
-    """
-    input_name, vecname, rel_systems = input_idx_map[idx]
-    dinputs = input_vec[vecname]
-
-    loc_idx = input_loc_idxs[idx]
-    if loc_idx != -1:
-        dinputs._views_flat[input_name][loc_idx] = 1.0
-
-    return rel_systems
-
-
-def array_input_setter(loop, inds, input_vec, input_idx_map, input_loc_idxs):
-    """
-    Sets 1's into the input vector in the multiple index case.
-    """
-    all_rel_systems = set()
-
-    for i in inds:
-        input_name, vecname, rel_systems = input_idx_map[i]
-        _update_rel_systems(all_rel_systems, rel_systems)
-
-        dinputs = input_vec[vecname]
-
-        loc_idx = input_loc_idxs[i]
-        if loc_idx != -1:
-            dinputs._views_flat[input_name][loc_idx] = 1.0
-
-    return all_rel_systems
-
-
-def matmat_input_setter(loop, inds, input_vec, input_idx_map, input_loc_idxs):
-    """
-    Sets 1's into the input vector in the matrix matrix case.
-    """
-    input_name, vecname, rel_systems = input_idx_map[inds[0]]
-
-    dinputs = input_vec[vecname]
-
-    for col, i in enumerate(inds):
-        loc_idx = input_loc_idxs[i]
-        if loc_idx != -1:
-            dinputs._views_flat[input_name][loc_idx, col] = 1.0
-
-    return rel_systems
-
-
-def par_deriv_matmat_input_setter(loop, inds, input_vec, input_idx_map, input_loc_idxs):
-    """
-    Sets 1's into the input vector in the matrix matrix with parallel deriv case.
-    """
-    all_rel_systems = set()
-
-    for matmat_idxs in inds:
-        input_name, vecname, rel_systems = input_idx_map[matmat_idxs[0]]
-        _update_rel_systems(all_rel_systems, rel_systems)
-
-        dinputs = input_vec[vecname]
-        ncol = dinputs._ncol
-
-        for col, i in enumerate(matmat_idxs):
-            loc_idx = input_loc_idxs[i]
-            if loc_idx != -1:
-                if ncol > 1:
-                    dinputs._views_flat[input_name][loc_idx, col] = 1.0
-                else:
-                    dinputs._views_flat[input_name][loc_idx] = 1.0
-
-
-    return all_rel_systems
 
 
 def _update_rel_systems(all_rel_systems, rel_systems):

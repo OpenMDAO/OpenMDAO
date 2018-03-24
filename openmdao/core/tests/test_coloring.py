@@ -107,7 +107,8 @@ class SimulColoringTestCase(unittest.TestCase):
     def test_simul_coloring_snopt(self):
 
         # first, run w/o coloring
-        p = run_opt(pyOptSparseDriver, {'optimizer': 'SNOPT', 'print_results': False})
+        p = run_opt(pyOptSparseDriver,
+                    {'optimizer': 'SNOPT', 'print_results': False, 'maxiter': 50})
 
         color_info = ([
             [20],
@@ -354,7 +355,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
             18: [9, 15, 20],
             19: [10, 20],
          })
-        
+
         p.driver.set_simul_deriv_color(color_info)
 
         p.setup(mode='fwd')

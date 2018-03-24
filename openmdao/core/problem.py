@@ -1263,8 +1263,7 @@ class Problem(object):
                 else:  # rev
                     vec_dinput['linear'].set_const(0.0)
 
-                rel_systems = input_setter(j, inds, total_info.input_vec, total_info.input_idx_map, 
-                                           total_info.input_loc_idxs)
+                rel_systems = input_setter(inds)
 
                 model._solve_linear(model._lin_vec_names, self._mode, rel_systems)
 
