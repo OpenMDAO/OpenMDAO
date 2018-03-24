@@ -290,7 +290,7 @@ class Driver(object):
 
             # If we have remote VOIs, pick an owning rank for each and use that
             # to bcast to others later
-            owning_ranks = model._owning_rank['output']
+            owning_ranks = model._owning_rank
             sizes = model._var_sizes['nonlinear']['output']
             for i, vname in enumerate(model._var_allprocs_abs_names['output']):
                 owner = owning_ranks[vname]
@@ -365,7 +365,7 @@ class Driver(object):
                     "RecordingManager.startup should never be called when "
                     "running in parallel on an inactive System")
             rrank = self._problem.comm.rank  # root ( aka model ) rank.
-            rowned = model._owning_rank['output']
+            rowned = model._owning_rank
             mydesvars = [n for n in mydesvars if rrank == rowned[n]]
             myresponses = [n for n in myresponses if rrank == rowned[n]]
             myobjectives = [n for n in myobjectives if rrank == rowned[n]]
@@ -486,7 +486,7 @@ class Driver(object):
             Value for the design variable.
         """
         if (name in self._remote_dvs and
-                self._problem.model._owning_rank['output'][name] != self._problem.comm.rank):
+                self._problem.model._owning_rank[name] != self._problem.comm.rank):
             return
 
         meta = self._designvars[name]
@@ -849,27 +849,33 @@ class Driver(object):
         if isinstance(self._simul_coloring_info, string_types):
             with open(self._simul_coloring_info, 'r') as f:
                 self._simul_coloring_info = json.load(f)
+                column_lists, row_map = self._simul_coloring_info
+                row_map = {int(k): v for k, v in iteritems(row_map)}
+                self._simul_coloring_info = column_lists, row_map
 
-        coloring, maps = self._simul_coloring_info
-        for dv, colors in iteritems(coloring):
-            if dv not in self._designvars:
-                # convert name from promoted to absolute
-                dv = prom2abs[dv][0]
-            self._designvars[dv]['simul_deriv_color'] = colors
-
-        for res, dvdict in iteritems(maps):
-            if res not in self._responses:
-                # convert name from promoted to absolute
-                res = prom2abs[res][0]
-            self._responses[res]['simul_map'] = dvdict
-
-            for dv, col_dict in dvdict.items():
-                col_dict = {int(k): v for k, v in iteritems(col_dict)}
-                if dv not in self._designvars:
-                    # convert name from promoted to absolute and replace dictionary key
-                    del dvdict[dv]
-                    dv = prom2abs[dv][0]
-                dvdict[dv] = col_dict
+        # if len(self._simul_coloring_info) == 2:  # per-variable coloring
+        #     coloring, maps = self._simul_coloring_info
+        #     for dv, colors in iteritems(coloring):
+        #         if dv not in self._designvars:
+        #             # convert name from promoted to absolute
+        #             dv = prom2abs[dv][0]
+        #         self._designvars[dv]['simul_deriv_color'] = colors
+        #
+        #     for res, dvdict in iteritems(maps):
+        #         if res not in self._responses:
+        #             # convert name from promoted to absolute
+        #             res = prom2abs[res][0]
+        #         self._responses[res]['simul_map'] = dvdict
+        #
+        #         for dv, col_dict in dvdict.items():
+        #             col_dict = {int(k): v for k, v in iteritems(col_dict)}
+        #             if dv not in self._designvars:
+        #                 # convert name from promoted to absolute and replace dictionary key
+        #                 del dvdict[dv]
+        #                 dv = prom2abs[dv][0]
+        #             dvdict[dv] = col_dict
+        # else:  # global coloring
+        #     pass  # nothing to be done.  We'll just use the data structure as given.
 
     def _pre_run_model_debug_print(self):
         """

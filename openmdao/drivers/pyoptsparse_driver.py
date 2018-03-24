@@ -549,6 +549,11 @@ class pyOptSparseDriver(Driver):
         """
         super(pyOptSparseDriver, self)._setup_simul_coloring(mode)
 
+        if self._simul_coloring_info is None:
+            return
+
+        column_lists, row_map = self._simul_coloring_info
+
         relevant = self._problem.model._relevant
 
         for res, meta in iteritems(self._responses):

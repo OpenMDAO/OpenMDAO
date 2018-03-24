@@ -93,12 +93,12 @@ class System(object):
         For outputs, the list will have length one since promoted output names are unique.
     _var_abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names, on current proc.
-    _var_allprocs_abs2meta : {}
+    _var_allprocs_abs2meta : dict
         Dictionary mapping absolute names to metadata dictionaries for allprocs variables.
         The keys are
         ('units', 'shape', 'size', 'var_set') for inputs and
         ('units', 'shape', 'size', 'var_set', 'ref', 'ref0', 'res_ref', 'distributed') for outputs.
-    _var_abs2meta : {}
+    _var_abs2meta : dict
         Dictionary mapping absolute names to metadata dictionaries for myproc variables.
     _var_allprocs_abs2idx : dict
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
@@ -147,8 +147,6 @@ class System(object):
         Vector of lower bounds, scaled and dimensionless.
     _upper_bounds : <Vector>
         Vector of upper bounds, scaled and dimensionless.
-    _scaling_vecs : dict of dict of Vectors
-        First key indicates vector type and coefficient, second key is vec_name.
     _nonlinear_solver : <NonlinearSolver>
         Nonlinear solver to be used for solve_nonlinear.
     _linear_solver : <LinearSolver>
@@ -228,7 +226,7 @@ class System(object):
         True if this system has resid scaling.
     _has_input_scaling : bool
         True if this system has input scaling.
-    _owning_rank : {'input': {}, 'output': {}}
+    _owning_rank : dict
         Dict mapping var name to the lowest rank where that variable is local.
     options : OptionsDictionary
         options dictionary
@@ -597,7 +595,7 @@ class System(object):
                             if 'size' in voi:
                                 ncol = voi['size']
                             else:
-                                owner = self._owning_rank['output'][vec_name]
+                                owner = self._owning_rank[vec_name]
                                 ncol = sizes[owner, abs2idx[vec_name][vec_name]]
                         rdct, _ = relevant[vec_name]['@all']
                         rel = rdct['output']
@@ -933,7 +931,7 @@ class System(object):
         """
         self._var_sizes = {}
         self._var_sizes_byset = {}
-        self._owning_rank = {'input': defaultdict(int), 'output': defaultdict(int)}
+        self._owning_rank = defaultdict(int)
 
     def _setup_global_shapes(self):
         """
@@ -1082,7 +1080,7 @@ class System(object):
                 self._var_relevant_names[vec_name][type_].extend(
                     v for v in self._var_abs_names[type_] if v in rel[type_])
 
-        self._rel_vec_names = set(self._rel_vec_name_list)
+        self._rel_vec_names = frozenset(self._rel_vec_name_list)
         self._lin_rel_vec_name_list = self._rel_vec_name_list[1:]
 
         for s in self._subsystems_myproc:
@@ -2062,10 +2060,10 @@ class System(object):
         dvs['indices'] = indices
         dvs['parallel_deriv_color'] = parallel_deriv_color
         dvs['vectorize_derivs'] = vectorize_derivs
-        # TODO: figure out why grouping the matmat variables this way
-        #       makes the flat_earth test run faster on one proc.
-        if vectorize_derivs and parallel_deriv_color is None:
-            dvs['parallel_deriv_color'] = '@matmat'
+        # # TODO: figure out why grouping the matmat variables this way
+        # #       makes the flat_earth test run faster on one proc.
+        # if vectorize_derivs and parallel_deriv_color is None:
+        #     dvs['parallel_deriv_color'] = '@matmat'
         dvs['simul_deriv_color'] = simul_coloring
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
@@ -2227,8 +2225,8 @@ class System(object):
 
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['vectorize_derivs'] = vectorize_derivs
-        if vectorize_derivs and parallel_deriv_color is None:
-            resp['parallel_deriv_color'] = '@matmat'
+        # if vectorize_derivs and parallel_deriv_color is None:
+        #     resp['parallel_deriv_color'] = '@matmat'
         resp['simul_deriv_color'] = simul_coloring
         resp['simul_map'] = simul_map
 
@@ -2413,7 +2411,7 @@ class System(object):
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name in out:
                 if 'size' not in out[name]:
-                    out[name]['size'] = sizes[self._owning_rank['output'][name], abs2idx[name]]
+                    out[name]['size'] = sizes[self._owning_rank[name], abs2idx[name]]
 
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -2465,7 +2463,7 @@ class System(object):
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name in out:
                 if 'size' not in out[name]:
-                    out[name]['size'] = sizes[self._owning_rank['output'][name], abs2idx[name]]
+                    out[name]['size'] = sizes[self._owning_rank[name], abs2idx[name]]
 
         if recurse:
             for subsys in self._subsystems_myproc:
