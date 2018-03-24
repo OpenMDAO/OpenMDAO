@@ -389,7 +389,7 @@ class _TotalJacInfo(object):
         """
         Iterate over index lists for the simul coloring case.
         """
-        col_lists, _ = coloring_info
+        col_lists, _, _ = coloring_info
 
         for i, ilist in enumerate(col_lists):
             if i == 0:  # first outer loop give all non-colored indices.
@@ -534,7 +534,7 @@ class _TotalJacInfo(object):
         """
         Set the appropriate part of the total jacobian for simul coloring input indices.
         """
-        _, row_map = self.simul_coloring
+        _, row_map, _ = self.simul_coloring
         relevant = self.relevant
         output_meta = self.output_meta
         idx2local = self.idx2local

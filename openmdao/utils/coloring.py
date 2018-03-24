@@ -471,7 +471,8 @@ def get_simul_meta_old(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=Fals
     return simul_colorings, simul_maps
 
 
-def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False, stream=sys.stdout):
+def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
+                   include_sparsity=True, stream=sys.stdout):
     """
     Compute simultaneous derivative colorings for the given problem.
 
@@ -487,6 +488,9 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False, s
         Tolerance used to determine if an array entry is nonzero.
     show_jac : bool
         If True, display a visualiation of the final total jacobian used to compute the coloring.
+    include_sparsity : bool
+        If True, include the sparsity structure of the total jacobian mapped to design vars
+        and responses.  (This info is used by pyOptSparseDriver).
     stream : file-like or None
         Stream where output coloring info will be written.
 
@@ -511,6 +515,36 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False, s
 
     rows = OrderedDict(sorted(rows.items(), key=lambda x: x[0]))
 
+    sparsity = None
+    if include_sparsity or (show_jac and stream is not None):
+        of = list(driver._objs)
+        of.extend([c for c, meta in iteritems(driver._cons)
+                   if not ('linear' in meta and meta['linear'])])
+        wrt = list(driver._designvars)
+
+        if include_sparsity:
+            sparsity = {}
+            row_start = row_end = 0
+            for res in of:
+                sparsity[res] = {}
+                res_size = int(driver._responses[res]['size'])
+                row_end += res_size
+                col_start = col_end = 0
+                for dv in wrt:
+                    dv_size = int(driver._designvars[dv]['size'])
+                    col_end += dv_size
+
+                    # save sparsity structure as  (rows, cols, shape)
+                    irows, icols = np.nonzero(J[row_start:row_end, col_start:col_end])
+                    # convert to make JSON serializable
+                    if irows.size > 0:
+                        irows = [int(i) for i in irows]
+                        icols = [int(i) for i in icols]
+                        sparsity[res][dv] = (irows, icols, (res_size, dv_size))
+                    col_start = col_end
+
+                row_start = row_end
+
     if stream is not None:
         if stream.isatty():
             stream.write("\n([\n")
@@ -522,8 +556,14 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False, s
             for col, row_list in iteritems(rows):
                 stream.write("   %s: %s,\n" % (col, list(row_list)))
             stream.write("})")
+
+            if sparsity:
+                import pprint
+                stream.write("\n\n")
+                pprint.pprint(sparsity)
+
         else:  # output json format to a file
-            s = json.dumps((col_lists, rows))
+            s = json.dumps((col_lists, rows, sparsity))
 
             # do a little pretty printing since the built-in json pretty printing stretches
             # the output vertically WAY too much.
@@ -555,16 +595,11 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False, s
             stream.write('\n'.join(lines))
             stream.write("\n")
 
-    if show_jac and stream is not None:
-        of = list(driver._objs)
-        of.extend([c for c, meta in iteritems(driver._cons)
-                   if not ('linear' in meta and meta['linear'])])
-        wrt = list(driver._designvars)
+        if show_jac and stream is not None:
+            stream.write("\n\n")
+            array_viz(J, problem, of, wrt, stream)
 
-        stream.write("\n\n")
-        array_viz(J, problem, of, wrt, stream)
-
-    return col_lists, rows
+    return col_lists, rows, sparsity
 
 
 def simul_coloring_summary(problem, color_info, stream=sys.stdout):
@@ -580,7 +615,7 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
     stream : file-like
         Where the output will go.
     """
-    column_lists, row_map = color_info
+    column_lists, row_map, sparsity = color_info
 
     desvars = problem.driver._designvars
 
@@ -593,6 +628,9 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
     else:  # rev
         raise RuntimeError("rev mode currently not supported for simultaneous derivs.")
 
+    if sparsity is not None:
+        stream.write("Sparsity structure has been computed for all response/design_var "
+                     "sub-jacobians.")
     if tot_size == tot_colors:
         stream.write("No simultaneous derivative solves are possible in this configuration.\n")
     else:
@@ -618,6 +656,8 @@ def _simul_coloring_setup_parser(parser):
     parser.add_argument('-j', '--jac', action='store_true', dest='show_jac',
                         help="Display a visualization of the final total jacobian used to "
                         "compute the coloring.")
+    parser.add_argument('-s', '--sparsity', action='store_true', dest='include_sparsity',
+                        help="Include the sparsity structure in the coloring data structure.")
 
 
 def _simul_coloring_cmd(options):
@@ -646,7 +686,9 @@ def _simul_coloring_cmd(options):
             outfile = open(options.outfile, 'w')
         Problem._post_setup_func = None  # avoid recursive loop
         color_info = get_simul_meta(prob, repeats=options.num_jacs, tol=options.tolerance,
-                                    show_jac=options.show_jac, stream=outfile)
+                                    show_jac=options.show_jac,
+                                    include_sparsity=options.include_sparsity,
+                                    stream=outfile)
         if sys.stdout.isatty():
             simul_coloring_summary(prob, color_info, stream=sys.stdout)
 
