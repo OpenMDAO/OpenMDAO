@@ -1227,13 +1227,20 @@ class Problem(object):
         """
         recording_iteration.stack.append(('_compute_totals', 0))
 
-        total_info = None
+        total_info = key = None
         if of is not None and wrt is not None:
             key = (frozenset(of), frozenset(wrt))
             total_info = self._tot_jac_info_cache[key]
 
         if total_info is None:
             total_info = _TotalJacInfo(self, of, wrt, global_names, return_format)
+            # if key is not None:
+            #     self._tot_jac_info_cache[key] = total_info
+        else:
+            total_info.J[:] = 0.0
+
+        # TODO: remove after debugging
+        self.total_info = total_info
 
         vec_dinput = self.model._vectors['input']
         vec_doutput =  self.model._vectors['output']

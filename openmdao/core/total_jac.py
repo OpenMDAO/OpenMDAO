@@ -389,7 +389,7 @@ class _TotalJacInfo(object):
         """
         Iterate over index lists for the simul coloring case.
         """
-        col_lists, _, _ = coloring_info
+        col_lists = coloring_info[0]
 
         for i, ilist in enumerate(col_lists):
             if i == 0:  # first outer loop give all non-colored indices.
@@ -518,6 +518,7 @@ class _TotalJacInfo(object):
                 slc = output_slice_map[output_name]
                 deriv_val = self.get_deriv_val(output_name, slc, doutputs,
                                                self.abs2meta[output_name]['distributed'])
+                #print("deriv_val:", output_name, input_name, deriv_val)
                 if fwd:
                     J[slc, i] = deriv_val
                 else:
@@ -534,7 +535,7 @@ class _TotalJacInfo(object):
         """
         Set the appropriate part of the total jacobian for simul coloring input indices.
         """
-        _, row_map, _ = self.simul_coloring
+        row_map = self.simul_coloring[1]
         relevant = self.relevant
         output_meta = self.output_meta
         idx2local = self.idx2local
@@ -553,6 +554,7 @@ class _TotalJacInfo(object):
                             out_idxs = output_meta[output_name]['indices']
                             if out_idxs is not None:
                                 deriv_val = deriv_val[out_idxs]
+                        #print("deriv_val:", i, output_name, input_name, deriv_val)
                         J[row, i] = deriv_val[idx2local[row]]
 
     def matmat_jac_setter(self, inds):

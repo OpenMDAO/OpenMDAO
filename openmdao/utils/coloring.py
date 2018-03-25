@@ -103,8 +103,8 @@ def _get_full_disjoint(J, start, end):
 
     Returns
     -------
-    (OrderedDict, dict)
-        Dict of disjoint columns keyed to column and dict of nonzero rows keyed to column.
+    (list, dict)
+        List of lists of disjoint columns and dict of nonzero rows keyed to column.
     """
     # skip desvars of size 1 since simul derivs will give no improvement
     if (end - start) == 0:
@@ -123,7 +123,7 @@ def _get_full_disjoint(J, start, end):
             if c2 not in rows:
                 rows[c2] = [int(i) for i in np.nonzero(J[:, c2])[0]]
 
-    full_disjoint = OrderedDict()
+    full_disjoint = []
     seen = set()
     allrows = {}
 
@@ -133,18 +133,19 @@ def _get_full_disjoint(J, start, end):
             continue
         seen.add(col)
         allrows[col] = J[:, col].copy()
-        full_disjoint[col] = [col]
+        full = [col]
         for other_col in colset:
             if other_col not in seen and not np.any(allrows[col] & J[:, other_col]):
                 seen.add(other_col)
-                full_disjoint[col].append(other_col)
+                full.append(other_col)
                 allrows[col] |= J[:, other_col]
 
-        if len(full_disjoint[col]) == 1:
-            del full_disjoint[col]
+        if len(full) == 1:
             del rows[col]
+        else:
+            full_disjoint.append(sorted(full))
 
-    return full_disjoint, rows
+    return sorted(full_disjoint, key=lambda x: len(x)), rows
 
 
 def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15, byvar=True):
@@ -292,7 +293,7 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-15):
 
         total_dv_offsets[dv] = tot_dv = OrderedDict()
 
-        for color, cols in enumerate(itervalues(full_disjoint)):
+        for color, cols in enumerate(full_disjoint):
             tot_dv[color] = tot_dv_columns = []
             for c in sorted(cols):
                 dvoffset = c - start
@@ -339,7 +340,7 @@ def _find_global_disjoint(prob, mode='fwd', repeats=1, tol=1e-15):
 
     full_disjoint, rows = _get_full_disjoint(J, 0, J.shape[1] - 1)
 
-    for color, cols in enumerate(itervalues(full_disjoint)):
+    for color, cols in enumerate(full_disjoint):
         print("color", color, "cols", len(cols))
 
     return full_disjoint, rows, J
@@ -511,15 +512,15 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
     # wrt any other columns).  The other entries are groups of columns that are disjoint wrt
     # each other.
     col_lists = [single_cols]
-    col_lists.extend(full_disjoint.values())
+    col_lists.extend(full_disjoint)
 
     rows = OrderedDict(sorted(rows.items(), key=lambda x: x[0]))
 
     sparsity = None
     if include_sparsity or (show_jac and stream is not None):
         of = list(driver._objs)
-        of.extend([c for c, meta in iteritems(driver._cons)
-                   if not ('linear' in meta and meta['linear'])])
+        of = [c for c, meta in iteritems(driver._cons)
+                   if not ('linear' in meta and meta['linear'])]
         wrt = list(driver._designvars)
 
         if include_sparsity:
@@ -555,12 +556,14 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
             stream.write("\n{\n")
             for col, row_list in iteritems(rows):
                 stream.write("   %s: %s,\n" % (col, list(row_list)))
-            stream.write("})")
+            stream.write("}")
 
             if sparsity:
                 import pprint
-                stream.write("\n\n")
+                stream.write(",\n")
                 pprint.pprint(sparsity)
+
+            stream.write(")\n")
 
         else:  # output json format to a file
             s = json.dumps((col_lists, rows, sparsity))

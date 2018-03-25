@@ -676,6 +676,9 @@ class Driver(object):
             derivs = prob._compute_totals(of=of, wrt=wrt, return_format='dict',
                                           global_names=global_names)
 
+        import pprint
+        pprint.pprint(derivs)
+
         # ... then convert to whatever the driver needs.
         if return_format in ('dict', 'array'):
             if self._has_scaling:
