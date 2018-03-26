@@ -3142,6 +3142,21 @@ class System(object):
 
         return states
 
+    def _list_states_allprocs(self):
+        """
+        Return list of all states at and below thi system across all procs.
+
+        Returns
+        -------
+        list
+            List of all states.
+        """
+        states = []
+        for subsys in self._subsystems_allprocs:
+            states.extend(subsys._list_states_allprocs())
+
+        return states
+
     def add_recorder(self, recorder, recurse=False):
         """
         Add a recorder to the driver.
