@@ -519,8 +519,7 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
     sparsity = None
     if include_sparsity or (show_jac and stream is not None):
         of = list(driver._objs)
-        of = [c for c, meta in iteritems(driver._cons)
-                   if not ('linear' in meta and meta['linear'])]
+        of = [c for c, meta in iteritems(driver._cons) if not ('linear' in meta and meta['linear'])]
         wrt = list(driver._designvars)
 
         if include_sparsity:

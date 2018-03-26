@@ -105,7 +105,7 @@ class SimulColoringTestCase(unittest.TestCase):
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_simul_coloring_snopt(self):
-
+        self.fail("FOOBAR")
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver,
                     {'optimizer': 'SNOPT', 'print_results': False})

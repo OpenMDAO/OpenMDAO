@@ -154,7 +154,9 @@ class Problem(object):
         # 2 -- The `final_setup` has been run, everything ready to run.
         self._setup_status = 0
 
-        self._lin_sol_cache = {}
+        # for the linear solution cache, keep separate copies for the cases with and without
+        # linear constraints in order to keep the solution keys simple.
+        self._lin_sol_cache = {True: {}, False: {}}
         self._tot_jac_info_cache = defaultdict(lambda: None)
 
     def __getitem__(self, name):
@@ -1239,8 +1241,7 @@ class Problem(object):
         else:
             total_info.J[:] = 0.0
 
-        # TODO: remove after debugging
-        self.total_info = total_info
+        has_lin_cons = total_info.has_lin_cons
 
         vec_dinput = self.model._vectors['input']
         vec_doutput =  self.model._vectors['output']
@@ -1260,8 +1261,8 @@ class Problem(object):
         model._linearize()
 
         # Main loop over columns (fwd) or rows (rev) of the jacobian
-        for par_deriv_color, matmat, idxs, idx_iter in itervalues(total_info.idx_iter_dict):
-            for j, (inds, input_setter, jac_setter) in enumerate(idx_iter(idxs)):
+        for _, _, idxs, idx_iter in itervalues(total_info.idx_iter_dict):
+            for inds, input_setter, jac_setter in idx_iter(idxs):
                 # this sets dinputs for the current par_deriv_color to 0
                 # dinputs is dresids in fwd, doutouts in rev
                 vec_doutput['linear'].set_const(0.0)
@@ -1270,9 +1271,33 @@ class Problem(object):
                 else:  # rev
                     vec_dinput['linear'].set_const(0.0)
 
-                rel_systems = input_setter(inds)
+                rel_systems, vec_names, cache_key = input_setter(inds)
+
+                # restore old linear solution if cache_linear_solution was set by the user for
+                # any input variables involved in this linear solution.
+                if cache_key is not None:
+                    lin_sol_cache = self._lin_sol_cache[has_lin_cons]
+                    if cache_key in lin_sol_cache:
+                        lin_sol = lin_sol_cache[cache_key]
+                        for i, vec_name in enumerate(vec_names):
+                            save_vec = lin_sol[i]
+                            doutputs = total_info.output_vec[vec_name]
+                            for vs in doutputs._data:
+                                doutputs._data[vs][:] = save_vec[vs]
+                    else:
+                        lin_sol_cache[cache_key] = lin_sol = []
+                        for vec_name in vec_names:
+                            lin_sol.append(deepcopy(total_info.output_vec[vec_name]._data))
 
                 model._solve_linear(model._lin_vec_names, self._mode, rel_systems)
+
+                if cache_key is not None:
+                    lin_sol = self._lin_sol_cache[has_lin_cons][cache_key]
+                    for i, vec_name in enumerate(vec_names):
+                        save_vec = lin_sol[i]
+                        doutputs = total_info.output_vec[vec_name]
+                        for vs, data in iteritems(doutputs._data):
+                            save_vec[vs][:] = data
 
                 jac_setter(inds)
 

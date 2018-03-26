@@ -72,6 +72,8 @@ class _TotalJacInfo(object):
         else:
             has_lin_cons = False
 
+        self.has_lin_cons = has_lin_cons
+
         self.output_slice_map, self.out_size = self._create_slice_map(self.output_list,
                                                                       self.output_meta)
         self.simul_coloring = None
@@ -99,6 +101,8 @@ class _TotalJacInfo(object):
             self.Jfinal = self._get_dict_J(J, wrt, old_wrt, of, old_of,
                                            self.input_meta, self.output_slice_map, return_format)
 
+        # linear solution caching
+        self._lin_sol_cache = {}
 
     def _get_dict_J(self, J, wrt, oldwrt, of, oldof, input_meta, output_slice_map, return_format):
         """
@@ -185,16 +189,20 @@ class _TotalJacInfo(object):
 
         simul_coloring = self.simul_coloring
 
-        for i, name in enumerate(names):
+        for name in names:
             rhsname = 'linear'
             in_var_meta = abs2meta[name]
 
             if name in vois:
+                # if name is in vois, then it has been declared as either a design var or
+                # a constraint or an objective.
                 meta = vois[name]
                 end += meta['size']
 
                 parallel_deriv_color = meta['parallel_deriv_color']
                 matmat = meta['vectorize_derivs']
+                cache_lin_sol = meta['cache_linear_solution']
+
                 _check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring)
                 if matmat or parallel_deriv_color:
                     rhsname = name
@@ -209,10 +217,12 @@ class _TotalJacInfo(object):
                     # correct for any negative indices
                     irange[in_idxs < 0] += in_var_meta['global_size']
 
-            else:  # name is not a VOI  (should only happen during testing)
+            else:  # name is not a design var or response  (should only happen during testing)
                 end += abs2meta[name]['size']
                 irange = np.arange(in_var_meta['global_size'], dtype=int)
                 in_idxs = parallel_deriv_color = matmat = None
+                cache_lin_sol = False
+
 
             in_var_idx = abs2idx[rhsname][name]
             sizes = var_sizes[rhsname]['output']
@@ -235,11 +245,12 @@ class _TotalJacInfo(object):
             # solve_linear, or it will contain -1, indicating we should not set any
             # value before calling solve_linear.
             loc_i = np.full(irange.shape, -1, dtype=int)
-            loc = np.logical_and(irange >= gstart, irange < gend)
-            if in_idxs is None:
-                loc_i[loc] = np.arange(0, gend - gstart, dtype=int)[loc]
-            else:
-                loc_i[loc] = irange[loc]
+            if gend > gstart:
+                loc = np.logical_and(irange >= gstart, irange < gend)
+                if in_idxs is None:
+                    loc_i[loc] = np.arange(0, gend - gstart, dtype=int)[loc]
+                else:
+                    loc_i[loc] = irange[loc]
 
             loc_idxs.append(loc_i)
 
@@ -271,11 +282,11 @@ class _TotalJacInfo(object):
                 else:
                     raise RuntimeError("Variable name '%s' matches a parallel_deriv_color name." %
                                        name)
-            elif not simul_coloring:
+            elif not simul_coloring:  # plain old single index iteration
                 idx_iter_dict[name] = (parallel_deriv_color, matmat,
                                        np.arange(start, end, dtype=int), self.single_index_iter)
 
-            tup = (name, rhsname, rel)
+            tup = (name, rhsname, rel, cache_lin_sol)
             idx_map.extend([tup] * (end - start))
             start = end
 
@@ -380,7 +391,7 @@ class _TotalJacInfo(object):
     #
     def single_index_iter(self, idxs):
         """
-        Iterate over indices for the single index (the default) case.
+        Iterate over single indices for a single variable.
         """
         for i in idxs:
             yield i, self.single_input_setter, self.single_jac_setter
@@ -391,33 +402,37 @@ class _TotalJacInfo(object):
         """
         col_lists = coloring_info[0]
 
-        for i, ilist in enumerate(col_lists):
-            if i == 0:  # first outer loop give all non-colored indices.
+        for color, ilist in enumerate(col_lists):
+            if color == 0:  # first outer loop give all non-colored indices.
                 for j in ilist:
-                    # do all non-colored indices individually
+                    # do all non-colored indices individually (one linear solve per index)
                     yield j, self.single_input_setter, self.single_jac_setter
             else:
                 # yield all indices for a color at once
-                yield ilist, self.array_input_setter, self.simul_coloring_jac_setter
+                # use color as lin sol cache key
+                yield ilist, self.simul_coloring_input_setter, self.simul_coloring_jac_setter
 
     def par_deriv_iter(self, idxs):
         """
         Iterate over index lists for the parallel deriv case.
         """
         for tup in zip(*idxs):
-            yield tup, self.array_input_setter, self.array_jac_setter
+            yield tup, self.par_deriv_input_setter, self.par_deriv_jac_setter
 
     def matmat_iter(self, idxs):
         """
         Iterate over index lists for the matrix matrix case.
         """
         for idx_list in idxs:
-            yield idx_list, self.matmat_input_setter, self.matmat_jac_setter
+            yield idx_list, self.matmat_input_setter, self.matmat_jac_setter,
 
     def par_deriv_matmat_iter(self, idxs):
         """
         Iterate over index lists for the combined parallel deriv matrix matrix case.
         """
+        # here, idxs is a list of arrays.  One array in the list for each parallel deriv
+        # variable, and the entries in each array are all of the indices corresponding
+        # to that variable's rows or columns in the total jacobian.
         yield idxs, self.par_deriv_matmat_input_setter, self.par_deriv_matmat_jac_setter
 
     #
@@ -427,30 +442,51 @@ class _TotalJacInfo(object):
         """
         Sets 1's into the input vector in the single index case.
         """
-        input_vec = self.input_vec
-        input_idx_map = self.input_idx_map
-        input_loc_idxs = self.input_loc_idxs
+        input_name, vecname, rel_systems, cache_lin_sol = self.input_idx_map[idx]
 
-        input_name, vecname, rel_systems = input_idx_map[idx]
-        dinputs = input_vec[vecname]
-
-        loc_idx = input_loc_idxs[idx]
+        loc_idx = self.input_loc_idxs[idx]
         if loc_idx != -1:
-            dinputs._views_flat[input_name][loc_idx] = 1.0
+            self.input_vec[vecname]._views_flat[input_name][loc_idx] = 1.0
 
-        return rel_systems
+        if cache_lin_sol:
+            return rel_systems, (vecname,), idx
+        else:
+            return rel_systems, None, None
 
-    def array_input_setter(self, inds):
+    def simul_coloring_input_setter(self, inds):
         """
         Sets 1's into the input vector in the multiple index case.
         """
         all_rel_systems = set()
+        cache = False
 
         for i in inds:
-            rel_systems = self.single_input_setter(i)
+            rel_systems, vec_names, _ = self.single_input_setter(i)
             _update_rel_systems(all_rel_systems, rel_systems)
+            cache |= vec_names is not None
 
-        return all_rel_systems
+        if cache:
+            return all_rel_systems, ('linear',), inds[0]
+        else:
+            return all_rel_systems, None, None
+
+    def par_deriv_input_setter(self, inds):
+        """
+        Sets 1's into the input vector in the multiple index case.
+        """
+        all_rel_systems = set()
+        vec_names = []
+
+        for count, i in enumerate(inds):
+            rel_systems, vnames, _ = self.single_input_setter(i)
+            _update_rel_systems(all_rel_systems, rel_systems)
+            if vnames is not None:
+                vec_names.append(vnames[0])
+
+        if vec_names:
+            return all_rel_systems, vec_names, inds[0]
+        else:
+            return all_rel_systems, None, None
 
     def matmat_input_setter(self, inds):
         """
@@ -460,16 +496,19 @@ class _TotalJacInfo(object):
         input_idx_map = self.input_idx_map
         input_loc_idxs = self.input_loc_idxs
 
-        input_name, vecname, rel_systems = input_idx_map[inds[0]]
+        input_name, vec_name, rel_systems, cache_lin_sol = input_idx_map[inds[0]]
 
-        dinputs = input_vec[vecname]
+        dinputs = input_vec[vec_name]
 
         for col, i in enumerate(inds):
             loc_idx = input_loc_idxs[i]
             if loc_idx != -1:
                 dinputs._views_flat[input_name][loc_idx, col] = 1.0
 
-        return rel_systems
+        if cache_lin_sol:
+            return rel_systems, (vec_name,), inds[0]
+        else:
+            return rel_systems, None, None
 
     def par_deriv_matmat_input_setter(self, inds):
         """
@@ -480,12 +519,17 @@ class _TotalJacInfo(object):
         input_loc_idxs = self.input_loc_idxs
 
         all_rel_systems = set()
+        cache = False
 
+        vec_names = []
         for matmat_idxs in inds:
-            input_name, vecname, rel_systems = input_idx_map[matmat_idxs[0]]
+            input_name, vec_name, rel_systems, cache_lin_sol = input_idx_map[matmat_idxs[0]]
+            if cache_lin_sol:
+                vec_names.append(vec_name)
+            cache |= cache_lin_sol
             _update_rel_systems(all_rel_systems, rel_systems)
 
-            dinputs = input_vec[vecname]
+            dinputs = input_vec[vec_name]
             ncol = dinputs._ncol
 
             for col, i in enumerate(matmat_idxs):
@@ -496,8 +540,10 @@ class _TotalJacInfo(object):
                     else:
                         dinputs._views_flat[input_name][loc_idx] = 1.0
 
-
-        return all_rel_systems
+        if cache:
+            return all_rel_systems, vec_names, inds[0][0]
+        else:
+            return all_rel_systems, None, None
 
     #
     # Jacobian setter functions
@@ -506,7 +552,7 @@ class _TotalJacInfo(object):
         """
         Set the appropriate part of the total jacobian for a single input index.
         """
-        input_name, vecname, _ = self.input_idx_map[i]
+        input_name, vecname, _, _ = self.input_idx_map[i]
         doutputs = self.output_vec[vecname]
         relevant = self.relevant
         output_slice_map = self.output_slice_map
@@ -524,7 +570,7 @@ class _TotalJacInfo(object):
                 else:
                     J[i, slc] = deriv_val
 
-    def array_jac_setter(self, inds):
+    def par_deriv_jac_setter(self, inds):
         """
         Set the appropriate part of the total jacobian for multiple input indices.
         """
@@ -542,7 +588,7 @@ class _TotalJacInfo(object):
         J = self.J
 
         for i in inds:
-            input_name, vecname, _ = self.input_idx_map[i]
+            input_name, vecname, _, _ = self.input_idx_map[i]
             doutputs = self.output_vec[vecname]
             for row in row_map[i]:
                 output_name = self.idx2name[row]
@@ -564,7 +610,7 @@ class _TotalJacInfo(object):
 
         # in plain matmat, all inds are for a single variable for each iteration of the outer loop,
         # so any relevance can be determined only once.
-        input_name, vecname, _ = self.input_idx_map[inds[0]]
+        input_name, vecname, _, _ = self.input_idx_map[inds[0]]
         dinputs = self.input_vec[vecname]
         doutputs = self.output_vec[vecname]
         ncol = dinputs._ncol
