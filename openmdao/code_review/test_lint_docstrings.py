@@ -49,7 +49,7 @@ def _is_context_manager(func):
         otherwise False.
 
     """
-    src = inspect.getsource(func)
+    src = inspect.getsource(func).lstrip()
     return 'return GeneratorContextManager' in src or src.startswith('@contextmanager')
 
 
@@ -525,7 +525,7 @@ class LintTestCase(unittest.TestCase):
 
                         # Loop over methods
                         methods = [x for x in dir(clss)
-                                   if inspect.ismethod(getattr(clss, x)) and
+                                   if (inspect.ismethod(getattr(clss, x)) or inspect.isfunction(getattr(clss, x))) and
                                    x in clss.__dict__]
                         for method_name in methods:
                             if print_info:
