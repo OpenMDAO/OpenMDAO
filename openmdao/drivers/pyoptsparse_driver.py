@@ -504,30 +504,30 @@ class pyOptSparseDriver(Driver):
                     for ikey, ival in iteritems(dv_dict):
                         isize = len(ival)
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
-            #else:
-                # if we don't convert to 'coo' here, pyoptsparse will do a
-                # conversion of our dense array into a fully dense 'coo', which is bad.
-                # TODO: look into getting rid of all of these conversions!
-                #new_sens = OrderedDict()
-                #res_jacs = self._res_jacs
-                #for okey in func_dict:
-                    #new_sens[okey] = newdv = OrderedDict()
-                    #for ikey in dv_dict:
-                        #if okey in res_jacs and ikey in res_jacs[okey]:
-                            #arr = sens_dict[okey][ikey]
-                            #coo = res_jacs[okey][ikey]
-                            #row, col, data = coo['coo']
-                            #coo['coo'][2] = arr[row, col].flatten()
-                            #newdv[ikey] = coo
-                        #else:
-                            #newdv[ikey] = sens_dict[okey][ikey]
-                #sens_dict = new_sens
-                #for name, dvdct in iteritems(self._res_jacs):
-                    #for dv, coo in iteritems(dvdct):
-                        #arr = sens_dict[name][dv]
-                        #row, col, data = coo['coo']
-                        #coo['coo'][2] = arr[row, col].flatten()
-                        #sens_dict[name][dv] = coo
+            # else:
+            #     if we don't convert to 'coo' here, pyoptsparse will do a
+            #     conversion of our dense array into a fully dense 'coo', which is bad.
+            #     TODO: look into getting rid of all of these conversions!
+            #     new_sens = OrderedDict()
+            #     res_jacs = self._res_jacs
+            #     for okey in func_dict:
+            #         new_sens[okey] = newdv = OrderedDict()
+            #         for ikey in dv_dict:
+            #             if okey in res_jacs and ikey in res_jacs[okey]:
+            #                 arr = sens_dict[okey][ikey]
+            #                 coo = res_jacs[okey][ikey]
+            #                 row, col, data = coo['coo']
+            #                 coo['coo'][2] = arr[row, col].flatten()
+            #                 newdv[ikey] = coo
+            #             else:
+            #                 newdv[ikey] = sens_dict[okey][ikey]
+            #     sens_dict = new_sens
+            #     for name, dvdct in iteritems(self._res_jacs):
+            #         for dv, coo in iteritems(dvdct):
+            #             arr = sens_dict[name][dv]
+            #             row, col, data = coo['coo']
+            #             coo['coo'][2] = arr[row, col].flatten()
+            #             sens_dict[name][dv] = coo
 
         except Exception as msg:
             tb = traceback.format_exc()
@@ -575,18 +575,18 @@ class pyOptSparseDriver(Driver):
                                "sparsity structure. (run openmdao simul_coloring with -s option)")
 
         self._res_jacs = {}
-        #for res, resdict in iteritems(sparsity):
-            #if res in self._objs:  # skip objectives
-                #continue
-            #self._res_jacs[res] = {}
-            #for dv, (rows, cols, shape) in iteritems(resdict):
-                #rows = np.array(rows, dtype=int)
-                #cols = np.array(cols, dtype=int)
-
-                ## print("sparsity for %s, %s: %d of %s" % (res, dv, rows.size,
-                ##                                         (shape[0] * shape[1])))
-
-                #self._res_jacs[res][dv] = {
-                    #'coo': [rows, cols, np.zeros(rows.size)],
-                    #'shape': [shape[0], shape[1]],
-                #}
+        # for res, resdict in iteritems(sparsity):
+        #     if res in self._objs:  # skip objectives
+        #         continue
+        #     self._res_jacs[res] = {}
+        #     for dv, (rows, cols, shape) in iteritems(resdict):
+        #         rows = np.array(rows, dtype=int)
+        #         cols = np.array(cols, dtype=int)
+        #
+        #         # print("sparsity for %s, %s: %d of %s" % (res, dv, rows.size,
+        #         #                                         (shape[0] * shape[1])))
+        #
+        #         self._res_jacs[res][dv] = {
+        #             'coo': [rows, cols, np.zeros(rows.size)],
+        #             'shape': [shape[0], shape[1]],
+        #         }

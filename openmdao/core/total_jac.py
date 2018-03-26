@@ -1,3 +1,6 @@
+"""
+Helper class for total jacobian computation.
+"""
 from __future__ import print_function, division
 
 from collections import OrderedDict
@@ -11,18 +14,68 @@ _contains_all = ContainsAll()
 
 
 class _TotalJacInfo(object):
+    """
+    Object to manage computation of total derivatives.
+
+    Attributes
+    ----------
+    comm : MPI.Comm or <FakeComm>
+        The global communicator.
+    relevant : dict
+        Map of absolute var name to vars that are relevant to it.
+    fwd : bool
+        If True, compute deriv in forward mode, else reverse (adjoint) mode.
+    out_meta : dict
+        Map of absoute output var name to tuples of the form (indices, distrib).
+    owning_ranks : dict
+        Map of absolute var name to the MPI process that owns it.
+    _idx2name : dict
+        Map of row/col index to variable name.  Used only if simul coloring is active.
+    idx2local : dict
+        Map of row/col index to index within a variable.  Used only if simul coloring is active.
+    output_vec : Dict of vectors keyed by vec_name.
+        Designated output vectors based on value of fwd.
+    simul_coloring : tuple of the form (column_lists, row_map, sparsity) or None
+        Contains all data necessary to simultaneously solve for groups of total derivatives.
+    has_lin_cons : bool
+        If True, this total jacobian contains linear constraints.
+    output_list : list of str
+        List of names of output variables for this total jacobian.  In fwd mode, outputs
+        are responses.  In rev mode, outputs are design variables.
+    J : ndarray
+        The dense array form of the total jacobian.
+    Jfinal : ndarray or dict
+        If return_format is 'array', Jfinal is J.  Otherwise it's either a nested dict (if
+        return_format is 'dict') or a flat dict (return_format 'flat_dict').
+    idx_iter_dict : dict
+        A dict containing an entry for each outer iteration of the total jacobian computation.
+    """
+
     def __init__(self, problem, of, wrt, global_names, return_format):
+        """
+        Initialize object.
+
+        Parameters
+        ----------
+        problem : <Problem>
+            Reference to that Problem object that contains this _TotalJacInfo.
+        of : iter of str
+            Response names.
+        wrt : iter of str
+            Design variable names.
+        global_names : bool
+            If True, names in of and wrt are global names.
+        return_format : str
+            Indicates the desired return format of the total jacobian. Can have value of
+            'array', 'dict', or 'flat_dict'.
+        """
         model = problem.model
         self.comm = problem.comm
-        self.nproc = problem.comm.size
-        self.iproc = model.comm.rank
-        self.var_sizes = model._var_sizes
         self.relevant = model._relevant
         self.fwd = (problem._mode == 'fwd')
-        self.abs2idx = model._var_allprocs_abs2idx
-        self.abs2meta = model._var_allprocs_abs2meta
         self.owning_ranks = problem.model._owning_rank
-        self.return_format = return_format
+
+        abs2meta = model._var_allprocs_abs2meta
 
         design_vars = problem.driver._designvars
         responses = problem.driver._responses
@@ -51,18 +104,13 @@ class _TotalJacInfo(object):
             if not global_names:
                 of = [prom2abs[name][0] for name in old_of]
 
-        self.of = of
-        self.old_of = old_of
-        self.wrt = wrt
-        self.old_wrt = old_wrt
-
         if self.fwd:
             self.input_list, self.output_list = wrt, of
-            self.input_meta, self.output_meta = design_vars, responses
+            self.input_meta, output_meta = design_vars, responses
             self.input_vec, self.output_vec = vec_dresid, vec_doutput
         else:  # rev
             self.input_list, self.output_list = of, wrt
-            self.input_meta, self.output_meta = responses, design_vars
+            self.input_meta, output_meta = responses, design_vars
             self.input_vec, self.output_vec = vec_doutput, vec_dresid
 
         for name in of:
@@ -74,37 +122,33 @@ class _TotalJacInfo(object):
 
         self.has_lin_cons = has_lin_cons
 
-        self.output_slice_map, self.out_size = self._create_slice_map(self.output_list,
-                                                                      self.output_meta)
-        self.simul_coloring = None
+        self.out_meta, out_size = self._create_meta_map(self.output_list, output_meta, abs2meta)
         if not has_lin_cons and problem.driver._simul_coloring_info is not None:
             self.simul_coloring = problem.driver._simul_coloring_info
-            self.idx2name, self.idx2local = self._create_idx_maps(self.output_list, self.output_meta,
-                                                                  self.out_size)
+            self._idx2name, self.idx2local = self._create_idx_maps(self.output_list, output_meta,
+                                                                   abs2meta, out_size)
         else:
-            self.idx2name = self.idx2local = None
+            self._idx2name = self.idx2local = self.simul_coloring = None
 
         self.input_idx_map, self.input_loc_idxs, self.idx_iter_dict = \
-            self._create_input_idx_map(self.input_list, self.input_meta, has_lin_cons)
+            self._create_input_idx_map(self.input_list, self.input_meta, has_lin_cons,
+                                       model._var_sizes, model._var_allprocs_abs2idx, abs2meta)
 
         # always allocate a 2D dense array and we can assign views to dict keys later if
         # return format is 'dict' or 'flat_dict'.
         if self.fwd:
-            self.J = J = np.zeros((self.out_size, self.input_loc_idxs.size))
+            self.J = J = np.zeros((out_size, self.input_loc_idxs.size))
         else:  # rev
-            self.J = J = np.zeros((self.input_loc_idxs.size, self.out_size))
+            self.J = J = np.zeros((self.input_loc_idxs.size, out_size))
 
         # for dict type return formats, map var names to views of the Jacobian array.
         if return_format == 'array':
             self.Jfinal = J
         else:
             self.Jfinal = self._get_dict_J(J, wrt, old_wrt, of, old_of,
-                                           self.input_meta, self.output_slice_map, return_format)
+                                           self.input_meta, self.out_meta, abs2meta, return_format)
 
-        # linear solution caching
-        self._lin_sol_cache = {}
-
-    def _get_dict_J(self, J, wrt, oldwrt, of, oldof, input_meta, output_slice_map, return_format):
+    def _get_dict_J(self, J, wrt, oldwrt, of, oldof, input_meta, out_meta, abs2meta, return_format):
         """
         Create a dict or flat-dict jacobian that maps to views in the given 2D array jacobian.
 
@@ -122,37 +166,38 @@ class _TotalJacInfo(object):
             Promoted names of output vars.
         input_meta : dict
             Dict of input voi metadata.
-        output_slice_map : dict
-            Dict mapping output name to array jacobian slice.
+        out_meta : dict
+            Dict mapping output name to array jacobian slice, indices, and distrib.
+        abs2meta : dict
+            Mapping of absolute var name to metadata dict for that var.
         return_format : str
             Indicates the desired form of the returned jacobian.
         """
         if self.fwd:
-            input_slice_map, in_size = self._create_slice_map(wrt, input_meta)
-            slice_map_in, slice_map_out = input_slice_map, output_slice_map
+            meta_in, in_size = self._create_meta_map(wrt, input_meta, abs2meta)
+            meta_out = out_meta
         else:
-            input_slice_map, in_size = self._create_slice_map(of, input_meta)
-            slice_map_in, slice_map_out = output_slice_map, input_slice_map
+            meta_out, in_size = self._create_meta_map(of, input_meta, abs2meta)
+            meta_in = out_meta
 
         Jdict = OrderedDict()
         if return_format == 'dict':
             for i, out in enumerate(of):
                 Jdict[oldof[i]] = outer = OrderedDict()
-                out_slice = slice_map_out[out]
+                out_slice = meta_out[out][0]
                 for j, inp in enumerate(wrt):
-                    outer[oldwrt[j]] = J[out_slice, slice_map_in[inp]]
+                    outer[oldwrt[j]] = J[out_slice, meta_in[inp][0]]
         elif return_format == 'flat_dict':
             for i, out in enumerate(of):
-                out_slice = slice_map_out[out]
+                out_slice = meta_out[out][0]
                 for j, inp in enumerate(wrt):
-                    Jdict[oldof[i], oldwrt[j]] = J[out_slice, slice_map_in[inp]]
+                    Jdict[oldof[i], oldwrt[j]] = J[out_slice, meta_in[inp][0]]
         else:
             raise ValueError("'%s' is not a valid jacobian return format." % return_format)
 
         return Jdict
 
-
-    def _create_input_idx_map(self, names, vois, has_lin_constraints):
+    def _create_input_idx_map(self, names, vois, has_lin_constraints, var_sizes, abs2idx, abs2meta):
         """
         Create a list that maps a global index to a name, col/row range, and other data.
 
@@ -162,6 +207,15 @@ class _TotalJacInfo(object):
             Names of the variables making up the rows or columns of the jacobian.
         vois : dict
             Mapping of variable of interest (desvar or response) name to its metadata.
+        has_lin_constraints : bool
+            If True, there are linear constraints used to compute the total jacobian.
+        var_sizes : dict of dict of arrays
+            Container for all variable sizes based on vec_name, input/output, and rank.
+        abs2idx : dict
+            Mapping of absolute var name to index of that var in the list of vars of the same
+            type (input or output).
+        abs2meta : dict
+            Mapping of absolute var name to metadata dict for that var.
 
         Returns
         -------
@@ -175,10 +229,7 @@ class _TotalJacInfo(object):
         idx_map = []
         start = 0
         end = 0
-        var_sizes = self.var_sizes
-        abs2idx = self.abs2idx
-        abs2meta = self.abs2meta
-        iproc = self.iproc
+        iproc = self.comm.rank
         owning_ranks = self.owning_ranks
         relevant = self.relevant
         has_par_deriv_color = False
@@ -222,7 +273,6 @@ class _TotalJacInfo(object):
                 irange = np.arange(in_var_meta['global_size'], dtype=int)
                 in_idxs = parallel_deriv_color = matmat = None
                 cache_lin_sol = False
-
 
             in_var_idx = abs2idx[rhsname][name]
             sizes = var_sizes[rhsname]['output']
@@ -299,9 +349,11 @@ class _TotalJacInfo(object):
 
         return idx_map, np.hstack(loc_idxs), idx_iter_dict
 
-    def _create_slice_map(self, names, vois):
+    def _create_meta_map(self, names, vois, abs2meta):
         """
-        Create a dict that maps var name to a jacobian row or column slice.
+        Create a dict that maps var name to metadata tuple.
+
+        The tuple has the form (jacobian row/column slice, indices, distrib)
 
         Parameters
         ----------
@@ -313,27 +365,30 @@ class _TotalJacInfo(object):
         Returns
         -------
         dict
-            Dict of slice keyed by output name.
+            Dict of metadata tuples keyed by output name.
         int
             Total number of rows or columns.
         """
         idx_map = {}
         start = 0
         end = 0
-        abs2meta = self.abs2meta
 
         for name in names:
             if name in vois:
-                end += vois[name]['size']
+                size = vois[name]['size']
+                indices = vois[name]['indices']
             else:
-                end += abs2meta[name]['size']
+                size = abs2meta[name]['size']
+                indices = None
 
-            idx_map[name] = slice(start, end)
+            end += size
+
+            idx_map[name] = (slice(start, end), indices, abs2meta[name]['distributed'])
             start = end
 
         return idx_map, end  # after the loop, end is the total size
 
-    def _create_idx_maps(self, names, vois, size):
+    def _create_idx_maps(self, names, vois, abs2meta, size):
         """
         Create a list that maps jacobian row/column index to var name.
 
@@ -343,6 +398,8 @@ class _TotalJacInfo(object):
             Names of the variables making up the rows or columns of the jacobian.
         vois : dict
             Mapping of variable of interest (desvar or response) name to its metadata.
+        abs2meta : dict
+            Mapping of absolute var name to metadata for that var.
         size : int
             Total number of rows/columns.
 
@@ -355,7 +412,6 @@ class _TotalJacInfo(object):
         """
         idx2name = [None] * size
         idx2local = np.empty(size, dtype=int)
-        abs2meta = self.abs2meta
 
         start = end = 0
         for name in names:
@@ -369,22 +425,6 @@ class _TotalJacInfo(object):
             start = end
 
         return idx2name, idx2local
-
-    def get_deriv_val(self, output_name, slc, doutputs, distrib):
-        deriv_val = out_idxs = None
-        sz = slc.stop - slc.start
-        if output_name in doutputs._views_flat:
-            deriv_val = doutputs._views_flat[output_name]
-            if sz != deriv_val.size:
-                deriv_val = deriv_val[self.output_meta[output_name]['indices']]
-
-        if self.nproc > 1 and not distrib:
-            root = self.owning_ranks[output_name]
-            if deriv_val is None:
-                deriv_val = np.empty(sz)
-            self.comm.Bcast(deriv_val, root=root)
-
-        return deriv_val
 
     #
     # outer loop iteration functions
@@ -403,7 +443,7 @@ class _TotalJacInfo(object):
         col_lists = coloring_info[0]
 
         for color, ilist in enumerate(col_lists):
-            if color == 0:  # first outer loop give all non-colored indices.
+            if color == 0:  # first outer loop gives all non-colored indices.
                 for j in ilist:
                     # do all non-colored indices individually (one linear solve per index)
                     yield j, self.single_input_setter, self.single_jac_setter
@@ -440,7 +480,7 @@ class _TotalJacInfo(object):
     #
     def single_input_setter(self, idx):
         """
-        Sets 1's into the input vector in the single index case.
+        Set 1's into the input vector in the single index case.
         """
         input_name, vecname, rel_systems, cache_lin_sol = self.input_idx_map[idx]
 
@@ -455,7 +495,7 @@ class _TotalJacInfo(object):
 
     def simul_coloring_input_setter(self, inds):
         """
-        Sets 1's into the input vector in the multiple index case.
+        Set 1's into the input vector in the multiple index case.
         """
         all_rel_systems = set()
         cache = False
@@ -472,7 +512,7 @@ class _TotalJacInfo(object):
 
     def par_deriv_input_setter(self, inds):
         """
-        Sets 1's into the input vector in the multiple index case.
+        Set 1's into the input vector in the multiple index case.
         """
         all_rel_systems = set()
         vec_names = []
@@ -490,7 +530,7 @@ class _TotalJacInfo(object):
 
     def matmat_input_setter(self, inds):
         """
-        Sets 1's into the input vector in the matrix matrix case.
+        Set 1's into the input vector in the matrix matrix case.
         """
         input_vec = self.input_vec
         input_idx_map = self.input_idx_map
@@ -512,7 +552,7 @@ class _TotalJacInfo(object):
 
     def par_deriv_matmat_input_setter(self, inds):
         """
-        Sets 1's into the input vector in the matrix matrix with parallel deriv case.
+        Set 1's into the input vector in the matrix matrix with parallel deriv case.
         """
         input_vec = self.input_vec
         input_idx_map = self.input_idx_map
@@ -555,16 +595,26 @@ class _TotalJacInfo(object):
         input_name, vecname, _, _ = self.input_idx_map[i]
         doutputs = self.output_vec[vecname]
         relevant = self.relevant
-        output_slice_map = self.output_slice_map
         fwd = self.fwd
         J = self.J
+        nproc = self.comm.size
 
         for output_name in self.output_list:
             if input_name not in relevant or output_name in relevant[input_name]:
-                slc = output_slice_map[output_name]
-                deriv_val = self.get_deriv_val(output_name, slc, doutputs,
-                                               self.abs2meta[output_name]['distributed'])
-                #print("deriv_val:", output_name, input_name, deriv_val)
+                slc, indices, distrib = self.out_meta[output_name]
+                deriv_val = None
+                if output_name in doutputs._views_flat:
+                    deriv_val = doutputs._views_flat[output_name]
+                    if indices is not None:
+                        deriv_val = deriv_val[indices]
+
+                if nproc > 1 and not distrib:
+                    root = self.owning_ranks[output_name]
+                    if deriv_val is None:
+                        deriv_val = np.empty(slc.stop - slc.start)
+                    self.comm.Bcast(deriv_val, root=root)
+
+                # print("deriv_val:", output_name, input_name, deriv_val)
                 if fwd:
                     J[slc, i] = deriv_val
                 else:
@@ -583,7 +633,7 @@ class _TotalJacInfo(object):
         """
         row_map = self.simul_coloring[1]
         relevant = self.relevant
-        output_meta = self.output_meta
+        out_meta = self.out_meta
         idx2local = self.idx2local
         J = self.J
 
@@ -591,61 +641,52 @@ class _TotalJacInfo(object):
             input_name, vecname, _, _ = self.input_idx_map[i]
             doutputs = self.output_vec[vecname]
             for row in row_map[i]:
-                output_name = self.idx2name[row]
-                deriv_val = out_idxs = None
+                output_name = self._idx2name[row]
+                deriv_val = None
                 if input_name not in relevant or output_name in relevant[input_name]:
+                    indices = out_meta[output_name][1]
                     if output_name in doutputs._views_flat:
                         deriv_val = doutputs._views_flat[output_name]
-                        if output_name in output_meta:
-                            out_idxs = output_meta[output_name]['indices']
-                            if out_idxs is not None:
-                                deriv_val = deriv_val[out_idxs]
-                        #print("deriv_val:", i, output_name, input_name, deriv_val)
+                        if indices is not None:
+                            deriv_val = deriv_val[indices]
+                        # print("deriv_val:", i, output_name, input_name, deriv_val)
                         J[row, i] = deriv_val[idx2local[row]]
 
     def matmat_jac_setter(self, inds):
         """
         Set the appropriate part of the total jacobian for matrix matrix input indices.
         """
-
         # in plain matmat, all inds are for a single variable for each iteration of the outer loop,
         # so any relevance can be determined only once.
         input_name, vecname, _, _ = self.input_idx_map[inds[0]]
         dinputs = self.input_vec[vecname]
         doutputs = self.output_vec[vecname]
         ncol = dinputs._ncol
-        output_slice_map = self.output_slice_map
         relevant = self.relevant
-        nproc = self.nproc
-        abs2meta = self.abs2meta
+        nproc = self.comm.size
         fwd = self.fwd
         J = self.J
         owning_ranks = self.owning_ranks
 
         for output_name in self.output_list:
-            slc = output_slice_map[output_name]
-            sz = slc.stop - slc.start
+            slc, indices, distrib = self.out_meta[output_name]
             deriv_val = out_idxs = None
             if input_name not in relevant or output_name in relevant[input_name]:
                 if output_name in doutputs._views_flat:
                     deriv_val = doutputs._views_flat[output_name]
-                    if ncol > 1:
-                        if sz != deriv_val.size // deriv_val.shape[1]:
-                            deriv_val = deriv_val[output_meta[output_name]['indices']]
-                    elif sz != deriv_val.size:
-                        deriv_val = deriv_val[output_meta[output_name]['indices']]
+                    if indices is not None:
+                        deriv_val = deriv_val[indices]
 
-                if nproc > 1 and not abs2meta[output_name]['distributed']:
+                if nproc > 1 and not distrib:
                     root = owning_ranks[output_name]
                     if deriv_val is None:
-                        deriv_val = np.empty((sz, ncol))
+                        deriv_val = np.empty((slc.stop - slc.start, ncol))
                     self.comm.Bcast(deriv_val, root=root)
 
                 if fwd:
                     J[slc, inds] = deriv_val
                 else:
                     J[inds, slc] = deriv_val.T
-
 
     def par_deriv_matmat_jac_setter(self, inds):
         """
@@ -715,6 +756,13 @@ def _fix_pdc_lengths(idx_iter_dict):
 def _update_rel_systems(all_rel_systems, rel_systems):
     """
     Combine all relevant systems in those cases where we have multiple input variables involved.
+
+    Parameters
+    ----------
+    all_rel_systems : set
+        Current set of all relevant system names.
+    rel_systems : set
+        Set of relevant system names for the latest iteration.
     """
     if all_rel_systems is _contains_all or rel_systems is _contains_all:
         all_rel_systems = _contains_all

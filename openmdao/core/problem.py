@@ -90,7 +90,9 @@ class Problem(object):
         1 -- The `setup` method has been called, but vectors not initialized.
         2 -- The `final_setup` has been run, everything ready to run.
     _lin_sol_cache : dict
-        Dict of indices keyed to solution vectors
+        Dict of indices keyed to solution vectors.
+    _tot_jac_info_cache : dict
+        Dict of _TotalJacInfo objects from previous total derivative computations.
     cite : str
         Listing of relevant citataions that should be referenced when
         publishing work that uses this class.
@@ -1182,27 +1184,6 @@ class Problem(object):
 
         return voi_info
 
-    # def _compute_totals_old(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
-    #
-    #             if cache_lin_sol:
-    #                 idx = (color,) if do_color_iter else i
-    #                 ikey = (vois[0][0], idx)
-    #                 if ikey in self._lin_sol_cache:
-    #                     save_vec = self._lin_sol_cache[ikey]
-    #                     for vs in doutputs._data:
-    #                         doutputs._data[vs][:] = save_vec[vs]
-    #                 else:
-    #                     self._lin_sol_cache[ikey] = deepcopy(doutputs._data)
-    #
-    #             model._solve_linear(lin_vec_names, mode, rel_systems)
-    #
-    #             if cache_lin_sol:
-    #                 save_vec = self._lin_sol_cache[ikey]
-    #                 for vs in doutputs._data:
-    #                     save_vec[vs][:] = doutputs._data[vs]
-    #
-    #     return totals
-
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
@@ -1244,8 +1225,8 @@ class Problem(object):
         has_lin_cons = total_info.has_lin_cons
 
         vec_dinput = self.model._vectors['input']
-        vec_doutput =  self.model._vectors['output']
-        vec_dresid =  self.model._vectors['residual']
+        vec_doutput = self.model._vectors['output']
+        vec_dresid = self.model._vectors['residual']
 
         model = self.model
         fwd = self._mode == 'fwd'
