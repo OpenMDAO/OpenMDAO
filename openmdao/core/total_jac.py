@@ -172,6 +172,11 @@ class _TotalJacInfo(object):
             Mapping of absolute var name to metadata dict for that var.
         return_format : str
             Indicates the desired form of the returned jacobian.
+
+        Returns
+        -------
+        dict
+            Dict form of the total jacobian that contains views of the ndarray jacobian.
         """
         if self.fwd:
             meta_in, in_size = self._create_meta_map(wrt, input_meta, abs2meta)
@@ -361,6 +366,8 @@ class _TotalJacInfo(object):
             Names of the variables making up the rows or columns of the jacobian.
         vois : dict
             Mapping of variable of interest (desvar or response) name to its metadata.
+        abs2meta : dict
+            Mapping of absolute var name to metadata for that var.
 
         Returns
         -------
@@ -432,6 +439,20 @@ class _TotalJacInfo(object):
     def single_index_iter(self, idxs):
         """
         Iterate over single indices for a single variable.
+
+        Parameters
+        ----------
+        idxs : iter of int
+            Total jacobian row/column indices.
+
+        Yields
+        ------
+        int
+            Current index.
+        method
+            Input setter method.
+        method
+            Jac setter method.
         """
         for i in idxs:
             yield i, self.single_input_setter, self.single_jac_setter
@@ -439,6 +460,20 @@ class _TotalJacInfo(object):
     def simul_coloring_iter(self, coloring_info):
         """
         Iterate over index lists for the simul coloring case.
+
+        Parameters
+        ----------
+        coloring_info : tuple of the form (column_lists, row_map, sparsity)
+            Row/column data needed to group colors and associate rows and columns.
+
+        Yields
+        ------
+        list of int or int
+            Current indices or current index.
+        method
+            Input setter method.
+        method
+            Jac setter method.
         """
         col_lists = coloring_info[0]
 
@@ -455,6 +490,20 @@ class _TotalJacInfo(object):
     def par_deriv_iter(self, idxs):
         """
         Iterate over index lists for the parallel deriv case.
+
+        Parameters
+        ----------
+        idxs : iter of int
+            Total jacobian row/column indices.
+
+        Yields
+        ------
+        list of int
+            Current indices.
+        method
+            Input setter method.
+        method
+            Jac setter method.
         """
         for tup in zip(*idxs):
             yield tup, self.par_deriv_input_setter, self.par_deriv_jac_setter
@@ -462,6 +511,20 @@ class _TotalJacInfo(object):
     def matmat_iter(self, idxs):
         """
         Iterate over index lists for the matrix matrix case.
+
+        Parameters
+        ----------
+        idxs : ndarray of int
+            Total jacobian row/column indices.
+
+        Yields
+        ------
+        list of int
+            Current indices.
+        method
+            Input setter method.
+        method
+            Jac setter method.
         """
         for idx_list in idxs:
             yield idx_list, self.matmat_input_setter, self.matmat_jac_setter,
@@ -469,6 +532,20 @@ class _TotalJacInfo(object):
     def par_deriv_matmat_iter(self, idxs):
         """
         Iterate over index lists for the combined parallel deriv matrix matrix case.
+
+        Parameters
+        ----------
+        idxs : iter of int
+            Total jacobian row/column indices.
+
+        Yields
+        ------
+        list of ndarray of int
+            Current indices.
+        method
+            Input setter method.
+        method
+            Jac setter method.
         """
         # here, idxs is a list of arrays.  One array in the list for each parallel deriv
         # variable, and the entries in each array are all of the indices corresponding
@@ -481,6 +558,20 @@ class _TotalJacInfo(object):
     def single_input_setter(self, idx):
         """
         Set 1's into the input vector in the single index case.
+
+        Parameters
+        ----------
+        idx : int
+            Total jacobian row or column index.
+
+        Returns
+        -------
+        set
+            Set of relevant system names.
+        tuple or None
+            vec_name corresponding to the given index (or None).
+        int or None
+            key used for storage of cached linear solve (if active, else None).
         """
         input_name, vecname, rel_systems, cache_lin_sol = self.input_idx_map[idx]
 
@@ -495,7 +586,21 @@ class _TotalJacInfo(object):
 
     def simul_coloring_input_setter(self, inds):
         """
-        Set 1's into the input vector in the multiple index case.
+        Set 1's into the input vector in the simul coloring case.
+
+        Parameters
+        ----------
+        inds : list of int
+            Total jacobian row or column indices.
+
+        Returns
+        -------
+        set
+            Set of relevant system names.
+        tuple of str or None
+            'linear' or None if linear solve caching is inactive.
+        int or None
+            key used for storage of cached linear solve (if active, else None).
         """
         all_rel_systems = set()
         cache = False
@@ -512,7 +617,21 @@ class _TotalJacInfo(object):
 
     def par_deriv_input_setter(self, inds):
         """
-        Set 1's into the input vector in the multiple index case.
+        Set 1's into the input vector in the parallel derivative case.
+
+        Parameters
+        ----------
+        inds : tuple of int
+            Total jacobian row or column indices.
+
+        Returns
+        -------
+        set
+            Set of relevant system names.
+        list of str or None
+            List of vec_names or None if linear solve caching is inactive.
+        int or None
+            key used for storage of cached linear solve (if active, else None).
         """
         all_rel_systems = set()
         vec_names = []
@@ -530,7 +649,21 @@ class _TotalJacInfo(object):
 
     def matmat_input_setter(self, inds):
         """
-        Set 1's into the input vector in the matrix matrix case.
+        Set 1's into the input vector in the matrix-matrix case.
+
+        Parameters
+        ----------
+        inds : ndarray of int
+            Total jacobian row or column indices.
+
+        Returns
+        -------
+        set
+            Set of relevant system names.
+        tuple of str or None
+            (vec_name,) or None if linear solve caching is inactive.
+        int or None
+            key used for storage of cached linear solve (if active, else None).
         """
         input_vec = self.input_vec
         input_idx_map = self.input_idx_map
@@ -553,6 +686,20 @@ class _TotalJacInfo(object):
     def par_deriv_matmat_input_setter(self, inds):
         """
         Set 1's into the input vector in the matrix matrix with parallel deriv case.
+
+        Parameters
+        ----------
+        inds : list of ndarray of int
+            Total jacobian row or column indices.
+
+        Returns
+        -------
+        set
+            Set of relevant system names.
+        list of str or None
+            vec_names or None if linear solve caching is inactive.
+        int or None
+            key used for storage of cached linear solve (if active, else None).
         """
         input_vec = self.input_vec
         input_idx_map = self.input_idx_map
@@ -591,6 +738,11 @@ class _TotalJacInfo(object):
     def single_jac_setter(self, i):
         """
         Set the appropriate part of the total jacobian for a single input index.
+
+        Parameters
+        ----------
+        i : int
+            Total jacobian row or column index.
         """
         input_name, vecname, _, _ = self.input_idx_map[i]
         doutputs = self.output_vec[vecname]
@@ -623,6 +775,11 @@ class _TotalJacInfo(object):
     def par_deriv_jac_setter(self, inds):
         """
         Set the appropriate part of the total jacobian for multiple input indices.
+
+        Parameters
+        ----------
+        inds : tuple of int
+            Total jacobian row or column indices.
         """
         for i in inds:
             self.single_jac_setter(i)
@@ -630,6 +787,11 @@ class _TotalJacInfo(object):
     def simul_coloring_jac_setter(self, inds):
         """
         Set the appropriate part of the total jacobian for simul coloring input indices.
+
+        Parameters
+        ----------
+        inds : list of int
+            Total jacobian row or column indices.
         """
         row_map = self.simul_coloring[1]
         relevant = self.relevant
@@ -655,6 +817,11 @@ class _TotalJacInfo(object):
     def matmat_jac_setter(self, inds):
         """
         Set the appropriate part of the total jacobian for matrix matrix input indices.
+
+        Parameters
+        ----------
+        inds : ndarray of int
+            Total jacobian row or column indices.
         """
         # in plain matmat, all inds are for a single variable for each iteration of the outer loop,
         # so any relevance can be determined only once.
@@ -691,6 +858,11 @@ class _TotalJacInfo(object):
     def par_deriv_matmat_jac_setter(self, inds):
         """
         Set the appropriate part of the total jacobian for par_deriv matrix matrix input indices.
+
+        Parameters
+        ----------
+        inds : list of ndarray of int
+            Total jacobian row or column indices.
         """
         for matmat_idxs in inds:
             self.matmat_jac_setter(matmat_idxs)
