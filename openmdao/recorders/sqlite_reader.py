@@ -351,6 +351,60 @@ class SqliteCaseReader(BaseCaseReader):
         """
         return re.compile('\|\\d+\|').split(coordinate)
 
+    def list_inputs(self,
+                    values=True,
+                    units=False,
+                    hierarchical=True,
+                    print_arrays=False,
+                    out_stream=_DEFAULT_OUT_STREAM):
+        """
+        Return and optionally log a list of input names and other optional information.
+        Also optionally logs the information to a user defined output stream.
+
+        Parameters
+        ----------
+        values : bool, optional
+            When True, display/return input values. Default is True.
+        units : bool, optional
+            When True, display/return units. Default is False.
+        hierarchical : bool, optional
+            When True, human readable output shows variables in hierarchical format.
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
+            by the values set with numpy.set_printoptions
+            Default is False.
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        list
+            list of input names and other optional information about those inputs
+        """
+        meta = self.abs2meta
+        inputs = []
+        final_system_case = self.system_cases.get_case(-1)
+        inputs_vals = final_system_case.inputs._values
+        if final_system_case is not None:
+            for name in inputs_vals.dtype.names:
+                outs = {}
+                if values:
+                    outs['value'] = inputs_vals[name]
+                if units:
+                    outs['units'] = meta[name]['units']
+                inputs.append((name, outs))
+
+            if out_stream == _DEFAULT_OUT_STREAM:
+                out_stream = sys.stdout
+
+            if out_stream:
+                self._write_outputs('input', None, inputs, hierarchical, print_arrays, out_stream)
+
+        return inputs
+
     def list_outputs(self,
                      explicit=True, implicit=True,
                      values=True,
@@ -365,10 +419,7 @@ class SqliteCaseReader(BaseCaseReader):
                      out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of output names and other optional information.
-
-        If the model is parallel, only the local variables are returned to the process.
-        Also optionally logs the information to a user defined output stream. If the model is
-        parallel, the rank 0 process logs information about all variables across all processes.
+        Also optionally logs the information to a user defined output stream.
 
         Parameters
         ----------
