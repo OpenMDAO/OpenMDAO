@@ -635,16 +635,16 @@ class _TotalJacInfo(object):
                     elif sz != deriv_val.size:
                         deriv_val = deriv_val[output_meta[output_name]['indices']]
 
-                    if nproc > 1 and not abs2meta[output_name]['distributed']:
-                        root = owning_ranks[output_name]
-                        if deriv_val is None:
-                            deriv_val = np.empty((sz, ncol))
-                        self.comm.Bcast(deriv_val, root=root)
+                if nproc > 1 and not abs2meta[output_name]['distributed']:
+                    root = owning_ranks[output_name]
+                    if deriv_val is None:
+                        deriv_val = np.empty((sz, ncol))
+                    self.comm.Bcast(deriv_val, root=root)
 
-                    if fwd:
-                        J[slc, inds] = deriv_val
-                    else:
-                        J[inds, slc] = deriv_val.T
+                if fwd:
+                    J[slc, inds] = deriv_val
+                else:
+                    J[inds, slc] = deriv_val.T
 
 
     def par_deriv_matmat_jac_setter(self, inds):
