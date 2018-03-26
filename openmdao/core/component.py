@@ -159,7 +159,7 @@ class Component(System):
         global_meta_names = {
             'input': ('units', 'shape', 'size', 'var_set'),
             'output': ('units', 'shape', 'size', 'var_set',
-                       'ref', 'ref0', 'res_ref', 'distributed'),
+                       'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper'),
         }
 
         for type_ in ['input', 'output']:
