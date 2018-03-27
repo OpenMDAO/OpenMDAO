@@ -444,6 +444,8 @@ class Problem(object):
         vector_class = self._vector_class
         force_alloc_complex = self._force_alloc_complex
 
+        self._tot_jac_info_cache = defaultdict(lambda: None)
+
         comm = self.comm
         mode = self._mode
 
@@ -1212,13 +1214,14 @@ class Problem(object):
 
         total_info = key = None
         if of is not None and wrt is not None:
-            key = (frozenset(of), frozenset(wrt))
+            key = (frozenset(of), frozenset(wrt), return_format, self._mode,
+                   self.model._owns_approx_jac)
             total_info = self._tot_jac_info_cache[key]
 
         if total_info is None:
             total_info = _TotalJacInfo(self, of, wrt, global_names, return_format)
-            # if key is not None:
-            #     self._tot_jac_info_cache[key] = total_info
+            if key is not None:
+                self._tot_jac_info_cache[key] = total_info
         else:
             total_info.J[:] = 0.0
 
