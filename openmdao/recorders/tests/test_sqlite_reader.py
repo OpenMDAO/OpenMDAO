@@ -383,12 +383,12 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
-        self.assertEqual(cr.units['px.x'], 'm')
-        self.assertEqual(cr.units['obj_cmp.y1'], 'm')
-        self.assertEqual(cr.units['obj_cmp.y2'], 'cm')
-        self.assertEqual(cr.units['d1.x'], None)
-        self.assertEqual(cr.units['d1.y1'], None)
-        self.assertEqual(cr.units['d1.y2'], None)
+        self.assertEqual(cr.abs2meta['px.x']['units'], 'm')
+        self.assertEqual(cr.abs2meta['obj_cmp.y1']['units'], 'm')
+        self.assertEqual(cr.abs2meta['obj_cmp.y2']['units'], 'cm')
+        self.assertEqual(cr.abs2meta['d1.x']['units'], None)
+        self.assertEqual(cr.abs2meta['d1.y1']['units'], None)
+        self.assertEqual(cr.abs2meta['d1.y2']['units'], None)
 
     def test_reading_system_metadata(self):
 
