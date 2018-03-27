@@ -3144,7 +3144,7 @@ class System(object):
 
     def _list_states_allprocs(self):
         """
-        Return list of all states at and below thi system across all procs.
+        Return list of all states at and below this system across all procs.
 
         Returns
         -------

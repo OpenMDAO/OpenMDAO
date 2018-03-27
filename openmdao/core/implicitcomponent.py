@@ -416,3 +416,14 @@ class ImplicitComponent(Component):
             List of all states.
         """
         return [name for name in self._outputs._names]
+
+    def _list_states_allprocs(self):
+        """
+        Return list of all states for this component.
+
+        Returns
+        -------
+        list
+            List of all states.
+        """
+        return self._list_states()

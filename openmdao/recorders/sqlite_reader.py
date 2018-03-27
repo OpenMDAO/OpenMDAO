@@ -386,9 +386,13 @@ class SqliteCaseReader(BaseCaseReader):
         """
         meta = self.abs2meta
         inputs = []
-        final_system_case = self.system_cases.get_case(-1)
-        inputs_vals = final_system_case.inputs._values
-        if final_system_case is not None:
+        final_system_case = self.system_cases.get_case(-1) if\
+            len(self.system_cases._case_keys) > 0 else None
+        inputs_vals = None
+        if final_system_case is not None and final_system_case.inputs is not None:
+            inputs_vals = final_system_case.inputs._values
+
+        if final_system_case is not None and inputs_vals is not None:
             for name in inputs_vals.dtype.names:
                 outs = {}
                 if values:
@@ -397,11 +401,18 @@ class SqliteCaseReader(BaseCaseReader):
                     outs['units'] = meta[name]['units']
                 inputs.append((name, outs))
 
-            if out_stream == _DEFAULT_OUT_STREAM:
-                out_stream = sys.stdout
+        if out_stream == _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
 
-            if out_stream:
-                self._write_outputs('input', None, inputs, hierarchical, print_arrays, out_stream)
+        if out_stream:
+            if final_system_case is None:
+                out_stream.write('WARNING: No system cases recorded. Make sure the recorder ' +
+                                 'is attached to a system object\n')
+            if inputs_vals is None:
+                out_stream.write('WARNING: Inputs not recorded. Make sure your recording ' +
+                                 'settings have record_inputs set to True\n')
+
+            self._write_outputs('input', None, inputs, hierarchical, print_arrays, out_stream)
 
         return inputs
 
@@ -463,19 +474,29 @@ class SqliteCaseReader(BaseCaseReader):
         meta = self.abs2meta
         expl_outputs = []
         impl_outputs = []
-        final_system_case = self.system_cases.get_case(-1)
-        outputs = final_system_case.outputs._values
-        residuals = final_system_case.residuals._values
+        final_system_case = self.system_cases.get_case(-1) if\
+            len(self.system_cases._case_keys) > 0 else None
+        outputs = None
+        residuals_vars = None
         if final_system_case is not None:
+            if final_system_case.outputs is not None:
+                outputs = final_system_case.outputs._values
+            if final_system_case.residuals is not None:
+                residuals = final_system_case.residuals._values
+
+        if final_system_case is not None and outputs is not None:
             for name in outputs.dtype.names:
-                if residuals_tol and residuals is not None and\
+                if residuals_tol and residuals_vars is not None and\
                    np.linalg.norm(residuals[name]) < residuals_tol:
                     continue
                 outs = {}
                 if values:
                     outs['value'] = outputs[name]
                 if residuals:
-                    outs['resids'] = residuals[name]
+                    if residuals_vars is None:
+                        outs['resids'] = 'Not Recorded'
+                    else:
+                        outs['resids'] = residuals_vars[name]
                 if units:
                     outs['units'] = meta[name]['units']
                 if shape:
@@ -496,6 +517,13 @@ class SqliteCaseReader(BaseCaseReader):
             out_stream = sys.stdout
 
         if out_stream:
+            if final_system_case is None:
+                out_stream.write('WARNING: No system cases recorded. Make sure the recorder ' +
+                                 'is attached to a system object\n')
+            if outputs is None:
+                out_stream.write('WARNING: Outputs not recorded. Make sure your recording ' +
+                                 'settings have record_outputs set to True\n')
+
             if explicit:
                 self._write_outputs('output', 'Explicit', expl_outputs, hierarchical, print_arrays,
                                     out_stream)
