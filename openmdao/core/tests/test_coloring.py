@@ -236,12 +236,11 @@ class SimulColoringTestCase(unittest.TestCase):
 
         p_color = run_opt(pyOptSparseDriver, {'optimizer': 'SLSQP', 'print_results': False},
                           color_info)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
         # run w/o coloring
         p = run_opt(pyOptSparseDriver, {'optimizer': 'SLSQP', 'print_results': False})
-
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
-        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
         # - coloring saves 16 solves per driver iter  (5 vs 21)
         # - initial solve for linear constraints takes 21 in both cases (only done once)

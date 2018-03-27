@@ -1287,12 +1287,6 @@ class Problem(object):
 
         recording_iteration.stack.pop()
 
-        # # pyoptsparse changes the dict jacobian, converting entries into it's internal 'coo'
-        # # format, so we have to return a copy else we can't cache it.  Only the dict and keys
-        # # are copied, not the underlying data arrays.
-        # if return_format != 'array':
-        #     return total_info.Jfinal.copy()
-
         return total_info.Jfinal
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):

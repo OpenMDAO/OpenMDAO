@@ -245,7 +245,7 @@ class pyOptSparseDriver(Driver):
             self._quantities.append(name)
 
         # Calculate and save derivatives for any linear constraints.
-        lcons = [key for (key, con) in iteritems(con_meta) if con['linear'] is True]
+        lcons = [key for (key, con) in iteritems(con_meta) if con['linear']]
         if len(lcons) > 0:
             _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list, return_format='dict')
             # convert all of our linear constraint jacs to COO format. Otherwise pyoptsparse will
@@ -507,29 +507,29 @@ class pyOptSparseDriver(Driver):
                         isize = len(ival)
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
             # else:
-                # if we don't convert to 'coo' here, pyoptsparse will do a
-                # conversion of our dense array into a fully dense 'coo', which is bad.
-                # TODO: look into getting rid of all of these conversions!
-                # new_sens = OrderedDict()
-                # res_jacs = self._res_jacs
-                # for okey in func_dict:
-                #     new_sens[okey] = newdv = OrderedDict()
-                #     for ikey in dv_dict:
-                #         if okey in res_jacs and ikey in res_jacs[okey]:
-                #             arr = sens_dict[okey][ikey]
-                #             coo = res_jacs[okey][ikey]
-                #             row, col, data = coo['coo']
-                #             coo['coo'][2] = arr[row, col].flatten()
-                #             newdv[ikey] = coo
-                #         else:
-                #             newdv[ikey] = sens_dict[okey][ikey]
-                # sens_dict = new_sens
-                # for name, dvdct in iteritems(self._res_jacs):
-                #     for dv, coo in iteritems(dvdct):
-                #         arr = sens_dict[name][dv]
-                #         row, col, data = coo['coo']
-                #         coo['coo'][2] = arr[row, col].flatten()
-                #         sens_dict[name][dv] = coo
+            #     # if we don't convert to 'coo' here, pyoptsparse will do a
+            #     # conversion of our dense array into a fully dense 'coo', which is bad.
+            #     # TODO: look into getting rid of all of these conversions!
+            #     new_sens = OrderedDict()
+            #     res_jacs = self._res_jacs
+            #     for okey in func_dict:
+            #         new_sens[okey] = newdv = OrderedDict()
+            #         for ikey in dv_dict:
+            #             if okey in res_jacs and ikey in res_jacs[okey]:
+            #                 arr = sens_dict[okey][ikey]
+            #                 coo = res_jacs[okey][ikey]
+            #                 row, col, data = coo['coo']
+            #                 coo['coo'][2] = arr[row, col].flatten()
+            #                 newdv[ikey] = coo
+            #             else:
+            #                 newdv[ikey] = sens_dict[okey][ikey]
+            #     sens_dict = new_sens
+            #     for name, dvdct in iteritems(self._res_jacs):
+            #         for dv, coo in iteritems(dvdct):
+            #             arr = sens_dict[name][dv]
+            #             row, col, data = coo['coo']
+            #             coo['coo'][2] = arr[row, col].flatten()
+            #             sens_dict[name][dv] = coo
 
         except Exception as msg:
             tb = traceback.format_exc()
