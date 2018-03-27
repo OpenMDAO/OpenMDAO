@@ -183,9 +183,6 @@ class SimulColoringTestCase(unittest.TestCase):
         except:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
-        # first, run w/o coloring
-        p = run_opt(pyOptSparseDriver, {'optimizer': 'SLSQP', 'print_results': False})
-
         color_info = ([
            [20],
            [0, 2, 4, 6, 8],
@@ -239,6 +236,9 @@ class SimulColoringTestCase(unittest.TestCase):
 
         p_color = run_opt(pyOptSparseDriver, {'optimizer': 'SLSQP', 'print_results': False},
                           color_info)
+
+        # run w/o coloring
+        p = run_opt(pyOptSparseDriver, {'optimizer': 'SLSQP', 'print_results': False})
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)

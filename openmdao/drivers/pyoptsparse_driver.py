@@ -264,9 +264,9 @@ class pyOptSparseDriver(Driver):
 
         # Add all equality constraints
         self.active_tols = {}
-        eqcons = OrderedDict((key, con) for (key, con) in iteritems(con_meta)
-                             if con['equals'] is not None)
-        for name, meta in iteritems(eqcons):
+        for name, meta in iteritems(con_meta):
+            if meta['equals'] is None:
+                continue
             size = meta['size']
             lower = upper = meta['equals']
             if fwd:
@@ -281,16 +281,17 @@ class pyOptSparseDriver(Driver):
                                      linear=True, wrt=wrt, jac=jac)
             else:
                 if name in self._res_jacs:
-                    jac = self._res_jacs[name]
+                    resjac = self._res_jacs[name]
+                    jac = {n: resjac[n] for n in wrt}
                 else:
                     jac = None
                 opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrt, jac=jac)
                 self._quantities.append(name)
 
         # Add all inequality constraints
-        iqcons = OrderedDict((key, con) for (key, con) in iteritems(con_meta)
-                             if con['equals'] is None)
-        for name, meta in iteritems(iqcons):
+        for name, meta in iteritems(con_meta):
+            if meta['equals'] is not None:
+                continue
             size = meta['size']
 
             # Bounds - double sided is supported
@@ -309,7 +310,8 @@ class pyOptSparseDriver(Driver):
                                      linear=True, wrt=wrt, jac=jac)
             else:
                 if name in self._res_jacs:
-                    jac = self._res_jacs[name]
+                    resjac = self._res_jacs[name]
+                    jac = {n: resjac[n] for n in wrt}
                 else:
                     jac = None
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=jac)
@@ -505,29 +507,29 @@ class pyOptSparseDriver(Driver):
                         isize = len(ival)
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
             # else:
-            #     if we don't convert to 'coo' here, pyoptsparse will do a
-            #     conversion of our dense array into a fully dense 'coo', which is bad.
-            #     TODO: look into getting rid of all of these conversions!
-            #     new_sens = OrderedDict()
-            #     res_jacs = self._res_jacs
-            #     for okey in func_dict:
-            #         new_sens[okey] = newdv = OrderedDict()
-            #         for ikey in dv_dict:
-            #             if okey in res_jacs and ikey in res_jacs[okey]:
-            #                 arr = sens_dict[okey][ikey]
-            #                 coo = res_jacs[okey][ikey]
-            #                 row, col, data = coo['coo']
-            #                 coo['coo'][2] = arr[row, col].flatten()
-            #                 newdv[ikey] = coo
-            #             else:
-            #                 newdv[ikey] = sens_dict[okey][ikey]
-            #     sens_dict = new_sens
-            #     for name, dvdct in iteritems(self._res_jacs):
-            #         for dv, coo in iteritems(dvdct):
-            #             arr = sens_dict[name][dv]
-            #             row, col, data = coo['coo']
-            #             coo['coo'][2] = arr[row, col].flatten()
-            #             sens_dict[name][dv] = coo
+                # if we don't convert to 'coo' here, pyoptsparse will do a
+                # conversion of our dense array into a fully dense 'coo', which is bad.
+                # TODO: look into getting rid of all of these conversions!
+                # new_sens = OrderedDict()
+                # res_jacs = self._res_jacs
+                # for okey in func_dict:
+                #     new_sens[okey] = newdv = OrderedDict()
+                #     for ikey in dv_dict:
+                #         if okey in res_jacs and ikey in res_jacs[okey]:
+                #             arr = sens_dict[okey][ikey]
+                #             coo = res_jacs[okey][ikey]
+                #             row, col, data = coo['coo']
+                #             coo['coo'][2] = arr[row, col].flatten()
+                #             newdv[ikey] = coo
+                #         else:
+                #             newdv[ikey] = sens_dict[okey][ikey]
+                # sens_dict = new_sens
+                # for name, dvdct in iteritems(self._res_jacs):
+                #     for dv, coo in iteritems(dvdct):
+                #         arr = sens_dict[name][dv]
+                #         row, col, data = coo['coo']
+                #         coo['coo'][2] = arr[row, col].flatten()
+                #         sens_dict[name][dv] = coo
 
         except Exception as msg:
             tb = traceback.format_exc()

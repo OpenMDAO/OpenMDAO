@@ -200,8 +200,6 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15, byvar=True):
 
     # get responses in order used by the driver
     of = prob.driver.get_ordered_nl_responses()
-    # of = list(prob.driver._objs)
-    # of.extend(n for n, m in iteritems(prob.driver._cons) if not ('linear' in m and m['linear']))
 
     if not of or not wrt:
         raise RuntimeError("Sparsity structure cannot be computed without declaration of design "
@@ -394,28 +392,28 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
         of = [c for c, meta in iteritems(driver._cons) if not ('linear' in meta and meta['linear'])]
         wrt = list(driver._designvars)
 
-        if include_sparsity:
-            sparsity = {}
-            row_start = row_end = 0
-            for res in of:
-                sparsity[res] = {}
-                res_size = int(driver._responses[res]['size'])
-                row_end += res_size
-                col_start = col_end = 0
-                for dv in wrt:
-                    dv_size = int(driver._designvars[dv]['size'])
-                    col_end += dv_size
+    if include_sparsity:
+        sparsity = {}
+        row_start = row_end = 0
+        for res in of:
+            sparsity[res] = {}
+            res_size = int(driver._responses[res]['size'])
+            row_end += res_size
+            col_start = col_end = 0
+            for dv in wrt:
+                dv_size = int(driver._designvars[dv]['size'])
+                col_end += dv_size
 
-                    # save sparsity structure as  (rows, cols, shape)
-                    irows, icols = np.nonzero(J[row_start:row_end, col_start:col_end])
-                    # convert to make JSON serializable
-                    if irows.size > 0:
-                        irows = [int(i) for i in irows]
-                        icols = [int(i) for i in icols]
-                        sparsity[res][dv] = (irows, icols, (res_size, dv_size))
-                    col_start = col_end
+                # save sparsity structure as  (rows, cols, shape)
+                irows, icols = np.nonzero(J[row_start:row_end, col_start:col_end])
+                # convert to make JSON serializable
+                if irows.size > 0:
+                    irows = [int(i) for i in irows]
+                    icols = [int(i) for i in icols]
+                    sparsity[res][dv] = (irows, icols, (res_size, dv_size))
+                col_start = col_end
 
-                row_start = row_end
+            row_start = row_end
 
     if stream is not None:
         if stream.isatty():
