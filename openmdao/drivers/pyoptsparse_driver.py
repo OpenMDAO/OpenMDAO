@@ -524,12 +524,6 @@ class pyOptSparseDriver(Driver):
                         else:
                             newdv[ikey] = sens_dict[okey][ikey]
                 sens_dict = new_sens
-                for name, dvdct in iteritems(self._res_jacs):
-                    for dv, coo in iteritems(dvdct):
-                        arr = sens_dict[name][dv]
-                        row, col, data = coo['coo']
-                        coo['coo'][2] = arr[row, col].flatten()
-                        sens_dict[name][dv] = coo
 
         except Exception as msg:
             tb = traceback.format_exc()
@@ -596,18 +590,18 @@ class pyOptSparseDriver(Driver):
                                "sparsity structure. (run openmdao simul_coloring with -s option)")
 
         self._res_jacs = {}
-        # for res, resdict in iteritems(sparsity):
-        #     if res in self._objs:  # skip objectives
-        #         continue
-        #     self._res_jacs[res] = {}
-        #     for dv, (rows, cols, shape) in iteritems(resdict):
-        #         rows = np.array(rows, dtype=int)
-        #         cols = np.array(cols, dtype=int)
-        #
-        #         # print("sparsity for %s, %s: %d of %s" % (res, dv, rows.size,
-        #         #                                         (shape[0] * shape[1])))
-        #
-        #         self._res_jacs[res][dv] = {
-        #             'coo': [rows, cols, np.zeros(rows.size)],
-        #             'shape': shape,
-        #         }
+        for res, resdict in iteritems(sparsity):
+            if res in self._objs:  # skip objectives
+                continue
+            self._res_jacs[res] = {}
+            for dv, (rows, cols, shape) in iteritems(resdict):
+                rows = np.array(rows, dtype=int)
+                cols = np.array(cols, dtype=int)
+
+                # print("sparsity for %s, %s: %d of %s" % (res, dv, rows.size,
+                #                                         (shape[0] * shape[1])))
+
+                self._res_jacs[res][dv] = {
+                    'coo': [rows, cols, np.zeros(rows.size)],
+                    'shape': shape,
+                }
