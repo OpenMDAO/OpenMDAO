@@ -554,6 +554,25 @@ class pyOptSparseDriver(Driver):
         """
         return self.options['optimizer']
 
+    def get_ordered_nl_responses(self):
+        """
+        Return the names of nonlinear responses in the order used by the driver.
+
+        Default order is objectives followed by nonlinear constraints.  This is used for
+        simultaneous derivative coloring and sparsity determination.
+
+        Returns
+        -------
+        list of str
+            The nonlinear response names in order.
+        """
+        order = list(self._objs)
+        order.extend(n for n, meta in iteritems(self._cons) if meta['equals'] is not None
+                     and not ('linear' in meta and meta['linear']))
+        order.extend(n for n, meta in iteritems(self._cons) if meta['equals'] is None
+                     and not ('linear' in meta and meta['linear']))
+        return order
+
     def _setup_simul_coloring(self, mode='fwd'):
         """
         Set up metadata for simultaneous derivative solution.

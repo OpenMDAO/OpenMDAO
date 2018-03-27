@@ -196,14 +196,12 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15, byvar=True):
 
     prob.run_model()
 
-    desvars = prob.driver._designvars
-    responses = prob.driver._responses
+    wrt = list(prob.driver._designvars)
 
-    wrt = list(desvars)
-
-    # remove linear constraints from consideration
-    of = list(prob.driver._objs)
-    of.extend(n for n, m in iteritems(prob.driver._cons) if not ('linear' in m and m['linear']))
+    # get responses in order used by the driver
+    of = prob.driver.get_ordered_nl_responses()
+    # of = list(prob.driver._objs)
+    # of.extend(n for n, m in iteritems(prob.driver._cons) if not ('linear' in m and m['linear']))
 
     if not of or not wrt:
         raise RuntimeError("Sparsity structure cannot be computed without declaration of design "
@@ -344,132 +342,6 @@ def _find_global_disjoint(prob, mode='fwd', repeats=1, tol=1e-15):
         print("color", color, "cols", len(cols))
 
     return full_disjoint, rows, J
-
-
-def get_simul_meta_old(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
-                       stream=sys.stdout):
-    """
-    Compute simultaneous derivative colorings for the given problem.
-
-    Parameters
-    ----------
-    problem : Problem
-        The Problem being analyzed.
-    mode : str
-        Derivative direction.
-    repeats : int
-        Number of times to repeat total jacobian computation.
-    tol : float
-        Tolerance used to determine if an array entry is nonzero.
-    show_jac : bool
-        If True, display a visualiation of the final total jacobian used to compute the coloring.
-    stream : file-like or None
-        Stream where output coloring info will be written.
-
-    Returns
-    -------
-    tuple of the form (simul_colorings, simul_maps)
-        Where simul_colorings is a dict of the form {dvname1: coloring_array, ...} and
-        simul_maps is a dict of the form
-        {resp_name: {dvname: {color: (row_idxs, col_idxs), ...}, ...}, ...}
-    """
-    driver = problem.driver
-
-    dv_idxs, res_idxs, J = _find_disjoint(problem, mode=mode, repeats=repeats, tol=tol)
-    all_colors = set()
-
-    simul_colorings = {}
-    simul_maps = {}
-
-    for dv in dv_idxs:
-        # negative colors will be iterated over individually, so start by filling the coloring array
-        # with -1.  We then replace specific entries with positive colors which will be iterated
-        # over as a group.
-        coloring = np.full(driver._designvars[dv]['size'], -1, dtype=int)
-
-        for color in dv_idxs[dv]:
-            coloring[np.array(dv_idxs[dv][color], dtype=int)] = color
-            all_colors.add(color)
-
-        if np.any(coloring != -1):
-            # need int conversion to avoid JSON serialization error
-            simul_colorings[dv] = [int(c) for c in coloring]
-
-    simul_colorings = OrderedDict(sorted(simul_colorings.items()))
-
-    for res in res_idxs:
-        simul_map = {}
-        for dv in res_idxs[res]:
-            simul_map[dv] = {c: v for c, v in iteritems(res_idxs[res][dv])
-                             if c in all_colors}
-            if not simul_map[dv]:
-                del simul_map[dv]
-
-        if simul_map:
-            simul_maps[res] = OrderedDict(sorted(simul_map.items()))
-
-    simul_maps = OrderedDict(sorted(simul_maps.items()))
-
-    if stream is not None:
-        if stream.isatty():
-            stream.write("\n({\n")
-            for n, coloring in iteritems(simul_colorings):
-                stream.write("   '%s': %s,\n" % (n, coloring))
-            stream.write("},")
-
-            stream.write("\n{\n")
-            for res, dvdict in iteritems(simul_maps):
-                stream.write("   '%s': {\n" % res)
-                for dv, coldict in iteritems(dvdict):
-                    stream.write("      '%s': {\n" % dv)
-                    for color, idxs in iteritems(coldict):
-                        stream.write("         %s: %s,\n" % (color, idxs))
-                    stream.write("      },\n")
-                stream.write("   },\n")
-            stream.write("})")
-        else:  # output json format to a file
-            s = json.dumps((simul_colorings, simul_maps))
-
-            # do a little pretty printing since the built-in json pretty printing stretches
-            # the output vertically WAY too much.
-            s = s.replace(',"', ',\n"')
-            s = s.replace(', "', ',\n"')
-            s = s.replace('{"', '{\n"')
-            s = s.replace(', {', ',\n{')
-            s = s.replace(']}', ']\n}')
-            s = s.replace('{}', '{\n}')
-            s = s.replace('}}', '}\n}')
-            s = s.replace('[{', '[\n{')
-            s = s.replace(' {', '\n{')
-
-            lines = []
-            indent = 0
-            for line in s.split('\n'):
-                start = line[0] if len(line) > 0 else ''
-                if start in ('{', '['):
-                    tab = ' ' * indent
-                    indent += 3
-                elif start in ('}', ']'):
-                    indent -= 3
-                    tab = ' ' * indent
-                else:
-                    tab = ' ' * indent
-
-                lines.append("%s%s" % (tab, line))
-
-            stream.write('\n'.join(lines))
-            stream.write("\n")
-
-    if show_jac and stream is not None:
-        of = list(driver._objs)
-        of.extend([c for c, meta in iteritems(driver._cons)
-                   if not ('linear' in meta and meta['linear'])])
-        wrt = list(driver._designvars)
-
-        stream.write("\n\n")
-        array_viz(J, problem, of, wrt, stream)
-
-    return simul_colorings, simul_maps
 
 
 def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,

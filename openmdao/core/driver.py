@@ -594,6 +594,23 @@ class Driver(object):
 
         return con_dict
 
+    def get_ordered_nl_responses(self):
+        """
+        Return the names of nonlinear responses in the order used by the driver.
+
+        Default order is objectives followed by nonlinear constraints.  This is used for
+        simultaneous derivative coloring and sparsity determination.
+
+        Returns
+        -------
+        list of str
+            The nonlinear response names in order.
+        """
+        order = list(self._objs)
+        order.extend(n for n, meta in iteritems(self._cons)
+                     if not ('linear' in meta and meta['linear']))
+        return order
+
     def run(self):
         """
         Execute this driver.
