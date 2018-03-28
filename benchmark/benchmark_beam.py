@@ -1,5 +1,5 @@
 """
-This benchmark documents a peformance problem with data transfers that needs to be examined.
+This benchmark documents a performance problem with data transfers that needs to be examined.
 """
 import unittest
 
@@ -9,6 +9,7 @@ from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group i
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group_slow import MultipointBeamGroup as MBGSlow
 
 
+@unittest.skip("for debugging, not for routine benchmarking")
 class BenchBeamSlowNP1(unittest.TestCase):
 
     N_PROCS = 1
@@ -33,6 +34,7 @@ class BenchBeamSlowNP1(unittest.TestCase):
         prob.run_model()
 
 
+@unittest.skip("for debugging, not for routine benchmarking")
 class BenchBeamSlowNP2(unittest.TestCase):
 
     N_PROCS = 2
@@ -57,6 +59,7 @@ class BenchBeamSlowNP2(unittest.TestCase):
         prob.run_model()
 
 
+@unittest.skip("for debugging, not for routine benchmarking")
 class BenchBeamSlowNP4(unittest.TestCase):
 
     N_PROCS = 4
@@ -81,6 +84,7 @@ class BenchBeamSlowNP4(unittest.TestCase):
         prob.run_model()
 
 
+@unittest.skip("for debugging, not for routine benchmarking")
 class BenchBeamNP1(unittest.TestCase):
 
     N_PROCS = 1
@@ -105,6 +109,7 @@ class BenchBeamNP1(unittest.TestCase):
         prob.run_model()
 
 
+@unittest.skip("for debugging, not for routine benchmarking")
 class BenchBeamNP2(unittest.TestCase):
 
     N_PROCS = 2
@@ -129,6 +134,7 @@ class BenchBeamNP2(unittest.TestCase):
         prob.run_model()
 
 
+@unittest.skip("for debugging, not for routine benchmarking")
 class BenchBeamNP4(unittest.TestCase):
 
     N_PROCS = 4
