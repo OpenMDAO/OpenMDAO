@@ -260,6 +260,8 @@ class pyOptSparseDriver(Driver):
                         # nonzero during the optimization.
                         mat = coo_matrix(subjac)
                         if mat.row.size > 0:
+                            # convert to 'coo' format here to avoid an emphatic warning
+                            # by pyoptsparse.
                             jacdct[n] = {'coo': [mat.row, mat.col, mat.data], 'shape': mat.shape}
 
         # Add all equality constraints

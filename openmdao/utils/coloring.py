@@ -406,10 +406,10 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
                 # save sparsity structure as  (rows, cols, shape)
                 irows, icols = np.nonzero(J[row_start:row_end, col_start:col_end])
                 # convert to make JSON serializable
-                if irows.size > 0:
-                    irows = [int(i) for i in irows]
-                    icols = [int(i) for i in icols]
-                    sparsity[res][dv] = (irows, icols, (res_size, dv_size))
+                irows = [int(i) for i in irows]
+                icols = [int(i) for i in icols]
+                sparsity[res][dv] = (irows, icols, (res_size, dv_size))
+
                 col_start = col_end
 
             row_start = row_end
