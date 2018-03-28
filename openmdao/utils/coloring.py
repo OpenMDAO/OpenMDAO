@@ -219,7 +219,7 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15, byvar=True):
     sz_zeros = fullJ[fullJ == 0.0].size
     print("smallest nonzero:", np.min(fullJ[fullJ > 0.0]))
     itol = tol * 1000.
-    print("%d zero values out of %d (%5.2f%%)" % (sz_zeros, fullJ.size, sz_zeros/fullJ.size*100.))
+    print("%d zero values out of %d (%5.2f%%)" % (sz_zeros, fullJ.size, sz_zeros/fullJ.size * 100.))
     while itol > tol / 1000.:
         if itol < 1.:
             print("%d entries < tol at tol of %g" % (fullJ[fullJ < itol].size, itol))
