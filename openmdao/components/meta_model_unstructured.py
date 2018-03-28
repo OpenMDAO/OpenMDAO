@@ -503,7 +503,7 @@ class MetaModelUnStructured(ExplicitComponent):
         self.train = False
 
     def _metadata(self, name):
-        return self._static_var_rel2data_io[name]['metadata']
+        return self._var_rel2data_io[name]['metadata']
 
 
 class MetaModel(MetaModelUnStructured):

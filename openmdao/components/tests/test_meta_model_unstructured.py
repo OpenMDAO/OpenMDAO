@@ -2,7 +2,7 @@ import numpy as np
 import unittest
 
 from openmdao.api import Group, Problem, MetaModelUnStructured, IndepVarComp, ResponseSurface, \
-    FloatKrigingSurrogate, KrigingSurrogate, MultiFiCoKrigingSurrogate
+    FloatKrigingSurrogate, KrigingSurrogate, MultiFiCoKrigingSurrogate, ScipyOptimizeDriver
 from openmdao.utils.assert_utils import assert_rel_error
 
 from openmdao.utils.logger_utils import TestLogger
@@ -66,7 +66,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         # create a MetaModelUnStructured for Sin and add it to a Problem
         sin_mm = MetaModelUnStructured()
-        sin_mm.add_input('x', 0., training_data = np.linspace(0,10,200))
+        sin_mm.add_input('x', 0., training_data=np.linspace(0,10,200))
         sin_mm.add_output('f_x', 0., training_data=f_x)
 
         prob = Problem()
@@ -445,9 +445,9 @@ class MetaModelTestCase(unittest.TestCase):
         trig = MetaModelUnStructured()
 
         x_train = np.linspace(0,10,20)
-        
+
         trig.add_input('x', 0., training_data=x_train)
-        trig.add_output('sin_x', 0., surrogate=FloatKrigingSurrogate(), 
+        trig.add_output('sin_x', 0., surrogate=FloatKrigingSurrogate(),
                         training_data=.5*np.sin(x_train))
         trig.add_output('cos_x', 0., training_data=.5*np.cos(x_train))
 
@@ -494,8 +494,8 @@ class MetaModelTestCase(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['trig.y'],
                          np.append(
-                            .5*np.sin(prob['trig.x']),
-                            .5*np.cos(prob['trig.x'])
+                             .5*np.sin(prob['trig.x']),
+                             .5*np.cos(prob['trig.x'])
                          ),
                          1e-4)
 
@@ -590,6 +590,38 @@ class MetaModelTestCase(unittest.TestCase):
             mm.add_output('y', np.zeros(4))
         self.assertEqual(str(cm.exception),
                          "Metamodel: First dimension of output 'y' must be 3")
+
+    def test_metamodel_subclass_optimize(self):
+        class Trig(MetaModelUnStructured):
+            def setup(self):
+                self.add_input('x', 0.,
+                               training_data=np.linspace(0,10,20))
+                self.add_output('sin_x', 0.,
+                                surrogate=FloatKrigingSurrogate(),
+                                training_data=.5*np.sin(np.linspace(0,10,20)))
+
+                self.declare_partials(of='sin_x', wrt='x', method='fd')
+
+        prob = Problem()
+
+        indep = IndepVarComp()
+        indep.add_output('x', 5.)
+
+        prob.model.add_subsystem('indep', indep)
+        prob.model.add_subsystem('trig', Trig())
+
+        prob.model.connect('indep.x', 'trig.x')
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'COBYLA'
+
+        prob.model.add_design_var('indep.x', lower=4, upper=7)
+        prob.model.add_objective('trig.sin_x')
+
+        prob.setup(check=True)
+
+        self.assertEqual(prob['trig.x'], [5.])
+        assert_rel_error(self, prob['trig.sin_x'], [.0], 1e-6)
 
 
 if __name__ == "__main__":
