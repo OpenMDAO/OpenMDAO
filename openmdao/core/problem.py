@@ -903,8 +903,7 @@ class Problem(object):
             wrt = list(self.driver._designvars)
             global_names = True
         if of is None:
-            of = list(self.driver._objs)
-            of.extend(list(self.driver._cons))
+            of = self.driver.get_ordered_nl_responses()
             global_names = True
 
         with self.model._scaled_context_all():
