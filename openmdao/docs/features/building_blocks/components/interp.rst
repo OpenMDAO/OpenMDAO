@@ -33,7 +33,7 @@ degrees and represent it with 5 control points that can be used as design variab
 
 .. embed-code::
     openmdao.components.tests.test_interp.TestBsplinesCompFeature.test_basic
-    :layout: interleave
+    :layout: code, output
 
 
 BsplinesComp Option Examples
@@ -51,7 +51,7 @@ distribution, our control points are evenly spaced over the domain, as seen in t
 
 .. embed-code::
     openmdao.components.tests.test_interp.TestBsplinesCompFeature.test_distribution_uniform
-    :layout: interleave, plot
+    :layout: code, plot
     :scale: 90
     :align: center
 
@@ -61,6 +61,6 @@ higher spatial frequency content) near the edges than the middle.
 
 .. embed-code::
     openmdao.components.tests.test_interp.TestBsplinesCompFeature.test_distribution_sine
-    :layout: interleave, plot
+    :layout: code, plot
     :scale: 90
     :align: center

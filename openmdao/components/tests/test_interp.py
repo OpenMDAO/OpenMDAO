@@ -7,6 +7,11 @@ import unittest
 
 import numpy as np
 
+try:
+    import matplotlib
+except ImportError:
+    matplotlib = None
+
 from openmdao.api import Problem, IndepVarComp
 from openmdao.components.interp import BsplinesComp
 from openmdao.utils.assert_utils import assert_rel_error
@@ -49,10 +54,10 @@ class TestBsplinesComp(unittest.TestCase):
         self.assertLess(max(delta[15:-15]), .06)
 
 
+@unittest.skipUnless(matplotlib, "Matplotlib is required.")
 class TestBsplinesCompFeature(unittest.TestCase):
 
     def setUp(self):
-        import matplotlib
         matplotlib.use('Agg')
 
     def test_basic(self):
