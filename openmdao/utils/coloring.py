@@ -216,6 +216,15 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15, byvar=True):
     # normalize the full J
     fullJ /= np.max(fullJ)
 
+    sz_zeros = fullJ[fullJ == 0.0].size
+    print("smallest nonzero:", np.min(fullJ[fullJ > 0.0]))
+    itol = tol * 1000.
+    print("%d zero values out of %d (%5.2f%%)" % (sz_zeros, fullJ.size, sz_zeros/fullJ.size*100.))
+    while itol > tol / 1000.:
+        if itol < 1.:
+            print("%d entries < tol at tol of %g" % (fullJ[fullJ < itol].size, itol))
+        itol /= 10
+
     boolJ = np.zeros(fullJ.shape, dtype=bool)
     boolJ[fullJ > tol] = True
 
@@ -337,7 +346,7 @@ def _find_global_disjoint(prob, mode='fwd', repeats=1, tol=1e-15):
     full_disjoint, rows = _get_full_disjoint(J, 0, J.shape[1] - 1)
 
     for color, cols in enumerate(full_disjoint):
-        print("color", color, "cols", len(cols))
+        print("color:", color, "columns:", len(cols))
 
     return full_disjoint, rows, J
 
@@ -392,10 +401,10 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
         wrt = list(driver._designvars)
 
     if include_sparsity:
-        sparsity = {}
+        sparsity = OrderedDict()
         row_start = row_end = 0
         for res in of:
-            sparsity[res] = {}
+            sparsity[res] = OrderedDict()
             res_size = int(driver._responses[res]['size'])
             row_end += res_size
             col_start = col_end = 0

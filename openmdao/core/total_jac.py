@@ -241,7 +241,7 @@ class _TotalJacInfo(object):
 
         idx_tups = [None] * len(names)
         loc_idxs = []
-        idx_iter_dict = {}  # a dict of index iterators
+        idx_iter_dict = OrderedDict()  # a dict of index iterators
 
         simul_coloring = self.simul_coloring
 

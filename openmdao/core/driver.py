@@ -16,7 +16,7 @@ from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.mpi import MPI
 from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.coloring import _use_simul_coloring
+import openmdao.utils.coloring as coloring_mod
 
 
 def _is_debug_print_opts_valid(opts):
@@ -388,7 +388,8 @@ class Driver(object):
             self._rec_mgr.record_metadata(self)
 
         # set up simultaneous deriv coloring
-        if self._simul_coloring_info and self.supports['simultaneous_derivatives']:
+        if (coloring_mod._use_simul_coloring and self._simul_coloring_info and
+                self.supports['simultaneous_derivatives']):
             if problem._mode == 'fwd':
                 self._setup_simul_coloring(problem._mode)
             else:
@@ -858,7 +859,7 @@ class Driver(object):
                                       "in 'rev' mode")
 
         # command line simul_coloring uses this env var to turn pre-existing coloring off
-        if not _use_simul_coloring:
+        if not coloring_mod._use_simul_coloring:
             return
 
         prom2abs = self._problem.model._var_allprocs_prom2abs_list['output']
