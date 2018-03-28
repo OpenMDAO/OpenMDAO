@@ -320,9 +320,9 @@ class MetaModelUnStructured(ExplicitComponent):
         for name, sz in self._surrogate_input_names:
             val = vec[name]
             if isinstance(val, np.ndarray):
-                if array_real and np.issubdtype(val.dtype, complex):
+                if array_real and np.issubdtype(val.dtype, np.complexfloating):
                     array_real = False
-                    arr = arr.astype(complex)
+                    arr = arr.astype(np.complexfloating)
                 arr[idx:idx + sz] = val.flat
                 idx += sz
             else:
@@ -354,9 +354,9 @@ class MetaModelUnStructured(ExplicitComponent):
             for name, sz in self._surrogate_input_names:
                 val = vec[name]
                 if isinstance(val, np.ndarray):
-                    if array_real and np.issubdtype(val.dtype, complex):
+                    if array_real and np.issubdtype(val.dtype, np.complexfloating):
                         array_real = False
-                        arr = arr.astype(complex)
+                        arr = arr.astype(np.complexfloating)
                     arr[row][idx:idx + sz] = val[row].flat
                     idx += sz
                 else:
