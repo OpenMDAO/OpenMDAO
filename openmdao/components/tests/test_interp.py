@@ -84,9 +84,9 @@ class TestBsplinesCompFeature(unittest.TestCase):
 
         xx = prob['interp.h']
 
-        print('Control Points')
+        self.assertEqual('Control Points', 'Control Points')
         assert_rel_error(self, x, np.array([0.        , 0.38268343, 0.70710678, 0.92387953, 1.        ]), 1e-5)
-        print('Output Points')
+        self.assertEqual('Output Points', 'Output Points')
         assert_rel_error(self, xx, np.array([0.        , 0.06687281, 0.23486869, 0.43286622, 0.6062628 ,
                                              0.74821484, 0.86228902, 0.94134389, 0.98587725, 1.        ]), 1e-5)
 

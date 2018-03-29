@@ -13,16 +13,10 @@ distributed design variables where you know that the physics gives you smooth de
 
 BsplinesComp accepts the following arguments during instantiation:
 
-================== ======= ====================================================================================================
-Name               Type    Description
-================== ======= ====================================================================================================
-num_control_points   int   Number of control points.
-num_points           int   Number of interpolated points.
-bspline_order        int   B-spline order.
-in_name              str   Name to use for the input variable (control points).
-out_name             str   Name to use for the output variable (interpolated points).
-distribution         str   Choice of spatial distribution to use for placing the control points. It can be 'sine' or 'uniform'.
-================== ======= ====================================================================================================
+.. embed-options::
+    openmdao.components.interp
+    _for_docs
+    metadata
 
 
 BsplinesComp Example
