@@ -846,9 +846,9 @@ class Driver(object):
 
             ::
 
-                # Information about simultaneous coloring for design vars and responses.  If a string,
-                # then simul_info is assumed to be the name of a file that contains the coloring
-                # information in JSON format.  If a tuple, the structure looks like this:
+                # Information about simultaneous coloring for design vars and responses.  If a
+                # string, then simul_info is assumed to be the name of a file that contains the
+                # coloring information in JSON format.  If a tuple, the structure looks like this:
 
                 (
                     # First, a list of column index lists, each index list representing columns
@@ -862,8 +862,8 @@ class Driver(object):
                     ],
 
                     # Next is a list of lists, one for each column, containing the nonzero rows for
-                    # that column.  If a column is not colored, then it will have a None entry instead
-                    # of a list.
+                    # that column.  If a column is not colored, then it will have a None entry
+                    # instead of a list.
                     [
                         [r1, rn, ...]   # list of nonzero rows for column 0
                         None,           # column 1 is not colored
