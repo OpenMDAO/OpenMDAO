@@ -131,6 +131,36 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         assert_rel_error(self, J, np.eye(2), 1.0e-3)
 
+    def test_scipy_optimizer_simple_paraboloid_unconstrained(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizer()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+
+        prob.setup(check=False)
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+
+        assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
+        assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
+
     def test_simple_paraboloid_unconstrained(self):
 
         prob = Problem()
