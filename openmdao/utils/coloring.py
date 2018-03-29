@@ -318,7 +318,7 @@ def _find_disjoint(prob, mode='fwd', repeats=1, tol=1e-15):
     return total_dv_offsets, total_res_offsets, J
 
 
-def _find_global_disjoint(prob, mode='fwd', repeats=1, tol=1e-15):
+def _find_global_disjoint(prob, J):
     """
     Find sets of disjoint columns in the total jac and their corresponding rows.
 
@@ -326,30 +326,68 @@ def _find_global_disjoint(prob, mode='fwd', repeats=1, tol=1e-15):
     ----------
     prob : Problem
         The Problem being analyzed.
-    mode : str
-        Derivative direction.
-    repeats : int
-        Number of times to repeat total jacobian computation.
-    tol : float
-        Tolerance on values in jacobian.  Anything smaller in magnitude will be
-        set to 0.0.
+    J : ndarray
+        Boolean total jacobian (True for nonzero values).
 
     Returns
     -------
     tuple
         Tuple of the form (disjoint_col_sets, rows_per_col)
     """
-    # TODO: fix this to work in rev mode as well
-    assert mode == 'fwd', "Only fwd mode is supported."
-
-    J = _get_bool_jac(prob, mode=mode, repeats=repeats, tol=tol)
-
     full_disjoint, rows = _get_full_disjoint(J, 0, J.shape[1] - 1)
 
     for color, cols in enumerate(full_disjoint):
         print("color:", color, "columns:", len(cols))
 
-    return full_disjoint, rows, J
+    return full_disjoint, rows
+
+
+def _sparsity_from_jac(J, of, wrt, driver):
+    """
+    Given a boolean total jacobian and a driver, compute subjac sparsity.
+
+    Parameters
+    ----------
+    J : ndarray
+        Boolean total jacobian.
+    of : list of str
+        List of responses.
+    wrt : list of str
+        List of design vars.
+    driver : <Driver>
+        Driver containing responses and design variables.
+
+    Returns
+    -------
+    OrderedDict
+        Nested OrderedDict of form sparsity[response][desvar] = (rows, cols, shape)
+    """
+    sparsity = OrderedDict()
+    row_start = row_end = 0
+    res_meta = driver._responses
+    dv_meta = driver._designvars
+
+    for res in of:
+        sparsity[res] = OrderedDict()
+        res_size = int(res_meta[res]['size'])
+        row_end += res_size
+        col_start = col_end = 0
+        for dv in wrt:
+            dv_size = int(dv_meta[dv]['size'])
+            col_end += dv_size
+
+            # save sparsity structure as  (rows, cols, shape)
+            irows, icols = np.nonzero(J[row_start:row_end, col_start:col_end])
+            # convert to make JSON serializable
+            irows = [int(i) for i in irows]
+            icols = [int(i) for i in icols]
+            sparsity[res][dv] = (irows, icols, (res_size, dv_size))
+
+            col_start = col_end
+
+        row_start = row_end
+
+    return sparsity
 
 
 def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
@@ -384,7 +422,12 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
     """
     driver = problem.driver
 
-    full_disjoint, rows, J = _find_global_disjoint(problem, mode=mode, repeats=repeats, tol=tol)
+    # TODO: fix this to work in rev mode as well
+    assert mode == 'fwd', "Simultaneous derivatives are currently supported only in fwd mode."
+
+    J = _get_bool_jac(problem, mode=mode, repeats=repeats, tol=tol)
+
+    full_disjoint, rows = _find_global_disjoint(problem, J)
     allcols = set(range(J.shape[1]))
     single_cols = list(allcols.difference(rows))
 
@@ -402,27 +445,7 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
         wrt = list(driver._designvars)
 
     if include_sparsity:
-        sparsity = OrderedDict()
-        row_start = row_end = 0
-        for res in of:
-            sparsity[res] = OrderedDict()
-            res_size = int(driver._responses[res]['size'])
-            row_end += res_size
-            col_start = col_end = 0
-            for dv in wrt:
-                dv_size = int(driver._designvars[dv]['size'])
-                col_end += dv_size
-
-                # save sparsity structure as  (rows, cols, shape)
-                irows, icols = np.nonzero(J[row_start:row_end, col_start:col_end])
-                # convert to make JSON serializable
-                irows = [int(i) for i in irows]
-                icols = [int(i) for i in icols]
-                sparsity[res][dv] = (irows, icols, (res_size, dv_size))
-
-                col_start = col_end
-
-            row_start = row_end
+        sparsity = _sparsity_from_jac(J, of, wrt, driver)
 
     if stream is not None:
         if stream.isatty():
