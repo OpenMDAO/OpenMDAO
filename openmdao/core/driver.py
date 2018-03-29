@@ -843,56 +843,50 @@ class Driver(object):
         Parameters
         ----------
         simul_info : str or tuple
-            Information about simultaneous coloring for design vars and responses.  If a string,
-            then simul_info is assumed to be the name of a file that contains the coloring
-            information in JSON format.  If a tuple, the structure looks like this:
 
-            (
-                First, a list of column index lists, each index list representing columns
-                having the same color, except for the very first index list, which contains
-                indices of all columns that are not colored.
+            ::
 
-                [
-                    [i1, i2, i3, ...]    # list of non-colored columns
+                # Information about simultaneous coloring for design vars and responses.  If a string,
+                # then simul_info is assumed to be the name of a file that contains the coloring
+                # information in JSON format.  If a tuple, the structure looks like this:
 
-                    [ia, ib, ...]    # list of columns in first color
+                (
+                    # First, a list of column index lists, each index list representing columns
+                    # having the same color, except for the very first index list, which contains
+                    # indices of all columns that are not colored.
+                    [
+                        [i1, i2, i3, ...]    # list of non-colored columns
+                        [ia, ib, ...]    # list of columns in first color
+                        [ic, id, ...]    # list of columns in second color
+                           ...           # remaining color lists, one list of columns per color
+                    ],
 
-                    [ic, id, ...]    # list of columns in second color
+                    # Next is a list of lists, one for each column, containing the nonzero rows for
+                    # that column.  If a column is not colored, then it will have a None entry instead
+                    # of a list.
+                    [
+                        [r1, rn, ...]   # list of nonzero rows for column 0
+                        None,           # column 1 is not colored
+                        [ra, rb, ...]   # list of nonzero rows for column 2
+                            ...
+                    ],
 
-                       ...           # remaining color lists, one list of columns per color
-                ],
-
-                Next is a list of lists, one for each column, containing the nonzero rows for
-                that column.  If a column is not colored, then it will have a None entry instead
-                of a list.
-
-                [
-                    [r1, rn, ...]   # list of nonzero rows for column 0
-
-                    None,           # column 1 is not colored
-
-                    [ra, rb, ...]   # list of nonzero rows for column 2
-                        ...
-                ],
-
-                The last tuple entry can be None, indicating that no sparsity structure is
-                specified, or it can be a nested dictionary where the outer keys are response
-                names, the inner keys are design variable names, and the value is a tuple of
-                the form (row_list, col_list, shape).
-
-                {
-                    resp1_name: {
-                        dv1_name: (rows, cols, shape),  # for sub-jac d_resp1/d_dv1
-
-                        dv2_name: (rows, cols, shape),
-                          ...
-                    },
-
-                    resp2_name: {
+                    # The last tuple entry can be None, indicating that no sparsity structure is
+                    # specified, or it can be a nested dictionary where the outer keys are response
+                    # names, the inner keys are design variable names, and the value is a tuple of
+                    # the form (row_list, col_list, shape).
+                    {
+                        resp1_name: {
+                            dv1_name: (rows, cols, shape),  # for sub-jac d_resp1/d_dv1
+                            dv2_name: (rows, cols, shape),
+                              ...
+                        },
+                        resp2_name: {
+                            ...
+                        }
                         ...
                     }
-                }
-            )
+                )
         """
         if self.supports['simultaneous_derivatives']:
             self._simul_coloring_info = simul_info

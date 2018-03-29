@@ -292,6 +292,7 @@ As total jacobians get larger, it may not be desirable to cut and paste the colo
 manually.  In this case, using the `-o` command line option will output the coloring to a file
 as follows:
 
+
 .. code-block:: none
 
     openmdao simul_coloring <your_script_name> -o my_coloring.json
