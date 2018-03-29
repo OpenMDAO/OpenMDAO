@@ -253,15 +253,6 @@ class Driver(object):
 
         # Gather up the information for design vars.
         self._designvars = model.get_design_vars(recurse=True)
-        desvar_size = np.sum(data['size'] for data in itervalues(self._designvars))
-
-        if ((problem._mode == 'fwd' and desvar_size > response_size) or
-                (problem._mode == 'rev' and response_size > desvar_size)):
-            warnings.warn("Inefficient choice of derivative mode.  You chose '%s' for a "
-                          "problem with %d design variables and %d response variables "
-                          "(objectives and constraints)." %
-                          (problem._mode, desvar_size, response_size), RuntimeWarning)
-
         self._has_scaling = (
             np.any([r['scaler'] is not None for r in self._responses.values()]) or
             np.any([dv['scaler'] is not None for dv in self._designvars.values()])
@@ -394,6 +385,23 @@ class Driver(object):
                 self._setup_simul_coloring(problem._mode)
             else:
                 raise RuntimeError("simultaneous derivs are currently not supported in rev mode.")
+
+        desvar_size = np.sum(data['size'] for data in itervalues(self._designvars))
+
+        # if we're using simultaneous derivatives then our effective design var size is less
+        # than the full design var size
+        if self._simul_coloring_info:
+            col_lists = self._simul_coloring_info[0]
+            if col_lists:
+                desvar_size = len(col_lists[0])
+                desvar_size += len(col_lists) - 1
+
+        if ((problem._mode == 'fwd' and desvar_size > response_size) or
+                (problem._mode == 'rev' and response_size > desvar_size)):
+            warnings.warn("Inefficient choice of derivative mode.  You chose '%s' for a "
+                          "problem with %d design variables and %d response variables "
+                          "(objectives and constraints)." %
+                          (problem._mode, desvar_size, response_size), RuntimeWarning)
 
     def _get_voi_val(self, name, meta, remote_vois):
         """
@@ -830,14 +838,61 @@ class Driver(object):
 
     def set_simul_deriv_color(self, simul_info):
         """
-        Set the coloring for simultaneous derivatives.
+        Set the coloring (and possibly the sub-jacobian sparsity) for simultaneous derivatives.
 
         Parameters
         ----------
-        simul_info : str or ({dv1: colors, ...}, {resp1: {dv1: {0: [res_idxs, dv_idxs]} ...} ...})
+        simul_info : str or tuple
             Information about simultaneous coloring for design vars and responses.  If a string,
             then simul_info is assumed to be the name of a file that contains the coloring
-            information in JSON format.
+            information in JSON format.  If a tuple, the structure looks like this:
+
+            (
+                First, a list of column index lists, each index list representing columns
+                having the same color, except for the very first index list, which contains
+                indices of all columns that are not colored.
+
+                [
+                    [i1, i2, i3, ...]    # list of non-colored columns
+
+                    [ia, ib, ...]    # list of columns in first color
+
+                    [ic, id, ...]    # list of columns in second color
+
+                       ...           # remaining color lists, one list of columns per color
+                ],
+
+                Next is a list of lists, one for each column, containing the nonzero rows for
+                that column.  If a column is not colored, then it will have a None entry instead
+                of a list.
+
+                [
+                    [r1, rn, ...]   # list of nonzero rows for column 0
+
+                    None,           # column 1 is not colored
+
+                    [ra, rb, ...]   # list of nonzero rows for column 2
+                        ...
+                ],
+
+                The last tuple entry can be None, indicating that no sparsity structure is
+                specified, or it can be a nested dictionary where the outer keys are response
+                names, the inner keys are design variable names, and the value is a tuple of
+                the form (row_list, col_list, shape).
+
+                {
+                    resp1_name: {
+                        dv1_name: (rows, cols, shape),  # for sub-jac d_resp1/d_dv1
+
+                        dv2_name: (rows, cols, shape),
+                          ...
+                    },
+
+                    resp2_name: {
+                        ...
+                    }
+                }
+            )
         """
         if self.supports['simultaneous_derivatives']:
             self._simul_coloring_info = simul_info
@@ -867,9 +922,12 @@ class Driver(object):
         if isinstance(self._simul_coloring_info, string_types):
             with open(self._simul_coloring_info, 'r') as f:
                 self._simul_coloring_info = json.load(f)
-                column_lists, row_map, sparsity = self._simul_coloring_info
-                # json has rows as strings, so convert back to ints
-                row_map = {int(k): v for k, v in iteritems(row_map)}
+                tup = self._simul_coloring_info
+                column_lists, row_map = tup[:2]
+                if len(tup) > 2:
+                    sparsity = tup[2]
+                else:
+                    sparsity = None
                 self._simul_coloring_info = column_lists, row_map, sparsity
 
     def _pre_run_model_debug_print(self):

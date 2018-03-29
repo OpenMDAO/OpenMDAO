@@ -9,6 +9,7 @@ additional MPI capability.
 from __future__ import print_function
 from collections import OrderedDict
 import traceback
+import warnings
 
 from six import iteritems, itervalues
 
@@ -585,13 +586,22 @@ class pyOptSparseDriver(Driver):
         if self._simul_coloring_info is None:
             return
 
-        column_lists, row_map, sparsity = self._simul_coloring_info
+        tup = self._simul_coloring_info
+        column_lists, row_map = tup[:2]
+        if len(tup) > 2:
+            sparsity = tup[2]
+        else:
+            sparsity = None
+        self._res_jacs = {}
 
         if sparsity is None:
-            raise RuntimeError("To use simul coloring with pyOptSparse you must include "
-                               "sparsity structure. (run openmdao simul_coloring with -s option)")
+            warnings.warn("pyOptSparseDriver is being used with simultaneous derivatives but "
+                          "no sparsity structure was provided.  Providing the sparsity structure "
+                          "can signficantly improve performance.  "
+                          "(run 'openmdao simul_coloring' from the command line with the "
+                          "-s option)")
+            return
 
-        self._res_jacs = {}
         for res, resdict in iteritems(sparsity):
             if res in self._objs:  # skip objectives
                 continue

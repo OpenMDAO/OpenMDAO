@@ -27,7 +27,7 @@ class RunOnceCounter(LinearRunOnce):
         super(RunOnceCounter, self)._iter_execute()
         self._solve_count += 1
 
-def run_opt(driver_class, options, color_info=None):
+def run_opt(driver_class, color_info=None, **options):
 
     # note: size must be an even number
     SIZE = 10
@@ -106,46 +106,51 @@ class SimulColoringTestCase(unittest.TestCase):
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_simul_coloring_snopt(self):
         # first, run w/o coloring
-        p = run_opt(pyOptSparseDriver,
-                    {'optimizer': 'SNOPT', 'print_results': False})
+        p = run_opt(pyOptSparseDriver, optimizer='SNOPT', print_results=False)
 
         color_info = ([
-           [20],
-           [0, 2, 4, 6, 8],
-           [1, 3, 5, 7, 9],
-           [10, 12, 14, 16, 18],
-           [11, 13, 15, 17, 19],
+           [20],   # uncolored column list
+           [0, 2, 4, 6, 8],   # color 1
+           [1, 3, 5, 7, 9],   # color 2
+           [10, 12, 14, 16, 18],   # color 3
+           [11, 13, 15, 17, 19],   # color 4
         ],
-        {
-           0: [1, 11, 12, 17],
-           1: [2, 17],
-           2: [3, 13, 18],
-           3: [4, 18],
-           4: [5, 14, 19],
-           5: [6, 19],
-           6: [7, 15, 20],
-           7: [8, 20],
-           8: [9, 16, 21],
-           9: [10, 21],
-           10: [1, 12, 17],
-           11: [2, 17],
-           12: [3, 13, 18],
-           13: [4, 18],
-           14: [5, 14, 19],
-           15: [6, 19],
-           16: [7, 15, 20],
-           17: [8, 20],
-           18: [9, 16, 21],
-           19: [10, 21],
-        },
-        {'circle.area': {'indeps.r': ([0], [0], (1, 1))},
-         'delta_theta_con.g': {'indeps.x': ([0, 0, 1, 1, 2, 2, 3, 3, 4, 4],
+        [
+           [1, 11, 12, 17],   # column 0
+           [2, 17],   # column 1
+           [3, 13, 18],   # column 2
+           [4, 18],   # column 3
+           [5, 14, 19],   # column 4
+           [6, 19],   # column 5
+           [7, 15, 20],   # column 6
+           [8, 20],   # column 7
+           [9, 16, 21],   # column 8
+           [10, 21],   # column 9
+           [1, 12, 17],   # column 10
+           [2, 17],   # column 11
+           [3, 13, 18],   # column 12
+           [4, 18],   # column 13
+           [5, 14, 19],   # column 14
+           [6, 19],   # column 15
+           [7, 15, 20],   # column 16
+           [8, 20],   # column 17
+           [9, 16, 21],   # column 18
+           [10, 21],   # column 19
+           None,   # column 20
+        ],
+        {'circle.area': {'indeps.r': ([0], [0], (1, 1)),
+                         'indeps.x': ([], [], (1, 10)),
+                         'indeps.y': ([], [], (1, 10))},
+         'delta_theta_con.g': {'indeps.r': ([], [], (5, 1)),
+                               'indeps.x': ([0, 0, 1, 1, 2, 2, 3, 3, 4, 4],
                                             [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
                                             (5, 10)),
                                'indeps.y': ([0, 0, 1, 1, 2, 2, 3, 3, 4, 4],
                                             [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
                                             (5, 10))},
-         'l_conx.g': {'indeps.x': ([0], [0], (1, 10))},
+         'l_conx.g': {'indeps.r': ([], [], (1, 1)),
+                      'indeps.x': ([0], [0], (1, 10)),
+                      'indeps.y': ([], [], (1, 10))},
          'r_con.g': {'indeps.r': ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
                                   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                   (10, 1)),
@@ -155,12 +160,12 @@ class SimulColoringTestCase(unittest.TestCase):
                      'indeps.y': ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
                                   [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
                                   (10, 10))},
-         'theta_con.g': {'indeps.x': ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8], (5, 10)),
+         'theta_con.g': {'indeps.r': ([], [], (5, 1)),
+                         'indeps.x': ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8], (5, 10)),
                          'indeps.y': ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8], (5, 10))}}
         )
 
-        p_color = run_opt(pyOptSparseDriver, {'optimizer': 'SNOPT', 'print_results': False},
-                          color_info)
+        p_color = run_opt(pyOptSparseDriver, color_info, optimizer='SNOPT', print_results=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -183,42 +188,48 @@ class SimulColoringTestCase(unittest.TestCase):
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
         color_info = ([
-           [20],
-           [0, 2, 4, 6, 8],
-           [1, 3, 5, 7, 9],
-           [10, 12, 14, 16, 18],
-           [11, 13, 15, 17, 19],
+           [20],   # uncolored column list
+           [0, 2, 4, 6, 8],   # color 1
+           [1, 3, 5, 7, 9],   # color 2
+           [10, 12, 14, 16, 18],   # color 3
+           [11, 13, 15, 17, 19],   # color 4
         ],
-        {
-           0: [1, 11, 12, 17],
-           1: [2, 17],
-           2: [3, 13, 18],
-           3: [4, 18],
-           4: [5, 14, 19],
-           5: [6, 19],
-           6: [7, 15, 20],
-           7: [8, 20],
-           8: [9, 16, 21],
-           9: [10, 21],
-           10: [1, 12, 17],
-           11: [2, 17],
-           12: [3, 13, 18],
-           13: [4, 18],
-           14: [5, 14, 19],
-           15: [6, 19],
-           16: [7, 15, 20],
-           17: [8, 20],
-           18: [9, 16, 21],
-           19: [10, 21],
-        },
-        {'circle.area': {'indeps.r': ([0], [0], (1, 1))},
-         'delta_theta_con.g': {'indeps.x': ([0, 0, 1, 1, 2, 2, 3, 3, 4, 4],
+        [
+           [1, 11, 12, 17],   # column 0
+           [2, 17],   # column 1
+           [3, 13, 18],   # column 2
+           [4, 18],   # column 3
+           [5, 14, 19],   # column 4
+           [6, 19],   # column 5
+           [7, 15, 20],   # column 6
+           [8, 20],   # column 7
+           [9, 16, 21],   # column 8
+           [10, 21],   # column 9
+           [1, 12, 17],   # column 10
+           [2, 17],   # column 11
+           [3, 13, 18],   # column 12
+           [4, 18],   # column 13
+           [5, 14, 19],   # column 14
+           [6, 19],   # column 15
+           [7, 15, 20],   # column 16
+           [8, 20],   # column 17
+           [9, 16, 21],   # column 18
+           [10, 21],   # column 19
+           None,   # column 20
+        ],
+        {'circle.area': {'indeps.r': ([0], [0], (1, 1)),
+                         'indeps.x': ([], [], (1, 10)),
+                         'indeps.y': ([], [], (1, 10))},
+         'delta_theta_con.g': {'indeps.r': ([], [], (5, 1)),
+                               'indeps.x': ([0, 0, 1, 1, 2, 2, 3, 3, 4, 4],
                                             [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
                                             (5, 10)),
                                'indeps.y': ([0, 0, 1, 1, 2, 2, 3, 3, 4, 4],
                                             [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
                                             (5, 10))},
-         'l_conx.g': {'indeps.x': ([0], [0], (1, 10))},
+         'l_conx.g': {'indeps.r': ([], [], (1, 1)),
+                      'indeps.x': ([0], [0], (1, 10)),
+                      'indeps.y': ([], [], (1, 10))},
          'r_con.g': {'indeps.r': ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
                                   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                   (10, 1)),
@@ -228,16 +239,16 @@ class SimulColoringTestCase(unittest.TestCase):
                      'indeps.y': ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
                                   [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
                                   (10, 10))},
-         'theta_con.g': {'indeps.x': ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8], (5, 10)),
+         'theta_con.g': {'indeps.r': ([], [], (5, 1)),
+                         'indeps.x': ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8], (5, 10)),
                          'indeps.y': ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8], (5, 10))}}
         )
 
-        p_color = run_opt(pyOptSparseDriver, {'optimizer': 'SLSQP', 'print_results': False},
-                          color_info)
+        p_color = run_opt(pyOptSparseDriver, color_info, optimizer='SLSQP', print_results=False)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
         # run w/o coloring
-        p = run_opt(pyOptSparseDriver, {'optimizer': 'SLSQP', 'print_results': False})
+        p = run_opt(pyOptSparseDriver, optimizer='SLSQP', print_results=False)
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
 
         # - coloring saves 16 solves per driver iter  (5 vs 21)
@@ -252,60 +263,40 @@ class SimulColoringScipyTestCase(unittest.TestCase):
     def test_simul_coloring(self):
 
         # first, run w/o coloring
-        p = run_opt(ScipyOptimizeDriver, {'optimizer': 'SLSQP', 'disp': False})
+        p = run_opt(ScipyOptimizeDriver, optimizer='SLSQP', disp=False)
 
         color_info = ([
-            [20],
-            [0, 2, 4, 6, 8],
-            [1, 3, 5, 7, 9],
-            [10, 12, 14, 16, 18],
-            [11, 13, 15, 17, 19],
-         ],
-         {
-            0: [1, 11, 16, 21],
-            1: [2, 16],
-            2: [3, 12, 17],
-            3: [4, 17],
-            4: [5, 13, 18],
-            5: [6, 18],
-            6: [7, 14, 19],
-            7: [8, 19],
-            8: [9, 15, 20],
-            9: [10, 20],
-            10: [1, 11, 16],
-            11: [2, 16],
-            12: [3, 12, 17],
-            13: [4, 17],
-            14: [5, 13, 18],
-            15: [6, 18],
-            16: [7, 14, 19],
-            17: [8, 19],
-            18: [9, 15, 20],
-            19: [10, 20],
-         },
-         {'delta_theta_con.g': {'indeps.x': ([0, 1, 1, 2, 2, 3, 3, 4, 4],
-                                             [8, 0, 1, 2, 3, 4, 5, 6, 7],
-                                             (5, 10)),
-                                'indeps.y': ([0, 1, 1, 2, 2, 3, 3, 4, 4],
-                                             [8, 0, 1, 2, 3, 4, 5, 6, 7],
-                                             (5, 10))},
-          'l_conx.g': {'indeps.x': ([0, 0], [8, 9], (1, 10)),
-                       'indeps.y': ([0, 0], [8, 9], (1, 10))},
-          'r_con.g': {'indeps.r': ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                                   (10, 1)),
-                      'indeps.x': ([1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                   [0, 1, 2, 3, 4, 5, 6, 7, 8],
-                                   (10, 10)),
-                      'indeps.y': ([1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                   [0, 1, 2, 3, 4, 5, 6, 7, 8],
-                                   (10, 10))},
-          'theta_con.g': {'indeps.r': ([0], [0], (5, 1)),
-                          'indeps.x': ([0, 1, 2, 3, 4], [9, 0, 2, 4, 6], (5, 10)),
-                          'indeps.y': ([0, 1, 2, 3, 4], [9, 0, 2, 4, 6], (5, 10))}}
-         )
-        p_color = run_opt(ScipyOptimizeDriver, {'optimizer': 'SLSQP', 'disp': False},
-                          color_info)
+           [20],   # uncolored column list
+           [0, 2, 4, 6, 8],   # color 1
+           [1, 3, 5, 7, 9],   # color 2
+           [10, 12, 14, 16, 18],   # color 3
+           [11, 13, 15, 17, 19],   # color 4
+        ],
+        [
+           [1, 11, 16, 21],   # column 0
+           [2, 16],   # column 1
+           [3, 12, 17],   # column 2
+           [4, 17],   # column 3
+           [5, 13, 18],   # column 4
+           [6, 18],   # column 5
+           [7, 14, 19],   # column 6
+           [8, 19],   # column 7
+           [9, 15, 20],   # column 8
+           [10, 20],   # column 9
+           [1, 11, 16],   # column 10
+           [2, 16],   # column 11
+           [3, 12, 17],   # column 12
+           [4, 17],   # column 13
+           [5, 13, 18],   # column 14
+           [6, 18],   # column 15
+           [7, 14, 19],   # column 16
+           [8, 19],   # column 17
+           [9, 15, 20],   # column 18
+           [10, 20],   # column 19
+           None,   # column 20
+        ])
+
+        p_color = run_opt(ScipyOptimizeDriver, color_info, optimizer='SLSQP', disp=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -385,55 +376,35 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
         # setup coloring
         color_info = ([
-            [20],
-            [0, 2, 4, 6, 8],
-            [1, 3, 5, 7, 9],
-            [10, 12, 14, 16, 18],
-            [11, 13, 15, 17, 19],
-         ],
-         {
-            0: [1, 11, 16, 21],
-            1: [2, 16],
-            2: [3, 12, 17],
-            3: [4, 17],
-            4: [5, 13, 18],
-            5: [6, 18],
-            6: [7, 14, 19],
-            7: [8, 19],
-            8: [9, 15, 20],
-            9: [10, 20],
-            10: [1, 11, 16],
-            11: [2, 16],
-            12: [3, 12, 17],
-            13: [4, 17],
-            14: [5, 13, 18],
-            15: [6, 18],
-            16: [7, 14, 19],
-            17: [8, 19],
-            18: [9, 15, 20],
-            19: [10, 20],
-         },
-         {'delta_theta_con.g': {'indeps.x': ([0, 1, 1, 2, 2, 3, 3, 4, 4],
-                                             [8, 0, 1, 2, 3, 4, 5, 6, 7],
-                                             (5, 10)),
-                                'indeps.y': ([0, 1, 1, 2, 2, 3, 3, 4, 4],
-                                             [8, 0, 1, 2, 3, 4, 5, 6, 7],
-                                             (5, 10))},
-          'l_conx.g': {'indeps.x': ([0, 0], [8, 9], (1, 10)),
-                       'indeps.y': ([0, 0], [8, 9], (1, 10))},
-          'r_con.g': {'indeps.r': ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                                   (10, 1)),
-                      'indeps.x': ([1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                   [0, 1, 2, 3, 4, 5, 6, 7, 8],
-                                   (10, 10)),
-                      'indeps.y': ([1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                   [0, 1, 2, 3, 4, 5, 6, 7, 8],
-                                   (10, 10))},
-          'theta_con.g': {'indeps.r': ([0], [0], (5, 1)),
-                          'indeps.x': ([0, 1, 2, 3, 4], [9, 0, 2, 4, 6], (5, 10)),
-                          'indeps.y': ([0, 1, 2, 3, 4], [9, 0, 2, 4, 6], (5, 10))}}
-         )
+           [20],   # uncolored column list
+           [0, 2, 4, 6, 8],   # color 1
+           [1, 3, 5, 7, 9],   # color 2
+           [10, 12, 14, 16, 18],   # color 3
+           [11, 13, 15, 17, 19],   # color 4
+        ],
+        [
+           [1, 11, 16, 21],   # column 0
+           [2, 16],   # column 1
+           [3, 12, 17],   # column 2
+           [4, 17],   # column 3
+           [5, 13, 18],   # column 4
+           [6, 18],   # column 5
+           [7, 14, 19],   # column 6
+           [8, 19],   # column 7
+           [9, 15, 20],   # column 8
+           [10, 20],   # column 9
+           [1, 11, 16],   # column 10
+           [2, 16],   # column 11
+           [3, 12, 17],   # column 12
+           [4, 17],   # column 13
+           [5, 13, 18],   # column 14
+           [6, 18],   # column 15
+           [7, 14, 19],   # column 16
+           [8, 19],   # column 17
+           [9, 15, 20],   # column 18
+           [10, 20],   # column 19
+           None,   # column 20
+        ], None)
 
         p.driver.set_simul_deriv_color(color_info)
 
