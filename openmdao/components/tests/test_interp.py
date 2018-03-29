@@ -7,6 +7,11 @@ import unittest
 
 import numpy as np
 
+try:
+    import matplotlib
+except ImportError:
+    matplotlib = None
+
 from openmdao.api import Problem, IndepVarComp
 from openmdao.components.interp import BsplinesComp
 from openmdao.utils.assert_utils import assert_rel_error
@@ -49,11 +54,41 @@ class TestBsplinesComp(unittest.TestCase):
         self.assertLess(max(delta[15:-15]), .06)
 
 
+@unittest.skipUnless(matplotlib, "Matplotlib is required.")
 class TestBsplinesCompFeature(unittest.TestCase):
 
     def setUp(self):
-        import matplotlib
         matplotlib.use('Agg')
+
+    def test_basic(self):
+        prob = Problem()
+        model = prob.model
+
+        n_cp = 5
+        n_point = 10
+
+        t = np.linspace(0, 0.5*np.pi, n_cp)
+        x = np.sin(t)
+
+        model.add_subsystem('px', IndepVarComp('x', val=x))
+        model.add_subsystem('interp', BsplinesComp(num_control_points=n_cp,
+                                                   num_points=n_point,
+                                                   in_name='h_cp',
+                                                   out_name='h'))
+
+        model.connect('px.x', 'interp.h_cp')
+
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        xx = prob['interp.h']
+
+        self.assertEqual('Control Points', 'Control Points')
+        assert_rel_error(self, x, np.array([0.        , 0.38268343, 0.70710678, 0.92387953, 1.        ]), 1e-5)
+        self.assertEqual('Output Points', 'Output Points')
+        assert_rel_error(self, xx, np.array([0.        , 0.06687281, 0.23486869, 0.43286622, 0.6062628 ,
+                                             0.74821484, 0.86228902, 0.94134389, 0.98587725, 1.        ]), 1e-5)
 
     def test_distribution_uniform(self):
         prob = Problem()
