@@ -562,6 +562,6 @@ class ScipyOptimizer(ScipyOptimizeDriver):
         **kwargs : dict
             Named args.
         """
-        super(ScipyOptimizeDriver, self).__init__(**kwargs)
+        super(ScipyOptimizer, self).__init__(**kwargs)
         warn_deprecation("'ScipyOptimizer' provides backwards compatibility "
                          "with OpenMDAO <= 2.2 ; use 'ScipyOptimizeDriver' instead.")
