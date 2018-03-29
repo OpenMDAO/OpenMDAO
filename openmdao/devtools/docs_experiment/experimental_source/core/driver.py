@@ -785,7 +785,7 @@ class Driver(object):
 
         prom2abs = self._problem.model._var_allprocs_prom2abs_list['output']
 
-        coloring, maps, sparsity = self._simul_coloring_info
+        coloring, maps = self._simul_coloring_info
         for dv, colors in iteritems(coloring):
             if dv not in self._designvars:
                 # convert name from promoted to absolute

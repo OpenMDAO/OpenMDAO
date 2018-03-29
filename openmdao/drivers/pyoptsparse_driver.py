@@ -492,8 +492,6 @@ class pyOptSparseDriver(Driver):
                 sens_dict = self._compute_totals(of=self._quantities,
                                                  wrt=self._indep_list,
                                                  return_format='dict')
-                # i = 0
-                # print("col %d:" % i, prob.total_info.J[:,i])
             # Let the optimizer try to handle the error
             except AnalysisError:
                 self._problem.model._clear_iprint()
@@ -553,7 +551,7 @@ class pyOptSparseDriver(Driver):
         """
         return self.options['optimizer']
 
-    def get_ordered_nl_responses(self):
+    def _get_ordered_nl_responses(self):
         """
         Return the names of nonlinear responses in the order used by the driver.
 

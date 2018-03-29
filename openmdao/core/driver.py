@@ -603,7 +603,7 @@ class Driver(object):
 
         return con_dict
 
-    def get_ordered_nl_responses(self):
+    def _get_ordered_nl_responses(self):
         """
         Return the names of nonlinear responses in the order used by the driver.
 

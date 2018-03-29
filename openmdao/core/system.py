@@ -2060,10 +2060,6 @@ class System(object):
         dvs['indices'] = indices
         dvs['parallel_deriv_color'] = parallel_deriv_color
         dvs['vectorize_derivs'] = vectorize_derivs
-        # # TODO: figure out why grouping the matmat variables this way
-        # #       makes the flat_earth test run faster on one proc.
-        # if vectorize_derivs and parallel_deriv_color is None:
-        #     dvs['parallel_deriv_color'] = '@matmat'
         dvs['simul_deriv_color'] = simul_coloring
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
@@ -2225,8 +2221,6 @@ class System(object):
 
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['vectorize_derivs'] = vectorize_derivs
-        # if vectorize_derivs and parallel_deriv_color is None:
-        #     resp['parallel_deriv_color'] = '@matmat'
         resp['simul_deriv_color'] = simul_coloring
         resp['simul_map'] = simul_map
 

@@ -146,7 +146,7 @@ def _get_full_disjoint(J, start, end):
     return sorted(full_disjoint, key=lambda x: len(x)), rows
 
 
-def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15, byvar=True):
+def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15):
     """
     Return a boolean version of the total jacobian.
 
@@ -168,8 +168,6 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15, byvar=True):
     tol : float
         Tolerance on values in jacobian.  Anything smaller in magnitude will be
         set to 0.0.
-    byvar : bool
-        If True, compute coloring by variable. Otherwise compute global coloring.
 
     Returns
     -------
@@ -197,7 +195,7 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15, byvar=True):
     wrt = list(prob.driver._designvars)
 
     # get responses in order used by the driver
-    of = prob.driver.get_ordered_nl_responses()
+    of = prob.driver._get_ordered_nl_responses()
 
     if not of or not wrt:
         raise RuntimeError("Sparsity structure cannot be computed without declaration of design "
@@ -392,7 +390,7 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
 
     sparsity = None
     if include_sparsity or (show_jac and stream is not None):
-        of = driver.get_ordered_nl_responses()
+        of = driver._get_ordered_nl_responses()
         wrt = list(driver._designvars)
 
     if include_sparsity:

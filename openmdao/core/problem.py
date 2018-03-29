@@ -45,7 +45,6 @@ ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 _contains_all = ContainsAll()
-_full_slice = slice(None)
 
 
 CITATION = """@inproceedings{2014_openmdao_derivs,
@@ -156,9 +155,7 @@ class Problem(object):
         # 2 -- The `final_setup` has been run, everything ready to run.
         self._setup_status = 0
 
-        # for the linear solution cache, keep separate copies for the cases with and without
-        # linear constraints in order to keep the solution keys simple.
-        self._lin_sol_cache = {True: {}, False: {}}
+        self._lin_sol_cache = {}
         self._tot_jac_info_cache = defaultdict(lambda: None)
 
     def __getitem__(self, name):
@@ -903,7 +900,7 @@ class Problem(object):
             wrt = list(self.driver._designvars)
             global_names = True
         if of is None:
-            of = self.driver.get_ordered_nl_responses()
+            of = self.driver._get_ordered_nl_responses()
             global_names = True
 
         with self.model._scaled_context_all():
@@ -1124,67 +1121,6 @@ class Problem(object):
         recording_iteration.stack.pop()
         return totals
 
-    def _get_voi_info(self, voi_lists, inp2rhs_name, input_vec, output_vec, input_vois):
-        voi_info = {}
-        model = self.model
-        nproc = self.comm.size
-        iproc = model.comm.rank
-        owning_ranks = model._owning_rank
-
-        for vois in itervalues(voi_lists):
-            for input_name, old_input_name, _, _, _, _ in vois:
-                vecname = inp2rhs_name[input_name]
-                if vecname not in input_vec:
-                    continue
-                sizes = model._var_sizes[vecname]['output']
-                dinputs = input_vec[vecname]
-                doutputs = output_vec[vecname]
-
-                in_var_idx = model._var_allprocs_abs2idx[vecname][input_name]
-                in_var_meta = model._var_allprocs_abs2meta[input_name]
-
-                dup = not in_var_meta['distributed']
-
-                start = np.sum(sizes[:iproc, in_var_idx])
-                end = start + sizes[iproc, in_var_idx]
-
-                in_idxs = None
-                if input_name in input_vois:
-                    in_voi_meta = input_vois[input_name]
-                    if 'indices' in in_voi_meta:
-                        in_idxs = in_voi_meta['indices']
-
-                if in_idxs is not None:
-                    irange = in_idxs
-                    # correct for negative indices (if indices are given, they are global)
-                    irange[in_idxs < 0] += in_var_meta['global_size']
-                    store = True if dup else np.any(np.logical_and(in_idxs >= start, in_idxs < end))
-                    if store:
-                        min_i = np.min(in_idxs)
-                    loc_size = len(in_idxs)
-                else:
-                    irange = np.arange(in_var_meta['global_size'], dtype=int)
-                    max_i = in_var_meta['global_size'] - 1
-                    min_i = 0
-                    loc_size = end - start
-                    store = True if dup else ((start <= min_i < end) or (start <= max_i < end))
-
-                if loc_size == 0:
-                    # var is not local. get size of var in owned proc
-                    loc_size = sizes[owning_ranks[input_name], in_var_idx]
-
-                if store:
-                    loc_idxs = irange
-                    if min_i > 0:
-                        loc_idxs = irange - min_i
-                else:
-                    loc_idxs = []
-
-                voi_info[input_name] = (dinputs, doutputs, irange, loc_idxs,
-                                        loc_size, start, end, dup, store)
-
-        return voi_info
-
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
@@ -1219,7 +1155,7 @@ class Problem(object):
 
         if total_info is None:
             total_info = _TotalJacInfo(self, of, wrt, global_names, return_format)
-            if key is not None:
+            if key is not None and not total_info.has_lin_cons:
                 self._tot_jac_info_cache[key] = total_info
         else:
             total_info.J[:] = 0.0
@@ -1258,8 +1194,8 @@ class Problem(object):
 
                 # restore old linear solution if cache_linear_solution was set by the user for
                 # any input variables involved in this linear solution.
-                if cache_key is not None:
-                    lin_sol_cache = self._lin_sol_cache[has_lin_cons]
+                if cache_key is not None and not has_lin_cons:
+                    lin_sol_cache = self._lin_sol_cache
                     if cache_key in lin_sol_cache:
                         lin_sol = lin_sol_cache[cache_key]
                         for i, vec_name in enumerate(vec_names):
@@ -1274,8 +1210,8 @@ class Problem(object):
 
                 model._solve_linear(model._lin_vec_names, self._mode, rel_systems)
 
-                if cache_key is not None:
-                    lin_sol = self._lin_sol_cache[has_lin_cons][cache_key]
+                if cache_key is not None and not has_lin_cons:
+                    lin_sol = self._lin_sol_cache[cache_key]
                     for i, vec_name in enumerate(vec_names):
                         save_vec = lin_sol[i]
                         doutputs = total_info.output_vec[vec_name]
