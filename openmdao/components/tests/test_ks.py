@@ -108,6 +108,27 @@ class TestKSFunction(unittest.TestCase):
 
 class TestKSFunctionFeatures(unittest.TestCase):
 
+    def test_basic(self):
+        import numpy as np
+
+        from openmdao.api import Problem, IndepVarComp, ExecComp
+        from openmdao.components.ks import KSComponent
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', val=np.array([5.0, 4.0])))
+        model.add_subsystem('comp', ExecComp('y = 3.0*x', x=np.zeros((2, )), y=np.zeros((2, ))))
+        model.add_subsystem('ks', KSComponent(width=2))
+
+        model.connect('px.x', 'comp.x')
+        model.connect('comp.y', 'ks.g')
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['ks.KS'], 15.0)
+
     def test_upper(self):
         import numpy as np
 

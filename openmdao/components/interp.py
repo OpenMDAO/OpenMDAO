@@ -142,12 +142,16 @@ class BsplinesComp(ExplicitComponent):
         """
         Declare metadata.
         """
-        self.metadata.declare('num_control_points', types=int)
-        self.metadata.declare('num_points', types=int)
-        self.metadata.declare('bspline_order', 4, types=int)
-        self.metadata.declare('in_name', types=str)
-        self.metadata.declare('out_name', types=str)
-        self.metadata.declare('distribution', 'sine', values=['uniform', 'sine'])
+        self.metadata.declare('num_control_points', types=int, desc="Number of control points.")
+        self.metadata.declare('num_points', types=int, desc="Number of interpolated points.")
+        self.metadata.declare('bspline_order', 4, types=int, desc="B-spline order.")
+        self.metadata.declare('in_name', types=str,
+                              desc="Name to use for the input variable (control points).")
+        self.metadata.declare('out_name', types=str,
+                              desc="Name to use for the output variable (interpolated points).")
+        self.metadata.declare('distribution', 'sine', values=['uniform', 'sine'],
+                              desc="Choice of spatial distribution to use for placing the control "
+                              "points. It can be 'sine' or 'uniform'.")
 
     def setup(self):
         """
@@ -193,3 +197,8 @@ class BsplinesComp(ExplicitComponent):
 
         out = self.jac * inputs[meta['in_name']].reshape(np.prod(in_shape))
         outputs[meta['out_name']] = out.reshape(out_shape)
+
+
+# TODO: We should not need to do this.
+def _for_docs():
+    return BsplinesComp()
