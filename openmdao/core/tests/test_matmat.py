@@ -391,15 +391,15 @@ def phase_model(order, nphases, dvgroup='pardv', congroup='parc', vectorize=Fals
 class MatMatTestCase(unittest.TestCase):
 
 
-    def test_feature_vectorized_derivs(self): 
+    def test_feature_vectorized_derivs(self):
         import numpy as np
         from openmdao.api import ExplicitComponent, ExecComp, IndepVarComp, Problem, ScipyOptimizeDriver
 
         SIZE = 5
 
-        class ExpensiveAnalysis(ExplicitComponent): 
+        class ExpensiveAnalysis(ExplicitComponent):
 
-            def setup(self): 
+            def setup(self):
 
                 self.add_input('x', val=np.ones(SIZE))
                 self.add_input('y', val=np.ones(SIZE))
@@ -409,18 +409,18 @@ class MatMatTestCase(unittest.TestCase):
                 self.declare_partials('f', 'x')
                 self.declare_partials('f', 'y')
 
-            def compute(self, inputs, outputs): 
+            def compute(self, inputs, outputs):
 
                 outputs['f'] = np.sum(inputs['x']**inputs['y'])
 
-            def compute_partials(self, inputs, J): 
+            def compute_partials(self, inputs, J):
 
                 J['f', 'x'] = inputs['y']*inputs['x']**(inputs['y']-1)
                 J['f', 'y'] = (inputs['x']**inputs['y'])*np.log(inputs['x'])
 
-        class CheapConstraint(ExplicitComponent): 
+        class CheapConstraint(ExplicitComponent):
 
-            def setup(self): 
+            def setup(self):
 
                 self.add_input('y', val=np.ones(SIZE))
                 self.add_output('g', shape=SIZE)
@@ -430,11 +430,11 @@ class MatMatTestCase(unittest.TestCase):
 
                 self.limit = 2*np.arange(SIZE)
 
-            def compute(self, inputs, outputs): 
+            def compute(self, inputs, outputs):
 
                 outputs['g'] = inputs['y']**2 - self.limit
 
-            def compute_partials(self, inputs, J): 
+            def compute_partials(self, inputs, J):
 
                 J['g', 'y'] = 2*inputs['y']
 
@@ -461,8 +461,8 @@ class MatMatTestCase(unittest.TestCase):
         p.driver = ScipyOptimizeDriver()
         p.run_driver()
 
-        assert_rel_error(self, [ 0.10000691, 0.1, 0.1, 0.1, 0.1], p['x'], 1e-5)
-        assert_rel_error(self, [ 0, 1.41421, 2.0, 2.44948, 2.82842], p['y'], 1e-5)
+        assert_rel_error(self, p['x'], [0.10000691, 0.1, 0.1, 0.1, 0.1], 1e-5)
+        assert_rel_error(self, p['y'], [0, 1.41421, 2.0, 2.44948, 2.82842], 1e-5)
 
     def test_simple_multi_fwd(self):
         p, expected = simple_model(order=20, vectorize=True)

@@ -12,17 +12,17 @@ there would be *N* solves for an array variable of size *N*.
 
 Certain models have a special kind of sparsity structure in the total derivative Jacobian that
 allows OpenMDAO to solve for multiple derivatives simultaneously. This results in far fewer linear
-solves and much-improved performance. 
-These problems are said to have separable variables. 
-The concept of separability is explained in the :ref:`theory manual<theory_separable_variables>`. 
+solves and much-improved performance.
+These problems are said to have separable variables.
+The concept of separability is explained in the :ref:`theory manual<theory_separable_variables>`.
 
 .. note::
 
    While it is possible for problems to exist where simultaneous reverse solves would be possible,
    OpenMDAO does not currently support simultaneous derivatives in reverse mode.
 
-In order to tell OpenMDAO to take advantage of the separable sparsity in your model, you call the 
-:code:`set_simul_deriv_color` method on a :code:`Driver` instance. 
+In order to tell OpenMDAO to take advantage of the separable sparsity in your model, you call the
+:code:`set_simul_deriv_color` method on a :code:`Driver` instance.
 
 .. automethod:: openmdao.core.driver.Driver.set_simul_deriv_color
     :noindex:
@@ -69,24 +69,19 @@ simultaneous derivatives in the :ref:`Simple Optimization using Simultaneous Der
 example.
 
 
-.. _feature_automatic_coloring: 
+.. _feature_automatic_coloring:
 
 Automatic Generation of Coloring
 ################################
 Although you can compute the coloring manually if you know enough information about your problem,
 doing so can be challenging. Also, even small changes to your model,
 e.g., adding new constraints or changing the sparsity of a sub-component, can change the
-simultaneous coloring of your model. So care must be taken to keep the coloring up to date when
+coloring of your model. So care must be taken to keep the coloring up to date when
 you change your model.
 
-To streamline the process, OpenMDAO provides an automatic coloring algorithm.
-OpenMDAO assigns random numbers to the nonzero entries of the partial derivative jacobian,
-then solves for the total jacobian.  Given this total jacobian, the coloring algorithm examines
-its sparsity and computes a coloring.
-
-OpenMDAO finds the nonzero entries based on the :ref:`declare_partials <feature_sparse_partials>`
-calls from all of the components in your model, so if you're not specifying the sparsity of the
-partial derivatives of your components, then it won't be possible to find an automatic coloring
+To streamline the process, OpenMDAO provides an automatic coloring algorithm that uses the
+sparsity pattern given by the :ref:`declare_partials <feature_sparse_partials>` calls from all of the components in your model.
+So if you're not :ref:`specifying the sparsity of the partial derivatives<feature_sparse_partials>` of your components, then it won't be possible to find an automatic coloring
 for your model.
 
 The *color_info* data structure can be generated automatically using the following command:
@@ -173,13 +168,11 @@ The coloring will be written in json format to the given file and can be loaded 
 
     prob.driver.set_simul_deriv_color('my_coloring.json')
 
-
-If you run *openmdao simul_coloring* and it turns out there is no simultaneous coloring available,
-don't be surprised.  Problems that have the necessary total Jacobian sparsity to allow
-simultaneous derivatives are relatively uncommon.  If you think that your total Jacobian is sparse
-enough that OpenMDAO should be computing a smaller coloring than it gave you, then you can run
-the coloring algorithm with a tolerance so that very small entries in the Jacobian will be treated
-as zeros.  You can set this tolerance using the *-t* command line option as follows:
+Setting the Zero Tolerance
+---------------------------
+Because of numerical noise, its possible to get some small non-zero values in the total derivative Jacobian even in places where
+the value should be identically zero.
+To deal with this, you can adjust the zero-tolerance value by setting the  *-t* command line option as follows:
 
 
 .. code-block:: none
@@ -189,6 +182,7 @@ as zeros.  You can set this tolerance using the *-t* command line option as foll
 
 Be careful when setting the tolerance, however, because if you make it too large then you will be
 zeroing out Jacobian entries that should not be ignored and your optimization may not converge.
+
 
 
 Checking that it works

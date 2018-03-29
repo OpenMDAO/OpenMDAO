@@ -10,7 +10,7 @@ OpenMDAO's parallel coloring algorithm.
 
 .. note::
 
-    Parallel coloring is appropriate when you have some inexpensive serial chain in your model, before the parallel points.
+    Parallel coloring is appropriate when you have some inexpensive serial data path in your model, before the parallel points.
     For more details on when a model calls for parallel coloring see the :ref:`theory manual entry on the fan-out model structures<theory_fan_out>`.
 
 
@@ -21,7 +21,6 @@ Two constraints, pointing to variables from different components on different pr
 -------------
 Usage Example
 -------------
-
 
 Here is a toy problem that runs on two processors showing how to use this feature
 

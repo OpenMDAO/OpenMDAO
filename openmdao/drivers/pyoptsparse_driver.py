@@ -322,6 +322,7 @@ class pyOptSparseDriver(Driver):
 
         except ImportError:
             msg = "Optimizer %s is not available in this installation." % optimizer
+
             raise ImportError(msg)
 
         # Set optimization options
