@@ -745,7 +745,7 @@ class _TotalJacInfo(object):
             Total jacobian row or column index.
         """
         input_name, vecname, _, _ = self.input_idx_map[i]
-        doutputs = self.output_vec[vecname]
+        out_views = self.output_vec[vecname]._views_flat
         relevant = self.relevant
         fwd = self.fwd
         J = self.J
@@ -755,16 +755,15 @@ class _TotalJacInfo(object):
             if input_name not in relevant or output_name in relevant[input_name]:
                 slc, indices, distrib = self.out_meta[output_name]
                 deriv_val = None
-                if output_name in doutputs._views_flat:
-                    deriv_val = doutputs._views_flat[output_name]
+                if output_name in out_views:
+                    deriv_val = out_views[output_name]
                     if indices is not None:
                         deriv_val = deriv_val[indices]
 
                 if nproc > 1 and not distrib:
-                    root = self.owning_ranks[output_name]
                     if deriv_val is None:
                         deriv_val = np.empty(slc.stop - slc.start)
-                    self.comm.Bcast(deriv_val, root=root)
+                    self.comm.Bcast(deriv_val, root=self.owning_ranks[output_name])
 
                 # print("deriv_val:", output_name, input_name, deriv_val)
                 if fwd:
@@ -797,18 +796,20 @@ class _TotalJacInfo(object):
         relevant = self.relevant
         out_meta = self.out_meta
         idx2local = self.idx2local
+        idx2name = self._idx2name
+        outvecs = self.output_vec
         J = self.J
 
         for i in inds:
             input_name, vecname, _, _ = self.input_idx_map[i]
-            doutputs = self.output_vec[vecname]
+            out_views = outvecs[vecname]._views_flat
             for row in row_map[i]:
-                output_name = self._idx2name[row]
+                output_name = idx2name[row]
                 deriv_val = None
                 if input_name not in relevant or output_name in relevant[input_name]:
-                    indices = out_meta[output_name][1]
-                    if output_name in doutputs._views_flat:
-                        deriv_val = doutputs._views_flat[output_name]
+                    if output_name in out_views:
+                        deriv_val = out_views[output_name]
+                        indices = out_meta[output_name][1]
                         if indices is not None:
                             deriv_val = deriv_val[indices]
                         # print("deriv_val:", i, output_name, input_name, deriv_val)
@@ -826,9 +827,8 @@ class _TotalJacInfo(object):
         # in plain matmat, all inds are for a single variable for each iteration of the outer loop,
         # so any relevance can be determined only once.
         input_name, vecname, _, _ = self.input_idx_map[inds[0]]
-        dinputs = self.input_vec[vecname]
-        doutputs = self.output_vec[vecname]
-        ncol = dinputs._ncol
+        out_views = self.output_vec[vecname]._views_flat
+        ncol = self.output_vec[vecname]._ncol
         relevant = self.relevant
         nproc = self.comm.size
         fwd = self.fwd
@@ -839,16 +839,15 @@ class _TotalJacInfo(object):
             slc, indices, distrib = self.out_meta[output_name]
             deriv_val = out_idxs = None
             if input_name not in relevant or output_name in relevant[input_name]:
-                if output_name in doutputs._views_flat:
-                    deriv_val = doutputs._views_flat[output_name]
+                if output_name in out_views:
+                    deriv_val = out_views[output_name]
                     if indices is not None:
                         deriv_val = deriv_val[indices]
 
                 if nproc > 1 and not distrib:
-                    root = owning_ranks[output_name]
                     if deriv_val is None:
                         deriv_val = np.empty((slc.stop - slc.start, ncol))
-                    self.comm.Bcast(deriv_val, root=root)
+                    self.comm.Bcast(deriv_val, root=owning_ranks[output_name])
 
                 if fwd:
                     J[slc, inds] = deriv_val
