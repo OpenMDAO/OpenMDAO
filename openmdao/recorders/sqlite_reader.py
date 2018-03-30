@@ -531,6 +531,17 @@ class SqliteCaseReader(BaseCaseReader):
 
     def _get_all_sysvars(self, get_outputs=True):
         """
+        Get the set of output or input variables and their values.
+
+        Parameters
+        ----------
+        get_outputs : bool, optional
+            indicates if the returned set should contain outputs. If false, returns inputs.
+
+        Returns
+        -------
+            map of global variable names to their values. None if no system iterations
+            were recorded.
         """
         coords = self.system_cases._case_keys
 
@@ -588,6 +599,18 @@ class SqliteCaseReader(BaseCaseReader):
 
     def _has_all_values(self, coord_map):
         """
+        Tell if the coord_map indicates that all variables from every recorded system
+        have been iterated over.
+
+        Parameters
+        ----------
+        coord_map : dict
+            maps stripped iteration coordinates to a bool indicating whether or not the system(s)
+            associated with that iteration coordinate have been iterated over.
+
+        Returns
+        -------
+            True if coord_map is True for each key, False otherwise.
         """
         for coord in coord_map:
             if not coord_map[coord]:
