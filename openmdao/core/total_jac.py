@@ -4,10 +4,12 @@ Helper class for total jacobian computation.
 from __future__ import print_function, division
 
 from collections import OrderedDict
+from copy import deepcopy
 import numpy as np
 from six import iteritems, itervalues
 
 from openmdao.utils.general_utils import ContainsAll
+from openmdao.recorders.recording_iteration_stack import recording_iteration
 
 
 _contains_all = ContainsAll()
@@ -19,12 +21,14 @@ class _TotalJacInfo(object):
 
     Attributes
     ----------
+    model : <System>
+        The top level System of the System tree.
     comm : MPI.Comm or <FakeComm>
         The global communicator.
     relevant : dict
         Map of absolute var name to vars that are relevant to it.
-    fwd : bool
-        If True, compute deriv in forward mode, else reverse (adjoint) mode.
+    _mode : str
+        If 'fwd' compute deriv in forward mode, else if 'rev', reverse (adjoint) mode.
     out_meta : dict
         Map of absoute output var name to tuples of the form (indices, distrib).
     owning_ranks : dict
@@ -44,11 +48,16 @@ class _TotalJacInfo(object):
         are responses.  In rev mode, outputs are design variables.
     J : ndarray
         The dense array form of the total jacobian.
-    Jfinal : ndarray or dict
+    J_dict : dict
+        Nested or flat dict with views of the jacobian.
+    J_final : ndarray or dict
         If return_format is 'array', Jfinal is J.  Otherwise it's either a nested dict (if
-        return_format is 'dict') or a flat dict (return_format 'flat_dict').
+        return_format is 'dict') or a flat dict (return_format 'flat_dict') with views into
+        the array jacobian.
     idx_iter_dict : dict
         A dict containing an entry for each outer iteration of the total jacobian computation.
+    _lin_sol_cache : dict
+        Dict of indices keyed to solution vectors.
     """
 
     def __init__(self, problem, of, wrt, global_names, return_format):
@@ -69,11 +78,14 @@ class _TotalJacInfo(object):
             Indicates the desired return format of the total jacobian. Can have value of
             'array', 'dict', or 'flat_dict'.
         """
-        model = problem.model
+        self.model = model = problem.model
         self.comm = problem.comm
         self.relevant = model._relevant
-        self.fwd = (problem._mode == 'fwd')
+        self._mode = problem._mode
         self.owning_ranks = problem.model._owning_rank
+        self._lin_sol_cache = {}
+        self._has_scaling = problem.driver._has_scaling
+        self.return_format = return_format
 
         abs2meta = model._var_allprocs_abs2meta
 
@@ -104,7 +116,9 @@ class _TotalJacInfo(object):
             if not global_names:
                 of = [prom2abs[name][0] for name in old_of]
 
-        if self.fwd:
+        fwd = self._mode == 'fwd'
+
+        if fwd:
             self.input_list, self.output_list = wrt, of
             self.input_meta, output_meta = design_vars, responses
             self.input_vec, self.output_vec = vec_dresid, vec_doutput
@@ -136,17 +150,27 @@ class _TotalJacInfo(object):
 
         # always allocate a 2D dense array and we can assign views to dict keys later if
         # return format is 'dict' or 'flat_dict'.
-        if self.fwd:
+        if fwd:
             self.J = J = np.zeros((out_size, self.input_loc_idxs.size))
         else:  # rev
             self.J = J = np.zeros((self.input_loc_idxs.size, out_size))
 
         # for dict type return formats, map var names to views of the Jacobian array.
         if return_format == 'array':
-            self.Jfinal = J
+            self.J_final = J
+            if self._has_scaling:
+                self.J_dict = self._get_dict_J(J, wrt, old_wrt, of, old_of,
+                                               self.input_meta, self.out_meta,
+                                               abs2meta, 'dict')
+            else:
+                self.J_dict = None
         else:
-            self.Jfinal = self._get_dict_J(J, wrt, old_wrt, of, old_of,
-                                           self.input_meta, self.out_meta, abs2meta, return_format)
+            self.J_final = self.J_dict = self._get_dict_J(J, wrt, old_wrt, of, old_of,
+                                                          self.input_meta, self.out_meta,
+                                                          abs2meta, return_format)
+        if self._has_scaling:
+            self.design_vars = {old_wrt[i]: design_vars[dv] for i, dv in enumerate(wrt)}
+            self.responses = {old_of[i]: responses[r] for i, r in enumerate(of)}
 
     def _get_dict_J(self, J, wrt, oldwrt, of, oldof, input_meta, out_meta, abs2meta, return_format):
         """
@@ -178,17 +202,17 @@ class _TotalJacInfo(object):
         dict
             Dict form of the total jacobian that contains views of the ndarray jacobian.
         """
-        if self.fwd:
+        if self._mode == 'fwd':
             meta_in, in_size = self._create_meta_map(wrt, input_meta, abs2meta)
             meta_out = out_meta
         else:
             meta_out, in_size = self._create_meta_map(of, input_meta, abs2meta)
             meta_in = out_meta
 
-        Jdict = OrderedDict()
+        J_dict = OrderedDict()
         if return_format == 'dict':
             for i, out in enumerate(of):
-                Jdict[oldof[i]] = outer = OrderedDict()
+                J_dict[oldof[i]] = outer = OrderedDict()
                 out_slice = meta_out[out][0]
                 for j, inp in enumerate(wrt):
                     outer[oldwrt[j]] = J[out_slice, meta_in[inp][0]]
@@ -196,11 +220,11 @@ class _TotalJacInfo(object):
             for i, out in enumerate(of):
                 out_slice = meta_out[out][0]
                 for j, inp in enumerate(wrt):
-                    Jdict[oldof[i], oldwrt[j]] = J[out_slice, meta_in[inp][0]]
+                    J_dict[oldof[i], oldwrt[j]] = J[out_slice, meta_in[inp][0]]
         else:
             raise ValueError("'%s' is not a valid jacobian return format." % return_format)
 
-        return Jdict
+        return J_dict
 
     def _create_input_idx_map(self, names, vois, has_lin_constraints, var_sizes, abs2idx, abs2meta):
         """
@@ -747,7 +771,7 @@ class _TotalJacInfo(object):
         input_name, vecname, _, _ = self.input_idx_map[i]
         out_views = self.output_vec[vecname]._views_flat
         relevant = self.relevant
-        fwd = self.fwd
+        fwd = self._mode == 'fwd'
         J = self.J
         nproc = self.comm.size
 
@@ -831,7 +855,7 @@ class _TotalJacInfo(object):
         ncol = self.output_vec[vecname]._ncol
         relevant = self.relevant
         nproc = self.comm.size
-        fwd = self.fwd
+        fwd = self._mode == 'fwd'
         J = self.J
         owning_ranks = self.owning_ranks
 
@@ -865,6 +889,126 @@ class _TotalJacInfo(object):
         """
         for matmat_idxs in inds:
             self.matmat_jac_setter(matmat_idxs)
+
+    def _compute_totals(self):
+        """
+        Compute derivatives of desired quantities with respect to desired inputs.
+
+        Returns
+        -------
+        derivs : object
+            Derivatives in form requested by 'return_format'.
+        """
+        recording_iteration.stack.append(('_compute_totals', 0))
+
+        self.J[:] = 0.0
+
+        has_lin_cons = self.has_lin_cons
+
+        model = self.model
+        vec_dinput = model._vectors['input']
+        vec_doutput = model._vectors['output']
+        vec_dresid = model._vectors['residual']
+
+        fwd = self._mode == 'fwd'
+
+        # Prepare model for calculation by cleaning out the derivatives
+        # vectors.
+        for vec_name in model._lin_vec_names:
+            vec_dinput[vec_name].set_const(0.0)
+            vec_doutput[vec_name].set_const(0.0)
+            vec_dresid[vec_name].set_const(0.0)
+
+        # Linearize Model
+        model._linearize()
+
+        # Main loop over columns (fwd) or rows (rev) of the jacobian
+        for _, _, idxs, idx_iter in itervalues(self.idx_iter_dict):
+            for inds, input_setter, jac_setter in idx_iter(idxs):
+                # this sets dinputs for the current par_deriv_color to 0
+                # dinputs is dresids in fwd, doutouts in rev
+                vec_doutput['linear'].set_const(0.0)
+                if fwd:
+                    vec_dresid['linear'].set_const(0.0)
+                else:  # rev
+                    vec_dinput['linear'].set_const(0.0)
+
+                rel_systems, vec_names, cache_key = input_setter(inds)
+
+                # restore old linear solution if cache_linear_solution was set by the user for
+                # any input variables involved in this linear solution.
+                if cache_key is not None and not has_lin_cons:
+                    lin_sol_cache = self._lin_sol_cache
+                    if cache_key in lin_sol_cache:
+                        lin_sol = lin_sol_cache[cache_key]
+                        for i, vec_name in enumerate(vec_names):
+                            save_vec = lin_sol[i]
+                            doutputs = self.output_vec[vec_name]
+                            for vs in doutputs._data:
+                                doutputs._data[vs][:] = save_vec[vs]
+                    else:
+                        lin_sol_cache[cache_key] = lin_sol = []
+                        for vec_name in vec_names:
+                            lin_sol.append(deepcopy(self.output_vec[vec_name]._data))
+
+                model._solve_linear(model._lin_vec_names, self._mode, rel_systems)
+
+                if cache_key is not None and not has_lin_cons:
+                    lin_sol = self._lin_sol_cache[cache_key]
+                    for i, vec_name in enumerate(vec_names):
+                        save_vec = lin_sol[i]
+                        doutputs = self.output_vec[vec_name]
+                        for vs, data in iteritems(doutputs._data):
+                            save_vec[vs][:] = data
+
+                jac_setter(inds)
+
+        if self._has_scaling:
+            self._do_scaling()
+
+        recording_iteration.stack.pop()
+
+        return self.J_final
+
+    def _do_scaling(self):
+        """
+        Apply scalers to the jacobian if the driver defined any.
+        """
+
+        # Note: the keys in dict jacobians are promoted names, so
+        # self.respones and self.design_vars have been defined to
+        # use promoted names as well.
+        if self.return_format in ('dict', 'array'):
+            for okey, odict in iteritems(self.J_dict):
+                oscaler = self.responses[okey]['scaler']
+
+                for ikey, val in iteritems(odict):
+                    iscaler = self.design_vars[ikey]['scaler']
+
+                    # Scale response side
+                    if oscaler is not None:
+                        val[:] = (oscaler * val.T).T
+
+                    # Scale design var side
+                    if iscaler is not None:
+                        val *= 1.0 / iscaler
+
+        elif self.return_format == 'flat_dict':
+            for tup, val in iteritems(self.J_dict):
+                okey, ikey = tup
+                oscaler = self.responses[okey]['scaler']
+                iscaler = self.design_vars[ikey]['scaler']
+
+                # Scale response side
+                if oscaler is not None:
+                    val[:] = (oscaler * val.T).T
+
+                # Scale design var side
+                if iscaler is not None:
+                    val *= 1.0 / iscaler
+        else:
+            raise RuntimeError("Derivative scaling by the driver only supports the 'dict' and "
+                               "'array' formats at present.")
 
 
 def _check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring):

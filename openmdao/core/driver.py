@@ -10,6 +10,7 @@ from six import iteritems, itervalues, string_types
 
 import numpy as np
 
+from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
@@ -117,6 +118,8 @@ class Driver(object):
         A data structure describing coloring for simultaneous derivs.
     _res_jacs : dict
         Dict of sparse subjacobians for use with certain optimizers, e.g. pyOptSparseDriver.
+    _total_jac : _TotalJacInfo or None
+        Cached total jacobian handling object.
     """
 
     def __init__(self):
@@ -206,6 +209,7 @@ class Driver(object):
 
         self._simul_coloring_info = None
         self._res_jacs = {}
+        self._total_jac = None
 
         self.fail = False
 
@@ -698,34 +702,18 @@ class Driver(object):
         if prob.model._owns_approx_jac:
             derivs = prob._compute_totals_approx(of=of, wrt=wrt, return_format='dict',
                                                  global_names=global_names)
+            if return_format == 'array':
+                derivs = self._dict2array_jac(derivs)
+            return derivs
         else:
-            derivs = prob._compute_totals(of=of, wrt=wrt, return_format='dict',
-                                          global_names=global_names)
+            total_jac = self._total_jac
+            if total_jac is None:
+                total_jac = _TotalJacInfo(prob, of, wrt, global_names, return_format)
 
-        # ... then convert to whatever the driver needs.
-        if return_format in ('dict', 'array'):
-            if self._has_scaling:
-                for okey, odict in iteritems(derivs):
-                    for ikey, val in iteritems(odict):
+            if not total_jac.has_lin_cons:
+                self._total_jac = total_jac  # don't cache linear constraint jacobian
 
-                        iscaler = self._designvars[ikey]['scaler']
-                        oscaler = self._responses[okey]['scaler']
-
-                        # Scale response side
-                        if oscaler is not None:
-                            val[:] = (oscaler * val.T).T
-
-                        # Scale design var side
-                        if iscaler is not None:
-                            val *= 1.0 / iscaler
-        else:
-            raise RuntimeError("Derivative scaling by the driver only supports the 'dict' and "
-                               "'array' formats at present.")
-
-        if return_format == 'array':
-            derivs = self._dict2array_jac(derivs)
-
-        return derivs
+            return total_jac._compute_totals()
 
     def record_iteration(self):
         """

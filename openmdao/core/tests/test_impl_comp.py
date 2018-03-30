@@ -787,7 +787,7 @@ class CacheLinSolutionTestCase(unittest.TestCase):
         for i in range(10):
             p['indeps.x'] += np.arange(10, dtype=float)
             p.run_model()
-            J = p.compute_totals(of=['C1.y'], wrt=['indeps.x'])
+            J = p.driver._compute_totals(of=['C1.y'], wrt=['indeps.x'])
 
     def test_caching_rev(self):
         p = Problem()
@@ -802,7 +802,7 @@ class CacheLinSolutionTestCase(unittest.TestCase):
         for i in range(10):
             p['indeps.x'] += np.arange(10, dtype=float)
             p.run_model()
-            J = p.compute_totals(of=['C1.y'], wrt=['indeps.x'])
+            J = p.driver._compute_totals(of=['C1.y'], wrt=['indeps.x'])
 
 
 if __name__ == '__main__':

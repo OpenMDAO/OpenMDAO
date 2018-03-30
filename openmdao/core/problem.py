@@ -3,7 +3,6 @@
 from __future__ import division, print_function
 
 import sys
-from copy import deepcopy
 
 from collections import OrderedDict, defaultdict, namedtuple
 from itertools import product
@@ -88,10 +87,6 @@ class Problem(object):
         0 -- Newly initialized problem or newly added model.
         1 -- The `setup` method has been called, but vectors not initialized.
         2 -- The `final_setup` has been run, everything ready to run.
-    _lin_sol_cache : dict
-        Dict of indices keyed to solution vectors.
-    _tot_jac_info_cache : dict
-        Dict of _TotalJacInfo objects from previous total derivative computations.
     cite : str
         Listing of relevant citataions that should be referenced when
         publishing work that uses this class.
@@ -154,9 +149,6 @@ class Problem(object):
         # 1 -- The `setup` method has been called, but vectors not initialized.
         # 2 -- The `final_setup` has been run, everything ready to run.
         self._setup_status = 0
-
-        self._lin_sol_cache = {}
-        self._tot_jac_info_cache = defaultdict(lambda: None)
 
     def __getitem__(self, name):
         """
@@ -1145,84 +1137,10 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        recording_iteration.stack.append(('_compute_totals', 0))
+        total_info = _TotalJacInfo(self, of, wrt, global_names, return_format)
+        total_info._compute_totals()
 
-        total_info = key = None
-        if of is not None and wrt is not None:
-            key = (frozenset(of), frozenset(wrt), return_format, self._mode,
-                   self.model._owns_approx_jac)
-            total_info = self._tot_jac_info_cache[key]
-
-        if total_info is None:
-            total_info = _TotalJacInfo(self, of, wrt, global_names, return_format)
-            if key is not None and not total_info.has_lin_cons:
-                self._tot_jac_info_cache[key] = total_info
-        else:
-            total_info.J[:] = 0.0
-
-        has_lin_cons = total_info.has_lin_cons
-
-        vec_dinput = self.model._vectors['input']
-        vec_doutput = self.model._vectors['output']
-        vec_dresid = self.model._vectors['residual']
-
-        model = self.model
-        fwd = self._mode == 'fwd'
-
-        # Prepare model for calculation by cleaning out the derivatives
-        # vectors.
-        for vec_name in model._lin_vec_names:
-            vec_dinput[vec_name].set_const(0.0)
-            vec_doutput[vec_name].set_const(0.0)
-            vec_dresid[vec_name].set_const(0.0)
-
-        # Linearize Model
-        model._linearize()
-
-        # Main loop over columns (fwd) or rows (rev) of the jacobian
-        for _, _, idxs, idx_iter in itervalues(total_info.idx_iter_dict):
-            for inds, input_setter, jac_setter in idx_iter(idxs):
-                # this sets dinputs for the current par_deriv_color to 0
-                # dinputs is dresids in fwd, doutouts in rev
-                vec_doutput['linear'].set_const(0.0)
-                if fwd:
-                    vec_dresid['linear'].set_const(0.0)
-                else:  # rev
-                    vec_dinput['linear'].set_const(0.0)
-
-                rel_systems, vec_names, cache_key = input_setter(inds)
-
-                # restore old linear solution if cache_linear_solution was set by the user for
-                # any input variables involved in this linear solution.
-                if cache_key is not None and not has_lin_cons:
-                    lin_sol_cache = self._lin_sol_cache
-                    if cache_key in lin_sol_cache:
-                        lin_sol = lin_sol_cache[cache_key]
-                        for i, vec_name in enumerate(vec_names):
-                            save_vec = lin_sol[i]
-                            doutputs = total_info.output_vec[vec_name]
-                            for vs in doutputs._data:
-                                doutputs._data[vs][:] = save_vec[vs]
-                    else:
-                        lin_sol_cache[cache_key] = lin_sol = []
-                        for vec_name in vec_names:
-                            lin_sol.append(deepcopy(total_info.output_vec[vec_name]._data))
-
-                model._solve_linear(model._lin_vec_names, self._mode, rel_systems)
-
-                if cache_key is not None and not has_lin_cons:
-                    lin_sol = self._lin_sol_cache[cache_key]
-                    for i, vec_name in enumerate(vec_names):
-                        save_vec = lin_sol[i]
-                        doutputs = total_info.output_vec[vec_name]
-                        for vs, data in iteritems(doutputs._data):
-                            save_vec[vs][:] = data
-
-                jac_setter(inds)
-
-        recording_iteration.stack.pop()
-
-        return total_info.Jfinal
+        return total_info.J_final
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
