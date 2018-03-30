@@ -710,8 +710,9 @@ class Driver(object):
             if total_jac is None:
                 total_jac = _TotalJacInfo(prob, of, wrt, global_names, return_format)
 
+            # don't cache linear constraint jacobian
             if not total_jac.has_lin_cons:
-                self._total_jac = total_jac  # don't cache linear constraint jacobian
+                self._total_jac = total_jac
 
             return total_jac._compute_totals()
 

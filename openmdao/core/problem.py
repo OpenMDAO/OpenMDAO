@@ -993,6 +993,9 @@ class Problem(object):
             Derivatives in form requested by 'return_format'.
         """
         recording_iteration.stack.append(('_compute_totals', 0))
+
+        total_info = _TotalJacInfo(self, of, wrt, global_names, return_format)
+
         model = self.model
         mode = self._mode
         vec_dinput = model._vectors['input']
@@ -1001,11 +1004,11 @@ class Problem(object):
         approx = model._owns_approx_jac
         prom2abs = model._var_allprocs_prom2abs_list['output']
 
-        # TODO - Pull 'of' and 'wrt' from driver if unspecified.
-        if wrt is None:
-            raise NotImplementedError("Need to specify 'wrt' for now.")
-        if of is None:
-            raise NotImplementedError("Need to specify 'of' for now.")
+        # # TODO - Pull 'of' and 'wrt' from driver if unspecified.
+        # if wrt is None:
+        #     raise NotImplementedError("Need to specify 'wrt' for now.")
+        # if of is None:
+        #     raise NotImplementedError("Need to specify 'of' for now.")
 
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
@@ -1017,14 +1020,14 @@ class Problem(object):
             vec_doutput[vec_name].set_const(0.0)
             vec_dresid[vec_name].set_const(0.0)
 
-        # Convert of and wrt names from promoted to absolute path
-        oldwrt, oldof = wrt, of
-        if not global_names:
-            of = [prom2abs[name][0] for name in oldof]
-            wrt = [prom2abs[name][0] for name in oldwrt]
-
-        input_list, output_list = wrt, of
-        old_input_list, old_output_list = oldwrt, oldof
+        # # Convert of and wrt names from promoted to absolute path
+        # oldwrt, oldof = wrt, of
+        # if not global_names:
+        #     of = [prom2abs[name][0] for name in oldof]
+        #     wrt = [prom2abs[name][0] for name in oldwrt]
+        #
+        # input_list, output_list = wrt, of
+        # old_input_list, old_output_list = oldwrt, oldof
 
         # Solve for derivs with the approximation_scheme.
         # This cuts out the middleman by grabbing the Jacobian directly after linearization.
