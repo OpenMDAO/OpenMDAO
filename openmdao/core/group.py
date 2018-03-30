@@ -506,8 +506,8 @@ class Group(System):
                         self.comm.Allgather(sizes_byset[type_][set_name][iproc, :], vsizes)
 
             # compute owning ranks
+            owns = self._owning_rank
             for type_ in ('input', 'output'):
-                self._owning_rank[type_] = owns = {}
                 sizes = self._var_sizes['linear'][type_]
                 for i, name in enumerate(self._var_allprocs_abs_names[type_]):
                     for rank in range(self.comm.size):

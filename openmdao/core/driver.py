@@ -16,7 +16,7 @@ from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.mpi import MPI
 from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.coloring import _use_simul_coloring
+import openmdao.utils.coloring as coloring_mod
 
 
 def _is_debug_print_opts_valid(opts):
@@ -253,15 +253,6 @@ class Driver(object):
 
         # Gather up the information for design vars.
         self._designvars = model.get_design_vars(recurse=True)
-        desvar_size = np.sum(data['size'] for data in itervalues(self._designvars))
-
-        if ((problem._mode == 'fwd' and desvar_size > response_size) or
-                (problem._mode == 'rev' and response_size > desvar_size)):
-            warnings.warn("Inefficient choice of derivative mode.  You chose '%s' for a "
-                          "problem with %d design variables and %d response variables "
-                          "(objectives and constraints)." %
-                          (problem._mode, desvar_size, response_size), RuntimeWarning)
-
         self._has_scaling = (
             np.any([r['scaler'] is not None for r in self._responses.values()]) or
             np.any([dv['scaler'] is not None for dv in self._designvars.values()])
@@ -290,7 +281,7 @@ class Driver(object):
 
             # If we have remote VOIs, pick an owning rank for each and use that
             # to bcast to others later
-            owning_ranks = model._owning_rank['output']
+            owning_ranks = model._owning_rank
             sizes = model._var_sizes['nonlinear']['output']
             for i, vname in enumerate(model._var_allprocs_abs_names['output']):
                 owner = owning_ranks[vname]
@@ -365,7 +356,7 @@ class Driver(object):
                     "RecordingManager.startup should never be called when "
                     "running in parallel on an inactive System")
             rrank = self._problem.comm.rank  # root ( aka model ) rank.
-            rowned = model._owning_rank['output']
+            rowned = model._owning_rank
             mydesvars = [n for n in mydesvars if rrank == rowned[n]]
             myresponses = [n for n in myresponses if rrank == rowned[n]]
             myobjectives = [n for n in myobjectives if rrank == rowned[n]]
@@ -388,11 +379,29 @@ class Driver(object):
             self._rec_mgr.record_metadata(self)
 
         # set up simultaneous deriv coloring
-        if self._simul_coloring_info and self.supports['simultaneous_derivatives']:
+        if (coloring_mod._use_simul_coloring and self._simul_coloring_info and
+                self.supports['simultaneous_derivatives']):
             if problem._mode == 'fwd':
                 self._setup_simul_coloring(problem._mode)
             else:
                 raise RuntimeError("simultaneous derivs are currently not supported in rev mode.")
+
+        desvar_size = np.sum(data['size'] for data in itervalues(self._designvars))
+
+        # if we're using simultaneous derivatives then our effective design var size is less
+        # than the full design var size
+        if self._simul_coloring_info:
+            col_lists = self._simul_coloring_info[0]
+            if col_lists:
+                desvar_size = len(col_lists[0])
+                desvar_size += len(col_lists) - 1
+
+        if ((problem._mode == 'fwd' and desvar_size > response_size) or
+                (problem._mode == 'rev' and response_size > desvar_size)):
+            warnings.warn("Inefficient choice of derivative mode.  You chose '%s' for a "
+                          "problem with %d design variables and %d response variables "
+                          "(objectives and constraints)." %
+                          (problem._mode, desvar_size, response_size), RuntimeWarning)
 
     def _get_voi_val(self, name, meta, remote_vois):
         """
@@ -486,7 +495,7 @@ class Driver(object):
             Value for the design variable.
         """
         if (name in self._remote_dvs and
-                self._problem.model._owning_rank['output'][name] != self._problem.comm.rank):
+                self._problem.model._owning_rank[name] != self._problem.comm.rank):
             return
 
         meta = self._designvars[name]
@@ -593,6 +602,23 @@ class Driver(object):
             con_dict[name] = self._get_voi_val(name, meta, self._remote_cons)
 
         return con_dict
+
+    def _get_ordered_nl_responses(self):
+        """
+        Return the names of nonlinear responses in the order used by the driver.
+
+        Default order is objectives followed by nonlinear constraints.  This is used for
+        simultaneous derivative coloring and sparsity determination.
+
+        Returns
+        -------
+        list of str
+            The nonlinear response names in order.
+        """
+        order = list(self._objs)
+        order.extend(n for n, meta in iteritems(self._cons)
+                     if not ('linear' in meta and meta['linear']))
+        return order
 
     def run(self):
         """
@@ -812,14 +838,55 @@ class Driver(object):
 
     def set_simul_deriv_color(self, simul_info):
         """
-        Set the coloring for simultaneous derivatives.
+        Set the coloring (and possibly the sub-jacobian sparsity) for simultaneous derivatives.
 
         Parameters
         ----------
-        simul_info : str or ({dv1: colors, ...}, {resp1: {dv1: {0: [res_idxs, dv_idxs]} ...} ...})
-            Information about simultaneous coloring for design vars and responses.  If a string,
-            then simul_info is assumed to be the name of a file that contains the coloring
-            information in JSON format.
+        simul_info : str or tuple
+
+            ::
+
+                # Information about simultaneous coloring for design vars and responses.  If a
+                # string, then simul_info is assumed to be the name of a file that contains the
+                # coloring information in JSON format.  If a tuple, the structure looks like this:
+
+                (
+                    # First, a list of column index lists, each index list representing columns
+                    # having the same color, except for the very first index list, which contains
+                    # indices of all columns that are not colored.
+                    [
+                        [i1, i2, i3, ...]    # list of non-colored columns
+                        [ia, ib, ...]    # list of columns in first color
+                        [ic, id, ...]    # list of columns in second color
+                           ...           # remaining color lists, one list of columns per color
+                    ],
+
+                    # Next is a list of lists, one for each column, containing the nonzero rows for
+                    # that column.  If a column is not colored, then it will have a None entry
+                    # instead of a list.
+                    [
+                        [r1, rn, ...]   # list of nonzero rows for column 0
+                        None,           # column 1 is not colored
+                        [ra, rb, ...]   # list of nonzero rows for column 2
+                            ...
+                    ],
+
+                    # The last tuple entry can be None, indicating that no sparsity structure is
+                    # specified, or it can be a nested dictionary where the outer keys are response
+                    # names, the inner keys are design variable names, and the value is a tuple of
+                    # the form (row_list, col_list, shape).
+                    {
+                        resp1_name: {
+                            dv1_name: (rows, cols, shape),  # for sub-jac d_resp1/d_dv1
+                            dv2_name: (rows, cols, shape),
+                              ...
+                        },
+                        resp2_name: {
+                            ...
+                        }
+                        ...
+                    }
+                )
         """
         if self.supports['simultaneous_derivatives']:
             self._simul_coloring_info = simul_info
@@ -841,7 +908,7 @@ class Driver(object):
                                       "in 'rev' mode")
 
         # command line simul_coloring uses this env var to turn pre-existing coloring off
-        if not _use_simul_coloring:
+        if not coloring_mod._use_simul_coloring:
             return
 
         prom2abs = self._problem.model._var_allprocs_prom2abs_list['output']
@@ -849,27 +916,13 @@ class Driver(object):
         if isinstance(self._simul_coloring_info, string_types):
             with open(self._simul_coloring_info, 'r') as f:
                 self._simul_coloring_info = json.load(f)
-
-        coloring, maps = self._simul_coloring_info
-        for dv, colors in iteritems(coloring):
-            if dv not in self._designvars:
-                # convert name from promoted to absolute
-                dv = prom2abs[dv][0]
-            self._designvars[dv]['simul_deriv_color'] = colors
-
-        for res, dvdict in iteritems(maps):
-            if res not in self._responses:
-                # convert name from promoted to absolute
-                res = prom2abs[res][0]
-            self._responses[res]['simul_map'] = dvdict
-
-            for dv, col_dict in dvdict.items():
-                col_dict = {int(k): v for k, v in iteritems(col_dict)}
-                if dv not in self._designvars:
-                    # convert name from promoted to absolute and replace dictionary key
-                    del dvdict[dv]
-                    dv = prom2abs[dv][0]
-                dvdict[dv] = col_dict
+                tup = self._simul_coloring_info
+                column_lists, row_map = tup[:2]
+                if len(tup) > 2:
+                    sparsity = tup[2]
+                else:
+                    sparsity = None
+                self._simul_coloring_info = column_lists, row_map, sparsity
 
     def _pre_run_model_debug_print(self):
         """

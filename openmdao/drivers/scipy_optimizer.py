@@ -209,6 +209,7 @@ class ScipyOptimizeDriver(Driver):
 
         self._con_cache = self.get_constraint_values()
         desvar_vals = self.get_design_var_values()
+        self._dvlist = list(self._designvars)
 
         # maxiter and disp get passsed into scipy with all the other options.
         self.opt_settings['maxiter'] = self.options['maxiter']
@@ -305,8 +306,7 @@ class ScipyOptimizeDriver(Driver):
 
             # precalculate gradients of linear constraints
             if lincons:
-                self._lincongrad_cache = self._compute_totals(of=lincons,
-                                                              wrt=list(self._designvars),
+                self._lincongrad_cache = self._compute_totals(of=lincons, wrt=self._dvlist,
                                                               return_format='array')
             else:
                 self._lincongrad_cache = None
@@ -472,7 +472,7 @@ class ScipyOptimizeDriver(Driver):
             Gradient of objective with respect to parameter array.
         """
         try:
-            grad = self._compute_totals(of=self._obj_and_nlcons, wrt=list(self._designvars),
+            grad = self._compute_totals(of=self._obj_and_nlcons, wrt=self._dvlist,
                                         return_format='array')
             self._grad_cache = grad
 
