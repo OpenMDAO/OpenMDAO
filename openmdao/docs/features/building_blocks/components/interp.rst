@@ -15,7 +15,7 @@ BsplinesComp accepts the following arguments during instantiation:
 
 .. embed-options::
     openmdao.components.interp
-    BsplinesComp
+    _for_docs
     metadata
 
 
