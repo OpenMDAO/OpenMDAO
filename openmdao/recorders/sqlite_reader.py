@@ -45,13 +45,15 @@ class SqliteCaseReader(BaseCaseReader):
     _prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
     _column_widths : dict
-        widths of the columns
+        widths of the columns.
     _align : str
-        The Python formatting alignment used when writing values into columns
+        The Python formatting alignment used when writing values into columns.
     _column_spacing: int
-        Number of spaces between columns
-    _indent_inc: int
-        Number of spaces indented in levels of the hierarchy
+        Number of spaces between columns.
+    _indent_inc : int
+        Number of spaces indented in levels of the hierarchy.
+    _coordinate_split_re : RegularExpression
+        Regular expression used for splitting iteration coordinates.
     """
 
     def __init__(self, filename):
@@ -69,6 +71,7 @@ class SqliteCaseReader(BaseCaseReader):
             if not is_valid_sqlite3_db(filename):
                 raise IOError('File does not contain a valid '
                               'sqlite database ({0})'.format(filename))
+        self._coordinate_split_re = re.compile('\|\\d+\|*')
 
         with sqlite3.connect(self.filename) as con:
             cur = con.cursor()
@@ -349,7 +352,7 @@ class SqliteCaseReader(BaseCaseReader):
         -------
             coordinate as array of strings.
         """
-        return re.compile('\|\\d+\|').split(coordinate)
+        return self._coordinate_split_re.split(coordinate)
 
     def list_inputs(self,
                     values=True,
@@ -385,18 +388,14 @@ class SqliteCaseReader(BaseCaseReader):
             list of input names and other optional information about those inputs
         """
         meta = self.abs2meta
+        sys_vars = self._get_all_sysvars(False)
         inputs = []
-        final_system_case = self.system_cases.get_case(-1) if\
-            len(self.system_cases._case_keys) > 0 else None
-        inputs_vals = None
-        if final_system_case is not None and final_system_case.inputs is not None:
-            inputs_vals = final_system_case.inputs._values
 
-        if final_system_case is not None and inputs_vals is not None:
-            for name in inputs_vals.dtype.names:
+        if sys_vars is not None and len(sys_vars) > 0:
+            for name in sys_vars:
                 outs = {}
                 if values:
-                    outs['value'] = inputs_vals[name]
+                    outs['value'] = sys_vars[name]['value']
                 if units:
                     outs['units'] = meta[name]['units']
                 inputs.append((name, outs))
@@ -405,10 +404,10 @@ class SqliteCaseReader(BaseCaseReader):
             out_stream = sys.stdout
 
         if out_stream:
-            if final_system_case is None:
+            if sys_vars is None:
                 out_stream.write('WARNING: No system cases recorded. Make sure the recorder ' +
                                  'is attached to a system object\n')
-            if inputs_vals is None:
+            elif len(sys_vars) is 0:
                 out_stream.write('WARNING: Inputs not recorded. Make sure your recording ' +
                                  'settings have record_inputs set to True\n')
 
@@ -474,33 +473,22 @@ class SqliteCaseReader(BaseCaseReader):
         meta = self.abs2meta
         expl_outputs = []
         impl_outputs = []
-        final_system_case = self.system_cases.get_case(-1) if\
-            len(self.system_cases._case_keys) > 0 else None
-        outputs = None
-        residuals_vars = None
-        if final_system_case is not None:
-            if final_system_case.outputs is not None:
-                outputs = final_system_case.outputs._values
-            if final_system_case.residuals is not None:
-                residuals = final_system_case.residuals._values
-
-        if final_system_case is not None and outputs is not None:
-            for name in outputs.dtype.names:
+        sys_vars = self._get_all_sysvars()
+        if sys_vars is not None and len(sys_vars) > 0:
+            for name in sys_vars:
                 if residuals_tol and residuals_vars is not None and\
-                   np.linalg.norm(residuals[name]) < residuals_tol:
+                   sys_vars[name]['residuals'] is not 'Not Recorded' and\
+                   np.linalg.norm(sys_vars[name]['residuals']) < residuals_tol:
                     continue
                 outs = {}
                 if values:
-                    outs['value'] = outputs[name]
+                    outs['value'] = sys_vars[name]['value']
                 if residuals:
-                    if residuals_vars is None:
-                        outs['resids'] = 'Not Recorded'
-                    else:
-                        outs['resids'] = residuals_vars[name]
+                    outs['resids'] = sys_vars[name]['residuals']
                 if units:
                     outs['units'] = meta[name]['units']
                 if shape:
-                    outs['shape'] = outputs[name].shape
+                    outs['shape'] = sys_vars[name]['value'].shape
                 if bounds:
                     outs['lower'] = meta[name]['lower']
                     outs['upper'] = meta[name]['upper']
@@ -517,10 +505,10 @@ class SqliteCaseReader(BaseCaseReader):
             out_stream = sys.stdout
 
         if out_stream:
-            if final_system_case is None:
+            if sys_vars is None:
                 out_stream.write('WARNING: No system cases recorded. Make sure the recorder ' +
                                  'is attached to a system object\n')
-            if outputs is None:
+            elif len(sys_vars) is 0:
                 out_stream.write('WARNING: Outputs not recorded. Make sure your recording ' +
                                  'settings have record_outputs set to True\n')
 
@@ -540,6 +528,71 @@ class SqliteCaseReader(BaseCaseReader):
             return impl_outputs
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
+
+    def _get_all_sysvars(self, get_outputs=True):
+        """
+        """
+        coords = self.system_cases._case_keys
+
+        # store the iteration coordinates without iteration numbers.
+        # coord_map intializes each iter_key to False, indicating we haven't
+        # grabbed values from this system
+        coord_map = {}
+        for c in coords:
+            split_iter = self._split_coordinate(c)
+            iter_key = ':'.join(split_iter)
+            coord_map[iter_key] = False
+
+        # didn't record any system iterations, return None
+        if len(coord_map) is 0:
+            return None
+
+        variables = {}
+        iteration_num = -1
+        # iterate over cases from end to start, unless we've grabbed values from
+        # every system
+        while not self._has_all_values(coord_map):
+            iteration = self.system_cases._case_keys[iteration_num]
+            iteration_num -= 1
+            split_iter = self._split_coordinate(iteration)
+            iter_key = ':'.join(split_iter)
+
+            # if coord_map[iter_key] is False, we haven't grabbed variable values
+            # from this system
+            if not coord_map[iter_key]:
+                coord_map[iter_key] = True
+                case = self.system_cases.get_case(iteration)
+                if get_outputs and case.outputs is None:
+                    continue
+                if not get_outputs and case.inputs is None:
+                    continue
+                outputs = case.outputs._values if case.outputs is not None else None
+                residuals = case.residuals._values if case.residuals is not None else None
+                inputs = case.inputs._values if case.inputs is not None else None
+                if get_outputs:
+                    if outputs is not None:
+                        for var_name in outputs.dtype.names:
+                            if var_name not in variables:
+                                if get_outputs:
+                                    variables[var_name] = {'value': outputs[var_name]}
+                                if residuals is not None and var_name in residuals.dtype.names:
+                                    variables[var_name]['residuals'] = residuals[var_name]
+                                else:
+                                    variables[var_name]['residuals'] = 'Not Recorded'
+                elif inputs is not None:
+                    for var_name in inputs.dtype.names:
+                        if var_name not in variables:
+                            variables[var_name] = {'value': inputs[var_name]}
+
+        return variables
+
+    def _has_all_values(self, coord_map):
+        """
+        """
+        for coord in coord_map:
+            if not coord_map[coord]:
+                return False
+        return True
 
     def _write_outputs(self, in_or_out, comp_type, outputs, hierarchical, print_arrays,
                        out_stream):
