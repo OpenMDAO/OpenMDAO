@@ -152,17 +152,21 @@ class _TotalJacInfo(object):
         else:
             self._idx2name = self.idx2local = self.simul_coloring = None
 
-        self.input_idx_map, self.input_loc_idxs, self.idx_iter_dict = \
-            self._create_input_idx_map(self.input_list, self.input_meta, has_lin_cons,
-                                       model._var_sizes, model._var_allprocs_abs2idx, abs2meta)
+        if approx:
+            _, input_size = self._create_meta_map(self.input_list, self.input_meta, abs2meta)
+        else:
+            self.input_idx_map, self.input_loc_idxs, self.idx_iter_dict = \
+                self._create_input_idx_map(self.input_list, self.input_meta, has_lin_cons,
+                                           model._var_sizes, model._var_allprocs_abs2idx, abs2meta)
+            input_size = self.input_loc_idxs.size
 
         # always allocate a 2D dense array and we can assign views to dict keys later if
         # return format is 'dict' or 'flat_dict'.
         if return_format == 'array' or not approx:
             if fwd:
-                self.J = J = np.zeros((out_size, self.input_loc_idxs.size))
+                self.J = J = np.zeros((out_size, input_size))
             else:  # rev
-                self.J = J = np.zeros((self.input_loc_idxs.size, out_size))
+                self.J = J = np.zeros((input_size, out_size))
         else:
             self.J = J = None
 
@@ -177,9 +181,7 @@ class _TotalJacInfo(object):
                                                abs2meta, 'dict')
             else:
                 self.J_dict = None
-        elif approx:
-            self.J_final = self.J_dict = None
-        else:
+        elif not approx:
             self.J_final = self.J_dict = self._get_dict_J(J, wrt, prom_wrt, of, prom_of,
                                                           self.input_meta, self.out_meta,
                                                           abs2meta, return_format)
@@ -188,6 +190,8 @@ class _TotalJacInfo(object):
             self.prom_responses = {prom_of[i]: responses[r] for i, r in enumerate(of)}
 
         if approx:
+            self.J_final = None
+
             # Initialization based on driver (or user) -requested "of" and "wrt".
             if not model._owns_approx_jac or model._owns_approx_of != set(of) \
                or model._owns_approx_wrt != set(wrt):
@@ -331,7 +335,7 @@ class _TotalJacInfo(object):
                     irange[in_idxs < 0] += in_var_meta['global_size']
 
             else:  # name is not a design var or response  (should only happen during testing)
-                end += abs2meta[name]['size']
+                end += in_var_meta['global_size']
                 irange = np.arange(in_var_meta['global_size'], dtype=int)
                 in_idxs = parallel_deriv_color = matmat = None
                 cache_lin_sol = False
@@ -389,13 +393,13 @@ class _TotalJacInfo(object):
                     range_list.append((start, end))
             elif matmat:
                 if name not in idx_iter_dict:
-                    idx_iter_dict[name] = (parallel_deriv_color, matmat,
+                    idx_iter_dict[name] = (None, matmat,
                                            [np.arange(start, end, dtype=int)], self.matmat_iter)
                 else:
                     raise RuntimeError("Variable name '%s' matches a parallel_deriv_color name." %
                                        name)
             elif not simul_coloring:  # plain old single index iteration
-                idx_iter_dict[name] = (parallel_deriv_color, matmat,
+                idx_iter_dict[name] = (None, False,
                                        np.arange(start, end, dtype=int), self.single_index_iter)
 
             tup = (name, rhsname, rel, cache_lin_sol)
@@ -443,7 +447,7 @@ class _TotalJacInfo(object):
                 size = vois[name]['size']
                 indices = vois[name]['indices']
             else:
-                size = abs2meta[name]['size']
+                size = abs2meta[name]['global_size']
                 indices = None
 
             end += size
@@ -483,7 +487,7 @@ class _TotalJacInfo(object):
             if name in vois:
                 end += vois[name]['size']
             else:
-                end += abs2meta[name]['size']
+                end += abs2meta[name]['global_size']
 
             idx2name[start:end] = [name] * (end - start)
             idx2local[start:end] = np.arange(0, end - start, dtype=int)
@@ -542,7 +546,6 @@ class _TotalJacInfo(object):
                     yield j, self.single_input_setter, self.single_jac_setter
             else:
                 # yield all indices for a color at once
-                # use color as lin sol cache key
                 yield ilist, self.simul_coloring_input_setter, self.simul_coloring_jac_setter
 
     def par_deriv_iter(self, idxs):
@@ -851,7 +854,6 @@ class _TotalJacInfo(object):
             Total jacobian row or column indices.
         """
         row_map = self.simul_coloring[1]
-        relevant = self.relevant
         out_meta = self.out_meta
         idx2local = self.idx2local
         idx2name = self._idx2name
@@ -864,16 +866,13 @@ class _TotalJacInfo(object):
             for row in row_map[i]:
                 output_name = idx2name[row]
                 deriv_val = None
-                if input_name not in relevant or output_name in relevant[input_name]:
-                    if output_name in out_views:
-                        deriv_val = out_views[output_name]
-                        indices = out_meta[output_name][1]
-                        if indices is not None:
-                            deriv_val = deriv_val[indices]
-                        # print("deriv_val:", i, output_name, input_name, deriv_val)
-                        J[row, i] = deriv_val[idx2local[row]]
-                else:
-                    raise RuntimeError("FOO")
+                if output_name in out_views:
+                    deriv_val = out_views[output_name]
+                    indices = out_meta[output_name][1]
+                    if indices is not None:
+                        deriv_val = deriv_val[indices]
+                    # print("deriv_val:", i, output_name, input_name, deriv_val)
+                    J[row, i] = deriv_val[idx2local[row]]
 
     def matmat_jac_setter(self, inds):
         """
@@ -1071,22 +1070,6 @@ class _TotalJacInfo(object):
                 model.approx_totals(method=method, **kwargs)
             else:
                 model.approx_totals(method='fd')
-
-        # # Initialization based on driver (or user) -requested "of" and "wrt".
-        # if not model._owns_approx_jac or model._owns_approx_of != set(of) \
-        #    or model._owns_approx_wrt != set(wrt):
-        #     model._owns_approx_of = set(of)
-        #     model._owns_approx_wrt = set(wrt)
-        #
-        #     # Support for indices defined on driver vars.
-        #     model._owns_approx_of_idx = {
-        #         key: val['indices'] for key, val in iteritems(self.responses)
-        #         if val['indices'] is not None
-        #     }
-        #     model._owns_approx_wrt_idx = {
-        #         key: val['indices'] for key, val in iteritems(self.design_vars)
-        #         if val['indices'] is not None
-        #     }
 
         model._setup_jacobians(recurse=False)
 
