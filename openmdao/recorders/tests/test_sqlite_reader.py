@@ -143,7 +143,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.prob = Problem()
 
         model = self.prob.model = Group()
-        model.add_subsystem('px', IndepVarComp('x', 1.0, units='m'), promotes=['x'])
+        model.add_subsystem('px', IndepVarComp('x', 1.0, units='m', lower=-1000, upper=1000), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -353,8 +353,8 @@ class TestSqliteCaseReader(unittest.TestCase):
                              'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|{}'
                              .format(i))
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_reading_driver_metadata(self):
         self.setup_sellar_model_with_optimization()
 
@@ -389,6 +389,13 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(cr.abs2meta['d1.x']['units'], None)
         self.assertEqual(cr.abs2meta['d1.y1']['units'], None)
         self.assertEqual(cr.abs2meta['d1.y2']['units'], None)
+        self.assertEqual(cr.abs2meta['px.x']['type'], 'Explicit')
+        self.assertEqual(cr.abs2meta['obj_cmp.y1']['type'], 'Explicit')
+        self.assertEqual(cr.abs2meta['obj_cmp.y2']['type'], 'Explicit')
+        self.assertEqual(cr.abs2meta['px.x']['lower'], -1000)
+        self.assertEqual(cr.abs2meta['px.x']['upper'], 1000)
+        self.assertEqual(cr.abs2meta['d2.y2']['upper'], None)
+        self.assertEqual(cr.abs2meta['d2.y2']['lower'], None)
 
     def test_reading_system_metadata(self):
 

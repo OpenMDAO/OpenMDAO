@@ -25,6 +25,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import get_conversion
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.utils.write_outputs import write_outputs
 
 # Use this as a special value to be able to tell if the caller set a value for the optional
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
@@ -236,14 +237,6 @@ class System(object):
         Dict of list of var names to record
     _norm0: float
         Normalization factor
-    _column_widths : dict
-        widths of the columns
-    _align : str
-        The Python formatting alignment used when writing values into columns
-    _column_spacing: int
-        Number of spaces between columns
-    _indent_inc: int
-        Number of spaces indented in levels of the hierarchy
     """
 
     def __init__(self, **kwargs):
@@ -370,23 +363,6 @@ class System(object):
         self._has_output_scaling = False
         self._has_resid_scaling = False
         self._has_input_scaling = False
-
-        # Formatting parameters for _write_outputs and _write_output_row methods
-        #     that are used by list_inputs and list_outputs methods
-        self._column_widths = {
-            'value': 20,
-            'resids': 20,
-            'units': 10,
-            'shape': 10,
-            'lower': 20,
-            'upper': 20,
-            'ref': 20,
-            'ref0': 20,
-            'res_ref': 20,
-        }
-        self._align = ''
-        self._column_spacing = 2
-        self._indent_inc = 2
 
     def _check_reconf(self):
         """
@@ -2582,7 +2558,7 @@ class System(object):
             out_stream = sys.stdout
 
         if out_stream:
-            self._write_outputs('input', None, inputs, hierarchical, print_arrays, out_stream)
+            self._write_outputs('input', None, inputs, hierarchical, print_arrays, out_stream, meta)
 
         return inputs
 
@@ -2685,10 +2661,10 @@ class System(object):
         if out_stream:
             if explicit:
                 self._write_outputs('output', 'Explicit', expl_outputs, hierarchical, print_arrays,
-                                    out_stream)
+                                    out_stream, meta)
             if implicit:
                 self._write_outputs('output', 'Implicit', impl_outputs, hierarchical, print_arrays,
-                                    out_stream)
+                                    out_stream, meta)
 
         if explicit and implicit:
             return expl_outputs + impl_outputs
@@ -2700,7 +2676,7 @@ class System(object):
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
     def _write_outputs(self, in_or_out, comp_type, outputs, hierarchical, print_arrays,
-                       out_stream):
+                       out_stream, meta):
         """
         Write table of variable names, values, residuals, and metadata to out_stream.
 
@@ -2729,9 +2705,6 @@ class System(object):
         """
         if out_stream is None:
             return
-
-        # Only local metadata but the most complete
-        meta = self._var_abs2meta
 
         # Make a dict of outputs. Makes it easier to work with in this method
         dict_of_outputs = OrderedDict()
@@ -2776,172 +2749,8 @@ class System(object):
                                     np.append(dict_of_outputs[name]['resids'],
                                               proc_outputs[name]['resids'])
 
-        count = len(dict_of_outputs)
-
-        # Write header
-        pathname = self.pathname if self.pathname else 'model'
-        header_name = 'Input' if in_or_out == 'input' else 'Output'
-        if in_or_out == 'input':
-            header = "%d %s(s) in '%s'" % (count, header_name, pathname)
-        else:
-            header = "%d %s %s(s) in '%s'" % (count, comp_type, header_name, pathname)
-        out_stream.write(header + '\n')
-        out_stream.write('-' * len(header) + '\n' + '\n')
-
-        if not count:
-            return
-
-        # Need an ordered list of possible output values for the two cases: inputs and outputs
-        #  so that we do the column output in the correct order
-        if in_or_out == 'input':
-            out_types = ('value', 'units',)
-        else:
-            out_types = ('value', 'resids', 'units', 'shape', 'lower', 'upper', 'ref',
-                         'ref0', 'res_ref')
-        # Figure out which columns will be displayed
-        # Look at any one of the outputs, they should all be the same
-        outputs = dict_of_outputs[list(dict_of_outputs)[0]]
-        column_names = []
-        for out_type in out_types:
-            if out_type in outputs:
-                column_names.append(out_type)
-
-        top_level_system_name = 'top'
-
-        # Find with width of the first column in the table
-        #    Need to look through all the possible varnames to find the max width
-        max_varname_len = max(len(top_level_system_name), len('varname'))
-        if hierarchical:
-            for name, outs in iteritems(dict_of_outputs):
-                for i, name_part in enumerate(name.split('.')):
-                    total_len = (i + 1) * self._indent_inc + len(name_part)
-                    max_varname_len = max(max_varname_len, total_len)
-        else:
-            for name, outs in iteritems(dict_of_outputs):
-                max_varname_len = max(max_varname_len, len(name))
-
-        # Determine the column widths of the data fields by finding the max width for all rows
-        for column_name in column_names:
-            self._column_widths[column_name] = len(column_name)  # has to be able to display name!
-        for name in self._var_allprocs_abs_names[in_or_out]:
-            if name in dict_of_outputs:
-                for column_name in column_names:
-                    if isinstance(dict_of_outputs[name][column_name], np.ndarray) and \
-                            dict_of_outputs[name][column_name].size > 1:
-                        out = '|{}|'.format(str(np.linalg.norm(dict_of_outputs[name][column_name])))
-                    else:
-                        out = str(dict_of_outputs[name][column_name])
-                    self._column_widths[column_name] = max(self._column_widths[column_name],
-                                                           len(str(out)))
-
-        # Write out the column headers
-        column_header = '{:{align}{width}}'.format('varname', align=self._align,
-                                                   width=max_varname_len)
-        column_dashes = max_varname_len * '-'
-        for column_name in column_names:
-            column_header += self._column_spacing * ' '
-            column_header += '{:{align}{width}}'.format(column_name, align=self._align,
-                                                        width=self._column_widths[column_name])
-            column_dashes += self._column_spacing * ' ' + self._column_widths[column_name] * '-'
-        out_stream.write(column_header + '\n')
-        out_stream.write(column_dashes + '\n')
-
-        # Write out the variable names and optional values and metadata
-        if hierarchical:
-            out_stream.write(top_level_system_name + '\n')
-
-            cur_sys_names = []
-            # _var_allprocs_abs_names has all the vars across all procs in execution order
-            #   But not all the values need to be written since, at least for output vars,
-            #      the output var lists are divided into explicit and implicit
-            for varname in self._var_allprocs_abs_names[in_or_out]:
-                if varname not in dict_of_outputs:
-                    continue
-
-                # For hierarchical, need to display system levels in the rows above the
-                #   actual row containing the var name and values. Want to make use
-                #   of the hierarchies that have been written about this.
-                existing_sys_names = []
-                varname_sys_names = varname.split('.')[:-1]
-                for i, sys_name in enumerate(varname_sys_names):
-                    if varname_sys_names[:i + 1] != cur_sys_names[:i + 1]:
-                        break
-                    else:
-                        existing_sys_names = cur_sys_names[:i + 1]
-
-                # What parts of the hierarchy for this varname need to be written that
-                #   were not already written above this
-                remaining_sys_path_parts = varname_sys_names[len(existing_sys_names):]
-
-                # Write the Systems in the var name path
-                indent = len(existing_sys_names) * self._indent_inc
-                for i, sys_name in enumerate(remaining_sys_path_parts):
-                    indent += self._indent_inc
-                    out_stream.write(indent * ' ' + sys_name + '\n')
-                cur_sys_names = varname_sys_names
-
-                indent += self._indent_inc
-                row = '{:{align}{width}}'.format(indent * ' ' + varname.split('.')[-1],
-                                                 align=self._align, width=max_varname_len)
-                self._write_outputs_rows(out_stream, row, column_names, dict_of_outputs[varname],
-                                         print_arrays)
-        else:
-            for name in self._var_allprocs_abs_names[in_or_out]:
-                if name in dict_of_outputs:
-                    row = '{:{align}{width}}'.format(name, align=self._align, width=max_varname_len)
-                    self._write_outputs_rows(out_stream, row, column_names, dict_of_outputs[name],
-                                             print_arrays)
-        out_stream.write(2 * '\n')
-
-    def _write_outputs_rows(self, out_stream, row, column_names, dict_of_outputs, print_arrays):
-        """
-        For one variable, write name, values, residuals, and metadata to out_stream.
-
-        Parameters
-        ----------
-        out_stream : file-like object
-            Where to send human readable output.
-            Set to None to suppress.
-        row : str
-            The string containing the contents of the beginning of this row output.
-            Contains the name of the System or varname, possibley indented to show hierarchy.
-
-        column_names : list of str
-            Indicates which columns will be written in this row.
-
-        dict_of_outputs : dict
-            Contains the values to be written in this row. Keys are columns names.
-
-        print_arrays : bool
-            When False, in the columnar display, just display norm of any ndarrays with size > 1.
-            The norm is surrounded by vertical bars to indicate that it is a norm.
-            When True, also display full values of the ndarray below the row. Format  is affected
-            by the values set with numpy.set_printoptions
-            Default is False.
-
-        """
-        if out_stream is None:
-            return
-        left_column_width = len(row)
-        have_array_values = []  # keep track of which values are arrays
-        for column_name in column_names:
-            row += self._column_spacing * ' '
-            if isinstance(dict_of_outputs[column_name], np.ndarray) and \
-                    dict_of_outputs[column_name].size > 1:
-                have_array_values.append(column_name)
-                out = '|{}|'.format(str(np.linalg.norm(dict_of_outputs[column_name])))
-            else:
-                out = str(dict_of_outputs[column_name])
-            row += '{:{align}{width}}'.format(out, align=self._align,
-                                              width=self._column_widths[column_name])
-        out_stream.write(row + '\n')
-        if print_arrays:
-            for column_name in have_array_values:
-                out_stream.write("{}  {}:\n".format(left_column_width * ' ', column_name))
-                out_str = str(dict_of_outputs[column_name])
-                indented_lines = [(left_column_width + self._indent_inc) * ' ' +
-                                  s for s in out_str.splitlines()]
-                out_stream.write('\n'.join(indented_lines) + '\n')
+        write_outputs(in_or_out, comp_type, dict_of_outputs, hierarchical, print_arrays, out_stream,
+                      self.pathname, self._var_allprocs_abs_names)
 
     def run_solve_nonlinear(self):
         """
