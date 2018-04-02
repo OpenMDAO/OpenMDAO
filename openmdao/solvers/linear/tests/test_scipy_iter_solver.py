@@ -196,9 +196,9 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        J = prob.compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False, return_format='flat_dict')
         icount1 = prob.model.linear_solver._iter_count
-        J = prob.compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False, return_format='flat_dict')
         icount2 = prob.model.linear_solver._iter_count
 
         # Should take less iterations when starting from previous solution.
@@ -222,9 +222,9 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        J = prob.compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False, return_format='flat_dict')
         icount1 = prob.model.linear_solver._iter_count
-        J = prob.compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False, return_format='flat_dict')
         icount2 = prob.model.linear_solver._iter_count
 
         # Should take less iterations when starting from previous solution.

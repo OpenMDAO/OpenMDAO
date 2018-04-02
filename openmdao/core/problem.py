@@ -992,129 +992,141 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        recording_iteration.stack.append(('_compute_totals', 0))
-
-        total_info = _TotalJacInfo(self, of, wrt, global_names, return_format)
-
-        model = self.model
-        mode = self._mode
-        vec_dinput = model._vectors['input']
-        vec_doutput = model._vectors['output']
-        vec_dresid = model._vectors['residual']
-        approx = model._owns_approx_jac
-        prom2abs = model._var_allprocs_prom2abs_list['output']
-
-        # # TODO - Pull 'of' and 'wrt' from driver if unspecified.
-        # if wrt is None:
-        #     raise NotImplementedError("Need to specify 'wrt' for now.")
-        # if of is None:
-        #     raise NotImplementedError("Need to specify 'of' for now.")
-
-        # Prepare model for calculation by cleaning out the derivatives
-        # vectors.
-        for vec_name in model._lin_vec_names:
-
-            # TODO: Do all three deriv vectors have the same keys?
-
-            vec_dinput[vec_name].set_const(0.0)
-            vec_doutput[vec_name].set_const(0.0)
-            vec_dresid[vec_name].set_const(0.0)
-
-        # # Convert of and wrt names from promoted to absolute path
-        # oldwrt, oldof = wrt, of
-        # if not global_names:
-        #     of = [prom2abs[name][0] for name in oldof]
-        #     wrt = [prom2abs[name][0] for name in oldwrt]
+        # recording_iteration.stack.append(('_compute_totals', 0))
         #
-        # input_list, output_list = wrt, of
-        # old_input_list, old_output_list = oldwrt, oldof
+        # total_info = _TotalJacInfo(self, of, wrt, global_names, return_format)
+        # of = total_info.of
+        # wrt = total_info.wrt
+        #
+        # model = self.model
+        # mode = self._mode
+        # vec_dinput = model._vectors['input']
+        # vec_doutput = model._vectors['output']
+        # vec_dresid = model._vectors['residual']
+        # approx = model._owns_approx_jac
+        # prom2abs = model._var_allprocs_prom2abs_list['output']
+        #
+        # # # TODO - Pull 'of' and 'wrt' from driver if unspecified.
+        # # if wrt is None:
+        # #     raise NotImplementedError("Need to specify 'wrt' for now.")
+        # # if of is None:
+        # #     raise NotImplementedError("Need to specify 'of' for now.")
+        #
+        # # Prepare model for calculation by cleaning out the derivatives
+        # # vectors.
+        # for vec_name in model._lin_vec_names:
+        #
+        #     # TODO: Do all three deriv vectors have the same keys?
+        #
+        #     vec_dinput[vec_name].set_const(0.0)
+        #     vec_doutput[vec_name].set_const(0.0)
+        #     vec_dresid[vec_name].set_const(0.0)
+        #
+        # # # Convert of and wrt names from promoted to absolute path
+        # # oldwrt, oldof = wrt, of
+        # # if not global_names:
+        # #     of = [prom2abs[name][0] for name in oldof]
+        # #     wrt = [prom2abs[name][0] for name in oldwrt]
+        # #
+        # # input_list, output_list = wrt, of
+        # # old_input_list, old_output_list = oldwrt, oldof
+        #
+        # # Solve for derivs with the approximation_scheme.
+        # # This cuts out the middleman by grabbing the Jacobian directly after linearization.
+        #
+        # # Re-initialize so that it is clean.
+        # if initialize:
+        #
+        #     if model._approx_schemes:
+        #         method = list(model._approx_schemes.keys())[0]
+        #         kwargs = model._owns_approx_jac_meta
+        #         model.approx_totals(method=method, **kwargs)
+        #     else:
+        #         model.approx_totals(method='fd')
+        #
+        # # Initialization based on driver (or user) -requested "of" and "wrt".
+        # if not model._owns_approx_jac or model._owns_approx_of != set(of) \
+        #    or model._owns_approx_wrt != set(wrt):
+        #     model._owns_approx_of = set(of)
+        #     model._owns_approx_wrt = set(wrt)
+        #
+        #     # Support for indices defined on driver vars.
+        #     dvs = self.driver._designvars
+        #     cons = self.driver._cons
+        #     objs = self.driver._objs
+        #
+        #     response_idx = {key: val['indices'] for key, val in iteritems(cons)
+        #                     if val['indices'] is not None}
+        #     for key, val in iteritems(objs):
+        #         if val['indices'] is not None:
+        #             response_idx[key] = val['indices']
+        #
+        #     model._owns_approx_of_idx = response_idx
+        #
+        #     model._owns_approx_wrt_idx = {key: val['indices'] for key, val in iteritems(dvs)
+        #                                   if val['indices'] is not None}
+        #
+        # model._setup_jacobians(recurse=False)
+        #
+        # # Need to temporarily disable size checking to support indices in des_vars and quantities.
+        # model.jacobian._override_checks = True
+        #
+        # # Linearize Model
+        # model._linearize()
+        #
+        # model.jacobian._override_checks = False
+        # approx_jac = model._jacobian._subjacs
+        #
+        # # Create data structures (and possibly allocate space) for the total
+        # # derivatives that we will return.
+        # totals = OrderedDict()
+        #
+        # output_list = total_info.output_list
+        # input_list = total_info.input_list
+        #
+        # old_output_list = total_info.prom_of
+        # old_input_list = total_info.prom_wrt
+        #
+        # if return_format == 'flat_dict':
+        #     for ocount, output_name in enumerate(total_info.of):
+        #         okey = old_output_list[ocount]
+        #         for icount, input_name in enumerate(total_info.wrt):
+        #             ikey = old_input_list[icount]
+        #             jac = approx_jac[output_name, input_name]
+        #             if isinstance(jac, list):
+        #                 # This is a design variable that was declared as an obj/con.
+        #                 totals[okey, ikey] = np.eye(len(jac[0]))
+        #                 odx = model._owns_approx_of_idx.get(okey)
+        #                 idx = model._owns_approx_wrt_idx.get(ikey)
+        #                 if odx is not None:
+        #                     totals[okey, ikey] = totals[okey, ikey][odx, :]
+        #                 if idx is not None:
+        #                     totals[okey, ikey] = totals[okey, ikey][:, idx]
+        #             else:
+        #                 totals[okey, ikey] = -jac
+        #
+        # elif return_format == 'dict':
+        #     for ocount, output_name in enumerate(total_info.of):
+        #         okey = old_output_list[ocount]
+        #         totals[okey] = tot = OrderedDict()
+        #         for icount, input_name in enumerate(total_info.wrt):
+        #             ikey = old_input_list[icount]
+        #             jac = approx_jac[output_name, input_name]
+        #             if isinstance(jac, list):
+        #                 # This is a design variable that was declared as an obj/con.
+        #                 tot[ikey] = np.eye(len(jac[0]))
+        #             else:
+        #                 tot[ikey] = -jac
+        # else:
+        #     msg = "Unsupported return format '%s." % return_format
+        #     raise NotImplementedError(msg)
+        #
+        # recording_iteration.stack.pop()
+        # return totals
+        total_info = _TotalJacInfo(self, of, wrt, global_names, return_format)
+        total_info._compute_totals_approx(initialize=initialize)
 
-        # Solve for derivs with the approximation_scheme.
-        # This cuts out the middleman by grabbing the Jacobian directly after linearization.
-
-        # Re-initialize so that it is clean.
-        if initialize:
-
-            if model._approx_schemes:
-                method = list(model._approx_schemes.keys())[0]
-                kwargs = model._owns_approx_jac_meta
-                model.approx_totals(method=method, **kwargs)
-            else:
-                model.approx_totals(method='fd')
-
-        # Initialization based on driver (or user) -requested "of" and "wrt".
-        if not model._owns_approx_jac or model._owns_approx_of != set(of) \
-           or model._owns_approx_wrt != set(wrt):
-            model._owns_approx_of = set(of)
-            model._owns_approx_wrt = set(wrt)
-
-            # Support for indices defined on driver vars.
-            dvs = self.driver._designvars
-            cons = self.driver._cons
-            objs = self.driver._objs
-
-            response_idx = {key: val['indices'] for key, val in iteritems(cons)
-                            if val['indices'] is not None}
-            for key, val in iteritems(objs):
-                if val['indices'] is not None:
-                    response_idx[key] = val['indices']
-
-            model._owns_approx_of_idx = response_idx
-
-            model._owns_approx_wrt_idx = {key: val['indices'] for key, val in iteritems(dvs)
-                                          if val['indices'] is not None}
-
-        model._setup_jacobians(recurse=False)
-
-        # Need to temporarily disable size checking to support indices in des_vars and quantities.
-        model.jacobian._override_checks = True
-
-        # Linearize Model
-        model._linearize()
-
-        model.jacobian._override_checks = False
-        approx_jac = model._jacobian._subjacs
-
-        # Create data structures (and possibly allocate space) for the total
-        # derivatives that we will return.
-        totals = OrderedDict()
-
-        if return_format == 'flat_dict':
-            for ocount, output_name in enumerate(output_list):
-                okey = old_output_list[ocount]
-                for icount, input_name in enumerate(input_list):
-                    ikey = old_input_list[icount]
-                    jac = approx_jac[output_name, input_name]
-                    if isinstance(jac, list):
-                        # This is a design variable that was declared as an obj/con.
-                        totals[okey, ikey] = np.eye(len(jac[0]))
-                        odx = model._owns_approx_of_idx.get(okey)
-                        idx = model._owns_approx_wrt_idx.get(ikey)
-                        if odx is not None:
-                            totals[okey, ikey] = totals[okey, ikey][odx, :]
-                        if idx is not None:
-                            totals[okey, ikey] = totals[okey, ikey][:, idx]
-                    else:
-                        totals[okey, ikey] = -jac
-
-        elif return_format == 'dict':
-            for ocount, output_name in enumerate(output_list):
-                okey = old_output_list[ocount]
-                totals[okey] = tot = OrderedDict()
-                for icount, input_name in enumerate(input_list):
-                    ikey = old_input_list[icount]
-                    jac = approx_jac[output_name, input_name]
-                    if isinstance(jac, list):
-                        # This is a design variable that was declared as an obj/con.
-                        tot[ikey] = np.eye(len(jac[0]))
-                    else:
-                        tot[ikey] = -jac
-        else:
-            msg = "Unsupported return format '%s." % return_format
-            raise NotImplementedError(msg)
-
-        recording_iteration.stack.pop()
-        return totals
+        return total_info.J_final
 
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
