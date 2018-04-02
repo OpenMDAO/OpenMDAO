@@ -7,6 +7,7 @@ from collections import OrderedDict
 from copy import deepcopy
 import numpy as np
 from six import iteritems, itervalues
+from six.moves import zip
 
 from openmdao.utils.general_utils import ContainsAll
 from openmdao.recorders.recording_iteration_stack import recording_iteration
@@ -60,7 +61,7 @@ class _TotalJacInfo(object):
         Dict of indices keyed to solution vectors.
     """
 
-    def __init__(self, problem, of, wrt, global_names, return_format):
+    def __init__(self, problem, of, wrt, global_names, return_format, approx=False):
         """
         Initialize object.
 
@@ -77,6 +78,8 @@ class _TotalJacInfo(object):
         return_format : str
             Indicates the desired return format of the total jacobian. Can have value of
             'array', 'dict', or 'flat_dict'.
+        approx : bool
+            If True, the object will compute approx total jacobians.
         """
         self.model = model = problem.model
         self.comm = problem.comm
@@ -86,6 +89,7 @@ class _TotalJacInfo(object):
         self._lin_sol_cache = {}
         self._has_scaling = problem.driver._has_scaling
         self.return_format = return_format
+        self.approx = approx
 
         abs2meta = model._var_allprocs_abs2meta
 
@@ -155,20 +159,27 @@ class _TotalJacInfo(object):
 
         # always allocate a 2D dense array and we can assign views to dict keys later if
         # return format is 'dict' or 'flat_dict'.
-        if fwd:
-            self.J = J = np.zeros((out_size, self.input_loc_idxs.size))
-        else:  # rev
-            self.J = J = np.zeros((self.input_loc_idxs.size, out_size))
+        if return_format == 'array' or not approx:
+            if fwd:
+                self.J = J = np.zeros((out_size, self.input_loc_idxs.size))
+            else:  # rev
+                self.J = J = np.zeros((self.input_loc_idxs.size, out_size))
+        else:
+            self.J = J = None
 
         # for dict type return formats, map var names to views of the Jacobian array.
         if return_format == 'array':
             self.J_final = J
-            if self._has_scaling:
+            if self._has_scaling or approx:
+                # for array return format, create a 'dict' view for scaling only, since
+                # our scaling data is by variable.
                 self.J_dict = self._get_dict_J(J, wrt, prom_wrt, of, prom_of,
                                                self.input_meta, self.out_meta,
                                                abs2meta, 'dict')
             else:
                 self.J_dict = None
+        elif approx:
+            self.J_final = self.J_dict = None
         else:
             self.J_final = self.J_dict = self._get_dict_J(J, wrt, prom_wrt, of, prom_of,
                                                           self.input_meta, self.out_meta,
@@ -1023,21 +1034,14 @@ class _TotalJacInfo(object):
 
         of = self.of
         wrt = self.wrt
-
         model = self.model
-        mode = self._mode
-        vec_dinput = model._vectors['input']
-        vec_doutput = model._vectors['output']
-        vec_dresid = model._vectors['residual']
-        approx = model._owns_approx_jac
-        prom2abs = model._var_allprocs_prom2abs_list['output']
 
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
         for vec_name in model._lin_vec_names:
-            vec_dinput[vec_name].set_const(0.0)
-            vec_doutput[vec_name].set_const(0.0)
-            vec_dresid[vec_name].set_const(0.0)
+            model._vectors['input'][vec_name].set_const(0.0)
+            model._vectors['output'][vec_name].set_const(0.0)
+            model._vectors['residual'][vec_name].set_const(0.0)
 
         # Solve for derivs with the approximation_scheme.
         # This cuts out the middleman by grabbing the Jacobian directly after linearization.
@@ -1078,46 +1082,31 @@ class _TotalJacInfo(object):
         model.jacobian._override_checks = False
         approx_jac = model._jacobian._subjacs
 
-        # Create data structures (and possibly allocate space) for the total
-        # derivatives that we will return.
-        totals = OrderedDict()
-
-        output_list = self.output_list
-        input_list = self.input_list
-
-        old_output_list = self.prom_of
-        old_input_list = self.prom_wrt
+        of_idx = model._owns_approx_of_idx
+        wrt_idx = model._owns_approx_wrt_idx
 
         if self.return_format == 'flat_dict':
-            for ocount, output_name in enumerate(self.of):
-                okey = old_output_list[ocount]
-                for icount, input_name in enumerate(self.wrt):
-                    ikey = old_input_list[icount]
-                    jac = approx_jac[output_name, input_name]
-                    if isinstance(jac, list):
-                        # This is a design variable that was declared as an obj/con.
-                        totals[okey, ikey] = np.eye(len(jac[0]))
-                        odx = model._owns_approx_of_idx.get(okey)
-                        idx = model._owns_approx_wrt_idx.get(ikey)
-                        if odx is not None:
-                            totals[okey, ikey] = totals[okey, ikey][odx, :]
-                        if idx is not None:
-                            totals[okey, ikey] = totals[okey, ikey][:, idx]
-                    else:
-                        totals[okey, ikey] = -jac
+            totals = OrderedDict()
+            for prom_out, output_name in zip(self.prom_of, of):
+                for prom_in, input_name in zip(self.prom_wrt, wrt):
+                    totals[prom_out, prom_in] = _get_subjac(approx_jac[output_name, input_name],
+                                                            prom_out, prom_in, of_idx, wrt_idx)
 
-        elif self.return_format in ('dict', 'array'):
-            for ocount, output_name in enumerate(self.of):
-                okey = old_output_list[ocount]
-                totals[okey] = tot = OrderedDict()
-                for icount, input_name in enumerate(self.wrt):
-                    ikey = old_input_list[icount]
-                    jac = approx_jac[output_name, input_name]
-                    if isinstance(jac, list):
-                        # This is a design variable that was declared as an obj/con.
-                        tot[ikey] = np.eye(len(jac[0]))
-                    else:
-                        tot[ikey] = -jac
+        elif self.return_format == 'dict':
+            totals = OrderedDict()
+            for prom_out, output_name in zip(self.prom_of, of):
+                totals[prom_out] = tot = OrderedDict()
+                for prom_in, input_name in zip(self.prom_wrt, wrt):
+                    tot[prom_in] = _get_subjac(approx_jac[output_name, input_name],
+                                               prom_out, prom_in, of_idx, wrt_idx)
+
+        elif self.return_format == 'array':
+            totals = self.J_dict
+            for prom_out, output_name in zip(self.prom_of, of):
+                tot = totals[prom_out]
+                for prom_in, input_name in zip(self.prom_wrt, wrt):
+                    tot[prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
+                                                  prom_out, prom_in, of_idx, wrt_idx)
         else:
             msg = "Unsupported return format '%s." % self.return_format
             raise NotImplementedError(msg)
@@ -1126,7 +1115,7 @@ class _TotalJacInfo(object):
             self._do_scaling(totals)
 
         if self.return_format == 'array':
-            totals = self._dict2array_jac(totals)
+            totals = self.J  # change back to array version
 
         recording_iteration.stack.pop()
         return totals
@@ -1145,11 +1134,11 @@ class _TotalJacInfo(object):
         responses = self.prom_responses
 
         if self.return_format in ('dict', 'array'):
-            for okey, odict in iteritems(J):
-                oscaler = responses[okey]['scaler']
+            for prom_out, odict in iteritems(J):
+                oscaler = responses[prom_out]['scaler']
 
-                for ikey, val in iteritems(odict):
-                    iscaler = desvars[ikey]['scaler']
+                for prom_in, val in iteritems(odict):
+                    iscaler = desvars[prom_in]['scaler']
 
                     # Scale response side
                     if oscaler is not None:
@@ -1161,9 +1150,9 @@ class _TotalJacInfo(object):
 
         elif self.return_format == 'flat_dict':
             for tup, val in iteritems(J):
-                okey, ikey = tup
-                oscaler = responses[okey]['scaler']
-                iscaler = desvars[ikey]['scaler']
+                prom_out, prom_in = tup
+                oscaler = responses[prom_out]['scaler']
+                iscaler = desvars[prom_in]['scaler']
 
                 # Scale response side
                 if oscaler is not None:
@@ -1176,33 +1165,39 @@ class _TotalJacInfo(object):
             raise RuntimeError("Derivative scaling by the driver only supports the 'dict' and "
                                "'array' formats at present.")
 
-    def _dict2array_jac(self, derivs):
-        osize = 0
-        isize = 0
-        do_wrt = True
-        islices = {}
-        oslices = {}
-        for okey, oval in iteritems(derivs):
-            if do_wrt:
-                for ikey, val in iteritems(oval):
-                    istart = isize
-                    isize += val.shape[1]
-                    islices[ikey] = slice(istart, isize)
-                do_wrt = False
-            ostart = osize
-            osize += oval[ikey].shape[0]
-            oslices[okey] = slice(ostart, osize)
 
-        new_derivs = np.zeros((osize, isize))
+def _get_subjac(jac, prom_out, prom_in, of_idx, wrt_idx):
+    """
+    Return proper subjacobian based on input/output names and indices.
 
-        relevant = self.model._relevant
+    Parameters
+    ----------
+    jac : list or ndarray
+        Subjacobian coming from approx_jac.
+    prom_out : str
+        Promoted output name.
+    prom_in : str
+        Promoted input name.
+    of_idx : dict
+        Mapping of promoted output name to indices.
+    wrt_idx : dict
+        Mapping of promoted input name to indices.
 
-        for okey, odict in iteritems(derivs):
-            for ikey, val in iteritems(odict):
-                if okey in relevant[ikey] or ikey in relevant[okey]:
-                    new_derivs[oslices[okey], islices[ikey]] = val
-
-        return new_derivs
+    Returns
+    -------
+    ndarray
+        The desired subjacobian.
+    """
+    if isinstance(jac, list):
+        # This is a design variable that was declared as an obj/con.
+        tot = np.eye(len(jac[0]))
+        if prom_out in of_idx:
+            tot = tot[of_idx[prom_out], :]
+        if prom_in in wrt_idx:
+            tot = tot[:, wrt_idx[prom_in]]
+        return tot
+    else:
+        return -jac
 
 
 def _check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring):

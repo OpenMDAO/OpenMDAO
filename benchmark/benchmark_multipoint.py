@@ -1,6 +1,6 @@
 from __future__ import print_function
 import unittest
-from six.moves import range
+from six.moves import range, zip
 import numpy as np
 
 import time

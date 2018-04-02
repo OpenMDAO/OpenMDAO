@@ -17,7 +17,7 @@ from docutils import nodes
 import numpy as np
 
 from six import StringIO, PY3
-from six.moves import range, cStringIO as cStringIO
+from six.moves import range, zip, cStringIO as cStringIO
 
 from sphinx.errors import SphinxError
 from sphinx.writers.html import HTMLTranslator

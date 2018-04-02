@@ -668,21 +668,16 @@ class Driver(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        prob = self._problem
+        total_jac = self._total_jac
 
-        # Compute the derivatives in dict format...
-        if prob.model._owns_approx_jac:
-            total_jac = _TotalJacInfo(prob, of, wrt, global_names, return_format)
-            return total_jac.compute_totals_approx()
-            # derivs = prob._compute_totals_approx(of=of, wrt=wrt, return_format=return_format,
-            #                                      global_names=global_names)
-            # # if return_format == 'array':
-            # #     derivs = self._dict2array_jac(derivs)
-            # return derivs
-        else:
-            total_jac = self._total_jac
+        if self._problem.model._owns_approx_jac:
             if total_jac is None:
-                total_jac = _TotalJacInfo(prob, of, wrt, global_names, return_format)
+                self._total_jac = total_jac = _TotalJacInfo(self._problem, of, wrt, global_names,
+                                                            return_format, approx=True)
+            return total_jac.compute_totals_approx()
+        else:
+            if total_jac is None:
+                total_jac = _TotalJacInfo(self._problem, of, wrt, global_names, return_format)
 
             # don't cache linear constraint jacobian
             if not total_jac.has_lin_cons:

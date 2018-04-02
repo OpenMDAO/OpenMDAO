@@ -10,7 +10,7 @@ used in more complicated driver.
 import copy
 
 from six import iteritems
-from six.moves import range
+from six.moves import range, zip
 
 import numpy as np
 from pyDOE import lhs
