@@ -642,34 +642,6 @@ class Driver(object):
         self.iter_count += 1
         return failure_flag
 
-    def _dict2array_jac(self, derivs):
-        osize = 0
-        isize = 0
-        do_wrt = True
-        islices = {}
-        oslices = {}
-        for okey, oval in iteritems(derivs):
-            if do_wrt:
-                for ikey, val in iteritems(oval):
-                    istart = isize
-                    isize += val.shape[1]
-                    islices[ikey] = slice(istart, isize)
-                do_wrt = False
-            ostart = osize
-            osize += oval[ikey].shape[0]
-            oslices[okey] = slice(ostart, osize)
-
-        new_derivs = np.zeros((osize, isize))
-
-        relevant = self._problem.model._relevant
-
-        for okey, odict in iteritems(derivs):
-            for ikey, val in iteritems(odict):
-                if okey in relevant[ikey] or ikey in relevant[okey]:
-                    new_derivs[oslices[okey], islices[ikey]] = val
-
-        return new_derivs
-
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.

@@ -89,8 +89,8 @@ class _TotalJacInfo(object):
 
         abs2meta = model._var_allprocs_abs2meta
 
-        design_vars = problem.driver._designvars
-        responses = problem.driver._responses
+        self.design_vars = design_vars = problem.driver._designvars
+        self.responses = responses = problem.driver._responses
         constraints = problem.driver._cons
 
         vec_doutput = model._vectors['output']
@@ -174,10 +174,11 @@ class _TotalJacInfo(object):
                                                           self.input_meta, self.out_meta,
                                                           abs2meta, return_format)
         if self._has_scaling:
-            self.design_vars = {prom_wrt[i]: design_vars[dv] for i, dv in enumerate(wrt)}
-            self.responses = {prom_of[i]: responses[r] for i, r in enumerate(of)}
+            self.prom_design_vars = {prom_wrt[i]: design_vars[dv] for i, dv in enumerate(wrt)}
+            self.prom_responses = {prom_of[i]: responses[r] for i, r in enumerate(of)}
 
-    def _get_dict_J(self, J, wrt, prom_wrt, of, prom_of, input_meta, out_meta, abs2meta, return_format):
+    def _get_dict_J(self, J, wrt, prom_wrt, of, prom_of, input_meta, out_meta, abs2meta,
+                    return_format):
         """
         Create a dict or flat-dict jacobian that maps to views in the given 2D array jacobian.
 
@@ -944,48 +945,64 @@ class _TotalJacInfo(object):
                 # restore old linear solution if cache_linear_solution was set by the user for
                 # any input variables involved in this linear solution.
                 if cache_key is not None and not has_lin_cons:
-                    self._restore_lin_sol_cache(vec_names)
+                    self._restore_lin_sol(vec_names, cache_key)
                     model._solve_linear(model._lin_vec_names, self._mode, rel_systems)
-                    self._save_lin_sol_cache(vec_names)
+                    self._save_lin_sol(vec_names, cache_key)
                 else:
                     model._solve_linear(model._lin_vec_names, self._mode, rel_systems)
 
                 jac_setter(inds)
 
         if self._has_scaling:
-            self._do_scaling()
+            self._do_scaling(self.J_dict)
 
         recording_iteration.stack.pop()
 
         return self.J_final
 
-    def _restore_lin_sol_cache(self, vec_names):
+    def _restore_lin_sol(self, vec_names, key):
         """
+        Restore the previous linear solution.
+
+        Parameters
+        ----------
+        vec_names : list of str
+            Names of output vectors to restore.
+        key : hashable object
+            Key to lookup linear solution.
         """
         lin_sol_cache = self._lin_sol_cache
-        if cache_key in lin_sol_cache:
-            lin_sol = lin_sol_cache[cache_key]
+        if key in lin_sol_cache:
+            lin_sol = lin_sol_cache[key]
             for i, vec_name in enumerate(vec_names):
                 save_vec = lin_sol[i]
                 doutputs = self.output_vec[vec_name]
                 for vs in doutputs._data:
                     doutputs._data[vs][:] = save_vec[vs]
         else:
-            lin_sol_cache[cache_key] = lin_sol = []
+            lin_sol_cache[key] = lin_sol = []
             for vec_name in vec_names:
                 lin_sol.append(deepcopy(self.output_vec[vec_name]._data))
 
-    def _save_lin_sol_cache(self, vec_names):
+    def _save_lin_sol(self, vec_names, key):
         """
+        Save the current linear solution.
+
+        Parameters
+        ----------
+        vec_names : list of str
+            Names of output vectors to restore.
+        key : hashable object
+            Key to lookup linear solution.
         """
-        lin_sol = self._lin_sol_cache[cache_key]
+        lin_sol = self._lin_sol_cache[key]
         for i, vec_name in enumerate(vec_names):
             save_vec = lin_sol[i]
             doutputs = self.output_vec[vec_name]
             for vs, data in iteritems(doutputs._data):
                 save_vec[vs][:] = data
 
-    def _compute_totals_approx(self, initialize=False):
+    def compute_totals_approx(self, initialize=False):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1004,7 +1021,7 @@ class _TotalJacInfo(object):
         """
         recording_iteration.stack.append(('_compute_totals', 0))
 
-        of = self..of
+        of = self.of
         wrt = self.wrt
 
         model = self.model
@@ -1018,28 +1035,15 @@ class _TotalJacInfo(object):
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
         for vec_name in model._lin_vec_names:
-
-            # TODO: Do all three deriv vectors have the same keys?
-
             vec_dinput[vec_name].set_const(0.0)
             vec_doutput[vec_name].set_const(0.0)
             vec_dresid[vec_name].set_const(0.0)
-
-        # # Convert of and wrt names from promoted to absolute path
-        # oldwrt, oldof = wrt, of
-        # if not global_names:
-        #     of = [prom2abs[name][0] for name in oldof]
-        #     wrt = [prom2abs[name][0] for name in oldwrt]
-        #
-        # input_list, output_list = wrt, of
-        # old_input_list, old_output_list = oldwrt, oldof
 
         # Solve for derivs with the approximation_scheme.
         # This cuts out the middleman by grabbing the Jacobian directly after linearization.
 
         # Re-initialize so that it is clean.
         if initialize:
-
             if model._approx_schemes:
                 method = list(model._approx_schemes.keys())[0]
                 kwargs = model._owns_approx_jac_meta
@@ -1054,20 +1058,14 @@ class _TotalJacInfo(object):
             model._owns_approx_wrt = set(wrt)
 
             # Support for indices defined on driver vars.
-            dvs = self.driver._designvars
-            cons = self.driver._cons
-            objs = self.driver._objs
-
-            response_idx = {key: val['indices'] for key, val in iteritems(cons)
-                            if val['indices'] is not None}
-            for key, val in iteritems(objs):
-                if val['indices'] is not None:
-                    response_idx[key] = val['indices']
-
-            model._owns_approx_of_idx = response_idx
-
-            model._owns_approx_wrt_idx = {key: val['indices'] for key, val in iteritems(dvs)
-                                          if val['indices'] is not None}
+            model._owns_approx_of_idx = {
+                key: val['indices'] for key, val in iteritems(self.responses)
+                if val['indices'] is not None
+            }
+            model._owns_approx_wrt_idx = {
+                key: val['indices'] for key, val in iteritems(self.design_vars)
+                if val['indices'] is not None
+            }
 
         model._setup_jacobians(recurse=False)
 
@@ -1084,16 +1082,16 @@ class _TotalJacInfo(object):
         # derivatives that we will return.
         totals = OrderedDict()
 
-        output_list = total_info.output_list
-        input_list = total_info.input_list
+        output_list = self.output_list
+        input_list = self.input_list
 
-        old_output_list = total_info.prom_of
-        old_input_list = total_info.prom_wrt
+        old_output_list = self.prom_of
+        old_input_list = self.prom_wrt
 
-        if return_format == 'flat_dict':
-            for ocount, output_name in enumerate(total_info.of):
+        if self.return_format == 'flat_dict':
+            for ocount, output_name in enumerate(self.of):
                 okey = old_output_list[ocount]
-                for icount, input_name in enumerate(total_info.wrt):
+                for icount, input_name in enumerate(self.wrt):
                     ikey = old_input_list[icount]
                     jac = approx_jac[output_name, input_name]
                     if isinstance(jac, list):
@@ -1108,11 +1106,11 @@ class _TotalJacInfo(object):
                     else:
                         totals[okey, ikey] = -jac
 
-        elif return_format == 'dict':
-            for ocount, output_name in enumerate(total_info.of):
+        elif self.return_format in ('dict', 'array'):
+            for ocount, output_name in enumerate(self.of):
                 okey = old_output_list[ocount]
                 totals[okey] = tot = OrderedDict()
-                for icount, input_name in enumerate(total_info.wrt):
+                for icount, input_name in enumerate(self.wrt):
                     ikey = old_input_list[icount]
                     jac = approx_jac[output_name, input_name]
                     if isinstance(jac, list):
@@ -1121,24 +1119,33 @@ class _TotalJacInfo(object):
                     else:
                         tot[ikey] = -jac
         else:
-            msg = "Unsupported return format '%s." % return_format
+            msg = "Unsupported return format '%s." % self.return_format
             raise NotImplementedError(msg)
+
+        if self._has_scaling:
+            self._do_scaling(totals)
+
+        if self.return_format == 'array':
+            totals = self._dict2array_jac(totals)
 
         recording_iteration.stack.pop()
         return totals
 
-    def _do_scaling(self):
+    def _do_scaling(self, J):
         """
         Apply scalers to the jacobian if the driver defined any.
-        """
-        desvars = self.design_vars
-        responses = self.responses
 
-        # Note: the keys in dict jacobians are promoted names, so
-        # self.respones and self.design_vars have been defined to
-        # use promoted names as well.
+        Parameters
+        ----------
+        J : ndarray or dict
+            Jacobian to be scaled.
+        """
+        # use promoted names for design vars and responses
+        desvars = self.prom_design_vars
+        responses = self.prom_responses
+
         if self.return_format in ('dict', 'array'):
-            for okey, odict in iteritems(self.J_dict):
+            for okey, odict in iteritems(J):
                 oscaler = responses[okey]['scaler']
 
                 for ikey, val in iteritems(odict):
@@ -1153,7 +1160,7 @@ class _TotalJacInfo(object):
                         val *= 1.0 / iscaler
 
         elif self.return_format == 'flat_dict':
-            for tup, val in iteritems(self.J_dict):
+            for tup, val in iteritems(J):
                 okey, ikey = tup
                 oscaler = responses[okey]['scaler']
                 iscaler = desvars[ikey]['scaler']
@@ -1168,6 +1175,34 @@ class _TotalJacInfo(object):
         else:
             raise RuntimeError("Derivative scaling by the driver only supports the 'dict' and "
                                "'array' formats at present.")
+
+    def _dict2array_jac(self, derivs):
+        osize = 0
+        isize = 0
+        do_wrt = True
+        islices = {}
+        oslices = {}
+        for okey, oval in iteritems(derivs):
+            if do_wrt:
+                for ikey, val in iteritems(oval):
+                    istart = isize
+                    isize += val.shape[1]
+                    islices[ikey] = slice(istart, isize)
+                do_wrt = False
+            ostart = osize
+            osize += oval[ikey].shape[0]
+            oslices[okey] = slice(ostart, osize)
+
+        new_derivs = np.zeros((osize, isize))
+
+        relevant = self.model._relevant
+
+        for okey, odict in iteritems(derivs):
+            for ikey, val in iteritems(odict):
+                if okey in relevant[ikey] or ikey in relevant[okey]:
+                    new_derivs[oslices[okey], islices[ikey]] = val
+
+        return new_derivs
 
 
 def _check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring):

@@ -1124,9 +1124,7 @@ class Problem(object):
         # recording_iteration.stack.pop()
         # return totals
         total_info = _TotalJacInfo(self, of, wrt, global_names, return_format)
-        total_info._compute_totals_approx(initialize=initialize)
-
-        return total_info.J_final
+        return total_info.compute_totals_approx(initialize=initialize)
 
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
