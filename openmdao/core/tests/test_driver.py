@@ -8,17 +8,10 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, IndepVarComp, Group, ExecComp
+from openmdao.api import Problem, IndepVarComp, Group, ExecComp, ScipyOptimizer
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
-from openmdao.utils.general_utils import set_pyoptsparse_opt
-
-# check that pyoptsparse is installed. if it is, try to use SLSQP.
-OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
-if OPTIMIZER:
-    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-
 
 class TestDriver(unittest.TestCase):
 
@@ -265,11 +258,10 @@ class TestDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = OPTIMIZER
-        if OPTIMIZER == 'SLSQP':
-            prob.driver.opt_settings['ACC'] = 1e-9
-        prob.driver.options['print_results'] = False
+        prob.driver = ScipyOptimizer()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
 
         model.add_design_var('p1.x', indices=[1], lower=-50.0, upper=50.0, ref=[5.0,])
         model.add_design_var('p2.y', indices=[1], lower=-50.0, upper=50.0)
