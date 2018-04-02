@@ -1126,7 +1126,7 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        J : ndarray or dict
+        J : dict
             Jacobian to be scaled.
         """
         # use promoted names for design vars and responses
