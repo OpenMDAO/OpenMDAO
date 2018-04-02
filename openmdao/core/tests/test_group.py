@@ -74,6 +74,16 @@ class ReportOrderComp(ExplicitComponent):
 
 class TestGroup(unittest.TestCase):
 
+    def test_add_subsystem_class(self):
+        p = Problem()
+        try:
+            p.model.add_subsystem('comp', IndepVarComp)
+        except TypeError as err:
+            self.assertEqual(str(err), "Subsystem 'comp' should be an instance, "
+                                       "but a class object was found.")
+        else:
+            self.fail('Exception expected.')
+
     def test_same_sys_name(self):
         """Test error checking for the case where we add two subsystems with the same name."""
         p = Problem()

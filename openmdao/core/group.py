@@ -5,6 +5,7 @@ from collections import Iterable, Counter, OrderedDict, defaultdict
 from itertools import product, chain
 from numbers import Number
 import warnings
+import inspect
 
 from six import iteritems, string_types, itervalues
 from six.moves import range
@@ -505,8 +506,8 @@ class Group(System):
                         self.comm.Allgather(sizes_byset[type_][set_name][iproc, :], vsizes)
 
             # compute owning ranks
+            owns = self._owning_rank
             for type_ in ('input', 'output'):
-                self._owning_rank[type_] = owns = {}
                 sizes = self._var_sizes['linear'][type_]
                 for i, name in enumerate(self._var_allprocs_abs_names[type_]):
                     for rank in range(self.comm.size):
@@ -1201,6 +1202,10 @@ class Group(System):
             enable users to instantiate and add a subsystem at the
             same time, and get the reference back.
         """
+        if inspect.isclass(subsys):
+            raise TypeError("Subsystem '%s' should be an instance, "
+                            "but a class object was found." % name)
+
         for sub in chain(self._subsystems_allprocs,
                          self._static_subsystems_allprocs):
             if name == sub.name:

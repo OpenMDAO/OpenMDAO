@@ -757,7 +757,7 @@ class TestJacobian(unittest.TestCase):
 
         msg = 'Variable name pair \("{}", "{}"\) must first be declared.'
         with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
-            J = prob.compute_totals(of=['comp.y'], wrt=['p.x'])
+            J = prob.compute_totals(of=['comp.y'], wrt=['p1.x'])
 
     def test_one_src_2_tgts_with_src_indices_densejac(self):
         size = 4

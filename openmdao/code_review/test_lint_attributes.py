@@ -106,7 +106,10 @@ class LintAttributesTestCase(unittest.TestCase):
                                 [c.__name__ for c in parent_classes])
                             )
                         class_doc = inspect.getdoc(class_)
-                        classdoc_matches = classdoc_re.findall(class_doc)
+                        if class_doc is None:
+                            classdoc_matches = []
+                        else:
+                            classdoc_matches = classdoc_re.findall(class_doc)
 
                         if len(classdoc_matches) > 1:
                             new_failures.append('multiple Attributes section in docstring')

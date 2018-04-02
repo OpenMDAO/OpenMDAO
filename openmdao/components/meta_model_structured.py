@@ -117,6 +117,17 @@ class _RegularGridInterp(object):
     def _interp_methods():
         """
         Method-specific settings for interpolation and for testing.
+
+        Returns
+        -------
+        key iterator
+            Valid interpolation name strings.
+        list
+            Valid interpolation name strings.
+        dict
+            Configuration object that stores limitations of each interpolation
+            method.
+
         """
         interpolator_configs = {
             "slinear": 1,
