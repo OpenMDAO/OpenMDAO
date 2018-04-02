@@ -919,8 +919,6 @@ class _TotalJacInfo(object):
         """
         recording_iteration.stack.append(('_compute_totals', 0))
 
-        self.J[:] = 0.0
-
         has_lin_cons = self.has_lin_cons
 
         model = self.model
@@ -1035,6 +1033,7 @@ class _TotalJacInfo(object):
         of = self.of
         wrt = self.wrt
         model = self.model
+        return_format = self.return_format
 
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
@@ -1049,7 +1048,7 @@ class _TotalJacInfo(object):
         # Re-initialize so that it is clean.
         if initialize:
             if model._approx_schemes:
-                method = list(model._approx_schemes.keys())[0]
+                method = list(model._approx_schemes)[0]
                 kwargs = model._owns_approx_jac_meta
                 model.approx_totals(method=method, **kwargs)
             else:

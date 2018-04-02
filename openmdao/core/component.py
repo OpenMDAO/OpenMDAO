@@ -20,9 +20,11 @@ from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 
 
 # Suppored methods for derivatives
-_supported_methods = {'fd': FiniteDifference,
-                      'cs': ComplexStep,
-                      'exact': None}
+_supported_methods = {
+    'fd': FiniteDifference,
+    'cs': ComplexStep,
+    'exact': None
+}
 
 
 class Component(System):
