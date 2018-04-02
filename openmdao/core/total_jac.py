@@ -89,7 +89,6 @@ class _TotalJacInfo(object):
         self._lin_sol_cache = {}
         self._has_scaling = problem.driver._has_scaling
         self.return_format = return_format
-        self.approx = approx
 
         abs2meta = model._var_allprocs_abs2meta
 
@@ -187,6 +186,23 @@ class _TotalJacInfo(object):
         if self._has_scaling:
             self.prom_design_vars = {prom_wrt[i]: design_vars[dv] for i, dv in enumerate(wrt)}
             self.prom_responses = {prom_of[i]: responses[r] for i, r in enumerate(of)}
+
+        if approx:
+            # Initialization based on driver (or user) -requested "of" and "wrt".
+            if not model._owns_approx_jac or model._owns_approx_of != set(of) \
+               or model._owns_approx_wrt != set(wrt):
+                model._owns_approx_of = set(of)
+                model._owns_approx_wrt = set(wrt)
+
+                # Support for indices defined on driver vars.
+                model._owns_approx_of_idx = {
+                    key: val['indices'] for key, val in iteritems(self.responses)
+                    if val['indices'] is not None
+                }
+                model._owns_approx_wrt_idx = {
+                    key: val['indices'] for key, val in iteritems(self.design_vars)
+                    if val['indices'] is not None
+                }
 
     def _get_dict_J(self, J, wrt, prom_wrt, of, prom_of, input_meta, out_meta, abs2meta,
                     return_format):
@@ -856,6 +872,8 @@ class _TotalJacInfo(object):
                             deriv_val = deriv_val[indices]
                         # print("deriv_val:", i, output_name, input_name, deriv_val)
                         J[row, i] = deriv_val[idx2local[row]]
+                else:
+                    raise RuntimeError("FOO")
 
     def matmat_jac_setter(self, inds):
         """
@@ -908,7 +926,7 @@ class _TotalJacInfo(object):
         for matmat_idxs in inds:
             self.matmat_jac_setter(matmat_idxs)
 
-    def _compute_totals(self):
+    def compute_totals(self):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1054,21 +1072,21 @@ class _TotalJacInfo(object):
             else:
                 model.approx_totals(method='fd')
 
-        # Initialization based on driver (or user) -requested "of" and "wrt".
-        if not model._owns_approx_jac or model._owns_approx_of != set(of) \
-           or model._owns_approx_wrt != set(wrt):
-            model._owns_approx_of = set(of)
-            model._owns_approx_wrt = set(wrt)
-
-            # Support for indices defined on driver vars.
-            model._owns_approx_of_idx = {
-                key: val['indices'] for key, val in iteritems(self.responses)
-                if val['indices'] is not None
-            }
-            model._owns_approx_wrt_idx = {
-                key: val['indices'] for key, val in iteritems(self.design_vars)
-                if val['indices'] is not None
-            }
+        # # Initialization based on driver (or user) -requested "of" and "wrt".
+        # if not model._owns_approx_jac or model._owns_approx_of != set(of) \
+        #    or model._owns_approx_wrt != set(wrt):
+        #     model._owns_approx_of = set(of)
+        #     model._owns_approx_wrt = set(wrt)
+        #
+        #     # Support for indices defined on driver vars.
+        #     model._owns_approx_of_idx = {
+        #         key: val['indices'] for key, val in iteritems(self.responses)
+        #         if val['indices'] is not None
+        #     }
+        #     model._owns_approx_wrt_idx = {
+        #         key: val['indices'] for key, val in iteritems(self.design_vars)
+        #         if val['indices'] is not None
+        #     }
 
         model._setup_jacobians(recurse=False)
 

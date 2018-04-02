@@ -888,17 +888,12 @@ class Problem(object):
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
-        if wrt is None:
-            wrt = list(self.driver._designvars)
-            global_names = True
-        if of is None:
-            of = self.driver._get_ordered_nl_responses()
-            global_names = True
-
         with self.model._scaled_context_all():
 
             # Calculate Total Derivatives
-            Jcalc = self._compute_totals(of=of, wrt=wrt, global_names=global_names)
+            # Jcalc = self._compute_totals(of=of, wrt=wrt, global_names=global_names)
+            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict')
+            Jcalc = total_info.compute_totals()
 
             # Approximate FD
             fd_args = {
@@ -907,8 +902,8 @@ class Problem(object):
                 'step_calc': step_calc,
             }
             model.approx_totals(method=method, **fd_args)
-            Jfd = self._compute_totals_approx(of=of, wrt=wrt, global_names=global_names,
-                                              initialize=True)
+            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True)
+            Jfd = total_info.compute_totals_approx(initialize=True)
 
         # Assemble and Return all metrics.
         data = {}
@@ -954,73 +949,11 @@ class Problem(object):
 
         with self.model._scaled_context_all():
             if self.model._owns_approx_jac:
-                totals = self._compute_totals_approx(of=of, wrt=wrt,
-                                                     return_format=return_format,
-                                                     global_names=False,
-                                                     initialize=True)
+                total_info = _TotalJacInfo(self, of, wrt, False, return_format, approx=True)
+                return total_info.compute_totals_approx(initialize=True)
             else:
-                totals = self._compute_totals(of=of, wrt=wrt,
-                                              return_format=return_format,
-                                              global_names=False)
-        return totals
-
-    def _compute_totals_approx(self, of=None, wrt=None, return_format='flat_dict',
-                               global_names=True, initialize=False):
-        """
-        Compute derivatives of desired quantities with respect to desired inputs.
-
-        Uses an approximation method, e.g., fd or cs to calculate the derivatives.
-
-        Parameters
-        ----------
-        of : list of variable name strings or None
-            Variables whose derivatives will be computed.
-        wrt : list of variable name strings or None
-            Variables with respect to which the derivatives will be computed.
-        return_format : string
-            Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
-            Default is a 'flat_dict', which returns them in a dictionary whose keys are
-            tuples of form (of, wrt).
-        global_names : bool
-            Set to True when passing in global names to skip some translation steps.
-        initialize : bool
-            Set to True to re-initialize the FD in model. This is only needed when manually
-            calling compute_totals on the problem.
-
-        Returns
-        -------
-        derivs : object
-            Derivatives in form requested by 'return_format'.
-        """
-        total_info = _TotalJacInfo(self, of, wrt, global_names, return_format)
-        return total_info.compute_totals_approx(initialize=initialize)
-
-    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
-        """
-        Compute derivatives of desired quantities with respect to desired inputs.
-
-        Parameters
-        ----------
-        of : list of variable name strings or None
-            Variables whose derivatives will be computed. Default is None, which
-            uses the driver's objectives and constraints.
-        wrt : list of variable name strings or None
-            Variables with respect to which the derivatives will be computed.
-            Default is None, which uses the driver's desvars.
-        return_format : string
-            Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
-            Default is a 'flat_dict', which returns them in a dictionary whose keys are
-            tuples of form (of, wrt).
-        global_names : bool
-            Set to True when passing in global names to skip some translation steps.
-
-        Returns
-        -------
-        derivs : object
-            Derivatives in form requested by 'return_format'.
-        """
-        total_info = _TotalJacInfo(self, of, wrt, global_names, return_format)
-        return total_info._compute_totals()
+                total_info = _TotalJacInfo(self, of, wrt, False, return_format)
+                return total_info.compute_totals()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
         """

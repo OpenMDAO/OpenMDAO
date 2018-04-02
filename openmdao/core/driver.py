@@ -683,7 +683,7 @@ class Driver(object):
             if not total_jac.has_lin_cons:
                 self._total_jac = total_jac
 
-            return total_jac._compute_totals()
+            return total_jac.compute_totals()
 
     def record_iteration(self):
         """

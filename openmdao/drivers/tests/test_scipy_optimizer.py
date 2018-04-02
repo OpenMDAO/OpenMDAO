@@ -52,9 +52,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        of = ['comp.f_xy']
-        wrt = ['p1.x', 'p2.y']
-        derivs = prob._compute_totals(of=of, wrt=wrt, return_format='array')
+        of = ['f_xy']
+        wrt = ['x', 'y']
+        derivs = prob.compute_totals(of=of, wrt=wrt, return_format='array')
 
         assert_rel_error(self, derivs[0, 0], -6.0, 1e-6)
         assert_rel_error(self, derivs[0, 1], 8.0, 1e-6)
@@ -65,9 +65,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        of = ['comp.f_xy']
-        wrt = ['p1.x', 'p2.y']
-        derivs = prob._compute_totals(of=of, wrt=wrt, return_format='array')
+        of = ['f_xy']
+        wrt = ['x', 'y']
+        derivs = prob.compute_totals(of=of, wrt=wrt, return_format='array')
 
         assert_rel_error(self, derivs[0, 0], -6.0, 1e-6)
         assert_rel_error(self, derivs[0, 1], 8.0, 1e-6)
@@ -92,16 +92,16 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        derivs = prob._compute_totals(of=['comp.y1'], wrt=['px.x'], return_format='array')
+        derivs = prob.compute_totals(of=['comp.y1'], wrt=['px.x'], return_format='array')
 
         J = comp.JJ[0:3, 0:2]
         assert_rel_error(self, J, derivs, 1.0e-3)
 
         # Support for a name to be in 'of' and 'wrt'
 
-        derivs = prob._compute_totals(of=['comp.y2', 'px.x', 'comp.y1'],
-                                      wrt=['px.x'],
-                                      return_format='array')
+        derivs = prob.compute_totals(of=['comp.y2', 'px.x', 'comp.y1'],
+                                     wrt=['px.x'],
+                                     return_format='array')
 
         assert_rel_error(self, J, derivs[3:, :], 1.0e-3)
         assert_rel_error(self, comp.JJ[3:4, 0:2], derivs[0:1, :], 1.0e-3)
