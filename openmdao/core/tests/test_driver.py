@@ -8,10 +8,16 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, IndepVarComp, Group, ExplicitComponent
+from openmdao.api import Problem, IndepVarComp, Group, ExecComp
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
+from openmdao.utils.general_utils import set_pyoptsparse_opt
+
+# check that pyoptsparse is installed. if it is, try to use SLSQP.
+OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
+if OPTIMIZER:
+    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 
 class TestDriver(unittest.TestCase):
@@ -238,6 +244,52 @@ class TestDriver(unittest.TestCase):
         self.assertEqual(str(context.exception),
                          "Function is_valid returns False for debug_print.")
 
+    def test_debug_print_desvar_physical_with_indices(self):
+        prob = Problem()
+        model = prob.model = Group()
+
+        size = 3
+        model.add_subsystem('p1', IndepVarComp('x', np.array([50.0] * size)))
+        model.add_subsystem('p2', IndepVarComp('y', np.array([50.0] * size)))
+        model.add_subsystem('comp', ExecComp('f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                             x=np.zeros(size), y=np.zeros(size),
+                                             f_xy=np.zeros(size)))
+        model.add_subsystem('con', ExecComp('c = - x + y',
+                                            c=np.zeros(size), x=np.zeros(size),
+                                            y=np.zeros(size)))
+
+        model.connect('p1.x', 'comp.x')
+        model.connect('p2.y', 'comp.y')
+        model.connect('p1.x', 'con.x')
+        model.connect('p2.y', 'con.y')
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.options['print_results'] = False
+
+        model.add_design_var('p1.x', indices=[1], lower=-50.0, upper=50.0, ref=[5.0,])
+        model.add_design_var('p2.y', indices=[1], lower=-50.0, upper=50.0)
+        model.add_objective('comp.f_xy', index=1)
+        model.add_constraint('con.c', indices=[1], upper=-15.0)
+
+        prob.setup(check=False)
+
+        prob.driver.options['debug_print'] = ['desvars',]
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.run_driver()
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+        # should see unscaled (physical) and the full arrays, not just what is indicated by indices
+        self.assertEqual(output[3], "p1.x: array([ 50.,  50.,  50.])")
+        self.assertEqual(output[4], "p2.y: array([ 50.,  50.,  50.])")
 
 if __name__ == "__main__":
     unittest.main()
