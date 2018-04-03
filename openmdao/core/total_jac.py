@@ -31,7 +31,7 @@ class _TotalJacInfo(object):
     mode : str
         If 'fwd' compute deriv in forward mode, else if 'rev', reverse (adjoint) mode.
     out_meta : dict
-        Map of absoute output var name to tuples of the form (indices, distrib).
+        Map of absoute output var name to tuples of the form (row/column slice, indices, distrib).
     owning_ranks : dict
         Map of absolute var name to the MPI process that owns it.
     idx2name : dict
