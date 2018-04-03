@@ -19,7 +19,7 @@ from openmdao.devtools.iprofile import _iprof_totals_exec, _iprof_totals_setup_p
 from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser
 from openmdao.error_checking.check_config import _check_config_cmd, _check_config_setup_parser
 from openmdao.devtools.iprof_utils import _Options
-
+from openmdao.utils.mpi import MPI
 from openmdao.utils.find_cite import print_citations
 
 
