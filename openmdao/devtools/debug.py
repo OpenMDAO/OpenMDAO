@@ -5,9 +5,12 @@ from __future__ import print_function
 import sys
 import os
 
+import numpy as np
+
 from six.moves import zip_longest
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group, System
+from openmdao.utils.mpi import MPI
 
 # an object used to detect when a named value isn't found
 _notfound = object()
@@ -203,6 +206,15 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
         for name, val in ret:
             print("%s%s: %s" % (vindent, name, val), file=stream)
 
+def _get_printer(comm, stream):
+    if comm.rank == 0:
+        def p(*args, **kwargs):
+            print(*args, file=stream, **kwargs)
+    else:
+        def p(*args, **kwargs):
+            pass
+
+    return p
 
 def config_summary(problem, stream=sys.stdout):
     """
@@ -216,59 +228,85 @@ def config_summary(problem, stream=sys.stdout):
         Where the output will be written.
     """
     model = problem.model
-    allsystems = list(model.system_iter(recurse=True, include_self=True))
-    allgroups = [s for s in allsystems if isinstance(s, Group)]
-    sysnames = [s.pathname for s in allsystems]
-    maxdepth = max([len(name.split('.')) for name in sysnames])
-    setup_done = problem._setup_status == 2
     meta = model._var_allprocs_abs2meta
+    locsystems = list(model.system_iter(recurse=True, include_self=True))
+    locgroups = [s for s in locsystems if isinstance(s, Group)]
 
-    print("============== Problem Summary ============", file=stream)
-    print("Groups:           %5d" % len(allgroups), file=stream)
-    print("Components:       %5d" % (len(allsystems) - len(allgroups)), file=stream)
-    print("Max tree depth:   %5d" % maxdepth, file=stream)
-    print(file=stream)
+    grpnames = [s.pathname for s in locgroups]
+    sysnames = [s.pathname for s in locsystems]
+    ln_solvers = set(type(s.linear_solver).__name__ for s in locgroups)
+    nl_solvers = set(type(s.nonlinear_solver).__name__ for s in locgroups)
+
+    max_depth = max([len(name.split('.')) for name in sysnames])
+    setup_done = problem._setup_status == 2
+
+    if problem.comm.size > 1:
+        local_max = np.array([max_depth])
+        global_max_depth = np.zeros(1, dtype=int)
+        problem.comm.Allreduce(local_max, global_max_depth, op=MPI.MAX)
+
+        proc_names = problem.comm.gather((sysnames, grpnames, ln_solvers, nl_solvers), root=0)
+        grpnames = set()
+        sysnames = set()
+        ln_solvers = set()
+        nl_solvers = set()
+        if proc_names is not None:
+            for rank in range(problem.comm.size):
+                systems, grps, lnsols, nlsols = proc_names[rank]
+                sysnames.update(systems)
+                grpnames.update(grps)
+                ln_solvers.update(lnsols)
+                nl_solvers.update(nlsols)
+    else:
+        global_max_depth = max_depth
+
+    printf = _get_printer(problem.comm, stream)
+
+    printf("============== Problem Summary ============")
+    printf("Groups:           %5d" % len(grpnames))
+    printf("Components:       %5d" % (len(sysnames) - len(grpnames)))
+    printf("Max tree depth:   %5d" % global_max_depth)
+    printf()
 
     if setup_done:
         desvars = model.get_design_vars()
-        print("Design variables: %5d   Total size: %8d" %
-              (len(desvars), sum(d['size'] for d in desvars.values())), file=stream)
+        printf("Design variables: %5d   Total size: %8d" %
+              (len(desvars), sum(d['size'] for d in desvars.values())))
 
         # TODO: give separate info for linear, nonlinear constraints, equality, inequality
         constraints = model.get_constraints()
-        print("Constraints:      %5d   Total size: %8d" %
-              (len(constraints), sum(d['size'] for d in constraints.values())), file=stream)
+        printf("Constraints:      %5d   Total size: %8d" %
+              (len(constraints), sum(d['size'] for d in constraints.values())))
 
         objs = model.get_objectives()
-        print("Objectives:       %5d   Total size: %8d" %
-              (len(objs), sum(d['size'] for d in objs.values())), file=stream)
+        printf("Objectives:       %5d   Total size: %8d" %
+              (len(objs), sum(d['size'] for d in objs.values())))
 
-    print(file=stream)
+    printf()
 
-    ninputs = len(model._var_allprocs_abs_names['input'])
+    input_names = model._var_allprocs_abs_names['input']
+    ninputs = len(input_names)
     if setup_done:
-        print("Input variables:  %5d   Total size: %8d" %
-              (ninputs, sum(d.size for d in model._inputs._data.values())), file=stream)
+        printf("Input variables:  %5d   Total size: %8d" %
+              (ninputs, sum(meta[n]['size'] for n in input_names)))
     else:
-        print("Input variables: %5d" % ninputs, file=stream)
+        printf("Input variables: %5d" % ninputs)
 
-    noutputs = len(model._var_allprocs_abs_names['output'])
+    output_names = model._var_allprocs_abs_names['output']
+    noutputs = len(output_names)
     if setup_done:
-        print("Output variables: %5d   Total size: %8d" %
-              (noutputs, sum(d.size for d in model._outputs._data.values())), file=stream)
+        printf("Output variables: %5d   Total size: %8d" %
+              (noutputs, sum(meta[n]['global_size'] for n in output_names)))
     else:
-        print("Output variables: %5d" % noutputs, file=stream)
+        printf("Output variables: %5d" % noutputs)
 
     if setup_done:
-        print(file=stream)
+        printf()
         conns = model._conn_global_abs_in2out
-        print("Total connections: %d   Total transfer data size: %d" %
-              (len(conns), sum(meta[n]['size'] for n in conns)), file=stream)
+        printf("Total connections: %d   Total transfer data size: %d" %
+              (len(conns), sum(meta[n]['size'] for n in conns)))
 
-    print(file=stream)
-    print("Driver type: %s" % problem.driver.__class__.__name__, file=stream)
-    print("Linear Solvers: %s" % sorted(set(type(s.linear_solver).__name__ for s in allgroups)),
-          file=stream)
-    print("Nonlinear Solvers: %s" % sorted(set(type(s.nonlinear_solver).__name__ for s in
-                                                         allgroups)),
-          file=stream)
+    printf()
+    printf("Driver type: %s" % problem.driver.__class__.__name__)
+    printf("Linear Solvers: %s" % sorted(ln_solvers))
+    printf("Nonlinear Solvers: %s" % sorted(nl_solvers))
