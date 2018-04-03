@@ -244,6 +244,7 @@ class Driver(object):
         self._problem = problem
         model = problem.model
 
+        self._total_jac = None
         self._objs = objs = OrderedDict()
         self._cons = cons = OrderedDict()
         self._responses = model.get_responses(recurse=True)

@@ -786,7 +786,12 @@ class CacheLinSolutionTestCase(unittest.TestCase):
 
         for i in range(10):
             p['indeps.x'] += np.arange(10, dtype=float)
+            # run_model always runs setup_driver which resets the cached total jacobian object,
+            # so save it here and restore after the run_model.  This is a contrived test.  In
+            # real life, we only care about caching linear solutions when we're under run_driver.
+            old_tot_jac = p.driver._total_jac
             p.run_model()
+            p.driver._total_jac = old_tot_jac
             J = p.driver._compute_totals(of=['C1.y'], wrt=['indeps.x'])
 
     def test_caching_rev(self):
@@ -801,7 +806,12 @@ class CacheLinSolutionTestCase(unittest.TestCase):
 
         for i in range(10):
             p['indeps.x'] += np.arange(10, dtype=float)
+            # run_model always runs setup_driver which resets the cached total jacobian object,
+            # so save it here and restore after the run_model.  This is a contrived test.  In
+            # real life, we only care about caching linear solutions when we're under run_driver.
+            old_tot_jac = p.driver._total_jac
             p.run_model()
+            p.driver._total_jac = old_tot_jac
             J = p.driver._compute_totals(of=['C1.y'], wrt=['indeps.x'])
 
 
