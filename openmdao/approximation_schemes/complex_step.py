@@ -121,8 +121,8 @@ class ComplexStep(ApproximationScheme):
         results_clone = current_vec._clone(True)
 
         for key, approximations in groupby(self._exec_list, self._key_fun):
-            # groupby (along with this key function) will group all 'of's that have
-            # the same wrt and step size.
+            # groupby (along with this key function) will group all 'of's that have the same wrt and
+            # step size.
             wrt, form, delta = key
             if form == 'reverse':
                 delta *= -1.0

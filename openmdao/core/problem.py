@@ -891,7 +891,6 @@ class Problem(object):
         with self.model._scaled_context_all():
 
             # Calculate Total Derivatives
-            # Jcalc = self._compute_totals(of=of, wrt=wrt, global_names=global_names)
             total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict')
             Jcalc = total_info.compute_totals()
 
