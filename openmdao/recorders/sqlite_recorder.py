@@ -86,7 +86,8 @@ class SqliteRecorder(BaseRecorder):
     _prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
     _abs2meta : {'name': {}}
-        Dictionary mapping absolute variable names to their metadata including units, bounds, and scaling.
+        Dictionary mapping absolute variable names to their metadata including units,
+        bounds, and scaling.
     _open_close_sqlite: bool
         If True, open, write, and close the sqlite file. Needed for when running under MPI.
     _pickle_version: int

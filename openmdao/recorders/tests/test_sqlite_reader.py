@@ -525,6 +525,196 @@ class TestSqliteCaseReader(unittest.TestCase):
                                        'incorrect Parameter value'
                                        ' for {0}'.format('mda.d2.y2'))
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
+    def test_get_child_cases(self):
+        self.setup_sellar_grouped_model()
+
+        self.prob.driver = pyOptSparseDriver()
+        self.prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            self.prob.driver.opt_settings['ACC'] = 1e-9
+
+        self.prob.driver.add_recorder(self.recorder)
+        self.prob.model.add_recorder(self.recorder)
+        driver = self.prob.driver
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_responses'] = True
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+
+        self.prob.model._nonlinear_solver.add_recorder(self.recorder)
+        self.prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            self.prob.driver.opt_settings['ACC'] = 1e-9
+
+        self.prob.setup(check=False)
+        self.prob.run_driver()
+        self.prob.cleanup()
+
+        cr = CaseReader(self.filename)
+
+        expected_coords = [
+            'rank0:SLSQP|0',
+            'rank0:SLSQP|1',
+            'rank0:SLSQP|2',
+            'rank0:SLSQP|3',
+            'rank0:SLSQP|4',
+            'rank0:SLSQP|5',
+            'rank0:SLSQP|6',
+        ]
+        ind = 0
+        for c in cr.get_cases():
+            self.assertEqual(c.iteration_coordinate, expected_coords[ind])
+            ind += 1
+
+        coords_2 = [
+            'rank0:SLSQP|0',
+            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:SLSQP|1',
+            'rank0:SLSQP|1|root._solve_nonlinear|1|NLRunOnce|0',
+            'rank0:SLSQP|2',
+            'rank0:SLSQP|2|root._solve_nonlinear|2|NLRunOnce|0',
+            'rank0:SLSQP|3',
+            'rank0:SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0',
+            'rank0:SLSQP|4',
+            'rank0:SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0',
+            'rank0:SLSQP|5',
+            'rank0:SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0',
+            'rank0:SLSQP|6',
+            'rank0:SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0'
+        ]
+        ind = 0
+        for c in cr.get_cases(recursive=True):
+            self.assertEqual(c.iteration_coordinate, coords_2[ind])
+            ind += 1
+
+        coord_children = [
+            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0'
+        ]
+        for c in cr.get_cases('rank0:SLSQP|0', True):
+            self.assertEqual(c.iteration_coordinate, coord_children[0])
+
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
+    def test_get_child_cases_system(self):
+        self.setup_sellar_grouped_model()
+
+        self.prob.driver = pyOptSparseDriver()
+        self.prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            self.prob.driver.opt_settings['ACC'] = 1e-9
+
+        self.prob.model.add_recorder(self.recorder)
+        driver = self.prob.driver
+
+        self.prob.model._nonlinear_solver.add_recorder(self.recorder)
+        self.prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            self.prob.driver.opt_settings['ACC'] = 1e-9
+
+        self.prob.setup(check=False)
+        self.prob.run_driver()
+        self.prob.cleanup()
+
+        cr = CaseReader(self.filename)
+
+        coords = [
+            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:SLSQP|1|root._solve_nonlinear|1|NLRunOnce|0',
+            'rank0:SLSQP|2|root._solve_nonlinear|2|NLRunOnce|0',
+            'rank0:SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0',
+            'rank0:SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0',
+            'rank0:SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0',
+            'rank0:SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0'
+        ]
+        ind = 0
+        for c in cr.get_cases(recursive=True):
+            self.assertEqual(c.iteration_coordinate, coords[ind])
+            ind += 1
+
+    def test_list_outputs(self):
+        self.setup_sellar_model()
+
+        nonlinear_solver = self.prob.model.nonlinear_solver
+        linear_solver = self.prob.model.linear_solver
+
+        d1 = self.prob.model.d1  # instance of SellarDis1withDerivatives, a Group
+        d1.nonlinear_solver = NonlinearBlockGS()
+        d1.nonlinear_solver.options['maxiter'] = 5
+        self.prob.model.add_recorder(self.recorder)
+        self.prob.model.recording_options['record_residuals'] = True
+
+        self.prob.setup(check=False)
+        self.prob.run_driver()
+        self.prob.cleanup()
+
+        cr = CaseReader(self.filename)
+
+        outputs = cr.list_outputs(True, True, True, True, None, True, True, True,
+                                  True, True, True)
+
+        expected_outputs = {
+            'd2.y2': {'lower': None, 'ref': 1.0, 'resids': [0.], 'shape': (1,), 'values': [12.0584882]},
+            'con_cmp1.con1': {'lower': None, 'ref': 1.0, 'resids': [0.], 'shape': (1,), 'values': [-22.4283024]},
+            'pz.z': {'lower': None, 'ref': 1.0, 'resids': [0., 0.], 'shape': (2,), 'values': [5., 2.]},
+            'obj_cmp.obj': {'lower': None, 'ref': 1.0, 'resids': [0.], 'shape': (1,), 'values': [28.5883082]},
+            'px.x': {'lower': None, 'ref': 1.0, 'resids': [0.], 'shape': (1,), 'values': [1.]},
+            'con_cmp2.con2': {'lower': None, 'ref': 1.0, 'resids': [0.], 'shape': (1,), 'values': [-11.9415118]},
+            'd1.y1': {'lower': None, 'ref': 1.0, 'resids': [1.318e-10], 'shape': (1,), 'values': [25.5883024]}
+        }
+
+        self.assertEqual(len(outputs), 7)
+        for o in outputs:
+            vals = o[1]
+            name = o[0]
+            expected = expected_outputs[name]
+            self.assertEqual(vals['lower'], expected['lower'])
+            self.assertEqual(vals['ref'], expected['ref'])
+            self.assertEqual(vals['shape'], expected['shape'])
+            np.testing.assert_almost_equal(vals['resids'], expected['resids'])
+            np.testing.assert_almost_equal(vals['value'], expected['values'])
+
+    def test_list_inputs(self):
+        self.setup_sellar_model()
+
+        nonlinear_solver = self.prob.model.nonlinear_solver
+        linear_solver = self.prob.model.linear_solver
+
+        d1 = self.prob.model.d1  # instance of SellarDis1withDerivatives, a Group
+        d1.nonlinear_solver = NonlinearBlockGS()
+        d1.nonlinear_solver.options['maxiter'] = 5
+        self.prob.model.add_recorder(self.recorder)
+        self.prob.model.recording_options['record_residuals'] = True
+
+        self.prob.setup(check=False)
+        self.prob.run_driver()
+        self.prob.cleanup()
+
+        cr = CaseReader(self.filename)
+
+        inputs = cr.list_inputs(True, True, True)
+
+        expected_inputs = {
+            'obj_cmp.x': {'value': [1.]},
+            'd2.z': {'value': [5., 2.]},
+            'con_cmp2.y2': {'value': [12.05848815]},
+            'obj_cmp.y2': {'value': [12.05848815]},
+            'obj_cmp.z': {'value': [5., 2.]},
+            'd1.x': {'value': [1.]},
+            'd1.z': {'value': [5., 2.]},
+            'd1.y2': {'value': [12.05848815]},
+            'con_cmp1.y1': {'value': [25.58830237]},
+            'obj_cmp.y1': {'value': [25.58830237]},
+            'd2.y1': {'value': [25.58830237]}
+        }
+
+        self.assertEqual(len(inputs), 11)
+        for o in inputs:
+            vals = o[1]
+            name = o[0]
+            expected = expected_inputs[name]
+            np.testing.assert_almost_equal(vals['value'], expected['value'])
 
 
 if __name__ == "__main__":

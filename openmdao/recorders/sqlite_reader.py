@@ -16,7 +16,7 @@ from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import is_valid_sqlite3_db
 from openmdao.utils.write_outputs import write_outputs
 
-from six import PY2, PY3, iteritems
+from six import PY2, PY3
 
 if PY2:
     import cPickle as pickle
@@ -163,7 +163,7 @@ class SqliteCaseReader(BaseCaseReader):
             raise ValueError('SQliteCaseReader encountered an unhandled '
                              'format version: {0}'.format(self.format_version))
 
-    def get_child_cases(self, parent=None, recursive=False):
+    def get_cases(self, parent=None, recursive=False):
         """
         Allows one to iterate over the driver and solver cases.
 
@@ -207,7 +207,7 @@ class SqliteCaseReader(BaseCaseReader):
             else []
 
         # grab an array of possible lengths of coordinates
-        coord_lengths = [1]  # start with 1 because that is the length of driver iteration coords
+        coord_lengths = [2]  # start with 2 because that is the length of driver iteration coords
         for s in solver_iter:
             s_len = len(self._split_coordinate(s[0]))
             if s_len not in coord_lengths:
@@ -228,7 +228,7 @@ class SqliteCaseReader(BaseCaseReader):
     def _find_child_cases(self, parent_iter_coord, split_parent_iter_coord, driver_iter,
                           solver_iter, recursive, coord_lengths):
         """
-        Finds all child cases of a given parent.
+        Finds all children of a given parent case.
 
         Parameters
         ----------
@@ -253,7 +253,7 @@ class SqliteCaseReader(BaseCaseReader):
         """
         ret = []
         par_len = len(split_parent_iter_coord)
-        par_len_idx = coord_lengths.index(par_len if par_len is not 0 else 1)
+        par_len_idx = coord_lengths.index(par_len if par_len is not 0 else 2)
         expected_child_length = coord_lengths[par_len_idx + 1] if par_len_idx <\
             len(coord_lengths) - 1 else -1
         if parent_iter_coord is '':  # CASE: grabbing children of 'root'
@@ -266,16 +266,13 @@ class SqliteCaseReader(BaseCaseReader):
                                                       coord_lengths)
             elif len(solver_iter) > 0:  # grabbing first layer of solver iterations
                 # find the iteration coordinate length of the first layer of solver iterations
-                min_iter_len = (0, len(self._split_coordinate(solver_iter[0])))
-                for idx, s in solver_iter:
-                    length = len(self._split_coordinate(s[0]))
-                    if length < min_iter_len[1]:
-                        min_iter_len[0] = idx
-                        min_iter_len[1] = length
+                min_iter_len = -1
+                if len(coord_lengths) > 1:
+                    min_iter_len = coord_lengths[1]
 
                 for s in solver_iter:
                     split_coord = self._split_coordinate(s[0])
-                    if len(split_coord) is min_iter_len[1]:
+                    if len(split_coord) is min_iter_len:
                         ret.append((s[0], 'solver'))
                         if recursive:
                             ret += self._find_child_cases(s[0], split_coord, driver_iter,
