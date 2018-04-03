@@ -156,6 +156,8 @@ def _tree_setup_parser(parser):
                         help='Add an attribute to search for in tree systems.')
     parser.add_argument('-v', '--var', action='append', default=[], dest='vecvars',
                         help='Add a variable to search for in vectors of tree systems.')
+    parser.add_argument('-r', '--rank', action='store', type=int, dest='rank',
+                        default=0, help="Display the tree on this rank (if MPI is active).")
 
 
 def _get_tree_filter(attrs, vecvars):
@@ -223,7 +225,7 @@ def _tree_cmd(options):
 
     def _tree(prob):
         tree(prob, show_colors=options.show_colors,
-             filter=filt, max_depth=options.depth, stream=out)
+             filter=filt, max_depth=options.depth, rank=options.rank, stream=out)
         exit()
     return _tree
 

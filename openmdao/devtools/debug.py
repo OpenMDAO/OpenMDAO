@@ -97,7 +97,7 @@ class _NoColor(object):
         return ''
 
 
-def _get_color_printer(stream=sys.stdout, colors=True):
+def _get_color_printer(stream=sys.stdout, colors=True, rank=0):
     """
     Return a print function tied to a particular stream, along with coloring info.
     """
@@ -110,18 +110,27 @@ def _get_color_printer(stream=sys.stdout, colors=True):
     if not colors:
         Fore = Back = Style = _NoColor()
 
-    def color_print(s, fore='', color='', end=''):
-        """
-        """
-        print(color + s, file=stream, end='')
-        print(Style.RESET_ALL, file=stream, end='')
-        print(end=end)
+    if MPI and MPI.COMM_WORLD.rank != rank:
+        if rank >= MPI.COMM_WORLD.size:
+            if MPI.COMM_WORLD.rank == 0:
+                print("Specified rank (%d) is outside of the valid range (0-%d)." %
+                      (rank, MPI.COMM_WORLD.size - 1))
+            sys.exit()
+        def color_print(s, **kwargs):
+            pass
+    else:
+        def color_print(s, fore='', color='', end=''):
+            """
+            """
+            print(color + s, file=stream, end='')
+            print(Style.RESET_ALL, file=stream, end='')
+            print(end=end)
 
     return color_print, Fore, Back, Style
 
 
 def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
-         filter=None, max_depth=0, stream=sys.stdout):
+         filter=None, max_depth=0, rank=0, stream=sys.stdout):
     """
     Dump the model tree structure to the given stream.
 
@@ -144,10 +153,13 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
         be displayed along with any name, value pairs returned from the filter, if any.
     max_depth : int
         Maximum depth for display.
+    rank : int
+        If MPI is active, the tree will only be displayed on this rank.  Only objects local
+        to the given rank will be displayed.
     stream : File-like
         Where dump output will go.
     """
-    cprint, Fore, Back, Style = _get_color_printer(stream, show_colors)
+    cprint, Fore, Back, Style = _get_color_printer(stream, show_colors, rank=rank)
 
     tab = 0
     if isinstance(top, Problem):
@@ -171,7 +183,7 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
             continue
 
         indent = '    ' * (depth + tab)
-        print(indent, file=stream, end='')
+        cprint(indent, end='')
 
         info = ''
         if isinstance(s, Group):
@@ -200,11 +212,12 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
                 cprint("  Jac: ")
                 cprint(jactype, color=Fore.MAGENTA + Style.BRIGHT)
 
-        print(file=stream)
+        cprint('', end='\n')
 
         vindent = indent + '  '
         for name, val in ret:
-            print("%s%s: %s" % (vindent, name, val), file=stream)
+            cprint("%s%s: %s\n" % (vindent, name, val))
+
 
 def _get_printer(comm, stream):
     if comm.rank == 0:
@@ -215,6 +228,7 @@ def _get_printer(comm, stream):
             pass
 
     return p
+
 
 def config_summary(problem, stream=sys.stdout):
     """
