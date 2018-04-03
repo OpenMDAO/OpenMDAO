@@ -5,6 +5,7 @@ from collections import Iterable, Counter, OrderedDict, defaultdict
 from itertools import product, chain
 from numbers import Number
 import warnings
+import inspect
 
 from six import iteritems, string_types, itervalues
 from six.moves import range
@@ -1201,6 +1202,10 @@ class Group(System):
             enable users to instantiate and add a subsystem at the
             same time, and get the reference back.
         """
+        if inspect.isclass(subsys):
+            raise TypeError("Subsystem '%s' should be an instance, "
+                            "but a class object was found." % name)
+
         for sub in chain(self._subsystems_allprocs,
                          self._static_subsystems_allprocs):
             if name == sub.name:
