@@ -144,15 +144,14 @@ class _TotalJacInfo(object):
             self.simul_coloring = None if has_lin_cons else driver._simul_coloring_info
 
             self.in_idx_map, self.in_loc_idxs, self.idx_iter_dict = \
-                self._create_in_idx_map(self.input_list, self.input_meta, has_lin_cons,
-                                        model._var_sizes, model._var_allprocs_abs2idx, abs2meta)
+                self._create_in_idx_map(has_lin_cons)
             in_size = self.in_loc_idxs.size
 
-            self.out_meta, out_size = self._create_meta_map(self.output_list, output_meta, abs2meta)
+            self.out_meta, out_size = self._get_tuple_map(self.output_list, output_meta, abs2meta)
 
             if not has_lin_cons and self.simul_coloring is not None:
                 self.idx2name, self.idx2local = self._create_idx_maps(self.output_list, output_meta,
-                                                                      abs2meta, out_size)
+                                                                      out_size)
             else:
                 self.idx2name = self.idx2local = self.simul_coloring = None
 
@@ -171,15 +170,15 @@ class _TotalJacInfo(object):
                 if self.has_scaling:
                     # for array return format, create a 'dict' view for scaling only, since
                     # our scaling data is by variable.
+                    in_meta, _ = self._get_tuple_map(self.input_list, self.input_meta, abs2meta)
                     self.J_dict = self._get_dict_J(J, wrt, prom_wrt, of, prom_of,
-                                                   self.input_meta, self.out_meta,
-                                                   abs2meta, 'dict')
+                                                   in_meta, self.out_meta, 'dict')
                 else:
                     self.J_dict = None
             else:
+                in_meta, _ = self._get_tuple_map(self.input_list, self.input_meta, abs2meta)
                 self.J_final = self.J_dict = self._get_dict_J(J, wrt, prom_wrt, of, prom_of,
-                                                              self.input_meta, self.out_meta,
-                                                              abs2meta, return_format)
+                                                              in_meta, self.out_meta, return_format)
 
         if self.has_scaling:
             self.prom_design_vars = {prom_wrt[i]: design_vars[dv] for i, dv in enumerate(wrt)}
@@ -194,14 +193,13 @@ class _TotalJacInfo(object):
         output_meta : dict
             Mapping of output name to response metadata (fwd) or design var metadata (rev).
         """
-        abs2meta = self.model._var_allprocs_abs2meta
         model = self.model
-        of = self.of
-        wrt = self.wrt
+        abs2meta = model._var_allprocs_abs2meta
 
         if self.return_format == 'array':
-            self.out_meta, out_size = self._create_meta_map(self.output_list, output_meta, abs2meta)
-            _, in_size = self._create_meta_map(self.input_list, self.input_meta, abs2meta)
+            self.out_meta, out_size = self._get_tuple_map(self.output_list, output_meta, abs2meta)
+            in_meta, in_size = self._get_tuple_map(self.input_list, self.input_meta, abs2meta)
+
             if self.mode == 'fwd':
                 self.J = J = np.zeros((out_size, in_size))
             else:  # rev
@@ -209,12 +207,11 @@ class _TotalJacInfo(object):
 
             # for array return format, create a 'dict' view so we can map partial subjacs into
             # the proper locations (and also do by-variable scaling if needed).
-            self.J_dict = self._get_dict_J(J, wrt, self.prom_wrt, of, self.prom_of,
-                                           self.input_meta, self.out_meta,
-                                           abs2meta, 'dict')
+            self.J_dict = self._get_dict_J(J, self.wrt, self.prom_wrt, self.of, self.prom_of,
+                                           in_meta, self.out_meta, 'dict')
 
-        of_set = frozenset(of)
-        wrt_set = frozenset(wrt)
+        of_set = frozenset(self.of)
+        wrt_set = frozenset(self.wrt)
 
         # Initialization based on driver (or user) -requested "of" and "wrt".
         if not model._owns_approx_jac or model._owns_approx_of != of_set \
@@ -232,8 +229,7 @@ class _TotalJacInfo(object):
                 if val['indices'] is not None
             }
 
-    def _get_dict_J(self, J, wrt, prom_wrt, of, prom_of, input_meta, out_meta, abs2meta,
-                    return_format):
+    def _get_dict_J(self, J, wrt, prom_wrt, of, prom_of, in_meta, out_meta, return_format):
         """
         Create a dict or flat-dict jacobian that maps to views in the given 2D array jacobian.
 
@@ -249,12 +245,10 @@ class _TotalJacInfo(object):
             Absolute names of output vars.
         prom_of : iter of str
             Promoted names of output vars.
-        input_meta : dict
-            Dict of input voi metadata.
+        in_meta : dict
+            Dict mapping input name to array jacobian slice, indices, and distrib.
         out_meta : dict
             Dict mapping output name to array jacobian slice, indices, and distrib.
-        abs2meta : dict
-            Mapping of absolute var name to metadata dict for that var.
         return_format : str
             Indicates the desired form of the returned jacobian.
 
@@ -264,10 +258,10 @@ class _TotalJacInfo(object):
             Dict form of the total jacobian that contains views of the ndarray jacobian.
         """
         if self.mode == 'fwd':
-            meta_in, in_size = self._create_meta_map(wrt, input_meta, abs2meta)
+            meta_in = in_meta
             meta_out = out_meta
         else:
-            meta_out, in_size = self._create_meta_map(of, input_meta, abs2meta)
+            meta_out = in_meta
             meta_in = out_meta
 
         J_dict = OrderedDict()
@@ -287,25 +281,14 @@ class _TotalJacInfo(object):
 
         return J_dict
 
-    def _create_in_idx_map(self, names, vois, has_lin_constraints, var_sizes, abs2idx, abs2meta):
+    def _create_in_idx_map(self, has_lin_constraints):
         """
         Create a list that maps a global index to a name, col/row range, and other data.
 
         Parameters
         ----------
-        names : iter of str
-            Names of the variables making up the rows or columns of the jacobian.
-        vois : dict
-            Mapping of variable of interest (desvar or response) name to its metadata.
         has_lin_constraints : bool
             If True, there are linear constraints used to compute the total jacobian.
-        var_sizes : dict of dict of arrays
-            Container for all variable sizes based on vec_name, input/output, and rank.
-        abs2idx : dict
-            Mapping of absolute var name to index of that var in the list of vars of the same
-            type (input or output).
-        abs2meta : dict
-            Mapping of absolute var name to metadata dict for that var.
 
         Returns
         -------
@@ -323,14 +306,18 @@ class _TotalJacInfo(object):
         owning_ranks = self.owning_ranks
         relevant = self.relevant
         has_par_deriv_color = False
+        abs2meta = self.model._var_allprocs_abs2meta
+        var_sizes = self.model._var_sizes
+        abs2idx = self.model._var_allprocs_abs2idx
+        vois = self.input_meta
 
-        idx_tups = [None] * len(names)
+        idx_tups = [None] * len(self.input_list)
         loc_idxs = []
         idx_iter_dict = OrderedDict()  # a dict of index iterators
 
         simul_coloring = self.simul_coloring
 
-        for name in names:
+        for name in self.input_list:
             rhsname = 'linear'
             in_var_meta = abs2meta[name]
 
@@ -439,7 +426,7 @@ class _TotalJacInfo(object):
 
         return idx_map, np.hstack(loc_idxs), idx_iter_dict
 
-    def _create_meta_map(self, names, vois, abs2meta):
+    def _get_tuple_map(self, names, vois, abs2meta):
         """
         Create a dict that maps var name to metadata tuple.
 
@@ -481,7 +468,7 @@ class _TotalJacInfo(object):
 
         return idx_map, end  # after the loop, end is the total size
 
-    def _create_idx_maps(self, names, vois, abs2meta, size):
+    def _create_idx_maps(self, names, vois, size):
         """
         Create a list that maps jacobian row/column index to var name.
 
@@ -491,8 +478,6 @@ class _TotalJacInfo(object):
             Names of the variables making up the rows or columns of the jacobian.
         vois : dict
             Mapping of variable of interest (desvar or response) name to its metadata.
-        abs2meta : dict
-            Mapping of absolute var name to metadata for that var.
         size : int
             Total number of rows/columns.
 
@@ -505,6 +490,7 @@ class _TotalJacInfo(object):
         """
         idx2name = [None] * size
         idx2local = np.empty(size, dtype=int)
+        abs2meta = self.model._var_allprocs_abs2meta
 
         start = end = 0
         for name in names:
