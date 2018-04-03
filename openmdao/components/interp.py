@@ -197,8 +197,3 @@ class BsplinesComp(ExplicitComponent):
 
         out = self.jac * inputs[meta['in_name']].reshape(np.prod(in_shape))
         outputs[meta['out_name']] = out.reshape(out_shape)
-
-
-# TODO: We should not need to do this.
-def _for_docs():
-    return BsplinesComp()
