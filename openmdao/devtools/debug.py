@@ -59,7 +59,7 @@ def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma:
                 for ivar, vname in enumerate(vnames[type_]):
                     vset = abs2meta[vname]['var_set']
                     if vset == sname:
-                        sz = sizes[type_][vset][rank, set_idxs[type_][vname]]
+                        sz = sizes[type_][vset][rank, set_idxs[vname]]
                         if sz > 0:
                             data.append((vname, str(set_total)))
                         nwid = max(nwid, len(vname))
@@ -86,7 +86,8 @@ def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma:
                                          wid2=piwid, wid3=pnwid))
         stream.write("\n\n")
 
-    _dump(problem.model, stream)
+    if not MPI or MPI.COMM_WORLD.rank == 0:
+        _dump(problem.model, stream)
 
 
 class _NoColor(object):

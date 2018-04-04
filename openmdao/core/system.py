@@ -2576,7 +2576,7 @@ class System(object):
                 outs['units'] = meta[name]['units']
             inputs.append((name, outs))
 
-        if out_stream == _DEFAULT_OUT_STREAM:
+        if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
         if out_stream:
@@ -2677,7 +2677,7 @@ class System(object):
             else:
                 expl_outputs.append((name, outs))
 
-        if out_stream == _DEFAULT_OUT_STREAM:
+        if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
         if out_stream:
