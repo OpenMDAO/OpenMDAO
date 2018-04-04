@@ -199,9 +199,9 @@ class SqliteRecorder(BaseRecorder):
                 self._abs2meta[name]['type'] = 'Implicit'
 
         # store the updated abs2prom and prom2abs
-        abs2prom = pickle.dumps(self._abs2prom, self._pickle_version)
-        prom2abs = pickle.dumps(self._prom2abs, self._pickle_version)
-        abs2meta = pickle.dumps(self._abs2meta, self._pickle_version)
+        abs2prom = pickle.dumps(self._abs2prom)
+        prom2abs = pickle.dumps(self._prom2abs)
+        abs2meta = pickle.dumps(self._abs2meta)
         if self._open_close_sqlite:
             with self.con:
                 self.con.execute("UPDATE metadata SET abs2prom=?, prom2abs=?, abs2meta=?",

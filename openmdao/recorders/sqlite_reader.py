@@ -165,7 +165,7 @@ class SqliteCaseReader(BaseCaseReader):
 
     def get_cases(self, parent=None, recursive=False):
         """
-        Allows one to iterate over the driver and solver cases.
+        Allow one to iterate over the driver and solver cases.
 
         Parameters
         ----------
@@ -228,7 +228,7 @@ class SqliteCaseReader(BaseCaseReader):
     def _find_child_cases(self, parent_iter_coord, split_parent_iter_coord, driver_iter,
                           solver_iter, recursive, coord_lengths):
         """
-        Finds all children of a given parent case.
+        Find all children of a given parent case.
 
         Parameters
         ----------
@@ -290,8 +290,7 @@ class SqliteCaseReader(BaseCaseReader):
 
     def _is_case_child(self, parent_coordinate, coordinate, expected_child_length):
         """
-        Tells if the given iteration coordinate indicates that the associated case is a
-        child case of the parent.
+        Tells if the given case is a child case of the parent.
 
         Parameters
         ----------
@@ -316,7 +315,7 @@ class SqliteCaseReader(BaseCaseReader):
 
     def _split_coordinate(self, coordinate):
         """
-        Splits up an iteration coordinate string based on the iteration index.
+        Split up an iteration coordinate string based on the iteration index.
 
         Parameters
         ----------
@@ -337,6 +336,7 @@ class SqliteCaseReader(BaseCaseReader):
                     out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of input names and other optional information.
+
         Also optionally logs the information to a user defined output stream.
 
         Parameters
@@ -404,6 +404,7 @@ class SqliteCaseReader(BaseCaseReader):
                      out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of output names and other optional information.
+
         Also optionally logs the information to a user defined output stream.
 
         Parameters
@@ -573,8 +574,7 @@ class SqliteCaseReader(BaseCaseReader):
 
     def _has_all_values(self, coord_map):
         """
-        Tell if the coord_map indicates that all variables from every recorded system
-        have been iterated over.
+        Tell if all variables from every recorded system have been iterated over.
 
         Parameters
         ----------
