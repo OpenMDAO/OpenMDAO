@@ -403,7 +403,7 @@ class Driver(object):
                           "(objectives and constraints)." %
                           (problem._mode, desvar_size, response_size), RuntimeWarning)
 
-    def _get_voi_val(self, name, meta, remote_vois):
+    def _get_voi_val(self, name, meta, remote_vois, unscaled=False, ignore_indices=False):
         """
         Get the value of a variable of interest (objective, constraint, or design var).
 
@@ -418,6 +418,10 @@ class Driver(object):
         remote_vois : dict
             Dict containing (owning_rank, size) for all remote vois of a particular
             type (design var, constraint, or objective).
+        unscaled : bool
+            Set to True if unscaled (physical) design variables are desired.
+        ignore_indices : bool
+            Set to True if the full array is desired, not just those indicated by indices.
 
         Returns
         -------
@@ -432,7 +436,7 @@ class Driver(object):
         if name in remote_vois:
             owner, size = remote_vois[name]
             if owner == comm.rank:
-                if indices is None:
+                if indices is None or ignore_indices:
                     val = vec[name].copy()
                 else:
                     val = vec[name][indices]
@@ -442,12 +446,12 @@ class Driver(object):
                 val = np.empty(size)
             comm.Bcast(val, root=owner)
         else:
-            if indices is None:
+            if indices is None or ignore_indices:
                 val = vec[name].copy()
             else:
                 val = vec[name][indices]
 
-        if self._has_scaling:
+        if self._has_scaling and not unscaled:
             # Scale design variable values
             adder = meta['adder']
             if adder is not None:
@@ -459,7 +463,7 @@ class Driver(object):
 
         return val
 
-    def get_design_var_values(self, filter=None):
+    def get_design_var_values(self, filter=None, unscaled=False, ignore_indices=False):
         """
         Return the design variable values.
 
@@ -469,6 +473,10 @@ class Driver(object):
         ----------
         filter : list
             List of desvar names used by recorders.
+        unscaled : bool
+            Set to True if unscaled (physical) design variables are desired.
+        ignore_indices : bool
+            Set to True if the full array is desired, not just those indicated by indices.
 
         Returns
         -------
@@ -481,7 +489,8 @@ class Driver(object):
             # use all the designvars
             dvs = self._designvars
 
-        return {n: self._get_voi_val(n, self._designvars[n], self._remote_dvs) for n in dvs}
+        return {n: self._get_voi_val(n, self._designvars[n], self._remote_dvs, unscaled=unscaled,
+                                     ignore_indices=ignore_indices) for n in dvs}
 
     def set_design_var(self, name, value):
         """
@@ -938,7 +947,7 @@ class Driver(object):
             print(len(header) * '-')
 
         if 'desvars' in self.options['debug_print']:
-            desvar_vals = self.get_design_var_values()
+            desvar_vals = self.get_design_var_values(unscaled=True, ignore_indices=True)
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Design Vars")
                 if desvar_vals:
