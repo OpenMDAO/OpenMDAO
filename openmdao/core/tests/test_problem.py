@@ -538,6 +538,19 @@ class TestProblem(unittest.TestCase):
         # the connected input variable, referenced by the absolute path
         assert_rel_error(self, prob['d2.y1'], 27.3049178437, 1e-6)
 
+    def test_feature_get_set_with_units(self):
+        from openmdao.api import Problem, ExecComp
+
+        prob = Problem()
+        comp = prob.model.add_subsystem('comp', ExecComp('y=x+1.', x={'value': 100.0, 'units': 'cm'},
+                                                         y={'units': 'm'}))
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.x'], 100, 1e-6)
+        assert_rel_error(self, prob['comp.x', 'm'], 1.0, 1e-6)
+
     def test_feature_set_get_array(self):
         import numpy as np
 

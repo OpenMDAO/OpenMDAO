@@ -24,10 +24,10 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration
-from openmdao.utils.general_utils import warn_deprecation, ContainsAll
+from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
-from openmdao.utils.general_utils import pad_name
+from openmdao.utils.units import get_conversion
 from openmdao.vectors.default_vector import DefaultVector
 
 try:
@@ -172,6 +172,10 @@ class Problem(object):
         float or ndarray
             the requested output/input variable.
         """
+        unit = None
+        if isinstance(name, tuple):
+            name, unit = name
+
         # Caching only needed if vectors aren't allocated yet.
         if self._setup_status == 1:
 
@@ -230,6 +234,9 @@ class Problem(object):
 
         # Need to cache the "get" in case the user calls in-place numpy operations.
         self._initial_condition_cache[name] = val
+
+        if unit is not None:
+
 
         return val
 
