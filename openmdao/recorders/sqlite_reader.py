@@ -167,6 +167,8 @@ class SqliteCaseReader(BaseCaseReader):
         """
         Allow one to iterate over the driver and solver cases.
 
+        Generator giving Driver and/or Solver cases in order.
+
         Parameters
         ----------
         parent : DriverCase or SolverCase or str, optional
@@ -176,10 +178,6 @@ class SqliteCaseReader(BaseCaseReader):
         recursive : bool, optional
             If True, will enable iterating over all successors in case hierarchy
             rather than just the direct children. Defaults to False.
-
-        Returns
-        -------
-            Generator giving Driver and/or Solver cases in order.
         """
         iter_coord = ''
         if parent is not None:
@@ -249,6 +247,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         Returns
         -------
+        list of tuples
             List of tuples of the form ('iteration_coordinate', 'type of iteration')
         """
         ret = []
@@ -303,6 +302,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         Returns
         -------
+        bool
             True if the given coordinate indicates that the case is a child of the
             given parent case. False otherwise.
         """
@@ -324,7 +324,8 @@ class SqliteCaseReader(BaseCaseReader):
 
         Returns
         -------
-            coordinate as array of strings.
+        list
+            coordinate as list of strings.
         """
         return self._coordinate_split_re.split(coordinate)
 
@@ -516,7 +517,8 @@ class SqliteCaseReader(BaseCaseReader):
 
         Returns
         -------
-            map of global variable names to their values. None if no system iterations
+        dictionary
+            dictionary of global variable names to their values. None if no system iterations
             were recorded.
         """
         coords = self.system_cases._case_keys
@@ -584,6 +586,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         Returns
         -------
+        bool
             True if coord_map is True for each key, False otherwise.
         """
         for coord in coord_map:
