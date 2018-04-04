@@ -310,7 +310,8 @@ def _cite_cmd(options):
         options.classes = None
 
     def _cite(prob):
-        print_citations(prob, classes=options.classes, out_stream=out)
+        if not MPI or MPI.COMM_WORLD.rank == 0:
+            print_citations(prob, classes=options.classes, out_stream=out)
         exit()
 
     return _cite
