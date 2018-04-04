@@ -366,7 +366,7 @@ _post_setup_map = {
 
 
 # Other non-post-setup functions go here
-_iprof_map = {
+_non_post_setup_map = {
     'trace': (_itrace_setup_parser, _itrace_exec),
     'iprof': (_iprof_setup_parser, _iprof_exec),
     'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec),
@@ -386,7 +386,7 @@ def openmdao_cmd():
         parser_setup_func(subp)
         subp.set_defaults(func=cmd, executor=_post_setup_exec)
 
-    for p, (parser_setup_func, cmd) in iteritems(_iprof_map):
+    for p, (parser_setup_func, cmd) in iteritems(_non_post_setup_map):
         subp = subs.add_parser(p)
         parser_setup_func(subp)
         subp.set_defaults(executor=cmd)

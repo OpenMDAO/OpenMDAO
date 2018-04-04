@@ -477,7 +477,7 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
     if sparsity is not None:
         stream.write("Sparsity structure has been computed for all response/design_var "
                      "sub-jacobians.")
-    if tot_size == tot_colors:
+    if tot_size == tot_colors or tot_colors == 0:
         stream.write("No simultaneous derivative solves are possible in this configuration.\n")
     else:
         stream.write("\nTotal colors vs. total size: %d vs %d  (%.1f%% improvement)\n" %
