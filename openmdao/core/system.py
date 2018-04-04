@@ -2614,8 +2614,6 @@ class System(object):
         out_stream : file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
-        meta : dict
-            Dictionary mapping absolute names to metadata dictionaries for myproc variables.
 
         Returns
         -------
