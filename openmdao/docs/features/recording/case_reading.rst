@@ -38,7 +38,7 @@ You can get a list of the case IDs using the `list_cases` method:
     for case_key in case_keys:
         print('Case:', case_key)
 
-Finally, the `get_case` method provides a way to get at individual cases. The argument to this method can either be:
+The `get_case` method provides a way to get at individual cases. The argument to this method can either be:
 
     #. Integer - in which case the argument is an index into the cases. Negative numbers can be used as indices just
             as is normally done in Python.
@@ -65,3 +65,53 @@ If we had not promoted `pz.z`, we would use:
 
     seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|6')
     print('Value of pz.z after 7th iteration of SLSQP =', seventh_slsqp_iteration_case.desvars['pz.z'])
+
+Finally, if a user would like to access metadata on a variable there is a `abs2meta` dictionary on the CaseReader. For example, if the user wanted the units of the `pz.z` variable they would use:
+
+.. code-block:: console
+
+    z_units = cr.abs2meta['pz.z']['units']
+
+*Iterating Over Cases*
+~~~~~~~~~~~~~~~~~~~~~~
+
+The :code:`get_cases` method provides a way to iterate over Driver and Solver cases in order.
+
+.. automethod:: openmdao.recorders.sqlite_reader.SqliteCaseReader.get_cases
+    :noindex:
+
+For example, if the user wanted to iterate over all Driver and Solver cases they would use:
+
+.. code-block:: console
+
+    for case in cr.get_cases(recursive=True):
+        timestamp = case.timestamp
+        ...
+
+If the user wanted to iterate over all solver cases that are descendents of the first driver case they could use:
+
+.. code-block:: console
+
+    for case in cr.get_cases(parent='rank0:SLSQP|0', recursive=True):
+        timestamp = case.timestamp
+        ...
+
+Note that this generator can return both Driver and Solver cases, which have different attributes.
+
+*Listing Variables*
+~~~~~~~~~~~~~~~~~~~
+
+Just like :ref:`listing variables <listing-variables>` on System objects, there is a :code:`list_inputs` method and a :code:`list_outputs` method.
+
+.. automethod:: openmdao.recorders.sqlite_reader.SqliteCaseReader.list_inputs
+    :noindex:
+
+.. automethod:: openmdao.recorders.sqlite_reader.SqliteCaseReader.list_outputs
+    :noindex:
+
+These methods use System cases and thus will only return variables on systems which have the recorder attached. Using these methods is as simple as:
+
+.. code-block:: console
+
+    cr.list_inputs()
+    cr.list_outputs()

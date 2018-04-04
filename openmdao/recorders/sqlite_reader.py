@@ -169,13 +169,13 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        parent : DriverCase or SolverCase or str
+        parent : DriverCase or SolverCase or str, optional
             Identifies which case's children to return. None indicates Root. Can pass a
             driver case, a solver case, or an iteration coordinate identifying a solver
-            or driver case.
-        recursive : bool
+            or driver case. Defaults to None.
+        recursive : bool, optional
             If True, will enable iterating over all successors in case hierarchy
-            rather than just the direct children.
+            rather than just the direct children. Defaults to False.
 
         Returns
         -------
