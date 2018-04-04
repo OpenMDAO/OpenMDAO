@@ -5,6 +5,7 @@ import os
 import sys
 import warnings
 import unittest
+import contextlib
 from mock import Mock
 from fnmatch import fnmatchcase
 from six import string_types
@@ -13,6 +14,24 @@ from collections import Iterable
 import numbers
 
 import numpy as np
+
+
+@contextlib.contextmanager
+def printoptions(*args, **kwargs):
+    """
+    Set numpy printoptions within a particular context.
+
+    Parameters
+    ----------
+    *args : tuple
+        Positional arguments.
+    **kwargs : dict
+        Keyword arguments.
+    """
+    original = np.get_printoptions()
+    np.set_printoptions(*args, **kwargs)
+    yield
+    np.set_printoptions(**original)
 
 
 def warn_deprecation(msg):

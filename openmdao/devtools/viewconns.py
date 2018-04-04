@@ -4,6 +4,7 @@ import sys
 import json
 import contextlib
 from itertools import chain
+from collections import defaultdict
 
 from six import iteritems
 
@@ -11,14 +12,10 @@ import numpy as np
 
 from openmdao.core.problem import Problem
 from openmdao.utils.units import convert_units
+from openmdao.utils.general_utils import printoptions
+from openmdao.utils.mpi import MPI
 from openmdao.devtools.webview import webview
 
-@contextlib.contextmanager
-def printoptions(*args, **kwargs):
-    original = np.get_printoptions()
-    np.set_printoptions(*args, **kwargs)
-    yield
-    np.set_printoptions(**original)
 
 def view_connections(root, outfile='connections.html', show_browser=True,
                      src_filter='', tgt_filter='', precision=6):
@@ -47,6 +44,9 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     precision : int, optional
         Sets the precision for displaying array values.
     """
+    if MPI and MPI.COMM_WORLD.rank != 0:
+        return
+
     # since people will be used to passing the Problem as the first arg to
     # the N2 diagram funct, allow them to pass a Problem here as well.
     if isinstance(root, Problem):
@@ -60,7 +60,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         tgt: src for tgt, src in iteritems(input_srcs) if src is not None
     }
 
-    src2tgts = {}
+    src2tgts = defaultdict(list)
     units = {n: data.get('units','')
                 for n, data in iteritems(system._var_allprocs_abs2meta)}
     vals = {}
@@ -70,29 +70,19 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         for t in system._var_abs_names['input']:
             tmeta = system._var_abs2meta[t]
             idxs = tmeta['src_indices']
-            flat = tmeta['flat_src_indices']
-            if idxs is None:
-                idxs = np.arange(tmeta['size'], dtype=int)
 
             if t in connections:
                 s = connections[t]
-                val = system._outputs[s]
-                if isinstance(val, np.ndarray):
-                    val = system._outputs[s].flatten()[idxs]
-                else:
-                    val = system._outputs[s]
+                val = _get_output(system, s, idxs)
 
                 # if there's a unit conversion, express the value in the
                 # units of the target
-                if units[t]:
+                if units[t] and val != "<on remote_proc":
                     val = convert_units(val, units[s], units[t])
 
-                if s not in src2tgts:
-                    src2tgts[s] = [t]
-                else:
-                    src2tgts[s].append(t)
+                src2tgts[s].append(t)
             else: # unconnected param
-                val = system._inputs[t]
+                val = _get_input(system, t, None)
 
             if isinstance(val, np.ndarray):
                 val = np.array2string(val)
@@ -156,3 +146,27 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     if show_browser:
         webview(outfile)
+
+
+def _get_input(system, name, idxs=None):
+    """
+    Return the named value if it's local to the process, else "<on remote proc".
+    """
+    if name in system._inputs:
+        val = system._inputs[name]
+        if idxs and isinstance(val, np.ndarray):
+            val = val.flatten()[idxs]
+        return val
+    return "<on remote proc>"
+
+
+def _get_output(system, name, idxs=None):
+    """
+    Return the named value if it's local to the process, else "<on remote proc".
+    """
+    if name in system._outputs:
+        val = system._outputs[name]
+        if idxs and isinstance(val, np.ndarray):
+            val = val.flatten()[idxs]
+        return val
+    return "<on remote proc>"
