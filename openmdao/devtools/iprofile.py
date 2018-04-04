@@ -11,10 +11,7 @@ from itertools import chain
 
 from six import iteritems, string_types
 
-try:
-    from mpi4py import MPI
-except ImportError:
-    MPI = None
+from openmdao.utils.mpi import MPI
 
 from openmdao.devtools.webview import webview
 from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _collect_methods, \
@@ -239,20 +236,22 @@ def _process_profile(flist):
     tree_nodes = {}
     tree_parts = []
 
+    tot_names = []
+
     for fname in flist:
         ext = os.path.splitext(fname)[1]
         try:
             int(ext.lstrip('.'))
             dec = ext
+            tot_names.append('$total' + dec)
         except:
-            dec = False
+            dec = None
 
         for funcpath, count, t in _iter_raw_prof_file(fname):
-
             parts = funcpath.split('-')
 
             # for multi-file MPI profiles, decorate names with the rank
-            if nfiles > 1 and dec:
+            if nfiles > 1 and dec is not None:
                 parts = ["%s%s" % (p,dec) for p in parts]
                 funcpath = '-'.join(parts)
 
@@ -276,7 +275,14 @@ def _process_profile(flist):
         node['tot_count'] = totals[short]['tot_count']
         del node['obj']
 
-    tree_nodes['$total']['tot_time'] = tree_nodes['$total']['time']
+
+    if nfiles > 1 and dec is not None:
+        tree_nodes['$total'] = tree_nodes['$total' + dec].copy()
+        tree_nodes['$total']['tot_time'] = 0.
+        for tot_name in tot_names:
+            tree_nodes['$total']['tot_time'] += tree_nodes[tot_name]['time']
+    else:
+        tree_nodes['$total']['tot_time'] = tree_nodes['$total']['time']
 
     return tree_nodes, totals
 
@@ -319,7 +325,7 @@ def _iprof_totals_exec(options):
 
     call_data, totals = _process_profile(options.file)
 
-    total_time = totals['$total']['tot_time']
+    total_time = call_data['$total']['tot_time']
 
     try:
 
