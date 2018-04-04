@@ -17,7 +17,7 @@ import numpy as np
 
 
 @contextlib.contextmanager
-def printoptions(*args, **kwargs):
+def printoptions(*args, **kwds):
     """
     Set numpy printoptions within a particular context.
 
@@ -25,7 +25,7 @@ def printoptions(*args, **kwargs):
     ----------
     *args : tuple
         Positional arguments.
-    **kwargs : dict
+    **kwds : dict
         Keyword arguments.
     """
     original = np.get_printoptions()
