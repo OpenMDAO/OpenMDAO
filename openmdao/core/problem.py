@@ -172,16 +172,12 @@ class Problem(object):
         float or ndarray
             the requested output/input variable.
         """
-        display_units = assigned_units = None
-        if isinstance(name, tuple):
-            name, display_units = name
-
         # Caching only needed if vectors aren't allocated yet.
         if self._setup_status == 1:
 
             # We have set and cached already
             if name in self._initial_condition_cache:
-                val, assigned_units, base_units = self._initial_condition_cache[name]
+                val = self._initial_condition_cache[name]
 
             # Vector not setup, so we need to pull values from saved metadata request.
             else:
@@ -191,10 +187,8 @@ class Problem(object):
                     if name in self.model._conn_abs_in2out:
                         src_name = self.model._conn_abs_in2out[name]
                         val = meta[src_name]['value']
-                        base_units = meta[src_name]['units']
                     else:
                         val = meta[name]['value']
-                        base_units = meta[name]['units']
 
                 elif name in proms['input']:
                     abs_name = proms['input'][name][0]
@@ -208,53 +202,34 @@ class Problem(object):
                             # raises the same error as vector access.
                             abs_name = prom_name2abs_name(self.model, name, 'input')
                         val = meta[src_name]['value']
-                        base_units = meta[src_name]['units']
                     else:
                         # This triggers a check for unconnected non-unique inputs, and
                         # raises the same error as vector access.
                         abs_name = prom_name2abs_name(self.model, name, 'input')
                         val = meta[abs_name]['value']
-                        base_units = meta[abs_name]['units']
 
                 elif name in proms['output']:
                     abs_name = prom_name2abs_name(self.model, name, 'output')
                     val = meta[abs_name]['value']
-                    base_units = meta[abs_name]['units']
 
                 else:
                     msg = 'Variable name "{}" not found.'
                     raise KeyError(msg.format(name))
 
+                self._initial_condition_cache[name] = val
+
         elif name in self.model._outputs:
             val = self.model._outputs[name]
-            try:
-                base_units = self.model._var_abs2meta[name]['units']
-            except KeyError:
-                abs_name = self.model._var_allprocs_prom2abs_list['output'][name][0]
-                base_units = self.model._var_abs2meta[abs_name]['units']
 
         elif name in self.model._inputs:
             val = self.model._inputs[name]
-            try:
-                base_units = self.model._var_abs2meta[name]['units']
-            except KeyError:
-                abs_name = self.model._var_allprocs_prom2abs_list['input'][name][0]
-                base_units = self.model._var_abs2meta[abs_name]['units']
 
         else:
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
 
-        if display_units is not None:
-            current_units = assigned_units if assigned_units is not None else base_units
-            scale, offset = get_conversion(current_units, display_units)
-            val = (val + offset) * scale
-        else:
-            display_units = base_units
-
         # Need to cache the "get" in case the user calls in-place numpy operations.
-        # The cache is alawys stored in the units of the latest call to get.
-        self._initial_condition_cache[name] = (val, display_units, base_units)
+        self._initial_condition_cache[name] = val
 
         return val
 
@@ -269,23 +244,9 @@ class Problem(object):
         value : float or ndarray or list
             value to set this variable to.
         """
-        assigned_units = None
-        if isinstance(name, tuple):
-            name, assigned_units = name
-
-        # Use getitem for current units intead of repeating code.
-        self[name]
-        _, display_units, base_units = self._initial_condition_cache[name]
-
-        if assigned_units is not None:
-            scale, offset = get_conversion(assigned_units, display_units)
-            value = (value + offset) * scale
-        else:
-            assigned_units = base_units
-
         # Caching only needed if vectors aren't allocated yet.
         if self._setup_status == 1:
-            self._initial_condition_cache[name] = (value, assigned_units, base_units)
+            self._initial_condition_cache[name] = value
         else:
             if name in self.model._outputs:
                 self.model._outputs[name] = value
@@ -299,12 +260,7 @@ class Problem(object):
         """
         Set all initial conditions that have been saved in cache after setup.
         """
-        for name, data in iteritems(self._initial_condition_cache):
-            value, assigned_units, base_units = data
-            if assigned_units is not None:
-                scale, offset = get_conversion(assigned_units, base_units)
-                value = (value + offset) * scale
-
+        for name, value in iteritems(self._initial_condition_cache):
             self[name] = value
 
         # Clean up cache
