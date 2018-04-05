@@ -109,7 +109,7 @@ class LatinHypercubeGenerator(DOEGenerator):
 
         Returns
         -------
-        _LHC_Individual
+        ndarray
             The randomly generated Latin hypercube.
         """
         rand_lhc = _rand_latin_hypercube(self._num_samples, self.num_design_vars)
@@ -193,7 +193,7 @@ class OptimizedLatinHypercubeGenerator(LatinHypercubeGenerator):
 
         Returns
         -------
-        _LHC_Individual
+        ndarray
             The optimized Latin hypercube.
         """
         rand_lhc = _rand_latin_hypercube(self._num_samples, self.num_design_vars)
@@ -219,7 +219,7 @@ class _LHC_Individual(object):
         q.
     _p : int, optional
         The method for calculating the norm.
-    _doe : numpy.array
+    _doe : ndarray
         The initial Latin hypercube (set of points).
     _phi : float
         The Morris-Mitchell sampling criterion for this Latin hypercube.
@@ -231,7 +231,7 @@ class _LHC_Individual(object):
 
         Parameters
         ----------
-        doe : numpy.array
+        doe : ndarray
             The initial Latin hypercube (set of points).
         q : int, optional
             q. Defaults to 2.
