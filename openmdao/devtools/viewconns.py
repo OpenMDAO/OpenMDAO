@@ -12,10 +12,9 @@ import numpy as np
 
 from openmdao.core.problem import Problem
 from openmdao.utils.units import convert_units
-from openmdao.utils.general_utils import printoptions
 from openmdao.utils.mpi import MPI
 from openmdao.devtools.webview import webview
-
+from openmdao.utils.general_utils import printoptions
 
 def view_connections(root, outfile='connections.html', show_browser=True,
                      src_filter='', tgt_filter='', precision=6):

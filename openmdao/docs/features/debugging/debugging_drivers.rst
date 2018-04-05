@@ -11,7 +11,8 @@ Usage
 -----
 
 This example shows how to use the :code:`Driver` debug printing options. The :code:`debug_print` option is a list of strings.
-The only valid strings are 'desvars', 'ln_cons', 'nl_cons', and 'objs'.
+The only valid strings are 'desvars', 'ln_cons', 'nl_cons', and 'objs'. Note that the values for the design variables
+printed are unscaled, physical values.
 
 
   .. embed-code::
