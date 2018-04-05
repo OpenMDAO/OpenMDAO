@@ -538,6 +538,74 @@ class TestProblem(unittest.TestCase):
         # the connected input variable, referenced by the absolute path
         assert_rel_error(self, prob['d2.y1'], 27.3049178437, 1e-6)
 
+    def test_get_set_with_units_exhaustive(self):
+        from openmdao.api import Problem, ExecComp
+
+        prob = Problem()
+        comp = prob.model.add_subsystem('comp', ExecComp('y=x-25.', x={'value': 77.0, 'units': 'degF'},
+                                                         y={'units': 'degC'}))
+        comp = prob.model.add_subsystem('prom', ExecComp('yy=xx-25.', xx={'value': 77.0, 'units': 'degF'},
+                                                         yy={'units': 'degC'}),
+                                        promotes=['xx', 'yy'])
+        comp = prob.model.add_subsystem('acomp', ExecComp('y=x-25.', x={'value': np.array([77.0, 95.0]), 'units': 'degF'},
+                                                         y={'units': 'degC'}))
+        comp = prob.model.add_subsystem('aprom', ExecComp('ayy=axx-25.', axx={'value': np.array([77.0, 95.0]), 'units': 'degF'},
+                                                          ayy={'units': 'degC'}),
+                                        promotes=['axx', 'ayy'])
+
+        prob.setup(check=False)
+
+        # Make sure everything works before final setup with caching system.
+
+        # Gets
+
+        assert_rel_error(self, prob['comp.x'], 77.0, 1e-6)
+        assert_rel_error(self, prob['comp.x', 'degC'], 25.0, 1e-6)
+        assert_rel_error(self, prob['comp.y'], 0.0, 1e-6)
+        assert_rel_error(self, prob['comp.y', 'degF'], 32.0, 1e-6)
+
+        assert_rel_error(self, prob['xx'], 77.0, 1e-6)
+        assert_rel_error(self, prob['xx', 'degC'], 25.0, 1e-6)
+        assert_rel_error(self, prob['yy'], 0.0, 1e-6)
+        assert_rel_error(self, prob['yy', 'degF'], 32.0, 1e-6)
+
+        assert_rel_error(self, prob['acomp.x'][0], 77.0, 1e-6)
+        assert_rel_error(self, prob['acomp.x'][1], 95.0, 1e-6)
+        assert_rel_error(self, prob['acomp.x', 'degC'][0], 25.0, 1e-6)
+        assert_rel_error(self, prob['acomp.x', 'degC'][1], 35.0, 1e-6)
+        assert_rel_error(self, prob['acomp.y'][0], 0.0, 1e-6)
+        assert_rel_error(self, prob['acomp.y', 'degF'][0], 32.0, 1e-6)
+
+        assert_rel_error(self, prob['axx'][0], 77.0, 1e-6)
+        assert_rel_error(self, prob['axx'][1], 95.0, 1e-6)
+        assert_rel_error(self, prob['axx', 'degC'][0], 25.0, 1e-6)
+        assert_rel_error(self, prob['axx', 'degC'][1], 35.0, 1e-6)
+        assert_rel_error(self, prob['ayy'][0], 0.0, 1e-6)
+        assert_rel_error(self, prob['ayy', 'degF'][0], 32.0, 1e-6)
+
+        # Sets
+
+        prob['comp.x', 'degC'] = 30.0
+        assert_rel_error(self, prob['comp.x'], 86.0, 1e-6)
+        assert_rel_error(self, prob['comp.x', 'degC'], 30.0, 1e-6)
+
+        prob['xx', 'degC'] = 30.0
+        assert_rel_error(self, prob['xx'], 86.0, 1e-6)
+        assert_rel_error(self, prob['xx', 'degC'], 30.0, 1e-6)
+
+        prob['acomp.x', 'degC'][0] = 30.0
+        assert_rel_error(self, prob['acomp.x'][0], 86.0, 1e-6)
+
+        # After final setup, we need to check the stuff we just set.
+        prob.final_setup()
+
+        assert_rel_error(self, prob['acomp.x'][0], 86.0, 1e-6)
+        assert_rel_error(self, prob['acomp.x'][1], 95.0, 1e-6)
+        assert_rel_error(self, prob['acomp.x', 'degC'][0], 30.0, 1e-6)
+        assert_rel_error(self, prob['acomp.x', 'degC'][1], 35.0, 1e-6)
+
+        # Now we do it all over again for coverage.
+
     def test_feature_get_set_with_units(self):
         from openmdao.api import Problem, ExecComp
 
@@ -550,6 +618,9 @@ class TestProblem(unittest.TestCase):
 
         assert_rel_error(self, prob['comp.x'], 100, 1e-6)
         assert_rel_error(self, prob['comp.x', 'm'], 1.0, 1e-6)
+        prob['comp.x', 'mm'] = 10.0
+        assert_rel_error(self, prob['comp.x'], 1.0, 1e-6)
+        assert_rel_error(self, prob['comp.x', 'm'], 1.0e-2, 1e-6)
 
     def test_feature_set_get_array(self):
         import numpy as np
