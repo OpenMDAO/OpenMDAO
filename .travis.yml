@@ -105,6 +105,7 @@ script:
     testflo -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*;
   else
     testflo -n 1 openmdao;
+  fi
 
 after_success:
 # again, only run coverage operations on the upload machine after success.
@@ -112,6 +113,7 @@ after_success:
     coveralls --rcfile=../../.coveragerc --output=coveralls.json;
     sed 's/\/home\/travis\/miniconda\/lib\/python'"$PY"'\/site-packages\///g' < coveralls.json > coveralls-upd.json;
     coveralls --upload=coveralls-upd.json;
+  fi
 
 deploy:
   provider: script
