@@ -93,7 +93,7 @@ class TestDOEDriverData(unittest.TestCase):
             """
             Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
 
-            Where x and y and xy[0] and xy[1] repectively.
+            Where x and y are xy[0] and xy[1] repectively.
             """
 
             def __init__(self):
@@ -103,7 +103,8 @@ class TestDOEDriverData(unittest.TestCase):
                 self.add_output('f_xy', val=0.0)
 
             def compute(self, inputs, outputs):
-                """f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
+                """
+                f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
                 """
                 x = inputs['xy'][0]
                 y = inputs['xy'][1]
@@ -126,8 +127,6 @@ class TestDOEDriverData(unittest.TestCase):
         prob.setup(check=False)
         prob.run_driver()
         prob.cleanup()
-
-        cases = CaseReader("CASES.sql").driver_cases
 
         expected = {
             0: {'xy': np.array([-11.279662, -32.120265])},
