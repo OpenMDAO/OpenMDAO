@@ -85,6 +85,7 @@ class TestSimpleGA(unittest.TestCase):
         prob.driver = SimpleGADriver()
         prob.driver.options['bits'] = {'p1.xC' : 8}
         prob.driver.options['max_gen'] = 400
+        prob.driver.options['pop_size'] = 25
 
         prob.setup(check=False)
         prob.run_driver()
@@ -180,6 +181,7 @@ class MPITestSimpleGA(unittest.TestCase):
         prob.driver = SimpleGADriver()
         prob.driver.options['bits'] = {'p1.xC' : 8}
         prob.driver.options['max_gen'] = 400
+        prob.driver.options['pop_size'] = 25
         prob.driver.options['run_parallel'] = True
 
         prob.setup(vector_class=PETScVector, check=False)
@@ -221,7 +223,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.run_driver()
 
         # Optimal solution
-        assert_rel_error(self, prob['comp.f'], 0.49398, 1e-4)
+        assert_rel_error(self, prob['comp.f'], 0.49399549, 1e-4)
         print('p2.xI', prob['p2.xI'])
         print('p1.xC', prob['p1.xC'])
 
