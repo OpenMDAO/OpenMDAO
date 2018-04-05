@@ -6,17 +6,13 @@ from __future__ import print_function
 import sys
 import traceback
 import inspect
-import itertools
-from itertools import chain
 
-from six.moves import zip
-from six import PY3, iteritems
+from six import PY3
 
 import numpy as np
 
-from collections import OrderedDict
-
 from openmdao.core.driver import Driver, RecordingDebugging
+from openmdao.core.analysis_error import AnalysisError
 from openmdao.utils.record_util import create_local_meta
 
 
@@ -25,54 +21,13 @@ class DOEGenerator(object):
     Base class for a callable object that generates cases for a DOEDriver.
     """
 
-    def __call__(self, desvars):
+    def __call__(self, design_vars):
         """
         Generate case.
 
         Parameters
         ----------
-        desvars : dict
-            Dictionary of design variables for which to generate values.
-
-        Returns
-        -------
-        dict
-            Dictionary of input values for the case.
-        """
-        pass
-
-
-class FullFactorialGenerator(DOEGenerator):
-    """
-    DOE case generator implementing the Full Factorial method.
-
-    Attributes
-    ----------
-    _num_levels : int
-        The number of evenly spaced levels between each design variable
-        lower and upper bound.
-    """
-
-    def __init__(self, num_levels=1):
-        """
-        Constructor.
-
-        Parameters
-        ----------
-        num_levels : int, optional
-            The number of evenly spaced levels between each design variable
-            lower and upper bound. Defaults to 1.
-        """
-        super(FullFactorialGenerator, self).__init__()
-        self._num_levels = num_levels
-
-    def __call__(self, desvars):
-        """
-        Generate case.
-
-        Parameters
-        ----------
-        desvars : dict
+        design_vars : dict
             Dictionary of design variables for which to generate values.
 
         Yields
@@ -80,31 +35,7 @@ class FullFactorialGenerator(DOEGenerator):
         dict
             Dictionary of input values for the case.
         """
-        values = OrderedDict()
-
-        for name, meta in iteritems(desvars):
-            values[name] = []
-
-            size = meta['size']
-
-            for k in range(size):
-                low = meta['lower']
-                if isinstance(low, np.ndarray):
-                    low = low[k]
-
-                high = meta['upper']
-                if isinstance(high, np.ndarray):
-                    high = high[k]
-
-                values[name].append(np.linspace(low, high, num=self._num_levels).tolist())
-
-        keys = values.keys()
-
-        for name in keys:
-            values[name] = [np.array(x) for x in itertools.product(*values[name])]
-
-        for combination in itertools.product(*values.values()):
-            yield dict(zip(keys, combination))
+        pass
 
 
 class DOEDriver(Driver):
