@@ -12,13 +12,7 @@ import numpy as np
 from openmdao.core.problem import Problem
 from openmdao.utils.units import convert_units
 from openmdao.devtools.webview import webview
-
-@contextlib.contextmanager
-def printoptions(*args, **kwargs):
-    original = np.get_printoptions()
-    np.set_printoptions(*args, **kwargs)
-    yield
-    np.set_printoptions(**original)
+from openmdao.utils.general_utils import printoptions
 
 def view_connections(root, outfile='connections.html', show_browser=True,
                      src_filter='', tgt_filter='', precision=6):
