@@ -29,7 +29,7 @@ class LatinHypercubeGenerator(DOEGenerator):
 
     def __init__(self, num_samples=1, seed=None):
         """
-        Constructor.
+        Initialize the LatinHypercubeGenerator.
 
         Parameters
         ----------
@@ -164,7 +164,7 @@ class OptimizedLatinHypercubeGenerator(LatinHypercubeGenerator):
 
     def __init__(self, num_samples=1, seed=None, population=20, generations=2, norm_method=1):
         """
-        Constructor.
+        Initialize the OptimizedLatinHypercubeGenerator.
 
         Parameters
         ----------
@@ -227,7 +227,7 @@ class _LHC_Individual(object):
 
     def __init__(self, doe, q=2, p=1):
         """
-        Constructor.
+        Initialize the _LHC_Individual.
 
         Parameters
         ----------

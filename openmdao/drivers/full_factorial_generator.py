@@ -24,7 +24,7 @@ class FullFactorialGenerator(DOEGenerator):
 
     def __init__(self, levels=1):
         """
-        Constructor.
+        Initialize the FullFactorialGenerator.
 
         Parameters
         ----------
