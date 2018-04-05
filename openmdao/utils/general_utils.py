@@ -422,6 +422,13 @@ def printoptions(*args, **kwargs):
     options at the end. See `set_printoptions` for the full description of
     available options.
 
+    Parameters
+    ----------
+    *args : list
+        Arguments.
+    **kwargs : dict
+        Keyword arguments.
+
     Examples
     --------
     >>> with printoptions(precision=2):
