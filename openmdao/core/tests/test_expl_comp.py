@@ -632,29 +632,29 @@ class ExplCompTestCase(unittest.TestCase):
                                hierarchical=True,
                                print_arrays=True)
 
-        np.set_printoptions(edgeitems=3, infstr='inf',
-                            linewidth = 75, nanstr = 'nan', precision = 8,
-                            suppress = False, threshold = 1000, formatter = None)
+        with printoptions(edgeitems=3, infstr='inf',
+                          linewidth = 75, nanstr = 'nan', precision = 8,
+                          suppress = False, threshold = 1000, formatter = None):
 
-        prob.model.list_outputs(values=True,
-                                implicit=False,
-                                units=True,
-                                shape=True,
-                                bounds=True,
-                                residuals=True,
-                                scaling=True,
-                                hierarchical=False,
-                                print_arrays=True)
+            prob.model.list_outputs(values=True,
+                                    implicit=False,
+                                    units=True,
+                                    shape=True,
+                                    bounds=True,
+                                    residuals=True,
+                                    scaling=True,
+                                    hierarchical=False,
+                                    print_arrays=True)
 
-        prob.model.list_outputs(values=True,
-                                implicit=False,
-                                units=True,
-                                shape=True,
-                                bounds=True,
-                                residuals=True,
-                                scaling=True,
-                                hierarchical=True,
-                                print_arrays=True)
+            prob.model.list_outputs(values=True,
+                                    implicit=False,
+                                    units=True,
+                                    shape=True,
+                                    bounds=True,
+                                    residuals=True,
+                                    scaling=True,
+                                    hierarchical=True,
+                                    print_arrays=True)
 
 
 if __name__ == '__main__':

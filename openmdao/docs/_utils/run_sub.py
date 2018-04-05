@@ -8,6 +8,7 @@ import sys
 import importlib
 import traceback
 import numpy as np
+from openmdao.utils.general_utils import printoptions
 
 if __name__ == '__main__':
     try:
@@ -33,9 +34,9 @@ if __name__ == '__main__':
         if not code_to_run:
             raise RuntimeError("OPENMDAO_CODE_TO_RUN has not been set.")
 
-        np.set_printoptions(precision=8)
+        with printoptions(precision=8):
+            exec(code_to_run, mod.__dict__)
 
-        exec(code_to_run, mod.__dict__)
     except Exception:
         traceback.print_exc()
         sys.exit(-1)
