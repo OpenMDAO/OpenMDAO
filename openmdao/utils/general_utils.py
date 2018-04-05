@@ -416,18 +416,18 @@ def run_model(prob):
 @contextlib.contextmanager
 def printoptions(*args, **kwargs):
     """
-    Context manager for setting print options.
+    Context manager for setting numpy print options.
 
     Set print options for the scope of the `with` block, and restore the old
-    options at the end. See `set_printoptions` for the full description of
+    options at the end. See `numpy.set_printoptions` for the full description of
     available options.
 
     Parameters
     ----------
     *args : list
-        Arguments.
+        Variable-length argument list.
     **kwargs : dict
-        Keyword arguments.
+        Arbitrary keyword arguments.
 
     Examples
     --------
