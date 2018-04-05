@@ -414,7 +414,7 @@ def run_model(prob):
 
 
 @contextlib.contextmanager
-def printoptions(*args, **kwargs):
+def printoptions(*args, **kwds):
     """
     Context manager for setting numpy print options.
 
@@ -426,7 +426,7 @@ def printoptions(*args, **kwargs):
     ----------
     *args : list
         Variable-length argument list.
-    **kwargs : dict
+    **kwds : dict
         Arbitrary keyword arguments.
 
     Examples
@@ -444,7 +444,7 @@ def printoptions(*args, **kwargs):
     """
     opts = np.get_printoptions()
     try:
-        np.set_printoptions(*args, **kwargs)
+        np.set_printoptions(*args, **kwds)
         yield np.get_printoptions()
     finally:
         np.set_printoptions(**opts)
