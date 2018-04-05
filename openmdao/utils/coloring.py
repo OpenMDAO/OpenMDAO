@@ -502,8 +502,8 @@ def _simul_coloring_setup_parser(parser):
     parser.add_argument('-j', '--jac', action='store_true', dest='show_jac',
                         help="Display a visualization of the final total jacobian used to "
                         "compute the coloring.")
-    parser.add_argument('-s', '--sparsity', action='store_true', dest='include_sparsity',
-                        help="Include the sparsity structure in the coloring data structure.")
+    parser.add_argument('--no-sparsity', action='store_true', dest='no_sparsity',
+                        help="Exclude the sparsity structure from the coloring data structure.")
 
 
 def _simul_coloring_cmd(options):
@@ -533,7 +533,7 @@ def _simul_coloring_cmd(options):
         Problem._post_setup_func = None  # avoid recursive loop
         color_info = get_simul_meta(prob, repeats=options.num_jacs, tol=options.tolerance,
                                     show_jac=options.show_jac,
-                                    include_sparsity=options.include_sparsity,
+                                    include_sparsity=not options.no_sparsity,
                                     stream=outfile)
         if sys.stdout.isatty():
             simul_coloring_summary(prob, color_info, stream=sys.stdout)
