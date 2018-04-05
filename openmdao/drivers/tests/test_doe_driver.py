@@ -2,6 +2,10 @@
 
 import unittest
 
+import os
+import shutil
+import tempfile
+
 import numpy as np
 
 from openmdao.api import Problem, IndepVarComp, SqliteRecorder, CaseReader
@@ -28,8 +32,23 @@ class TestDOEDriver(unittest.TestCase):
             prob.driver = DOEDriver(Problem())
 
         self.assertEqual(str(err.exception),
-            "DOEDriver requires an instance of DOEGenerator, but you "
-            "supplied an instance of Problem.")
+            "DOEDriver requires an instance of DOEGenerator, but an instance "
+            "of Problem was found.")
+
+
+class TestDOEDriverData(unittest.TestCase):
+
+    def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix='TestDOEDriver-')
+        os.chdir(self.tempdir)
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
 
     def test_fullfactorial(self):
         prob = Problem()

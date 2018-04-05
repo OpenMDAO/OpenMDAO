@@ -127,14 +127,14 @@ class DOEDriver(Driver):
             The case generator
         """
         if not isinstance(generator, DOEGenerator):
-            print(generator, "class?", inspect.isclass(generator))
             if inspect.isclass(generator):
-                print("should raise correct err")
                 raise TypeError("DOEDriver requires an instance of DOEGenerator, "
-                                "but a class object was found: %s" % generator.__name__)
+                                "but a class object was found: %s"
+                                % generator.__name__)
             else:
                 raise TypeError("DOEDriver requires an instance of DOEGenerator, "
-                                "but you supplied an instance of %s." % type(generator).__name__)
+                                "but an instance of %s was found."
+                                % type(generator).__name__)
 
         self._generator = generator
 
