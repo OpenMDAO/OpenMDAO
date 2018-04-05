@@ -593,6 +593,7 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['xx'], 86.0, 1e-6)
         assert_rel_error(self, prob['xx', 'degC'], 30.0, 1e-6)
 
+        # In place operations pre/post final setup don't work.
         prob['acomp.x', 'degC'][0] = 30.0
         assert_rel_error(self, prob['acomp.x'][0], 86.0, 1e-6)
 
