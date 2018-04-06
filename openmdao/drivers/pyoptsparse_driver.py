@@ -266,7 +266,6 @@ class pyOptSparseDriver(Driver):
                             jacdct[n] = {'coo': [mat.row, mat.col, mat.data], 'shape': mat.shape}
 
         # Add all equality constraints
-        self.active_tols = {}
         for name, meta in iteritems(con_meta):
             if meta['equals'] is None:
                 continue

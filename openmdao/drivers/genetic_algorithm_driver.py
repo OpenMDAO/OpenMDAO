@@ -15,7 +15,7 @@ Guidelines for a Genetic Algorithm with Uniform Crossover. In: Chawdhry P.K., Ro
 import copy
 
 from six import iteritems
-from six.moves import range
+from six.moves import range, zip
 
 import numpy as np
 from pyDOE import lhs

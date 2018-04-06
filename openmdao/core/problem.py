@@ -3,7 +3,6 @@
 from __future__ import division, print_function
 
 import sys
-from copy import deepcopy
 
 from collections import OrderedDict, defaultdict, namedtuple
 from itertools import product
@@ -88,10 +87,6 @@ class Problem(object):
         0 -- Newly initialized problem or newly added model.
         1 -- The `setup` method has been called, but vectors not initialized.
         2 -- The `final_setup` has been run, everything ready to run.
-    _lin_sol_cache : dict
-        Dict of indices keyed to solution vectors.
-    _tot_jac_info_cache : dict
-        Dict of _TotalJacInfo objects from previous total derivative computations.
     cite : str
         Listing of relevant citataions that should be referenced when
         publishing work that uses this class.
@@ -154,9 +149,6 @@ class Problem(object):
         # 1 -- The `setup` method has been called, but vectors not initialized.
         # 2 -- The `final_setup` has been run, everything ready to run.
         self._setup_status = 0
-
-        self._lin_sol_cache = {}
-        self._tot_jac_info_cache = defaultdict(lambda: None)
 
     def __getitem__(self, name):
         """
@@ -896,17 +888,11 @@ class Problem(object):
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
-        if wrt is None:
-            wrt = list(self.driver._designvars)
-            global_names = True
-        if of is None:
-            of = self.driver._get_ordered_nl_responses()
-            global_names = True
-
         with self.model._scaled_context_all():
 
             # Calculate Total Derivatives
-            Jcalc = self._compute_totals(of=of, wrt=wrt, global_names=global_names)
+            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict')
+            Jcalc = total_info.compute_totals()
 
             # Approximate FD
             fd_args = {
@@ -915,8 +901,8 @@ class Problem(object):
                 'step_calc': step_calc,
             }
             model.approx_totals(method=method, **fd_args)
-            Jfd = self._compute_totals_approx(of=of, wrt=wrt, global_names=global_names,
-                                              initialize=True)
+            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True)
+            Jfd = total_info.compute_totals_approx(initialize=True)
 
         # Assemble and Return all metrics.
         data = {}
@@ -962,267 +948,11 @@ class Problem(object):
 
         with self.model._scaled_context_all():
             if self.model._owns_approx_jac:
-                totals = self._compute_totals_approx(of=of, wrt=wrt,
-                                                     return_format=return_format,
-                                                     global_names=False,
-                                                     initialize=True)
+                total_info = _TotalJacInfo(self, of, wrt, False, return_format, approx=True)
+                return total_info.compute_totals_approx(initialize=True)
             else:
-                totals = self._compute_totals(of=of, wrt=wrt,
-                                              return_format=return_format,
-                                              global_names=False)
-        return totals
-
-    def _compute_totals_approx(self, of=None, wrt=None, return_format='flat_dict',
-                               global_names=True, initialize=False):
-        """
-        Compute derivatives of desired quantities with respect to desired inputs.
-
-        Uses an approximation method, e.g., fd or cs to calculate the derivatives.
-
-        Parameters
-        ----------
-        of : list of variable name strings or None
-            Variables whose derivatives will be computed.
-        wrt : list of variable name strings or None
-            Variables with respect to which the derivatives will be computed.
-        return_format : string
-            Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
-            Default is a 'flat_dict', which returns them in a dictionary whose keys are
-            tuples of form (of, wrt).
-        global_names : bool
-            Set to True when passing in global names to skip some translation steps.
-        initialize : bool
-            Set to True to re-initialize the FD in model. This is only needed when manually
-            calling compute_totals on the problem.
-
-        Returns
-        -------
-        derivs : object
-            Derivatives in form requested by 'return_format'.
-        """
-        recording_iteration.stack.append(('_compute_totals', 0))
-        model = self.model
-        mode = self._mode
-        vec_dinput = model._vectors['input']
-        vec_doutput = model._vectors['output']
-        vec_dresid = model._vectors['residual']
-        approx = model._owns_approx_jac
-        prom2abs = model._var_allprocs_prom2abs_list['output']
-
-        # TODO - Pull 'of' and 'wrt' from driver if unspecified.
-        if wrt is None:
-            raise NotImplementedError("Need to specify 'wrt' for now.")
-        if of is None:
-            raise NotImplementedError("Need to specify 'of' for now.")
-
-        # Prepare model for calculation by cleaning out the derivatives
-        # vectors.
-        for vec_name in model._lin_vec_names:
-
-            # TODO: Do all three deriv vectors have the same keys?
-
-            vec_dinput[vec_name].set_const(0.0)
-            vec_doutput[vec_name].set_const(0.0)
-            vec_dresid[vec_name].set_const(0.0)
-
-        # Convert of and wrt names from promoted to absolute path
-        oldwrt, oldof = wrt, of
-        if not global_names:
-            of = [prom2abs[name][0] for name in oldof]
-            wrt = [prom2abs[name][0] for name in oldwrt]
-
-        input_list, output_list = wrt, of
-        old_input_list, old_output_list = oldwrt, oldof
-
-        # Solve for derivs with the approximation_scheme.
-        # This cuts out the middleman by grabbing the Jacobian directly after linearization.
-
-        # Re-initialize so that it is clean.
-        if initialize:
-
-            if model._approx_schemes:
-                method = list(model._approx_schemes.keys())[0]
-                kwargs = model._owns_approx_jac_meta
-                model.approx_totals(method=method, **kwargs)
-            else:
-                model.approx_totals(method='fd')
-
-        # Initialization based on driver (or user) -requested "of" and "wrt".
-        if not model._owns_approx_jac or model._owns_approx_of != set(of) \
-           or model._owns_approx_wrt != set(wrt):
-            model._owns_approx_of = set(of)
-            model._owns_approx_wrt = set(wrt)
-
-            # Support for indices defined on driver vars.
-            dvs = self.driver._designvars
-            cons = self.driver._cons
-            objs = self.driver._objs
-
-            response_idx = {key: val['indices'] for key, val in iteritems(cons)
-                            if val['indices'] is not None}
-            for key, val in iteritems(objs):
-                if val['indices'] is not None:
-                    response_idx[key] = val['indices']
-
-            model._owns_approx_of_idx = response_idx
-
-            model._owns_approx_wrt_idx = {key: val['indices'] for key, val in iteritems(dvs)
-                                          if val['indices'] is not None}
-
-        model._setup_jacobians(recurse=False)
-
-        # Need to temporarily disable size checking to support indices in des_vars and quantities.
-        model.jacobian._override_checks = True
-
-        # Linearize Model
-        model._linearize()
-
-        model.jacobian._override_checks = False
-        approx_jac = model._jacobian._subjacs
-
-        # Create data structures (and possibly allocate space) for the total
-        # derivatives that we will return.
-        totals = OrderedDict()
-
-        if return_format == 'flat_dict':
-            for ocount, output_name in enumerate(output_list):
-                okey = old_output_list[ocount]
-                for icount, input_name in enumerate(input_list):
-                    ikey = old_input_list[icount]
-                    jac = approx_jac[output_name, input_name]
-                    if isinstance(jac, list):
-                        # This is a design variable that was declared as an obj/con.
-                        totals[okey, ikey] = np.eye(len(jac[0]))
-                        odx = model._owns_approx_of_idx.get(okey)
-                        idx = model._owns_approx_wrt_idx.get(ikey)
-                        if odx is not None:
-                            totals[okey, ikey] = totals[okey, ikey][odx, :]
-                        if idx is not None:
-                            totals[okey, ikey] = totals[okey, ikey][:, idx]
-                    else:
-                        totals[okey, ikey] = -jac
-
-        elif return_format == 'dict':
-            for ocount, output_name in enumerate(output_list):
-                okey = old_output_list[ocount]
-                totals[okey] = tot = OrderedDict()
-                for icount, input_name in enumerate(input_list):
-                    ikey = old_input_list[icount]
-                    jac = approx_jac[output_name, input_name]
-                    if isinstance(jac, list):
-                        # This is a design variable that was declared as an obj/con.
-                        tot[ikey] = np.eye(len(jac[0]))
-                    else:
-                        tot[ikey] = -jac
-        else:
-            msg = "Unsupported return format '%s." % return_format
-            raise NotImplementedError(msg)
-
-        recording_iteration.stack.pop()
-        return totals
-
-    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
-        """
-        Compute derivatives of desired quantities with respect to desired inputs.
-
-        Parameters
-        ----------
-        of : list of variable name strings or None
-            Variables whose derivatives will be computed. Default is None, which
-            uses the driver's objectives and constraints.
-        wrt : list of variable name strings or None
-            Variables with respect to which the derivatives will be computed.
-            Default is None, which uses the driver's desvars.
-        return_format : string
-            Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
-            Default is a 'flat_dict', which returns them in a dictionary whose keys are
-            tuples of form (of, wrt).
-        global_names : bool
-            Set to True when passing in global names to skip some translation steps.
-
-        Returns
-        -------
-        derivs : object
-            Derivatives in form requested by 'return_format'.
-        """
-        recording_iteration.stack.append(('_compute_totals', 0))
-
-        total_info = key = None
-        if of is not None and wrt is not None:
-            key = (frozenset(of), frozenset(wrt), return_format, self._mode,
-                   self.model._owns_approx_jac)
-            total_info = self._tot_jac_info_cache[key]
-
-        if total_info is None:
-            total_info = _TotalJacInfo(self, of, wrt, global_names, return_format)
-            if key is not None and not total_info.has_lin_cons:
-                self._tot_jac_info_cache[key] = total_info
-        else:
-            total_info.J[:] = 0.0
-
-        has_lin_cons = total_info.has_lin_cons
-
-        vec_dinput = self.model._vectors['input']
-        vec_doutput = self.model._vectors['output']
-        vec_dresid = self.model._vectors['residual']
-
-        model = self.model
-        fwd = self._mode == 'fwd'
-
-        # Prepare model for calculation by cleaning out the derivatives
-        # vectors.
-        for vec_name in model._lin_vec_names:
-            vec_dinput[vec_name].set_const(0.0)
-            vec_doutput[vec_name].set_const(0.0)
-            vec_dresid[vec_name].set_const(0.0)
-
-        # Linearize Model
-        model._linearize()
-
-        # Main loop over columns (fwd) or rows (rev) of the jacobian
-        for _, _, idxs, idx_iter in itervalues(total_info.idx_iter_dict):
-            for inds, input_setter, jac_setter in idx_iter(idxs):
-                # this sets dinputs for the current par_deriv_color to 0
-                # dinputs is dresids in fwd, doutouts in rev
-                vec_doutput['linear'].set_const(0.0)
-                if fwd:
-                    vec_dresid['linear'].set_const(0.0)
-                else:  # rev
-                    vec_dinput['linear'].set_const(0.0)
-
-                rel_systems, vec_names, cache_key = input_setter(inds)
-
-                # restore old linear solution if cache_linear_solution was set by the user for
-                # any input variables involved in this linear solution.
-                if cache_key is not None and not has_lin_cons:
-                    lin_sol_cache = self._lin_sol_cache
-                    if cache_key in lin_sol_cache:
-                        lin_sol = lin_sol_cache[cache_key]
-                        for i, vec_name in enumerate(vec_names):
-                            save_vec = lin_sol[i]
-                            doutputs = total_info.output_vec[vec_name]
-                            for vs in doutputs._data:
-                                doutputs._data[vs][:] = save_vec[vs]
-                    else:
-                        lin_sol_cache[cache_key] = lin_sol = []
-                        for vec_name in vec_names:
-                            lin_sol.append(deepcopy(total_info.output_vec[vec_name]._data))
-
-                model._solve_linear(model._lin_vec_names, self._mode, rel_systems)
-
-                if cache_key is not None and not has_lin_cons:
-                    lin_sol = self._lin_sol_cache[cache_key]
-                    for i, vec_name in enumerate(vec_names):
-                        save_vec = lin_sol[i]
-                        doutputs = total_info.output_vec[vec_name]
-                        for vs, data in iteritems(doutputs._data):
-                            save_vec[vs][:] = data
-
-                jac_setter(inds)
-
-        recording_iteration.stack.pop()
-
-        return total_info.Jfinal
+                total_info = _TotalJacInfo(self, of, wrt, False, return_format)
+                return total_info.compute_totals()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
         """

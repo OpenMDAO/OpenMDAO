@@ -4,7 +4,7 @@ from __future__ import division, print_function, absolute_import
 import warnings
 
 from six import raise_from
-from six.moves import range
+from six.moves import range, zip
 
 from scipy import __version__ as scipy_version
 try:

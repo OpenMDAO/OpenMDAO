@@ -184,7 +184,8 @@ class LintTestCase(unittest.TestCase):
 
         # Check that summary is present
         if not summary:
-            new_failures.append('is missing a summary.')
+            return ['is missing a summary.']
+
         # Summary should be a single line.
         if len(summary) > 1:
             new_failures.append('summary should be only one line.')
