@@ -143,7 +143,7 @@ CITATIONS = """
     year    = 1995,
     volume  = 43,
     pages   = {381-402},
-    author  = {Morris, M., and Mitchell, T}
+    author  = {M. Morris and T. Mitchell}
 }
 """
 

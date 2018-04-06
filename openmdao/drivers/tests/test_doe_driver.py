@@ -11,6 +11,7 @@ import numpy as np
 
 from openmdao.api import Problem, ExplicitComponent, IndepVarComp, SqliteRecorder, CaseReader
 from openmdao.drivers.doe_driver import DOEDriver
+from openmdao.drivers.uniform_generator import UniformGenerator
 from openmdao.drivers.full_factorial_generator import FullFactorialGenerator
 from openmdao.drivers.latin_hypercube_generator import OptimizedLatinHypercubeGenerator
 
@@ -38,7 +39,7 @@ class TestDOEDriver(unittest.TestCase):
                          "but an instance of Problem was found.")
 
 
-class TestDOEDriverData(unittest.TestCase):
+class TestDOEDriverRecorded(unittest.TestCase):
 
     def setUp(self):
         self.startdir = os.getcwd()
@@ -51,6 +52,43 @@ class TestDOEDriverData(unittest.TestCase):
             shutil.rmtree(self.tempdir)
         except OSError:
             pass
+
+    def test_uniform_generator(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        model.add_design_var('x', lower=-10, upper=10)
+        model.add_design_var('y', lower=-10, upper=10)
+        model.add_objective('f_xy')
+
+        prob.driver = DOEDriver(UniformGenerator(num_samples=5, seed=0))
+        prob.driver.add_recorder(SqliteRecorder("CASES.sql"))
+
+        prob.setup(check=False)
+        prob.run_driver()
+        prob.cleanup()
+
+        # all values should be between -10 and 10, specific values don't really
+        # matter, we'll just check them to make sure they are not all zeros, etc.
+        expected = {
+            0: {'x': np.array([ 0.97627008]), 'y': np.array([ 4.30378733])},
+            1: {'x': np.array([ 2.05526752]), 'y': np.array([ 0.89766366])},
+            2: {'x': np.array([-1.52690401]), 'y': np.array([ 2.91788226])},
+            3: {'x': np.array([-1.24825577]), 'y': np.array([ 7.83546002])},
+            4: {'x': np.array([ 9.27325521]), 'y': np.array([-2.33116962])},
+        }
+
+        cases = CaseReader("CASES.sql").driver_cases
+
+        self.assertEqual(cases.num_cases, 5)
+
+        for n in range(cases.num_cases):
+            assert_rel_error(self, cases.get_case(n).desvars['x'], expected[n]['x'], 1e-4)
+            assert_rel_error(self, cases.get_case(n).desvars['y'], expected[n]['y'], 1e-4)
 
     def test_full_factorial(self):
         prob = Problem()
@@ -90,7 +128,7 @@ class TestDOEDriverData(unittest.TestCase):
     def test_optimized_latin_hypercube(self):
         class ParaboloidArray(ExplicitComponent):
             """
-            Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
+            Evaluates the equation f(x,y) = (x-3)^2 + x*y + (y+4)^2 - 3.
 
             Where x and y are xy[0] and xy[1] repectively.
             """
@@ -143,7 +181,6 @@ class TestDOEDriverData(unittest.TestCase):
                 2: {'xy': np.array([-14.40863002, 41.14735283])},
                 3: {'xy': np.array([ 10.93968028,-27.70567498])},
             }
-
 
         cases = CaseReader("CASES.sql").driver_cases
 
