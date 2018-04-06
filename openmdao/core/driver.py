@@ -384,7 +384,7 @@ class Driver(object):
             self._rec_mgr.record_metadata(self)
 
         # set up simultaneous deriv coloring
-        if (coloring_mod._use_simul_coloring and self._simul_coloring_info and
+        if (coloring_mod._use_sparsity and self._simul_coloring_info and
                 self.supports['simultaneous_derivatives']):
             if problem._mode == 'fwd':
                 self._setup_simul_coloring(problem._mode)
@@ -876,7 +876,7 @@ class Driver(object):
                                       "in 'rev' mode")
 
         # command line simul_coloring uses this env var to turn pre-existing coloring off
-        if not coloring_mod._use_simul_coloring:
+        if not coloring_mod._use_sparsity:
             return
 
         prom2abs = self._problem.model._var_allprocs_prom2abs_list['output']
@@ -888,9 +888,12 @@ class Driver(object):
                 column_lists, row_map = tup[:2]
                 if len(tup) > 2:
                     sparsity = tup[2]
-                else:
-                    sparsity = None
-                self._simul_coloring_info = column_lists, row_map, sparsity
+                    if self._total_jac_sparsity is not None:
+                        raise RuntimeError("Total jac sparsity was set in both _simul_coloring_info"
+                                           " and _total_jac_sparsity.")
+                    self._total_jac_sparsity = sparsity
+
+                self._simul_coloring_info = column_lists, row_map
 
     def _pre_run_model_debug_print(self):
         """
