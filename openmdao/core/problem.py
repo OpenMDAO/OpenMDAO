@@ -233,6 +233,28 @@ class Problem(object):
 
         return val
 
+    def get_val(name, units=None, indices=None):
+        """
+        Get an output/input variable.
+
+        Function is used if you want to specify display units.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+        units : str, optional
+            Units to convert to before upon return.
+        indices : int or list or slice object, optional
+            Indices or slice to return.
+
+        Returns
+        -------
+        float or ndarray
+            The requested output/input variable.
+        """
+        pass
+
     def __setitem__(self, name, value):
         """
         Set an output/input variable.
@@ -255,6 +277,25 @@ class Problem(object):
             else:
                 msg = 'Variable name "{}" not found.'
                 raise KeyError(msg.format(name))
+
+    def set_val(name, value, units=None, indices=None):
+        """
+        Set an output/input variable.
+
+        Function is used if you want to set a value using a different unit.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+        value : float or ndarray or list
+            Value to set this variable to.
+        units : str, optional
+            Units that value is defined in.
+        indices : int or list or slice object, optional
+            Indices or slice to set to specified value.
+        """
+        pass
 
     def _set_initial_conditions(self):
         """
