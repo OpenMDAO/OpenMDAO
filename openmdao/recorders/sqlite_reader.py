@@ -289,7 +289,7 @@ class SqliteCaseReader(BaseCaseReader):
 
     def _is_case_child(self, parent_coordinate, coordinate, expected_child_length):
         """
-        Tells if the given case is a child case of the parent.
+        Tell if the given case is a child case of the parent.
 
         Parameters
         ----------

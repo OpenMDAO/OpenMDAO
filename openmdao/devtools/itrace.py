@@ -77,7 +77,7 @@ def _get_printer(stream, rank=-1):
     # rank < 0 means output on all ranks
     if not MPI or rank < 0 or MPI.COMM_WORLD.rank == rank:
         def prt(*args, **kwargs):
-            print(*args, **kwargs, file=stream)
+            print(*args, file=stream, **kwargs)
     else:
         def prt(*args, **kwargs):
             pass
