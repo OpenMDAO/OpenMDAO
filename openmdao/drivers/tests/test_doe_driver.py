@@ -19,7 +19,7 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.utils.assert_utils import assert_rel_error
 
 
-class TestDOEDriver(unittest.TestCase):
+class TestDOEDriverErrors(unittest.TestCase):
 
     def test_generator_check(self):
         prob = Problem()
@@ -39,7 +39,7 @@ class TestDOEDriver(unittest.TestCase):
                          "but an instance of Problem was found.")
 
 
-class TestDOEDriverRecorded(unittest.TestCase):
+class TestDOEDriver(unittest.TestCase):
 
     def setUp(self):
         self.startdir = os.getcwd()

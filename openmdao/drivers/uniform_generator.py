@@ -3,7 +3,8 @@ Case generator for Design-of-Experiments Driver implementing the Uniform method.
 """
 import numpy as np
 
-from six import moves, iteritems
+from six import iteritems
+from six.moves import range
 
 from openmdao.drivers.doe_driver import DOEGenerator
 
@@ -61,7 +62,7 @@ class UniformGenerator(DOEGenerator):
         if self._seed is not None:
             np.random.seed(self._seed)
 
-        for i in moves.range(self._num_samples):
+        for i in range(self._num_samples):
             sample = {}
 
             for (name, meta) in iteritems(design_vars):
