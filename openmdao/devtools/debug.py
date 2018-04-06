@@ -275,53 +275,53 @@ def config_summary(problem, stream=sys.stdout):
     else:
         global_max_depth = max_depth
 
-    printf = _get_printer(problem.comm, stream)
+    printer = _get_printer(problem.comm, stream)
 
-    printf("============== Problem Summary ============")
-    printf("Groups:           %5d" % len(grpnames))
-    printf("Components:       %5d" % (len(sysnames) - len(grpnames)))
-    printf("Max tree depth:   %5d" % global_max_depth)
-    printf()
+    printer("============== Problem Summary ============")
+    printer("Groups:           %5d" % len(grpnames))
+    printer("Components:       %5d" % (len(sysnames) - len(grpnames)))
+    printer("Max tree depth:   %5d" % global_max_depth)
+    printer()
 
     if setup_done:
         desvars = model.get_design_vars()
-        printf("Design variables: %5d   Total size: %8d" %
+        printer("Design variables: %5d   Total size: %8d" %
               (len(desvars), sum(d['size'] for d in desvars.values())))
 
         # TODO: give separate info for linear, nonlinear constraints, equality, inequality
         constraints = model.get_constraints()
-        printf("Constraints:      %5d   Total size: %8d" %
+        printer("Constraints:      %5d   Total size: %8d" %
               (len(constraints), sum(d['size'] for d in constraints.values())))
 
         objs = model.get_objectives()
-        printf("Objectives:       %5d   Total size: %8d" %
+        printer("Objectives:       %5d   Total size: %8d" %
               (len(objs), sum(d['size'] for d in objs.values())))
 
-    printf()
+    printer()
 
     input_names = model._var_allprocs_abs_names['input']
     ninputs = len(input_names)
     if setup_done:
-        printf("Input variables:  %5d   Total size: %8d" %
+        printer("Input variables:  %5d   Total size: %8d" %
               (ninputs, sum(meta[n]['size'] for n in input_names)))
     else:
-        printf("Input variables: %5d" % ninputs)
+        printer("Input variables: %5d" % ninputs)
 
     output_names = model._var_allprocs_abs_names['output']
     noutputs = len(output_names)
     if setup_done:
-        printf("Output variables: %5d   Total size: %8d" %
+        printer("Output variables: %5d   Total size: %8d" %
               (noutputs, sum(meta[n]['global_size'] for n in output_names)))
     else:
-        printf("Output variables: %5d" % noutputs)
+        printer("Output variables: %5d" % noutputs)
 
     if setup_done:
-        printf()
+        printer()
         conns = model._conn_global_abs_in2out
-        printf("Total connections: %d   Total transfer data size: %d" %
+        printer("Total connections: %d   Total transfer data size: %d" %
               (len(conns), sum(meta[n]['size'] for n in conns)))
 
-    printf()
-    printf("Driver type: %s" % problem.driver.__class__.__name__)
-    printf("Linear Solvers: %s" % sorted(ln_solvers))
-    printf("Nonlinear Solvers: %s" % sorted(nl_solvers))
+    printer()
+    printer("Driver type: %s" % problem.driver.__class__.__name__)
+    printer("Linear Solvers: %s" % sorted(ln_solvers))
+    printer("Nonlinear Solvers: %s" % sorted(nl_solvers))
