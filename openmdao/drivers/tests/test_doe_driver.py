@@ -5,6 +5,7 @@ import unittest
 import os
 import shutil
 import tempfile
+import platform
 
 import numpy as np
 
@@ -16,8 +17,6 @@ from openmdao.drivers.latin_hypercube_generator import OptimizedLatinHypercubeGe
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.utils.assert_utils import assert_rel_error
 
-from pprint import pprint
-
 
 class TestDOEDriver(unittest.TestCase):
 
@@ -28,15 +27,15 @@ class TestDOEDriver(unittest.TestCase):
             prob.driver = DOEDriver(FullFactorialGenerator)
 
         self.assertEqual(str(err.exception),
-            "DOEDriver requires an instance of DOEGenerator, but a class "
-            "object was found: FullFactorialGenerator")
+                         "DOEDriver requires an instance of DOEGenerator, "
+                         "but a class object was found: FullFactorialGenerator")
 
         with self.assertRaises(TypeError) as err:
             prob.driver = DOEDriver(Problem())
 
         self.assertEqual(str(err.exception),
-            "DOEDriver requires an instance of DOEGenerator, but an instance "
-            "of Problem was found.")
+                         "DOEDriver requires an instance of DOEGenerator, "
+                         "but an instance of Problem was found.")
 
 
 class TestDOEDriverData(unittest.TestCase):
@@ -128,12 +127,23 @@ class TestDOEDriverData(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        expected = {
-            0: {'xy': np.array([-11.279662, -32.120265])},
-            1: {'xy': np.array([ 40.069084, -11.377920])},
-            2: {'xy': np.array([ 10.5913699, 41.147352826])},
-            3: {'xy': np.array([-39.06031971, 22.29432501])},
-        }
+        # the integer methods in the random module changed in Python 3.2
+        # https://docs.python.org/dev/whatsnew/3.2.html#random
+        if platform.python_version() < '3.2':
+            expected = {
+                0: {'xy': np.array([-11.279662,  -32.120265])},
+                1: {'xy': np.array([ 40.069084,  -11.377920])},
+                2: {'xy': np.array([ 10.5913699,  41.147352826])},
+                3: {'xy': np.array([-39.06031971, 22.29432501])},
+            }
+        else:
+            expected = {
+                0: {'xy': np.array([ 38.7203376,  17.87973416])},
+                1: {'xy': np.array([-34.9309156, -11.37792043])},
+                2: {'xy': np.array([-14.40863002, 41.14735283])},
+                3: {'xy': np.array([ 10.93968028,-27.70567498])},
+            }
+
 
         cases = CaseReader("CASES.sql").driver_cases
 
