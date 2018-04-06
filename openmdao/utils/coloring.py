@@ -232,6 +232,7 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15):
     print("\nUsing tolerance: %g" % good_tol)
     print("Most common number of zero entries (%d of %d) repeated %d times out of %d tolerances "
           "tested.\n" % (sorted_items[0][0], fullJ.size, len(sorted_items[0][1]), n_tested))
+    print("Total jacobian shape:", fullJ.shape)
 
     boolJ = np.zeros(fullJ.shape, dtype=bool)
     boolJ[fullJ > good_tol] = True
@@ -476,7 +477,7 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
 
     if sparsity is not None:
         stream.write("Sparsity structure has been computed for all response/design_var "
-                     "sub-jacobians.")
+                     "sub-jacobians.\n")
     if tot_size == tot_colors or tot_colors == 0:
         stream.write("No simultaneous derivative solves are possible in this configuration.\n")
     else:
