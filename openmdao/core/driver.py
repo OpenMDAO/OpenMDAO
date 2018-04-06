@@ -10,6 +10,7 @@ from six import iteritems, itervalues, string_types
 
 import numpy as np
 
+from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
@@ -117,6 +118,8 @@ class Driver(object):
         A data structure describing coloring for simultaneous derivs.
     _res_jacs : dict
         Dict of sparse subjacobians for use with certain optimizers, e.g. pyOptSparseDriver.
+    _total_jac : _TotalJacInfo or None
+        Cached total jacobian handling object.
     """
 
     def __init__(self):
@@ -206,6 +209,7 @@ class Driver(object):
 
         self._simul_coloring_info = None
         self._res_jacs = {}
+        self._total_jac = None
 
         self.fail = False
 
@@ -240,6 +244,7 @@ class Driver(object):
         self._problem = problem
         model = problem.model
 
+        self._total_jac = None
         self._objs = objs = OrderedDict()
         self._cons = cons = OrderedDict()
         self._responses = model.get_responses(recurse=True)
@@ -403,7 +408,7 @@ class Driver(object):
                           "(objectives and constraints)." %
                           (problem._mode, desvar_size, response_size), RuntimeWarning)
 
-    def _get_voi_val(self, name, meta, remote_vois):
+    def _get_voi_val(self, name, meta, remote_vois, unscaled=False, ignore_indices=False):
         """
         Get the value of a variable of interest (objective, constraint, or design var).
 
@@ -418,6 +423,10 @@ class Driver(object):
         remote_vois : dict
             Dict containing (owning_rank, size) for all remote vois of a particular
             type (design var, constraint, or objective).
+        unscaled : bool
+            Set to True if unscaled (physical) design variables are desired.
+        ignore_indices : bool
+            Set to True if the full array is desired, not just those indicated by indices.
 
         Returns
         -------
@@ -432,7 +441,7 @@ class Driver(object):
         if name in remote_vois:
             owner, size = remote_vois[name]
             if owner == comm.rank:
-                if indices is None:
+                if indices is None or ignore_indices:
                     val = vec[name].copy()
                 else:
                     val = vec[name][indices]
@@ -442,12 +451,12 @@ class Driver(object):
                 val = np.empty(size)
             comm.Bcast(val, root=owner)
         else:
-            if indices is None:
+            if indices is None or ignore_indices:
                 val = vec[name].copy()
             else:
                 val = vec[name][indices]
 
-        if self._has_scaling:
+        if self._has_scaling and not unscaled:
             # Scale design variable values
             adder = meta['adder']
             if adder is not None:
@@ -459,7 +468,7 @@ class Driver(object):
 
         return val
 
-    def get_design_var_values(self, filter=None):
+    def get_design_var_values(self, filter=None, unscaled=False, ignore_indices=False):
         """
         Return the design variable values.
 
@@ -469,6 +478,10 @@ class Driver(object):
         ----------
         filter : list
             List of desvar names used by recorders.
+        unscaled : bool
+            Set to True if unscaled (physical) design variables are desired.
+        ignore_indices : bool
+            Set to True if the full array is desired, not just those indicated by indices.
 
         Returns
         -------
@@ -481,7 +494,8 @@ class Driver(object):
             # use all the designvars
             dvs = self._designvars
 
-        return {n: self._get_voi_val(n, self._designvars[n], self._remote_dvs) for n in dvs}
+        return {n: self._get_voi_val(n, self._designvars[n], self._remote_dvs, unscaled=unscaled,
+                                     ignore_indices=ignore_indices) for n in dvs}
 
     def set_design_var(self, name, value):
         """
@@ -638,34 +652,6 @@ class Driver(object):
         self.iter_count += 1
         return failure_flag
 
-    def _dict2array_jac(self, derivs):
-        osize = 0
-        isize = 0
-        do_wrt = True
-        islices = {}
-        oslices = {}
-        for okey, oval in iteritems(derivs):
-            if do_wrt:
-                for ikey, val in iteritems(oval):
-                    istart = isize
-                    isize += val.shape[1]
-                    islices[ikey] = slice(istart, isize)
-                do_wrt = False
-            ostart = osize
-            osize += oval[ikey].shape[0]
-            oslices[okey] = slice(ostart, osize)
-
-        new_derivs = np.zeros((osize, isize))
-
-        relevant = self._problem.model._relevant
-
-        for okey, odict in iteritems(derivs):
-            for ikey, val in iteritems(odict):
-                if okey in relevant[ikey] or ikey in relevant[okey]:
-                    new_derivs[oslices[okey], islices[ikey]] = val
-
-        return new_derivs
-
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
@@ -692,40 +678,22 @@ class Driver(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        prob = self._problem
+        total_jac = self._total_jac
 
-        # Compute the derivatives in dict format...
-        if prob.model._owns_approx_jac:
-            derivs = prob._compute_totals_approx(of=of, wrt=wrt, return_format='dict',
-                                                 global_names=global_names)
+        if self._problem.model._owns_approx_jac:
+            if total_jac is None:
+                self._total_jac = total_jac = _TotalJacInfo(self._problem, of, wrt, global_names,
+                                                            return_format, approx=True)
+            return total_jac.compute_totals_approx()
         else:
-            derivs = prob._compute_totals(of=of, wrt=wrt, return_format='dict',
-                                          global_names=global_names)
+            if total_jac is None:
+                total_jac = _TotalJacInfo(self._problem, of, wrt, global_names, return_format)
 
-        # ... then convert to whatever the driver needs.
-        if return_format in ('dict', 'array'):
-            if self._has_scaling:
-                for okey, odict in iteritems(derivs):
-                    for ikey, val in iteritems(odict):
+            # don't cache linear constraint jacobian
+            if not total_jac.has_lin_cons:
+                self._total_jac = total_jac
 
-                        iscaler = self._designvars[ikey]['scaler']
-                        oscaler = self._responses[okey]['scaler']
-
-                        # Scale response side
-                        if oscaler is not None:
-                            val[:] = (oscaler * val.T).T
-
-                        # Scale design var side
-                        if iscaler is not None:
-                            val *= 1.0 / iscaler
-        else:
-            raise RuntimeError("Derivative scaling by the driver only supports the 'dict' and "
-                               "'array' formats at present.")
-
-        if return_format == 'array':
-            derivs = self._dict2array_jac(derivs)
-
-        return derivs
+            return total_jac.compute_totals()
 
     def record_iteration(self):
         """
@@ -938,7 +906,7 @@ class Driver(object):
             print(len(header) * '-')
 
         if 'desvars' in self.options['debug_print']:
-            desvar_vals = self.get_design_var_values()
+            desvar_vals = self.get_design_var_values(unscaled=True, ignore_indices=True)
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Design Vars")
                 if desvar_vals:

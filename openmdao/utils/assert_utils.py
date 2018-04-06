@@ -4,6 +4,7 @@ Functions for making assertions about OpenMDAO Systems.
 import numpy as np
 from math import isnan
 from six import raise_from
+from six.moves import zip
 
 from openmdao.core.component import Component
 from openmdao.core.group import Group

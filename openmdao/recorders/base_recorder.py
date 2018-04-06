@@ -24,6 +24,8 @@ class BaseRecorder(object):
         Tells recorder whether to record the inputs of a System.
     recording_options['record_residuals'] :  bool(False)
         Tells recorder whether to record the residuals of a System.
+    recording_options['metadata_excludes']: list of strings([])
+        Patterns for user-defined metadata to exclude in recording of a System.
     recording_options['record_derivatives'] :  bool(False)
         Tells recorder whether to record the derivatives of a Driver.
     recording_options['record_desvars'] :  bool(True)

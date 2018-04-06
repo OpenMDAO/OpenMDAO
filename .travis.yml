@@ -50,7 +50,6 @@ before_install:
 - if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
     MASTER_BUILD=1;
   fi
-- export OPENMDAO_TEST_DOCS=1
 
 install:
 # get key decrypted, placed, chmodded, and added for passwordless access to WebFaction
@@ -101,13 +100,20 @@ script:
   fi
 
 # run the tests from down here to see if it can work without being at top level
-- testflo -n 1 openmdao  -m "ptest*"
-- testflo -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*
+# only do coverage on the upload machine.
+- if [ "$UPLOAD_DOCS" ]; then
+    testflo -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*;
+  else
+    testflo -n 1 openmdao;
+  fi
 
 after_success:
-- coveralls --rcfile=../../.coveragerc --output=coveralls.json
-- sed 's/\/home\/travis\/miniconda\/lib\/python'"$PY"'\/site-packages\///g' < coveralls.json > coveralls-upd.json
-- coveralls --upload=coveralls-upd.json
+# again, only run coverage operations on the upload machine after success.
+- if [ "$UPLOAD_DOCS" ]; then
+    coveralls --rcfile=../../.coveragerc --output=coveralls.json;
+    sed 's/\/home\/travis\/miniconda\/lib\/python'"$PY"'\/site-packages\///g' < coveralls.json > coveralls-upd.json;
+    coveralls --upload=coveralls-upd.json;
+  fi
 
 deploy:
   provider: script

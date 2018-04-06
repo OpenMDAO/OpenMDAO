@@ -15,7 +15,7 @@ generate an approximate Jacobian for the entire group during the linearization s
 which inputs and output pairs are needed in this Jacobian. When :code:`solve_linear` is called from any system that contains this system, the approximated Jacobian
 is used for the derivatives in this system.
 
-The derivatives approximated in this matter are total derivatives of outputs of the group with respect to inputs. If any components in the group contain
+The derivatives approximated in this manner are total derivatives of outputs of the group with respect to inputs. If any components in the group contain
 implicit states, then you must have an appropriate solver (such as :code:`NewtonSolver`) inside the group to solve the implicit relationships.
 
 Here is a classic example of where you might use an approximation like finite difference. In this example, we could just
