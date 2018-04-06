@@ -391,30 +391,54 @@ def _write_sparsity(sparsity, stream):
 
 
 def _write_coloring(col_lists, rows, sparsity, stream):
-    if stream.isatty():
-        stream.write("\n########### BEGIN COLORING DATA ################")
-    
-        stream.write("\n([\n")
-        for color, col_list in enumerate(col_lists):
-            if color == 0:
-                stream.write("   %s,   # uncolored columns\n" % col_list)
-            else:
-                stream.write("   %s,   # color %d\n" % (col_list, color))
-        stream.write("],")
+    """
+    Write the coloring and sparsity structures to the given stream.
 
-        stream.write("\n[\n")
-        for col, row_list in enumerate(rows):
-            stream.write("   %s,   # column %d\n" % (row_list, col))
-        stream.write("]")
-
-        if sparsity:
-            _write_sparsity(sparsity, stream)
+    Parameters
+    ----------
+    col_lists : list of lists
+        Lists of groups of columns of the same color.  First list is the list of all non-colored
+        columns.
+    rows : list of lists
+        For each colored column, the list of all nonzero row entries.  For non-colored columns,
+        the value is None.
+    sparsity : dict
+        Nested dict of subjac sparsity for each total derivative.
+    stream : file-like
+        Output stream.
+    """
+    stream.write("[[\n")
+    last_idx = len(col_lists) - 1
+    for i, col_list in enumerate(col_lists):
+        stream.write("   %s" % col_list)
+        if i == last_idx:
+            stream.write("\n")
         else:
+            stream.write(",\n")
+
+    stream.write("],\n[\n")
+    last_idx = len(rows) - 1
+    for i, row_list in enumerate(rows):
+        if row_list is None:
+            stream.write("   null")
+        else:
+            stream.write("   %s" % row_list)
+        if i == last_idx:
+            stream.write("\n")
+        else:
+            stream.write(",\n")
+    stream.write("]")
+
+    if sparsity:
+        stream.write(",\n")
+        _write_sparsity(sparsity, stream)
+    else:
+        if stream.isatty():
             stream.write(",\nNone")
+        else:
+            stream.write(",\nnull")
 
-        stream.write(")\n")
-        stream.write("########### END COLORING DATA ############\n")
-
+    stream.write("]")
 
 
 def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False, stream=sys.stdout):
@@ -516,46 +540,15 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
 
     if stream is not None:
         if stream.isatty():
-            stream.write("\n########### BEGIN COLORING DATA ################")
-            stream.write("\n([\n")
-            for color, col_list in enumerate(col_lists):
-                if color == 0:
-                    stream.write("   %s,   # uncolored columns\n" % col_list)
-                else:
-                    stream.write("   %s,   # color %d\n" % (col_list, color))
-            stream.write("],")
+            stream.write("\n########### BEGIN COLORING DATA ################\n")
+            _write_coloring(col_lists, rows, sparsity, stream)
+            stream.write("\n########### END COLORING DATA ############\n")
 
-            stream.write("\n[\n")
-            for col, row_list in enumerate(rows):
-                stream.write("   %s,   # column %d\n" % (row_list, col))
-            stream.write("]")
-
-            if sparsity:
-                _write_sparsity(sparsity, stream)
-            else:
-                stream.write(",\nNone")
-
-            stream.write(")\n")
-            stream.write("########### END COLORING DATA ############\n")
-
-        else:  # output json format to a file
-            s = json.dumps((col_lists, rows, sparsity))
-
-            # do a little pretty printing since the built-in json pretty printing stretches
-            # the output vertically WAY too much.
-            s = s.replace(', [', ',\n[')
-            s = s.replace('[[', '[\n[')
-            s = s.replace(', null', ',\nnull')
-            s = s.replace('[],\n[],\n[', '[], [], [')
-            s = s.replace('], "', '],\n   "')
-            s = s.replace('}, "', '},\n"')
-            s = s.replace('{"', '{\n   "')
-            stream.write(s)
-            stream.write("\n")
-
-        if show_jac and stream is not None:
-            stream.write("\n\n")
-            array_viz(J, problem, of, wrt, stream)
+            if show_jac:
+                stream.write("\n\n")
+                array_viz(J, problem, of, wrt, stream)
+        else:
+            _write_coloring(col_lists, rows, sparsity, stream)
 
     return col_lists, rows, sparsity
 
@@ -611,7 +604,7 @@ def _simul_coloring_setup_parser(parser):
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', action='store', dest='outfile', help='output file (json format)')
-    parser.add_argument('-n', action='store', dest='num_jacs', default=1, type=int,
+    parser.add_argument('-n', action='store', dest='num_jacs', default=3, type=int,
                         help='number of times to repeat total derivative computation')
     parser.add_argument('-t', action='store', dest='tolerance', default=1.e-15, type=float,
                         help='tolerance used to determine if a total jacobian entry is nonzero')
@@ -669,7 +662,7 @@ def _sparsity_setup_parser(parser):
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', action='store', dest='outfile', help='output file (json format).')
-    parser.add_argument('-n', action='store', dest='num_jacs', default=1, type=int,
+    parser.add_argument('-n', action='store', dest='num_jacs', default=3, type=int,
                         help='number of times to repeat total derivative computation.')
     parser.add_argument('-t', action='store', dest='tolerance', default=1.e-15, type=float,
                         help='tolerance used to determine if a total jacobian entry is nonzero.')
