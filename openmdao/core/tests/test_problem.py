@@ -676,7 +676,6 @@ class TestProblem(unittest.TestCase):
         with assertRaisesRegex(self, TypeError, msg):
             prob.set_val('no_unit.x', 55.0, 'degK')
 
-
     def test_feature_get_set_with_units(self):
         from openmdao.api import Problem, ExecComp
 
