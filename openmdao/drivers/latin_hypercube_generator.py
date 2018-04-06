@@ -137,11 +137,13 @@ class LatinHypercubeGenerator(DOEGenerator):
 
 
 CITATIONS = """
-@journal {Morris:1995:SOU,
-        title = {Exploratory Design for Computer Experiments},
-        booktitle = {Journal of Statistical Planing and Inference},
-        year = {1995},
-        author = {Morris, M., and Mitchell, T}
+@article {morris_mitchell_1995,
+    title   = {Exploratory Design for Computer Experiments},
+    journal = {Journal of Statistical Planning and Inference},
+    year    = 1995,
+    volume  = 43,
+    pages   = {381-402},
+    author  = {Morris, M., and Mitchell, T}
 }
 """
 
