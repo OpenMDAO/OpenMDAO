@@ -559,53 +559,95 @@ class TestProblem(unittest.TestCase):
 
         # Gets
 
-        assert_rel_error(self, prob['comp.x'], 77.0, 1e-6)
-        assert_rel_error(self, prob['comp.x', 'degC'], 25.0, 1e-6)
-        assert_rel_error(self, prob['comp.y'], 0.0, 1e-6)
-        assert_rel_error(self, prob['comp.y', 'degF'], 32.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x'), 77.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'degC'), 25.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.y'), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.y', 'degF'), 32.0, 1e-6)
 
-        assert_rel_error(self, prob['xx'], 77.0, 1e-6)
-        assert_rel_error(self, prob['xx', 'degC'], 25.0, 1e-6)
-        assert_rel_error(self, prob['yy'], 0.0, 1e-6)
-        assert_rel_error(self, prob['yy', 'degF'], 32.0, 1e-6)
+        assert_rel_error(self, prob.get_val('xx'), 77.0, 1e-6)
+        assert_rel_error(self, prob.get_val('xx', 'degC'), 25.0, 1e-6)
+        assert_rel_error(self, prob.get_val('yy'), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('yy', 'degF'), 32.0, 1e-6)
 
-        assert_rel_error(self, prob['acomp.x'][0], 77.0, 1e-6)
-        assert_rel_error(self, prob['acomp.x'][1], 95.0, 1e-6)
-        assert_rel_error(self, prob['acomp.x', 'degC'][0], 25.0, 1e-6)
-        assert_rel_error(self, prob['acomp.x', 'degC'][1], 35.0, 1e-6)
-        assert_rel_error(self, prob['acomp.y'][0], 0.0, 1e-6)
-        assert_rel_error(self, prob['acomp.y', 'degF'][0], 32.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', indices=0), 77.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=[0]), 25.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.y', indices=0), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.y', 'degF', indices=0), 32.0, 1e-6)
 
-        assert_rel_error(self, prob['axx'][0], 77.0, 1e-6)
-        assert_rel_error(self, prob['axx'][1], 95.0, 1e-6)
-        assert_rel_error(self, prob['axx', 'degC'][0], 25.0, 1e-6)
-        assert_rel_error(self, prob['axx', 'degC'][1], 35.0, 1e-6)
-        assert_rel_error(self, prob['ayy'][0], 0.0, 1e-6)
-        assert_rel_error(self, prob['ayy', 'degF'][0], 32.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', indices=0), 77.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', indices=1), 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=0), 25.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
+        assert_rel_error(self, prob.get_val('ayy', indices=0), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('ayy', 'degF', indices=0), 32.0, 1e-6)
 
         # Sets
 
-        prob['comp.x', 'degC'] = 30.0
+        prob.set_val('comp.x', 30.0, 'degC')
         assert_rel_error(self, prob['comp.x'], 86.0, 1e-6)
-        assert_rel_error(self, prob['comp.x', 'degC'], 30.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'degC'), 30.0, 1e-6)
 
-        prob['xx', 'degC'] = 30.0
+        prob.set_val('xx', 30.0, 'degC')
         assert_rel_error(self, prob['xx'], 86.0, 1e-6)
-        assert_rel_error(self, prob['xx', 'degC'], 30.0, 1e-6)
+        assert_rel_error(self, prob.get_val('xx', 'degC'), 30.0, 1e-6)
 
-        # In place operations pre/post final setup don't work.
-        prob['acomp.x', 'degC'][0] = 30.0
+        prob.set_val('acomp.x', 30.0, 'degC', indices=[0])
         assert_rel_error(self, prob['acomp.x'][0], 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=0), 30.0, 1e-6)
 
-        # After final setup, we need to check the stuff we just set.
+        prob.set_val('axx', 30.0, 'degC', indices=0)
+        assert_rel_error(self, prob['axx'][0], 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([0])), 30.0, 1e-6)
+
         prob.final_setup()
 
-        assert_rel_error(self, prob['acomp.x'][0], 86.0, 1e-6)
-        assert_rel_error(self, prob['acomp.x'][1], 95.0, 1e-6)
-        assert_rel_error(self, prob['acomp.x', 'degC'][0], 30.0, 1e-6)
-        assert_rel_error(self, prob['acomp.x', 'degC'][1], 35.0, 1e-6)
-
         # Now we do it all over again for coverage.
+
+        # Gets
+
+        assert_rel_error(self, prob.get_val('comp.x'), 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'degC'), 30.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.y'), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.y', 'degF'), 32.0, 1e-6)
+
+        assert_rel_error(self, prob.get_val('xx'), 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('xx', 'degC'), 30.0, 1e-6)
+        assert_rel_error(self, prob.get_val('yy'), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('yy', 'degF'), 32.0, 1e-6)
+
+        assert_rel_error(self, prob.get_val('acomp.x', indices=0), 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=[0]), 30.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.y', indices=0), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.y', 'degF', indices=0), 32.0, 1e-6)
+
+        assert_rel_error(self, prob.get_val('axx', indices=0), 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', indices=1), 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=0), 30.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
+        assert_rel_error(self, prob.get_val('ayy', indices=0), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('ayy', 'degF', indices=0), 32.0, 1e-6)
+
+        # Sets
+
+        prob.set_val('comp.x', 35.0, 'degC')
+        assert_rel_error(self, prob['comp.x'], 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'degC'), 35.0, 1e-6)
+
+        prob.set_val('xx', 35.0, 'degC')
+        assert_rel_error(self, prob['xx'], 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('xx', 'degC'), 35.0, 1e-6)
+
+        prob.set_val('acomp.x', 35.0, 'degC', indices=[0])
+        assert_rel_error(self, prob['acomp.x'][0], 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=0), 35.0, 1e-6)
+
+        prob.set_val('axx', 35.0, 'degC', indices=0)
+        assert_rel_error(self, prob['axx'][0], 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([0])), 35.0, 1e-6)
 
     def test_feature_get_set_with_units(self):
         from openmdao.api import Problem, ExecComp
@@ -617,11 +659,33 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.x'], 100, 1e-6)
-        assert_rel_error(self, prob['comp.x', 'm'], 1.0, 1e-6)
-        prob['comp.x', 'mm'] = 10.0
-        assert_rel_error(self, prob['comp.x'], 1.0, 1e-6)
-        assert_rel_error(self, prob['comp.x', 'm'], 1.0e-2, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x'), 100, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'm'), 1.0, 1e-6)
+        prob.set_val('comp.x', 10.0, 'mm')
+        assert_rel_error(self, prob.get_val('comp.x'), 1.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'm'), 1.0e-2, 1e-6)
+
+    def test_feature_get_set_array_with_units(self):
+        from openmdao.api import Problem, ExecComp
+
+        prob = Problem()
+        comp = prob.model.add_subsystem('comp', ExecComp('y=x+1.', x={'value': np.array([100.0, 33.3]), 'units': 'cm'},
+                                                         y={'shape' : (2, ), 'units': 'm'}))
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob.get_val('comp.x'), np.array([100, 33.3]), 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'm'), np.array([1.0, 0.333]), 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'km', indices=[0]), 0.001, 1e-6)
+
+        prob.set_val('comp.x', 10.0, 'mm')
+        assert_rel_error(self, prob.get_val('comp.x'), np.array([1.0, 1.0]), 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'm', indices=0), 1.0e-2, 1e-6)
+
+        prob.set_val('comp.x', 50.0, 'mm', indices=[1])
+        assert_rel_error(self, prob.get_val('comp.x'), np.array([1.0, 5.0]), 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'm', indices=1), 5.0e-2, 1e-6)
 
     def test_feature_set_get_array(self):
         import numpy as np
