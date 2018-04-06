@@ -17,24 +17,6 @@ import numbers
 import numpy as np
 
 
-@contextlib.contextmanager
-def printoptions(*args, **kwds):
-    """
-    Set numpy printoptions within a particular context.
-
-    Parameters
-    ----------
-    *args : tuple
-        Positional arguments.
-    **kwds : dict
-        Keyword arguments.
-    """
-    original = np.get_printoptions()
-    np.set_printoptions(*args, **kwargs)
-    yield
-    np.set_printoptions(**original)
-
-
 def warn_deprecation(msg):
     """
     Raise a warning and prints a deprecation message to stdout.
