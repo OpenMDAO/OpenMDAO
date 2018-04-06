@@ -6,7 +6,6 @@ import os
 import sys
 import warnings
 import unittest
-import contextlib
 from mock import Mock
 from fnmatch import fnmatchcase
 from six import string_types
