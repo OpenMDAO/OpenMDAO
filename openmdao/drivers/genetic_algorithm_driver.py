@@ -6,6 +6,11 @@ Prof. William A. Crossley.
 
 This basic GA algorithm is compartmentalized into the GeneticAlgorithm class so that it can be
 used in more complicated driver.
+
+The following reference is only for the automatic population sizing:
+Williams E.A., Crossley W.A. (1998) Empirically-Derived Population Size and Mutation Rate
+Guidelines for a Genetic Algorithm with Uniform Crossover. In: Chawdhry P.K., Roy R., Pant R.K.
+(eds) Soft Computing in Engineering Design and Manufacturing. Springer, London.
 """
 import copy
 
@@ -31,7 +36,8 @@ class SimpleGADriver(Driver):
     options['max_gen'] :  int(300)
         Number of generations before termination.
     options['pop_size'] :  int(25)
-        Number of points in the GA.
+        Number of points in the GA. Set to 0 and it will be computed as four times the total number
+        of bits.
 
     Attributes
     ----------
@@ -71,8 +77,9 @@ class SimpleGADriver(Driver):
                              ' generation each iteration.')
         self.options.declare('max_gen', default=300,
                              desc='Number of generations before termination.')
-        self.options.declare('pop_size', default=25,
-                             desc='Number of points in the GA.')
+        self.options.declare('pop_size', default=0,
+                             desc='Number of points in the GA. Set to 0 and it will be computed '
+                             'as four times the number of bits.')
         self.options.declare('run_parallel', default=False,
                              desc='Set to True to execute the points in a generation in parallel.')
 
@@ -153,6 +160,10 @@ class SimpleGADriver(Driver):
                 i, j = self._desvar_idx[abs_name]
 
             bits[i:j] = val
+
+        # Automatic population size.
+        if pop_size == 0:
+            pop_size = 4 * np.sum(bits)
 
         desvar_new, obj, nfit = ga.execute_ga(lower_bound, upper_bound, bits, pop_size, max_gen)
 

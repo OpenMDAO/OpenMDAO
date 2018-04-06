@@ -35,7 +35,9 @@ You can change the number of generations to run the genetic algorithm by setting
     openmdao.drivers.tests.test_genetic_algorithm_driver.TestFeatureSimpleGA.test_option_max_gen
     :layout: interleave
 
-You can change the population size by setting the "pop_size" option.
+You can change the population size by setting the "pop_size" option. The default value for pop_size is 0,
+which means that the driver automatically computes a population size that is 4 times the total number of
+bits for all variables encoded.
 
 .. embed-code::
     openmdao.drivers.tests.test_genetic_algorithm_driver.TestFeatureSimpleGA.test_option_pop_size

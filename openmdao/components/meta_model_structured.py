@@ -769,7 +769,3 @@ class MetaModelStructured(ExplicitComponent):
 
             if self.metadata['training_data_gradients']:
                 partials[out_name, "%s_train" % out_name] = dy_ddata
-
-
-def _for_docs():
-    return MetaModelStructured()
