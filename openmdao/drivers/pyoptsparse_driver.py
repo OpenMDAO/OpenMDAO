@@ -137,6 +137,7 @@ class pyOptSparseDriver(Driver):
         self.supports['two_sided_constraints'] = True
         self.supports['linear_constraints'] = True
         self.supports['simultaneous_derivatives'] = True
+        self.supports['total_jac_sparsity'] = True
 
         # What we don't support yet
         self.supports['active_set'] = False
