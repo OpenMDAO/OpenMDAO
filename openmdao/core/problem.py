@@ -252,7 +252,17 @@ class Problem(object):
 
         if units is not None:
             base_units = self._get_units(name)
-            scale, offset = get_conversion(base_units, units)
+
+            if base_units is None:
+                msg = "Incompatible units for conversion: '{}' and '{}'."
+                raise TypeError(msg.format(base_units, units))
+
+            try:
+                scale, offset = get_conversion(base_units, units)
+            except TypeError:
+                msg = "Incompatible units for conversion: '{}' and '{}'."
+                raise TypeError(msg.format(base_units, units))
+
             val = (val + offset) * scale
 
         return val
@@ -353,7 +363,17 @@ class Problem(object):
         """
         if units is not None:
             base_units = self._get_units(name)
-            scale, offset = get_conversion(units, base_units)
+
+            if base_units is None:
+                msg = "Incompatible units for conversion: '{}' and '{}'."
+                raise TypeError(msg.format(units, base_units))
+
+            try:
+                scale, offset = get_conversion(units, base_units)
+            except TypeError:
+                msg = "Incompatible units for conversion: '{}' and '{}'."
+                raise TypeError(msg.format(units, base_units))
+
             value = (value + offset) * scale
 
         if indices is not None:

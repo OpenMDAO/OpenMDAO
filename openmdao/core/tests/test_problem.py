@@ -649,6 +649,34 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['axx'][0], 95.0, 1e-6)
         assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([0])), 35.0, 1e-6)
 
+    def test_get_set_with_units_error_messages(self):
+        from openmdao.api import Problem, ExecComp
+
+        prob = Problem()
+        comp = prob.model.add_subsystem('comp', ExecComp('y=x+1.', x={'value': 100.0, 'units': 'cm'},
+                                                         y={'units': 'm'}))
+        comp = prob.model.add_subsystem('no_unit', ExecComp('y=x+1.', x={'value': 100.0}))
+
+        prob.setup()
+        prob.run_model()
+
+        msg = "Incompatible units for conversion: 'cm' and 'degK'."
+        with assertRaisesRegex(self, TypeError, msg):
+            prob.get_val('comp.x', 'degK')
+
+        msg = "Incompatible units for conversion: 'degK' and 'cm'."
+        with assertRaisesRegex(self, TypeError, msg):
+            prob.set_val('comp.x', 55.0, 'degK')
+
+        msg = "Incompatible units for conversion: 'None' and 'degK'."
+        with assertRaisesRegex(self, TypeError, msg):
+            prob.get_val('no_unit.x', 'degK')
+
+        msg = "Incompatible units for conversion: 'degK' and 'None'."
+        with assertRaisesRegex(self, TypeError, msg):
+            prob.set_val('no_unit.x', 55.0, 'degK')
+
+
     def test_feature_get_set_with_units(self):
         from openmdao.api import Problem, ExecComp
 
