@@ -22,6 +22,7 @@ Single-Discipline Optimization
 
 
 .. _user_guide_multi_disciplinary_opt:
+
 ------------------------------
 Multidisciplinary Optimization
 ------------------------------
