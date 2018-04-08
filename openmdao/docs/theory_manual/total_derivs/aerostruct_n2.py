@@ -3,8 +3,7 @@ This is not a real run_file. It is only used to make the n2
 diagram for the notional aerostructural problem used for demonstration in the docs.
 """
 
-from openmdao.api import Problem, Group, ExecComp, IndepVarComp, view_model
-
+from openmdao.api import Problem, Group, ExecComp, IndepVarComp, view_model, ImplicitComponent
 
 p = Problem()
 dvs = p.model.add_subsystem('design_vars', IndepVarComp(), promotes=['*'])
@@ -24,6 +23,7 @@ p.model.add_subsystem('constraint', ExecComp('g=Cl'), promotes=['*'])
 p.setup()
 
 view_model(p, outfile='aerostruct_n2.html', embeddable=True, draw_potential_connections=False)
+
 
 
 

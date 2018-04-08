@@ -42,13 +42,20 @@ So understanding how to take advantage of the model hierarchy in order to custom
 A More Realistic Example
 --------------------------
 
-Consider aerostructural model of an aircraft wing comprised of a Computational Fluid Dynamics (CFD) solver, a simple finite-element beam analysis, and a very simple fuel burn. In OpenMDAO the model is setup as follows:
+Consider aerostructural model of an aircraft wing comprised of a Computational Fluid Dynamics (CFD) solver, a simple finite-element beam analysis, with a fuel-burn objective and a :math:`C_l` constraint.
+In OpenMDAO the model is setup as follows:
 
-[Show Notional N2 diagram]
+.. figure:: aerostruct_n2.png
+    :align: center
+    :width: 75%
 
-Note that, similar to the simple example above, the coupling between the aerodynamics and structural analyses can be isolated from the rest of the model.
-Those two are grouped together in the :code:`cycle` group, causing the top level of the model has a feed-forward structure.
-The computational cost of the aerodynamic and structural analyses means that a :ref:`DirectSolver <directsolver>` at the top level of the hierarchy is simply not a viable option.
+    N2 diagram for an aerostructural model with linear solvers noted in :code:`()`
+
+Note that this model has almost the exact same structure in its N2 diagram as the sellar problem.
+Specifically the coupling between the aerodynamics and structural analyses can be isolated from the rest of the model.
+Those two are grouped together in the :code:`aerostruct_cycle` group, giving the top level of the model a feed-forward structure.
+There is a subtle difference though; the Sellar problem is constructed of all explicit components but this aerostructural problem has two implicit analyses in the :code:`aero` and :code:`struct` components.
+Practically speaking the presence of a CFD component means that the model is too big to use a :ref:`DirectSolver <directsolver>` at the top level of the hierarchy.
 
 Instead, based on the advice in the :ref:`theory manual entry on selecting which kind of linear solver to use<theory_selecting_linear_solver>`,
 the feed-forward structure on the top level indicates that the default ref:`LinearRunOnce<lnrunonce>` solver is a good choice for that level of the model.
@@ -63,16 +70,8 @@ and then assign additional solvers to the aerodynamics and structural analyses.
     Despite the analogy it is not required or even advised that your linear solver architecture matches your nonlinear solver architecture.
     It could very well be a better choice to use the :ref:`PETScKrylov<petscKrylov>` solver for the :code:`cycle` level, even if the :ref:`NonlinearBlockGS<nlbgs>` solver was as the nonlinear solver.
 
-For the sake of the example, a Krylov solver will be used for the the the aerodynamics analysis and an direct factorization is used for the structural solver.
-
-So the full solver hierarchy looks like this:
-
-LinearRunOnce
-    * Des Vars
-    * Cycle: LinearBlockGS
-        - Aero: PETScKrylove
-        - Struct: DirectSolver
-    * FuelBurn
+The :ref:`LinearBlockGS<linearblockgs>` solver requires that any implicit components underneath it have their own linear solvers to converge their part of the overall linear system. So a :ref:`PETScKrylov<petsckrylov>` solver is used for :code:`aero` and an :ref:`DirectSolver <directsolver>` is use for :code:`struct`.
+Looking back at the figure above, notice that these solvers are all called out in their respective hierarchical locations.
 
 
 
