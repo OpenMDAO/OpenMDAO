@@ -19,7 +19,7 @@ from openmdao.devtools.iprofile import _iprof_totals_exec, _iprof_totals_setup_p
 from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser
 from openmdao.error_checking.check_config import _check_config_cmd, _check_config_setup_parser
 from openmdao.devtools.iprof_utils import _Options
-
+from openmdao.utils.mpi import MPI
 from openmdao.utils.find_cite import print_citations
 
 
@@ -156,6 +156,8 @@ def _tree_setup_parser(parser):
                         help='Add an attribute to search for in tree systems.')
     parser.add_argument('-v', '--var', action='append', default=[], dest='vecvars',
                         help='Add a variable to search for in vectors of tree systems.')
+    parser.add_argument('-r', '--rank', action='store', type=int, dest='rank',
+                        default=0, help="Display the tree on this rank (if MPI is active).")
 
 
 def _get_tree_filter(attrs, vecvars):
@@ -223,7 +225,7 @@ def _tree_cmd(options):
 
     def _tree(prob):
         tree(prob, show_colors=options.show_colors,
-             filter=filt, max_depth=options.depth, stream=out)
+             filter=filt, max_depth=options.depth, rank=options.rank, stream=out)
         exit()
     return _tree
 
@@ -308,7 +310,8 @@ def _cite_cmd(options):
         options.classes = None
 
     def _cite(prob):
-        print_citations(prob, classes=options.classes, out_stream=out)
+        if not MPI or MPI.COMM_WORLD.rank == 0:
+            print_citations(prob, classes=options.classes, out_stream=out)
         exit()
 
     return _cite
@@ -363,7 +366,7 @@ _post_setup_map = {
 
 
 # Other non-post-setup functions go here
-_iprof_map = {
+_non_post_setup_map = {
     'trace': (_itrace_setup_parser, _itrace_exec),
     'iprof': (_iprof_setup_parser, _iprof_exec),
     'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec),
@@ -383,7 +386,7 @@ def openmdao_cmd():
         parser_setup_func(subp)
         subp.set_defaults(func=cmd, executor=_post_setup_exec)
 
-    for p, (parser_setup_func, cmd) in iteritems(_iprof_map):
+    for p, (parser_setup_func, cmd) in iteritems(_non_post_setup_map):
         subp = subs.add_parser(p)
         parser_setup_func(subp)
         subp.set_defaults(executor=cmd)

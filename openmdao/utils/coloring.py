@@ -232,6 +232,7 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15):
     print("\nUsing tolerance: %g" % good_tol)
     print("Most common number of zero entries (%d of %d) repeated %d times out of %d tolerances "
           "tested.\n" % (sorted_items[0][0], fullJ.size, len(sorted_items[0][1]), n_tested))
+    print("Total jacobian shape:", fullJ.shape)
 
     boolJ = np.zeros(fullJ.shape, dtype=bool)
     boolJ[fullJ > good_tol] = True
@@ -476,8 +477,8 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
 
     if sparsity is not None:
         stream.write("Sparsity structure has been computed for all response/design_var "
-                     "sub-jacobians.")
-    if tot_size == tot_colors:
+                     "sub-jacobians.\n")
+    if tot_size == tot_colors or tot_colors == 0:
         stream.write("No simultaneous derivative solves are possible in this configuration.\n")
     else:
         stream.write("\nTotal colors vs. total size: %d vs %d  (%.1f%% improvement)\n" %
@@ -502,8 +503,8 @@ def _simul_coloring_setup_parser(parser):
     parser.add_argument('-j', '--jac', action='store_true', dest='show_jac',
                         help="Display a visualization of the final total jacobian used to "
                         "compute the coloring.")
-    parser.add_argument('-s', '--sparsity', action='store_true', dest='include_sparsity',
-                        help="Include the sparsity structure in the coloring data structure.")
+    parser.add_argument('--no-sparsity', action='store_true', dest='no_sparsity',
+                        help="Exclude the sparsity structure from the coloring data structure.")
 
 
 def _simul_coloring_cmd(options):
@@ -533,7 +534,7 @@ def _simul_coloring_cmd(options):
         Problem._post_setup_func = None  # avoid recursive loop
         color_info = get_simul_meta(prob, repeats=options.num_jacs, tol=options.tolerance,
                                     show_jac=options.show_jac,
-                                    include_sparsity=options.include_sparsity,
+                                    include_sparsity=not options.no_sparsity,
                                     stream=outfile)
         if sys.stdout.isatty():
             simul_coloring_summary(prob, color_info, stream=sys.stdout)
