@@ -182,14 +182,14 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15):
 
     prob.setup(mode=mode)
 
+    prob.run_model()
+
     seen = set()
     for system in prob.model.system_iter(recurse=True, include_self=True):
         if system._jacobian not in seen:
             # replace jacobian set_abs with one that replaces all subjacs with random numbers
             system._jacobian._set_abs = _SubjacRandomizer(system._jacobian, tol)
             seen.add(system._jacobian)
-
-    prob.run_model()
 
     wrt = list(prob.driver._designvars)
 
@@ -239,7 +239,7 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15):
     print("\nUsing tolerance: %g" % good_tol)
     print("Most common number of zero entries (%d of %d) repeated %d times out of %d tolerances "
           "tested.\n" % (sorted_items[0][0], fullJ.size, len(sorted_items[0][1]), n_tested))
-    print("Total jacobian shape:", fullJ.shape)
+    print("Total jacobian shape:", fullJ.shape, "\n")
 
     boolJ = np.zeros(fullJ.shape, dtype=bool)
     boolJ[fullJ > good_tol] = True
@@ -407,36 +407,47 @@ def _write_coloring(col_lists, rows, sparsity, stream):
     stream : file-like
         Output stream.
     """
+    tty = stream.isatty()
+    none = 'None' if tty else 'null'
+
     stream.write("[[\n")
     last_idx = len(col_lists) - 1
     for i, col_list in enumerate(col_lists):
         stream.write("   %s" % col_list)
-        if i == last_idx:
-            stream.write("\n")
-        else:
-            stream.write(",\n")
+        if i < last_idx:
+            stream.write(",")
+
+        if tty:
+            if i == 0:
+                stream.write("   # uncolored columns")
+            else:
+                stream.write("   # color %d" % i)
+
+        stream.write("\n")
 
     stream.write("],\n[\n")
     last_idx = len(rows) - 1
     for i, row_list in enumerate(rows):
         if row_list is None:
-            stream.write("   null")
+            stream.write("   %s" % none)
         else:
             stream.write("   %s" % row_list)
-        if i == last_idx:
-            stream.write("\n")
-        else:
-            stream.write(",\n")
+
+        if i < last_idx:
+            stream.write(",")
+
+        if tty:
+            stream.write("   # column %d" % i)
+
+        stream.write("\n")
+
     stream.write("]")
 
     if sparsity:
         stream.write(",\n")
         _write_sparsity(sparsity, stream)
     else:
-        if stream.isatty():
-            stream.write(",\nNone")
-        else:
-            stream.write(",\nnull")
+        stream.write(",\n%s" % none)
 
     stream.write("]")
 
@@ -583,9 +594,6 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
     else:  # rev
         raise RuntimeError("rev mode currently not supported for simultaneous derivs.")
 
-    if sparsity is not None:
-        stream.write("Sparsity structure has been computed for all response/design_var "
-                     "sub-jacobians.\n")
     if tot_size == tot_colors or tot_colors == 0:
         stream.write("No simultaneous derivative solves are possible in this configuration.\n")
     else:

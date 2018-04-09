@@ -10,7 +10,7 @@ from six import iteritems
 
 from openmdao.core.problem import Problem
 from openmdao.utils.coloring import _simul_coloring_setup_parser, _simul_coloring_cmd, \
-                                    _sparsity_setup_parser, _sparsity_cmd
+    _sparsity_setup_parser, _sparsity_cmd
 from openmdao.devtools.problem_viewer.problem_viewer import view_model
 from openmdao.devtools.viewconns import view_connections
 from openmdao.devtools.debug import config_summary, tree, dump_dist_idxs
