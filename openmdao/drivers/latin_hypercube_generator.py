@@ -55,8 +55,8 @@ class LatinHypercubeGenerator(DOEGenerator):
 
         Yields
         ------
-        dict
-            Dictionary of input values for the case.
+        list
+            list of name, value tuples for the design variables.
         """
         # Add up sizes
         self.num_design_vars = sum(meta['size'] for meta in itervalues(design_vars))
@@ -94,13 +94,13 @@ class LatinHypercubeGenerator(DOEGenerator):
 
         # Return random values in given buckets
         for i in range(self._num_samples):
-            sample = {}
+            sample = []
             for key, bounds in iteritems(buckets):
                 vals = [
                     np.random.uniform(bounds[k][i][0], bounds[k][i][1])
                         for k in range(design_vars[key]['size'])
                 ]
-                sample[key] = np.array(vals)
+                sample.append((key, np.array(vals)))
             yield sample
 
     def _get_lhc(self):
@@ -343,12 +343,6 @@ class _LHC_Individual(object):
     def __iter__(self):
         for row in self._doe:
             yield row
-
-    def __repr__(self):
-        return repr(self._doe)
-
-    def __str__(self):
-        return str(self._doe)
 
     def __getitem__(self, *args):
         return self._doe.__getitem__(*args)

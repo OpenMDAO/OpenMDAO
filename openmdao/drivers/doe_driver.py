@@ -32,8 +32,8 @@ class DOEGenerator(object):
 
         Yields
         ------
-        dict
-            Dictionary of input values for the case.
+        list
+            list of name, value tuples for the design variables.
         """
         pass
 
@@ -121,8 +121,8 @@ class DOEDriver(Driver):
         metadata = create_local_meta('DOEDriver')
         metadata['coord'] = (iter_count,)
 
-        for dv_name in case:
-            self.set_design_var(dv_name, case[dv_name])
+        for dv_name, dv_val in case:
+            self.set_design_var(dv_name, dv_val)
 
         return metadata
 

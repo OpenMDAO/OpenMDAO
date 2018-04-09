@@ -46,8 +46,8 @@ class FullFactorialGenerator(DOEGenerator):
 
         Yields
         ------
-        dict
-            Dictionary of input values for the case.
+        list
+            list of name, value tuples for the design variables.
         """
         values = OrderedDict()
 
@@ -73,4 +73,4 @@ class FullFactorialGenerator(DOEGenerator):
             values[name] = [np.array(x) for x in itertools.product(*values[name])]
 
         for combination in itertools.product(*values.values()):
-            yield dict(zip(keys, combination))
+            yield zip(keys, combination)

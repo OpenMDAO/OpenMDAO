@@ -32,13 +32,6 @@ class UniformGenerator(DOEGenerator):
 
         seed : int or None, optional
             Seed for randon number generator.
-
-        num_par_doe : int, optional
-            The number of DOE cases to run concurrently.  Defaults to 1.
-
-        load_balance : bool, Optional
-            If True, use rank 0 as master and load balance cases among all of the
-            other ranks. Defaults to False.
         """
         super(UniformGenerator, self).__init__()
 
@@ -56,14 +49,14 @@ class UniformGenerator(DOEGenerator):
 
         Yields
         ------
-        dict
-            Dictionary of input values for the case.
+        list
+            list of name, value tuples for the design variables.
         """
         if self._seed is not None:
             np.random.seed(self._seed)
 
         for i in range(self._num_samples):
-            sample = {}
+            sample = []
 
             for (name, meta) in iteritems(design_vars):
                 values = []
@@ -79,6 +72,6 @@ class UniformGenerator(DOEGenerator):
 
                     values.append(np.random.uniform(lower, upper))
 
-                sample[name] = np.array(values)
+                sample.append((name, np.array(values)))
 
             yield sample
