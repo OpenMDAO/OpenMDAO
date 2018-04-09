@@ -76,7 +76,7 @@ Matrix-Free Problems
 
 OpenMDAO is capable of solving linear systems in a matrix-free manner, to support situations where the Jacobian is too big to be fit into memory or when its just too inefficient to do so.
 
-Practically speaking, if any components in your model use the :ref:`compute_jacvec_product<comp-type-2-explicitcomp>` or `apply_linear<comp-type-3-implicitcomp>` to provide derivatives then you should be using a matrix-free linear solver architecture. These two methods provide linear operators that take in a vector and output the effect of multiplying it by a matrix. However, the underlying implementation does not actually need to assemble any matrices.
+Practically speaking, if any components in your model use the :ref:`compute_jacvec_product<comp-type-2-explicitcomp>` or :ref:`apply_linear<comp-type-3-implicitcomp>` to provide derivatives then you should be using a matrix-free linear solver architecture. These two methods provide linear operators that take in a vector and output the effect of multiplying it by a matrix. However, the underlying implementation does not actually need to assemble any matrices.
 
 Some high-fidelity PDE solvers will provide this kind of interface to get access to their partial derivatives.
 The kind of linear operator is also what is generally provided by algorithmic differentiations packages.
