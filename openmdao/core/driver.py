@@ -810,7 +810,7 @@ class Driver(object):
 
     def set_simul_deriv_color(self, simul_info):
         """
-        Set the coloring for simultaneous total derivatives.
+        Set the coloring (and possibly the sub-jac sparsity) for simultaneous total derivatives.
 
         Parameters
         ----------
