@@ -466,6 +466,31 @@ class MatMatTestCase(unittest.TestCase):
         for i in range(N_PHASES):
             assert_rel_error(self, expected, p['p%d.y_lgl' % i], 1.e-5)
 
+    def test_feature_declaration(self):
+        # Tests the code that shows the signature for compute_multi_jacvec
+        prob = Problem()
+        model = prob.model
+
+        comp1 = model.add_subsystem('p', IndepVarComp())
+        comp1.add_output('length', 7.0)
+        comp1.add_output('width', 3.0)
+
+        model.add_subsystem('comp', RectangleMultiJacVec())
+
+        model.connect('p.length', 'comp.length')
+        model.connect('p.width', 'comp.width')
+
+        model.add_design_var('p.length', vectorize_derivs=True)
+        model.add_design_var('p.width', vectorize_derivs=True)
+        model.add_constraint('comp.area', vectorize_derivs=True)
+
+        prob.setup(check=False, mode='rev')
+        prob.run_model()
+
+        J = prob.compute_totals(of=['comp.area'], wrt=['p.length', 'p.width'])
+        assert_rel_error(self, J['comp.area', 'p.length'], 3.0)
+        assert_rel_error(self, J['comp.area', 'p.width'], 7.0)
+
 
 class JacVec(ExplicitComponent):
 
@@ -494,6 +519,7 @@ class JacVec(ExplicitComponent):
                 d_inputs['x'] += d_fxy * inputs['y']
             if 'y' in d_inputs:
                 d_inputs['y'] += d_fxy * inputs['x']
+
 
 class MultiJacVec(JacVec):
     def compute_multi_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
