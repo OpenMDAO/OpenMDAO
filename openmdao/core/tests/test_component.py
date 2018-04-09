@@ -160,6 +160,10 @@ class TestExplicitComponent(unittest.TestCase):
         with assertRaisesRegex(self, NameError, msg):
             comp.add_input('', val=5.0)
 
+        msg = "':' is not a valid input name."
+        with assertRaisesRegex(self, NameError, msg):
+            comp.add_input(':', val=5.0)
+
         msg = "'x.y' is not a valid output name."
         with assertRaisesRegex(self, NameError, msg):
             comp.add_output('x.y', val=5.0)
@@ -171,6 +175,10 @@ class TestExplicitComponent(unittest.TestCase):
         msg = "'' is not a valid output name."
         with assertRaisesRegex(self, NameError, msg):
             comp.add_output('', val=5.0)
+
+        msg = "':' is not a valid output name."
+        with assertRaisesRegex(self, NameError, msg):
+            comp.add_output(':', val=5.0)
 
         # Make sure regex allows vartree syntax.
         comp.add_input('a:b', val=5.0)
