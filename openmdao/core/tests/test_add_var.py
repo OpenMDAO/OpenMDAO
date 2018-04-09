@@ -192,6 +192,7 @@ class TestAddVar(unittest.TestCase):
         assert_rel_error(self, p['y_d'], 2. * np.ones(6))
         assert_rel_error(self, p['y_e'], 2. * np.ones((3, 2)))
 
+    #def test_
 
 if __name__ == '__main__':
     unittest.main()
