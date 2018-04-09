@@ -28,7 +28,7 @@ _supported_methods = {'fd': FiniteDifference,
 
 
 # regex to check for valid names.
-namecheck_rgx = re.compile('[_a-zA-Z0-9][_a-zA-Z0-9\:]*')
+namecheck_rgx = re.compile('[_a-zA-Z][_a-zA-Z0-9\:]*')
 
 
 class Component(System):
