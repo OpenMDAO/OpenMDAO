@@ -247,34 +247,6 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15):
     return boolJ
 
 
-def _compute_ranges(names, vois):
-    """
-    Get a list of varible ranges with one entry per row or column in the jacobian.
-
-    Parameters
-    ----------
-    names : iter of str
-        Names of vois.
-    vois : dict
-        Metadata of vois.
-
-    Returns
-    -------
-    list
-        List of size total_voi_size containing tuples of the form (start, end, name).
-    """
-    ranges = []
-    start = 0
-    end = -1
-    for name in names:
-        end += vois[name]['size']
-        tup = (start, end, name)
-        ranges.extend([tup] * (end - start + 1))
-        start = end + 1
-
-    return ranges
-
-
 def _find_global_disjoint(prob, J):
     """
     Find sets of disjoint columns in the total jac and their corresponding rows.
@@ -487,6 +459,7 @@ def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False, str
 
     if stream is not None:
         _write_sparsity(sparsity, stream)
+        stream.write("\n")
 
         if show_jac and stream is not None:
             stream.write("\n\n")
@@ -674,8 +647,6 @@ def _sparsity_setup_parser(parser):
                         help='number of times to repeat total derivative computation.')
     parser.add_argument('-t', action='store', dest='tolerance', default=1.e-15, type=float,
                         help='tolerance used to determine if a total jacobian entry is nonzero.')
-    parser.add_argument('-m', '--mode', action='store', dest='mode', default='fwd',
-                        help='derivative direction.')
     parser.add_argument('-j', '--jac', action='store_true', dest='show_jac',
                         help="Display a visualization of the final total jacobian used to "
                         "compute the sparsity.")
@@ -706,7 +677,7 @@ def _sparsity_cmd(options):
         else:
             outfile = open(options.outfile, 'w')
         Problem._post_setup_func = None  # avoid recursive loop
-        get_sparsity(prob, repeats=options.num_jacs, tol=options.tolerance, mode=options.mode,
+        get_sparsity(prob, repeats=options.num_jacs, tol=options.tolerance, mode=prob._mode,
                      show_jac=options.show_jac, stream=outfile)
         exit()
     return _sparsity

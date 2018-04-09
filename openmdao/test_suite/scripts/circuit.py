@@ -46,3 +46,4 @@ p['circuit.n1.V'] = 10.
 p['circuit.n2.V'] = 1.
 
 p.run_model()
+
