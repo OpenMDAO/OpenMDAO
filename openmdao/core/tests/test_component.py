@@ -58,15 +58,15 @@ class TestExplicitComponent(unittest.TestCase):
         msg = "Incompatible shape for '.*': Expected (.*) but got (.*)"
 
         with assertRaisesRegex(self, ValueError, msg):
-            comp.add_output('arr', val=np.ones((2,2)), shape=([2]))
+            comp.add_output('arr', val=np.ones((2, 2)), shape=([2]))
 
         with assertRaisesRegex(self, ValueError, msg):
-            comp.add_input('arr', val=np.ones((2,2)), shape=([2]))
+            comp.add_input('arr', val=np.ones((2, 2)), shape=([2]))
 
         msg = "Shape of indices does not match shape for '.*': Expected (.*) but got (.*)"
 
         with assertRaisesRegex(self, ValueError, msg):
-            comp.add_input('arr', val=np.ones((2,2)), src_indices=[0,1])
+            comp.add_input('arr', val=np.ones((2, 2)), src_indices=[0, 1])
 
         msg = ("The shape argument should be an int, tuple, or list "
                "but a '<(.*) 'numpy.ndarray'>' was given")
@@ -88,6 +88,101 @@ class TestExplicitComponent(unittest.TestCase):
         shapes = np.array([3], dtype=np.uint32)
         comp.add_output('aro', shape=shapes[0])
         comp.add_input('ari', shape=shapes[0])
+
+        msg = "The name argument should be a string"
+        name = 3
+
+        with assertRaisesRegex(self, TypeError, msg):
+            comp.add_input(name, val=np.ones((2, 2)))
+
+        with assertRaisesRegex(self, TypeError, msg):
+            comp.add_output(name, val=np.ones((2, 2)))
+
+        msg = 'The val argument should be a float, list, tuple, ndarray or Iterable'
+        val = Component
+
+        with assertRaisesRegex(self, TypeError, msg):
+            comp.add_input('x', val=val)
+
+        with assertRaisesRegex(self, TypeError, msg):
+            comp.add_output('x', val=val)
+
+        msg = 'The src_indices argument should be an int, list, tuple, ndarray or Iterable'
+        src = Component
+
+        with assertRaisesRegex(self, TypeError, msg):
+            comp.add_input('x', val=np.ones((2, 2)), src_indices=src)
+
+        msg = 'The units argument should be a str or None'
+        units = Component
+
+        with assertRaisesRegex(self, TypeError, msg):
+            comp.add_input('x', val=np.ones((2, 2)), units=units)
+
+        with assertRaisesRegex(self, TypeError, msg):
+            comp.add_output('x', val=np.ones((2, 2)), units=units)
+
+        msg = 'The ref argument should be a float, list, tuple, ndarray or Iterable'
+        val = Component
+
+        with assertRaisesRegex(self, TypeError, msg):
+            comp.add_output('x', val=5.0, ref=val)
+
+        msg = 'The ref0 argument should be a float, list, tuple, ndarray or Iterable'
+        val = Component
+
+        with assertRaisesRegex(self, TypeError, msg):
+            comp.add_output('x', val=5.0, ref0=val)
+
+        msg = 'The res_ref argument should be a float, list, tuple, ndarray or Iterable'
+        val = Component
+
+        with assertRaisesRegex(self, TypeError, msg):
+            comp.add_output('x', val=5.0, res_ref=val)
+
+        msg = 'The res_units argument should be a str or None'
+        units = Component
+
+        with assertRaisesRegex(self, TypeError, msg):
+            comp.add_output('x', val=5.0, res_units=val)
+
+        # Test some forbidden names.
+
+        msg = "'x.y' is not a valid input name."
+        with assertRaisesRegex(self, NameError, msg):
+            comp.add_input('x.y', val=5.0)
+
+        msg = "'x-y' is not a valid input name."
+        with assertRaisesRegex(self, NameError, msg):
+            comp.add_input('x-y', val=5.0)
+
+        msg = "'' is not a valid input name."
+        with assertRaisesRegex(self, NameError, msg):
+            comp.add_input('', val=5.0)
+
+        msg = "':' is not a valid input name."
+        with assertRaisesRegex(self, NameError, msg):
+            comp.add_input(':', val=5.0)
+
+        msg = "'x.y' is not a valid output name."
+        with assertRaisesRegex(self, NameError, msg):
+            comp.add_output('x.y', val=5.0)
+
+        msg = "'x-y' is not a valid output name."
+        with assertRaisesRegex(self, NameError, msg):
+            comp.add_output('x-y', val=5.0)
+
+        msg = "'' is not a valid output name."
+        with assertRaisesRegex(self, NameError, msg):
+            comp.add_output('', val=5.0)
+
+        msg = "':' is not a valid output name."
+        with assertRaisesRegex(self, NameError, msg):
+            comp.add_output(':', val=5.0)
+
+        # Make sure regex allows vartree syntax.
+        comp.add_input('a:b', val=5.0)
+        comp.add_output('b:c', val=5.0)
 
     def test_setup_bug1(self):
         # This tests a bug where, if you run setup more than once on a derived component class,
