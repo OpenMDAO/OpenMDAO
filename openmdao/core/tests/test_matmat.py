@@ -6,7 +6,26 @@ import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, \
                          ScipyOptimizeDriver, DefaultVector, DenseJacobian, DirectSolver
+from openmdao.core.tests.test_expl_comp import RectangleComp
 from openmdao.utils.assert_utils import assert_rel_error
+
+
+class RectangleMultiJacVec(RectangleComp):
+
+    def compute_multi_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        if mode == 'fwd':
+            if 'area' in d_outputs:
+                if 'length' in d_inputs:
+                    d_outputs['area'] += inputs['width'] * d_inputs['length']
+                if 'width' in d_inputs:
+                    d_outputs['area'] += inputs['length'] * d_inputs['width']
+        elif mode == 'rev':
+            if 'area' in d_outputs:
+                if 'length' in d_inputs:
+                    d_inputs['length'] += inputs['width'] * d_outputs['area']
+                if 'width' in d_inputs:
+                    d_inputs['width'] += inputs['length'] * d_outputs['area']
+
 
 def lgl(n, tol=np.finfo(float).eps):
     """
