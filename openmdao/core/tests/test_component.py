@@ -152,37 +152,48 @@ class TestExplicitComponent(unittest.TestCase):
         with assertRaisesRegex(self, NameError, msg):
             comp.add_input('x.y', val=5.0)
 
-        msg = "'x-y' is not a valid input name."
+        msg = "'*' is not a valid input name."
         with assertRaisesRegex(self, NameError, msg):
-            comp.add_input('x-y', val=5.0)
+            comp.add_input('*', val=5.0)
 
-        msg = "'' is not a valid input name."
+        msg = "'?' is not a valid input name."
         with assertRaisesRegex(self, NameError, msg):
-            comp.add_input('', val=5.0)
+            comp.add_input('?', val=5.0)
 
-        msg = "':' is not a valid input name."
+        msg = "'\[' is not a valid input name."
         with assertRaisesRegex(self, NameError, msg):
-            comp.add_input(':', val=5.0)
+            comp.add_input('[', val=5.0)
+
+        msg = "'\]' is not a valid input name."
+        with assertRaisesRegex(self, NameError, msg):
+            comp.add_input(']', val=5.0)
 
         msg = "'x.y' is not a valid output name."
         with assertRaisesRegex(self, NameError, msg):
             comp.add_output('x.y', val=5.0)
 
-        msg = "'x-y' is not a valid output name."
+        msg = "'*' is not a valid output name."
         with assertRaisesRegex(self, NameError, msg):
-            comp.add_output('x-y', val=5.0)
+            comp.add_output('*', val=5.0)
 
-        msg = "'' is not a valid output name."
+        msg = "'?' is not a valid output name."
         with assertRaisesRegex(self, NameError, msg):
-            comp.add_output('', val=5.0)
+            comp.add_output('?', val=5.0)
 
-        msg = "':' is not a valid output name."
+        msg = "'\[' is not a valid output name."
         with assertRaisesRegex(self, NameError, msg):
-            comp.add_output(':', val=5.0)
+            comp.add_output('[', val=5.0)
 
-        # Make sure regex allows vartree syntax.
+        msg = "'\]' is not a valid output name."
+        with assertRaisesRegex(self, NameError, msg):
+            comp.add_output(']', val=5.0)
+
+        # Stuff we allow.
         comp.add_input('a:b', val=5.0)
         comp.add_output('b:c', val=5.0)
+        comp.add_input('x-y', val=5.0)
+        comp.add_output('---', val=5.0)
+        comp.add_output('-+=&$(;"<>@;^', val=5.0)
 
     def test_setup_bug1(self):
         # This tests a bug where, if you run setup more than once on a derived component class,
