@@ -23,10 +23,10 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration
-from openmdao.utils.general_utils import warn_deprecation, ContainsAll
+from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
-from openmdao.utils.general_utils import pad_name
+from openmdao.utils.units import get_conversion
 from openmdao.vectors.default_vector import DefaultVector
 
 try:
@@ -225,6 +225,102 @@ class Problem(object):
 
         return val
 
+    def get_val(self, name, units=None, indices=None):
+        """
+        Get an output/input variable.
+
+        Function is used if you want to specify display units.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+        units : str, optional
+            Units to convert to before upon return.
+        indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
+            Indices or slice to return.
+
+        Returns
+        -------
+        float or ndarray
+            The requested output/input variable.
+        """
+        val = self[name]
+
+        if indices is not None:
+            val = val[indices]
+
+        if units is not None:
+            base_units = self._get_units(name)
+
+            if base_units is None:
+                msg = "Incompatible units for conversion: '{}' and '{}'."
+                raise TypeError(msg.format(base_units, units))
+
+            try:
+                scale, offset = get_conversion(base_units, units)
+            except TypeError:
+                msg = "Incompatible units for conversion: '{}' and '{}'."
+                raise TypeError(msg.format(base_units, units))
+
+            val = (val + offset) * scale
+
+        return val
+
+    def _get_units(self, name):
+        """
+        Get the units for a variable name.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+
+        Returns
+        -------
+        str
+            Unit string.
+        """
+        if self._setup_status == 1:
+            proms = self.model._var_allprocs_prom2abs_list
+            meta = self.model._var_abs2meta
+            if name in meta:
+                units = meta[name]['units']
+
+            elif name in proms['input']:
+                # This triggers a check for unconnected non-unique inputs, and
+                # raises the same error as vector access.
+                abs_name = prom_name2abs_name(self.model, name, 'input')
+                units = meta[abs_name]['units']
+
+            elif name in proms['output']:
+                abs_name = prom_name2abs_name(self.model, name, 'output')
+                units = meta[abs_name]['units']
+
+            else:
+                msg = 'Variable name "{}" not found.'
+                raise KeyError(msg.format(name))
+
+        elif name in self.model._outputs:
+            try:
+                units = self.model._var_abs2meta[name]['units']
+            except KeyError:
+                abs_name = self.model._var_allprocs_prom2abs_list['output'][name][0]
+                units = self.model._var_abs2meta[abs_name]['units']
+
+        elif name in self.model._inputs:
+            try:
+                units = self.model._var_abs2meta[name]['units']
+            except KeyError:
+                abs_name = self.model._var_allprocs_prom2abs_list['input'][name][0]
+                units = self.model._var_abs2meta[abs_name]['units']
+
+        else:
+            msg = 'Variable name "{}" not found.'
+            raise KeyError(msg.format(name))
+
+        return units
+
     def __setitem__(self, name, value):
         """
         Set an output/input variable.
@@ -247,6 +343,43 @@ class Problem(object):
             else:
                 msg = 'Variable name "{}" not found.'
                 raise KeyError(msg.format(name))
+
+    def set_val(self, name, value, units=None, indices=None):
+        """
+        Set an output/input variable.
+
+        Function is used if you want to set a value using a different unit.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+        value : float or ndarray or list
+            Value to set this variable to.
+        units : str, optional
+            Units that value is defined in.
+        indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
+            Indices or slice to set to specified value.
+        """
+        if units is not None:
+            base_units = self._get_units(name)
+
+            if base_units is None:
+                msg = "Incompatible units for conversion: '{}' and '{}'."
+                raise TypeError(msg.format(units, base_units))
+
+            try:
+                scale, offset = get_conversion(units, base_units)
+            except TypeError:
+                msg = "Incompatible units for conversion: '{}' and '{}'."
+                raise TypeError(msg.format(units, base_units))
+
+            value = (value + offset) * scale
+
+        if indices is not None:
+            self[name][indices] = value
+        else:
+            self[name] = value
 
     def _set_initial_conditions(self):
         """
