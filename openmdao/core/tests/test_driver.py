@@ -15,6 +15,7 @@ from openmdao.utils.general_utils import printoptions
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
 
+
 class TestDriver(unittest.TestCase):
 
     def test_basic_get(self):
