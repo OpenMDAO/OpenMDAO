@@ -10,7 +10,7 @@ import numpy as np
 
 from collections import OrderedDict
 from openmdao.recorders.base_case_reader import BaseCaseReader
-from openmdao.recorders.case import DriverCase, SystemCase, SolverCase
+from openmdao.recorders.case import DriverCase, SystemCase, SolverCase, PromotedToAbsoluteMap
 from openmdao.recorders.cases import BaseCases
 from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import is_valid_sqlite3_db
@@ -39,7 +39,11 @@ class SqliteCaseReader(BaseCaseReader):
     ----------
     format_version : int
         The version of the format assumed when loading the file.
-    abs2meta : dict
+    output2meta : dict
+        Dictionary mapping output variables to their metadata
+    input2meta : dict
+        Dictionary mapping input variables to their metadata
+    _abs2meta : dict
         Dictionary mapping variables to their metadata
     _abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names.
@@ -73,17 +77,20 @@ class SqliteCaseReader(BaseCaseReader):
             self.format_version = row[0]
             self._abs2prom = None
             self._prom2abs = None
-            self.abs2meta = None
+            self._abs2meta = None
 
             if PY2:
                 self._abs2prom = pickle.loads(str(row[1])) if row[1] is not None else None
                 self._prom2abs = pickle.loads(str(row[2])) if row[2] is not None else None
-                self.abs2meta = pickle.loads(str(row[3])) if row[3] is not None else None
+                self._abs2meta = pickle.loads(str(row[3])) if row[3] is not None else None
             if PY3:
                 self._abs2prom = pickle.loads(row[1]) if row[1] is not None else None
                 self._prom2abs = pickle.loads(row[2]) if row[2] is not None else None
-                self.abs2meta = pickle.loads(row[3]) if row[3] is not None else None
+                self._abs2meta = pickle.loads(row[3]) if row[3] is not None else None
         con.close()
+
+        self.output2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs, True)
+        self.input2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs, False)
 
         self._load()
 
@@ -134,17 +141,17 @@ class SqliteCaseReader(BaseCaseReader):
                     if PY3:
                         self.driver_metadata = pickle.loads(row[0])
 
-                cur.execute("SELECT id, scaling_factors, user_metadata FROM system_metadata")
+                cur.execute("SELECT id, scaling_factors, component_metadata FROM system_metadata")
                 for row in cur:
                     id = row[0]
                     self.system_metadata[id] = {}
 
                     if PY2:
                         self.system_metadata[id]['scaling_factors'] = pickle.loads(str(row[1]))
-                        self.system_metadata[id]['user_metadata'] = pickle.loads(str(row[2]))
+                        self.system_metadata[id]['component_metadata'] = pickle.loads(str(row[2]))
                     if PY3:
                         self.system_metadata[id]['scaling_factors'] = pickle.loads(row[1])
-                        self.system_metadata[id]['user_metadata'] = pickle.loads(row[2])
+                        self.system_metadata[id]['component_metadata'] = pickle.loads(row[2])
 
                 cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")
                 for row in cur:
@@ -363,7 +370,7 @@ class SqliteCaseReader(BaseCaseReader):
         list
             list of input names and other optional information about those inputs
         """
-        meta = self.abs2meta
+        meta = self._abs2meta
         sys_vars = self._get_all_sysvars(False)
         inputs = []
 
@@ -447,7 +454,7 @@ class SqliteCaseReader(BaseCaseReader):
         list
             list of output names and other optional information about those outputs
         """
-        meta = self.abs2meta
+        meta = self._abs2meta
         expl_outputs = []
         impl_outputs = []
         sys_vars = self._get_all_sysvars()
@@ -626,7 +633,7 @@ class SqliteCaseReader(BaseCaseReader):
             return
 
         # Only local metadata but the most complete
-        meta = self.abs2meta
+        meta = self._abs2meta
 
         # Make a dict of outputs. Makes it easier to work with in this method
         dict_of_outputs = OrderedDict()

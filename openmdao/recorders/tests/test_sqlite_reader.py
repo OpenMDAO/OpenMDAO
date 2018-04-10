@@ -383,19 +383,19 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
-        self.assertEqual(cr.abs2meta['px.x']['units'], 'm')
-        self.assertEqual(cr.abs2meta['obj_cmp.y1']['units'], 'm')
-        self.assertEqual(cr.abs2meta['obj_cmp.y2']['units'], 'cm')
-        self.assertEqual(cr.abs2meta['d1.x']['units'], None)
-        self.assertEqual(cr.abs2meta['d1.y1']['units'], None)
-        self.assertEqual(cr.abs2meta['d1.y2']['units'], None)
-        self.assertEqual(cr.abs2meta['px.x']['type'], 'Explicit')
-        self.assertEqual(cr.abs2meta['obj_cmp.y1']['type'], 'Explicit')
-        self.assertEqual(cr.abs2meta['obj_cmp.y2']['type'], 'Explicit')
-        self.assertEqual(cr.abs2meta['px.x']['lower'], -1000)
-        self.assertEqual(cr.abs2meta['px.x']['upper'], 1000)
-        self.assertEqual(cr.abs2meta['d2.y2']['upper'], None)
-        self.assertEqual(cr.abs2meta['d2.y2']['lower'], None)
+        self.assertEqual(cr.output2meta['x']['units'], 'm')
+        self.assertEqual(cr.input2meta['obj_cmp.y1']['units'], 'm')
+        self.assertEqual(cr.input2meta['obj_cmp.y2']['units'], 'cm')
+        self.assertEqual(cr.input2meta['d1.x']['units'], None)
+        self.assertEqual(cr.input2meta['d1.y1']['units'], None)
+        self.assertEqual(cr.input2meta['d1.y2']['units'], None)
+        self.assertEqual(cr.output2meta['x']['type'], 'Explicit')
+        self.assertEqual(cr.input2meta['obj_cmp.y1']['type'], 'Explicit')
+        self.assertEqual(cr.input2meta['obj_cmp.y2']['type'], 'Explicit')
+        self.assertEqual(cr.output2meta['x']['lower'], -1000)
+        self.assertEqual(cr.output2meta['x']['upper'], 1000)
+        self.assertEqual(cr.output2meta['y2']['upper'], None)
+        self.assertEqual(cr.output2meta['y2']['lower'], None)
 
     def test_reading_system_metadata(self):
 
@@ -443,9 +443,9 @@ class TestSqliteCaseReader(unittest.TestCase):
                 sorted(['root', 'mda.d1', 'pz'])
         )
 
-        self.assertEqual(cr.system_metadata['root']['user_metadata']['test1'], 1)
-        self.assertEqual(cr.system_metadata['mda.d1']['user_metadata']['test2'], "2")
-        self.assertFalse('test3' in cr.system_metadata['pz']['user_metadata'])
+        self.assertEqual(cr.system_metadata['root']['component_metadata']['test1'], 1)
+        self.assertEqual(cr.system_metadata['mda.d1']['component_metadata']['test2'], "2")
+        self.assertFalse('test3' in cr.system_metadata['pz']['component_metadata'])
 
         assert_rel_error(
             self, cr.system_metadata['pz']['scaling_factors']['output']['nonlinear']['phys'][0][1], [2.0, 2.0], 1.0e-3)
