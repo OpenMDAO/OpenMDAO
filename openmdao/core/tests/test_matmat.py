@@ -6,11 +6,22 @@ import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, \
                          ScipyOptimizeDriver, DefaultVector, DenseJacobian, DirectSolver
-from openmdao.core.tests.test_expl_comp import RectangleComp
 from openmdao.utils.assert_utils import assert_rel_error
 
 
-class RectangleMultiJacVec(RectangleComp):
+class RectangleCompVectorized(ExplicitComponent):
+    """
+    A simple Explicit Component that computes the area of a rectangle.
+    """
+    def setup(self):
+        self.add_input('length', val=np.array([3.0, 4.0, 5.0]))
+        self.add_input('width', val=np.array([1.0, 2.0, 3.0]))
+        self.add_output('area', shape=(3, ))
+
+        self.declare_partials('*', '*')
+
+    def compute(self, inputs, outputs):
+        outputs['area'] = inputs['length'] * inputs['width']
 
     def compute_multi_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         if mode == 'fwd':
@@ -472,10 +483,10 @@ class MatMatTestCase(unittest.TestCase):
         model = prob.model
 
         comp1 = model.add_subsystem('p', IndepVarComp())
-        comp1.add_output('length', 7.0)
-        comp1.add_output('width', 3.0)
+        comp1.add_output('length', np.array([3.0, 4.0, 5.0]))
+        comp1.add_output('width', np.array([1.0, 2.0, 3.0]))
 
-        model.add_subsystem('comp', RectangleMultiJacVec())
+        model.add_subsystem('comp', RectangleCompVectorized())
 
         model.connect('p.length', 'comp.length')
         model.connect('p.width', 'comp.width')
@@ -488,8 +499,8 @@ class MatMatTestCase(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_totals(of=['comp.area'], wrt=['p.length', 'p.width'])
-        assert_rel_error(self, J['comp.area', 'p.length'], 3.0)
-        assert_rel_error(self, J['comp.area', 'p.width'], 7.0)
+        assert_rel_error(self, J['comp.area', 'p.length'], np.diag(np.array([1.0, 2.0, 3.0])))
+        assert_rel_error(self, J['comp.area', 'p.width'], np.diag(np.array([3.0, 4.0, 5.0])))
 
 
 class JacVec(ExplicitComponent):
