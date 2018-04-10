@@ -337,6 +337,7 @@ class SqliteCaseReader(BaseCaseReader):
         return self._coordinate_split_re.split(coordinate)
 
     def list_inputs(self,
+                    case_id=None,
                     values=True,
                     units=False,
                     hierarchical=True,
@@ -349,6 +350,9 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
+        case_id : int or string, optional
+            The integer index or string-identifier of the system case whose outputs will be listed.
+            If None, gives all inputs. Defaults to None.
         values : bool, optional
             When True, display/return input values. Default is True.
         units : bool, optional
@@ -371,7 +375,10 @@ class SqliteCaseReader(BaseCaseReader):
             list of input names and other optional information about those inputs
         """
         meta = self._abs2meta
-        sys_vars = self._get_all_sysvars(False)
+        if case_id is None:
+            sys_vars = self._get_all_sysvars(False)
+        else:
+            sys_vars = self._get_case_sysvars(case_id, False)
         inputs = []
 
         if sys_vars is not None and len(sys_vars) > 0:
@@ -399,6 +406,7 @@ class SqliteCaseReader(BaseCaseReader):
         return inputs
 
     def list_outputs(self,
+                     case_id=None,
                      explicit=True, implicit=True,
                      values=True,
                      residuals=False,
@@ -417,6 +425,9 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
+        case_id : int or string, optional
+            The integer index or string-identifier of the system case whose outputs will be listed.
+            If None, gives all inputs. Defaults to None.
         explicit : bool, optional
             include outputs from explicit components. Default is True.
         implicit : bool, optional
@@ -458,6 +469,12 @@ class SqliteCaseReader(BaseCaseReader):
         expl_outputs = []
         impl_outputs = []
         sys_vars = self._get_all_sysvars()
+
+        if case_id is None:
+            sys_vars = self._get_all_sysvars()
+        else:
+            sys_vars = self._get_case_sysvars(case_id)
+
         if sys_vars is not None and len(sys_vars) > 0:
             for name in sys_vars:
                 if residuals_tol and residuals_vars is not None and\
@@ -512,6 +529,45 @@ class SqliteCaseReader(BaseCaseReader):
             return impl_outputs
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
+
+    def _get_case_sysvars(self, case_id, get_outputs=True):
+        """
+        Get the set of output or input variables and their values for a given case.
+
+        Parameters
+        ----------
+        case_id : int or string
+            The integer index or string-identifier of the system case whose outputs will be listed.
+        get_outputs : bool, optional
+            indicates if the returned set should contain outputs. If false, returns inputs.
+
+        Returns
+        -------
+        dictionary
+            dictionary of global variable names to their values. None if no system iterations
+            were recorded.
+        """
+        variables = {}
+        case = self.system_cases.get_case(case_id)
+        if get_outputs and case.outputs is None:
+            return variables
+
+        outputs = case.outputs._values if case.outputs is not None else None
+        residuals = case.residuals._values if case.residuals is not None else None
+        inputs = case.inputs._values if case.inputs is not None else None
+        if get_outputs:
+            for var_name in outputs.dtype.names:
+                variables[var_name] = {'value': outputs[var_name]}
+                if residuals is not None and var_name in residuals.dtype.names:
+                    variables[var_name]['residuals'] = residuals[var_name]
+                else:
+                    variables[var_name]['residuals'] = 'Not Recorded'
+        elif inputs is not None:
+            for var_name in inputs.dtype.names:
+                if var_name not in variables:
+                    variables[var_name] = {'value': inputs[var_name]}
+
+        return variables
 
     def _get_all_sysvars(self, get_outputs=True):
         """
@@ -568,8 +624,7 @@ class SqliteCaseReader(BaseCaseReader):
                 if get_outputs:
                     for var_name in outputs.dtype.names:
                         if var_name not in variables:
-                            if get_outputs:
-                                variables[var_name] = {'value': outputs[var_name]}
+                            variables[var_name] = {'value': outputs[var_name]}
                             if residuals is not None and var_name in residuals.dtype.names:
                                 variables[var_name]['residuals'] = residuals[var_name]
                             else:
