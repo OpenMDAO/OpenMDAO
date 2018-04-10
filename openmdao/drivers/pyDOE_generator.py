@@ -27,6 +27,8 @@ class FullFactorialGenerator(DOEGenerator):
     _levels : int
         The number of evenly spaced levels between each design variable
         lower and upper bound.
+    _method : string
+        the pyDOE function to use.
     """
 
     def __init__(self, levels=2):
@@ -41,6 +43,7 @@ class FullFactorialGenerator(DOEGenerator):
         """
         super(FullFactorialGenerator, self).__init__()
         self._levels = levels
+        self._convert_indices = False
 
     def __call__(self, design_vars):
         """
@@ -61,7 +64,12 @@ class FullFactorialGenerator(DOEGenerator):
         size = sum([meta['size'] for name, meta in iteritems(design_vars)])
 
         # generate indices
-        ff = pyDOE.fullfact([self._levels]*size)
+        if self._method is 'pbdesign':
+            ff = pyDOE.pbdesign(size)
+            ff[ff < 0] = 0  # replace -1 with zero
+        else:
+            ff = pyDOE.fullfact([self._levels]*size)
+
 
         # generate values for each level for each design variable
         # over the range of that varable's lower to upper bound
@@ -100,6 +108,26 @@ class FullFactorialGenerator(DOEGenerator):
                 row += size
 
             yield retval
+
+
+class PlackettBurmanGenerator(FullFactorialGenerator):
+    """
+    DOE case generator implementing the Plackett-Burman method.
+
+    Attributes
+    ----------
+    _levels : int
+        The number of evenly spaced levels between each design variable
+        lower and upper bound.
+    """
+
+    def __init__(self):
+        """
+        Initialize the PlackettBurmanGenerator.
+        """
+        super(PlackettBurmanGenerator, self).__init__()
+        self._levels = 2
+        self._method = 'pbdesign'
 
 
 class pyDOEGenerator(DOEGenerator):

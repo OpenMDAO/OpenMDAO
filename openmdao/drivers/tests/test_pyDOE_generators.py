@@ -18,7 +18,7 @@ from openmdao.drivers.latin_hypercube_generator import OptimizedLatinHypercubeGe
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.utils.assert_utils import assert_rel_error
 
-from openmdao.drivers.pyDOE_generator import FullFactorialGenerator
+from openmdao.drivers.pyDOE_generator import FullFactorialGenerator, PlackettBurmanGenerator
 
 
 class ParaboloidArray(ExplicitComponent):
@@ -192,6 +192,41 @@ class TestDOEDriver(unittest.TestCase):
         for n in range(cases.num_cases):
             self.assertEqual(cases.get_case(n).desvars['xy'][0], expected[n]['xy'][0])
             self.assertEqual(cases.get_case(n).desvars['xy'][1], expected[n]['xy'][1])
+
+    def test_plackett_burman(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.add_design_var('x', lower=0.0, upper=1.0)
+        model.add_design_var('y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        prob.driver = DOEDriver(PlackettBurmanGenerator())
+        prob.driver.add_recorder(SqliteRecorder("CASES.sql"))
+
+        prob.setup(check=False)
+        prob.run_driver()
+        prob.cleanup()
+
+        expected = {
+            0: {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
+            1: {'x': np.array([1.]), 'y': np.array([0.]), 'f_xy': np.array([17.00])},
+            2: {'x': np.array([0.]), 'y': np.array([1.]), 'f_xy': np.array([31.00])},
+            3: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
+        }
+
+        cases = CaseReader("CASES.sql").driver_cases
+
+        self.assertEqual(cases.num_cases, 4)
+
+        for n in range(cases.num_cases):
+            self.assertEqual(cases.get_case(n).desvars['x'], expected[n]['x'])
+            self.assertEqual(cases.get_case(n).desvars['y'], expected[n]['y'])
+            self.assertEqual(cases.get_case(n).objectives['f_xy'], expected[n]['f_xy'])
 
     def test_optimized_latin_hypercube(self):
         prob = Problem()
