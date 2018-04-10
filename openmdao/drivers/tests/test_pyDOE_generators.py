@@ -18,7 +18,7 @@ from openmdao.drivers.latin_hypercube_generator import OptimizedLatinHypercubeGe
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.utils.assert_utils import assert_rel_error
 
-from openmdao.drivers.pyDOE_generator import FullFactorialGenerator, PlackettBurmanGenerator
+from openmdao.drivers.factorial_generators import FullFactorialGenerator, PlackettBurmanGenerator
 
 
 class ParaboloidArray(ExplicitComponent):
