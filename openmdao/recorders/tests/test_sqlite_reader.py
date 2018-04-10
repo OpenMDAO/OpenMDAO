@@ -643,6 +643,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         d1.nonlinear_solver = NonlinearBlockGS()
         d1.nonlinear_solver.options['maxiter'] = 5
         self.prob.model.add_recorder(self.recorder)
+        self.prob.model.d1.add_recorder(self.recorder)
         self.prob.model.recording_options['record_residuals'] = True
 
         self.prob.setup(check=False)
@@ -675,6 +676,23 @@ class TestSqliteCaseReader(unittest.TestCase):
             np.testing.assert_almost_equal(vals['resids'], expected['resids'])
             np.testing.assert_almost_equal(vals['value'], expected['values'])
 
+        expected_outputs_case = {
+            'd1.y1': {'lower': None, 'ref': 1.0, 'resids': [1.318e-10], 'shape': (1,), 'values': [25.5454859]}
+        }
+
+        outputs_case = cr.list_outputs(1, True, True, True, True, None, True, True, True,
+                                       True, True, True)
+        
+        for o in outputs_case:
+            vals = o[1]
+            name = o[0]
+            expected = expected_outputs_case[name]
+            self.assertEqual(vals['lower'], expected['lower'])
+            self.assertEqual(vals['ref'], expected['ref'])
+            self.assertEqual(vals['shape'], expected['shape'])
+            np.testing.assert_almost_equal(vals['resids'], expected['resids'])
+            np.testing.assert_almost_equal(vals['value'], expected['values'])
+
     def test_list_inputs(self):
         self.setup_sellar_model()
 
@@ -685,6 +703,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         d1.nonlinear_solver = NonlinearBlockGS()
         d1.nonlinear_solver.options['maxiter'] = 5
         self.prob.model.add_recorder(self.recorder)
+        self.prob.model.d1.add_recorder(self.recorder)
         self.prob.model.recording_options['record_residuals'] = True
 
         self.prob.setup(check=False)
@@ -714,6 +733,20 @@ class TestSqliteCaseReader(unittest.TestCase):
             vals = o[1]
             name = o[0]
             expected = expected_inputs[name]
+            np.testing.assert_almost_equal(vals['value'], expected['value'])
+
+        expected_inputs_case = {
+            'd1.z': {'value': [5., 2.]},
+            'd1.x': {'value': [1.]},
+            'd1.y2': {'value': [12.27257053]}
+        }
+
+        inputs_case = cr.list_inputs(1, True, True, True, None)
+        
+        for o in inputs_case:
+            vals = o[1]
+            name = o[0]
+            expected = expected_inputs_case[name]
             np.testing.assert_almost_equal(vals['value'], expected['value'])
 
 

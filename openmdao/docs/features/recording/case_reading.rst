@@ -122,3 +122,17 @@ These methods use System cases and thus will only return variables on systems wh
 
     cr.list_inputs()
     cr.list_outputs()
+
+
+By default, both methods will give all recorded variables and, if the `values` parameter is set to True, the last recorded value of each variable. Using the `case_id` parameter, however, enables listing inputs and outputs for a single system case. For example, listing the first and last system outputs recorded would be:
+
+.. code-block:: console
+
+    cr.list_outputs(case_id=0)
+    cr.list_outputs(case_id=-1)
+
+But you can also choose to use a specific iteration coordinate:
+
+.. code-block:: console
+
+    cr.list_inputs(case_id='rank0:SLSQP|0|root._solve_nonlinear|0')
