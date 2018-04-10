@@ -175,13 +175,13 @@ class TestDOEDriver(unittest.TestCase):
 
         expected = {
             0: {'xy': np.array([-50., -50.])},
-            1: {'xy': np.array([-50.,   0.])},
-            2: {'xy': np.array([-50.,  50.])},
-            3: {'xy': np.array([  0., -50.])},
+            1: {'xy': np.array([  0., -50.])},
+            2: {'xy': np.array([ 50., -50.])},
+            3: {'xy': np.array([-50.,   0.])},
             4: {'xy': np.array([  0.,   0.])},
-            5: {'xy': np.array([  0.,  50.])},
-            6: {'xy': np.array([ 50., -50.])},
-            7: {'xy': np.array([ 50.,   0.])},
+            5: {'xy': np.array([ 50.,   0.])},
+            6: {'xy': np.array([-50.,  50.])},
+            7: {'xy': np.array([  0.,  50.])},
             8: {'xy': np.array([ 50.,  50.])},
         }
 
@@ -190,9 +190,8 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(cases.num_cases, 9)
 
         for n in range(cases.num_cases):
-            print(cases.get_case(n).desvars['xy'])
-            # self.assertEqual(cases.get_case(n).desvars['xy'][0], expected[n]['xy'][0])
-            # self.assertEqual(cases.get_case(n).desvars['xy'][1], expected[n]['xy'][1])
+            self.assertEqual(cases.get_case(n).desvars['xy'][0], expected[n]['xy'][0])
+            self.assertEqual(cases.get_case(n).desvars['xy'][1], expected[n]['xy'][1])
 
     def test_optimized_latin_hypercube(self):
         prob = Problem()

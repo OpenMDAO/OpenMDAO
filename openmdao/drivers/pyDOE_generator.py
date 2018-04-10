@@ -58,13 +58,19 @@ class FullFactorialGenerator(DOEGenerator):
         """
         names = design_vars.keys()
 
-        # generate values for each level of each design variable
+        size = sum([meta['size'] for name, meta in iteritems(design_vars)])
+
+        # generate indices
+        ff = pyDOE.fullfact([self._levels]*size)
+
+        # generate values for each level for each design variable
         # over the range of that varable's lower to upper bound
-        values = OrderedDict()
 
+        # rows = vars (# rows/var = var size), cols = levels
+        values = np.zeros((size, self._levels))
+
+        row = 0
         for name, meta in iteritems(design_vars):
-            values[name] = []
-
             size = meta['size']
 
             for k in range(size):
@@ -76,25 +82,24 @@ class FullFactorialGenerator(DOEGenerator):
                 if isinstance(upper, np.ndarray):
                     upper = upper[k]
 
-                values[name].append(np.linspace(lower, upper, num=self._levels).tolist())
-
-        from pprint import pprint
-        pprint(values)
-        # convert to arrays
-        for name in names:
-            values[name] = [np.array(x) for x in itertools.product(*values[name])]
-        pprint(values)
-
-        # generate indices
-        size = sum([meta['size'] for name, meta in iteritems(design_vars)])
-        print('size:', size)
-        ff = pyDOE.fullfact([self._levels]*size)
-        print(ff)
+                values[row][:] = np.linspace(lower, upper, num=self._levels)
+                row += 1
 
         # yield values for ff generated indices
-        for row in ff:
+        for idxs in ff.astype('int'):
+            retval = []
+            var = row = 0
+            for name, meta in iteritems(design_vars):
+                size = meta['size']
+                val = np.zeros(size)
+                for k in range(size):
+                    idx = idxs[var+k]
+                    val[k] = values[row+k][idx]
+                retval.append((name, val))
+                var += 1
+                row += size
 
-            yield [(name, values[name][i]) for name, i in zip(names, row.astype('int'))]
+            yield retval
 
 
 class pyDOEGenerator(DOEGenerator):
