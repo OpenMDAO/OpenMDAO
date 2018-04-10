@@ -110,18 +110,18 @@ class TestDriver(unittest.TestCase):
         prob.run_model()
 
         base = prob.compute_totals(of=['obj', 'con1'], wrt=['z'])
-        
+
         prob = Problem()
         prob.model = model = SellarDerivatives()
-    
+
         model.add_design_var('z', ref=2.0, ref0=0.0)
         model.add_objective('obj', ref=1.0, ref0=0.0)
         model.add_constraint('con1', lower=0, ref=2.0, ref0=0.0)
         prob.set_solver_print(level=0)
-    
+
         prob.setup(check=False)
         prob.run_model()
-        
+
         derivs = prob.driver._compute_totals(of=['obj_cmp.obj', 'con_cmp1.con1'], wrt=['pz.z'],
                                              return_format='dict')
         assert_rel_error(self, base[('con1', 'z')][0], derivs['con_cmp1.con1']['pz.z'][0], 1e-5)
@@ -301,8 +301,7 @@ class TestDriver(unittest.TestCase):
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
         # should see unscaled (physical) and the full arrays, not just what is indicated by indices
-        self.assertEqual(output[3], "p1.x: array([ 50.,  50.,  50.])")
-        self.assertEqual(output[4], "p2.y: array([ 50.,  50.,  50.])")
+        self.assertEqual(output[3], "{'p1.x': array([ 50.,  50.,  50.]), 'p2.y': array([ 50.,  50.,  50.])}")
 
 if __name__ == "__main__":
     unittest.main()
