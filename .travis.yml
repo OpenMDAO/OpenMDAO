@@ -104,7 +104,8 @@ script:
 - if [ "$UPLOAD_DOCS" ]; then
     testflo -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*;
   else
-    testflo -n 1 openmdao;
+    # testflo -n 1 openmdao;
+    testflo --pre_announce -s -v openmdao;
   fi
 
 after_success:
