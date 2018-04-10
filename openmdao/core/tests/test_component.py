@@ -160,13 +160,17 @@ class TestExplicitComponent(unittest.TestCase):
         with assertRaisesRegex(self, NameError, msg):
             comp.add_input('?', val=5.0)
 
-        msg = "'\[' is not a valid input name."
-        with assertRaisesRegex(self, NameError, msg):
+        msg = "'[' is not a valid input name."
+        with self.assertRaises(NameError) as context:
             comp.add_input('[', val=5.0)
 
-        msg = "'\]' is not a valid input name."
-        with assertRaisesRegex(self, NameError, msg):
+        self.assertEqual(str(context.exception), msg)
+
+        msg = "']' is not a valid input name."
+        with self.assertRaises(NameError) as context:
             comp.add_input(']', val=5.0)
+
+        self.assertEqual(str(context.exception), msg)
 
         msg = "'x.y' is not a valid output name."
         with assertRaisesRegex(self, NameError, msg):
@@ -180,13 +184,17 @@ class TestExplicitComponent(unittest.TestCase):
         with assertRaisesRegex(self, NameError, msg):
             comp.add_output('?', val=5.0)
 
-        msg = "'\[' is not a valid output name."
-        with assertRaisesRegex(self, NameError, msg):
+        msg = "'[' is not a valid output name."
+        with self.assertRaises(NameError) as context:
             comp.add_output('[', val=5.0)
 
-        msg = "'\]' is not a valid output name."
-        with assertRaisesRegex(self, NameError, msg):
+        self.assertEqual(str(context.exception), msg)
+
+        msg = "']' is not a valid output name."
+        with self.assertRaises(NameError) as context:
             comp.add_output(']', val=5.0)
+
+        self.assertEqual(str(context.exception), msg)
 
         # Stuff we allow.
         comp.add_input('a:b', val=5.0)
