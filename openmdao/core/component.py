@@ -5,7 +5,6 @@ from __future__ import division
 from collections import OrderedDict, Iterable
 from copy import deepcopy
 from itertools import product
-import re
 from six import string_types, iteritems, itervalues
 
 import numpy as np
@@ -27,8 +26,8 @@ _supported_methods = {'fd': FiniteDifference,
                       'exact': None}
 
 
-# regex to check for valid names.
-namecheck_rgx = re.compile('[_a-zA-Z][_a-zA-Z0-9\:]*')
+# Certain characters are not valid in variable names.
+forbidden_chars = ['.', '*', '?', '!', '[', ']']
 
 
 class Component(System):
@@ -318,8 +317,7 @@ class Component(System):
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('The name argument should be a string')
-        match = namecheck_rgx.match(name)
-        if match is None or match.group() != name:
+        if any([True for character in forbidden_chars if character in name]):
             raise NameError("'%s' is not a valid input name." % name)
         if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
             raise TypeError('The val argument should be a float, list, tuple, ndarray or Iterable')
@@ -442,8 +440,7 @@ class Component(System):
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('The name argument should be a string')
-        match = namecheck_rgx.match(name)
-        if match is None or match.group() != name:
+        if any([True for character in forbidden_chars if character in name]):
             raise NameError("'%s' is not a valid output name." % name)
         if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
             msg = 'The val argument should be a float, list, tuple, ndarray or Iterable'
