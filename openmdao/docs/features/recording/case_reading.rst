@@ -66,11 +66,18 @@ If we had not promoted `pz.z`, we would use:
     seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|6')
     print('Value of pz.z after 7th iteration of SLSQP =', seventh_slsqp_iteration_case.desvars['pz.z'])
 
-Finally, if a user would like to access metadata on a variable there is a `abs2meta` dictionary on the CaseReader. For example, if the user wanted the units of the `pz.z` variable they would use:
+If a user would like to access the user-defined metadata on a given system or the scaling factors, the CaseReader also has a `system_metadata` dictionary. Accessing this data for `pz.z` would look like:
 
 .. code-block:: console
 
-    z_units = cr.abs2meta['pz.z']['units']
+    pz_metadata = cr.system_metadata['pz']['component_metadata']
+    pz_scaling = cr.system_metadata['pz']['scaling_factors']
+
+Finally, if a user would like to access variable metadata there is a `output2meta` dictionary and a `input2meta` dictionary on the CaseReader. For example, if the user wanted the units of the `pz.z` variable they would use:
+
+.. code-block:: console
+
+    z_units = cr.output2meta['z']['units']
 
 *Iterating Over Cases*
 ~~~~~~~~~~~~~~~~~~~~~~
