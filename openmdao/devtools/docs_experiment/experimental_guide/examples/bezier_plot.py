@@ -1,3 +1,5 @@
+# Adding a comment and a future import to make sure it works.
+from __future__ import print_function
 import matplotlib.path as mpath
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt

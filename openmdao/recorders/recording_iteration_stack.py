@@ -143,6 +143,8 @@ class Recording(object):
             else:
                 self.recording_requester.record_iteration()
 
+        self.recording_requester = None
+
         # Enable the following line for stack debugging.
         # print_recording_iteration_stack()
 

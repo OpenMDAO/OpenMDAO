@@ -240,6 +240,44 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy']['x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy']['y'], [[8.0]], 1e-6)
 
+    def test_compute_totals_no_args(self):
+        p = Problem()
+
+        dv = p.model.add_subsystem('des_vars', IndepVarComp())
+        dv.add_output('x', val=2.)
+
+        p.model.add_subsystem('calc', ExecComp('y=2*x'))
+
+        p.model.connect('des_vars.x', 'calc.x')
+
+        p.model.add_design_var('des_vars.x')
+        p.model.add_objective('calc.y')
+
+        p.setup()
+        p.run_model()
+
+        derivs = p.compute_totals()
+
+        assert_rel_error(self, derivs['calc.y', 'des_vars.x'], [[2.0]], 1e-6)
+
+    def test_compute_totals_no_args_promoted(self):
+        p = Problem()
+
+        dv = p.model.add_subsystem('des_vars', IndepVarComp(), promotes=['*'])
+        dv.add_output('x', val=2.)
+
+        p.model.add_subsystem('calc', ExecComp('y=2*x'), promotes=['*'])
+
+        p.model.add_design_var('x')
+        p.model.add_objective('y')
+
+        p.setup()
+        p.run_model()
+
+        derivs = p.compute_totals()
+
+        assert_rel_error(self, derivs['calc.y', 'des_vars.x'], [[2.0]], 1e-6)
+
     def test_feature_set_indeps(self):
         from openmdao.api import Problem, Group, IndepVarComp
         from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -499,6 +537,182 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 27.3049178437, 1e-6)
         # the connected input variable, referenced by the absolute path
         assert_rel_error(self, prob['d2.y1'], 27.3049178437, 1e-6)
+
+    def test_get_set_with_units_exhaustive(self):
+        from openmdao.api import Problem, ExecComp
+
+        prob = Problem()
+        comp = prob.model.add_subsystem('comp', ExecComp('y=x-25.', x={'value': 77.0, 'units': 'degF'},
+                                                         y={'units': 'degC'}))
+        comp = prob.model.add_subsystem('prom', ExecComp('yy=xx-25.', xx={'value': 77.0, 'units': 'degF'},
+                                                         yy={'units': 'degC'}),
+                                        promotes=['xx', 'yy'])
+        comp = prob.model.add_subsystem('acomp', ExecComp('y=x-25.', x={'value': np.array([77.0, 95.0]), 'units': 'degF'},
+                                                         y={'units': 'degC'}))
+        comp = prob.model.add_subsystem('aprom', ExecComp('ayy=axx-25.', axx={'value': np.array([77.0, 95.0]), 'units': 'degF'},
+                                                          ayy={'units': 'degC'}),
+                                        promotes=['axx', 'ayy'])
+
+        prob.setup(check=False)
+
+        # Make sure everything works before final setup with caching system.
+
+        # Gets
+
+        assert_rel_error(self, prob.get_val('comp.x'), 77.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'degC'), 25.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.y'), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.y', 'degF'), 32.0, 1e-6)
+
+        assert_rel_error(self, prob.get_val('xx'), 77.0, 1e-6)
+        assert_rel_error(self, prob.get_val('xx', 'degC'), 25.0, 1e-6)
+        assert_rel_error(self, prob.get_val('yy'), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('yy', 'degF'), 32.0, 1e-6)
+
+        assert_rel_error(self, prob.get_val('acomp.x', indices=0), 77.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=[0]), 25.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.y', indices=0), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.y', 'degF', indices=0), 32.0, 1e-6)
+
+        assert_rel_error(self, prob.get_val('axx', indices=0), 77.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', indices=1), 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=0), 25.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
+        assert_rel_error(self, prob.get_val('ayy', indices=0), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('ayy', 'degF', indices=0), 32.0, 1e-6)
+
+        # Sets
+
+        prob.set_val('comp.x', 30.0, 'degC')
+        assert_rel_error(self, prob['comp.x'], 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'degC'), 30.0, 1e-6)
+
+        prob.set_val('xx', 30.0, 'degC')
+        assert_rel_error(self, prob['xx'], 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('xx', 'degC'), 30.0, 1e-6)
+
+        prob.set_val('acomp.x', 30.0, 'degC', indices=[0])
+        assert_rel_error(self, prob['acomp.x'][0], 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=0), 30.0, 1e-6)
+
+        prob.set_val('axx', 30.0, 'degC', indices=0)
+        assert_rel_error(self, prob['axx'][0], 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([0])), 30.0, 1e-6)
+
+        prob.final_setup()
+
+        # Now we do it all over again for coverage.
+
+        # Gets
+
+        assert_rel_error(self, prob.get_val('comp.x'), 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'degC'), 30.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.y'), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.y', 'degF'), 32.0, 1e-6)
+
+        assert_rel_error(self, prob.get_val('xx'), 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('xx', 'degC'), 30.0, 1e-6)
+        assert_rel_error(self, prob.get_val('yy'), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('yy', 'degF'), 32.0, 1e-6)
+
+        assert_rel_error(self, prob.get_val('acomp.x', indices=0), 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=[0]), 30.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.y', indices=0), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.y', 'degF', indices=0), 32.0, 1e-6)
+
+        assert_rel_error(self, prob.get_val('axx', indices=0), 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', indices=1), 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=0), 30.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
+        assert_rel_error(self, prob.get_val('ayy', indices=0), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('ayy', 'degF', indices=0), 32.0, 1e-6)
+
+        # Sets
+
+        prob.set_val('comp.x', 35.0, 'degC')
+        assert_rel_error(self, prob['comp.x'], 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'degC'), 35.0, 1e-6)
+
+        prob.set_val('xx', 35.0, 'degC')
+        assert_rel_error(self, prob['xx'], 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('xx', 'degC'), 35.0, 1e-6)
+
+        prob.set_val('acomp.x', 35.0, 'degC', indices=[0])
+        assert_rel_error(self, prob['acomp.x'][0], 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=0), 35.0, 1e-6)
+
+        prob.set_val('axx', 35.0, 'degC', indices=0)
+        assert_rel_error(self, prob['axx'][0], 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([0])), 35.0, 1e-6)
+
+    def test_get_set_with_units_error_messages(self):
+        from openmdao.api import Problem, ExecComp
+
+        prob = Problem()
+        comp = prob.model.add_subsystem('comp', ExecComp('y=x+1.', x={'value': 100.0, 'units': 'cm'},
+                                                         y={'units': 'm'}))
+        comp = prob.model.add_subsystem('no_unit', ExecComp('y=x+1.', x={'value': 100.0}))
+
+        prob.setup()
+        prob.run_model()
+
+        msg = "Incompatible units for conversion: 'cm' and 'degK'."
+        with assertRaisesRegex(self, TypeError, msg):
+            prob.get_val('comp.x', 'degK')
+
+        msg = "Incompatible units for conversion: 'degK' and 'cm'."
+        with assertRaisesRegex(self, TypeError, msg):
+            prob.set_val('comp.x', 55.0, 'degK')
+
+        msg = "Incompatible units for conversion: 'None' and 'degK'."
+        with assertRaisesRegex(self, TypeError, msg):
+            prob.get_val('no_unit.x', 'degK')
+
+        msg = "Incompatible units for conversion: 'degK' and 'None'."
+        with assertRaisesRegex(self, TypeError, msg):
+            prob.set_val('no_unit.x', 55.0, 'degK')
+
+    def test_feature_get_set_with_units(self):
+        from openmdao.api import Problem, ExecComp
+
+        prob = Problem()
+        comp = prob.model.add_subsystem('comp', ExecComp('y=x+1.', x={'value': 100.0, 'units': 'cm'},
+                                                         y={'units': 'm'}))
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob.get_val('comp.x'), 100, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'm'), 1.0, 1e-6)
+        prob.set_val('comp.x', 10.0, 'mm')
+        assert_rel_error(self, prob.get_val('comp.x'), 1.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'm'), 1.0e-2, 1e-6)
+
+    def test_feature_get_set_array_with_units(self):
+        from openmdao.api import Problem, ExecComp
+
+        prob = Problem()
+        comp = prob.model.add_subsystem('comp', ExecComp('y=x+1.', x={'value': np.array([100.0, 33.3]), 'units': 'cm'},
+                                                         y={'shape' : (2, ), 'units': 'm'}))
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob.get_val('comp.x'), np.array([100, 33.3]), 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'm'), np.array([1.0, 0.333]), 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'km', indices=[0]), 0.001, 1e-6)
+
+        prob.set_val('comp.x', 10.0, 'mm')
+        assert_rel_error(self, prob.get_val('comp.x'), np.array([1.0, 1.0]), 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'm', indices=0), 1.0e-2, 1e-6)
+
+        prob.set_val('comp.x', 50.0, 'mm', indices=[1])
+        assert_rel_error(self, prob.get_val('comp.x'), np.array([1.0, 5.0]), 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'm', indices=1), 5.0e-2, 1e-6)
 
     def test_feature_set_get_array(self):
         import numpy as np

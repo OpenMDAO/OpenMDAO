@@ -931,10 +931,10 @@ class TestMetaModelStructuredMapFeature(unittest.TestCase):
         xor_interp = MetaModelStructured(method='slinear')
 
         # set up inputs and outputs
-        xor_interp.add_input('x', 0.0, np.array([0.0, 1.0]), units=None)
-        xor_interp.add_input('y', 1.0, np.array([0.0, 1.0]), units=None)
+        xor_interp.add_input('x', 0.0, training_data=np.array([0.0, 1.0]), units=None)
+        xor_interp.add_input('y', 1.0, training_data=np.array([0.0, 1.0]), units=None)
 
-        xor_interp.add_output('xor', 1.0, np.array([[0.0, 1.0], [1.0, 0.0]]), units=None)
+        xor_interp.add_output('xor', 1.0, training_data=np.array([[0.0, 1.0], [1.0, 0.0]]), units=None)
 
         # Set up the OpenMDAO model
         model = Group()
@@ -981,11 +981,11 @@ class TestMetaModelStructuredMapFeature(unittest.TestCase):
 
         # Create regular grid interpolator instance
         interp = MetaModelStructured(method='cubic')
-        interp.add_input('p1', 0.5, p1)
-        interp.add_input('p2', 0.0, p2)
-        interp.add_input('p3', 3.14, p3)
+        interp.add_input('p1', 0.5, training_data=p1)
+        interp.add_input('p2', 0.0, training_data=p2)
+        interp.add_input('p3', 3.14, training_data=p3)
 
-        interp.add_output('f', 0.0, f)
+        interp.add_output('f', 0.0, training_data=f)
 
 
         # Set up the OpenMDAO model

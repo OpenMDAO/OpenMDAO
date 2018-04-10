@@ -74,6 +74,16 @@ class ReportOrderComp(ExplicitComponent):
 
 class TestGroup(unittest.TestCase):
 
+    def test_add_subsystem_class(self):
+        p = Problem()
+        try:
+            p.model.add_subsystem('comp', IndepVarComp)
+        except TypeError as err:
+            self.assertEqual(str(err), "Subsystem 'comp' should be an instance, "
+                                       "but a class object was found.")
+        else:
+            self.fail('Exception expected.')
+
     def test_same_sys_name(self):
         """Test error checking for the case where we add two subsystems with the same name."""
         p = Problem()
@@ -111,7 +121,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['comp1.b'], 6.0)
 
     def test_group_add(self):
-        model=Group()
+        model = Group()
         ecomp = ExecComp('b=2.0*a', a=3.0, b=6.0)
 
         with warnings.catch_warnings(record=True) as w:
@@ -350,9 +360,9 @@ class TestGroup(unittest.TestCase):
         """Promoting all variables with asterisk."""
         p = Problem()
         p.model.add_subsystem('comp1', IndepVarComp([('a', 2.0), ('x', 5.0)]),
-                               promotes_outputs=['*'])
+                              promotes_outputs=['*'])
         p.model.add_subsystem('comp2', ExecComp('y=2*x'),
-                               promotes_inputs=['x'])
+                              promotes_inputs=['x'])
         p.setup()
 
         p.set_solver_print(level=0)
@@ -785,13 +795,22 @@ class TestGroup(unittest.TestCase):
 
     def test_set_order_feature(self):
         from openmdao.api import Problem, IndepVarComp, NonlinearRunOnce
-        from openmdao.core.tests.test_group import ReportOrderComp
+
+        class ReportOrderComp(ExplicitComponent):
+            """Adds name to list."""
+            def __init__(self, order_list):
+                super(ReportOrderComp, self).__init__()
+                self._order_list = order_list
+
+            def compute(self, inputs, outputs):
+                self._order_list.append(self.pathname)
 
         # this list will record the execution order of our C1, C2, and C3 components
         order_list = []
+
         prob = Problem()
         model = prob.model
-        model.nonlinear_solver = NonlinearRunOnce()
+
         model.add_subsystem('indeps', IndepVarComp('x', 1.))
         model.add_subsystem('C1', ReportOrderComp(order_list))
         model.add_subsystem('C2', ReportOrderComp(order_list))
@@ -799,13 +818,10 @@ class TestGroup(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        self.assertEqual(['indeps', 'C1', 'C2', 'C3'],
-                         [s.name for s in model._static_subsystems_allprocs])
-
         prob.setup(check=False)
         prob.run_model()
 
-        self.assertEqual(['C1', 'C2', 'C3'], order_list)
+        self.assertEqual(order_list, ['C1', 'C2', 'C3'])
 
         # reset the shared order list
         order_list[:] = []
@@ -816,7 +832,7 @@ class TestGroup(unittest.TestCase):
         # after changing the order, we must call setup again
         prob.setup(check=False)
         prob.run_model()
-        self.assertEqual(['C2', 'C1', 'C3'], order_list)
+        self.assertEqual(order_list, ['C2', 'C1', 'C3'])
 
     def test_set_order(self):
 

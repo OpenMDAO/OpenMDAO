@@ -8,7 +8,7 @@ from collections import OrderedDict, defaultdict, namedtuple
 from itertools import product
 
 from six import iteritems, iterkeys, itervalues
-from six.moves import range
+from six.moves import range, cStringIO
 
 import numpy as np
 import scipy.sparse as sparse
@@ -20,11 +20,13 @@ from openmdao.core.driver import Driver
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
+from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration
-from openmdao.utils.general_utils import warn_deprecation, ContainsAll
+from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
+from openmdao.utils.units import get_conversion
 from openmdao.vectors.default_vector import DefaultVector
 
 try:
@@ -223,6 +225,102 @@ class Problem(object):
 
         return val
 
+    def get_val(self, name, units=None, indices=None):
+        """
+        Get an output/input variable.
+
+        Function is used if you want to specify display units.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+        units : str, optional
+            Units to convert to before upon return.
+        indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
+            Indices or slice to return.
+
+        Returns
+        -------
+        float or ndarray
+            The requested output/input variable.
+        """
+        val = self[name]
+
+        if indices is not None:
+            val = val[indices]
+
+        if units is not None:
+            base_units = self._get_units(name)
+
+            if base_units is None:
+                msg = "Incompatible units for conversion: '{}' and '{}'."
+                raise TypeError(msg.format(base_units, units))
+
+            try:
+                scale, offset = get_conversion(base_units, units)
+            except TypeError:
+                msg = "Incompatible units for conversion: '{}' and '{}'."
+                raise TypeError(msg.format(base_units, units))
+
+            val = (val + offset) * scale
+
+        return val
+
+    def _get_units(self, name):
+        """
+        Get the units for a variable name.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+
+        Returns
+        -------
+        str
+            Unit string.
+        """
+        if self._setup_status == 1:
+            proms = self.model._var_allprocs_prom2abs_list
+            meta = self.model._var_abs2meta
+            if name in meta:
+                units = meta[name]['units']
+
+            elif name in proms['input']:
+                # This triggers a check for unconnected non-unique inputs, and
+                # raises the same error as vector access.
+                abs_name = prom_name2abs_name(self.model, name, 'input')
+                units = meta[abs_name]['units']
+
+            elif name in proms['output']:
+                abs_name = prom_name2abs_name(self.model, name, 'output')
+                units = meta[abs_name]['units']
+
+            else:
+                msg = 'Variable name "{}" not found.'
+                raise KeyError(msg.format(name))
+
+        elif name in self.model._outputs:
+            try:
+                units = self.model._var_abs2meta[name]['units']
+            except KeyError:
+                abs_name = self.model._var_allprocs_prom2abs_list['output'][name][0]
+                units = self.model._var_abs2meta[abs_name]['units']
+
+        elif name in self.model._inputs:
+            try:
+                units = self.model._var_abs2meta[name]['units']
+            except KeyError:
+                abs_name = self.model._var_allprocs_prom2abs_list['input'][name][0]
+                units = self.model._var_abs2meta[abs_name]['units']
+
+        else:
+            msg = 'Variable name "{}" not found.'
+            raise KeyError(msg.format(name))
+
+        return units
+
     def __setitem__(self, name, value):
         """
         Set an output/input variable.
@@ -245,6 +343,43 @@ class Problem(object):
             else:
                 msg = 'Variable name "{}" not found.'
                 raise KeyError(msg.format(name))
+
+    def set_val(self, name, value, units=None, indices=None):
+        """
+        Set an output/input variable.
+
+        Function is used if you want to set a value using a different unit.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+        value : float or ndarray or list
+            Value to set this variable to.
+        units : str, optional
+            Units that value is defined in.
+        indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
+            Indices or slice to set to specified value.
+        """
+        if units is not None:
+            base_units = self._get_units(name)
+
+            if base_units is None:
+                msg = "Incompatible units for conversion: '{}' and '{}'."
+                raise TypeError(msg.format(units, base_units))
+
+            try:
+                scale, offset = get_conversion(units, base_units)
+            except TypeError:
+                msg = "Incompatible units for conversion: '{}' and '{}'."
+                raise TypeError(msg.format(units, base_units))
+
+            value = (value + offset) * scale
+
+        if indices is not None:
+            self[name][indices] = value
+        else:
+            self[name] = value
 
     def _set_initial_conditions(self):
         """
@@ -431,6 +566,8 @@ class Problem(object):
         vector_class = self._vector_class
         force_alloc_complex = self._force_alloc_complex
 
+        self._tot_jac_info_cache = defaultdict(lambda: None)
+
         comm = self.comm
         mode = self._mode
 
@@ -455,11 +592,26 @@ class Problem(object):
         if Problem._post_setup_func is not None:
             Problem._post_setup_func(self)
 
+    def _all_components_provide_jacobians(self):
+        """
+        Are all components providing jacobians.
+
+        Returns
+        -------
+        boolean
+            True if all Components use jacobian-free linear operators; False otherwise.
+        """
+        for comp in self.model.system_iter(typ=Component, include_self=True):
+            if comp.matrix_free:
+                return False
+        return True
+
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6,
                        method='fd', step=None, form=DEFAULT_FD_OPTIONS['form'],
                        step_calc=DEFAULT_FD_OPTIONS['step_calc'],
-                       force_dense=True, suppress_output=False):
+                       force_dense=True, suppress_output=False,
+                       show_only_incorrect=False):
         """
         Check partial derivatives comprehensively for all components in your model.
 
@@ -495,6 +647,8 @@ class Problem(object):
             If True, analytic derivatives will be coerced into arrays. Default is True.
         suppress_output : bool
             Set to True to suppress all output. Default is False.
+        show_only_incorrect : bool, optional
+            Set to True if output should print only the subjacs found to be incorrect.
 
         Returns
         -------
@@ -530,7 +684,6 @@ class Problem(object):
                 raise ValueError(msg)
             comps = [model._get_subsystem(c_name) for c_name in comps]
 
-        current_mode = self._mode
         self.set_solver_print(level=0)
 
         # This is a defaultdict of (defaultdict of dicts).
@@ -805,7 +958,9 @@ class Problem(object):
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, all_fd_options,
-                                  suppress_output=suppress_output, indep_key=indep_key)
+                                  suppress_output=suppress_output, indep_key=indep_key,
+                                  all_comps_provide_jacs=self._all_components_provide_jacobians(),
+                                  show_only_incorrect=show_only_incorrect)
 
         return partials_data
 
@@ -866,18 +1021,11 @@ class Problem(object):
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
-        if wrt is None:
-            wrt = list(self.driver._designvars)
-            global_names = True
-        if of is None:
-            of = list(self.driver._objs)
-            of.extend(list(self.driver._cons))
-            global_names = True
-
         with self.model._scaled_context_all():
 
             # Calculate Total Derivatives
-            Jcalc = self._compute_totals(of=of, wrt=wrt, global_names=global_names)
+            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict')
+            Jcalc = total_info.compute_totals()
 
             # Approximate FD
             fd_args = {
@@ -886,8 +1034,8 @@ class Problem(object):
                 'step_calc': step_calc,
             }
             model.approx_totals(method=method, **fd_args)
-            Jfd = self._compute_totals_approx(of=of, wrt=wrt, global_names=global_names,
-                                              initialize=True)
+            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True)
+            Jfd = total_info.compute_totals_approx(initialize=True)
 
         # Assemble and Return all metrics.
         data = {}
@@ -933,648 +1081,11 @@ class Problem(object):
 
         with self.model._scaled_context_all():
             if self.model._owns_approx_jac:
-                totals = self._compute_totals_approx(of=of, wrt=wrt,
-                                                     return_format=return_format,
-                                                     global_names=False,
-                                                     initialize=True)
+                total_info = _TotalJacInfo(self, of, wrt, False, return_format, approx=True)
+                return total_info.compute_totals_approx(initialize=True)
             else:
-                totals = self._compute_totals(of=of, wrt=wrt,
-                                              return_format=return_format,
-                                              global_names=False)
-        return totals
-
-    def _compute_totals_approx(self, of=None, wrt=None, return_format='flat_dict',
-                               global_names=True, initialize=False):
-        """
-        Compute derivatives of desired quantities with respect to desired inputs.
-
-        Uses an approximation method, e.g., fd or cs to calculate the derivatives.
-
-        Parameters
-        ----------
-        of : list of variable name strings or None
-            Variables whose derivatives will be computed.
-        wrt : list of variable name strings or None
-            Variables with respect to which the derivatives will be computed.
-        return_format : string
-            Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
-            Default is a 'flat_dict', which returns them in a dictionary whose keys are
-            tuples of form (of, wrt).
-        global_names : bool
-            Set to True when passing in global names to skip some translation steps.
-        initialize : bool
-            Set to True to re-initialize the FD in model. This is only needed when manually
-            calling compute_totals on the problem.
-
-        Returns
-        -------
-        derivs : object
-            Derivatives in form requested by 'return_format'.
-        """
-        recording_iteration.stack.append(('_compute_totals', 0))
-        model = self.model
-        mode = self._mode
-        vec_dinput = model._vectors['input']
-        vec_doutput = model._vectors['output']
-        vec_dresid = model._vectors['residual']
-        approx = model._owns_approx_jac
-        prom2abs = model._var_allprocs_prom2abs_list['output']
-
-        # TODO - Pull 'of' and 'wrt' from driver if unspecified.
-        if wrt is None:
-            raise NotImplementedError("Need to specify 'wrt' for now.")
-        if of is None:
-            raise NotImplementedError("Need to specify 'of' for now.")
-
-        # Prepare model for calculation by cleaning out the derivatives
-        # vectors.
-        for vec_name in model._lin_vec_names:
-
-            # TODO: Do all three deriv vectors have the same keys?
-
-            vec_dinput[vec_name].set_const(0.0)
-            vec_doutput[vec_name].set_const(0.0)
-            vec_dresid[vec_name].set_const(0.0)
-
-        # Convert of and wrt names from promoted to absolute path
-        oldwrt, oldof = wrt, of
-        if not global_names:
-            of = [prom2abs[name][0] for name in oldof]
-            wrt = [prom2abs[name][0] for name in oldwrt]
-
-        input_list, output_list = wrt, of
-        old_input_list, old_output_list = oldwrt, oldof
-
-        # Solve for derivs with the approximation_scheme.
-        # This cuts out the middleman by grabbing the Jacobian directly after linearization.
-
-        # Re-initialize so that it is clean.
-        if initialize:
-
-            if model._approx_schemes:
-                method = list(model._approx_schemes.keys())[0]
-                kwargs = model._owns_approx_jac_meta
-                model.approx_totals(method=method, **kwargs)
-            else:
-                model.approx_totals(method='fd')
-
-        # Initialization based on driver (or user) -requested "of" and "wrt".
-        if not model._owns_approx_jac or model._owns_approx_of != set(of) \
-           or model._owns_approx_wrt != set(wrt):
-            model._owns_approx_of = set(of)
-            model._owns_approx_wrt = set(wrt)
-
-            # Support for indices defined on driver vars.
-            dvs = self.driver._designvars
-            cons = self.driver._cons
-            objs = self.driver._objs
-
-            response_idx = {key: val['indices'] for key, val in iteritems(cons)
-                            if val['indices'] is not None}
-            for key, val in iteritems(objs):
-                if val['indices'] is not None:
-                    response_idx[key] = val['indices']
-
-            model._owns_approx_of_idx = response_idx
-
-            model._owns_approx_wrt_idx = {key: val['indices'] for key, val in iteritems(dvs)
-                                          if val['indices'] is not None}
-
-        model._setup_jacobians(recurse=False)
-
-        # Need to temporarily disable size checking to support indices in des_vars and quantities.
-        model.jacobian._override_checks = True
-
-        # Linearize Model
-        model._linearize()
-
-        model.jacobian._override_checks = False
-        approx_jac = model._jacobian._subjacs
-
-        # Create data structures (and possibly allocate space) for the total
-        # derivatives that we will return.
-        totals = OrderedDict()
-
-        if return_format == 'flat_dict':
-            for ocount, output_name in enumerate(output_list):
-                okey = old_output_list[ocount]
-                for icount, input_name in enumerate(input_list):
-                    ikey = old_input_list[icount]
-                    jac = approx_jac[output_name, input_name]
-                    if isinstance(jac, list):
-                        # This is a design variable that was declared as an obj/con.
-                        totals[okey, ikey] = np.eye(len(jac[0]))
-                        odx = model._owns_approx_of_idx.get(okey)
-                        idx = model._owns_approx_wrt_idx.get(ikey)
-                        if odx is not None:
-                            totals[okey, ikey] = totals[okey, ikey][odx, :]
-                        if idx is not None:
-                            totals[okey, ikey] = totals[okey, ikey][:, idx]
-                    else:
-                        totals[okey, ikey] = -jac
-
-        elif return_format == 'dict':
-            for ocount, output_name in enumerate(output_list):
-                okey = old_output_list[ocount]
-                totals[okey] = tot = OrderedDict()
-                for icount, input_name in enumerate(input_list):
-                    ikey = old_input_list[icount]
-                    jac = approx_jac[output_name, input_name]
-                    if isinstance(jac, list):
-                        # This is a design variable that was declared as an obj/con.
-                        tot[ikey] = np.eye(len(jac[0]))
-                    else:
-                        tot[ikey] = -jac
-        else:
-            msg = "Unsupported return format '%s." % return_format
-            raise NotImplementedError(msg)
-
-        recording_iteration.stack.pop()
-        return totals
-
-    def _get_voi_info(self, voi_lists, inp2rhs_name, input_vec, output_vec, input_vois):
-        voi_info = {}
-        model = self.model
-        nproc = self.comm.size
-        iproc = model.comm.rank
-
-        for vois in itervalues(voi_lists):
-            for input_name, old_input_name, _, _, _ in vois:
-                vecname = inp2rhs_name[input_name]
-                if vecname not in input_vec:
-                    continue
-                sizes = model._var_sizes[vecname]['output']
-                dinputs = input_vec[vecname]
-                doutputs = output_vec[vecname]
-
-                in_var_idx = model._var_allprocs_abs2idx[vecname][input_name]
-                in_var_meta = model._var_allprocs_abs2meta[input_name]
-
-                dup = not in_var_meta['distributed']
-
-                start = np.sum(sizes[:iproc, in_var_idx])
-                end = start + sizes[iproc, in_var_idx]
-
-                in_idxs = None
-                if input_name in input_vois:
-                    in_voi_meta = input_vois[input_name]
-                    if 'indices' in in_voi_meta:
-                        in_idxs = in_voi_meta['indices']
-
-                if in_idxs is not None:
-                    neg = in_idxs[in_idxs < 0]
-                    irange = in_idxs
-                    if np.any(neg):
-                        irange[neg] += end
-                    max_i = np.max(in_idxs)
-                    min_i = np.min(in_idxs)
-                    loc_size = len(in_idxs)
-                else:
-                    irange = np.arange(in_var_meta['global_size'], dtype=int)
-                    max_i = in_var_meta['global_size'] - 1
-                    min_i = 0
-                    loc_size = end - start
-
-                if loc_size == 0:
-                    # var is not local. get size of var in owned proc
-                    for rank in range(nproc):
-                        sz = sizes[rank, in_var_idx]
-                        if sz > 0:
-                            loc_size = sz
-                            break
-
-                # set totals to zeros instead of None in those cases when none
-                # of the specified indices are within the range of interest
-                # for this proc.
-                store = True if ((start <= min_i < end) or (start <= max_i < end)) else dup
-
-                if store:
-                    loc_idxs = irange
-                    if min_i > 0:
-                        loc_idxs = irange - min_i
-                else:
-                    loc_idxs = []
-
-                voi_info[input_name] = (dinputs, doutputs, irange, loc_idxs, max_i, min_i,
-                                        loc_size, start, end, dup, store)
-
-        return voi_info
-
-    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
-        """
-        Compute derivatives of desired quantities with respect to desired inputs.
-
-        Parameters
-        ----------
-        of : list of variable name strings or None
-            Variables whose derivatives will be computed. Default is None, which
-            uses the driver's objectives and constraints.
-        wrt : list of variable name strings or None
-            Variables with respect to which the derivatives will be computed.
-            Default is None, which uses the driver's desvars.
-        return_format : string
-            Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
-            Default is a 'flat_dict', which returns them in a dictionary whose keys are
-            tuples of form (of, wrt).
-        global_names : bool
-            Set to True when passing in global names to skip some translation steps.
-
-        Returns
-        -------
-        derivs : object
-            Derivatives in form requested by 'return_format'.
-        """
-        recording_iteration.stack.append(('_compute_totals', 0))
-        model = self.model
-        mode = self._mode
-        vec_dinput = model._vectors['input']
-        vec_doutput = model._vectors['output']
-        vec_dresid = model._vectors['residual']
-        nproc = self.comm.size
-        iproc = model.comm.rank
-        sizes = model._var_sizes['nonlinear']['output']
-        relevant = model._relevant
-        fwd = (mode == 'fwd')
-        prom2abs = model._var_allprocs_prom2abs_list['output']
-        abs2idx = model._var_allprocs_abs2idx['linear']
-
-        if wrt is None:
-            wrt = list(self.driver._designvars)
-        if of is None:
-            of = list(self.driver._objs)
-            of.extend(self.driver._cons)
-
-        # A number of features will need to be supported here as development
-        # goes forward.
-        # -------------------------------------------------------------------
-        # TODO: Support constraint sparsity (i.e., skip in/out that are not
-        #       relevant for this constraint) (desvars too?)
-        # TODO: Don't calculate for inactive constraints
-        # -------------------------------------------------------------------
-
-        # Prepare model for calculation by cleaning out the derivatives
-        # vectors.
-        matmat = False
-        for vec_name in model._lin_vec_names:
-            vec_dinput[vec_name].set_const(0.0)
-            vec_doutput[vec_name].set_const(0.0)
-            vec_dresid[vec_name].set_const(0.0)
-
-        # Linearize Model
-        model._linearize()
-
-        # Create data structures (and possibly allocate space) for the total
-        # derivatives that we will return.
-        totals = OrderedDict()
-
-        if return_format == 'flat_dict':
-            for okey in of:
-                for ikey in wrt:
-                    totals[(okey, ikey)] = None
-        elif return_format == 'dict':
-            for okey in of:
-                totals[okey] = OrderedDict()
-                for ikey in wrt:
-                    totals[okey][ikey] = None
-        else:
-            msg = "Unsupported return format '%s." % return_format
-            raise NotImplementedError(msg)
-
-        # Convert of and wrt names from promoted to unpromoted
-        # (which is absolute path since we're at the top)
-        oldwrt, oldof = wrt, of
-        if not global_names:
-            of = [prom2abs[name][0] for name in oldof]
-            wrt = [prom2abs[name][0] for name in oldwrt]
-
-        owning_ranks = self.model._owning_rank['output']
-
-        # we don't do simultaneous derivatives when compute_totals is called for linear constaints
-        has_lin_constraints = False
-
-        if fwd:
-            input_list, output_list = wrt, of
-            old_input_list, old_output_list = oldwrt, oldof
-            input_vec, output_vec = vec_dresid, vec_doutput
-            input_vois = self.driver._designvars
-            output_vois = self.driver._responses
-            remote_outputs = self.driver._remote_responses
-            for n in of:
-                if n in output_vois and 'linear' in output_vois[n] and output_vois[n]['linear']:
-                    has_lin_constraints = True
-                    break
-        else:  # rev
-            input_list, output_list = of, wrt
-            old_input_list, old_output_list = oldof, oldwrt
-            input_vec, output_vec = vec_doutput, vec_dresid
-            input_vois = self.driver._responses
-            output_vois = self.driver._designvars
-            remote_outputs = self.driver._remote_dvs
-
-        # Solve for derivs using linear solver.
-
-        # this maps either a parallel_deriv_color to a list of tuples of (absname, oldname)
-        # of variables in that group, or, for variables that aren't in an
-        # parallel_deriv_color, it maps the variable name to a one entry list containing
-        # the tuple (absname, oldname) for that variable.  oldname will be
-        # the promoted name if the 'global_names' arg is False, else it will
-        # be the same as absname (the absolute variable name).
-        voi_lists = OrderedDict()
-
-        # this maps the names from input_list to the corresponding names
-        # of the RHS vectors.  For any variables that are not part of an
-        # parallel_deriv_color, they will map to 'linear'.  All parallel_deriv_color'ed variables
-        # will just map to their own name.
-        inp2rhs_name = {}
-
-        # if not all inputs are VOIs, then this is a test where most likely
-        # design vars, constraints, and objectives were not specified, so
-        # don't do relevance checking (because we only want to analyze the
-        # dependency graph for VOIs rather than for every input/output
-        # in the model)
-        use_rel_reduction = True
-
-        for i, name in enumerate(input_list):
-            if name in input_vois:
-                meta = input_vois[name]
-                parallel_deriv_color = meta['parallel_deriv_color']
-                simul_coloring = meta['simul_deriv_color']
-                matmat = meta['vectorize_derivs']
-            else:
-                parallel_deriv_color = simul_coloring = None
-                use_rel_reduction = False
-                matmat = False
-
-            if simul_coloring is not None:
-                if parallel_deriv_color:
-                    raise RuntimeError("Using both simul_coloring and parallel_deriv_color with "
-                                       "variable '%s' is not supported." % name)
-                if matmat:
-                    raise RuntimeError("Using both simul_coloring and vectorize_derivs with "
-                                       "variable '%s' is not supported." % name)
-
-            if parallel_deriv_color is None:  # variable is not in a parallel_deriv_color
-                if name in voi_lists:
-                    raise RuntimeError("Variable name '%s' matches a parallel_deriv_color name." %
-                                       name)
-                else:
-                    # store the absolute name along with the original name, which
-                    # can be either promoted or absolute depending on the value
-                    # of the 'global_names' flag.
-                    voi_lists[name] = [(name, old_input_list[i], parallel_deriv_color, matmat,
-                                        simul_coloring)]
-                    inp2rhs_name[name] = name if matmat else 'linear'
-            else:
-                if parallel_deriv_color not in voi_lists:
-                    voi_lists[parallel_deriv_color] = []
-                voi_lists[parallel_deriv_color].append((name, old_input_list[i],
-                                                        parallel_deriv_color, matmat,
-                                                        simul_coloring))
-                inp2rhs_name[name] = name
-
-        lin_vec_names = sorted(set(inp2rhs_name.values()))
-
-        voi_info = self._get_voi_info(voi_lists, inp2rhs_name, input_vec, output_vec, input_vois)
-
-        for vois in itervalues(voi_lists):
-            # If Forward mode, solve linear system for each 'wrt'
-            # If Adjoint mode, solve linear system for each 'of'
-
-            matmats = [m for _, _, _, m, _ in vois]
-            matmat = matmats[0]
-            if any(matmats) and not all(matmats):
-                raise RuntimeError("Mixing of vectorized and non-vectorized derivs in the same "
-                                   "parallel color group (%s) is not supported." %
-                                   [name for _, name, _, _, _ in vois])
-            simul_coloring = vois[0][4] if not has_lin_constraints else None
-
-            if use_rel_reduction:
-                rel_systems = set()
-                for voi, _, _, _, _ in vois:
-                    rel_systems.update(relevant[voi]['@all'][1])
-            else:
-                rel_systems = _contains_all
-
-            if matmat:
-                idx_iter = range(1)
-            elif simul_coloring is not None:
-                loc_idx_dict = defaultdict(lambda: -1)
-                # here we're guaranteed that there is only one voi
-                input_name = vois[0][0]
-                info = voi_info[input_name]
-                dinputs = info[0]
-                colors = set(simul_coloring)
-                if not isinstance(simul_coloring, np.ndarray):
-                    simul_coloring = np.array(simul_coloring, dtype=int)
-
-                def idx_iter():
-                    for c in colors:
-                        # iterate over negative colors individually
-                        if c < 0:
-                            for i in np.nonzero(simul_coloring == c)[0]:
-                                yield (c, i)
-                        else:
-                            nzs = np.nonzero(simul_coloring == c)[0]
-                            if nzs.size == 1:
-                                yield (c, nzs[0])
-                            else:
-                                yield (c, nzs)
-                idx_iter = idx_iter()
-            else:
-                loc_idx_dict = defaultdict(lambda: -1)
-                max_len = max(len(voi_info[name][2]) for name, _, _, _, _ in vois)
-                idx_iter = range(max_len)
-
-            for i in idx_iter:
-                if simul_coloring is not None:
-                    color, i = i
-                    do_color_iter = isinstance(i, np.ndarray) and i.size > 1
-                else:
-                    do_color_iter = False
-
-                # this sets dinputs for the current parallel_deriv_color to 0
-                # dinputs is dresids in fwd, doutouts in rev
-                if fwd:
-                    vec_dresid['linear'].set_const(0.0)
-                    if use_rel_reduction:
-                        vec_doutput['linear'].set_const(0.0)
-                else:  # rev
-                    vec_doutput['linear'].set_const(0.0)
-                    if use_rel_reduction:
-                        vec_dinput['linear'].set_const(0.0)
-
-                for input_name, old_input_name, pd_color, matmat, simul in vois:
-                    dinputs, doutputs, idxs, _, max_i, min_i, loc_size, start, end, dup, _ = \
-                        voi_info[input_name]
-
-                    if matmat:
-                        if input_name in dinputs:
-                            vec = dinputs._views_flat[input_name]
-                            if vec.size == 1:
-                                if start <= idxs[0] < end:
-                                    vec[idxs[0] - start] = 1.0
-                            else:
-                                for ii, idx in enumerate(idxs):
-                                    if start <= idx < end:
-                                        vec[idx - start, ii] = 1.0
-                    elif simul is not None:
-                        ii = idxs[i]
-                        final_idxs = ii[np.logical_and(ii >= start, ii < end)]
-                        vec_dinput['linear'].set_const(0.0)
-                        dinputs._views_flat[input_name][final_idxs] = 1.0
-                    else:
-                        if i >= len(idxs):
-                            # reuse the last index if loop iter is larger than current var size
-                            idx = idxs[-1]
-                        else:
-                            idx = idxs[i]
-                        if start <= idx < end and input_name in dinputs._views_flat:
-                            # Dictionary access returns a scaler for 1d input, and we
-                            # need a vector for clean code, so use _views_flat.
-                            dinputs._views_flat[input_name][idx - start] = 1.0
-
-                model._solve_linear(lin_vec_names, mode, rel_systems)
-
-                for input_name, old_input_name, _, matmat, simul in vois:
-                    dinputs, doutputs, idxs, loc_idxs, max_i, min_i, loc_size, start, end, \
-                        dup, store = voi_info[input_name]
-                    ncol = dinputs._ncol
-
-                    if matmat:
-                        loc_idx = loc_idxs
-                    elif simul is not None and do_color_iter:
-                        loc_idx = loc_idxs[i - start]
-                    else:
-                        if simul is None:
-                            if i >= len(idxs):
-                                idx = idxs[-1]  # reuse the last index
-                                delta_loc_idx = 0  # don't increment local_idx
-                            else:
-                                idx = idxs[i]
-                                delta_loc_idx = 1
-                            # totals to zeros instead of None in those cases when none
-                            # of the specified indices are within the range of interest
-                            # for this proc.
-                            if store:
-                                loc_idx_dict[input_name] += delta_loc_idx
-                            loc_idx = loc_idx_dict[input_name]
-                        else:
-                            idx = loc_idx = i
-
-                    # Pull out the answers and pack into our data structure.
-                    for ocount, output_name in enumerate(output_list):
-                        out_idxs = None
-                        if output_name in output_vois:
-                            out_idxs = output_vois[output_name]['indices']
-
-                        if use_rel_reduction and output_name not in relevant[input_name]:
-                            # irrelevant output, just give zeros
-                            if out_idxs is None:
-                                out_var_idx = abs2idx[output_name]
-                                if output_name in remote_outputs:
-                                    _, sz = remote_outputs[output_name]
-                                else:
-                                    sz = sizes[iproc, out_var_idx]
-                                if ncol > 1:
-                                    deriv_val = np.zeros((sz, ncol))
-                                else:
-                                    deriv_val = np.zeros(sz)
-                            elif ncol > 1:
-                                deriv_val = np.zeros((len(out_idxs), ncol))
-                            else:
-                                deriv_val = np.zeros(len(out_idxs))
-                        else:  # relevant output
-                            if output_name in doutputs._views_flat:
-                                deriv_val = doutputs._views_flat[output_name]
-                                size = deriv_val.size
-                            else:
-                                deriv_val = None
-
-                            if out_idxs is not None:
-                                size = out_idxs.size
-                                if deriv_val is not None:
-                                    deriv_val = deriv_val[out_idxs]
-
-                            if dup and nproc > 1:
-                                out_var_idx = abs2idx[output_name]
-                                root = owning_ranks[output_name]
-                                if deriv_val is None:
-                                    if out_idxs is not None:
-                                        sz = size
-                                    else:
-                                        sz = sizes[root, out_var_idx]
-                                    if ncol > 1:
-                                        deriv_val = np.empty((sz, ncol))
-                                    else:
-                                        deriv_val = np.empty(sz)
-                                self.comm.Bcast(deriv_val, root=root)
-
-                        len_val = len(deriv_val)
-
-                        if store and matmat and len(deriv_val.shape) == 1:
-                            deriv_val = np.atleast_2d(deriv_val).T
-
-                        if return_format == 'flat_dict':
-                            if fwd:
-                                key = (old_output_list[ocount], old_input_name)
-
-                                if totals[key] is None:
-                                    totals[key] = np.zeros((len_val, loc_size))
-                                if store:
-                                    if simul is not None and do_color_iter:
-                                        smap = output_vois[output_name]['simul_map']
-                                        if (smap is not None and input_name in smap and
-                                                color in smap[input_name]):
-                                            col_idxs = smap[input_name][color][1]
-                                            if col_idxs:
-                                                row_idxs = smap[input_name][color][0]
-                                                mat = totals[key]
-                                                for idx, col in enumerate(col_idxs):
-                                                    mat[row_idxs[idx], col] = \
-                                                        deriv_val[row_idxs[idx]]
-                                    else:
-                                        totals[key][:, loc_idx] = deriv_val
-                            else:
-                                key = (old_input_name, old_output_list[ocount])
-
-                                if totals[key] is None:
-                                    totals[key] = np.zeros((loc_size, len_val))
-                                if store:
-                                    totals[key][loc_idx, :] = deriv_val.T
-
-                        elif return_format == 'dict':
-                            if fwd:
-                                okey = old_output_list[ocount]
-
-                                if totals[okey][old_input_name] is None:
-                                    totals[okey][old_input_name] = np.zeros((len_val, loc_size))
-                                if store:
-                                    if simul is not None and do_color_iter:
-                                        smap = output_vois[output_name]['simul_map']
-                                        if (smap is not None and input_name in smap and
-                                                color in smap[input_name]):
-                                            col_idxs = smap[input_name][color][1]
-                                            if col_idxs:
-                                                row_idxs = smap[input_name][color][0]
-                                                mat = totals[okey][old_input_name]
-                                                for idx, col in enumerate(col_idxs):
-                                                    mat[row_idxs[idx], col] = \
-                                                        deriv_val[row_idxs[idx]]
-                                    else:
-                                        totals[okey][old_input_name][:, loc_idx] = deriv_val
-                            else:
-                                ikey = old_output_list[ocount]
-
-                                if totals[old_input_name][ikey] is None:
-                                    totals[old_input_name][ikey] = np.zeros((loc_size, len_val))
-                                if store:
-                                    totals[old_input_name][ikey][loc_idx, :] = deriv_val.T
-                        else:
-                            raise RuntimeError("unsupported return format")
-
-        recording_iteration.stack.pop()
-
-        return totals
+                total_info = _TotalJacInfo(self, of, wrt, False, return_format)
+                return total_info.compute_totals()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
@@ -1601,7 +1112,8 @@ class Problem(object):
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,
-                              suppress_output=False, indep_key=None):
+                              suppress_output=False, indep_key=None, all_comps_provide_jacs=False,
+                              show_only_incorrect=False):
     """
     Compute the relative and absolute errors in the given derivatives and print to the out_stream.
 
@@ -1628,6 +1140,10 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         Set to True to suppress all output. Just calculate errors and add the keys.
     indep_key : dict of sets, optional
         Keyed by component name, contains the of/wrt keys that are declared not dependent.
+    all_comps_provide_jacs : bool, optional
+        Set to True if all components provide a Jacobian (are not matrix-free).
+    show_only_incorrect : bool, optional
+        Set to True if output should print only the subjacs found to be incorrect.
     """
     nan = float('nan')
 
@@ -1635,8 +1151,20 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         if totals:
             deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
         else:
-            deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e} | {6:.4e} | {7:.4e}"\
-                         " | {8:.4e} | {9:.4e} | {10:.4e}"
+            if not all_comps_provide_jacs:
+                deriv_line = "{0} wrt {1} | {2:.4e} | {3} | {4:.4e} | {5:.4e} | {6} | {7}" \
+                             " | {8:.4e} | {9} | {10}"
+            else:
+                deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
+
+    # Keep track of the worst subjac in terms of relative error for fwd and rev
+    if not suppress_output and compact_print and not totals:
+        worst_subjac_rel_err = 0.0
+        worst_subjac = None
+
+    if not suppress_output and not totals and show_only_incorrect:
+        out_stream.write('\n** Only writing information about components with '
+                         'incorrect Jacobians **\n\n')
 
     for system in system_list:
         # No need to see derivatives of IndepVarComps
@@ -1644,6 +1172,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             continue
 
         sys_name = system.pathname
+        sys_class_name = type(system).__name__
 
         # Match header to appropriate type.
         if isinstance(system, Component):
@@ -1662,48 +1191,65 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         sorted_keys = sorted(iterkeys(derivatives))
 
         if not suppress_output:
+            # Need to capture the output of a component's derivative
+            # info so that it can be used if that component is the
+            # worst subjac. That info is printed at the bottom of all the output
+            out_buffer = cStringIO()
+            num_bad_jacs = 0  # Keep track of number of bad derivative values for each component
             if out_stream:
-                out_stream.write('-' * (len(sys_name) + 15) + '\n')
-                out_stream.write("{}: '{}'".format(sys_type, sys_name) + '\n')
-                out_stream.write('-' * (len(sys_name) + 15) + '\n')
+                header_str = '-' * (len(sys_name) + len(sys_type) + len(sys_class_name) + 5) + '\n'
+                out_buffer.write(header_str)
+                out_buffer.write("{}: {} '{}'".format(sys_type, sys_class_name, sys_name) + '\n')
+                out_buffer.write(header_str)
 
             if compact_print:
                 # Error Header
                 if totals:
                     header = "{0} wrt {1} | {2} | {3} | {4} | {5}"\
                         .format(
-                            _pad_name('<output>', 30, True),
-                            _pad_name('<variable>', 30, True),
-                            _pad_name('calc mag.'),
-                            _pad_name('check mag.'),
-                            _pad_name('a(cal-chk)'),
-                            _pad_name('r(cal-chk)'),
+                            pad_name('<output>', 30, quotes=True),
+                            pad_name('<variable>', 30, quotes=True),
+                            pad_name('calc mag.'),
+                            pad_name('check mag.'),
+                            pad_name('a(cal-chk)'),
+                            pad_name('r(cal-chk)'),
                         )
                 else:
-                    #
-                    max_width_of = len('<output>')
-                    max_width_wrt = len('<variable>')
+                    max_width_of = len("'<output>'")
+                    max_width_wrt = len("'<variable>'")
                     for of, wrt in sorted_keys:
-                        max_width_of = max(max_width_of, len(of))
-                        max_width_wrt = max(max_width_wrt, len(wrt))
+                        max_width_of = max(max_width_of, len(of) + 2)  # 2 to include quotes
+                        max_width_wrt = max(max_width_wrt, len(wrt) + 2)
 
-                    header = "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}"\
-                        .format(
-                            _pad_name('<output>', max_width_of, True),
-                            _pad_name('<variable>', max_width_wrt, True),
-                            _pad_name('fwd mag.'),
-                            _pad_name('rev mag.'),
-                            _pad_name('check mag.'),
-                            _pad_name('a(fwd-chk)'),
-                            _pad_name('a(rev-chk)'),
-                            _pad_name('a(fwd-rev)'),
-                            _pad_name('r(fwd-chk)'),
-                            _pad_name('r(rev-chk)'),
-                            _pad_name('r(fwd-rev)')
-                        )
+                    if not all_comps_provide_jacs:
+                        header = \
+                            "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}" \
+                            .format(
+                                pad_name('<output>', max_width_of, quotes=True),
+                                pad_name('<variable>', max_width_wrt, quotes=True),
+                                pad_name('fwd mag.'),
+                                pad_name('rev mag.'),
+                                pad_name('check mag.'),
+                                pad_name('a(fwd-chk)'),
+                                pad_name('a(rev-chk)'),
+                                pad_name('a(fwd-rev)'),
+                                pad_name('r(fwd-chk)'),
+                                pad_name('r(rev-chk)'),
+                                pad_name('r(fwd-rev)')
+                            )
+                    else:
+                        header = "{0} wrt {1} | {2} | {3} | {4} | {5}"\
+                            .format(
+                                pad_name('<output>', max_width_of, quotes=True),
+                                pad_name('<variable>', max_width_wrt, quotes=True),
+                                pad_name('fwd mag.'),
+                                pad_name('check mag.'),
+                                pad_name('a(fwd-chk)'),
+                                pad_name('r(fwd-chk)'),
+                            )
                 if out_stream:
-                    out_stream.write(header + '\n')
-                    out_stream.write('-' * len(header) + '\n' + '\n')
+                    out_buffer.write(header + '\n')
+                    out_buffer.write('-' * len(header) + '\n' + '\n')
 
         for of, wrt in sorted_keys:
 
@@ -1754,8 +1300,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     if totals:
                         if out_stream:
                             out_stream.write(deriv_line.format(
-                                _pad_name(of, 30, True),
-                                _pad_name(wrt, 30, True),
+                                pad_name(of, 30, quotes=True),
+                                pad_name(wrt, 30, quotes=True),
                                 magnitude.forward,
                                 magnitude.fd,
                                 abs_err.forward,
@@ -1767,26 +1313,63 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             if not np.isnan(error) and error >= abs_error_tol:
                                 error_string += ' >ABS_TOL'
                                 break
-                        for error in rel_err:
+
+                        # See if this component has the greater
+                        # error in the derivative computation
+                        # compared to the other components so far
+                        is_worst_subjac = False
+                        for i, error in enumerate(rel_err):
+                            if not np.isnan(error):
+                                #  only 1st and 2d errs
+                                if i < 2 and error > worst_subjac_rel_err:
+                                    worst_subjac_rel_err = error
+                                    worst_subjac = (sys_type, sys_class_name, sys_name)
+                                    is_worst_subjac = True
                             if not np.isnan(error) and error >= rel_error_tol:
                                 error_string += ' >REL_TOL'
                                 break
 
+                        if error_string:  # Any error string indicates that at least one of the
+                                            # derivative calcs is greater than the rel tolerance
+                            num_bad_jacs += 1
+
                         if out_stream:
-                            out_stream.write(deriv_line.format(
-                                _pad_name(of, max_width_of, True),
-                                _pad_name(wrt, max_width_wrt, True),
-                                magnitude.forward,
-                                magnitude.reverse,
-                                magnitude.fd,
-                                abs_err.forward,
-                                abs_err.reverse,
-                                abs_err.forward_reverse,
-                                rel_err.forward,
-                                rel_err.reverse,
-                                rel_err.forward_reverse,
-                            ) + error_string + '\n')
-                else:
+                            if not all_comps_provide_jacs:
+                                deriv_info_line = \
+                                    deriv_line.format(
+                                        pad_name(of, max_width_of, quotes=True),
+                                        pad_name(wrt, max_width_wrt, quotes=True),
+                                        magnitude.forward,
+                                        _format_if_not_matrix_free(
+                                            system.matrix_free, magnitude.reverse),
+                                        magnitude.fd,
+                                        abs_err.forward,
+                                        _format_if_not_matrix_free(system.matrix_free,
+                                                                   abs_err.reverse),
+                                        _format_if_not_matrix_free(
+                                            system.matrix_free, abs_err.forward_reverse),
+                                        rel_err.forward,
+                                        _format_if_not_matrix_free(system.matrix_free,
+                                                                   rel_err.reverse),
+                                        _format_if_not_matrix_free(
+                                            system.matrix_free, rel_err.forward_reverse),
+                                    )
+                            else:
+                                deriv_info_line = \
+                                    deriv_line.format(
+                                        pad_name(of, max_width_of, quotes=True),
+                                        pad_name(wrt, max_width_wrt, quotes=True),
+                                        magnitude.forward,
+                                        magnitude.fd,
+                                        abs_err.forward,
+                                        rel_err.forward,
+                                    )
+                            if not show_only_incorrect or error_string:
+                                out_buffer.write(deriv_info_line + error_string + '\n')
+
+                            if is_worst_subjac:
+                                worst_subjac_line = deriv_info_line
+                else:  # not compact print
 
                     if totals:
                         fd_desc = "{}:{}".format(global_options['']['method'],
@@ -1796,96 +1379,107 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         fd_desc = "{}:{}".format(global_options[sys_name][wrt]['method'],
                                                  global_options[sys_name][wrt]['form'])
 
-                    if compact_print:
-                        check_desc = "    (Check Type: {})".format(fd_desc)
-                    else:
-                        check_desc = ""
-
                     # Magnitudes
                     if out_stream:
-                        out_stream.write("  {}: '{}' wrt '{}'".format(sys_name, of, wrt) + '\n')
-                        out_stream.write('    Forward Magnitude : {:.6e}'.format(magnitude.forward)
+                        out_buffer.write("  {}: '{}' wrt '{}'".format(sys_name, of, wrt) + '\n')
+                        out_buffer.write('    Forward Magnitude : {:.6e}'.format(magnitude.forward)
                                          + '\n')
-                    if not totals:
+                    if not totals and system.matrix_free:
                         txt = '    Reverse Magnitude : {:.6e}'
                         if out_stream:
-                            out_stream.write(txt.format(magnitude.reverse) + '\n')
+                            out_buffer.write(txt.format(magnitude.reverse) + '\n')
                     if out_stream:
-                        out_stream.write('         Fd Magnitude : {:.6e} ({})'.format(magnitude.fd,
+                        out_buffer.write('         Fd Magnitude : {:.6e} ({})'.format(magnitude.fd,
                                          fd_desc) + '\n')
                     # Absolute Errors
-                    if totals:
+                    if totals or not system.matrix_free:
                         error_descs = ('(Jfor  - Jfd) ', )
                     else:
                         error_descs = ('(Jfor  - Jfd) ', '(Jrev  - Jfd) ', '(Jfor  - Jrev)')
                     for error, desc in zip(abs_err, error_descs):
                         error_str = _format_error(error, abs_error_tol)
+                        if error_str.endswith('*'):
+                            num_bad_jacs += 1
                         if out_stream:
-                            out_stream.write('    Absolute Error {}: {}'.format(desc, error_str) +
+                            out_buffer.write('    Absolute Error {}: {}'.format(desc, error_str) +
                                              '\n')
                     if out_stream:
-                        out_stream.write('\n')
+                        out_buffer.write('\n')
 
                     # Relative Errors
                     for error, desc in zip(rel_err, error_descs):
                         error_str = _format_error(error, rel_error_tol)
+                        if error_str.endswith('*'):
+                            num_bad_jacs += 1
                         if out_stream:
-                            out_stream.write('    Relative Error {}: {}'.format(desc, error_str) +
+                            out_buffer.write('    Relative Error {}: {}'.format(desc, error_str) +
                                              '\n')
+
                     if out_stream:
-                        out_stream.write('\n')
+                        out_buffer.write('\n')
 
                     # Raw Derivatives
                     if out_stream:
-                        out_stream.write('    Raw Forward Derivative (Jfor)\n')
-                        out_stream.write(str(forward) + '\n')
-                        out_stream.write('\n')
+                        out_buffer.write('    Raw Forward Derivative (Jfor)\n')
+                        out_buffer.write(str(forward) + '\n')
+                        out_buffer.write('\n')
 
-                    if not totals:
+                    if not totals and system.matrix_free:
                         if out_stream:
-                            out_stream.write('    Raw Reverse Derivative (Jfor)\n')
-                            out_stream.write(str(reverse) + '\n')
-                            out_stream.write('\n')
+                            out_buffer.write('    Raw Reverse Derivative (Jfor)\n')
+                            out_buffer.write(str(reverse) + '\n')
+                            out_buffer.write('\n')
 
                     if out_stream:
-                        out_stream.write('    Raw FD Derivative (Jfd)\n')
-                        out_stream.write(str(fd) + '\n')
-                        out_stream.write('\n')
+                        out_buffer.write('    Raw FD Derivative (Jfd)\n')
+                        out_buffer.write(str(fd) + '\n')
+                        out_buffer.write('\n')
 
                     if out_stream:
-                        out_stream.write(' -' * 30 + '\n')
+                        out_buffer.write(' -' * 30 + '\n')
+
+                # End of if compact print if/else
+            # End of if not suppress_output
+        # End of for of, wrt in sorted_keys
+
+        if not show_only_incorrect or num_bad_jacs:
+            if out_stream and not suppress_output:
+                out_stream.write(out_buffer.getvalue())
+
+    # End of for system in system_list
+
+    if not suppress_output and compact_print and not totals:
+        if worst_subjac:
+            worst_subjac_header = \
+                "Sub Jacobian with Largest Relative Error: {1} '{2}'".format(*worst_subjac)
+            out_stream.write('\n' + '#' * len(worst_subjac_header) + '\n')
+            out_stream.write("{}\n".format(worst_subjac_header))
+            out_stream.write('#' * len(worst_subjac_header) + '\n')
+            out_stream.write(header + '\n')
+            out_stream.write('-' * len(header) + '\n')
+            out_stream.write(worst_subjac_line + '\n')
 
 
-def _pad_name(name, pad_num=10, quotes=False):
+def _format_if_not_matrix_free(matrix_free, val):
     """
-    Pad a string so that they all line up when stacked.
+    Return string to represent deriv check value in compact display.
 
     Parameters
     ----------
-    name : str
-        The string to pad.
-    pad_num : int
-        The number of total spaces the string should take up.
-    quotes : bool
-        If name should be quoted.
+    matrix_free : bool
+        If True, then the associated Component is matrix-free.
+    val : float
+        The deriv check value.
 
     Returns
     -------
     str
-        Padded string
+        String which is the actual value if matrix-free, otherwise 'n/a'
     """
-    l_name = len(name)
-    quotes_len = 2 if quotes else 0
-    if l_name + quotes_len < pad_num:
-        pad = pad_num - (l_name + quotes_len)
-        if quotes:
-            pad_str = "'{name}'{sep:<{pad}}"
-        else:
-            pad_str = "{name}{sep:<{pad}}"
-        pad_name = pad_str.format(name=name, sep='', pad=pad)
-        return pad_name
+    if matrix_free:
+        return '{0:.4e}'.format(val)
     else:
-        return '{0}'.format(name)
+        return pad_name('n/a')
 
 
 def _format_error(error, tol):

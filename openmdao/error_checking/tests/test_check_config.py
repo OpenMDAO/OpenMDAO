@@ -2,7 +2,7 @@ import unittest
 
 from six.moves import range
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, LinearBlockGS, NonlinearBlockGS
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.error_checking.check_config import get_sccs_topo
 
@@ -71,6 +71,10 @@ class TestCheckConfig(unittest.TestCase):
         root.connect("indep.x", "C3.b")
         root.connect("indep.x", "C4.b")
 
+        # set iterative solvers since we have cycles
+        root.linear_solver = LinearBlockGS()
+        root.nonlinear_solver = NonlinearBlockGS()
+
         testlogger = TestLogger()
         p.setup(check=True, logger=testlogger)
 
@@ -110,6 +114,10 @@ class TestCheckConfig(unittest.TestCase):
         root.connect("indep.x", "G1.C2.b")
         root.connect("indep.x", "C3.b")
         root.connect("indep.x", "C4.b")
+
+        # set iterative solvers since we have cycles
+        root.linear_solver = LinearBlockGS()
+        root.nonlinear_solver = NonlinearBlockGS()
 
         testlogger = TestLogger()
         p.setup(check=True, logger=testlogger)
@@ -190,6 +198,10 @@ class TestCheckConfig(unittest.TestCase):
         G1.connect("C23.z", "N3.b")
         G1.connect("N3.z", "C2.b")
         G1.connect("C11.z", "C3.b")
+
+        # set iterative solvers since we have cycles
+        root.linear_solver = LinearBlockGS()
+        root.nonlinear_solver = NonlinearBlockGS()
 
         testlogger = TestLogger()
         p.setup(check=True, logger=testlogger)

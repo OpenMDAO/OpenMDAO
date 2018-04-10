@@ -12,3 +12,5 @@ Components
     linearsystem.rst
     metamodelstructured.rst
     metamodelunstructured.rst
+    ks.rst
+    interp.rst

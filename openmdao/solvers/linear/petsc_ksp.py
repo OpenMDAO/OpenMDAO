@@ -366,19 +366,19 @@ class PETScKrylov(LinearSolver):
             rhs_array = b_vec.get_data()
 
             # create PETSc vectors from numpy arrays
-            self.sol_petsc_vec = PETSc.Vec().createWithArray(sol_array,
-                                                             comm=system.comm)
-            self.rhs_petsc_vec = PETSc.Vec().createWithArray(rhs_array,
-                                                             comm=system.comm)
+            sol_petsc_vec = PETSc.Vec().createWithArray(sol_array, comm=system.comm)
+            rhs_petsc_vec = PETSc.Vec().createWithArray(rhs_array, comm=system.comm)
 
             # run PETSc solver
             self._iter_count = 0
             ksp = self._get_ksp_solver(system, vec_name)
             ksp.setTolerances(max_it=maxiter, atol=atol, rtol=rtol)
-            ksp.solve(self.rhs_petsc_vec, self.sol_petsc_vec)
+            ksp.solve(rhs_petsc_vec, sol_petsc_vec)
 
             # stuff the result into the x vector
             x_vec.set_data(sol_array)
+
+            sol_petsc_vec = rhs_petsc_vec = None
 
         return False, 0., 0.
 
@@ -466,6 +466,7 @@ class PETScKrylov(LinearSolver):
         else:
             ksp.setPCSide(PETSc.PC.Side.RIGHT)
         ksp.setMonitor(Monitor(self))
+        ksp.setInitialGuessNonzero(True)
 
         pc_mat = ksp.getPC()
         pc_mat.setType('python')

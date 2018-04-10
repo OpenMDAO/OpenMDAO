@@ -59,27 +59,13 @@ does the same computation as the :ref:`Paraboloid Tutorial <tutorial_paraboloid_
     openmdao.components.tests.extcode_paraboloid
 
 
-Next we need to build the OpenMDAO component that makes use of this external code.
+The following example demonstrates how to build an OpenMDAO component that makes use of this external code.
 
 .. embed-code::
     openmdao.components.tests.test_external_code.ParaboloidExternalCode
 
 
-We include this component in a model and run the model.
-
-.. embed-code::
-    openmdao.components.tests.test_external_code.TestExternalCodeFeature.test_main
-    :layout: interleave
-
-
-Next, we will go through each section and explain how this code works.
-
-::
-
-    from __future__ import print_function
-
-    from openmdao.api import Problem, Group, ExternalCode, IndepVarComp
-
+We will go through each section and explain how this code works.
 
 OpenMDAO provides a base class, `ExternalCode`, which you should inherit from to
 build your wrapper components. Just like any other component, you will define the
@@ -102,31 +88,51 @@ code needed to do all that file writing, reading, and parsing.
     openmdao.components.tests.test_external_code.ParaboloidExternalCode.compute
 
 
-`ParaboloidExternalCode` is now complete. All that is left is to actually run it.
+`ParaboloidExternalCode` is now complete. All that is left is to actually use it in a model.
 
-Setting up and running the model
---------------------------------
+.. embed-code::
+    openmdao.components.tests.test_external_code.TestExternalCodeFeature.test_main
+    :layout: interleave
 
-::
 
-    if __name__ == "__main__":
+Using ExternalCode in an Optimization
+-------------------------------------
 
-        top = Problem()
-        top.model = model = Group()
+If you are going to use an ExternalCode component in a gradient based optimization, you'll need to
+get its :ref:`partial derivatives<advanced_guide_partial_derivs_explicit>` somehow.
+One way would be just to use :ref:`finite-difference approximations<feature_declare_partials_approx>` for the partials.
 
-        # Create and connect inputs
-        model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', IndepVarComp('y', -4.0))
-        model.add_subsystem('p', ParaboloidExternalCode())
+In the following example, the `ParaboloidExternalCode` component has been modified to specify
+that partial derivatives are approximiated via finite difference.
 
-        model.connect('p1.x', 'p.x')
-        model.connect('p2.y', 'p.y')
+.. embed-code::
+    openmdao.components.tests.test_external_code.ParaboloidExternalCodeFD
 
-        # Run the ExternalCode Component
-        top.setup()
-        top.run_model()
+Now we can perform an optimization using the external code, as shown here:
 
-        # Print the output
-        print(top['p.f_xy'],)
+.. embed-code::
+    openmdao.components.tests.test_external_code.TestExternalCodeFeature.test_optimize_fd
+    :layout: interleave
+
+Alternatively, if the code you are wrapping happens to provide analytic derivatives you could
+have those written out to a file and then parse that file in the
+:ref:`compute_partials<comp-type-2-explicitcomp>` method.
+
+Here is a version of our external script that writes its derivatives to a second output file:
+
+.. embed-code::
+    openmdao.components.tests.extcode_paraboloid_derivs
+
+And the corresponding `ParaboloidExternalCodeDerivs` component:
+
+.. embed-code::
+    openmdao.components.tests.test_external_code.ParaboloidExternalCodeDerivs
+
+Again, we can perform an optimization using the external code with derivatives:
+
+.. embed-code::
+    openmdao.components.tests.test_external_code.TestExternalCodeFeature.test_optimize_derivs
+    :layout: interleave
+
 
 .. tags:: ExternalCode, FileWrapping

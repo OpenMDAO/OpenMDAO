@@ -13,7 +13,8 @@ from six.moves import cPickle as pickle
 from openmdao.recorders.base_recorder import BaseRecorder
 from openmdao.utils.mpi import MPI
 
-from openmdao.utils.record_util import values_to_array
+from openmdao.utils.record_util import values_to_array, check_path
+from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.core.driver import Driver
 from openmdao.core.system import System
 
@@ -84,11 +85,16 @@ class SqliteRecorder(BaseRecorder):
         Dictionary mapping absolute names to promoted names.
     _prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
+    _abs2meta : {'name': {}}
+        Dictionary mapping absolute variable names to their metadata including units,
+        bounds, and scaling.
     _open_close_sqlite: bool
         If True, open, write, and close the sqlite file. Needed for when running under MPI.
+    _pickle_version: int
+        The pickle protocol version to use when pickling metadata.
     """
 
-    def __init__(self, filepath, append=False):
+    def __init__(self, filepath, append=False, pickle_version=2):
         """
         Initialize the SqliteRecorder.
 
@@ -98,6 +104,8 @@ class SqliteRecorder(BaseRecorder):
             Path to the recorder file.
         append : bool
             Optional. If True, append to an existing case recorder file.
+        pickle_version : int
+            Optional. The pickle protocol version to use when pickling metadata.
         """
         super(SqliteRecorder, self).__init__()
 
@@ -109,6 +117,8 @@ class SqliteRecorder(BaseRecorder):
         self.model_viewer_data = None
         self._abs2prom = {'input': {}, 'output': {}}
         self._prom2abs = {'input': {}, 'output': {}}
+        self._abs2meta = {}
+        self._pickle_version = pickle_version
 
         if append:
             raise NotImplementedError("Append feature not implemented for SqliteRecorder")
@@ -122,7 +132,7 @@ class SqliteRecorder(BaseRecorder):
             with self.con:
                 self.cursor = self.con.cursor()
                 self.cursor.execute("CREATE TABLE metadata( format_version INT, "
-                                    "abs2prom BLOB, prom2abs BLOB)")
+                                    "abs2prom BLOB, prom2abs BLOB, abs2meta BLOB)")
                 self.cursor.execute("INSERT INTO metadata(format_version, abs2prom, "
                                     "prom2abs) VALUES(?,?,?)",
                                     (format_version, None, None))
@@ -146,7 +156,7 @@ class SqliteRecorder(BaseRecorder):
                 self.cursor.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
                                     "model_viewer_data BLOB)")
                 self.cursor.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
-                                    "scaling_factors BLOB)")
+                                    "scaling_factors BLOB, user_metadata BLOB)")
                 self.cursor.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
                                     "solver_options BLOB, solver_class TEXT)")
 
@@ -180,13 +190,22 @@ class SqliteRecorder(BaseRecorder):
                     self._prom2abs[io][v] = list(set(self._prom2abs[io][v]) |
                                                  set(system._var_allprocs_prom2abs_list[io][v]))
 
+        # grab all of the units
+        states = system._list_states_allprocs()
+        for name in system._var_allprocs_abs2meta:
+            self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy()
+            self._abs2meta[name]['type'] = 'Explicit'
+            if name in states:
+                self._abs2meta[name]['type'] = 'Implicit'
+
         # store the updated abs2prom and prom2abs
         abs2prom = pickle.dumps(self._abs2prom)
         prom2abs = pickle.dumps(self._prom2abs)
+        abs2meta = pickle.dumps(self._abs2meta)
         if self._open_close_sqlite:
             with self.con:
-                self.con.execute("UPDATE metadata SET abs2prom=?, prom2abs=?",
-                                 (abs2prom, prom2abs))
+                self.con.execute("UPDATE metadata SET abs2prom=?, prom2abs=?, abs2meta=?",
+                                 (abs2prom, prom2abs, abs2meta))
 
     def record_iteration_driver(self, recording_requester, data, metadata):
         """
@@ -324,7 +343,7 @@ class SqliteRecorder(BaseRecorder):
         """
         driver_class = type(recording_requester).__name__
         model_viewer_data = pickle.dumps(recording_requester._model_viewer_data,
-                                         pickle.HIGHEST_PROTOCOL)
+                                         self._pickle_version)
         with self.con:
             self.con.execute("INSERT INTO driver_metadata(id, model_viewer_data) VALUES(?,?)",
                              (driver_class, sqlite3.Binary(model_viewer_data)))
@@ -349,15 +368,25 @@ class SqliteRecorder(BaseRecorder):
             scaling_vecs[kind] = scaling = {}
             for vecname, vec in iteritems(odict):
                 scaling[vecname] = vec._scaling
-        scaling_factors = pickle.dumps(scaling_vecs,
-                                       pickle.HIGHEST_PROTOCOL)
+        scaling_factors = pickle.dumps(scaling_vecs, self._pickle_version)
+
+        # create a copy of the system's metadata excluding what is in 'metadata_excludes'
+        user_metadata = OptionsDictionary()
+        excludes = recording_requester.recording_options['metadata_excludes']
+        for key in recording_requester.metadata._dict:
+            if check_path(key, [], excludes, True):
+                user_metadata._dict[key] = recording_requester.metadata._dict[key]
+        user_metadata._read_only = recording_requester.metadata._read_only
+        pickled_metadata = pickle.dumps(user_metadata, self._pickle_version)
+
         path = recording_requester.pathname
         if not path:
             path = 'root'
         with self.con:
-            self.con.execute("INSERT INTO system_metadata(id, scaling_factors) \
-                              VALUES(?,?)",
-                             (path, sqlite3.Binary(scaling_factors)))
+            self.con.execute("INSERT INTO system_metadata(id, scaling_factors, user_metadata) \
+                              VALUES(?,?, ?)",
+                             (path, sqlite3.Binary(scaling_factors),
+                              sqlite3.Binary(pickled_metadata)))
 
     def record_metadata_solver(self, recording_requester):
         """
@@ -374,8 +403,7 @@ class SqliteRecorder(BaseRecorder):
             path = 'root'
         id = "{}.{}".format(path, solver_class)
 
-        solver_options = pickle.dumps(recording_requester.options,
-                                      pickle.HIGHEST_PROTOCOL)
+        solver_options = pickle.dumps(recording_requester.options, self._pickle_version)
 
         with self.con:
             self.con.execute(

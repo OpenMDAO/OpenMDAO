@@ -11,25 +11,24 @@ from itertools import chain
 
 from six import iteritems, string_types
 
-try:
-    from mpi4py import MPI
-except ImportError:
-    MPI = None
+from openmdao.utils.mpi import MPI
 
 from openmdao.devtools.webview import webview
 from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _collect_methods, \
-     _setup_func_group, _get_methods
+     _setup_func_group, _get_methods, _Options
 
 
 def _prof_node(fpath, parts):
     pathparts = fpath.split('-')
+    obj, etime, count = parts
+
     return {
         'id': fpath,
-        'time': parts[1],
-        'count': parts[2],
+        'time': etime,
+        'count': count,
         'tot_time': 0.,
         'tot_count': 0,
-        'obj': parts[0],
+        'obj': obj,
         'depth': len(pathparts) - 1,
     }
 
@@ -87,6 +86,8 @@ def setup(methods=None, finalize=True):
         If True, register a function to finalize the profile before exit.
 
     """
+    if not func_group:
+        _setup_func_group()
     _setup(_Options(methods=methods), finalize=finalize)
 
 
@@ -218,6 +219,51 @@ def _iter_raw_prof_file(rawname):
             yield path, int(count), float(elapsed)
 
 
+def _process_1_profile(fname):
+    """
+    Take the generated raw profile data, potentially from multiple files,
+    and combine it to get execution counts and timing data.
+
+    Parameters
+    ----------
+
+    flist : list of str
+        Names of raw profiling data files.
+
+    """
+
+    totals = {}
+    tree_nodes = {}
+    tree_parts = []
+
+    empty = [None, 0., 0]
+
+    for funcpath, count, t in _iter_raw_prof_file(fname):
+        parts = funcpath.split('-')
+
+        tree_nodes[funcpath] = node = _prof_node(funcpath, [None, t, count])
+
+        funcname = parts[-1]
+
+        if funcname not in totals:
+            totals[funcname] = [0., 0]
+
+        totals[funcname][0] += t
+        totals[funcname][1] += count
+
+        tree_parts.append((parts, node))
+
+    for parts, node in tree_parts:
+        short = parts[-1]
+        node['tot_time'] = totals[short][0]
+        node['tot_count'] = totals[short][1]
+        del node['obj']
+
+    tree_nodes['$total']['tot_time'] = tree_nodes['$total']['time']
+
+    return tree_nodes, totals
+
+
 def _process_profile(flist):
     """
     Take the generated raw profile data, potentially from multiple files,
@@ -232,51 +278,63 @@ def _process_profile(flist):
     """
 
     nfiles = len(flist)
-    totals = {}
+    top_nodes = []
+    top_totals = []
 
-    tree_nodes = {}
-    tree_parts = []
+    if nfiles == 1:
+        return _process_1_profile(flist[0])
 
-    for fname in flist:
+    for fname in sorted(flist):
         ext = os.path.splitext(fname)[1]
         try:
             int(ext.lstrip('.'))
             dec = ext
+            tot_names.append('$total' + dec)
         except:
-            dec = False
+            dec = None
 
-        for funcpath, count, t in _iter_raw_prof_file(fname):
+        nodes, tots = _process_1_profile(fname)
+        top_nodes.append(nodes)
+        top_totals.append(tots)
 
-            parts = funcpath.split('-')
+    tree_nodes = {}
+    grand_total = _prof_node('$total', [None, 0., 1])
+    grand_total['tot_count'] = 1
 
-            # for multi-file MPI profiles, decorate names with the rank
-            if nfiles > 1 and dec:
-                parts = ["%s%s" % (p,dec) for p in parts]
-                funcpath = '-'.join(parts)
+    for i, nodes in enumerate(top_nodes):
+        grand_total['tot_time'] += nodes['$total']['tot_time']
+        grand_total['time'] += nodes['$total']['time']
 
-            tree_nodes[funcpath] = node = _prof_node(funcpath, [None, t, count])
+        for name, node in iteritems(nodes):
+            newname = _fix_name(name, i)
+            node['id'] = newname
+            node['depth'] += 1
+            tree_nodes[newname] = node
 
-            funcname = parts[-1]
+    tree_nodes['$total'] = grand_total
 
-            if funcname in totals:
-                tnode = totals[funcname]
+    totals = {}
+    tot_names = []
+    for i, tot in enumerate(top_totals):
+        tot_names.append('$total.%d' % i)
+        for name, tots in iteritems(tot):
+            if name == '$total':
+                totals[tot_names[-1]] = tots
             else:
-                totals[funcname] = tnode = _prof_node(funcpath, [None, 0., 0])
+                totals[name] = tots
 
-            tnode['tot_time'] += t
-            tnode['tot_count'] += count
-
-            tree_parts.append((parts, node))
-
-    for parts, node in tree_parts:
-        short = parts[-1]
-        node['tot_time'] = totals[short]['tot_time']
-        node['tot_count'] = totals[short]['tot_count']
-        del node['obj']
-
-    tree_nodes['$total']['tot_time'] = tree_nodes['$total']['time']
+    totals['$total'] = [0., 0]
+    for tname in tot_names:
+        totals['$total'][0] += totals[tname][0]
+        totals['$total'][1] += totals[tname][1]
 
     return tree_nodes, totals
+
+
+def _fix_name(name, i):
+    parts = name.split('-')
+    parts[0] = '$total.%d' % i
+    return '-'.join(['$total'] + parts)
 
 
 def _iprof_totals_setup_parser(parser):
@@ -313,21 +371,28 @@ def _iprof_totals_exec(options):
             print("iprofview can only process a single python file.", file=sys.stderr)
             sys.exit(-1)
         _iprof_py_file(options)
-        options.file = ['iprof.0']
+        if MPI:
+            options.file = ['iprof.%d' % i for i in range(MPI.COMM_WORLD.size)]
+        else:
+            options.file = ['iprof.0']
+
+    if MPI and MPI.COMM_WORLD.rank != 0:
+        return
 
     call_data, totals = _process_profile(options.file)
 
-    total_time = totals['$total']['tot_time']
+    total_time = call_data['$total']['tot_time']
 
     try:
 
         out_stream.write("\nTotal     Total           Function\n")
         out_stream.write("Calls     Time (s)    %   Name\n")
 
-        calls = sorted(totals.items(), key=lambda x : x[1]['tot_time'])
+        calls = sorted(totals.items(), key=lambda x : x[1][0])
         for func, data in calls[-options.maxcalls:]:
             out_stream.write("%6d %11f %6.2f %s\n" %
-                               (data['tot_count'], data['tot_time'], (data['tot_time']/total_time*100.), func))
+                               (data[1], data[0],
+                               (data[0]/total_time*100.), func))
     finally:
         if out_stream is not sys.stdout:
             out_stream.close()

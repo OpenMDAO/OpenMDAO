@@ -5,9 +5,12 @@ from __future__ import print_function
 import sys
 import os
 
+import numpy as np
+
 from six.moves import zip_longest
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group, System
+from openmdao.utils.mpi import MPI
 
 # an object used to detect when a named value isn't found
 _notfound = object()
@@ -56,7 +59,7 @@ def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma:
                 for ivar, vname in enumerate(vnames[type_]):
                     vset = abs2meta[vname]['var_set']
                     if vset == sname:
-                        sz = sizes[type_][vset][rank, set_idxs[type_][vname]]
+                        sz = sizes[type_][vset][rank, set_idxs[vname]]
                         if sz > 0:
                             data.append((vname, str(set_total)))
                         nwid = max(nwid, len(vname))
@@ -83,7 +86,8 @@ def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma:
                                          wid2=piwid, wid3=pnwid))
         stream.write("\n\n")
 
-    _dump(problem.model, stream)
+    if not MPI or MPI.COMM_WORLD.rank == 0:
+        _dump(problem.model, stream)
 
 
 class _NoColor(object):
@@ -94,7 +98,7 @@ class _NoColor(object):
         return ''
 
 
-def _get_color_printer(stream=sys.stdout, colors=True):
+def _get_color_printer(stream=sys.stdout, colors=True, rank=0):
     """
     Return a print function tied to a particular stream, along with coloring info.
     """
@@ -107,18 +111,27 @@ def _get_color_printer(stream=sys.stdout, colors=True):
     if not colors:
         Fore = Back = Style = _NoColor()
 
-    def color_print(s, fore='', color='', end=''):
-        """
-        """
-        print(color + s, file=stream, end='')
-        print(Style.RESET_ALL, file=stream, end='')
-        print(end=end)
+    if MPI and MPI.COMM_WORLD.rank != rank:
+        if rank >= MPI.COMM_WORLD.size:
+            if MPI.COMM_WORLD.rank == 0:
+                print("Specified rank (%d) is outside of the valid range (0-%d)." %
+                      (rank, MPI.COMM_WORLD.size - 1))
+            sys.exit()
+        def color_print(s, **kwargs):
+            pass
+    else:
+        def color_print(s, fore='', color='', end=''):
+            """
+            """
+            print(color + s, file=stream, end='')
+            print(Style.RESET_ALL, file=stream, end='')
+            print(end=end)
 
     return color_print, Fore, Back, Style
 
 
 def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
-         filter=None, max_depth=0, stream=sys.stdout):
+         filter=None, max_depth=0, rank=0, stream=sys.stdout):
     """
     Dump the model tree structure to the given stream.
 
@@ -141,10 +154,13 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
         be displayed along with any name, value pairs returned from the filter, if any.
     max_depth : int
         Maximum depth for display.
+    rank : int
+        If MPI is active, the tree will only be displayed on this rank.  Only objects local
+        to the given rank will be displayed.
     stream : File-like
         Where dump output will go.
     """
-    cprint, Fore, Back, Style = _get_color_printer(stream, show_colors)
+    cprint, Fore, Back, Style = _get_color_printer(stream, show_colors, rank=rank)
 
     tab = 0
     if isinstance(top, Problem):
@@ -168,7 +184,7 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
             continue
 
         indent = '    ' * (depth + tab)
-        print(indent, file=stream, end='')
+        cprint(indent, end='')
 
         info = ''
         if isinstance(s, Group):
@@ -197,11 +213,22 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
                 cprint("  Jac: ")
                 cprint(jactype, color=Fore.MAGENTA + Style.BRIGHT)
 
-        print(file=stream)
+        cprint('', end='\n')
 
         vindent = indent + '  '
         for name, val in ret:
-            print("%s%s: %s" % (vindent, name, val), file=stream)
+            cprint("%s%s: %s\n" % (vindent, name, val))
+
+
+def _get_printer(comm, stream):
+    if comm.rank == 0:
+        def p(*args, **kwargs):
+            print(*args, file=stream, **kwargs)
+    else:
+        def p(*args, **kwargs):
+            pass
+
+    return p
 
 
 def config_summary(problem, stream=sys.stdout):
@@ -216,115 +243,85 @@ def config_summary(problem, stream=sys.stdout):
         Where the output will be written.
     """
     model = problem.model
-    allsystems = list(model.system_iter(recurse=True, include_self=True))
-    allgroups = [s for s in allsystems if isinstance(s, Group)]
-    sysnames = [s.pathname for s in allsystems]
-    maxdepth = max([len(name.split('.')) for name in sysnames])
-    setup_done = problem._setup_status == 2
     meta = model._var_allprocs_abs2meta
+    locsystems = list(model.system_iter(recurse=True, include_self=True))
+    locgroups = [s for s in locsystems if isinstance(s, Group)]
 
-    print("============== Problem Summary ============", file=stream)
-    print("Groups:           %5d" % len(allgroups), file=stream)
-    print("Components:       %5d" % (len(allsystems) - len(allgroups)), file=stream)
-    print("Max tree depth:   %5d" % maxdepth, file=stream)
-    print(file=stream)
+    grpnames = [s.pathname for s in locgroups]
+    sysnames = [s.pathname for s in locsystems]
+    ln_solvers = set(type(s.linear_solver).__name__ for s in locgroups)
+    nl_solvers = set(type(s.nonlinear_solver).__name__ for s in locgroups)
+
+    max_depth = max([len(name.split('.')) for name in sysnames])
+    setup_done = problem._setup_status == 2
+
+    if problem.comm.size > 1:
+        local_max = np.array([max_depth])
+        global_max_depth = np.zeros(1, dtype=int)
+        problem.comm.Allreduce(local_max, global_max_depth, op=MPI.MAX)
+
+        proc_names = problem.comm.gather((sysnames, grpnames, ln_solvers, nl_solvers), root=0)
+        grpnames = set()
+        sysnames = set()
+        ln_solvers = set()
+        nl_solvers = set()
+        if proc_names is not None:
+            for rank in range(problem.comm.size):
+                systems, grps, lnsols, nlsols = proc_names[rank]
+                sysnames.update(systems)
+                grpnames.update(grps)
+                ln_solvers.update(lnsols)
+                nl_solvers.update(nlsols)
+    else:
+        global_max_depth = max_depth
+
+    printer = _get_printer(problem.comm, stream)
+
+    printer("============== Problem Summary ============")
+    printer("Groups:           %5d" % len(grpnames))
+    printer("Components:       %5d" % (len(sysnames) - len(grpnames)))
+    printer("Max tree depth:   %5d" % global_max_depth)
+    printer()
 
     if setup_done:
         desvars = model.get_design_vars()
-        print("Design variables: %5d   Total size: %8d" %
-              (len(desvars), sum(d['size'] for d in desvars.values())), file=stream)
+        printer("Design variables: %5d   Total size: %8d" %
+              (len(desvars), sum(d['size'] for d in desvars.values())))
 
         # TODO: give separate info for linear, nonlinear constraints, equality, inequality
         constraints = model.get_constraints()
-        print("Constraints:      %5d   Total size: %8d" %
-              (len(constraints), sum(d['size'] for d in constraints.values())), file=stream)
+        printer("Constraints:      %5d   Total size: %8d" %
+              (len(constraints), sum(d['size'] for d in constraints.values())))
 
         objs = model.get_objectives()
-        print("Objectives:       %5d   Total size: %8d" %
-              (len(objs), sum(d['size'] for d in objs.values())), file=stream)
+        printer("Objectives:       %5d   Total size: %8d" %
+              (len(objs), sum(d['size'] for d in objs.values())))
 
-    print(file=stream)
+    printer()
 
-    ninputs = len(model._var_allprocs_abs_names['input'])
+    input_names = model._var_allprocs_abs_names['input']
+    ninputs = len(input_names)
     if setup_done:
-        print("Input variables:  %5d   Total size: %8d" %
-              (ninputs, sum(d.size for d in model._inputs._data.values())), file=stream)
+        printer("Input variables:  %5d   Total size: %8d" %
+              (ninputs, sum(meta[n]['size'] for n in input_names)))
     else:
-        print("Input variables: %5d" % ninputs, file=stream)
+        printer("Input variables: %5d" % ninputs)
 
-    noutputs = len(model._var_allprocs_abs_names['output'])
+    output_names = model._var_allprocs_abs_names['output']
+    noutputs = len(output_names)
     if setup_done:
-        print("Output variables: %5d   Total size: %8d" %
-              (noutputs, sum(d.size for d in model._outputs._data.values())), file=stream)
+        printer("Output variables: %5d   Total size: %8d" %
+              (noutputs, sum(meta[n]['global_size'] for n in output_names)))
     else:
-        print("Output variables: %5d" % noutputs, file=stream)
+        printer("Output variables: %5d" % noutputs)
 
     if setup_done:
-        print(file=stream)
+        printer()
         conns = model._conn_global_abs_in2out
-        print("Total connections: %d   Total transfer data size: %d" %
-              (len(conns), sum(meta[n]['size'] for n in conns)), file=stream)
+        printer("Total connections: %d   Total transfer data size: %d" %
+              (len(conns), sum(meta[n]['size'] for n in conns)))
 
-    print(file=stream)
-    print("Driver type: %s" % problem.driver.__class__.__name__, file=stream)
-    print("Linear Solvers: %s" % sorted(set(type(s.linear_solver).__name__ for s in allgroups)),
-          file=stream)
-    print("Nonlinear Solvers: %s" % sorted(set(type(s.nonlinear_solver).__name__ for s in
-                                                         allgroups)),
-          file=stream)
-
-try:
-    import resource
-
-    def max_mem_usage():
-        """
-        Returns
-        -------
-        The max memory used by this process and its children, in MB.
-        """
-        denom = 1024.
-        if sys.platform == 'darwin':
-            denom *= denom
-        total = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / denom
-        total += resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / denom
-        return total
-except ImportError:
-    pass
-
-try:
-    import psutil
-
-    def mem_usage(msg='', out=sys.stdout):
-        """
-        Returns
-        -------
-        The current memory used by this process (and it's children?), in MB.
-        """
-        denom = 1024. * 1024.
-        p = psutil.Process(os.getpid())
-        mem = p.memory_info().rss / denom
-        if msg:
-            print(msg,"%6.3f MB" % mem, file=out)
-        return mem
-
-    def diff_mem(fn):
-        """
-        This gives the difference in memory before and after the
-        decorated function is called. Requires psutil to be installed.
-        """
-        @functools.wraps(fn)
-        def wrapper(*args, **kwargs):
-            startmem = mem_usage()
-            ret = fn(*args, **kwargs)
-            maxmem = mem_usage()
-            diff = maxmem - startmem
-            if diff > 0.0:
-                if args and hasattr(args[0], 'pathname'):
-                    name = args[0].pathname
-                else:
-                    name = ''
-                print(name,"%s added %5.3f MB (total: %6.3f)" % (fn.__name__, diff, maxmem))
-            return ret
-        return wrapper
-except ImportError:
-    pass
+    printer()
+    printer("Driver type: %s" % problem.driver.__class__.__name__)
+    printer("Linear Solvers: %s" % sorted(ln_solvers))
+    printer("Nonlinear Solvers: %s" % sorted(nl_solvers))

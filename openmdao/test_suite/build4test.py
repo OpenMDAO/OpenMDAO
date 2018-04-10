@@ -136,7 +136,7 @@ if __name__ == '__main__':
     p.final_setup()
     p.run_model()
     #
-    from openmdao.devtools.debug import max_mem_usage
+    from openmdao.devtools.memory import max_mem_usage
     print("mem:", max_mem_usage())
 
     config_summary(p)

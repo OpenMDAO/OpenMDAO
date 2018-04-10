@@ -4,7 +4,7 @@ from __future__ import division, print_function, absolute_import
 import warnings
 
 from six import raise_from
-from six.moves import range
+from six.moves import range, zip
 
 from scipy import __version__ as scipy_version
 try:
@@ -117,6 +117,17 @@ class _RegularGridInterp(object):
     def _interp_methods():
         """
         Method-specific settings for interpolation and for testing.
+
+        Returns
+        -------
+        key iterator
+            Valid interpolation name strings.
+        list
+            Valid interpolation name strings.
+        dict
+            Configuration object that stores limitations of each interpolation
+            method.
+
         """
         interpolator_configs = {
             "slinear": 1,
@@ -758,7 +769,3 @@ class MetaModelStructured(ExplicitComponent):
 
             if self.metadata['training_data_gradients']:
                 partials[out_name, "%s_train" % out_name] = dy_ddata
-
-
-def _for_docs():
-    return MetaModelStructured()

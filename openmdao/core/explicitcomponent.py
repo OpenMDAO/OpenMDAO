@@ -183,7 +183,10 @@ class ExplicitComponent(Component):
                 J._set_partials_meta(abs_key, meta, abs_key[1] in abs2prom['input'])
 
                 if 'method' in meta and meta['method']:
-                    self._approx_schemes[meta['method']].add_approximation(abs_key, meta)
+
+                    # Don't approximate output wrt output.
+                    if abs_key[1] not in self._var_allprocs_abs_names['output']:
+                        self._approx_schemes[meta['method']].add_approximation(abs_key, meta)
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()

@@ -133,6 +133,7 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
     )
     def test_subset(self, param_instance):
         param_instance.linear_solver_class = DirectSolver
+        param_instance.linear_solver_options['maxiter'] = 0
 
         param_instance.setup()
         problem = param_instance.problem

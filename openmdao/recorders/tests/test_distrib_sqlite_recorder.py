@@ -231,7 +231,7 @@ class DistributedRecorderTest(unittest.TestCase):
         # Determine the expected values for the sysincludes
         # this gets all of the outputs but just locally
         rrank = prob.comm.rank  # root ( aka model ) rank.
-        rowned = prob.model._owning_rank['output']
+        rowned = prob.model._owning_rank
         # names of sysincl vars on this rank
         local_inclnames = [n for n in prob.driver.recording_options['includes'] if rrank == rowned[n]]
         # Get values for vars on this rank
@@ -258,7 +258,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
 
         if prob.comm.rank == 0:
-            coordinate = [0, 'SLSQP', (49,)]
+            coordinate = [0, 'SLSQP', (48,)]
             self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
                                                      expected_objectives, expected_constraints,
                                                      expected_includes),), self.eps)

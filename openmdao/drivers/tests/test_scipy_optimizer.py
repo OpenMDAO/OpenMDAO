@@ -52,9 +52,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        of = ['comp.f_xy']
-        wrt = ['p1.x', 'p2.y']
-        derivs = prob.driver._compute_totals(of=of, wrt=wrt, return_format='array')
+        of = ['f_xy']
+        wrt = ['x', 'y']
+        derivs = prob.compute_totals(of=of, wrt=wrt, return_format='array')
 
         assert_rel_error(self, derivs[0, 0], -6.0, 1e-6)
         assert_rel_error(self, derivs[0, 1], 8.0, 1e-6)
@@ -65,9 +65,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        of = ['comp.f_xy']
-        wrt = ['p1.x', 'p2.y']
-        derivs = prob.driver._compute_totals(of=of, wrt=wrt, return_format='array')
+        of = ['f_xy']
+        wrt = ['x', 'y']
+        derivs = prob.compute_totals(of=of, wrt=wrt, return_format='array')
 
         assert_rel_error(self, derivs[0, 0], -6.0, 1e-6)
         assert_rel_error(self, derivs[0, 1], 8.0, 1e-6)
@@ -92,17 +92,16 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'],
-                                             return_format='array')
+        derivs = prob.compute_totals(of=['comp.y1'], wrt=['px.x'], return_format='array')
 
         J = comp.JJ[0:3, 0:2]
         assert_rel_error(self, J, derivs, 1.0e-3)
 
         # Support for a name to be in 'of' and 'wrt'
 
-        derivs = prob.driver._compute_totals(of=['comp.y2', 'px.x', 'comp.y1'],
-                                             wrt=['px.x'],
-                                             return_format='array')
+        derivs = prob.compute_totals(of=['comp.y2', 'px.x', 'comp.y1'],
+                                     wrt=['px.x'],
+                                     return_format='array')
 
         assert_rel_error(self, J, derivs[3:, :], 1.0e-3)
         assert_rel_error(self, comp.JJ[3:4, 0:2], derivs[0:1, :], 1.0e-3)
@@ -130,6 +129,36 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                                         return_format='array')
 
         assert_rel_error(self, J, np.eye(2), 1.0e-3)
+
+    def test_scipy_optimizer_simple_paraboloid_unconstrained(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizer()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+
+        prob.setup(check=False)
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+
+        assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
+        assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
 
     def test_simple_paraboloid_unconstrained(self):
 

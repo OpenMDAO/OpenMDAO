@@ -48,6 +48,11 @@ This allows custom tailoring of the approximation settings on a variable basis.
 Here, we show how to set the step size. In this case, the TrickyParaboloid requires a higher step size because the values and derivatives
 are fairly large, so we give it a higher stepsize.
 
+Notice that in the output, for components that provide a Jacobian, only information about the forward derivatives are
+shown. For components that are matrix-free, both forward and reverse derivative information is shown. Implicit
+components are matrix-free if they define a :code:`apply linear` method. Explicit components are matrix-free if they
+define either :code:`compute_jacvec_product` or :code:`compute_multi_jacvec_product` methods.
+
 .. embed-code::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_step_on_comp
     :layout: interleave
@@ -128,8 +133,22 @@ For a more compact display, set :code:`compact_print` to True. Notice that if an
 exceeded, `>ABS_TOL` is printed at the end of the line. Similarly, if any of the relative tolerances are
 exceeded, `>REL_TOL` is printed at the end of the line.
 
+In the compact form, the reverse derivative values are only shown for matrix-free components.
+
+Also, notice that at the bottom of the output, the partial derivative calculation with the largest relative error is given.
+
 .. embed-code::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_compact_print_formatting
+    :layout: interleave
+
+Show Only Incorrect Printing Option
+-----------------------------------
+
+If you are only concerned with seeing the partials calculations that are incorrect, set :code:`show_only_incorrect` to
+True. This applies to both :code:`compact_print` :code:`True` and :code:`False`.
+
+.. embed-code::
+    openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_check_partials_show_only_incorrect
     :layout: interleave
 
 .. tags:: Derivatives

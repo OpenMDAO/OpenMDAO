@@ -19,6 +19,7 @@ and you can also use a different surrogate model for each output.
     `MetaModelUnStructured` represents a collection of surrogate models trained at the
     same locations in the design space.
 
+
 The following example demonstrates a simple `Problem` in which a
 `MetaModelUnStructured` component uses surrogates to mimic the sine and cosine functions.
 
@@ -32,9 +33,6 @@ not had a surrogate assigned will use one of the default type.
 If ``default_surrogate`` is not specified, then a surrogate must be
 given for all outputs.
 
-Training data is provided as metadata to the ``trig`` component using the variable
-names prefixed with ``train:``.  This can be done anytime before the `MetaModelUnStructured`
-runs for the first time.
 
 The first time a `MetaModelUnStructured` runs, it will train the surrogates using the
 training data that has been provided, and then it will predict the output
@@ -43,6 +41,15 @@ values. This training step only occurs on the first run.
 .. embed-code::
     openmdao.components.tests.test_meta_model_unstructured.MetaModelTestCase.test_metamodel_feature
     :layout: code, output
+
+
+Advanced usage
+--------------
+
+You can specify the training data after instantiation if you like, by setting the component's :ref:`metadata<component_metadata>`.
+Training data is provided as metadata to the ``trig`` component using the variable
+names prefixed with ``train:``.  This can be done anytime before the `MetaModelUnStructured`
+runs for the first time.
 
 The inputs and outputs of a `MetaModelUnStructured` are not limited to scalar values. The
 following modified version of the example uses an array to predict sine and
