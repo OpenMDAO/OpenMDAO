@@ -59,6 +59,8 @@ The implementation of each method will be illustrated using a simple explicit co
   the same as the code in compute_jacvec_product. This won't always be the case, depending on the math operations that
   are required for multiplying by a matrix versus multiplying by a vector.
 
+  This method is only used when "vectorize_derivs" is set to True on a design variable or response.
+
   .. embed-code::
       openmdao.core.tests.test_matmat.RectangleCompVectorized.compute_multi_jacvec_product
 
