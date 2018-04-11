@@ -603,11 +603,19 @@ class PartialDependGroup(Group):
         self.add_constraint('ParallelGroup1.Con2.y', upper=0.0, parallel_deriv_color=color)
 
 
+def dump(*args):
+    for arg in args:
+        print(arg, end='')
+    print()
+    sys.stdout.flush()
+
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ParDerivColorFeatureTestCase(unittest.TestCase):
     N_PROCS = 2
 
     def test_fwd_vs_rev(self):
+        dump("STARTING test_fwd_vs_rev")
+
         import time
 
         import numpy as np
@@ -615,37 +623,56 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         from openmdao.api import Problem, PETScVector
         from openmdao.core.tests.test_parallel_derivatives import PartialDependGroup
 
+        dump("IMPORTS DONE")
         size = 4
 
         of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
         wrt = ['Indep1.x']
 
         # run first in fwd mode
+        dump("creating PROBLEM")
         p = Problem(model=PartialDependGroup())
+        dump("setup(FWD)")
         p.setup(vector_class=PETScVector, check=False, mode='fwd')
+        dump("run_model()")
         p.run_model()
+        dump("run_model DONE")
 
         elapsed_fwd = time.time()
+        dump("COMPUTE_TOTALS")
         J = p.compute_totals(of, wrt, return_format='dict')
+        dump("COMPUTE_TOTALS done")
         elapsed_fwd = time.time() - elapsed_fwd
 
+        dump("CHECKING ERRORS")
         assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
         assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
+        dump("CHECKING ERRORS done")
 
         # now run in rev mode and compare times for deriv calculation
+        dump("creating PROBLEM (rev)")
         p = Problem(model=PartialDependGroup())
+        dump("setup()")
         p.setup(vector_class=PETScVector, check=False, mode='rev')
+        dump("run_model()")
         p.run_model()
+        dump("run_model() done")
 
         elapsed_rev = time.time()
+        dump("COMPUTE_TOTALS")
         J = p.compute_totals(of, wrt, return_format='dict')
+        dump("COMPUTE_TOTALS done")
         elapsed_rev = time.time() - elapsed_rev
 
+        dump("CHECKING ERRORS")
         assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
         assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
+        dump("CHECKING ERRORS done")
 
         # make sure that rev mode is faster than fwd mode
+        dump("CHECKING elapsed time")
         self.assertGreater(elapsed_fwd / elapsed_rev, 1.0)
+        dump("CHECKING elapsed time DONE")
 
 
 class CleanupTestCase(unittest.TestCase):
