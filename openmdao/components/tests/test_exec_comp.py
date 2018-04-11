@@ -538,6 +538,25 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, prob['comp.y'], 3.0, 0.00001)
 
+    def test_feature_multi_output(self):
+        from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+
+        prob = Problem()
+        prob.model = model = Group()
+
+        model.add_subsystem('p', IndepVarComp('x', 2.0))
+        model.add_subsystem('comp', ExecComp(['y1=x+1.', 'y2=x-1.']))
+
+        model.connect('p.x', 'comp.x')
+
+        prob.setup()
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.y1'], 3.0, 0.00001)
+        assert_rel_error(self, prob['comp.y2'], 1.0, 0.00001)
+
     def test_feature_array(self):
         import numpy as np
 
