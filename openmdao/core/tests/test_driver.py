@@ -2,14 +2,16 @@
 
 from __future__ import print_function
 
+from distutils.version import LooseVersion
 from six import StringIO
 import sys
 import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, IndepVarComp, Group, ExecComp, ScipyOptimizer
+from openmdao.api import Problem, IndepVarComp, Group, ExecComp, ScipyOptimizeDriver
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.general_utils import printoptions
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
 
@@ -99,15 +101,27 @@ class TestDriver(unittest.TestCase):
         prob = Problem()
         prob.model = model = SellarDerivatives()
 
-        model.add_design_var('z', ref=2.0, ref0=0.0)
-        model.add_objective('obj', ref=1.0, ref0=0.0)
-        model.add_constraint('con1', lower=0, ref=2.0, ref0=0.0)
+        model.add_design_var('z')
+        model.add_objective('obj')
+        model.add_constraint('con1')
         prob.set_solver_print(level=0)
 
         prob.setup(check=False)
         prob.run_model()
 
         base = prob.compute_totals(of=['obj', 'con1'], wrt=['z'])
+        
+        prob = Problem()
+        prob.model = model = SellarDerivatives()
+    
+        model.add_design_var('z', ref=2.0, ref0=0.0)
+        model.add_objective('obj', ref=1.0, ref0=0.0)
+        model.add_constraint('con1', lower=0, ref=2.0, ref0=0.0)
+        prob.set_solver_print(level=0)
+    
+        prob.setup(check=False)
+        prob.run_model()
+        
         derivs = prob.driver._compute_totals(of=['obj_cmp.obj', 'con_cmp1.con1'], wrt=['pz.z'],
                                              return_format='dict')
         assert_rel_error(self, base[('con1', 'z')][0], derivs['con_cmp1.con1']['pz.z'][0], 1e-5)
@@ -258,7 +272,7 @@ class TestDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -274,8 +288,15 @@ class TestDriver(unittest.TestCase):
         stdout = sys.stdout
         strout = StringIO()
         sys.stdout = strout
+
         try:
-            prob.run_driver()
+            # formatting has changed in numpy 1.14 and beyond.
+            if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+                with printoptions(precision=2, legacy="1.13"):
+                    prob.run_driver()
+            else:
+                with printoptions(precision=2):
+                    prob.run_driver()
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')

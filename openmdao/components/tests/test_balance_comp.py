@@ -8,6 +8,7 @@ from numpy.testing import assert_almost_equal
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, \
     NewtonSolver, DirectSolver, DenseJacobian
 from openmdao.api import BalanceComp
+from openmdao.utils.general_utils import printoptions
 
 
 class TestBalanceComp(unittest.TestCase):
@@ -58,12 +59,11 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        np.set_printoptions(linewidth=1024)
+        with printoptions(linewidth=1024):
+            cpd = prob.check_partials()
 
-        cpd = prob.check_partials()
-
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+            for (of, wrt) in cpd['balance']:
+                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_create_on_init(self):
 
@@ -94,12 +94,11 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        np.set_printoptions(linewidth=1024)
+        with printoptions(linewidth=1024):
+            cpd = prob.check_partials()
 
-        cpd = prob.check_partials()
-
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+            for (of, wrt) in cpd['balance']:
+                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_vectorized(self):
 
@@ -141,12 +140,12 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
 
-        np.set_printoptions(linewidth=1024)
+        with printoptions(linewidth=1024):
 
-        cpd = prob.check_partials()
+            cpd = prob.check_partials()
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+            for (of, wrt) in cpd['balance']:
+                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_vectorized_with_mult(self):
 
@@ -192,12 +191,12 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        np.set_printoptions(linewidth=1024)
+        with printoptions(linewidth=1024):
 
-        cpd = prob.check_partials()
+            cpd = prob.check_partials()
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+            for (of, wrt) in cpd['balance']:
+                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_vectorized_with_default_mult(self):
         """
@@ -241,12 +240,12 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        np.set_printoptions(linewidth=1024)
+        with printoptions(linewidth=1024):
 
-        cpd = prob.check_partials()
+            cpd = prob.check_partials()
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+            for (of, wrt) in cpd['balance']:
+                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_scalar(self):
 
@@ -288,12 +287,12 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
 
-        np.set_printoptions(linewidth=1024)
+        with printoptions(linewidth=1024):
 
-        cpd = prob.check_partials()
+            cpd = prob.check_partials()
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+            for (of, wrt) in cpd['balance']:
+                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_scalar_with_guess_func(self):
 
@@ -335,12 +334,12 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
 
-        np.set_printoptions(linewidth=1024)
+        with printoptions(linewidth=1024):
 
-        cpd = prob.check_partials()
+            cpd = prob.check_partials()
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+            for (of, wrt) in cpd['balance']:
+                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_scalar_with_guess_func_additional_input(self):
 
@@ -386,12 +385,12 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
 
-        np.set_printoptions(linewidth=1024)
+        with printoptions(linewidth=1024):
 
-        cpd = prob.check_partials()
+            cpd = prob.check_partials()
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+            for (of, wrt) in cpd['balance']:
+                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_rhs_val(self):
         """ Test solution with a default RHS value and no connected RHS variable. """
@@ -427,12 +426,12 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
 
-        np.set_printoptions(linewidth=1024)
+        with printoptions(linewidth=1024):
 
-        cpd = prob.check_partials()
+            cpd = prob.check_partials()
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+            for (of, wrt) in cpd['balance']:
+                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_scalar_with_mult(self):
 
@@ -478,12 +477,12 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        np.set_printoptions(linewidth=1024)
+        with printoptions(linewidth=1024):
 
-        cpd = prob.check_partials()
+            cpd = prob.check_partials()
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+            for (of, wrt) in cpd['balance']:
+                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_renamed_vars(self):
 
@@ -529,12 +528,12 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        np.set_printoptions(linewidth=1024)
+        with printoptions(linewidth=1024):
 
-        cpd = prob.check_partials()
+            cpd = prob.check_partials()
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+            for (of, wrt) in cpd['balance']:
+                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_feature_scalar(self):
         from numpy.testing import assert_almost_equal

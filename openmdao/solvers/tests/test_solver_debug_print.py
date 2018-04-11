@@ -8,6 +8,7 @@ import shutil
 import tempfile
 
 import unittest
+from distutils.version import LooseVersion
 
 import numpy as np
 
@@ -22,6 +23,7 @@ from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
 
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import run_model
+from openmdao.utils.general_utils import printoptions
 
 from nose_parameterized import parameterized
 
@@ -39,11 +41,6 @@ class TestNonlinearSolvers(unittest.TestCase):
         self.startdir = os.getcwd()
         self.tempdir = tempfile.mkdtemp(prefix='test_solver')
         os.chdir(self.tempdir)
-
-        # formatting has changed in numpy 1.14 and beyond.
-        from distutils.version import LooseVersion
-        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
-            np.set_printoptions(legacy='1.13')
 
         # iteration coordinate, file name and variable data are common for all tests
         coord = 'rank0:root._solve_nonlinear|0|NLRunOnce|0|circuit._solve_nonlinear|0'
@@ -111,8 +108,14 @@ class TestNonlinearSolvers(unittest.TestCase):
         p['circuit.n1.V'] = 10.
         p['circuit.n2.V'] = 1e-3
 
-        # run the model and check for expected output file
-        output = run_model(p)
+        opts = {}
+        # formatting has changed in numpy 1.14 and beyond.
+        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+            opts["legacy"] = '1.13'
+
+        with printoptions(**opts):
+            # run the model and check for expected output file
+            output = run_model(p)
 
         expected_output = '\n'.join([
             self.expected_data,
@@ -150,8 +153,14 @@ class TestNonlinearSolvers(unittest.TestCase):
         p['circuit.n1.V'] = 10.
         p['circuit.n2.V'] = 1e-3
 
-        # run the model
-        p.run_model()
+        opts = {}
+        # formatting has changed in numpy 1.14 and beyond.
+        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+            opts["legacy"] = '1.13'
+
+        with printoptions(**opts):
+            # run the model
+            p.run_model()
 
         with open('rank0_root_0_NLRunOnce_0_circuit_0.dat', 'r') as f:
             self.assertEqual(f.read(), self.expected_data)

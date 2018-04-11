@@ -17,7 +17,7 @@ from docutils import nodes
 import numpy as np
 
 from six import StringIO, PY3
-from six.moves import range, cStringIO as cStringIO
+from six.moves import range, zip, cStringIO as cStringIO
 
 from sphinx.errors import SphinxError
 from sphinx.writers.html import HTMLTranslator
@@ -27,6 +27,7 @@ if sys.version_info[0] == 2:
     import cgi as cgiesc
 else:
     import html as cgiesc
+from openmdao.utils.general_utils import printoptions
 
 sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
 table_name = 'feature_unit_tests'   # name of the table to be queried
@@ -719,22 +720,20 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False):
             sys.stderr = strout
 
             # We need more precision from numpy
-            save_opts = np.get_printoptions()
-            np.set_printoptions(precision=8)
+            with printoptions(precision=8):
 
-            if module is None:
-                globals_dict = {
-                        '__file__': path,
-                        '__name__': '__main__',
-                        '__package__': None,
-                        '__cached__': None,
-                }
-            else:
-                globals_dict = module.__dict__
+                if module is None:
+                    globals_dict = {
+                            '__file__': path,
+                            '__name__': '__main__',
+                            '__package__': None,
+                            '__cached__': None,
+                    }
+                else:
+                    globals_dict = module.__dict__
 
-            exec(code_to_run, globals_dict)
+                exec(code_to_run, globals_dict)
 
-            np.set_printoptions(precision=save_opts['precision'])
             output = strout.getvalue()
 
     except subprocess.CalledProcessError as e:
