@@ -47,7 +47,7 @@ class _FactorialGenerator(DOEGenerator):
         """
         super(_FactorialGenerator, self).__init__()
 
-        if method not in ['fullfact', 'pbdesign']:
+        if method not in self._supported_methods:
             raise RuntimeError('Invalid method specified for generator: %s. '
                                'Method must be one of %s.' %
                                (method, _supported_methods))
@@ -120,6 +120,7 @@ class _FactorialGenerator(DOEGenerator):
 
             yield retval
 
+
 class FullFactorialGenerator(_FactorialGenerator):
     """
     DOE case generator implementing the Full Factorial method.
@@ -148,3 +149,129 @@ class PlackettBurmanGenerator(_FactorialGenerator):
         Initialize the PlackettBurmanGenerator.
         """
         super(PlackettBurmanGenerator, self).__init__('pbdesign', 2)
+
+
+class LatinHypercubeGenerator(DOEGenerator):
+    """
+    Base class for DOE case generators implementing the pyDOE factorial methods.
+
+    Attributes
+    ----------
+    _samples : int
+        The number of evenly spaced levels between each design variable
+        lower and upper bound.
+    _supported_criterion : list
+        supported pyDOE criterion names.
+    _criterion : string
+        the pyDOE criterion to use.
+    _iterations : int
+        The number of iterations to use for maximin and correlations algorithms.
+    _seed : int or None
+        Random seed.
+    """
+
+    _supported_criterion = [
+        "center", "c",
+        "maximin", "m",
+        "centermaximin", "cm",
+        "correlation", "corr",
+        None
+    ]
+
+    def __init__(self, samples=None, criterion=None, iterations=5, seed=None):
+        """
+        Initialize the LatinHypercubeGenerator.
+
+        See: https://pythonhosted.org/pyDOE/randomized.html
+
+        Parameters
+        ----------
+        samples : int, optional
+            The number of samples to generate for each factor (Defaults to n)
+        criterion : str, optional
+            Allowable values are "center" or "c", "maximin" or "m",
+            "centermaximin" or "cm", and "correlation" or "corr". If no value
+            given, the design is simply randomized.
+        iterations : int, optional
+            The number of iterations in the maximin and correlations algorithms
+            (Defaults to 5).
+        seed : int, optional
+            Random seed to use if design is randomized. Defaults to None.
+        """
+        super(LatinHypercubeGenerator, self).__init__()
+
+        if criterion not in self._supported_criterion:
+            raise RuntimeError("Invalid criterion '%s' specified for %s. "
+                               "Must be one of %s." %
+                               (criterion, self.__class__.__name__,
+                                self._supported_criterion))
+
+        self._samples = samples
+        self._criterion = criterion
+        self._iterations = iterations
+        self._seed = seed
+
+    def __call__(self, design_vars):
+        """
+        Generate case.
+
+        Parameters
+        ----------
+        design_vars : dict
+            Dictionary of design variables for which to generate values.
+
+        Yields
+        ------
+        list
+            list of name, value tuples for the design variables.
+        """
+        if self._seed is not None:
+            np.random.seed(self._seed)
+
+        size = sum([meta['size'] for name, meta in iteritems(design_vars)])
+
+        if self._samples is None:
+            self._samples = size
+
+        print('criterion:', self._criterion)
+        # generate design
+        lhd = pyDOE.lhs(size, samples=self._samples,
+                        criterion=self._criterion,
+                        iterations=self._iterations)
+
+        print(lhd)
+
+        # generate values for each level for each design variable
+        # over the range of that varable's lower to upper bound
+
+        # rows = vars (# rows/var = var size), cols = levels
+        values = np.zeros((size, self._samples))
+
+        print(values)
+
+        # yield desvar values for lhd samples
+        for row in lhd:
+            retval = []
+            col = 0
+            var = 0
+            for name, meta in iteritems(design_vars):
+                size = meta['size']
+                val = np.zeros(size)
+                for k in range(size):
+                    sample = row[col+k]
+
+                    lower = meta['lower']
+                    if isinstance(lower, np.ndarray):
+                        lower = lower[k]
+
+                    upper = meta['upper']
+                    if isinstance(upper, np.ndarray):
+                        upper = upper[k]
+
+                    val[k] = lower + sample*(upper-lower)
+
+                retval.append((name, val))
+                var += 1
+                col += size
+
+            yield retval
