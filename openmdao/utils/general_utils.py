@@ -1,6 +1,7 @@
 """Some miscellaneous utility functions."""
 from __future__ import division
 
+import contextlib
 import os
 import sys
 import warnings
@@ -8,7 +9,7 @@ import unittest
 from mock import Mock
 from fnmatch import fnmatchcase
 from six import string_types
-from six.moves import range
+from six.moves import range, cStringIO as StringIO
 from collections import Iterable
 import numbers
 
@@ -349,3 +350,101 @@ def find_matches(pattern, var_list):
     elif pattern in var_list:
         return [pattern]
     return [name for name in var_list if fnmatchcase(name, pattern)]
+
+
+def pad_name(name, pad_num=10, quotes=False):
+    """
+    Pad a string so that they all line up when stacked.
+
+    Parameters
+    ----------
+    name : str
+        The string to pad.
+    pad_num : int
+        The number of total spaces the string should take up.
+    quotes : bool
+        If name should be quoted.
+
+    Returns
+    -------
+    str
+        Padded string
+    """
+    l_name = len(name)
+    quotes_len = 2 if quotes else 0
+    if l_name + quotes_len < pad_num:
+        pad = pad_num - (l_name + quotes_len)
+        if quotes:
+            pad_str = "'{name}'{sep:<{pad}}"
+        else:
+            pad_str = "{name}{sep:<{pad}}"
+        pad_name = pad_str.format(name=name, sep='', pad=pad)
+        return pad_name
+    else:
+        if quotes:
+            return "'{0}'".format(name)
+        else:
+            return '{0}'.format(name)
+
+
+def run_model(prob):
+    """
+    Call `run_model` on problem and capture output.
+
+    Parameters
+    ----------
+    prob : Problem
+        an instance of Problem
+
+    Returns
+    -------
+    string
+        output from calling `run_model` on the Problem, captured from stdout
+    """
+    stdout = sys.stdout
+    strout = StringIO()
+
+    sys.stdout = strout
+    try:
+        prob.run_model()
+    finally:
+        sys.stdout = stdout
+
+    return strout.getvalue()
+
+
+@contextlib.contextmanager
+def printoptions(*args, **kwds):
+    """
+    Context manager for setting numpy print options.
+
+    Set print options for the scope of the `with` block, and restore the old
+    options at the end. See `numpy.set_printoptions` for the full description of
+    available options.
+
+    Parameters
+    ----------
+    *args : list
+        Variable-length argument list.
+    **kwds : dict
+        Arbitrary keyword arguments.
+
+    Examples
+    --------
+    >>> with printoptions(precision=2):
+    ...     print(np.array([2.0])) / 3
+    [0.67]
+    The `as`-clause of the `with`-statement gives the current print options:
+    >>> with printoptions(precision=2) as opts:
+    ...      assert_equal(opts, np.get_printoptions())
+
+    See Also
+    --------
+    set_printoptions, get_printoptions
+    """
+    opts = np.get_printoptions()
+    try:
+        np.set_printoptions(*args, **kwds)
+        yield np.get_printoptions()
+    finally:
+        np.set_printoptions(**opts)

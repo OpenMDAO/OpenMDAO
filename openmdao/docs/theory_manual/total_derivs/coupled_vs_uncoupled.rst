@@ -13,9 +13,10 @@ Uncoupled Models
 ----------------------------
 
 If you have a completely uncoupled model, then the partial derivative Jacobian matrix will have an lower-triangular structure.
-If you are using *reverse* mode, then the left hand side of the unified derivatives equations will be the transpose-Jacobian and will have an upper triangular structure.
-The upper-triagular transpose jacobian structure is notable because it can also be seen in the :ref:`n2 diagram<om-command-view_model>`
-that OpenMDAO can produce.
+The resulting linear system can be solved using a block forward or backward substitution algorithm.
+Alternatively you could view the solution algorithm as a single iteration of a block Gauss-Seidel algorithm.
+In OpenMDAO, the single pass block Gauss-Seidel algorithm is implemented via the :ref:`LinearRunOnce<lnrunonce>` solver.
+This is the default solver used by OpenMDAO on all :ref:`Groups<feature_grouping_components>`.
 
 .. figure:: matrix_figs/uncoupled_fwd.png
     :align: center
@@ -23,11 +24,9 @@ that OpenMDAO can produce.
 
     The linear system for an uncoupled system can be solved with forward substitution in forward mode
 
-The resulting linear system can be solved using a block forward or backward substitution algorithm.
-Alternatively you could view the solution algorithm as a single iteration of a block Gauss-Seidel algorithm.
-In OpenMDAO, the single pass block Gauss-Seidel algorithm is implemented via the :ref:`LinearRunOnce<lnrunonce>` solver.
-This is the default solver used by OpenMDAO on all :ref:`Groups<feature_grouping_components>`.
-
+If you are using *reverse* mode, then the left hand side of the unified derivatives equations will be the transpose-Jacobian and will have an upper triangular structure.
+The upper-triagular transpose jacobian structure is notable because it can also be seen in the :ref:`n2 diagram<om-command-view_model>`
+that OpenMDAO can produce.
 
 .. figure:: matrix_figs/uncoupled_rev.png
     :align: center

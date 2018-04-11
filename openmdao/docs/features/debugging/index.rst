@@ -4,7 +4,7 @@
 Debugging
 *********
 
-Sometimes things don't work. We have a set of tools and methods that you can use to try and figure out whats going on. 
+Sometimes things don't work. We have a set of tools and methods that you can use to try and figure out whats going on.
 
 
 
@@ -15,4 +15,5 @@ Sometimes things don't work. We have a set of tools and methods that you can use
     newton_solver_not_converging.rst
     listing_variables.rst
     debugging_drivers.rst
+    debugging_solvers.rst
     profiling/index.rst

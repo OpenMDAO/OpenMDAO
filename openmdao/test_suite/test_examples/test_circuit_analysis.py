@@ -9,6 +9,8 @@ from openmdao.utils.assert_utils import assert_rel_error
 
 
 class Resistor(ExplicitComponent):
+    """Computes current across a resistor using Ohm's law."""
+
     def initialize(self):
         self.metadata.declare('R', default=1., desc='Resistance in Ohms')
 
@@ -26,6 +28,8 @@ class Resistor(ExplicitComponent):
 
 
 class Diode(ExplicitComponent):
+    """Computes current across a diode using the Shockley diode equation."""
+
     def initialize(self):
         self.metadata.declare('Is', default=1e-15, desc='Saturation current in Amps')
         self.metadata.declare('Vt', default=.025875, desc='Thermal voltage in Volts')
@@ -46,6 +50,8 @@ class Diode(ExplicitComponent):
 
 
 class Node(ImplicitComponent):
+    """Computes voltage residual across a node based on incoming and outgoing current."""
+
     def initialize(self):
         self.metadata.declare('n_in', default=1, types=int, desc='number of connections with + assumed in')
         self.metadata.declare('n_out', default=1, types=int, desc='number of current connections + assumed out')

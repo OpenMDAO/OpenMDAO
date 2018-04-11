@@ -59,8 +59,8 @@ So despite having good parallel scaling for the nonlinear analysis, in reverse m
     This kind of parallel scaling limitation is unique to reverse mode. If :code:`z1` and :code:`z2` were very large vectors, and :code:`x` was smaller vector, then we could use forward mode for the total derivative calculations an both :code:`z1` and :code:`z2` would have work to do for every single solve.
 
 
-Enabling parallel computation derivatives in fan-out models
--------------------------------------------------------------
+Approach for Computing Parallel Derivatives in Multipoint Models
+-------------------------------------------------------------------
 
 Keeping in mind that we've stipulated components that compute :code:`x` and :code:`y` are inexpensive, the existing parallel resources of the model can be leveraged to enable parallel calculation of derivatives for both :code:`z1` and :code:`z2`.
 
@@ -82,3 +82,33 @@ The linear solves now looks like this:
 
 Here, each of the two vectors is being solved for on a different processor.
 The grayed out blocks represent memory that is **not** allocated on that processor.
+
+
+Coloring Variables for Parallel Derivatives
+-----------------------------------------------
+
+In the above example there was only a single set of variables computed in parallel.
+Even if the model was larger and ran with :math:`n` points across :math:`n` processors, all the :math:`z` variables could be combined into a single parallel derivative solve.
+In a parallel coloring sense, all the :math:`z` variables belong to the same color.
+
+Consider a slightly more complex problem where each point output two different variables: :math:`foo` and :math:`bar`.
+Using standard reverse mode, for :matH:`n` points there would need to be :math:`2n` linear solves to compute all the derivatives.
+Just like before, parallel derivatives are needed to maintain the parallel scaling of the model in reverse mode.
+However, unlike the earlier problem there would now need to be two different colors: one for all the :math:`foo` variables and one for all the :math:`bar` variables.
+
+
+.. note::
+
+    Parallel derivative coloring is distinct from :ref:`simultaneous derivative coloring<theory_separable_variables>`.
+    In the parallel coloring, you are specifying variables for which distinct linear solves can be performed in parallel on different processors.
+    In simultaneous coloring you are specifying sets of variables that can be combined into a single linear solve.
+
+
+Demonstration of the Parallel Speedup
+-------------------------------------------------
+
+
+
+How to use it
+------------------
+

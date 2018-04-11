@@ -2,10 +2,14 @@
 
 from __future__ import division, print_function
 
+from six import iteritems
+
 import os
+import re
 
 import numpy as np
 
+from copy import deepcopy
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
@@ -14,6 +18,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate
 
 
 class SolverInfo(object):
@@ -121,7 +126,7 @@ class Solver(object):
     _solver_info : <SolverInfo>
         Object to store some formatting for iprint that is shared across all solvers.
     cite : str
-        Listing of relevant citataions that should be referenced when
+        Listing of relevant citations that should be referenced when
         publishing work that uses this class.
     options : <OptionsDictionary>
         Options dictionary.
@@ -168,6 +173,7 @@ class Solver(object):
                              desc='whether to print output')
         self.options.declare('err_on_maxiter', types=bool, default=False,
                              desc="When True, AnalysisError will be raised if we don't converge.")
+
         # Case recording options
         self.recording_options.declare('record_abs_error', types=bool, default=True,
                                        desc='Set to True to record absolute error at the \
@@ -183,7 +189,7 @@ class Solver(object):
                                        desc='Patterns for variables to include in recording')
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
-                                       '(processed post-includes)')
+                                            '(processed post-includes)')
         # Case recording related
         self._filtered_vars_to_record = {}
         self._norm0 = 0.0
@@ -522,7 +528,63 @@ class Solver(object):
 class NonlinearSolver(Solver):
     """
     Base class for nonlinear solvers.
+
+    Attributes
+    ----------
+    _system : <System>
+        Pointer to the owning system.
+    _depth : int
+        How many subsolvers deep this solver is (0 means not a subsolver).
+    _vec_names : [str, ...]
+        List of right-hand-side (RHS) vector names.
+    _mode : str
+        'fwd' or 'rev', applicable to linear solvers only.
+    _iter_count : int
+        Number of iterations for the current invocation of the solver.
+    _rec_mgr : <RecordingManager>
+        object that manages all recorders added to this solver
+    _solver_info : <SolverInfo>
+        Object to store some formatting for iprint that is shared across all solvers.
+    _err_cache : dict
+        Dictionary holding input and output vectors at start of iteration, if requested.
+    cite : str
+        Listing of relevant citations that should be referenced when
+        publishing work that uses this class.
+    options : <OptionsDictionary>
+        Options dictionary.
+    recording_options : <OptionsDictionary>
+        Recording options dictionary.
+    metadata : dict
+        Dictionary holding data about this solver.
+    supports : <OptionsDictionary>
+        Options dictionary describing what features are supported by this
+        solver.
+    _filtered_vars_to_record: Dict
+        Dict of list of var names to record
+    _norm0: float
+        Normalization factor
     """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
+        """
+        super(NonlinearSolver, self).__init__(**kwargs)
+        self._err_cache = {}
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        self.options.declare('debug_print', types=bool, default=False,
+                             desc='If true, the values of input and output variables at '
+                                  'the start of iteration are printed and written to a file '
+                                  'after a failure to converge.')
 
     def solve(self):
         """
@@ -537,7 +599,28 @@ class NonlinearSolver(Solver):
         float
             relative error.
         """
-        return self._run_iterator()
+        fail, abs_err, rel_err = self._run_iterator()
+
+        if fail and self.options['debug_print']:
+            coord = get_formatted_iteration_coordinate()
+
+            out_str = "\n# Inputs and outputs at start of iteration '%s':\n" % coord
+            for vec_type, vec in iteritems(self._err_cache):
+                out_str += '\n'
+                out_str += '# %s %ss\n' % (vec._name, vec._typ)
+                for abs_name in sorted(vec._views.keys()):
+                    out_str += '%s = %s\n' % (abs_name, repr(vec._views[abs_name]))
+
+            print(out_str)
+
+            filename = coord.replace('._solve_nonlinear', '')
+            filename = re.sub('[^0-9a-zA-Z]', '_', filename) + '.dat'
+            with open(filename, 'w') as f:
+                f.write(out_str)
+                print("Inputs and outputs at start of iteration have been "
+                      "saved to '%s'." % filename)
+
+        return fail, abs_err, rel_err
 
     def _iter_initialize(self):
         """
@@ -550,6 +633,10 @@ class NonlinearSolver(Solver):
         float
             error at the first iteration.
         """
+        if self.options['debug_print']:
+            self._err_cache['inputs'] = deepcopy(self._system._inputs)
+            self._err_cache['outputs'] = deepcopy(self._system._outputs)
+
         if self.options['maxiter'] > 0:
             self._run_apply()
             norm = self._iter_get_norm()

@@ -207,3 +207,14 @@ openmdao trace
 The :code:`openmdao trace` command prints a call trace for a specified set of functions.  Optionally it can
 display values of function locals and return values.  For more detail, see
 :ref:`Instance-based Call Tracing <instbasedtrace>`.
+
+
+Using Commands under MPI
+------------------------
+
+In general, usage of openmdao subcommands under MPI is the same as usual, except the command will
+be preceded by `mpirun -n <num_procs>`.  For example:
+
+.. embed-shell-cmd::
+    :cmd: mpirun -n 2 openmdao summary multipoint_beam_opt.py
+    :dir: ../test_suite/scripts

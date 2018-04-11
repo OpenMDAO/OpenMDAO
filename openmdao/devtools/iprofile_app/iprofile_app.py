@@ -19,6 +19,7 @@ from itertools import groupby
 from openmdao.devtools.iprofile import _process_profile, _iprof_py_file
 from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _collect_methods, \
      _setup_func_group
+from openmdao.utils.mpi import MPI
 
 
 def _launch_browser(port):
@@ -199,9 +200,12 @@ def _iprof_exec(options):
             print("iprofview can only process a single python file.", file=sys.stderr)
             sys.exit(-1)
         _iprof_py_file(options)
-        options.file = ['iprof.0']
+        if MPI:
+            options.file = ['iprof.%d' % i for i in range(MPI.COMM_WORLD.size)]
+        else:
+            options.file = ['iprof.0']
 
-    if not options.noshow:
+    if not options.noshow and (not MPI or MPI.COMM_WORLD.rank == 0):
         app = _Application(options)
         app.listen(options.port)
 

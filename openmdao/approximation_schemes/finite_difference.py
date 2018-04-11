@@ -3,7 +3,7 @@ from __future__ import division, print_function
 
 from collections import namedtuple
 from itertools import groupby
-from six.moves import range
+from six.moves import range, zip
 
 import numpy as np
 

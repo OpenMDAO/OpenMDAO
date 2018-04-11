@@ -30,10 +30,10 @@ sys = build_sys()
 
 sys.jacobian()
 sys.spacer()
-sys.vector(base_color='red')
+sys.vector(base_color='red', highlight=[2,2,2,2,2])
 sys.spacer()
 sys.operator('=')
-sys.vector(base_color='green')
+sys.vector(base_color='green', highlight=[2,1,1,1,1])
 
 sys.write('uncoupled_fwd')
 
@@ -44,10 +44,10 @@ sys = build_sys()
 
 sys.jacobian(transpose=True)
 sys.spacer()
-sys.vector(base_color='red')
+sys.vector(base_color='red', highlight=[2,2,2,2,2])
 sys.spacer()
 sys.operator('=')
-sys.vector(base_color='green')
+sys.vector(base_color='green', highlight=[2,1,1,1,1])
 
 sys.write('uncoupled_rev')
 
@@ -64,17 +64,17 @@ sys.add_variable(4, size=2)
 sys.add_variable(5, size=1)
 
 sys.connect(1, [2,3,4,5])
-sys.connect(2, [1,3,4,5])
-sys.connect(3, [1,2,4,5])
-sys.connect(4, [1,2,3,5])
-sys.connect(5, [1,2,3,4])
+sys.connect(2, [5])
+sys.connect(3, [2,4,5])
+sys.connect(4, [2,5])
+sys.connect(5, [2,3,4])
 
 sys.jacobian()
 sys.spacer()
 sys.vector(base_color='red', highlight=[2,2,2,2,2])
 sys.spacer()
 sys.operator('=')
-sys.vector(base_color='green', highlight=[2,2,2,2,2])
+sys.vector(base_color='green', highlight=[2,1,1,1,1])
 
 sys.write('coupled_fwd')
 
