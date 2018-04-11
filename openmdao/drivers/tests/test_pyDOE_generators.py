@@ -13,7 +13,7 @@ import numpy as np
 from openmdao.api import Problem, ExplicitComponent, IndepVarComp, SqliteRecorder, CaseReader
 from openmdao.drivers.doe_driver import DOEDriver
 from openmdao.drivers.uniform_generator import UniformGenerator
-from openmdao.drivers.pyDOE_generator import FullFactorialGenerator, PlackettBurmanGenerator, \
+from openmdao.drivers.pyDOE_generators import FullFactorialGenerator, PlackettBurmanGenerator, \
     LatinHypercubeGenerator
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -323,7 +323,7 @@ class TestDOEDriver(unittest.TestCase):
 
         cases = CaseReader("CASES.sql").driver_cases
 
-        self.assertEqual(cases.num_cases, 4)
+        self.assertEqual(cases.num_cases, samples)
 
         # the sample space for each variable (0 to upper) should be divided into
         # equal size buckets and each variable should have a value in each bucket
@@ -333,7 +333,7 @@ class TestDOEDriver(unittest.TestCase):
         y1_buckets = set()
 
         # with criterion of 'center', sample values should be in the center of a bucket
-        valid_values = [bucket_size*(bucket + 1/2) for bucket in all_buckets]
+        valid_values = [round(bucket_size*(bucket + 1/2), 3) for bucket in all_buckets]
 
         for n in range(cases.num_cases):
             x1 = cases.get_case(n).desvars['indep.x1']
@@ -342,8 +342,8 @@ class TestDOEDriver(unittest.TestCase):
             x1_buckets.add(int(x1/bucket_size))
             y1_buckets.add(int(y1/bucket_size))
 
-            self.assertTrue(x1 in valid_values)
-            self.assertTrue(y1 in valid_values)
+            self.assertTrue(round(x1, 3) in valid_values, '%f not in %s' % (x1, valid_values))
+            self.assertTrue(round(y1, 3) in valid_values, '%f not in %s' % (x1, valid_values))
 
         self.assertEqual(x1_buckets, all_buckets)
         self.assertEqual(y1_buckets, all_buckets)

@@ -233,12 +233,11 @@ class LatinHypercubeGenerator(DOEGenerator):
         if self._samples is None:
             self._samples = size
 
-        print('criterion:', self._criterion)
         # generate design
+        print('criterion:', self._criterion)
         lhd = pyDOE.lhs(size, samples=self._samples,
                         criterion=self._criterion,
                         iterations=self._iterations)
-
         print(lhd)
 
         # generate values for each level for each design variable
@@ -246,8 +245,6 @@ class LatinHypercubeGenerator(DOEGenerator):
 
         # rows = vars (# rows/var = var size), cols = levels
         values = np.zeros((size, self._samples))
-
-        print(values)
 
         # yield desvar values for lhd samples
         for row in lhd:
