@@ -33,7 +33,7 @@ This is the default solver used by OpenMDAO on all :ref:`Groups<feature_grouping
     :align: center
     :width: 50%
 
-    The linear system for an uncoupled system can be solved with backwards substitution in reverse mode
+    The linear system for an uncoupled system can be solved with back substitution in reverse mode
 
 
 ----------------------------

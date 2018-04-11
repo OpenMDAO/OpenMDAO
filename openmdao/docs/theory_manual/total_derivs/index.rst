@@ -67,16 +67,15 @@ The explanation of OpenMDAO's features for improving linear solver performance a
 Advanced Linear Solver Features for Special Cases
 ---------------------------------------------------
 
-There are certain cases where it is possible to further improve linear solver performance
-via the application of specialized algorithms.
+There are certain cases where it is possible to further improve linear solver performance via the application of specialized algorithms.
 In some cases, the application of these algorithms can have an impact on whether you choose the forward or reverse mode for derivative solves.
 The is section details the types of structures within a model that are necessary in order to benefit from these algorithms.
 
 .. toctree::
     :maxdepth: 1
 
-    vectorized.rst
     separable.rst
     fan_out.rst
+    vectorized.rst
 
 

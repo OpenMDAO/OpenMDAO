@@ -1,8 +1,8 @@
 .. _theory_vectorized_derivaties:
 
-*************************************************************
-Vectorizing Derivative Solves for Array Variables
-*************************************************************
+****************************************************************************
+Vectorizing Derivative Solves for Array Variables At a Larger Memory Cost
+****************************************************************************
 
 When a model has a :ref:`feed-forward or uncoupled<theory_selecting_linear_solver>`, data path from design variables to constraints, then you can you can use the default :ref:`LinearRunOnce<lnrunonce>` solver to compute total derivatives.
 This solver will recurse down through your model computing matrix-vector products as it goes, and will compute derivatives one design variable at a time or one constraint at a time in forward or reverse modes respectively.
@@ -18,6 +18,12 @@ The advantage of this approach is that the number of recursive traversals of the
 
 While reduced computational overhead is advantageous, this approach also gives an increased memory footprint.
 As we noted, in order to use this algorithm multiple right-hand-side vectors and solutions vectors must be allocated at the same time.
+
+.. tip::
+
+    If you are considering using vectorized total derivatives solves because you have a set of vectorized components in your model, you might also consider checking if your problem has a separable structure that can be taken advantage of with :ref:`simultaneous derivatives<theory_separable_variables>`.
+    If you can use simultaneous derivatives, you get all of the computational speed up, with none of the memory cost.
+    If your problem isn't separable, then you consider vectorized derivatives instead.
 
 -----------------------------
 How Much Memory Does it Use?
@@ -48,6 +54,7 @@ This illustrates how the memory cost of vectorization grows with two key factors
     #. The number of output variables in a model
     #. The size of the output variable you want to vectorize the total derivative solve for
 
+Ultimately you have to weigh the memory cost and compute savings to determine if this feature is good for your specific use case.
 
 ----------------------------------------------------------------
 Usage With Components That Use Assembled Jacobians
@@ -59,9 +66,10 @@ Internally, OpenMDAO will switch from doing matrix-vector products to vectorized
 Essentially in either case, if you stored the partial derivative Jacobian in a variable :code:`A`, and your vector as variable :code:`b` will always do
 
 .. code::
+
     c = A.dot(b)
 
-This NumPy syntax works whether b is a vector or a collection of vectors that have been stacked together (vectorized)
+This NumPy syntax works whether b is a vector or a collection of vectors that have been stacked together (vectorized), which is why you don't need to do anything differently when using assembled Jacobians.
 
 ----------------------------------------------------------------
 Usage With Components That Use Matrix-Free Partial Derivatives
@@ -73,7 +81,7 @@ If you have any components that use the matrix-free APIs,
     #. :ref:`apply_linear<comp-type-3-implicitcomp>`
 
 Then you need to implement an additional methods in order to use vectorized derivative solves.
-The new methods are necessary because the linear operators themselves need to be vectorized.
+The new methods are necessary because the linear operators themselves need to be vectorized and its not possible for OpenMDAO to efficiently do that for you.
 
     #. :ref:`compute_multi_jacvec_product<comp-type-2-explicitcomp>`
     #. :ref:`apply_multi_linear<comp-type-3-implicitcomp>`

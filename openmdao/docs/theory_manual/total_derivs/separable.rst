@@ -1,7 +1,7 @@
 .. _theory_separable_variables:
 
 ****************************************************************************************
-Solving for Multiple Derivatives Simultaneously for Separable Constraints
+Solving for Derivatives of Multiple Separable Constraints Using a Single Linear Solve
 ****************************************************************************************
 
 A set of constraints are separable when there are subsets of the design variables that don't affect any of the responses.
@@ -25,13 +25,12 @@ Normally, summing multiple right hand side vectors would result in the solution 
   \end{gather}
 
 However, because the problem is separable we know that :math:`\frac{dy_i}{dx_j}=0` for all :math:`i \ne j` for seperable variables.
-So it is safe to do all the linear solves at the same time.
+So it is safe to do all the linear solves at the same time, and we can get a significant computational savings with no additional complexity of memory costs.
 
-.. note::
+.. tip::
 
-  Most optimization problems don't display this kind of separability because all (or at least most) of the design variables effect the objective function.
-  This means that there is a dense row in the total derivative Jacobian which means the problem is not separable in forward mode.
-  Similarly if you are using reverse mode any input that affects all the outputs creates dense column (which would become a dense row in the transpose of the total derivative Jacobian), will also prevent a separable problem structure.
+     If your problem isn't separable, you might still be able to make use of :ref:`vectorized derivatives<theory_vectorized_derivaties>`.
+     This alternate algorithm offers similar computational gains, but comes with a non-trivial increase in memory usage.
 
 
 A Simple Example
@@ -54,8 +53,9 @@ The two dense columns corresponding to :math:`a, b` mean that all of the outputs
    :alt: Two linear solves needed for the two non-separable variables
 
 Normally, each of the remaining variables (:math:`c, d, e`) would also need their own linear solves, as shown below.
-In this figure, the known non-zero values in the solution vector are noted by the darker red.
-Notice how the three separate vectors have no overlapping non-zero values anywhere.
+In the red solution vector and green right hand side vector, the zero values are denoted by the lighter colored boxes.
+The non-zero values are denoted by the darker colored blocks.
+Notice how the three solution vectors vectors have no overlapping non-zero values.
 
 .. figure:: matrix_figs/simultaneous_sparse_separate.png
    :align: center
@@ -84,21 +84,44 @@ Then the task of finding the separable variables can be performed using a graph 
 In that case, a set of separable variables are said to have the same color.
 The simple example problem would then have three colors; one each for :math:`a` and :math:`b` and one more for :math:`c,d,e`.
 
-Of course, in order to use a graph coloring algorithm you need to first have the total derivative Jacobian.
-OpenMDAO can compute that for you, but there is one potential pitfall that needs to be accounted for.
-For any arbitrary point in the design space there is a chance that some total derivatives will turn out to be zero, but could be non-zero at other locations.
+So if you know the total derivative Jacobian then, in theory, you could color any arbitrary problem.
+Since OpenMDAO can compute the total derivative Jacobian, it would seem to be simply a matter of applying a coloring algorithm to it.
+However there is a potential pitfall that needs to be accounted for.
+For any arbitrary point in the design space there some total derivatives could turn out to be zero, despite the fact that they are non-zero at other locations.
 An incidental zero would mean a missing edge in the graph and could potentially deliver an incorrect coloring.
+So the challenge is to figure out the non-zero entries in the total derivative Jacobian in a more robust way.
 
-However, in general OpenMDAO knows the partial derivative sparsity of a model because the :ref:`non-zero partials are specified<feature_sparse_partials>` by each component in its setup method.
-So we need to compute the sparsity pattern of the total Jacobian, given the sparsity pattern of the partial Jacobian, in a way that reduces the impact of incidental zero values.
+OpenMDAO knows the partial derivative sparsity of a model because the :ref:`non-zero partials are specified<feature_sparse_partials>` by each component in its setup method.
+So we need to compute the sparsity pattern of the total Jacobian, given the sparsity pattern of the partial Jacobian, in a way that reduces the chance of getting of incidental zero values.
 
-OpenMDAO accomplishes this by setting random numbers into the non-zero entries of the partial derivative matrix, and then computing total derivatives using that random left hand side for the linear system.
-Using random values reduces the likelyhood that an incidental non-zero will show up in the Jacobian, and that chance can be further reduced by computing the total derivative Jacobian multiple times with different random left hand sides.
+.. From the `Unified Derivative Equations`_, we know that the total derivative Jacobian is the inverse of the partial derivative Jacobian:
 
-Hence the cost of the coloring algorithm is roughly equivalent to the cost of several computations of the complete total derivative Jacobian.
-If the model is intended to be used in an optimization context, then it is fair to assume that these computations are inexpensive enough to be performed several times for the coloring.
-If the problem structure stays fixed, the coloring only needs to be computed once.
+.. .. _Unified Derivative Equations: http://mdolab.engin.umich.edu/content/review-and-unification-discrete-methods-computing-derivatives-single-and-multi-disciplinary
 
+.. .. math::
+
+..     \left[ \frac{dr}{du}\right] = \left[ \frac{\partial r}{\partial u}\right]^{-1} \left[I \right] =  \left[ \frac{\partial r}{\partial u}\right]^{-1}.
+
+We can minimize the chance of having an incidental zeros in the inverse by setting random numbers into the non-zero entries of the partial derivative matrix, then computing the resulting total derivative Jacobian using the randomized values.
+The derivatives computed in this way will not be physically meaningful, but the chance of having any incidental zero values is now very small.
+The likelihood of incidental zeros can be further reduced by computing the total derivative Jacobian multiple times with different random left hand sides and summing the resulting total derivative Jacobians together.
+
+Hence the cost of the coloring algorithm is equivalent to the cost of :math:`n` computations of the full total derivative Jacobian.
+The larger you choose to make :math:`n`, the more reliable your coloring will be.
+If the model is intended to be used in an optimization context, then it is fair to assume that total derivative Jacobian are inexpensive enough to computed many times and using a few additional computations to compute a coloring will not significantly impact the overall compute cost.
+
+
+Choosing Forward or Reverse Mode for Separable Problems
+-------------------------------------------------------
+If a problem has a section of design variables and constraints that are separable,
+then it is possible to leverage that quality in either forward or reverse mode.
+Which mode you choose depends on which direction gives you less total linear solves.
+In the example above we show how separability change the faster method from reverse to forward, but in general it does not have to cause that effect.
+
+Normally you count the number of design variables and responses and choose the mode corresponding to whichever one is smaller.
+For separable problems, you count the number of colors you have in each direction and choose which ever one is smaller.
+Sometimes the answer is different than you would get by counting design variables and constraints, but sometimes its not.
+The result is problem dependent.
 
 .. Relevance to Finite Difference and Complex Step
 .. --------------------------------------------------
