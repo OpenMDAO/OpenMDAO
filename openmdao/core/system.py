@@ -2902,7 +2902,7 @@ class System(object):
             Set to None to suppress.
         row : str
             The string containing the contents of the beginning of this row output.
-            Contains the name of the System or varname, possibley indented to show hierarchy.
+            Contains the name of the System or varname, possibly indented to show hierarchy.
 
         column_names : list of str
             Indicates which columns will be written in this row.

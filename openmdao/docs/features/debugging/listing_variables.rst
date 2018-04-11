@@ -140,3 +140,19 @@ of full values of the array below the row. The format is affected by the values 
 .. embed-code::
     openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_for_docs_array_list_vars_options
     :layout: interleave
+
+*Listing Problem Variables*
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:code:`Problem` has a method :code:`list_problem_vars` which prints out the values and metadata for design,
+constraint, and objective variables.
+
+.. automethod:: openmdao.core.problem.Problem.list_problem_vars
+    :noindex:
+
+The user can optionally print out a variety of metadata. In this example, all the metadata is printed. The
+:code:`print_arrays` option is also set to true so that full array values are printed.
+
+.. embed-code::
+    openmdao.core.tests.test_problem.TestProblem.test_feature_list_problem_vars
+    :layout: interleave
