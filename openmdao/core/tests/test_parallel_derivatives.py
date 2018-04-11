@@ -613,34 +613,35 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
 
     def test_fwd_vs_rev(self):
         try:
+            import time
+
+            import numpy as np
+
+            from openmdao.api import Problem, PETScVector
+            from openmdao.core.tests.test_parallel_derivatives import PartialDependGroup
+
+            size = 4
+
+            of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
+            wrt = ['Indep1.x']
+
+            # run first in fwd mode
+            p = Problem(model=PartialDependGroup())
+            p.setup(vector_class=PETScVector, check=False, mode='fwd')
+            p.run_model()
+
+            elapsed_fwd = time.time()
+            J = p.compute_totals(of, wrt, return_format='dict')
+            elapsed_fwd = time.time() - elapsed_fwd
+
+            assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
+            assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
+
+            # now run in rev mode and compare times for deriv calculation
+            p = Problem(model=PartialDependGroup())
+            p.setup(vector_class=PETScVector, check=False, mode='rev')
+
             with tracing():
-                import time
-
-                import numpy as np
-
-                from openmdao.api import Problem, PETScVector
-                from openmdao.core.tests.test_parallel_derivatives import PartialDependGroup
-
-                size = 4
-
-                of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
-                wrt = ['Indep1.x']
-
-                # run first in fwd mode
-                p = Problem(model=PartialDependGroup())
-                p.setup(vector_class=PETScVector, check=False, mode='fwd')
-                p.run_model()
-
-                elapsed_fwd = time.time()
-                J = p.compute_totals(of, wrt, return_format='dict')
-                elapsed_fwd = time.time() - elapsed_fwd
-
-                assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
-                assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
-
-                # now run in rev mode and compare times for deriv calculation
-                p = Problem(model=PartialDependGroup())
-                p.setup(vector_class=PETScVector, check=False, mode='rev')
                 p.run_model()
 
                 elapsed_rev = time.time()
