@@ -84,7 +84,8 @@ install:
   fi
 
 - pip install redbaron
-- pip install git+https://github.com/OpenMDAO/testflo.git
+# - pip install git+https://github.com/OpenMDAO/testflo.git
+- pip install git+https://github.com/naylor-b/testflo.git
 - pip install coverage
 - pip install git+https://github.com/swryan/coveralls-python@work
 - pip install .  # Not using -e on purpose here, to catch pkging errors
@@ -104,7 +105,7 @@ script:
 - if [ "$UPLOAD_DOCS" ]; then
     testflo -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*;
   else
-    testflo --pre_announce -s -v openmdao;
+    testflo --pre_announce -s openmdao;
   fi
 
 
