@@ -128,7 +128,6 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         teg.nonlinear_solver.options['max_sub_solves'] = 1
         teg.nonlinear_solver.options['atol'] = 1e-4
 
-
         prob.setup(check=False)
         prob.set_solver_print(level=0)
 

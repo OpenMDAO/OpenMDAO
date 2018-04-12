@@ -58,7 +58,6 @@ def format_singluar_error(err, system, mtx):
     n = 0
     varname = "Unknown"
     for name in system._var_allprocs_abs_names['output']:
-        relname = system._var_abs2prom['output'][name]
         n += len(system._outputs._views_flat[name])
         if loc <= n:
             varname = name
