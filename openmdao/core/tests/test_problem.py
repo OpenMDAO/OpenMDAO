@@ -1220,11 +1220,11 @@ class TestProblem(unittest.TestCase):
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
         self.assertEquals(output[1], 'Design Variables')
-        assertRegex(self, output[5], '^pz.z +\|[0-9. +-]+\| +2')
+        assertRegex(self, output[5], '^pz.z +\|[0-9. e+-]+\| +2')
         self.assertEquals(output[9], 'Constraints')
-        assertRegex(self, output[14], '^con_cmp2.con2 +\[[0-9. +-]+\] +1')
+        assertRegex(self, output[14], '^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
         self.assertEquals(output[17], 'Objectives')
-        assertRegex(self, output[21], '^obj_cmp.obj +\[[0-9. +-]+\] +1')
+        assertRegex(self, output[21], '^obj_cmp.obj +\[[0-9. e+-]+\] +1')
 
 
         # With show_promoted_name=False
@@ -1236,9 +1236,9 @@ class TestProblem(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        assertRegex(self, output[5], '^z +\|[0-9. +-]+\| +2')
-        assertRegex(self, output[14], '^con2 +\[[0-9. +-]+\] +1')
-        assertRegex(self, output[21], '^obj +\[[0-9. +-]+\] +1')
+        assertRegex(self, output[5], '^z +\|[0-9. e+-]+\| +2')
+        assertRegex(self, output[14], '^con2 +\[[0-9. e+-]+\] +1')
+        assertRegex(self, output[21], '^obj +\[[0-9. e+-]+\] +1')
 
         # With all the optional columns
         stdout = sys.stdout
@@ -1268,7 +1268,7 @@ class TestProblem(unittest.TestCase):
         assertRegex(self, output[3],'^name\s+value\s+size\s+lower\s+upper\s+ref\s+ref0\s+'
                          'indices\s+adder\s+scaler\s+parallel_deriv_color\s+'
                          'vectorize_derivs\s+simul_deriv_color\s+cache_linear_solution')
-        assertRegex(self, output[5],'^pz.z\s+\|[0-9.+-]+\|\s+2\s+\|10.0\|\s+\|[0-9.+-]+\|\s+None\s+'
+        assertRegex(self, output[5],'^pz.z\s+\|[0-9.e+-]+\|\s+2\s+\|10.0\|\s+\|[0-9.e+-]+\|\s+None\s+'
                          'None\s+None\s+None\s+None\s+None\s+False\s+None\s+False')
 
         # With all the optional columns and print_arrays
@@ -1297,11 +1297,11 @@ class TestProblem(unittest.TestCase):
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
         assertRegex(self, output[6], '^\s+value:')
-        assertRegex(self, output[7], '^\s+\[[0-9. +-]+\]')
+        assertRegex(self, output[7], '^\s+\[[0-9. e+-]+\]')
         assertRegex(self, output[9], '^\s+lower:')
-        assertRegex(self, output[10], '^\s+\[[0-9. +-]+\]')
+        assertRegex(self, output[10], '^\s+\[[0-9. e+-]+\]')
         assertRegex(self, output[12], '^\s+upper:')
-        assertRegex(self, output[13], '^\s+\[[0-9. +-]+\]')
+        assertRegex(self, output[13], '^\s+\[[0-9. e+-]+\]')
 
     def test_feature_list_problem_vars(self):
         import numpy as np
