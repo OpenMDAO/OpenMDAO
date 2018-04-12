@@ -79,6 +79,7 @@ class BoundsEnforceLS(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
+        super(BoundsEnforceLS, self)._declare_options()
         opt = self.options
         opt.declare(
             'bound_enforcement', default='vector', values=['vector', 'scalar', 'wall'],
