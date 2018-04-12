@@ -1,5 +1,5 @@
 """
-Factorial Case generators for Design-of-Experiments Driver using pyDOE.
+Case generators for Design-of-Experiments Driver using pyDOE.
 """
 
 from six import iteritems, itervalues
@@ -15,10 +15,8 @@ from collections import OrderedDict
 from openmdao.drivers.doe_driver import DOEGenerator
 import pyDOE
 
-_methods = ['fullfact', 'ff2n', 'fractfract', 'pbdesign', 'bbdesign', 'ccdesign', 'lhs']
 
-
-class _FactorialGenerator(DOEGenerator):
+class _Generator(DOEGenerator):
     """
     Base class for DOE case generators implementing the pyDOE factorial methods.
 
@@ -33,7 +31,7 @@ class _FactorialGenerator(DOEGenerator):
         the pyDOE function to use.
     """
 
-    _supported_methods = ['fullfact', 'pbdesign']
+    _supported_methods = ['fullfact', 'pbdesign', 'bbdesign']
 
     def __init__(self, method, levels=2):
         """
@@ -45,12 +43,13 @@ class _FactorialGenerator(DOEGenerator):
             The number of evenly spaced levels between each design variable
             lower and upper bound. Defaults to 2.
         """
-        super(_FactorialGenerator, self).__init__()
+        super(_Generator, self).__init__()
 
         if method not in self._supported_methods:
-            raise ValueError('Invalid method specified for generator: %s. '
-                             'Method must be one of %s.' %
-                             (method, self._supported_methods))
+            raise ValueError("Invalid method '%s' specified for %s. "
+                             "Method must be one of %s." %
+                             (method, self.__class__.__name__,
+                              self._supported_methods))
 
         self._method = method
         self._levels = levels
@@ -75,14 +74,22 @@ class _FactorialGenerator(DOEGenerator):
 
         # generate indices
         if self._method is 'fullfact':
-            ff = pyDOE.fullfact([self._levels]*size)
+            doe = pyDOE.fullfact([self._levels]*size)
         elif self._method is 'pbdesign':
-            ff = pyDOE.pbdesign(size)
-            ff[ff < 0] = 0  # replace -1 with zero
+            doe = pyDOE.pbdesign(size)
+            doe[doe < 0] = 0  # replace -1 with zero
+        elif self._method is 'bbdesign':
+            if size < 3:
+                raise RuntimeError("Total size of design variables is %d,"
+                                   "but must be at least 3 when using %s. " %
+                                   (size, self.__class__.__name__))
+            doe = pyDOE.bbdesign(size, center=self._center)
+            doe = doe + 1  # replace [-1, 0, 1] with [0, 1, 2]
         else:
-            raise RuntimeError('Invalid method specified for generator: %s. '
-                               'Method must be one of %s.' %
-                               (self._method, self._supported_methods))
+            raise RuntimeError("Invalid method '%s' specified for %s. "
+                               "Method must be one of %s." %
+                               (self._method, self.__class__.__name__,
+                                self._supported_methods))
 
         # generate values for each level for each design variable
         # over the range of that varable's lower to upper bound
@@ -106,8 +113,8 @@ class _FactorialGenerator(DOEGenerator):
                 values[row][:] = np.linspace(lower, upper, num=self._levels)
                 row += 1
 
-        # yield values for ff generated indices
-        for idxs in ff.astype('int'):
+        # yield values for doe generated indices
+        for idxs in doe.astype('int'):
             retval = []
             var = row = 0
             for name, meta in iteritems(design_vars):
@@ -123,7 +130,7 @@ class _FactorialGenerator(DOEGenerator):
             yield retval
 
 
-class FullFactorialGenerator(_FactorialGenerator):
+class FullFactorialGenerator(_Generator):
     """
     DOE case generator implementing the Full Factorial method.
     """
@@ -141,7 +148,7 @@ class FullFactorialGenerator(_FactorialGenerator):
         super(FullFactorialGenerator, self).__init__('fullfact', levels)
 
 
-class PlackettBurmanGenerator(_FactorialGenerator):
+class PlackettBurmanGenerator(_Generator):
     """
     DOE case generator implementing the Plackett-Burman method.
     """
@@ -151,6 +158,30 @@ class PlackettBurmanGenerator(_FactorialGenerator):
         Initialize the PlackettBurmanGenerator.
         """
         super(PlackettBurmanGenerator, self).__init__('pbdesign', 2)
+
+
+class BoxBehnkenGenerator(_Generator):
+    """
+    DOE case generator implementing the Box-Behnken method.
+
+    Attributes
+    ----------
+    _center : int
+        The number of center points to include.
+    """
+
+    def __init__(self, center=1):
+        """
+        Initialize the BoxBehnkenGenerator.
+
+        Parameters
+        ----------
+        center : int, optional
+            The number of center points to include (default = 1).
+        """
+        super(BoxBehnkenGenerator, self).__init__('bbdesign', 3)
+
+        self._center = center
 
 
 class LatinHypercubeGenerator(DOEGenerator):
@@ -203,10 +234,10 @@ class LatinHypercubeGenerator(DOEGenerator):
         super(LatinHypercubeGenerator, self).__init__()
 
         if criterion not in self._supported_criterion:
-            raise RuntimeError("Invalid criterion '%s' specified for %s. "
-                               "Must be one of %s." %
-                               (criterion, self.__class__.__name__,
-                                self._supported_criterion))
+            raise ValueError("Invalid criterion '%s' specified for %s. "
+                             "Must be one of %s." %
+                             (criterion, self.__class__.__name__,
+                             self._supported_criterion))
 
         self._samples = samples
         self._criterion = criterion

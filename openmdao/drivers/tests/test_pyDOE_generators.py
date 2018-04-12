@@ -10,7 +10,8 @@ import platform
 
 import numpy as np
 
-from openmdao.api import Problem, ExplicitComponent, IndepVarComp, SqliteRecorder, CaseReader
+from openmdao.api import Problem, ExplicitComponent, IndepVarComp, ExecComp, \
+    SqliteRecorder, CaseReader
 
 from openmdao.drivers.doe_driver import DOEDriver
 
@@ -62,27 +63,36 @@ class TestErrors(unittest.TestCase):
                          "DOEDriver requires an instance of DOEGenerator, "
                          "but an instance of Problem was found.")
 
-    def test_generator_method(self):
+    def test_factorial_method(self):
         # error that could occur only when using/extending the base class
-        from openmdao.drivers.pyDOE_generators import _FactorialGenerator
+        from openmdao.drivers.pyDOE_generators import _Generator
 
         with self.assertRaises(ValueError) as err:
-            _FactorialGenerator('blah')
+            _Generator('foo')
 
         self.assertEqual(str(err.exception),
-                         "Invalid method specified for generator: blah. "
-                         "Method must be one of ['fullfact', 'pbdesign'].")
+                         "Invalid method 'foo' specified for _Generator. "
+                         "Method must be one of ['fullfact', 'pbdesign', 'bbdesign'].")
 
         # error that could occur only if the _method attribute is tampered with
         ff = FullFactorialGenerator()
-        ff._method = 'blah'
+        ff._method = 'bar'
 
         with self.assertRaises(RuntimeError) as err:
             list(ff({}))
 
         self.assertEqual(str(err.exception),
-                         "Invalid method specified for generator: blah. "
-                         "Method must be one of ['fullfact', 'pbdesign'].")
+                         "Invalid method 'bar' specified for FullFactorialGenerator. "
+                         "Method must be one of ['fullfact', 'pbdesign', 'bbdesign'].")
+
+    def test_lhc_criterion(self):
+        with self.assertRaises(ValueError) as err:
+            LatinHypercubeGenerator(criterion='foo')
+
+        self.assertEqual(str(err.exception),
+                         "Invalid criterion 'foo' specified for LatinHypercubeGenerator. "
+                         "Must be one of ['center', 'c', 'maximin', 'm', 'centermaximin', "
+                         "'cm', 'correlation', 'corr', None].")
 
 
 class TestDOEDriver(unittest.TestCase):
@@ -249,6 +259,67 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(cases.get_case(n).desvars['x'], expected[n]['x'])
             self.assertEqual(cases.get_case(n).desvars['y'], expected[n]['y'])
             self.assertEqual(cases.get_case(n).objectives['f_xy'], expected[n]['f_xy'])
+
+    def test_box_behnken(self):
+        upper = 10.
+        center = 1
+
+        prob = Problem()
+        model = prob.model
+
+        indep = model.add_subsystem('indep', IndepVarComp(), promotes=['*'])
+        indep.add_output('x', 0.0)
+        indep.add_output('y', 0.0)
+        indep.add_output('z', 0.0)
+
+        model.add_subsystem('comp', ExecComp('a = x**2 + y - z'), promotes=['*'])
+
+        model.add_design_var('x', lower=0., upper=upper)
+        model.add_design_var('y', lower=0., upper=upper)
+        model.add_design_var('z', lower=0., upper=upper)
+
+        model.add_objective('a')
+
+        prob.driver = DOEDriver(BoxBehnkenGenerator(center=center))
+        prob.driver.add_recorder(SqliteRecorder("CASES.sql"))
+
+        prob.setup(check=False)
+        prob.run_driver()
+        prob.cleanup()
+
+        cases = CaseReader("CASES.sql").driver_cases
+
+        # The Box-Behnken design for 3 factors involves three blocks, in each of
+        # which 2 factors are varied thru the 4 possible combinations of high & low.
+        # It also includes centre points (all factors at their central values).
+        self.assertEqual(cases.num_cases, (3*4)+1)
+
+        expected = {
+            0:  {'x': np.array([ 0.]), 'y': np.array([ 0.]), 'z': np.array([ 5.])},
+            1:  {'x': np.array([10.]), 'y': np.array([ 0.]), 'z': np.array([ 5.])},
+            2:  {'x': np.array([ 0.]), 'y': np.array([10.]), 'z': np.array([ 5.])},
+            3:  {'x': np.array([10.]), 'y': np.array([10.]), 'z': np.array([ 5.])},
+
+            4:  {'x': np.array([ 0.]), 'y': np.array([ 5.]), 'z': np.array([ 0.])},
+            5:  {'x': np.array([10.]), 'y': np.array([ 5.]), 'z': np.array([ 0.])},
+            6:  {'x': np.array([ 0.]), 'y': np.array([ 5.]), 'z': np.array([10.])},
+            7:  {'x': np.array([10.]), 'y': np.array([ 5.]), 'z': np.array([10.])},
+
+            8:  {'x': np.array([ 5.]), 'y': np.array([ 0.]), 'z': np.array([ 0.])},
+            9:  {'x': np.array([ 5.]), 'y': np.array([10.]), 'z': np.array([ 0.])},
+            10: {'x': np.array([ 5.]), 'y': np.array([ 0.]), 'z': np.array([10.])},
+            11: {'x': np.array([ 5.]), 'y': np.array([10.]), 'z': np.array([10.])},
+
+            12: {'x': np.array([ 5.]), 'y': np.array([ 5.]), 'z': np.array([ 5.])},
+        }
+
+        for n in range(cases.num_cases):
+            x = cases.get_case(n).desvars['x']
+            y = cases.get_case(n).desvars['y']
+            z = cases.get_case(n).desvars['z']
+            self.assertEqual(cases.get_case(n).desvars['x'], expected[n]['x'])
+            self.assertEqual(cases.get_case(n).desvars['y'], expected[n]['y'])
+            self.assertEqual(cases.get_case(n).desvars['z'], expected[n]['z'])
 
     def test_latin_hypercube(self):
         prob = Problem()
