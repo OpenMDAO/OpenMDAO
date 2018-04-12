@@ -3,7 +3,7 @@
 from __future__ import division, print_function
 
 from six import iteritems
-
+from collections import OrderedDict
 import os
 import re
 
@@ -575,7 +575,7 @@ class NonlinearSolver(Solver):
             options dictionary.
         """
         super(NonlinearSolver, self).__init__(**kwargs)
-        self._err_cache = {}
+        self._err_cache = OrderedDict()
 
     def _declare_options(self):
         """

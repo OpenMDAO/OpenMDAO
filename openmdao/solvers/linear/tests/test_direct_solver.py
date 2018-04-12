@@ -128,13 +128,14 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         teg.nonlinear_solver.options['max_sub_solves'] = 1
         teg.nonlinear_solver.options['atol'] = 1e-4
 
+
         prob.setup(check=False)
         prob.set_solver_print(level=0)
 
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for row associated with state/residual 'thrust'."
+        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for column associated with state/residual 'thrust_equilibrium_group.dynamics.z'."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -172,7 +173,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for row associated with state/residual 'thrust'."
+        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for column associated with state/residual 'thrust_equilibrium_group.dynamics.z'."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
