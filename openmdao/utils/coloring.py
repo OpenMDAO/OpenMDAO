@@ -527,12 +527,13 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
             stream.write("\n########### BEGIN COLORING DATA ################\n")
             _write_coloring(col_lists, rows, sparsity, stream)
             stream.write("\n########### END COLORING DATA ############\n")
-
-            if show_jac:
-                stream.write("\n\n")
-                array_viz(J, problem, of, wrt, stream)
         else:
             _write_coloring(col_lists, rows, sparsity, stream)
+
+        if show_jac:
+            s = stream if stream.isatty() else sys.stdout
+            s.write("\n\n")
+            array_viz(J, problem, of, wrt, s)
 
     return col_lists, rows, sparsity
 

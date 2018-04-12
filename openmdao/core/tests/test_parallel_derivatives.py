@@ -14,6 +14,8 @@ from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.recorders.recording_iteration_stack import recording_iteration
+
 
 if MPI:
     from openmdao.api import PETScVector
@@ -604,57 +606,54 @@ class PartialDependGroup(Group):
         self.add_constraint('ParallelGroup1.Con2.y', upper=0.0, parallel_deriv_color=color)
 
 
-import traceback
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ParDerivColorFeatureTestCase(unittest.TestCase):
     N_PROCS = 2
 
     def test_fwd_vs_rev(self):
-        try:
-            import time
+        import time
 
-            import numpy as np
+        import numpy as np
 
-            from openmdao.api import Problem, PETScVector
-            from openmdao.core.tests.test_parallel_derivatives import PartialDependGroup
+        from openmdao.api import Problem, PETScVector
+        from openmdao.core.tests.test_parallel_derivatives import PartialDependGroup
 
-            size = 4
+        recording_iteration.stack = []
+        size = 4
 
-            of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
-            wrt = ['Indep1.x']
+        of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
+        wrt = ['Indep1.x']
 
-            # run first in fwd mode
-            p = Problem(model=PartialDependGroup())
-            p.setup(vector_class=PETScVector, check=False, mode='fwd')
-            p.run_model()
+        # run first in fwd mode
+        p = Problem(model=PartialDependGroup())
+        p.setup(vector_class=PETScVector, check=False, mode='fwd')
+        p.run_model()
 
-            elapsed_fwd = time.time()
-            J = p.compute_totals(of, wrt, return_format='dict')
-            elapsed_fwd = time.time() - elapsed_fwd
+        elapsed_fwd = time.time()
+        J = p.compute_totals(of, wrt, return_format='dict')
+        elapsed_fwd = time.time() - elapsed_fwd
 
-            assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
-            assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
+        assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
+        assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
 
-            # now run in rev mode and compare times for deriv calculation
-            p = Problem(model=PartialDependGroup())
-            p.setup(vector_class=PETScVector, check=False, mode='rev')
+        recording_iteration.stack = []
 
-            p.run_model()
+        # now run in rev mode and compare times for deriv calculation
+        p = Problem(model=PartialDependGroup())
+        p.setup(vector_class=PETScVector, check=False, mode='rev')
 
-            elapsed_rev = time.time()
-            J = p.compute_totals(of, wrt, return_format='dict')
-            elapsed_rev = time.time() - elapsed_rev
+        p.run_model()
 
-            assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
-            assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
+        elapsed_rev = time.time()
+        J = p.compute_totals(of, wrt, return_format='dict')
+        elapsed_rev = time.time() - elapsed_rev
 
-            # make sure that rev mode is faster than fwd mode
-            self.assertGreater(elapsed_fwd / elapsed_rev, 1.0)
-        except:
-            traceback.print_exc()
-            sys.stderr.flush()
-            sys.stdout.flush()
+        assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
+        assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
+
+        # make sure that rev mode is faster than fwd mode
+        self.assertGreater(elapsed_fwd / elapsed_rev, 1.0)
 
 
 class CleanupTestCase(unittest.TestCase):
