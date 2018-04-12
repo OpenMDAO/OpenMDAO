@@ -1132,14 +1132,14 @@ class Problem(object):
         desvar_opts : list of str
             List of optional columns to be displayed in the desvars table.
             Allowed values are:
-            ['lower', 'upper', 'ref’, 'ref0’, 'indices’, 'adder’, 'scaler’, 'parallel_deriv_color’,
-            'vectorize_derivs’, 'simul_coloring’, 'cache_linear_solution’]
+            ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler', 'parallel_deriv_color',
+            'vectorize_derivs', 'simul_coloring', 'cache_linear_solution']
         cons_opts : list of str
             List of optional columns to be displayed in the cons table.
             Allowed values are:
-            ['lower’, 'upper’, 'equals’, ref’, 'ref0’, 'indices’, 'index’, adder’, 'scaler’,
-            'linear’, parallel_deriv_color’, 'vectorize_derivs’, 'simul_coloring’, 'simul_map’,
-            'cache_linear_solution’]
+            ['lower', 'upper', 'equals', ref', 'ref0', 'indices', 'index', adder', 'scaler',
+            'linear', parallel_deriv_color', 'vectorize_derivs', 'simul_coloring', 'simul_map',
+            'cache_linear_solution']
         objs_opts : list of str
             List of optional columns to be displayed in the objs table.
             Allowed values are:
