@@ -156,7 +156,7 @@ class SqliteRecorder(BaseRecorder):
                 self.cursor.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
                                     "model_viewer_data BLOB)")
                 self.cursor.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
-                                    "scaling_factors BLOB, user_metadata BLOB)")
+                                    "scaling_factors BLOB, component_metadata BLOB)")
                 self.cursor.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
                                     "solver_options BLOB, solver_class TEXT)")
 
@@ -383,7 +383,7 @@ class SqliteRecorder(BaseRecorder):
         if not path:
             path = 'root'
         with self.con:
-            self.con.execute("INSERT INTO system_metadata(id, scaling_factors, user_metadata) \
+            self.con.execute("INSERT INTO system_metadata(id, scaling_factors, component_metadata) \
                               VALUES(?,?, ?)",
                              (path, sqlite3.Binary(scaling_factors),
                               sqlite3.Binary(pickled_metadata)))
