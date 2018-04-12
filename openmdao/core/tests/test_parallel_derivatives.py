@@ -605,7 +605,6 @@ class PartialDependGroup(Group):
 
 
 import traceback
-from openmdao.devtools.itrace import tracing
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ParDerivColorFeatureTestCase(unittest.TestCase):
@@ -641,18 +640,17 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
             p = Problem(model=PartialDependGroup())
             p.setup(vector_class=PETScVector, check=False, mode='rev')
 
-            with tracing():
-                p.run_model()
+            p.run_model()
 
-                elapsed_rev = time.time()
-                J = p.compute_totals(of, wrt, return_format='dict')
-                elapsed_rev = time.time() - elapsed_rev
+            elapsed_rev = time.time()
+            J = p.compute_totals(of, wrt, return_format='dict')
+            elapsed_rev = time.time() - elapsed_rev
 
-                assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
-                assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
+            assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
+            assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
 
-                # make sure that rev mode is faster than fwd mode
-                self.assertGreater(elapsed_fwd / elapsed_rev, 1.0)
+            # make sure that rev mode is faster than fwd mode
+            self.assertGreater(elapsed_fwd / elapsed_rev, 1.0)
         except:
             traceback.print_exc()
             sys.stderr.flush()
