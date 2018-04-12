@@ -1363,15 +1363,14 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertTrue(output.count("Objectives") > 1,
                         "Should be more than one objective header printed")
 
-        self.assertTrue(len([s for s in output if s.startswith('p1.x')]) > 1,
+        self.assertTrue(len([s for s in output if s.startswith("{'p1.x")]) > 1,
                         "Should be more than one p1.x printed")
-        self.assertTrue(len([s for s in output if s.startswith('p2.y')]) > 1,
+        self.assertTrue(len([s for s in output if "'p2.y'" in s]) > 1,
                         "Should be more than one p2.y printed")
-        self.assertTrue(len([s for s in output if s.startswith('con.c')]) > 1,
+        self.assertTrue(len([s for s in output if s.startswith("{'con.c")]) > 1,
                         "Should be more than one con.c printed")
-        self.assertTrue(len([s for s in output if s.startswith('comp.f_xy')]) > 1,
+        self.assertTrue(len([s for s in output if s.startswith("{'comp.f_xy")]) > 1,
                         "Should be more than one comp.f_xy printed")
-
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 class TestPyoptSparseFeature(unittest.TestCase):
