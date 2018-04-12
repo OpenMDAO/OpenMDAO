@@ -47,6 +47,7 @@ before_install:
 - ./miniconda.sh -b  -p /home/travis/miniconda;
 - export PATH=/home/travis/miniconda/bin:$PATH
 
+
 - if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
     MASTER_BUILD=1;
   fi
@@ -81,6 +82,9 @@ install:
 - if [ "$MPI" ]; then
     pip install git+https://bitbucket.org/mpi4py/mpi4py@2.0.0;
     pip install git+https://bitbucket.org/petsc/petsc4py@3.7.0;
+    export OMPI_MCA_orte_base_help_aggregate=0;
+    export OMPI_MCA_mpi_abort_print_stack=1;
+    export OMPI_MCA_mpi_param_check=1fi;
   fi
 
 - pip install redbaron
