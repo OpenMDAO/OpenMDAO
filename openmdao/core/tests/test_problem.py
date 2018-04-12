@@ -1329,18 +1329,13 @@ class TestProblem(unittest.TestCase):
                                desvar_opts=['lower', 'upper', 'ref', 'ref0',
                                             'indices', 'adder', 'scaler',
                                             'parallel_deriv_color',
-                                            'vectorize_derivs', 'simul_deriv_color',
-                                            'cache_linear_solution'],
+                                            'vectorize_derivs'],
                                cons_opts=['lower', 'upper', 'equals', 'ref', 'ref0',
-                                          'indices', 'adder', 'scaler', 'linear',
-                                          'parallel_deriv_color',
-                                          'vectorize_derivs', 'simul_deriv_color', 'simul_map',
-                                          'cache_linear_solution'],
+                                          'indices', 'adder', 'scaler', 'linear'],
                                objs_opts=['ref', 'ref0',
                                           'indices', 'adder', 'scaler',
                                           'parallel_deriv_color',
-                                          'vectorize_derivs', 'simul_deriv_color', 'simul_map',
-                                          'cache_linear_solution'],
+                                          'vectorize_derivs']
                                )
 
 if __name__ == "__main__":
