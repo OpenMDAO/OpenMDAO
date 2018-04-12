@@ -142,7 +142,7 @@ of full values of the array below the row. The format is affected by the values 
     :layout: interleave
 
 *Listing Problem Variables*
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :code:`Problem` has a method :code:`list_problem_vars` which prints out the values and metadata for design,
 constraint, and objective variables.
@@ -152,6 +152,41 @@ constraint, and objective variables.
 
 The user can optionally print out a variety of metadata. In this example, all the metadata is printed. The
 :code:`print_arrays` option is also set to true so that full array values are printed.
+
+.. raw:: directive
+    ----------------
+    Design Variables
+    ----------------
+    name  value               size  lower   upper            ref   ref0  indices  adder  scaler  parallel_deriv_color  vectorize_derivs  simul_deriv_color  cache_linear_solution
+    ----  ------------------  ----  ------  ---------------  ----  ----  -------  -----  ------  --------------------  ----------------  -----------------  ---------------------
+    pz.z  |1.97763888351|     2     |10.0|  |14.1421356237|  None  None  None     None   None    None                  False             None               False
+          value:
+          [ 1.97763888  0.        ]
+
+          lower:
+          [-10.   0.]
+
+          upper:
+          [ 10.  10.]
+
+    px.x  [  2.03071135e-15]  1     0.0     10.0             None  None  None     None   None    None                  False             None               False
+
+    -----------
+    Constraints
+    -----------
+    name           value               size  lower                     upper  equals  ref   ref0  indices  adder  scaler  linear  parallel_deriv_color  vectorize_derivs  simul_deriv_color  simul_map  cache_linear_solution
+    -------------  ------------------  ----  ------------------------  -----  ------  ----  ----  -------  -----  ------  ------  --------------------  ----------------  -----------------  ---------  ---------------------
+    con_cmp1.con1  [ -1.22025501e-10]  1     -1.7976931348623157e+308  0.0    None    None  None  None     None   None    False   None                  False             None               None       False
+    con_cmp2.con2  [-20.24472223]      1     -1.7976931348623157e+308  0.0    None    None  None  None     None   None    False   None                  False             None               None       False
+
+    ----------
+    Objectives
+    ----------
+    name         value          size  ref   ref0  indices  adder  scaler  parallel_deriv_color  vectorize_derivs  simul_deriv_color  simul_map  cache_linear_solution
+    -----------  -------------  ----  ----  ----  -------  -----  ------  --------------------  ----------------  -----------------  ---------  ---------------------
+    obj_cmp.obj  [ 3.18339395]  1     None  None  None     None   None    None                  False             None               None       False
+
+
 
 .. embed-code::
     openmdao.core.tests.test_problem.TestProblem.test_feature_list_problem_vars
