@@ -1,5 +1,5 @@
 """
-Case generator for Design-of-Experiments Driver implementing the Uniform method..
+Case generator for Design-of-Experiments Driver implementing the Uniform method.
 """
 import numpy as np
 

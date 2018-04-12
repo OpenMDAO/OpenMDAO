@@ -11,10 +11,11 @@ import platform
 import numpy as np
 
 from openmdao.api import Problem, ExplicitComponent, IndepVarComp, SqliteRecorder, CaseReader
+
 from openmdao.drivers.doe_driver import DOEDriver
+
 from openmdao.drivers.uniform_generator import UniformGenerator
-from openmdao.drivers.pyDOE_generators import FullFactorialGenerator, PlackettBurmanGenerator, \
-    LatinHypercubeGenerator
+from openmdao.drivers.pyDOE_generators import *
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.utils.assert_utils import assert_rel_error
@@ -42,7 +43,7 @@ class ParaboloidArray(ExplicitComponent):
         outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
 
 
-class TestDOEDriverErrors(unittest.TestCase):
+class TestErrors(unittest.TestCase):
 
     def test_generator_check(self):
         prob = Problem()
@@ -60,6 +61,28 @@ class TestDOEDriverErrors(unittest.TestCase):
         self.assertEqual(str(err.exception),
                          "DOEDriver requires an instance of DOEGenerator, "
                          "but an instance of Problem was found.")
+
+    def test_generator_method(self):
+        # error that could occur only when using/extending the base class
+        from openmdao.drivers.pyDOE_generators import _FactorialGenerator
+
+        with self.assertRaises(ValueError) as err:
+            _FactorialGenerator('blah')
+
+        self.assertEqual(str(err.exception),
+                         "Invalid method specified for generator: blah. "
+                         "Method must be one of ['fullfact', 'pbdesign'].")
+
+        # error that could occur only if the _method attribute is tampered with
+        ff = FullFactorialGenerator()
+        ff._method = 'blah'
+
+        with self.assertRaises(RuntimeError) as err:
+            list(ff({}))
+
+        self.assertEqual(str(err.exception),
+                         "Invalid method specified for generator: blah. "
+                         "Method must be one of ['fullfact', 'pbdesign'].")
 
 
 class TestDOEDriver(unittest.TestCase):
@@ -301,18 +324,18 @@ class TestDOEDriver(unittest.TestCase):
         model = prob.model
 
         indep = model.add_subsystem('indep', IndepVarComp())
-        indep.add_output('x1', 0.0)
-        indep.add_output('y1', 0.0)
+        indep.add_output('x', 0.0)
+        indep.add_output('y', 0.0)
 
-        model.add_subsystem('comp1', Paraboloid())
+        model.add_subsystem('comp', Paraboloid())
 
-        model.connect('indep.x1', 'comp1.x')
-        model.connect('indep.y1', 'comp1.y')
+        model.connect('indep.x', 'comp.x')
+        model.connect('indep.y', 'comp.y')
 
-        model.add_design_var('indep.x1', lower=0., upper=upper)
-        model.add_design_var('indep.y1', lower=0., upper=upper)
+        model.add_design_var('indep.x', lower=0., upper=upper)
+        model.add_design_var('indep.y', lower=0., upper=upper)
 
-        model.add_objective('comp1.f_xy')
+        model.add_objective('comp.f_xy')
 
         prob.driver = DOEDriver(LatinHypercubeGenerator(samples=samples, criterion='c'))
         prob.driver.add_recorder(SqliteRecorder("CASES.sql"))
@@ -329,24 +352,25 @@ class TestDOEDriver(unittest.TestCase):
         # equal size buckets and each variable should have a value in each bucket
         bucket_size = upper/samples
         all_buckets = set(range(samples))
-        x1_buckets = set()
-        y1_buckets = set()
 
-        # with criterion of 'center', sample values should be in the center of a bucket
+        x_buckets_filled = set()
+        y_buckets_filled = set()
+
+        # with criterion of 'center', each value should be in the center of a bucket
         valid_values = [round(bucket_size*(bucket + 1/2), 3) for bucket in all_buckets]
 
         for n in range(cases.num_cases):
-            x1 = cases.get_case(n).desvars['indep.x1']
-            y1 = cases.get_case(n).desvars['indep.y1']
+            x = cases.get_case(n).desvars['indep.x']
+            y = cases.get_case(n).desvars['indep.y']
 
-            x1_buckets.add(int(x1/bucket_size))
-            y1_buckets.add(int(y1/bucket_size))
+            x_buckets_filled.add(int(x/bucket_size))
+            y_buckets_filled.add(int(y/bucket_size))
 
-            self.assertTrue(round(x1, 3) in valid_values, '%f not in %s' % (x1, valid_values))
-            self.assertTrue(round(y1, 3) in valid_values, '%f not in %s' % (x1, valid_values))
+            self.assertTrue(round(x, 3) in valid_values, '%f not in %s' % (x, valid_values))
+            self.assertTrue(round(y, 3) in valid_values, '%f not in %s' % (y, valid_values))
 
-        self.assertEqual(x1_buckets, all_buckets)
-        self.assertEqual(y1_buckets, all_buckets)
+        self.assertEqual(x_buckets_filled, all_buckets)
+        self.assertEqual(y_buckets_filled, all_buckets)
 
 
 if __name__ == "__main__":

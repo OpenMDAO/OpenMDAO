@@ -35,7 +35,7 @@ class _FactorialGenerator(DOEGenerator):
 
     _supported_methods = ['fullfact', 'pbdesign']
 
-    def __init__(self, method, levels):
+    def __init__(self, method, levels=2):
         """
         Initialize the FullFactorialGenerator.
 
@@ -48,9 +48,9 @@ class _FactorialGenerator(DOEGenerator):
         super(_FactorialGenerator, self).__init__()
 
         if method not in self._supported_methods:
-            raise RuntimeError('Invalid method specified for generator: %s. '
-                               'Method must be one of %s.' %
-                               (method, _supported_methods))
+            raise ValueError('Invalid method specified for generator: %s. '
+                             'Method must be one of %s.' %
+                             (method, self._supported_methods))
 
         self._method = method
         self._levels = levels
@@ -80,7 +80,9 @@ class _FactorialGenerator(DOEGenerator):
             ff = pyDOE.pbdesign(size)
             ff[ff < 0] = 0  # replace -1 with zero
         else:
-            raise RuntimeError("Invalid method for _FactorialGenerator.")
+            raise RuntimeError('Invalid method specified for generator: %s. '
+                               'Method must be one of %s.' %
+                               (self._method, self._supported_methods))
 
         # generate values for each level for each design variable
         # over the range of that varable's lower to upper bound
@@ -153,7 +155,7 @@ class PlackettBurmanGenerator(_FactorialGenerator):
 
 class LatinHypercubeGenerator(DOEGenerator):
     """
-    Base class for DOE case generators implementing the pyDOE factorial methods.
+    DOE case generators implementing Latin hypercube method via pyDOE.
 
     Attributes
     ----------
@@ -234,15 +236,12 @@ class LatinHypercubeGenerator(DOEGenerator):
             self._samples = size
 
         # generate design
-        print('criterion:', self._criterion)
         lhd = pyDOE.lhs(size, samples=self._samples,
                         criterion=self._criterion,
                         iterations=self._iterations)
-        print(lhd)
 
         # generate values for each level for each design variable
         # over the range of that varable's lower to upper bound
-
         # rows = vars (# rows/var = var size), cols = levels
         values = np.zeros((size, self._samples))
 
