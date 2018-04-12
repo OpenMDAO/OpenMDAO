@@ -52,4 +52,17 @@ The implementation of each method will be illustrated using a simple explicit co
   .. embed-code::
       openmdao.core.tests.test_expl_comp.RectangleJacVec.compute_jacvec_product
 
-Note that the last two are optional, because the class can implement one, the other, or neither if the user wants to use the finite-difference or complex-step method.
+  [Optional] Provide the partial derivatives as a matrix-matrix product. If :code:`mode` is :code:`'fwd'`, this method must
+  compute :math:`d\_{outputs} = J \cdot d\_{inputs}`, where :math:`J` is the partial derivative Jacobian, and where both
+  d_outputs and d_inputs are matrices instead of vectors. If :code:`mode` is :code:`'rev'`, this method must similarly
+  compute :math:`d\_{inputs} = J^T \cdot d\_{outputs}`. Note that in this case, the code in compute_multi_jacvec_product is
+  the same as the code in compute_jacvec_product. This won't always be the case, depending on the math operations that
+  are required for multiplying by a matrix versus multiplying by a vector.
+
+  This method is only used when "vectorize_derivs" is set to True on a design variable or response.
+
+  .. embed-code::
+      openmdao.core.tests.test_matmat.RectangleCompVectorized.compute_multi_jacvec_product
+
+Note that the last three are optional, because the class can implement compute_partials, one or both of compute_jacvec_product and
+compute_multi_jacvec_product, or neither if the user wants to use the finite-difference or complex-step method.

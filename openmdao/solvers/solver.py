@@ -5,6 +5,7 @@ from __future__ import division, print_function
 from six import iteritems
 from collections import OrderedDict
 import os
+import pprint
 import re
 
 import numpy as np
@@ -608,8 +609,8 @@ class NonlinearSolver(Solver):
             for vec_type, vec in iteritems(self._err_cache):
                 out_str += '\n'
                 out_str += '# %s %ss\n' % (vec._name, vec._typ)
-                for abs_name in sorted(vec._views.keys()):
-                    out_str += '%s = %s\n' % (abs_name, repr(vec._views[abs_name]))
+                out_str += pprint.pformat(vec._views)
+                out_str += '\n'
 
             print(out_str)
 

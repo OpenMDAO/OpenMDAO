@@ -177,8 +177,10 @@ packages = [
     'test_suite.components',
     'vectors',
 ]
-from openmdao.docs._utils.generate_sourcedocs import generate_docs
-generate_docs("..", "../..", packages)
+
+if os.path.isfile("make_sourcedocs"):
+    from openmdao.docs._utils.generate_sourcedocs import generate_docs
+    generate_docs("..", "../..", packages)
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
