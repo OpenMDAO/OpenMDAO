@@ -15,3 +15,5 @@ Working with Derivatives
     check_total_derivatives.rst
     picking_mode.rst
     simul_derivs.rst
+    sparse_totals.rst
+

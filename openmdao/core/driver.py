@@ -117,6 +117,8 @@ class Driver(object):
         A combined dict containing entries from _remote_cons and _remote_objs.
     _simul_coloring_info : tuple of dicts
         A data structure describing coloring for simultaneous derivs.
+    _total_jac_sparsity : dict, str, or None
+        Specifies sparsity of sub-jacobians of the total jacobian. Only used by pyOptSparseDriver.
     _res_jacs : dict
         Dict of sparse subjacobians for use with certain optimizers, e.g. pyOptSparseDriver.
     _total_jac : _TotalJacInfo or None
@@ -186,6 +188,7 @@ class Driver(object):
         self.supports.declare('gradients', types=bool, default=False)
         self.supports.declare('active_set', types=bool, default=False)
         self.supports.declare('simultaneous_derivatives', types=bool, default=False)
+        self.supports.declare('total_jac_sparsity', types=bool, default=False)
 
         # Debug printing.
         self.debug_print = OptionsDictionary()
@@ -209,6 +212,7 @@ class Driver(object):
         self.supports.declare('integer_design_vars', types=bool, default=False)
 
         self._simul_coloring_info = None
+        self._total_jac_sparsity = None
         self._res_jacs = {}
         self._total_jac = None
 
@@ -385,7 +389,7 @@ class Driver(object):
             self._rec_mgr.record_metadata(self)
 
         # set up simultaneous deriv coloring
-        if (coloring_mod._use_simul_coloring and self._simul_coloring_info and
+        if (coloring_mod._use_sparsity and self._simul_coloring_info and
                 self.supports['simultaneous_derivatives']):
             if problem._mode == 'fwd':
                 self._setup_simul_coloring(problem._mode)
@@ -807,7 +811,7 @@ class Driver(object):
 
     def set_simul_deriv_color(self, simul_info):
         """
-        Set the coloring (and possibly the sub-jacobian sparsity) for simultaneous derivatives.
+        Set the coloring (and possibly the sub-jac sparsity) for simultaneous total derivatives.
 
         Parameters
         ----------
@@ -863,6 +867,39 @@ class Driver(object):
             raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
                                self._get_name())
 
+    def set_total_jac_sparsity(self, sparsity):
+        """
+        Set the sparsity of sub-jacobians of the total jacobian.
+
+        Note: This currently will have no effect if you are not using the pyOptSparseDriver.
+
+        Parameters
+        ----------
+        sparsity : str or dict
+
+            ::
+
+                # Sparsity is a nested dictionary where the outer keys are response
+                # names, the inner keys are design variable names, and the value is a tuple of
+                # the form (row_list, col_list, shape).
+                {
+                    resp1: {
+                        dv1: (rows, cols, shape),  # for sub-jac d_resp1/d_dv1
+                        dv2: (rows, cols, shape),
+                          ...
+                    },
+                    resp2: {
+                        ...
+                    }
+                    ...
+                }
+        """
+        if self.supports['total_jac_sparsity']:
+            self._total_jac_sparsity = sparsity
+        else:
+            raise RuntimeError("Driver '%s' does not support setting of total jacobian sparsity." %
+                               self._get_name())
+
     def _setup_simul_coloring(self, mode='fwd'):
         """
         Set up metadata for simultaneous derivative solution.
@@ -877,7 +914,7 @@ class Driver(object):
                                       "in 'rev' mode")
 
         # command line simul_coloring uses this env var to turn pre-existing coloring off
-        if not coloring_mod._use_simul_coloring:
+        if not coloring_mod._use_sparsity:
             return
 
         prom2abs = self._problem.model._var_allprocs_prom2abs_list['output']
@@ -889,9 +926,12 @@ class Driver(object):
                 column_lists, row_map = tup[:2]
                 if len(tup) > 2:
                     sparsity = tup[2]
-                else:
-                    sparsity = None
-                self._simul_coloring_info = column_lists, row_map, sparsity
+                    if self._total_jac_sparsity is not None:
+                        raise RuntimeError("Total jac sparsity was set in both _simul_coloring_info"
+                                           " and _total_jac_sparsity.")
+                    self._total_jac_sparsity = sparsity
+
+                self._simul_coloring_info = column_lists, row_map
 
     def _pre_run_model_debug_print(self):
         """
