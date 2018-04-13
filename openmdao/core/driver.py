@@ -4,6 +4,7 @@ from __future__ import print_function
 import os
 import json
 from collections import OrderedDict
+import pprint
 import warnings
 
 from six import iteritems, itervalues, string_types
@@ -910,8 +911,7 @@ class Driver(object):
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Design Vars")
                 if desvar_vals:
-                    for name, value in iteritems(desvar_vals):
-                        print("{}: {}".format(name, repr(value)))
+                    pprint.pprint(desvar_vals)
                 else:
                     print("None")
                 print()
@@ -925,8 +925,7 @@ class Driver(object):
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Nonlinear constraints")
                 if cons:
-                    for name, value in iteritems(cons):
-                        print("{}: {}".format(name, repr(value)))
+                    pprint.pprint(cons)
                 else:
                     print("None")
                 print()
@@ -936,8 +935,7 @@ class Driver(object):
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Linear constraints")
                 if cons:
-                    for name, value in iteritems(cons):
-                        print("{}: {}".format(name, repr(value)))
+                    pprint.pprint(cons)
                 else:
                     print("None")
                 print()
@@ -947,8 +945,7 @@ class Driver(object):
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Objectives")
                 if objs:
-                    for name, value in iteritems(objs):
-                        print("{}: {}".format(name, repr(value)))
+                    pprint.pprint(objs)
                 else:
                     print("None")
                 print()
