@@ -44,6 +44,9 @@ def format_singluar_error(err, system, mtx):
 
     loc = int(err_msg.split('number ')[1].split(' is exactly')[0])
 
+    # Lapack:DGETRF outputs INFO, which uses fortran numbering.
+    loc -= 1
+
     col_norm = np.linalg.norm(mtx[:, loc - 1])
     row_norm = np.linalg.norm(mtx[loc - 1, :])
 
@@ -55,10 +58,9 @@ def format_singluar_error(err, system, mtx):
     n = 0
     varname = "Unknown"
     for name in system._var_allprocs_abs_names['output']:
-        relname = system._var_abs2prom['output'][name]
-        n += len(system._outputs[relname])
+        n += len(system._outputs._views_flat[name])
         if loc <= n:
-            varname = relname
+            varname = name
             break
 
     msg = "Singular entry found in '{}' for {} associated with state/residual '{}'."
