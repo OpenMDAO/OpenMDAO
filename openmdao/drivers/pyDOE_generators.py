@@ -18,7 +18,7 @@ import pyDOE
 
 class _Generator(DOEGenerator):
     """
-    Base class for DOE case generators implementing the pyDOE factorial methods.
+    Base class for DOE case generators implementing pyDOE methods.
 
     Attributes
     ----------
@@ -27,13 +27,9 @@ class _Generator(DOEGenerator):
         lower and upper bound.
     _supported_methods : list
         supported pyDOE function names.
-    _method : string
-        the pyDOE function to use.
     """
 
-    _supported_methods = ['fullfact', 'pbdesign', 'bbdesign']
-
-    def __init__(self, method, levels=2):
+    def __init__(self, levels=2):
         """
         Initialize the FullFactorialGenerator.
 
@@ -44,14 +40,6 @@ class _Generator(DOEGenerator):
             lower and upper bound. Defaults to 2.
         """
         super(_Generator, self).__init__()
-
-        if method not in self._supported_methods:
-            raise ValueError("Invalid method '%s' specified for %s. "
-                             "Method must be one of %s." %
-                             (method, self.__class__.__name__,
-                              self._supported_methods))
-
-        self._method = method
         self._levels = levels
 
     def __call__(self, design_vars):
@@ -72,24 +60,7 @@ class _Generator(DOEGenerator):
 
         size = sum([meta['size'] for name, meta in iteritems(design_vars)])
 
-        # generate indices
-        if self._method is 'fullfact':
-            doe = pyDOE.fullfact([self._levels]*size)
-        elif self._method is 'pbdesign':
-            doe = pyDOE.pbdesign(size)
-            doe[doe < 0] = 0  # replace -1 with zero
-        elif self._method is 'bbdesign':
-            if size < 3:
-                raise RuntimeError("Total size of design variables is %d,"
-                                   "but must be at least 3 when using %s. " %
-                                   (size, self.__class__.__name__))
-            doe = pyDOE.bbdesign(size, center=self._center)
-            doe = doe + 1  # replace [-1, 0, 1] with [0, 1, 2]
-        else:
-            raise RuntimeError("Invalid method '%s' specified for %s. "
-                               "Method must be one of %s." %
-                               (self._method, self.__class__.__name__,
-                                self._supported_methods))
+        doe = self._generate_design(size)
 
         # generate values for each level for each design variable
         # over the range of that varable's lower to upper bound
@@ -121,13 +92,29 @@ class _Generator(DOEGenerator):
                 size = meta['size']
                 val = np.zeros(size)
                 for k in range(size):
-                    idx = idxs[var+k]
-                    val[k] = values[row+k][idx]
+                    idx = idxs[var + k]
+                    val[k] = values[row + k][idx]
                 retval.append((name, val))
                 var += 1
                 row += size
 
             yield retval
+
+    def _generate_design(self, size):
+        """
+        Generate DOE design.
+
+        Parameters
+        ----------
+        size : int
+            The number of factors for the design.
+
+        Returns
+        -------
+        ndarray
+            The design matrix as a size x levels array of indices.
+        """
+        pass
 
 
 class FullFactorialGenerator(_Generator):
@@ -135,17 +122,21 @@ class FullFactorialGenerator(_Generator):
     DOE case generator implementing the Full Factorial method.
     """
 
-    def __init__(self, levels=2):
+    def _generate_design(self, size):
         """
-        Initialize the FullFactorialGenerator.
+        Generate a full factorial DOE design.
 
         Parameters
         ----------
-        levels : int, optional
-            The number of evenly spaced levels between each design variable
-            lower and upper bound. Defaults to 2.
+        size : int
+            The number of factors for the design.
+
+        Returns
+        -------
+        ndarray
+            The design matrix as a size x levels array of indices.
         """
-        super(FullFactorialGenerator, self).__init__('fullfact', levels)
+        return pyDOE.fullfact([self._levels] * size)
 
 
 class PlackettBurmanGenerator(_Generator):
@@ -157,7 +148,27 @@ class PlackettBurmanGenerator(_Generator):
         """
         Initialize the PlackettBurmanGenerator.
         """
-        super(PlackettBurmanGenerator, self).__init__('pbdesign', 2)
+        super(PlackettBurmanGenerator, self).__init__(levels=2)
+
+    def _generate_design(self, size):
+        """
+        Generate a Plackett-Burman DOE design.
+
+        Parameters
+        ----------
+        size : int
+            The number of factors for the design.
+
+        Returns
+        -------
+        ndarray
+            The design matrix as a size x levels array of indices.
+        """
+        doe = pyDOE.pbdesign(size)
+
+        doe[doe < 0] = 0  # replace -1 with zero
+
+        return doe
 
 
 class BoxBehnkenGenerator(_Generator):
@@ -170,18 +181,41 @@ class BoxBehnkenGenerator(_Generator):
         The number of center points to include.
     """
 
-    def __init__(self, center=1):
+    def __init__(self, center=None):
         """
         Initialize the BoxBehnkenGenerator.
 
         Parameters
         ----------
         center : int, optional
-            The number of center points to include (default = 1).
+            The number of center points to include (default = None).
         """
-        super(BoxBehnkenGenerator, self).__init__('bbdesign', 3)
-
+        super(BoxBehnkenGenerator, self).__init__(levels=3)
         self._center = center
+
+    def _generate_design(self, size):
+        """
+        Generate a Box-Behnken DOE design.
+
+        Parameters
+        ----------
+        size : int
+            The number of factors for the design.
+
+        Returns
+        -------
+        ndarray
+            The design matrix as a size x levels array of indices.
+        """
+        # generate indices
+        if size < 3:
+            raise RuntimeError("Total size of design variables is %d,"
+                               "but must be at least 3 when using %s. " %
+                               (size, self.__class__.__name__))
+
+        doe = pyDOE.bbdesign(size, center=self._center)
+
+        return doe + 1  # replace [-1, 0, 1] with [0, 1, 2]
 
 
 class LatinHypercubeGenerator(DOEGenerator):
@@ -237,7 +271,7 @@ class LatinHypercubeGenerator(DOEGenerator):
             raise ValueError("Invalid criterion '%s' specified for %s. "
                              "Must be one of %s." %
                              (criterion, self.__class__.__name__,
-                             self._supported_criterion))
+                              self._supported_criterion))
 
         self._samples = samples
         self._criterion = criterion
@@ -285,7 +319,7 @@ class LatinHypercubeGenerator(DOEGenerator):
                 size = meta['size']
                 val = np.zeros(size)
                 for k in range(size):
-                    sample = row[col+k]
+                    sample = row[col + k]
 
                     lower = meta['lower']
                     if isinstance(lower, np.ndarray):
@@ -295,7 +329,7 @@ class LatinHypercubeGenerator(DOEGenerator):
                     if isinstance(upper, np.ndarray):
                         upper = upper[k]
 
-                    val[k] = lower + sample*(upper-lower)
+                    val[k] = lower + sample * (upper - lower)
 
                 retval.append((name, val))
                 var += 1
