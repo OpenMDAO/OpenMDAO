@@ -13,7 +13,7 @@ import platform
 import numpy as np
 
 from openmdao.api import Problem, ExplicitComponent, IndepVarComp, ExecComp, \
-    SqliteRecorder, CaseReader
+    SqliteRecorder, CaseReader, PETScVector
 
 from openmdao.drivers.doe_driver import DOEDriver
 from openmdao.drivers.doe_generators import UniformGenerator, FullFactorialGenerator, \
@@ -488,6 +488,69 @@ class TestDOEDriver(unittest.TestCase):
 
         self.assertEqual(x_buckets_filled, all_buckets)
         self.assertEqual(y_buckets_filled, all_buckets)
+
+
+@unittest.skipUnless(PETScVector, "PETSc is required.")
+class TestParallelDOE(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix='TestDOEDriver-')
+        os.chdir(self.tempdir)
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
+
+    def test_full_factorial(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.add_design_var('x', lower=0.0, upper=1.0)
+        model.add_design_var('y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        prob.driver = DOEDriver(FullFactorialGenerator(levels=2))
+        prob.driver.add_recorder(SqliteRecorder("CASES.sql"))
+        prob.driver.options['run_parallel'] =  True
+
+        prob.setup(vector_class=PETScVector)
+        prob.run_driver()
+        prob.cleanup()
+
+        expected = {
+            0: {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
+            1: {'x': np.array([.5]), 'y': np.array([0.]), 'f_xy': np.array([19.25])},
+            2: {'x': np.array([1.]), 'y': np.array([0.]), 'f_xy': np.array([17.00])},
+
+            3: {'x': np.array([0.]), 'y': np.array([.5]), 'f_xy': np.array([26.25])},
+            4: {'x': np.array([.5]), 'y': np.array([.5]), 'f_xy': np.array([23.75])},
+            5: {'x': np.array([1.]), 'y': np.array([.5]), 'f_xy': np.array([21.75])},
+
+            6: {'x': np.array([0.]), 'y': np.array([1.]), 'f_xy': np.array([31.00])},
+            7: {'x': np.array([.5]), 'y': np.array([1.]), 'f_xy': np.array([28.75])},
+            8: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
+        }
+
+        if model.comm.rank == 0:
+            cases = CaseReader("CASES.sql").driver_cases
+
+            # self.assertEqual(cases.num_cases, 4)
+
+            for n in range(cases.num_cases):
+                print(cases.get_case(n).desvars['x'], cases.get_case(n).desvars['y'])
+                # self.assertEqual(cases.get_case(n).desvars['x'], expected[n]['x'])
+                # self.assertEqual(cases.get_case(n).desvars['y'], expected[n]['y'])
+                # self.assertEqual(cases.get_case(n).objectives['f_xy'], expected[n]['f_xy'])
 
 
 if __name__ == "__main__":

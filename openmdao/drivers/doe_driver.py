@@ -42,6 +42,11 @@ class DOEDriver(Driver):
     """
     Design-of-Experiments Driver.
 
+    Options
+    -------
+    options['run_parallel'] :  bool
+        If True and running under MPI, cases will run in parallel. Default is False.
+
     Attributes
     ----------
     _generator : DOEGenerator
@@ -67,9 +72,30 @@ class DOEDriver(Driver):
                                 "but an instance of %s was found."
                                 % type(generator).__name__)
 
+        super(DOEDriver, self).__init__()
+
         self._generator = generator
 
-        super(DOEDriver, self).__init__()
+        self.options.declare('run_parallel', default=False,
+                             desc='Set to True to run the cases in parallel.')
+
+    def _setup_driver(self, problem):
+        """
+        Prepare the driver for execution.
+
+        This is the final thing to run during setup.
+
+        Parameters
+        ----------
+        problem : <Problem>
+            Pointer to the containing problem.
+        """
+        super(DOEDriver, self)._setup_driver(problem)
+
+        if self.options['run_parallel']:
+            self._comm = self._problem.comm
+        else:
+            self._comm = None
 
     def run(self):
         """
@@ -82,10 +108,13 @@ class DOEDriver(Driver):
         """
         self.iter_count = 0
 
-        # This runs a DOE in serial on a single process.
-        model = self._problem.model
+        if self._comm:
+            case_gen = self._parallel_generator
+        else:
+            case_gen = self._generator
 
-        for case in self._generator(self._designvars):
+        for case in case_gen(self._designvars):
+            print(self._comm.rank, 'running case:', case)
             metadata = self._prep_case(case, self.iter_count)
 
             terminate, exc = self._try_case(metadata)
@@ -166,3 +195,30 @@ class DOEDriver(Driver):
                 terminate = True
 
         return terminate, exc
+
+    def _parallel_generator(self, design_vars):
+        """
+        Generate case for this processor when running under MPI.
+
+        Parameters
+        ----------
+        design_vars : dict
+            Dictionary of design variables for which to generate values.
+
+        Yields
+        ------
+        list
+            list of name, value tuples for the design variables.
+        """
+        rank = self._comm.rank
+        size = self._comm.size
+
+        # exhausted = False
+
+        for i, case in enumerate(self._generator(design_vars)):
+            if rank == i % size:
+                yield case
+            else:
+                print(self._comm.rank, 'skipping', i)
+
+        # yield None
