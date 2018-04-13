@@ -298,6 +298,15 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(cases.get_case(n).desvars['z'], expected[n]['z'])
 
     def test_latin_hypercube(self):
+        samples = 4
+
+        bounds = np.array([
+            [-1, -10],  # lower bounds for x and y
+            [ 1,  10]   # upper bounds for x and y
+        ])
+        xlb, xub = bounds[0][0], bounds[1][0]
+        ylb, yub = bounds[0][1], bounds[1][1]
+
         prob = Problem()
         model = prob.model
 
@@ -305,8 +314,8 @@ class TestDOEDriver(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        model.add_design_var('x', lower=-1.0, upper=1.0)
-        model.add_design_var('y', lower=-10.0, upper=10.0)
+        model.add_design_var('x', lower=xlb, upper=xub)
+        model.add_design_var('y', lower=ylb, upper=yub)
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(LatinHypercubeGenerator(samples=4, seed=0))
@@ -316,6 +325,21 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
+        # the sample space for each variable should be divided into equal
+        # size buckets and each variable should have a value in each bucket
+        all_buckets = set(range(samples))
+
+        xlb, xub = bounds[0][0], bounds[1][0]
+        x_offset = 0 - xlb
+        x_bucket_size = xub - xlb
+        x_buckets_filled = set()
+
+        ylb, yub = bounds[0][1], bounds[1][1]
+        y_offset = 0 - ylb
+        y_bucket_size = yub - ylb
+        y_buckets_filled = set()
+
+        # expected values for seed = 0
         expected = {
             0: {'x': np.array([-0.19861831]), 'y': np.array([-6.42405317])},
             1: {'x': np.array([ 0.2118274]),  'y': np.array([ 9.458865])},
@@ -328,17 +352,36 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(cases.num_cases, 4)
 
         for n in range(cases.num_cases):
-            assert_rel_error(self, cases.get_case(n).desvars['x'], expected[n]['x'], 1e-4)
-            assert_rel_error(self, cases.get_case(n).desvars['y'], expected[n]['y'], 1e-4)
+            x = cases.get_case(n).desvars['x']
+            y = cases.get_case(n).desvars['y']
+
+            bucket = int((x+x_offset)/(x_bucket_size/samples))
+            x_buckets_filled.add(bucket)
+
+            bucket = int((y+y_offset)/(y_bucket_size/samples))
+            y_buckets_filled.add(bucket)
+
+            assert_rel_error(self, x, expected[n]['x'], 1e-4)
+            assert_rel_error(self, y, expected[n]['y'], 1e-4)
+
+        self.assertEqual(x_buckets_filled, all_buckets)
+        self.assertEqual(y_buckets_filled, all_buckets)
 
     def test_latin_hypercube_array(self):
+        samples = 4
+
+        bounds = np.array([
+            [-10, -50],  # lower bounds for x and y
+            [ 10,  50]   # upper bounds for x and y
+        ])
+
         prob = Problem()
         model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('xy', np.array([50., 50.])), promotes=['*'])
         model.add_subsystem('comp', ParaboloidArray(), promotes=['*'])
 
-        model.add_design_var('xy', lower=np.array([-10., -50.]), upper=np.array([10., 50.]))
+        model.add_design_var('xy', lower=bounds[0], upper=bounds[1])
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(LatinHypercubeGenerator(samples=4, seed=0))
@@ -348,6 +391,21 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
+        # the sample space for each variable should be divided into equal
+        # size buckets and each variable should have a value in each bucket
+        all_buckets = set(range(samples))
+
+        xlb, xub = bounds[0][0], bounds[1][0]
+        x_offset = 0 - xlb
+        x_bucket_size = xub - xlb
+        x_buckets_filled = set()
+
+        ylb, yub = bounds[0][1], bounds[1][1]
+        y_offset = 0 - ylb
+        y_bucket_size = yub - ylb
+        y_buckets_filled = set()
+
+        # expected values for seed = 0
         expected = {
             0: {'xy': np.array([-1.98618312, -32.12026584])},
             1: {'xy': np.array([ 2.118274,    47.29432502])},
@@ -360,12 +418,24 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(cases.num_cases, 4)
 
         for n in range(cases.num_cases):
-            assert_rel_error(self, cases.get_case(n).desvars['xy'][0], expected[n]['xy'][0], 1e-4)
-            assert_rel_error(self, cases.get_case(n).desvars['xy'][1], expected[n]['xy'][1], 1e-4)
+            x = cases.get_case(n).desvars['xy'][0]
+            y = cases.get_case(n).desvars['xy'][1]
+
+            bucket = int((x+x_offset)/(x_bucket_size/samples))
+            x_buckets_filled.add(bucket)
+
+            bucket = int((y+y_offset)/(y_bucket_size/samples))
+            y_buckets_filled.add(bucket)
+
+            assert_rel_error(self, x, expected[n]['xy'][0], 1e-4)
+            assert_rel_error(self, y, expected[n]['xy'][1], 1e-4)
+
+        self.assertEqual(x_buckets_filled, all_buckets)
+        self.assertEqual(y_buckets_filled, all_buckets)
 
     def test_latin_hypercube_center(self):
-        upper = 10.
         samples = 4
+        upper = 10.
 
         prob = Problem()
         model = prob.model
@@ -403,7 +473,7 @@ class TestDOEDriver(unittest.TestCase):
         x_buckets_filled = set()
         y_buckets_filled = set()
 
-        # with criterion of 'center', each value should be in the center of a bucket
+        # with criterion of 'center', each value should be in the center of it's bucket
         valid_values = [round(bucket_size*(bucket + 1/2), 3) for bucket in all_buckets]
 
         for n in range(cases.num_cases):

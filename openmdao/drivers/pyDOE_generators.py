@@ -18,7 +18,7 @@ import pyDOE
 
 class _Generator(DOEGenerator):
     """
-    Base class for DOE case generators implementing pyDOE methods.
+    Base class for DOE case generators implementing methods from pyDOE.
 
     Attributes
     ----------
@@ -207,7 +207,6 @@ class BoxBehnkenGenerator(_Generator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        # generate indices
         if size < 3:
             raise RuntimeError("Total size of design variables is %d,"
                                "but must be at least 3 when using %s. " %
