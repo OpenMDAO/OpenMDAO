@@ -142,6 +142,8 @@ def _get_full_disjoint(J, start, end):
 
         if len(full) > 1:
             full_disjoint.append(sorted(full))
+        else:
+            rows[col] = None
 
     return sorted(full_disjoint, key=lambda x: len(x)), rows
 
