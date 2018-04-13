@@ -47,7 +47,6 @@ before_install:
 - ./miniconda.sh -b  -p /home/travis/miniconda;
 - export PATH=/home/travis/miniconda/bin:$PATH
 
-
 - if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
     MASTER_BUILD=1;
   fi
@@ -82,14 +81,10 @@ install:
 - if [ "$MPI" ]; then
     pip install git+https://bitbucket.org/mpi4py/mpi4py@2.0.0;
     pip install git+https://bitbucket.org/petsc/petsc4py@3.7.0;
-    export OMPI_MCA_orte_base_help_aggregate=0;
-    export OMPI_MCA_mpi_abort_print_stack=1;
-    export OMPI_MCA_mpi_param_check=1fi;
   fi
 
 - pip install redbaron
-# - pip install git+https://github.com/OpenMDAO/testflo.git
-- pip install git+https://github.com/naylor-b/testflo.git
+- pip install git+https://github.com/OpenMDAO/testflo.git
 - pip install coverage
 - pip install git+https://github.com/swryan/coveralls-python@work
 - pip install .  # Not using -e on purpose here, to catch pkging errors
@@ -109,7 +104,7 @@ script:
 - if [ "$UPLOAD_DOCS" ]; then
     testflo -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*;
   else
-    testflo --pre_announce -s --timeout=60 openmdao;
+    testflo -n 1 --timeout=120 openmdao;
   fi
 
 
