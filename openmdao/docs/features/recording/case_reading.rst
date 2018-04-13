@@ -66,11 +66,18 @@ If we had not promoted `pz.z`, we would use:
     seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|6')
     print('Value of pz.z after 7th iteration of SLSQP =', seventh_slsqp_iteration_case.desvars['pz.z'])
 
-Finally, if a user would like to access metadata on a variable there is a `abs2meta` dictionary on the CaseReader. For example, if the user wanted the units of the `pz.z` variable they would use:
+If a user would like to access the user-defined metadata on a given system or the scaling factors, the CaseReader also has a `system_metadata` dictionary. Note that the case recorder does need to be explicitly added to a system in order for its metadata to be recorded. Accessing this data for `pz` would look like:
 
 .. code-block:: console
 
-    z_units = cr.abs2meta['pz.z']['units']
+    pz_metadata = cr.system_metadata['pz']['component_metadata']
+    pz_scaling = cr.system_metadata['pz']['scaling_factors']
+
+Finally, if a user would like to access variable metadata there is a `output2meta` dictionary and a `input2meta` dictionary on the CaseReader. For example, if the user wanted the units of the `pz.z` variable they would use:
+
+.. code-block:: console
+
+    z_units = cr.output2meta['z']['units']
 
 *Iterating Over Cases*
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -115,3 +122,17 @@ These methods use System cases and thus will only return variables on systems wh
 
     cr.list_inputs()
     cr.list_outputs()
+
+
+By default, both methods will give all recorded variables and, if the `values` parameter is set to True, the last recorded value of each variable. Using the `case_id` parameter, however, enables listing inputs and outputs for a single system case. For example, listing the first and last system outputs recorded would be:
+
+.. code-block:: console
+
+    cr.list_outputs(case_id=0)
+    cr.list_outputs(case_id=-1)
+
+But you can also choose to use a specific iteration coordinate:
+
+.. code-block:: console
+
+    cr.list_inputs(case_id='rank0:SLSQP|0|root._solve_nonlinear|0')
