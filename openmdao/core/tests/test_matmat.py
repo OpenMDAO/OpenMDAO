@@ -5,8 +5,108 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, \
-                         ScipyOptimizeDriver, DefaultVector, DenseJacobian, DirectSolver
+                         ScipyOptimizeDriver, DefaultVector, DenseJacobian, DirectSolver, \
+                         ImplicitComponent, LinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
+
+
+class QuadraticCompVectorized(ImplicitComponent):
+    """
+    A Simple Implicit Component representing a Quadratic Equation.
+
+    R(a, b, c, x) = ax^2 + bx + c
+
+    Solution via Quadratic Formula:
+    x = (-b + sqrt(b^2 - 4ac)) / 2a
+    """
+    def setup(self):
+        self.add_input('a', val=np.array([1.0, 2.0, 3.0]))
+        self.add_input('b', val=np.array([2.0, 3.0, 4.0]))
+        self.add_input('c', val=np.array([-1.0, -2.0, -3.0]))
+        self.add_output('x', val=np.array([.5, .5, .5]))
+
+        self.declare_partials(of='*', wrt='*')
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        a = inputs['a']
+        b = inputs['b']
+        c = inputs['c']
+        x = outputs['x']
+        residuals['x'] = a * x ** 2 + b * x + c
+
+    def solve_nonlinear(self, inputs, outputs):
+        a = inputs['a']
+        b = inputs['b']
+        c = inputs['c']
+        outputs['x'] = (-b + (b ** 2 - 4 * a * c) ** 0.5) / (2 * a)
+
+    def linearize(self, inputs, outputs, partials):
+        a = inputs['a']
+        b = inputs['b']
+        x = outputs['x']
+        self.inv_jac = 1.0 / (2 * a * x + b)
+
+    def apply_multi_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+        a = inputs['a']
+        b = inputs['b']
+        c = inputs['c']
+        x = outputs['x']
+        if mode == 'fwd':
+            if 'x' in d_residuals:
+                if 'x' in d_outputs:
+                    d_residuals['x'] += (2 * a * x + b) * d_outputs['x']
+                if 'a' in d_inputs:
+                    d_residuals['x'] += x ** 2 * d_inputs['a']
+                if 'b' in d_inputs:
+                    d_residuals['x'] += x * d_inputs['b']
+                if 'c' in d_inputs:
+                    d_residuals['x'] += d_inputs['c']
+        elif mode == 'rev':
+            if 'x' in d_residuals:
+                if 'x' in d_outputs:
+                    d_outputs['x'] += (2 * a * x + b) * d_residuals['x']
+                if 'a' in d_inputs:
+                    d_inputs['a'] += x ** 2 * d_residuals['x']
+                if 'b' in d_inputs:
+                    d_inputs['b'] += x * d_residuals['x']
+                if 'c' in d_inputs:
+                    d_inputs['c'] += d_residuals['x']
+
+    def solve_linear(self, d_outputs, d_residuals, mode):
+        if mode == 'fwd':
+            d_outputs['x'] = self.inv_jac * d_residuals['x']
+        elif mode == 'rev':
+            d_residuals['x'] = self.inv_jac * d_outputs['x']
+
+
+class RectangleCompVectorized(ExplicitComponent):
+    """
+    A simple Explicit Component that computes the area of a rectangle.
+    """
+    def setup(self):
+        self.add_input('length', val=np.array([3.0, 4.0, 5.0]))
+        self.add_input('width', val=np.array([1.0, 2.0, 3.0]))
+        self.add_output('area', shape=(3, ))
+
+        self.declare_partials('*', '*')
+
+    def compute(self, inputs, outputs):
+        outputs['area'] = inputs['length'] * inputs['width']
+
+    def compute_multi_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        if mode == 'fwd':
+            if 'area' in d_outputs:
+                if 'length' in d_inputs:
+                    d_outputs['area'] += inputs['width'] * d_inputs['length']
+                if 'width' in d_inputs:
+                    d_outputs['area'] += inputs['length'] * d_inputs['width']
+        elif mode == 'rev':
+            if 'area' in d_outputs:
+                if 'length' in d_inputs:
+                    d_inputs['length'] += inputs['width'] * d_outputs['area']
+                if 'width' in d_inputs:
+                    d_inputs['width'] += inputs['length'] * d_outputs['area']
+
 
 def lgl(n, tol=np.finfo(float).eps):
     """
@@ -521,6 +621,60 @@ class MatMatTestCase(unittest.TestCase):
         for i in range(N_PHASES):
             assert_rel_error(self, expected, p['p%d.y_lgl' % i], 1.e-5)
 
+    def test_feature_declaration(self):
+        # Tests the code that shows the signature for compute_multi_jacvec
+        prob = Problem()
+        model = prob.model
+
+        comp1 = model.add_subsystem('p', IndepVarComp())
+        comp1.add_output('length', np.array([3.0, 4.0, 5.0]))
+        comp1.add_output('width', np.array([1.0, 2.0, 3.0]))
+
+        model.add_subsystem('comp', RectangleCompVectorized())
+
+        model.connect('p.length', 'comp.length')
+        model.connect('p.width', 'comp.width')
+
+        model.add_design_var('p.length', vectorize_derivs=True)
+        model.add_design_var('p.width', vectorize_derivs=True)
+        model.add_constraint('comp.area', vectorize_derivs=True)
+
+        prob.setup(check=False, mode='rev')
+        prob.run_model()
+
+        J = prob.compute_totals(of=['comp.area'], wrt=['p.length', 'p.width'])
+        assert_rel_error(self, J['comp.area', 'p.length'], np.diag(np.array([1.0, 2.0, 3.0])))
+        assert_rel_error(self, J['comp.area', 'p.width'], np.diag(np.array([3.0, 4.0, 5.0])))
+
+    def test_implicit(self):
+        prob = Problem()
+        model = prob.model
+
+        comp1 = model.add_subsystem('p', IndepVarComp())
+        comp1.add_output('a', np.array([1.0, 2.0, 3.0]))
+        comp1.add_output('b', np.array([2.0, 3.0, 4.0]))
+        comp1.add_output('c', np.array([-1.0, -2.0, -3.0]))
+        model.add_subsystem('comp', QuadraticCompVectorized())
+
+        model.connect('p.a', 'comp.a')
+        model.connect('p.b', 'comp.b')
+        model.connect('p.c', 'comp.c')
+
+        model.add_design_var('p.a', vectorize_derivs=True)
+        model.add_design_var('p.b', vectorize_derivs=True)
+        model.add_design_var('p.c', vectorize_derivs=True)
+        model.add_constraint('comp.x', vectorize_derivs=True)
+
+        model.linear_solver = LinearBlockGS()
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        J = prob.compute_totals(of=['comp.x'], wrt=['p.a', 'p.b', 'p.c'])
+        assert_rel_error(self, J['comp.x', 'p.a'], np.diag(np.array([-0.06066017, -0.05, -0.03971954])), 1e-4)
+        assert_rel_error(self, J['comp.x', 'p.b'], np.diag(np.array([-0.14644661, -0.1, -0.07421663])), 1e-4)
+        assert_rel_error(self, J['comp.x', 'p.c'], np.diag(np.array([-0.35355339, -0.2, -0.13867505])), 1e-4)
 
 class JacVec(ExplicitComponent):
 
@@ -549,6 +703,7 @@ class JacVec(ExplicitComponent):
                 d_inputs['x'] += d_fxy * inputs['y']
             if 'y' in d_inputs:
                 d_inputs['y'] += d_fxy * inputs['x']
+
 
 class MultiJacVec(JacVec):
     def compute_multi_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
@@ -639,7 +794,6 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
 
         assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
-
 
 if __name__ == '__main__':
     unittest.main()

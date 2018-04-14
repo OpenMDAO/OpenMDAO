@@ -258,25 +258,33 @@ class PromotedToAbsoluteMap:
 
     def __getitem__(self, key):
         """
-        Use the promoted variable name to get the corresponding value.
+        Use the variable name to get the corresponding value.
 
         Parameters
         ----------
         key : string
-            Promoted variable name.
+            variable name.
 
         Returns
         -------
         array :
             An array entry value that corresponds to the given variable name.
         """
+        var_names = list(self._values.keys()) if isinstance(self._values, dict)\
+            else self._values.dtype.names
+
+        # user trying to access via absolute name rather than promoted
+        if '.' in key:
+            if key in var_names:
+                return self._values[key]
+
         # outputs only have one option in _prom2abs
         if self._is_output:
             return self._values[self._prom2abs['output'][key][0]]
 
         # inputs may have multiple options, so we try until we succeed
         for k in self._prom2abs['input'][key]:
-            if k in self._values.dtype.names:
+            if k in var_names:
                 return self._values[k]
 
         raise ValueError("no field of name " + key)

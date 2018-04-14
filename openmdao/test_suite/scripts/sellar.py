@@ -52,9 +52,6 @@ prob.model.add_constraint('con_cmp2.con2', upper=0)
 
 prob.setup()
 
-from openmdao.api import view_model
-view_model(prob, embeddable=True, draw_potential_connections=False)
-
 prob['indeps.x'] = 2.
 prob['indeps.z'] = [-1., -1.]
 

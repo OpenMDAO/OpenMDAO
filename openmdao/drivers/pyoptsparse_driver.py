@@ -10,8 +10,9 @@ from __future__ import print_function
 from collections import OrderedDict
 import traceback
 import warnings
+import json
 
-from six import iteritems, itervalues
+from six import iteritems, itervalues, string_types
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -137,6 +138,7 @@ class pyOptSparseDriver(Driver):
         self.supports['two_sided_constraints'] = True
         self.supports['linear_constraints'] = True
         self.supports['simultaneous_derivatives'] = True
+        self.supports['total_jac_sparsity'] = True
 
         # What we don't support yet
         self.supports['active_set'] = False
@@ -191,6 +193,8 @@ class pyOptSparseDriver(Driver):
             raise RuntimeError('Multiple objectives have been added to pyOptSparseDriver'
                                ' but the selected optimizer ({0}) does not support'
                                ' multiple objectives.'.format(self.options['optimizer']))
+
+        self._setup_tot_jac_sparsity()
 
     def run(self):
         """
@@ -570,46 +574,25 @@ class pyOptSparseDriver(Driver):
                      and not ('linear' in meta and meta['linear']))
         return order
 
-    def _setup_simul_coloring(self, mode='fwd'):
+    def _setup_tot_jac_sparsity(self):
         """
-        Set up metadata for simultaneous derivative solution.
-
-        Parameters
-        ----------
-        mode : str
-            Derivative direction, either 'fwd' or 'rev'.
+        Set up total jacobian subjac sparsity.
         """
-        super(pyOptSparseDriver, self)._setup_simul_coloring(mode)
-
-        if self._simul_coloring_info is None:
+        if self._total_jac_sparsity is None:
             return
 
-        tup = self._simul_coloring_info
-        column_lists, row_map = tup[:2]
-        if len(tup) > 2:
-            sparsity = tup[2]
-        else:
-            sparsity = None
+        if isinstance(self._total_jac_sparsity, string_types):
+            with open(self._total_jac_sparsity, 'r') as f:
+                self._total_jac_sparsity = json.load(f)
+
         self._res_jacs = {}
-
-        if sparsity is None:
-            warnings.warn("pyOptSparseDriver is being used with simultaneous derivatives but "
-                          "no sparsity structure was provided.  Providing the sparsity structure "
-                          "can signficantly improve performance.  "
-                          "(run 'openmdao simul_coloring' from the command line with the "
-                          "-s option)")
-            return
-
-        for res, resdict in iteritems(sparsity):
+        for res, resdict in iteritems(self._total_jac_sparsity):
             if res in self._objs:  # skip objectives
                 continue
             self._res_jacs[res] = {}
             for dv, (rows, cols, shape) in iteritems(resdict):
                 rows = np.array(rows, dtype=int)
                 cols = np.array(cols, dtype=int)
-
-                # print("sparsity for %s, %s: %d of %s" % (res, dv, rows.size,
-                #                                         (shape[0] * shape[1])))
 
                 self._res_jacs[res][dv] = {
                     'coo': [rows, cols, np.zeros(rows.size)],

@@ -22,7 +22,7 @@ p.model.add_subsystem('constraint', ExecComp('g=Cl'), promotes=['*'])
 
 p.setup()
 
-view_model(p, outfile='aerostruct_n2.html', embeddable=True, draw_potential_connections=False)
+view_model(p, outfile='aerostruct_n2.html', embeddable=True, draw_potential_connections=False, show_browser=False)
 
 
 

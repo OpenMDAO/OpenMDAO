@@ -46,7 +46,8 @@ You can learn details on how to determine if your problem has the necessary stru
     :maxdepth: 1
 
     assembled_jacobian.rst
-    linear_restart.rst
-    vectorized_derivs.rst
     simul_derivs.rst
+    sparse_totals.rst
     parallel_derivs.rst
+    vectorized_derivs.rst
+    linear_restart.rst

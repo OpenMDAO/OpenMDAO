@@ -383,19 +383,19 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
-        self.assertEqual(cr.abs2meta['px.x']['units'], 'm')
-        self.assertEqual(cr.abs2meta['obj_cmp.y1']['units'], 'm')
-        self.assertEqual(cr.abs2meta['obj_cmp.y2']['units'], 'cm')
-        self.assertEqual(cr.abs2meta['d1.x']['units'], None)
-        self.assertEqual(cr.abs2meta['d1.y1']['units'], None)
-        self.assertEqual(cr.abs2meta['d1.y2']['units'], None)
-        self.assertEqual(cr.abs2meta['px.x']['type'], 'Explicit')
-        self.assertEqual(cr.abs2meta['obj_cmp.y1']['type'], 'Explicit')
-        self.assertEqual(cr.abs2meta['obj_cmp.y2']['type'], 'Explicit')
-        self.assertEqual(cr.abs2meta['px.x']['lower'], -1000)
-        self.assertEqual(cr.abs2meta['px.x']['upper'], 1000)
-        self.assertEqual(cr.abs2meta['d2.y2']['upper'], None)
-        self.assertEqual(cr.abs2meta['d2.y2']['lower'], None)
+        self.assertEqual(cr.output2meta['x']['units'], 'm')
+        self.assertEqual(cr.input2meta['obj_cmp.y1']['units'], 'm')
+        self.assertEqual(cr.input2meta['obj_cmp.y2']['units'], 'cm')
+        self.assertEqual(cr.input2meta['d1.x']['units'], None)
+        self.assertEqual(cr.input2meta['d1.y1']['units'], None)
+        self.assertEqual(cr.input2meta['d1.y2']['units'], None)
+        self.assertEqual(cr.output2meta['x']['type'], 'Explicit')
+        self.assertEqual(cr.input2meta['obj_cmp.y1']['type'], 'Explicit')
+        self.assertEqual(cr.input2meta['obj_cmp.y2']['type'], 'Explicit')
+        self.assertEqual(cr.output2meta['x']['lower'], -1000)
+        self.assertEqual(cr.output2meta['x']['upper'], 1000)
+        self.assertEqual(cr.output2meta['y2']['upper'], None)
+        self.assertEqual(cr.output2meta['y2']['lower'], None)
 
     def test_reading_system_metadata(self):
 
@@ -443,9 +443,9 @@ class TestSqliteCaseReader(unittest.TestCase):
                 sorted(['root', 'mda.d1', 'pz'])
         )
 
-        self.assertEqual(cr.system_metadata['root']['user_metadata']['test1'], 1)
-        self.assertEqual(cr.system_metadata['mda.d1']['user_metadata']['test2'], "2")
-        self.assertFalse('test3' in cr.system_metadata['pz']['user_metadata'])
+        self.assertEqual(cr.system_metadata['root']['component_metadata']['test1'], 1)
+        self.assertEqual(cr.system_metadata['mda.d1']['component_metadata']['test2'], "2")
+        self.assertFalse('test3' in cr.system_metadata['pz']['component_metadata'])
 
         assert_rel_error(
             self, cr.system_metadata['pz']['scaling_factors']['output']['nonlinear']['phys'][0][1], [2.0, 2.0], 1.0e-3)
@@ -643,6 +643,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         d1.nonlinear_solver = NonlinearBlockGS()
         d1.nonlinear_solver.options['maxiter'] = 5
         self.prob.model.add_recorder(self.recorder)
+        self.prob.model.d1.add_recorder(self.recorder)
         self.prob.model.recording_options['record_residuals'] = True
 
         self.prob.setup(check=False)
@@ -651,7 +652,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
-        outputs = cr.list_outputs(True, True, True, True, None, True, True, True,
+        outputs = cr.list_outputs(None, True, True, True, True, None, True, True, True,
                                   True, True, True)
 
         expected_outputs = {
@@ -675,6 +676,23 @@ class TestSqliteCaseReader(unittest.TestCase):
             np.testing.assert_almost_equal(vals['resids'], expected['resids'])
             np.testing.assert_almost_equal(vals['value'], expected['values'])
 
+        expected_outputs_case = {
+            'd1.y1': {'lower': None, 'ref': 1.0, 'resids': [1.318e-10], 'shape': (1,), 'values': [25.5454859]}
+        }
+
+        outputs_case = cr.list_outputs(1, True, True, True, True, None, True, True, True,
+                                       True, True, True)
+        
+        for o in outputs_case:
+            vals = o[1]
+            name = o[0]
+            expected = expected_outputs_case[name]
+            self.assertEqual(vals['lower'], expected['lower'])
+            self.assertEqual(vals['ref'], expected['ref'])
+            self.assertEqual(vals['shape'], expected['shape'])
+            np.testing.assert_almost_equal(vals['resids'], expected['resids'])
+            np.testing.assert_almost_equal(vals['value'], expected['values'])
+
     def test_list_inputs(self):
         self.setup_sellar_model()
 
@@ -685,6 +703,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         d1.nonlinear_solver = NonlinearBlockGS()
         d1.nonlinear_solver.options['maxiter'] = 5
         self.prob.model.add_recorder(self.recorder)
+        self.prob.model.d1.add_recorder(self.recorder)
         self.prob.model.recording_options['record_residuals'] = True
 
         self.prob.setup(check=False)
@@ -693,7 +712,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
-        inputs = cr.list_inputs(True, True, True)
+        inputs = cr.list_inputs(None, True, True, True)
 
         expected_inputs = {
             'obj_cmp.x': {'value': [1.]},
@@ -714,6 +733,20 @@ class TestSqliteCaseReader(unittest.TestCase):
             vals = o[1]
             name = o[0]
             expected = expected_inputs[name]
+            np.testing.assert_almost_equal(vals['value'], expected['value'])
+
+        expected_inputs_case = {
+            'd1.z': {'value': [5., 2.]},
+            'd1.x': {'value': [1.]},
+            'd1.y2': {'value': [12.27257053]}
+        }
+
+        inputs_case = cr.list_inputs(1, True, True, True, None)
+        
+        for o in inputs_case:
+            vals = o[1]
+            name = o[0]
+            expected = expected_inputs_case[name]
             np.testing.assert_almost_equal(vals['value'], expected['value'])
 
 
