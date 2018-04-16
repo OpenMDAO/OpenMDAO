@@ -589,11 +589,11 @@ class Driver(object):
         ctype : string
             Default is 'all'. Optionally return just the inequality constraints
             with 'ineq' or the equality constraints with 'eq'.
-        unscaled : bool
-            Set to True if unscaled (physical) design variables are desired.
         lintype : string
             Default is 'all'. Optionally return just the linear constraints
             with 'linear' or the nonlinear constraints with 'nonlinear'.
+        unscaled : bool
+            Set to True if unscaled (physical) design variables are desired.
         filter : list
             List of constraint names used by recorders.
 
@@ -966,7 +966,7 @@ class Driver(object):
         Optionally print some debugging information after the model runs.
         """
         if 'nl_cons' in self.options['debug_print']:
-            cons = self.get_constraint_values(unscaled=True, lintype='nonlinear')
+            cons = self.get_constraint_values(lintype='nonlinear', unscaled=True)
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Nonlinear constraints")
                 if cons:
@@ -976,7 +976,7 @@ class Driver(object):
                 print()
 
         if 'ln_cons' in self.options['debug_print']:
-            cons = self.get_constraint_values(unscaled=True, lintype='linear')
+            cons = self.get_constraint_values(lintype='linear', unscaled=True)
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Linear constraints")
                 if cons:
