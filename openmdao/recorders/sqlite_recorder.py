@@ -212,14 +212,6 @@ class SqliteRecorder(BaseRecorder):
         constraints = data['con']
         sysvars = data['sys']
 
-        # Need to gather up the values from across the ranks, if MPI
-        # if MPI:
-        #     desvars = self._gather_vars(root, desvars)
-        #     responses = self._gather_vars(root, responses)
-        #     objectives = self._gather_vars(root, objectives)
-        #     constraints = self._gather_vars(root, constraints)
-        #     sysvars = self._gather_vars(root, sysvars)
-
         if MPI is None or MPI.COMM_WORLD.rank == 0:
             desvars_array = values_to_array(desvars)
             responses_array = values_to_array(responses)

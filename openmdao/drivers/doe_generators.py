@@ -23,7 +23,7 @@ class UniformGenerator(DOEGenerator):
     Attributes
     ----------
     _num_samples : int
-        The number of samples to run.
+        The number of samples in the DOE.
     _seed : int or None
         Random seed.
     """
@@ -93,8 +93,8 @@ class _pyDOE_Generator(DOEGenerator):
     _levels : int
         The number of evenly spaced levels between each design variable
         lower and upper bound.
-    _supported_methods : list
-        supported pyDOE function names.
+    _num_samples : int
+        The number of samples in the DOE.
     """
 
     def __init__(self, levels=2):
@@ -129,6 +129,8 @@ class _pyDOE_Generator(DOEGenerator):
         size = sum([meta['size'] for name, meta in iteritems(design_vars)])
 
         doe = self._generate_design(size)
+
+        self._num_samples = len(doe)
 
         # generate values for each level for each design variable
         # over the range of that varable's lower to upper bound
@@ -302,6 +304,8 @@ class LatinHypercubeGenerator(DOEGenerator):
         The number of iterations to use for maximin and correlations algorithms.
     _seed : int or None
         Random seed.
+    _num_samples : int
+        The number of samples in the DOE.
     """
 
     _supported_criterion = [
@@ -368,17 +372,19 @@ class LatinHypercubeGenerator(DOEGenerator):
             self._samples = size
 
         # generate design
-        lhd = pyDOE.lhs(size, samples=self._samples,
+        doe = pyDOE.lhs(size, samples=self._samples,
                         criterion=self._criterion,
                         iterations=self._iterations)
+
+        self._num_samples = len(doe)
 
         # generate values for each level for each design variable
         # over the range of that varable's lower to upper bound
         # rows = vars (# rows/var = var size), cols = levels
         values = np.zeros((size, self._samples))
 
-        # yield desvar values for lhd samples
-        for row in lhd:
+        # yield desvar values for doe samples
+        for row in doe:
             retval = []
             col = 0
             var = 0

@@ -143,32 +143,31 @@ class Driver(object):
         ###########################
         self.options.declare('debug_print', types=list, is_valid=_is_debug_print_opts_valid,
                              desc="List of what type of Driver variables to print at each "
-                             "iteration. Valid items in list are 'desvars', 'ln_cons', "
-                             "'nl_cons', 'objs'",
+                                  "iteration. Valid items in list are 'desvars', 'ln_cons', "
+                                  "'nl_cons', 'objs'",
                              default=[])
 
         ###########################
         self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
                                        default=True)
         self.recording_options.declare('record_desvars', types=bool, default=True,
-                                       desc='Set to True to record design variables at the \
-                                       driver level')
+                                       desc='Set to True to record design variables at the '
+                                            'driver level')
         self.recording_options.declare('record_responses', types=bool, default=False,
                                        desc='Set to True to record responses at the driver level')
         self.recording_options.declare('record_objectives', types=bool, default=True,
-                                       desc='Set to True to record objectives at the \
-                                       driver level')
+                                       desc='Set to True to record objectives at the driver level')
         self.recording_options.declare('record_constraints', types=bool, default=True,
-                                       desc='Set to True to record constraints at the \
-                                       driver level')
+                                       desc='Set to True to record constraints at the '
+                                            'driver level')
         self.recording_options.declare('includes', types=list, default=['*'],
                                        desc='Patterns for variables to include in recording')
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
-                                       '(processed post-includes)')
+                                            '(processed post-includes)')
         self.recording_options.declare('record_derivatives', types=bool, default=False,
-                                       desc='Set to True to record derivatives at the driver \
-                                       level')
+                                       desc='Set to True to record derivatives at the driver '
+                                            'level')
         ###########################
 
         # What the driver supports.

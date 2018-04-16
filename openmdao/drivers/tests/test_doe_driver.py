@@ -477,8 +477,8 @@ class TestDOEDriver(unittest.TestCase):
         valid_values = [round(bucket_size*(bucket + 1/2), 3) for bucket in all_buckets]
 
         for n in range(cases.num_cases):
-            x = cases.get_case(n).desvars['indep.x']
-            y = cases.get_case(n).desvars['indep.y']
+            x = float(cases.get_case(n).desvars['indep.x'])
+            y = float(cases.get_case(n).desvars['indep.y'])
 
             x_buckets_filled.add(int(x/bucket_size))
             y_buckets_filled.add(int(y/bucket_size))
@@ -519,7 +519,7 @@ class TestParallelDOE(unittest.TestCase):
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver(FullFactorialGenerator(levels=2))
+        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
         prob.driver.add_recorder(SqliteRecorder("CASES.sql"))
         prob.driver.options['run_parallel'] =  True
 
@@ -543,6 +543,7 @@ class TestParallelDOE(unittest.TestCase):
 
         if model.comm.rank == 0:
             cases = CaseReader("CASES.sql").driver_cases
+            print('# cases:', cases.num_cases)
 
             # self.assertEqual(cases.num_cases, 4)
 

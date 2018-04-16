@@ -13,13 +13,23 @@ import numpy as np
 
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.utils.record_util import create_local_meta
 
 
 class DOEGenerator(object):
     """
     Base class for a callable object that generates cases for a DOEDriver.
+
+    Attributes
+    ----------
+    _num_samples : int
+        The number of samples generated (available after generator has been called).
     """
+
+    def __init__(self):
+        """
+        Initialize the DOEGenerator.
+        """
+        self._num_samples = 0
 
     def __call__(self, design_vars):
         """
@@ -51,6 +61,8 @@ class DOEDriver(Driver):
     ----------
     _generator : DOEGenerator
         The case generator
+    _name : str
+        The name used to identify this driver in recorded cases.
     """
 
     def __init__(self, generator):
@@ -75,9 +87,21 @@ class DOEDriver(Driver):
         super(DOEDriver, self).__init__()
 
         self._generator = generator
+        self._name = 'DOEDriver_' + type(generator).__name__.replace('Generator', '')
 
         self.options.declare('run_parallel', default=False,
                              desc='Set to True to run the cases in parallel.')
+
+    def _get_name(self):
+        """
+        Get the type name of current DOE generator.
+
+        Returns
+        -------
+        str
+            The the type name of the current DOE generator.
+        """
+        return self._name
 
     def _setup_driver(self, problem):
         """
@@ -114,67 +138,37 @@ class DOEDriver(Driver):
             case_gen = self._generator
 
         for case in case_gen(self._designvars):
-            print(self._comm.rank, 'running case:', case)
-            metadata = self._prep_case(case, self.iter_count)
-
-            terminate, exc = self._try_case(metadata)
-
-            if exc is not None:
-                if PY3:
-                    raise exc[0].with_traceback(exc[1], exc[2])
-                else:
-                    # exec needed here since otherwise python3 will
-                    # barf with a syntax error  :(
-                    exec('raise exc[0], exc[1], exc[2]')
-
+            metadata = self._try_case(case)
             self.iter_count += 1
 
         return False
 
-    def _prep_case(self, case, iter_count):
-        """
-        Create metadata for the case and set design variables.
-
-        Parameters
-        ----------
-        case : dict
-            Dictionary of input values for the case.
-        iter_count : int
-            Keep track of iterations for case recording.
-
-        Returns
-        -------
-        dict
-            Information about the running of this case.
-        """
-        metadata = create_local_meta('DOEDriver')
-        metadata['coord'] = (iter_count,)
-
-        for dv_name, dv_val in case:
-            self.set_design_var(dv_name, dv_val)
-
-        return metadata
-
-    def _try_case(self, metadata):
+    def _try_case(self, case=[]):
         """
         Run case, save exception info and mark the metadata if the case fails.
 
         Parameters
         ----------
-        metadata : dict
-            Information about the running of this case.
+        case : list
+            list of name, value tuples for the design variables.
 
         Returns
         -------
-        bool
-            Flag indicating whether or not to terminate execution
-        exc_info
-            Information about any Exception that occurred in running this case
+        metadata : dict
+            Information about the running of this case.
         """
+        print('----------------------')
+        print('running case:', case)
+        sys.stdout.flush()
+
         terminate = False
         exc = None
 
+        metadata = {}
         metadata['terminate'] = 0
+
+        for dv_name, dv_val in case:
+            self.set_design_var(dv_name, dv_val)
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             try:
@@ -194,7 +188,10 @@ class DOEDriver(Driver):
                 exc = sys.exc_info()
                 terminate = True
 
-        return terminate, exc
+        print(metadata)
+        # print('----------------------')
+        # sys.stdout.flush()
+        return metadata
 
     def _parallel_generator(self, design_vars):
         """
@@ -213,12 +210,25 @@ class DOEDriver(Driver):
         rank = self._comm.rank
         size = self._comm.size
 
-        # exhausted = False
-
         for i, case in enumerate(self._generator(design_vars)):
             if rank == i % size:
+                print('returning Case', i, 'of', self._generator._num_samples)
+                sys.stdout.flush()
                 yield case
             else:
-                print(self._comm.rank, 'skipping', i)
+                print('skipping Case', i, 'of', self._generator._num_samples)
+                sys.stdout.flush()
 
-        # yield None
+        print('iter exhausted, i =', i, 'case =', case)
+        extra_procs = size - (self._generator._num_samples % size)
+        print('extra_procs =', extra_procs)
+        if rank >= (size - extra_procs):
+            print('I am extra')
+            print(i + 1, 'of', self._generator._num_samples, 'duplicating last case')
+            sys.stdout.flush()
+            # duplicate last case on extra procs
+            yield case
+        else:
+            print(i + 1, 'of', self._generator._num_samples, 'stopping iter')
+            sys.stdout.flush()
+            raise StopIteration
