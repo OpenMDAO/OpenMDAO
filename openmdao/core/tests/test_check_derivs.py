@@ -1939,7 +1939,7 @@ class TestProblemCheckTotals(unittest.TestCase):
                 self.nonlinear_solver.options['maxiter'] = 1
 
             def initialize(self):
-                self.metadata.declare('ode_class', desc='System defining the ODE')
+                self.metadata.declare('ode_class', desc='System defining the ODE.')
 
 
         p = Problem(model=GaussLobattoPhase())
