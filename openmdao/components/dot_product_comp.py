@@ -1,3 +1,6 @@
+"""Definition of the Dot Product Component."""
+
+
 from six import string_types
 
 import numpy as np
@@ -20,6 +23,9 @@ class DotProductComp(ExplicitComponent):
     """
 
     def initialize(self):
+        """
+        Declare metadata.
+        """
         self.metadata.declare('vec_size', types=int,
                               desc='The number of points at which the dot product is computed')
         self.metadata.declare('length', types=int, default=3,
@@ -38,6 +44,9 @@ class DotProductComp(ExplicitComponent):
                               desc='The units for vector c.')
 
     def setup(self):
+        """
+        Declare inputs, outputs, and derivatives for the dot product component.
+        """
         meta = self.metadata
         vec_size = meta['vec_size']
         m = meta['length']
@@ -60,12 +69,32 @@ class DotProductComp(ExplicitComponent):
         self.declare_partials(of=meta['c_name'], wrt=meta['b_name'], rows=row_idxs, cols=col_idxs)
 
     def compute(self, inputs, outputs):
+        """
+        Compute the dot product of inputs `a` and `b` using np.einsum.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        """
         meta = self.metadata
         a = inputs[meta['a_name']]
         b = inputs[meta['b_name']]
         outputs[meta['c_name']] = np.einsum('ni,ni->n', a, b)
 
     def compute_partials(self, inputs, partials):
+        """
+        Compute the sparse partials for the dot product w.r.t. the inputs.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        partials : Jacobian
+            sub-jac components written to partials[output_name, input_name]
+        """
         meta = self.metadata
         a = inputs[meta['a_name']]
         b = inputs[meta['b_name']]
@@ -76,4 +105,12 @@ class DotProductComp(ExplicitComponent):
 
 
 def _for_docs():  # pragma: no cover
+    """
+    Provide documentation for metadata of DotProductComp.
+
+    Returns
+    -------
+    comp
+        An instance of DotProductComp for use by the sphinx doc extensions.
+    """
     return DotProductComp()

@@ -554,6 +554,21 @@ class TestShapes(unittest.TestCase):
                          "for the connection 'indep.x' to 'C1.x'. Expected (5, 2) but "
                          "got (1, 10, 1, 1).")
 
+    def test_connect_1D_to_2D(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', val=np.arange(10)))
+        p.model.add_subsystem('C1', ExecComp('y=5*x',
+                                             x={'value': np.zeros((5, 2))},
+                                             y={'value': np.zeros((5, 2))}))
+        p.model.connect('indep.x', 'C1.x')
+
+        with self.assertRaises(Exception) as context:
+            p.setup()
+        self.assertEqual(str(context.exception),
+                         "The source and target shapes do not match or are ambiguous "
+                         "for the connection 'indep.x' to 'C1.x'. Expected (5, 2) but "
+                         "got (10,).")
+
 
         #class TestUBCS(unittest.TestCase):
 

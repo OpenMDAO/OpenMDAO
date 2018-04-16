@@ -149,9 +149,10 @@ def array_viz(arr, prob=None, of=None, wrt=None, stream=sys.stdout):
 
 def array_connection_compatible(shape1, shape2):
     """
-    Returns True if the two arrays shapes are compatible.  Array shapes are compatible
-    if the underlying data has the same size and is stored in the same contiguous order
-    for the two shapes.
+    Return True if the two arrays shapes are compatible.
+
+    Array shapes are compatible if the underlying data has the same size and is
+    stored in the same contiguous order for the two shapes.
 
     Parameters
     ----------
@@ -162,15 +163,22 @@ def array_connection_compatible(shape1, shape2):
 
     Returns
     -------
-    True if the two shapes are compatible, else False.
+    bool
+        True if the two shapes are compatible for connection, else False.
     """
     ashape1 = np.asarray(shape1, dtype=int)
     ashape2 = np.asarray(shape2, dtype=int)
 
-    nz1 = np.where(ashape1 > 1)
-    fundamental_shape1 = ashape1[np.min(nz1): np.max(nz1)]
+    size1 = np.prod(ashape1)
+    size2 = np.prod(ashape2)
 
-    nz2 = np.where(ashape2 > 1)
-    fundamental_shape2 = ashape2[np.min(nz2): np.max(nz2)]
+    if size1 != size2:
+        return False
+
+    nz1 = np.where(ashape1 > 1)[0]
+    fundamental_shape1 = ashape1[np.min(nz1): np.max(nz1) + 1]
+
+    nz2 = np.where(ashape2 > 1)[0]
+    fundamental_shape2 = ashape2[np.min(nz2): np.max(nz2) + 1]
 
     return np.all(fundamental_shape1 == fundamental_shape2)
