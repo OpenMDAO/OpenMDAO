@@ -1,14 +1,15 @@
+"""Definition of the Cross Product Component."""
+
 from six import string_types
 
 import numpy as np
-import scipy.linalg as spla
 
 from openmdao.api import ExplicitComponent
 
 
 class CrossProductComp(ExplicitComponent):
     """
-    Computes a vectorized dot product
+    Compute a vectorized dot product.
 
     math::
         c = np.cross(a, b)
@@ -27,6 +28,9 @@ class CrossProductComp(ExplicitComponent):
     """
 
     def initialize(self):
+        """
+        Declare metadata.
+        """
         self.metadata.declare('vec_size', types=int, default=1,
                               desc='The number of points at which the dot product is computed')
         self.metadata.declare('a_name', types=string_types, default='a',
@@ -47,6 +51,9 @@ class CrossProductComp(ExplicitComponent):
                             [-1, 0, 1, 0, 0, 0]], dtype=np.float64)
 
     def setup(self):
+        """
+        Declare inputs, outputs, and derivatives for the cross product component.
+        """
         meta = self.metadata
         vec_size = meta['vec_size']
 
@@ -77,12 +84,32 @@ class CrossProductComp(ExplicitComponent):
                               rows=row_idxs, cols=col_idxs, val=0)
 
     def compute(self, inputs, outputs):
+        """
+        Compute the dot product of inputs `a` and `b` using np.cross.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        """
         meta = self.metadata
         a = inputs[meta['a_name']]
         b = inputs[meta['b_name']]
         outputs[meta['c_name']] = np.cross(a, b)
 
     def compute_partials(self, inputs, partials):
+        """
+        Compute the sparse partials for the cross product w.r.t. the inputs.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        partials : Jacobian
+            sub-jac components written to partials[output_name, input_name]
+        """
         meta = self.metadata
         a = inputs[meta['a_name']]
         b = inputs[meta['b_name']]
@@ -95,4 +122,12 @@ class CrossProductComp(ExplicitComponent):
 
 
 def _for_docs():  # pragma: no cover
+    """
+    Provide documentation for metadata of CrossProductComp.
+
+    Returns
+    -------
+    comp
+        An instance of CrossProductComp for use by the sphinx doc extensions.
+    """
     return CrossProductComp()
