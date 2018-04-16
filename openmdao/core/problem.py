@@ -1109,6 +1109,169 @@ class Problem(object):
 
         self.model._set_solver_print(level=level, depth=depth, type_=type_)
 
+    def list_problem_vars(self,
+                          show_promoted_name=True,
+                          print_arrays=False,
+                          desvar_opts=[],
+                          cons_opts=[],
+                          objs_opts=[],
+                          ):
+        """
+        Print all design variables and responses (objectives and constraints).
+
+        Parameters
+        ----------
+        show_promoted_name : bool
+            If True, then show the promoted names of the variables.
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
+            by the values set with numpy.set_printoptions
+            Default is False.
+        desvar_opts : list of str
+            List of optional columns to be displayed in the desvars table.
+            Allowed values are:
+            ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler', 'parallel_deriv_color',
+            'vectorize_derivs', 'simul_coloring', 'cache_linear_solution']
+        cons_opts : list of str
+            List of optional columns to be displayed in the cons table.
+            Allowed values are:
+            ['lower', 'upper', 'equals', ref', 'ref0', 'indices', 'index', adder', 'scaler',
+            'linear', parallel_deriv_color', 'vectorize_derivs', 'simul_coloring', 'simul_map',
+            'cache_linear_solution']
+        objs_opts : list of str
+            List of optional columns to be displayed in the objs table.
+            Allowed values are:
+            ['ref', 'ref0', 'indices', 'adder', 'scaler',
+            'parallel_deriv_color', 'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+            'cache_linear_solution']
+
+        """
+        default_col_names = ['name', 'value', 'size']
+
+        # Design vars
+        desvars = self.model.get_design_vars()
+        header = "Design Variables"
+        col_names = default_col_names + desvar_opts
+        self._write_var_info_table(header, col_names, desvars,
+                                   show_promoted_name=show_promoted_name,
+                                   print_arrays=print_arrays,
+                                   col_spacing=2)
+
+        # Constraints
+        cons = self.model.get_constraints()
+        header = "Constraints"
+        col_names = default_col_names + cons_opts
+        self._write_var_info_table(header, col_names, cons, show_promoted_name=show_promoted_name,
+                                   print_arrays=print_arrays,
+                                   col_spacing=2)
+
+        objs = self.model.get_objectives()
+        header = "Objectives"
+        col_names = default_col_names + objs_opts
+        self._write_var_info_table(header, col_names, objs, show_promoted_name=show_promoted_name,
+                                   print_arrays=print_arrays,
+                                   col_spacing=2)
+
+    def _write_var_info_table(self, header, col_names, vars, print_arrays=False,
+                              show_promoted_name=True, col_spacing=1):
+        """
+        Write a table of information for the data in vars.
+
+        Parameters
+        ----------
+        header : str
+            The header line for the table.
+        col_names : list of str
+            List of column labels.
+        vars : OrderedDict
+            Keys are variable names and values are metadata for the variables.
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
+            by the values set with numpy.set_printoptions
+            Default is False.
+        show_promoted_name : bool
+            If True, then show the promoted names of the variables.
+        col_spacing : int
+            Number of spaces between columns in the table.
+        """
+        abs2prom = self.model._var_abs2prom
+
+        # Get the values for all the elements in the tables
+        rows = []
+        for name, meta in iteritems(vars):
+            row = {}
+            for col_name in col_names:
+                if col_name == 'name':
+                    if show_promoted_name:
+                        row[col_name] = name
+                    else:
+                        if name in abs2prom['input']:
+                            row[col_name] = abs2prom['input'][name]
+                        else:
+                            row[col_name] = abs2prom['output'][name]
+                elif col_name == 'value':
+                    row[col_name] = self[name]
+                else:
+                    row[col_name] = meta[col_name]
+            rows.append(row)
+
+        col_space = ' ' * col_spacing
+        print("-" * len(header))
+        print(header)
+        print("-" * len(header))
+
+        # loop through the rows finding the max widths
+        max_width = {}
+        for col_name in col_names:
+            max_width[col_name] = len(col_name)
+        for row in rows:
+            for col_name in col_names:
+                cell = row[col_name]
+                if isinstance(cell, np.ndarray) and cell.size > 1:
+                    out = '|{}|'.format(str(np.linalg.norm(cell)))
+                else:
+                    out = str(cell)
+                max_width[col_name] = max(len(out), max_width[col_name])
+
+        # print col headers
+        header_div = ''
+        header_col_names = ''
+        for col_name in col_names:
+            header_div += '-' * max_width[col_name] + col_space
+            header_col_names += pad_name(col_name, max_width[col_name], quotes=False) + col_space
+        print(header_col_names)
+        print(header_div[:-1])
+
+        # print rows with var info
+        for row in rows:
+            have_array_values = []  # keep track of which values are arrays
+            row_string = ''
+            for col_name in col_names:
+                cell = row[col_name]
+                if isinstance(cell, np.ndarray) and cell.size > 1:
+                    out = '|{}|'.format(str(np.linalg.norm(cell)))
+                    have_array_values.append(col_name)
+                else:
+                    out = str(cell)
+                row_string += pad_name(out, max_width[col_name], quotes=False) + col_space
+            print(row_string)
+
+            if print_arrays:
+                left_column_width = max_width['name']
+                for col_name in have_array_values:
+                    print("{}{}:".format((left_column_width + col_spacing) * ' ', col_name))
+                    cell = row[col_name]
+                    out_str = str(cell)
+                    indented_lines = [(left_column_width + col_spacing) * ' ' +
+                                      s for s in out_str.splitlines()]
+                    print('\n'.join(indented_lines) + '\n')
+
+        print()
+
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,

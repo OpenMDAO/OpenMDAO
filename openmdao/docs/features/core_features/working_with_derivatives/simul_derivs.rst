@@ -115,7 +115,7 @@ like this:
                 'x': (
                     [0, 0, 1, 1, 2, 2, 3, 3, 4, 4],   # sparse row indices
                     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],   # sparse column indices
-                    (5, 10)  # shape
+                    [5, 10]  # shape
                 )
             }
         }
@@ -166,6 +166,8 @@ would look like this:
     Using tolerance: 1e-20
     Most common number of zero entries (400 of 462) repeated 11 times out of 11 tolerances tested.
 
+    Total jacobian shape: (22, 21)
+
     1 uncolored columns
     5 columns in color 1
     5 columns in color 2
@@ -173,7 +175,7 @@ would look like this:
     5 columns in color 4
 
     ########### BEGIN COLORING DATA ################
-    ([
+    [[
        [20],   # uncolored columns
        [0, 2, 4, 6, 8],   # color 1
        [1, 3, 5, 7, 9],   # color 2
@@ -203,7 +205,33 @@ would look like this:
        [10, 20],   # column 19
        None,   # column 20
     ],
-    None)
+    {
+    "circle.area": {
+       "indeps.x": [[], [], [1, 10]],
+       "indeps.y": [[], [], [1, 10]],
+       "indeps.r": [[0], [0], [1, 1]]
+    },
+    "r_con.g": {
+       "indeps.x": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+       "indeps.y": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+       "indeps.r": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [10, 1]]
+    },
+    "theta_con.g": {
+       "indeps.x": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+       "indeps.y": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+       "indeps.r": [[], [], [5, 1]]
+    },
+    "delta_theta_con.g": {
+       "indeps.x": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+       "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+       "indeps.r": [[], [], [5, 1]]
+    },
+    "l_conx.g": {
+       "indeps.x": [[0], [0], [1, 10]],
+       "indeps.y": [[], [], [1, 10]],
+       "indeps.r": [[], [], [1, 1]]
+    }
+    }]
     ########### END COLORING DATA ############
 
 
