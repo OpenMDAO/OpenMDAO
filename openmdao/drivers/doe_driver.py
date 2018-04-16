@@ -157,15 +157,7 @@ class DOEDriver(Driver):
         metadata : dict
             Information about the running of this case.
         """
-        print('----------------------')
-        print('running case:', case)
-        sys.stdout.flush()
-
-        terminate = False
-        exc = None
-
         metadata = {}
-        metadata['terminate'] = 0
 
         for dv_name, dv_val in case:
             self.set_design_var(dv_name, dv_val)
@@ -179,18 +171,9 @@ class DOEDriver(Driver):
                 metadata['success'] = 0
             except Exception:
                 metadata['success'] = 0
-                metadata['terminate'] = 1  # tell master to stop sending cases in lb case
                 metadata['msg'] = traceback.format_exc()
-
                 print(metadata['msg'])
 
-                # if not self._load_balance:
-                exc = sys.exc_info()
-                terminate = True
-
-        print(metadata)
-        # print('----------------------')
-        # sys.stdout.flush()
         return metadata
 
     def _parallel_generator(self, design_vars):
@@ -212,23 +195,11 @@ class DOEDriver(Driver):
 
         for i, case in enumerate(self._generator(design_vars)):
             if rank == i % size:
-                print('returning Case', i, 'of', self._generator._num_samples)
-                sys.stdout.flush()
                 yield case
-            else:
-                print('skipping Case', i, 'of', self._generator._num_samples)
-                sys.stdout.flush()
 
-        print('iter exhausted, i =', i, 'case =', case)
         extra_procs = size - (self._generator._num_samples % size)
-        print('extra_procs =', extra_procs)
         if rank >= (size - extra_procs):
-            print('I am extra')
-            print(i + 1, 'of', self._generator._num_samples, 'duplicating last case')
-            sys.stdout.flush()
             # duplicate last case on extra procs
             yield case
         else:
-            print(i + 1, 'of', self._generator._num_samples, 'stopping iter')
-            sys.stdout.flush()
             raise StopIteration
