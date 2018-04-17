@@ -49,9 +49,10 @@ Recall that in the non-linear analysis, moving forward through the model, you co
 When solving for derivatives of :code:`z1`, the :code:`z2` components won't have any work to do and will idle.
 Similarly the :code:`z1` components won't have any work to do when solving for derivatives of :code:`z2`.
 That means that in each linear solve half of the computational resources of the model will be idle.
+This is represented visually by the light red sections of the vector, representing known zero entries in the vector.
 In general if you had had n different :code:`z` variables, then only :math:`1/n` of the total compute resource would be active for any one linear solve.
 
-So despite having good parallel scaling for the nonlinear analysis, in reverse mode the parallel scaling is essentially non-existent.
+So despite having good parallel scaling for the nonlinear analysis (moving forward through the model), in reverse mode the parallel scaling is essentially non-existent.
 
 
 .. note::
@@ -62,17 +63,16 @@ So despite having good parallel scaling for the nonlinear analysis, in reverse m
 Approach for Computing Parallel Derivatives in Multipoint Models
 -------------------------------------------------------------------
 
-Keeping in mind that we've stipulated components that compute :code:`x` and :code:`y` are inexpensive, the existing parallel resources of the model can be leveraged to enable parallel calculation of derivatives for both :code:`z1` and :code:`z2`.
+Keeping in mind that we've stipulated that computations for :code:`x` and :code:`y` are inexpensive, the existing parallel resources of the model can be leveraged to enable parallel calculation of derivatives for both :code:`z1` and :code:`z2`.
 
 The fundamental problem is that both :code:`z1` and :code:`z2` need to back-propagate through :code:`y` and :code:`x` in order to compute derivatives, so parallelizing the two solves would result in the two back-propagations interfering with each other.
 However, we already have two processors (one for :code:`s1,z1` and one for :code:`s2,z2`), so we can duplicate :code:`y` and :code:`x` on each processor and then handle the back-propagation for each of the two linear solves on separate processors.
 At the end of that back-propagation each processor will now have the correct derivative for one of the constraints, and the derivative values need to be all-gathered before they can be used.
 
-This duplication will come with potentially a small additional memory cost, because space for  must now be allocated in the linear vectors on all processors.
-However, it might make sense to allocate :code:`x,y` on all processors to avoid a communication step where the values are broadcast out to all processors, in which case there is 0 additional memory cost.
-Regardless, as long as the  :code:`s1,z1` and :code:`s2,z1` variables are much larger, this additional memory cost is negligible.
+This duplication will come with potentially a small additional memory cost, because space for (:code:`x,y`) must now be allocated in the linear vectors on all processors.
+As long as the  :code:`s1,z1` and :code:`s2,z1` variables are much larger, this additional memory cost is negligible.
 
-When using this parallelization algorithm, there are still :math:`n` linear solves, for :math:`n` variables, but now all of them can be run in parallel to gain back the scaling that is itinerantly present in the forward mode for this model structure.
+When using this parallelization algorithm, there are still :math:`n` linear solves, for :math:`n` variables, but now all of them can be run in parallel to gain back the scaling that is inherently present in the forward mode for this model structure.
 The linear solves now looks like this:
 
 .. figure:: matrix_figs/parallel_adj_combined.png
