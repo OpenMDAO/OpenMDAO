@@ -135,8 +135,11 @@ class DirectSolver(LinearSolver):
             mtx = system._jacobian._int_mtx
             # Perform dense or sparse lu factorization
             if isinstance(mtx, DenseMatrix):
-                ranges = system._jacobian._view_ranges[system.pathname]
-                matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
+                if system._views_assembled_jac:
+                    ranges = system._jacobian._view_ranges[system.pathname]
+                    matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
+                else:
+                    matrix = mtx._matrix
 
                 # During LU decomposition, detect singularities and warn user.
                 with warnings.catch_warnings():
@@ -151,14 +154,15 @@ class DirectSolver(LinearSolver):
                         raise RuntimeError(format_singluar_error(err, system, matrix))
 
             elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
-                ranges = system._jacobian._view_ranges[system.pathname]
-                matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
+                if system._views_assembled_jac:
+                    ranges = system._jacobian._view_ranges[system.pathname]
+                    matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
+                else:
+                    matrix = mtx._matrix
                 try:
                     self._lu = scipy.sparse.linalg.splu(matrix)
                 except RuntimeError as err:
                     if 'exactly singular' in str(err):
-                        ranges = system._jacobian._view_ranges[system.pathname]
-                        matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
                         raise RuntimeError(format_singluar_csc_error(system, matrix))
                     else:
                         reraise(*sys.exc_info())

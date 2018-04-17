@@ -4,7 +4,6 @@ import numpy as np
 
 from scipy.sparse import issparse
 
-from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.name_maps import key2abs_key
 from openmdao.matrices.matrix import sparse_types
 
@@ -24,31 +23,19 @@ class Jacobian(object):
         Dictionary of the user-supplied sub-Jacobians keyed by absolute names.
     _subjacs_info : dict
         Dictionary of the sub-Jacobian metadata keyed by absolute names.
-    options : <OptionsDictionary>
-        Options dictionary.
     _override_checks : bool
         If we are approximating a jacobian at the top level and we have specified indices on the
         functions or designvars, then we need to disable the size checking temporarily so that we
         can assign a jacobian with less rows or columns than the variable sizes.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            options dictionary.
         """
         self._system = None
-
         self._subjacs = {}
         self._subjacs_info = {}
-
-        self.options = OptionsDictionary()
-        self.options.update(kwargs)
-
         self._override_checks = False
 
     def _abs_key2shape(self, abs_key):

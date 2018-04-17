@@ -6,6 +6,8 @@ from numpy import ndarray
 from scipy.sparse import coo_matrix, csr_matrix
 
 from six import iteritems
+from six.moves import range
+
 from collections import OrderedDict, Counter, defaultdict
 
 from openmdao.matrices.matrix import Matrix, _compute_index_map, sparse_types
@@ -36,16 +38,13 @@ class COOMatrix(Matrix):
 
         submats = self._submats
         metadata = self._metadata
-        pre_metadata = OrderedDict()
+        pre_metadata = self._key_ranges = OrderedDict()
         locations = {}
 
         for key, (info, loc, src_indices, shape, factor) in iteritems(submats):
-            if not info['dependent']:
-                continue
             val = info['value']
             rows = info['rows']
-            dense = (rows is None and (val is None or
-                     isinstance(val, ndarray)))
+            dense = (rows is None and (val is None or isinstance(val, ndarray)))
 
             full_size = np.prod(shape)
             if dense:
@@ -73,22 +72,20 @@ class COOMatrix(Matrix):
                 ind2 = counter
                 locations[loc] = (ind1, ind2, key)
 
-            pre_metadata[key] = (ind1, ind2, None)
+            pre_metadata[key] = (ind1, ind2, dense)
 
         data = np.zeros(counter)
-        rows = -np.ones(counter, int)
-        cols = -np.ones(counter, int)
+        rows = np.empty(counter, dtype=int)
+        cols = np.empty(counter, dtype=int)
 
-        for key, (ind1, ind2, idxs) in iteritems(pre_metadata):
+        for key, (ind1, ind2, dense) in iteritems(pre_metadata):
             info, loc, src_indices, shape, factor = submats[key]
             irow, icol = loc
             val = info['value']
-            dense = (info['rows'] is None and (val is None or
-                     isinstance(val, ndarray)))
+            idxs = None
 
             if dense:
                 jac_type = ndarray
-                rowrange = np.arange(shape[0], dtype=int)
 
                 if src_indices is None:
                     colrange = np.arange(shape[1], dtype=int)
@@ -99,12 +96,12 @@ class COOMatrix(Matrix):
                 subrows = rows[ind1:ind2]
                 subcols = cols[ind1:ind2]
 
-                for i, row in enumerate(rowrange):
-                    subrows[i * ncols: (i + 1) * ncols] = row
+                for i in range(shape[0]):
+                    subrows[i * ncols: (i + 1) * ncols] = i
                     subcols[i * ncols: (i + 1) * ncols] = colrange
 
-                rows[ind1:ind2] += irow
-                cols[ind1:ind2] += icol
+                subrows += irow
+                subcols += icol
 
             else:  # sparse
                 if isinstance(val, sparse_types):
@@ -185,7 +182,7 @@ class COOMatrix(Matrix):
 
     def _update_add_submat(self, key, jac):
         """
-        Add the subjac values to an existing  sub-jacobian.
+        Add the subjac values to an existing sub-jacobian.
 
         Parameters
         ----------
@@ -212,7 +209,7 @@ class COOMatrix(Matrix):
         else:
             self._matrix.data[idxs] += val
 
-    def _prod(self, in_vec, mode, ranges):
+    def _prod(self, in_vec, mode, ranges, mask=None):
         """
         Perform a matrix vector product.
 
@@ -230,7 +227,18 @@ class COOMatrix(Matrix):
         ndarray[:]
             vector resulting from the product.
         """
+        # when we have a derivative based solver at a level below the
+        # group that owns the AssembledJacobian, we need to use only
+        # the part of the matrix that is relevant to the lower level
+        # system.
+        mat = self._matrix
+        if ranges is not None:
+            rstart, rend, cstart, cend = ranges
+            if not((rend - rstart) == mat.shape[0] and (cend - cstart) == mat.shape[1]):
+                raise RuntimeError("Placing a sparse jacobian under another assembled jacobian "
+                                   "is currently not supported.")
+
         if mode == 'fwd':
-            return self._matrix.dot(in_vec)
+            return mat.dot(in_vec)
         else:  # rev
-            return self._matrix.T.dot(in_vec)
+            return mat.T.dot(in_vec)
