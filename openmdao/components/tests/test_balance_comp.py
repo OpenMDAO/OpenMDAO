@@ -540,8 +540,6 @@ class TestBalanceComp(unittest.TestCase):
         from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NewtonSolver, \
             DirectSolver, DenseJacobian, BalanceComp
 
-        n = 1
-
         prob = Problem(model=Group())
 
         bal = BalanceComp()
@@ -589,8 +587,6 @@ class TestBalanceComp(unittest.TestCase):
         from numpy.testing import assert_almost_equal
         from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NewtonSolver, \
             DirectSolver, DenseJacobian, BalanceComp
-
-        n = 1
 
         prob = Problem(model=Group())
 
