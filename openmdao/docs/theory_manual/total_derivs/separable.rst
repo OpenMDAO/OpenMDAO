@@ -53,9 +53,9 @@ The two dense columns corresponding to :math:`a, b` mean that all of the outputs
    :alt: Two linear solves needed for the two non-separable variables
 
 Normally, each of the remaining variables (:math:`c, d, e`) would also need their own linear solves, as shown below.
-In the red solution vector and green right hand side vector, the zero values are denoted by the lighter colored boxes.
+In the solution and right hand side vectors, the zero values are denoted by the lighter colored blocks.
 The non-zero values are denoted by the darker colored blocks.
-Notice how the three solution vectors vectors have no overlapping non-zero values.
+Notice how the three solution vectors have no overlapping non-zero values.
 
 .. figure:: matrix_figs/simultaneous_sparse_separate.png
    :align: center
@@ -84,7 +84,7 @@ Then the task of finding the separable variables can be performed using a graph 
 In that case, a set of separable variables are said to have the same color.
 The simple example problem would then have three colors; one each for :math:`a` and :math:`b` and one more for :math:`c,d,e`.
 
-So if you know the total derivative Jacobian then, in theory, you could color any arbitrary problem.
+For any arbitrary problem, once you know the total derivative Jacobian then, in theory, you could color it.
 Since OpenMDAO can compute the total derivative Jacobian, it would seem to be simply a matter of applying a coloring algorithm to it.
 However there is a potential pitfall that needs to be accounted for.
 For any arbitrary point in the design space there some total derivatives could turn out to be zero, despite the fact that they are non-zero at other locations.

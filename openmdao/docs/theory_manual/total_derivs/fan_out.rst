@@ -30,18 +30,18 @@ However the block diagonal structure for :code:`s1,z1` and :code:`s2,z2` means t
 
 .. figure:: matrix_figs/parallel_adj_jac.png
    :align: center
-   :width: 40%
+   :width: 80%
    :alt: Jacobian structure for fan-out models
 
 
 If we want to compute the derivatives :math:`\frac{dz1}{dx}` and :math:`\frac{dz2}{dx}`, then reverse mode preferred because it requires 2 linear solves instead of 100, but there is an inherent inefficiency that will limit the parallel scalability of reverse mode that needs to be considered as well.
 Given the feed-forward structure of this model the :ref:`LinearRunOnce<lnrunonce>` solver is recommended, which will use a back-substitution style algorithm to solve for total derivatives in reverse mode.
-Looking at the linear system needed to solve in reverse mode we see that the dense column for :code:`y` has now become a dense row ---in reverse mode you use :math:`\left[ \frac{\partial R}{\partial U} \right]^T` --- and because we're using back-propagation that dense row now occurs *after* the two parallel constraints in the execution order (remember that order reversed from the forward pass).
+Looking at the linear system needed to solve in reverse mode we see that the dense column for :code:`y` in the partial derivative Jacobian has now become a dense row ---in reverse mode you use :math:`\left[ \frac{\partial R}{\partial U} \right]^T` --- and because we're using back-propagation that dense row now occurs *after* the two parallel constraints in the execution order (remember that order reversed from the forward pass).
 You can see that in each of the two solution vectors, the entries for :code:`y` and :code:`x` are highlighted as non-zero and hence they would overlap if you tried to perform both linear solves at the same time.
 
 .. figure:: matrix_figs/parallel_adj_separate.png
    :align: center
-   :width: 50%
+   :width: 75%
    :alt: Jacobian structure for fan-out models
 
 
@@ -69,7 +69,7 @@ The fundamental problem is that both :code:`z1` and :code:`z2` need to back-prop
 However, we already have two processors (one for :code:`s1,z1` and one for :code:`s2,z2`), so we can duplicate :code:`y` and :code:`x` on each processor and then handle the back-propagation for each of the two linear solves on separate processors.
 At the end of that back-propagation each processor will now have the correct derivative for one of the constraints, and the derivative values need to be all-gathered before they can be used.
 
-This duplication will come with a small additional memory cost, because space for (:code:`x,y`) must now be allocated in the linear vectors on all processors.
+This duplication will come with a small additional memory cost, because space for :code:`x,y` must now be allocated in the linear vectors on all processors.
 As long as the  :code:`s1,z1` and :code:`s2,z1` variables are much larger, this additional memory cost is negligible.
 
 When using this parallelization algorithm, there are still :math:`n` linear solves, for :math:`n` variables, but now all of them can be run in parallel to gain back the scaling that is inherently present in the forward mode for this model structure.
@@ -77,7 +77,7 @@ The linear solves now looks like this:
 
 .. figure:: matrix_figs/parallel_adj_combined.png
    :align: center
-   :width: 50%
+   :width: 75%
    :alt: Jacobian structure for fan-out models using parallel adjoint
 
 Here, each of the two vectors is being solved for on a different processor.
@@ -91,10 +91,15 @@ In the above example there was only a single set of variables computed in parall
 Even if the model was larger and ran with :math:`n` points across :math:`n` processors, all the :math:`z` variables could be combined into a single parallel derivative solve.
 In a parallel coloring sense, all the :math:`z` variables belong to the same color.
 
-Consider a slightly more complex problem where each point output two different variables: :math:`foo` and :math:`bar`.
+Consider a slightly more complex problem where each point output two different variables: :math:`a` and :math:`b`.
 Using standard reverse mode, for :matH:`n` points there would need to be :math:`2n` linear solves to compute all the derivatives.
 Just like before, parallel derivatives are needed to maintain the parallel scaling of the model in reverse mode.
-However, unlike the earlier problem there would now need to be two different colors: one for all the :math:`foo` variables and one for all the :math:`bar` variables.
+However, unlike the earlier problem there would now need to be two different colors: one for all the :math:`a` variables and one for all the :math:`b` variables.
+
+.. figure:: matrix_figs/parallel_adj_2color.png
+   :align: center
+   :width: 75%
+   :alt: Jacobian structure for fan-out model with 2 colors using parallel adjoint
 
 
 .. note::
