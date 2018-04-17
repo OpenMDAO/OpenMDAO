@@ -1,8 +1,8 @@
 .. _sparse-totals:
 
-*****************************
-Sparsity of Total Derivatives
-*****************************
+****************************************
+Computing Sparsity of Total Derivatives
+****************************************
 
 
 If your total derivative jacobian is sparse, certain optimizers, e.g., the SNOPT optimizer

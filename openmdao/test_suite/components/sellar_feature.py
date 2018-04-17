@@ -11,7 +11,7 @@ From Sellar's analytic problem.
 import numpy as np
 
 from openmdao.api import Group, ExplicitComponent, ExecComp, IndepVarComp, \
-                         NonlinearBlockGS, ScipyKrylov
+                         NonlinearBlockGS, ScipyKrylov, DirectSolver
 
 
 class SellarDis1(ExplicitComponent):

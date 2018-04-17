@@ -4,7 +4,7 @@
 Vectorizing Derivative Solves for Array Variables At a Larger Memory Cost
 ****************************************************************************
 
-When a model has a :ref:`feed-forward or uncoupled<theory_selecting_linear_solver>`, data path from design variables to constraints, then you can you can use the default :ref:`LinearRunOnce<lnrunonce>` solver to compute total derivatives.
+When a model has a :ref:`feed-forward<theory_selecting_linear_solver>` (i.e. uncoupled) data path from design variables to constraints, then you can you can use the default :ref:`LinearRunOnce<lnrunonce>` solver to compute total derivatives.
 This solver will recurse down through your model computing matrix-vector products as it goes, and will compute derivatives one design variable at a time or one constraint at a time in forward or reverse modes respectively.
 Consider what this means if you have a design variable or constraint composed of a large array.
 In this case, the recursive algorithm is called once per entry in the variable.
