@@ -6,14 +6,14 @@ Solving for Derivatives of Multiple Separable Constraints Using a Single Linear 
 
 A set of constraints are separable when there are subsets of the design variables that don't affect any of the responses.
 In other words, there is some subset of columns of the **total derivative Jacobian** where none of those columns have nonzero values in any of the same rows.
-This kind of sparsity structure in the total derivative Jacobian allows OpenMDAO to solve for compute multiple total derivatives simultaneously, which can dramatically reduce the cost of computing total derivatives.
+This kind of sparsity structure in the total derivative Jacobian allows OpenMDAO to solve for multiple total derivatives simultaneously, which can dramatically reduce the cost of computing total derivatives.
 Remember that OpenMDAO solves the :ref:`unified derivative equations<theory_total_derivatives>` to compute total derivatives
 
 .. math::
 
     \left[\frac{\partial \mathcal{R}}{\partial U}\right] \left[\frac{du}{dr}\right] = \left[ I \right] = \left[\frac{\partial \mathcal{R}}{\partial U}\right]^T \left[\frac{du}{dr}\right]^T .
 
-When separable constraints are present multiple right hand sides from :math:`\left[ I \right]` can be combined into a single right hand side vector and then total derivatives for multiple variables can be computed with a single linear solve.
+When separable constraints are present, multiple right hand sides from :math:`\left[ I \right]` can be combined into a single right hand side vector and then total derivatives for multiple variables can be computed with a single linear solve.
 Normally, summing multiple right hand side vectors would result in the solution vector holding linear combinations of multiple derivatives:
 
 .. math::
