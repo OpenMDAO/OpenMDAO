@@ -447,9 +447,9 @@ class TestJacobian(unittest.TestCase):
         model.linear_solver = LinearBlockGS()
         sup.linear_solver = LinearBlockGS()
 
-        sub1.jacobian = DenseJacobian()
+        sub1.jacobian = CSCJacobian()
         sub1.linear_solver = DirectSolver()
-        sub2.jacobian = DenseJacobian()
+        sub2.jacobian = CSCJacobian()
         sub2.linear_solver = DirectSolver()
         prob.set_solver_print(level=0)
 
@@ -461,6 +461,8 @@ class TestJacobian(unittest.TestCase):
 
         # Make sure we don't get a size mismatch.
         derivs = prob.compute_totals(of=of, wrt=wrt)
+        for key in derivs:
+            print(key, derivs[key])
 
     def test_assembled_jac_bad_key(self):
         # this test fails if AssembledJacobian._update sets in_start with 'output' instead of 'input'

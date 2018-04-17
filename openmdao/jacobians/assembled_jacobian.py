@@ -375,9 +375,7 @@ class AssembledJacobian(Jacobian):
                             masked_mtx = np.ma.array(ext_mtx._matrix, mask=mask, fill_value=0.0)
 
                             masked_product = np.ma.dot(masked_mtx.T, dresids).flatten()
-
-                            for set_name, data in iteritems(d_inputs._data):
-                                data += np.ma.filled(masked_product, fill_value=0.0)
+                            d_inputs.iadd_data(np.ma.filled(masked_product, fill_value=0.0))
                         else:  # sparse matrix
                             d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None, mask=mask_cols))
                     else:
@@ -401,24 +399,19 @@ def _create_mask_cache(d_inputs, ext_mtx):
         The mask array or None.
     """
     if len(d_inputs._views) > len(d_inputs._names):
-        mask = np.zeros(len(d_inputs), dtype=np.bool)
         sub = d_inputs._names
         if isinstance(ext_mtx, DenseMatrix):
-            for name in d_inputs._views:
-                if name not in sub:
-                    # TODO: For now, we figure out where each variable in the matrix is using
-                    # the matrix metadata, but this is not ideal. The framework does not provide
-                    # this information cleanly, but an upcoming refactor will address this.
-                    for key, val in iteritems(ext_mtx._metadata):
-                        if key[1] == name:
-                            mask[val[1]] = True
+            mask = np.ones(len(d_inputs), dtype=np.bool)
+            for key, val in iteritems(ext_mtx._metadata):
+                if key[1] in sub:
+                    mask[val[1]] = False
+
         else:  # sparse matrix type
-            for name in d_inputs._views:
-                if name not in sub:
-                    for key, val in iteritems(ext_mtx._key_ranges):
-                        if key[1] == name:
-                            ind1, ind2, _ = val
-                            mask[ind1:ind2] = True
+            mask = np.zeros(ext_mtx._matrix.data.size, dtype=np.bool)
+            for key, val in iteritems(ext_mtx._key_ranges):
+                if key[1] in sub:
+                    ind1, ind2, _ = val
+                    mask[ind1:ind2] = True
 
         return mask
 

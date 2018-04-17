@@ -52,9 +52,9 @@ class COOMatrix(Matrix):
                     delta = full_size
                 else:
                     delta = shape[0] * len(src_indices)
-            elif rows is None:
+            elif rows is None:  # sparse matrix
                 delta = val.data.size
-            else:
+            else:  # list sparse format
                 delta = len(rows)
 
             if loc in locations:
