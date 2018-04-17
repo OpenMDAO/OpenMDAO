@@ -151,7 +151,8 @@ class SqliteRecorder(BaseRecorder):
                 self.cursor.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, "
                                     "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                                     "success INT, msg TEXT, abs_err REAL, rel_err REAL, "
-                                    "solver_output BLOB, solver_residuals BLOB)")
+                                    "solver_inputs BLOB, solver_output BLOB, "
+                                    "solver_residuals BLOB)")
 
                 self.cursor.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
                                     "model_viewer_data BLOB)")
@@ -190,13 +191,35 @@ class SqliteRecorder(BaseRecorder):
                     self._prom2abs[io][v] = list(set(self._prom2abs[io][v]) |
                                                  set(system._var_allprocs_prom2abs_list[io][v]))
 
-        # grab all of the units
+        # grab all of the units and type
         states = system._list_states_allprocs()
-        for name in system._var_allprocs_abs2meta:
+        desvars = system.get_design_vars(True)
+        responses = system.get_responses(True)
+        objectives = system.get_objectives(True)
+        constraints = system.get_constraints(True)
+        inputs = system._var_allprocs_abs_names['input']
+        outputs = system._var_allprocs_abs_names['output']
+        full_var_set = [(inputs, 'input'), (outputs, 'output'),
+                        (desvars, 'desvar'), (responses, 'response'),
+                        (objectives, 'objective'), (constraints, 'constraint')]
+
+        for var_set, var_type in full_var_set:
+            for name in var_set:
+                if name not in self._abs2meta:
+                    self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy()
+                    self._abs2meta[name]['type'] = set()
+                if var_type not in self._abs2meta[name]['type']:
+                    self._abs2meta[name]['type'].add(var_type)
+                self._abs2meta[name]['explicit'] = True
+                if name in states:
+                    self._abs2meta[name]['explicit'] = False
+
+        for name in inputs:
             self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy()
-            self._abs2meta[name]['type'] = 'Explicit'
+            self._abs2meta[name]['type'] = 'input'
+            self._abs2meta[name]['explicit'] = True
             if name in states:
-                self._abs2meta[name]['type'] = 'Implicit'
+                self._abs2meta[name]['explicit'] = False
 
         # store the updated abs2prom and prom2abs
         abs2prom = pickle.dumps(self._abs2prom)
@@ -310,24 +333,28 @@ class SqliteRecorder(BaseRecorder):
         """
         abs = data['abs']
         rel = data['rel']
+        inputs = data['i']
         outputs = data['o']
         residuals = data['r']
 
+        inputs_array = values_to_array(inputs)
         outputs_array = values_to_array(outputs)
         residuals_array = values_to_array(residuals)
 
+        inputs_blob = array_to_blob(inputs_array)
         outputs_blob = array_to_blob(outputs_array)
         residuals_blob = array_to_blob(residuals_array)
 
         with self.con:
             self.cursor.execute("INSERT INTO solver_iterations(counter, iteration_coordinate, "
-                                "timestamp, success, msg, abs_err, rel_err, solver_output, "
-                                "solver_residuals) VALUES(?,?,?,?,?,?,?,?,?)",
+                                "timestamp, success, msg, abs_err, rel_err, "
+                                "solver_inputs, solver_output, solver_residuals) "
+                                "VALUES(?,?,?,?,?,?,?,?,?,?)",
                                 (self._counter, self._iteration_coordinate,
                                  metadata['timestamp'],
                                  metadata['success'], metadata['msg'],
                                  abs, rel,
-                                 outputs_blob, residuals_blob))
+                                 inputs_blob, outputs_blob, residuals_blob))
 
             self.cursor.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
                                 ('solver', self.cursor.lastrowid))

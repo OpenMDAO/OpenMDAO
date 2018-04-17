@@ -23,7 +23,8 @@ class Case(object):
         Message associated with the case.
     """
 
-    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg):
+    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, inputs=None,
+                 outputs=None, residuals=None):
         """
         Initialize.
 
@@ -41,6 +42,12 @@ class Case(object):
             Success flag for the case.
         msg : str
             Message associated with the case.
+        inputs : array
+            Inputs to read in from the recording file.
+        outputs : array
+            Outputs to read in from the recording file.
+        residuals : array
+            Residuals to read in from the recording file.
         """
         self.filename = filename
         self.counter = counter
@@ -49,6 +56,9 @@ class Case(object):
         self.timestamp = timestamp
         self.success = success
         self.msg = msg
+        self.inputs = inputs
+        self.outputs = outputs
+        self.residuals = residuals
 
 
 class DriverCase(Case):
@@ -179,6 +189,8 @@ class SolverCase(Case):
         Solver absolute error that has been read in from the recording file.
     rel_err : array
         Solver relative error that has been read in from the recording file.
+    inputs : array
+        Solver inputs that have been read in from the recording file.
     outputs : PromotedToAbsoluteMap
         Solver outputs that have been read in from the recording file.
     residuals : PromotedToAbsoluteMap
@@ -186,7 +198,7 @@ class SolverCase(Case):
     """
 
     def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg,
-                 abs_err, rel_err, outputs, residuals, prom2abs):
+                 abs_err, rel_err, inputs, outputs, residuals, prom2abs):
         """
         Initialize.
 
@@ -208,6 +220,8 @@ class SolverCase(Case):
             Solver absolute error to read in from the recording file.
         rel_err : array
             Solver relative error to read in from the recording file.
+        inputs : array
+            Solver inputs to read in from the recording file.
         outputs : array
             Solver outputs to read in from the recording file.
         residuals : array
@@ -220,7 +234,10 @@ class SolverCase(Case):
 
         self.abs_err = abs_err
         self.rel_err = rel_err
-        self.outputs = PromotedToAbsoluteMap(outputs[0], prom2abs) if outputs.dtype.names else None
+        self.inputs = PromotedToAbsoluteMap(inputs[0], prom2abs, False) if inputs.dtype.names\
+            else None
+        self.outputs = PromotedToAbsoluteMap(outputs[0], prom2abs) if outputs.dtype.names\
+            else None
         self.residuals = PromotedToAbsoluteMap(residuals[0], prom2abs) if residuals.dtype.names\
             else None
 

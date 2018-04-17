@@ -497,7 +497,7 @@ class SqliteCaseReader(BaseCaseReader):
                     outs['ref'] = meta[name]['ref']
                     outs['ref0'] = meta[name]['ref0']
                     outs['res_ref'] = meta[name]['res_ref']
-                if meta[name]['type'] == 'Explicit':
+                if meta[name]['explicit']:
                     expl_outputs.append((name, outs))
                 else:
                     impl_outputs.append((name, outs))
@@ -825,12 +825,14 @@ class SolverCases(BaseCases):
         con.close()
 
         idx, counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
-            output_blob, residuals_blob = row
+            input_blob, output_blob, residuals_blob = row
 
+        input_array = blob_to_array(input_blob)
         output_array = blob_to_array(output_blob)
         residuals_array = blob_to_array(residuals_blob)
 
         case = SolverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
-                          abs_err, rel_err, output_array, residuals_array, self._prom2abs)
+                          abs_err, rel_err, input_array, output_array, residuals_array,
+                          self._prom2abs)
 
         return case
