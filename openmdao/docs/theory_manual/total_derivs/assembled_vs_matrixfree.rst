@@ -27,7 +27,7 @@ These methods are explicitly computing the elements of that Jacobian matrix, and
 Additionally, if your model has a very large hierarchy (i.e. many levels, many components, many variables) then an assembled Jacobian will likely offer a significant performance advantage.
 The reason that large models benefit is that without the assembled Jacobian, OpenMDAO must recursively loop over each level of the hierarchy, each component, and each variable in order to compute Jacobian-vector products.
 That triple for-loop is rather expensive, and it's much more efficient to collect the Jacobian in a single chunk of memory if possible.
-So even if you are using an iterative linear solver, such as :ref:`ScipyKrylov<scipyiterativesolver>` or :ref:`PetscKrylov<petscKrylov>`
+So even if you are using an iterative linear solver, such as :ref:`ScipyKrylov<scipyiterativesolver>` or :ref:`PetscKrylov<petscKrylov>`, an assembled Jacobian is generally more efficient.
 
 .. note::
     If you want to see how to add an assembled Jacobian to your model, check out :ref:`this feature doc <feature_assembled_jacobian>`.
