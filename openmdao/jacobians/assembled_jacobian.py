@@ -25,9 +25,6 @@ SUBJAC_META_DEFAULTS = {
     'dependent': False,
 }
 
-# TODO : AssembledJacobians currently don't work with some of the more advanced derivatives
-# features, including Matrix-Matrix, Parallel Derivatives, and Multiple Varsets.
-
 
 class AssembledJacobian(Jacobian):
     """
@@ -52,28 +49,26 @@ class AssembledJacobian(Jacobian):
         the jacobian.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, matrix_class):
         """
         Initialize all attributes.
 
         Parameters
         ----------
-        **kwargs : dict
-            options dictionary.
+        matrix_class : type
+            Class to use to create internal matrices.
         """
         global Component
         # avoid circular imports
         from openmdao.core.component import Component
 
         super(AssembledJacobian, self).__init__()
-        self.options.declare('matrix_class', default=DenseMatrix,
-                             desc='<Matrix> class to use in this <Jacobian>.')
-        self.options.update(kwargs)
         self._view_ranges = {}
         self._int_mtx = None
         self._ext_mtx = {}
         self._keymap = {}
         self._mask_caches = {}
+        self._matrix_class = matrix_class
 
         self._subjac_iters = defaultdict(lambda: None)
 
@@ -116,8 +111,8 @@ class AssembledJacobian(Jacobian):
 
         abs2meta = system._var_abs2meta
 
-        self._int_mtx = int_mtx = self.options['matrix_class'](system.comm)
-        ext_mtx = self.options['matrix_class'](system.comm)
+        self._int_mtx = int_mtx = self._matrix_class(system.comm)
+        ext_mtx = self._matrix_class(system.comm)
 
         out_ranges = self._out_ranges = {
             abs_name: self._get_var_range(abs_name, 'output') for abs_name in
@@ -202,7 +197,7 @@ class AssembledJacobian(Jacobian):
         abs2meta = system._var_abs2meta
         ranges = self._view_ranges[system.pathname]
 
-        ext_mtx = self.options['matrix_class'](system.comm)
+        ext_mtx = self._matrix_class(system.comm)
 
         in_offset = {n: self._get_var_range(n, 'input')[0] for n in
                      system._var_allprocs_abs_names['input']}
@@ -433,17 +428,11 @@ class DenseJacobian(AssembledJacobian):
     Assemble dense global <Jacobian>.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            options dictionary.
         """
-        super(DenseJacobian, self).__init__(**kwargs)
-        self.options['matrix_class'] = DenseMatrix
+        super(DenseJacobian, self).__init__(matrix_class=DenseMatrix)
 
 
 class COOJacobian(AssembledJacobian):
@@ -451,17 +440,11 @@ class COOJacobian(AssembledJacobian):
     Assemble sparse global <Jacobian> in Coordinate list format.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            options dictionary.
         """
-        super(COOJacobian, self).__init__(**kwargs)
-        self.options['matrix_class'] = COOMatrix
+        super(COOJacobian, self).__init__(matrix_class=COOMatrix)
 
 
 class CSRJacobian(AssembledJacobian):
@@ -469,17 +452,11 @@ class CSRJacobian(AssembledJacobian):
     Assemble sparse global <Jacobian> in Compressed Row Storage format.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            options dictionary.
         """
-        super(CSRJacobian, self).__init__(**kwargs)
-        self.options['matrix_class'] = CSRMatrix
+        super(CSRJacobian, self).__init__(matrix_class=CSRMatrix)
 
 
 class CSCJacobian(AssembledJacobian):
@@ -487,14 +464,8 @@ class CSCJacobian(AssembledJacobian):
     Assemble sparse global <Jacobian> in Compressed Col Storage format.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            options dictionary.
         """
-        super(CSCJacobian, self).__init__(**kwargs)
-        self.options['matrix_class'] = CSCMatrix
+        super(CSCJacobian, self).__init__(matrix_class=CSCMatrix)
