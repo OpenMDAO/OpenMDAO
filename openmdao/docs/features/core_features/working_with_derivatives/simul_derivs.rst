@@ -286,16 +286,10 @@ The coloring will be written in json format to the given file and can be loaded 
 
     prob.driver.set_simul_deriv_color('my_coloring.json')
 
-Setting the Zero Tolerance
----------------------------
-Because of numerical noise, its possible to get some small non-zero values in the total derivative Jacobian even in places where
-the value should be identically zero.
-To deal with this, you can adjust the zero-tolerance value by setting the  *-t* command line option as follows:
-=======
 
-If you run *openmdao simul_coloring* and it turns out there is no simultaneous coloring available,
-don't be surprised.  Problems that have the necessary total Jacobian sparsity to allow
-simultaneous derivatives are relatively uncommon.
+If you run *openmdao simul_coloring* and it turns out there is no simultaneous coloring available or that you don't gain very much by coloring,
+don't be surprised.
+Problems that have the necessary total Jacobian sparsity to allow simultaneous derivatives are relatively uncommon.
 
 
 Checking that it works
