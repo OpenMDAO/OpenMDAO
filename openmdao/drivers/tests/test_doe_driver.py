@@ -545,10 +545,20 @@ class TestParallelDOE(unittest.TestCase):
             cases = CaseReader("CASES.sql").driver_cases
             print('# cases:', cases.num_cases)
 
-            # self.assertEqual(cases.num_cases, 4)
+            # self.assertEqual(cases.num_cases, 9)
 
             for n in range(cases.num_cases):
-                print(cases.get_case(n).desvars['x'], cases.get_case(n).desvars['y'])
+                case = cases.get_case(n)
+                print('-----------')
+                print('filename:', case.filename)
+                print('counter:', case.counter)
+                print('iteration_coordinate:', case.iteration_coordinate)
+                print('timestamp:', case.timestamp)
+                print('success:', case.success)
+                print('msg:', case.msg)
+                print(cases.get_case(n).desvars['x'],
+                      cases.get_case(n).desvars['y'])
+                      # cases.get_case(n).desvars['f_xy'])
                 # self.assertEqual(cases.get_case(n).desvars['x'], expected[n]['x'])
                 # self.assertEqual(cases.get_case(n).desvars['y'], expected[n]['y'])
                 # self.assertEqual(cases.get_case(n).objectives['f_xy'], expected[n]['f_xy'])

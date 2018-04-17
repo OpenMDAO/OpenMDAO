@@ -37,7 +37,7 @@ def print_recording_iteration_stack():
     print(60 * '^')
 
 
-def get_formatted_iteration_coordinate():
+def get_formatted_iteration_coordinate(rank=None):
     """
     Format the iteration coordinate into human-readable form.
 
@@ -54,10 +54,12 @@ def get_formatted_iteration_coordinate():
     for name, iter_count in recording_iteration.stack:
         iteration_coord_list.append('{}{}{}'.format(name, separator, iter_count))
 
-    if MPI and MPI.COMM_WORLD.rank > 0:
-        rank = MPI.COMM_WORLD.rank
-    else:
-        rank = 0
+    if rank is None:
+        if MPI and MPI.COMM_WORLD.rank > 0:
+            rank = MPI.COMM_WORLD.rank
+        else:
+            rank = 0
+
     formatted_iteration_coordinate = ':'.join(["rank%d" % rank,
                                                separator.join(iteration_coord_list)])
     return formatted_iteration_coordinate

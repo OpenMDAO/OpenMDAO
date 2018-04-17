@@ -294,7 +294,41 @@ class Driver(object):
         self._remote_responses = self._remote_cons.copy()
         self._remote_responses.update(self._remote_objs)
 
-        # Case recording setup
+        # set up case recording
+        self._setup_recording()
+
+        # set up simultaneous deriv coloring
+        if (coloring_mod._use_simul_coloring and self._simul_coloring_info and
+                self.supports['simultaneous_derivatives']):
+            if problem._mode == 'fwd':
+                self._setup_simul_coloring(problem._mode)
+            else:
+                raise RuntimeError("simultaneous derivs are currently not supported in rev mode.")
+
+        desvar_size = np.sum(data['size'] for data in itervalues(self._designvars))
+
+        # if we're using simultaneous derivatives then our effective design var size is less
+        # than the full design var size
+        if self._simul_coloring_info:
+            col_lists = self._simul_coloring_info[0]
+            if col_lists:
+                desvar_size = len(col_lists[0])
+                desvar_size += len(col_lists) - 1
+
+        if ((problem._mode == 'fwd' and desvar_size > response_size) or
+                (problem._mode == 'rev' and response_size > desvar_size)):
+            warnings.warn("Inefficient choice of derivative mode.  You chose '%s' for a "
+                          "problem with %d design variables and %d response variables "
+                          "(objectives and constraints)." %
+                          (problem._mode, desvar_size, response_size), RuntimeWarning)
+
+    def _setup_recording(self):
+        """
+        Setup case recording.
+        """
+        problem = self._problem
+        model = problem.model
+
         mydesvars = myobjectives = myconstraints = myresponses = set()
         mysystem_outputs = set()
         incl = self.recording_options['includes']
@@ -325,19 +359,17 @@ class Driver(object):
 
         # get the includes that were requested for this Driver recording
         if incl:
-            prob = self._problem
-            root = prob.model
             # The my* variables are sets
 
             # First gather all of the desired outputs
             # The following might only be the local vars if MPI
-            mysystem_outputs = {n for n in root._outputs
+            mysystem_outputs = {n for n in model._outputs
                                 if check_path(n, incl, excl)}
 
             # If MPI, and on rank 0, need to gather up all the variables
             #    even those not local to rank 0
             if MPI:
-                all_vars = root.comm.gather(mysystem_outputs, root=0)
+                all_vars = model.comm.gather(mysystem_outputs, root=0)
                 if MPI.COMM_WORLD.rank == 0:
                     mysystem_outputs = all_vars[-1]
                     for d in all_vars[:-1]:
@@ -354,7 +386,7 @@ class Driver(object):
                 raise RuntimeError(
                     "RecordingManager.startup should never be called when "
                     "running in parallel on an inactive System")
-            rrank = self._problem.comm.rank  # root ( aka model ) rank.
+            rrank = problem.comm.rank
             rowned = model._owning_rank
             mydesvars = [n for n in mydesvars if rrank == rowned[n]]
             myresponses = [n for n in myresponses if rrank == rowned[n]]
@@ -376,31 +408,6 @@ class Driver(object):
             self._model_viewer_data = _get_viewer_data(problem)
         if self.recording_options['record_metadata']:
             self._rec_mgr.record_metadata(self)
-
-        # set up simultaneous deriv coloring
-        if (coloring_mod._use_simul_coloring and self._simul_coloring_info and
-                self.supports['simultaneous_derivatives']):
-            if problem._mode == 'fwd':
-                self._setup_simul_coloring(problem._mode)
-            else:
-                raise RuntimeError("simultaneous derivs are currently not supported in rev mode.")
-
-        desvar_size = np.sum(data['size'] for data in itervalues(self._designvars))
-
-        # if we're using simultaneous derivatives then our effective design var size is less
-        # than the full design var size
-        if self._simul_coloring_info:
-            col_lists = self._simul_coloring_info[0]
-            if col_lists:
-                desvar_size = len(col_lists[0])
-                desvar_size += len(col_lists) - 1
-
-        if ((problem._mode == 'fwd' and desvar_size > response_size) or
-                (problem._mode == 'rev' and response_size > desvar_size)):
-            warnings.warn("Inefficient choice of derivative mode.  You chose '%s' for a "
-                          "problem with %d design variables and %d response variables "
-                          "(objectives and constraints)." %
-                          (problem._mode, desvar_size, response_size), RuntimeWarning)
 
     def _get_voi_val(self, name, meta, remote_vois):
         """
@@ -768,9 +775,10 @@ class Driver(object):
         constraints = {name: constraints[name]
                        for name in self._filtered_vars_to_record['con']}
 
+        model = self._problem.model
+
         if self.recording_options['includes']:
-            root = self._problem.model
-            outputs = root._outputs
+            outputs = model._outputs
             # outputsinputs, outputs, residuals = root.get_nonlinear_vectors()
             sysvars = {}
             views = outputs._views
@@ -781,12 +789,11 @@ class Driver(object):
             sysvars = {}
 
         if MPI:
-            root = self._problem.model
-            desvars = self._gather_vars(root, desvars)
-            responses = self._gather_vars(root, responses)
-            objectives = self._gather_vars(root, objectives)
-            constraints = self._gather_vars(root, constraints)
-            sysvars = self._gather_vars(root, sysvars)
+            desvars = self._gather_vars(model, desvars)
+            responses = self._gather_vars(model, responses)
+            objectives = self._gather_vars(model, objectives)
+            constraints = self._gather_vars(model, constraints)
+            sysvars = self._gather_vars(model, sysvars)
 
         data['des'] = desvars
         data['res'] = responses
