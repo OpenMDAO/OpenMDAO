@@ -136,8 +136,6 @@ class AssembledJacobian(Jacobian):
 
         # create the matrix subjacs
         for abs_key, (info, shape) in iteritems(self._subjacs_info):
-            if not info['dependent']:
-                continue
             res_abs_name, wrt_abs_name = abs_key
             # because self._subjacs_info is shared among all 'related' assembled jacs,
             # we use out_ranges (and later in_ranges) to weed out keys outside of this jac
@@ -220,13 +218,10 @@ class AssembledJacobian(Jacobian):
                     if in_abs_name not in system._conn_global_abs_in2out:
                         abs_key = (res_abs_name, in_abs_name)
 
-                        if abs_key in subjacs_info:
-                            info, shape = subjacs_info[abs_key]
-                            if not info['dependent']:
-                                continue
-                        else:
+                        if abs_key not in subjacs_info:
                             continue
 
+                        info, shape = subjacs_info[abs_key]
                         ext_mtx._add_submat(abs_key, info, res_offset - ranges[0],
                                             in_offset[in_abs_name] - ranges[2], None, shape)
 
