@@ -12,7 +12,7 @@ though the speed up comes at the cost of some additional memory allocation withi
 
     Vectorizing derivatives is only viable for variables/constraints that have a purely feed-forward data path through the model.
     If there are any solvers in the path between your variable and the objective/constraint of your model then you should not use this feature!
-    See the :ref:`Theory Manual on vectorized derivatives<theory_vectorized_derivaties>` for a detailed explanation of how this feature works.
+    See the :ref:`Theory Manual on vectorized derivatives<theory_fan_out>` for a detailed explanation of how this feature works.
 
 You can vectorize derivatives in either :code:`fwd` or :code:`rev` modes.
 Below is an example of how to do it for :code:`rev` mode, where you specify an argument to :code:`add_constraint()`.
