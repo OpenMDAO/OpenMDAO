@@ -77,7 +77,7 @@ class EmbedCodeDirective(Directive):
             raise SphinxError("The following layout options are invalid: %s" % bad)
         if 'interleave' in layout and ('code' in layout or 'output' in layout):
             raise SphinxError("The interleave option is mutually exclusive to the code "
-                              "and print options.")
+                              "and output options.")
 
         remove_docstring = 'strip-docstrings' in self.options
         do_run = 'output' in layout or 'interleave' in layout or 'plot' in layout
@@ -116,7 +116,7 @@ class EmbedCodeDirective(Directive):
                     remove_docstrings(inspect.getsource(getattr(class_, 'tearDown')))))
 
                 code_to_run = '\n'.join([self_code, setup_code, source, teardown_code])
-
+                print(code_to_run)
             except Exception:
                 err = traceback.format_exc()
                 raise SphinxError("Problem with embed of " + path + ": \n" + str(err))
@@ -145,6 +145,7 @@ class EmbedCodeDirective(Directive):
                     run_code(code_to_run, path, module=module, cls=class_,
                              shows_plot=True)
             else:
+                print(code_to_run)
                 skipped, failed, run_outputs = \
                     run_code(code_to_run, path, module=module, cls=class_)
 
