@@ -116,7 +116,6 @@ class EmbedCodeDirective(Directive):
                     remove_docstrings(inspect.getsource(getattr(class_, 'tearDown')))))
 
                 code_to_run = '\n'.join([self_code, setup_code, source, teardown_code])
-                print(code_to_run)
             except Exception:
                 err = traceback.format_exc()
                 raise SphinxError("Problem with embed of " + path + ": \n" + str(err))
@@ -145,7 +144,6 @@ class EmbedCodeDirective(Directive):
                     run_code(code_to_run, path, module=module, cls=class_,
                              shows_plot=True)
             else:
-                print(code_to_run)
                 skipped, failed, run_outputs = \
                     run_code(code_to_run, path, module=module, cls=class_)
 
