@@ -543,12 +543,14 @@ class Driver(object):
 
         return {n: self._get_voi_val(n, self._responses[n], self._remote_objs) for n in resps}
 
-    def get_objective_values(self, filter=None):
+    def get_objective_values(self, unscaled=False, filter=None):
         """
         Return objective values.
 
         Parameters
         ----------
+        unscaled : bool
+            Set to True if unscaled (physical) design variables are desired.
         filter : list
             List of objective names used by recorders.
 
@@ -562,9 +564,10 @@ class Driver(object):
         else:
             objs = self._objs
 
-        return {n: self._get_voi_val(n, self._objs[n], self._remote_objs) for n in objs}
+        return {n: self._get_voi_val(n, self._objs[n], self._remote_objs, unscaled=unscaled)
+                for n in objs}
 
-    def get_constraint_values(self, ctype='all', lintype='all', filter=None):
+    def get_constraint_values(self, ctype='all', lintype='all', unscaled=False, filter=None):
         """
         Return constraint values.
 
@@ -576,6 +579,8 @@ class Driver(object):
         lintype : string
             Default is 'all'. Optionally return just the linear constraints
             with 'linear' or the nonlinear constraints with 'nonlinear'.
+        unscaled : bool
+            Set to True if unscaled (physical) design variables are desired.
         filter : list
             List of constraint names used by recorders.
 
@@ -605,7 +610,7 @@ class Driver(object):
             if ctype == 'ineq' and meta['equals'] is not None:
                 continue
 
-            con_dict[name] = self._get_voi_val(name, meta, self._remote_cons)
+            con_dict[name] = self._get_voi_val(name, meta, self._remote_cons, unscaled=unscaled)
 
         return con_dict
 
@@ -958,7 +963,7 @@ class Driver(object):
         Optionally print some debugging information after the model runs.
         """
         if 'nl_cons' in self.options['debug_print']:
-            cons = self.get_constraint_values(lintype='nonlinear')
+            cons = self.get_constraint_values(lintype='nonlinear', unscaled=True)
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Nonlinear constraints")
                 if cons:
@@ -968,7 +973,7 @@ class Driver(object):
                 print()
 
         if 'ln_cons' in self.options['debug_print']:
-            cons = self.get_constraint_values(lintype='linear')
+            cons = self.get_constraint_values(lintype='linear', unscaled=True)
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Linear constraints")
                 if cons:
@@ -978,7 +983,7 @@ class Driver(object):
                 print()
 
         if 'objs' in self.options['debug_print']:
-            objs = self.get_objective_values()
+            objs = self.get_objective_values(unscaled=True)
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Objectives")
                 if objs:
