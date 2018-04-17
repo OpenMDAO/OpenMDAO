@@ -537,7 +537,8 @@ class TestBalanceComp(unittest.TestCase):
 
     def test_feature_scalar(self):
         from numpy.testing import assert_almost_equal
-        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NewtonSolver, DirectSolver, DenseJacobian, BalanceComp
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NewtonSolver, \
+            DirectSolver, DenseJacobian, BalanceComp
 
         n = 1
 
@@ -584,11 +585,58 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
+    def test_feature_scalar_with_default_mult(self):
+        from numpy.testing import assert_almost_equal
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NewtonSolver, \
+            DirectSolver, DenseJacobian, BalanceComp
+
+        n = 1
+
+        prob = Problem(model=Group())
+
+        bal = BalanceComp()
+
+        bal.add_balance('x', use_mult=True, mult_val=2.0)
+
+        tgt = IndepVarComp(name='y_tgt', val=4)
+
+        exec_comp = ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
+
+        prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
+
+        prob.model.add_subsystem(name='exec', subsys=exec_comp)
+
+        prob.model.add_subsystem(name='balance', subsys=bal)
+
+        prob.model.connect('y_tgt', 'balance.rhs:x')
+        prob.model.connect('balance.x', 'exec.x')
+        prob.model.connect('exec.y', 'balance.lhs:x')
+
+        prob.model.linear_solver = DirectSolver()
+
+        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.nonlinear_solver.options['maxiter'] = 100
+        prob.model.nonlinear_solver.options['iprint'] = 0
+
+        prob.model.jacobian = DenseJacobian()
+
+        prob.setup(check=False)
+
+        # A reasonable initial guess to find the positive root.
+        prob['balance.x'] = 1.0
+
+        prob.run_model()
+
+        print('x = ', prob['balance.x'])
+
+        assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
+
     def test_feature_vector(self):
         import numpy as np
         from numpy.testing import assert_almost_equal
 
-        from openmdao.api import Problem, Group, ExecComp, NewtonSolver, DirectSolver, DenseJacobian, BalanceComp
+        from openmdao.api import Problem, Group, ExecComp, NewtonSolver, DirectSolver, \
+            DenseJacobian, BalanceComp
 
         n = 100
 
