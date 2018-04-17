@@ -1680,6 +1680,7 @@ class Group(System):
             approx._init_approximations()
 
             self._jacobian._system = self
+            self._views_assembled_jac = False
             self._jacobian._initialize()
 
         super(Group, self)._setup_jacobians(jacobian, recurse)
