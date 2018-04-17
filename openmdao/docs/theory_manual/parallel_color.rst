@@ -5,8 +5,6 @@
 Parallel Derivative Computation
 *******************************
 
-
-
 Computing derivatives with respect to multiple variables in parallel can result
 in significant performance increases over computing them in serial, but this
 should only be done for models where the sets of variables that are dependent
