@@ -141,7 +141,7 @@ class DOEDriver(Driver):
 
         return False
 
-    def _run_case(self, case=[]):
+    def _run_case(self, case):
         """
         Run case, save exception info and mark the metadata if the case fails.
 
@@ -167,15 +167,13 @@ class DOEDriver(Driver):
                 metadata['success'] = 0
                 metadata['msg'] = traceback.format_exc()
                 print(metadata['msg'])
-                sys.stdout.flush()
 
-            # so we can put the proper rank even when recording on rank 0
+            # so we get the proper rank when recording on rank 0
             if self._comm:
                 metadata['override_rank'] = self._comm.rank
 
+            # save reference to metadata for use in record_iteration
             self._metadata = metadata
-            print('_run_case returning:', self._metadata)
-            sys.stdout.flush()
 
     def _parallel_generator(self, design_vars):
         """
@@ -207,7 +205,7 @@ class DOEDriver(Driver):
 
     def _setup_recording(self):
         """
-        Setup case recording.
+        Set up case recording.
 
         We want to gather the same variables from all processors when running
         in parallel.
@@ -215,15 +213,8 @@ class DOEDriver(Driver):
         super(DOEDriver, self)._setup_recording()
 
         if self._comm:
-            # record on all procs
-            # for recorder in self._rec_mgr._recorders:
-            #     recorder._parallel = True
-            # record all requested vars on all procs
             self._filtered_vars_to_record = \
                 self._comm.bcast(self._filtered_vars_to_record, root=0)
-
-        print('vars_to_record:', self._filtered_vars_to_record)
-        sys.stdout.flush()
 
     def record_iteration(self):
         """
@@ -232,107 +223,68 @@ class DOEDriver(Driver):
         if not self._rec_mgr._recorders:
             return
 
-        print('=====================\nrecord_iteration')
-        print('=====================')
-        sys.stdout.flush()
+        # Get the data to record (collective calls that get across all ranks)
+        opts = self.recording_options
+        filt = self._filtered_vars_to_record
 
-        metadata = self._metadata
-        print(metadata)
-        sys.stdout.flush()
-
-        # Get the data to record
-        data = {}
-        if self.recording_options['record_desvars']:
-            # collective call that gets across all ranks
-            desvars = self.get_design_var_values()
+        if opts['record_desvars']:
+            des_vars = self.get_design_var_values(filt['des'])
         else:
-            desvars = {}
+            des_vars = {}
 
-        if self.recording_options['record_responses']:
-            # responses = self.get_response_values() # not really working yet
-            responses = {}
+        if opts['record_objectives']:
+            obj_vars = self.get_objective_values(filt['obj'])
         else:
-            responses = {}
+            obj_vars = {}
 
-        if self.recording_options['record_objectives']:
-            objectives = self.get_objective_values()
+        if opts['record_constraints']:
+            con_vars = self.get_constraint_values(filt['con'])
         else:
-            objectives = {}
+            con_vars = {}
 
-        if self.recording_options['record_constraints']:
-            constraints = self.get_constraint_values()
+        if False:  # opts['record_responses']:  # not really working yet
+            res_vars = self.get_response_values(filt['res'])
         else:
-            constraints = {}
-
-        desvars = {name: desvars[name]
-                   for name in self._filtered_vars_to_record['des']}
-        # responses not working yet
-        # responses = {name: responses[name] for name in self._filtered_vars_to_record['res']}
-        objectives = {name: objectives[name]
-                      for name in self._filtered_vars_to_record['obj']}
-        constraints = {name: constraints[name]
-                       for name in self._filtered_vars_to_record['con']}
+            res_vars = {}
 
         model = self._problem.model
 
-        if self.recording_options['includes']:
+        if opts['includes']:
             outputs = model._outputs
-            # outputsinputs, outputs, residuals = root.get_nonlinear_vectors()
-            sysvars = {}
             views = outputs._views
-            for name in outputs._names:
-                if name in self._filtered_vars_to_record['sys']:
-                    sysvars[name] = views[name]
+            sys_vars = {name: views[name] for name in outputs._names if name in filt['sys']}
         else:
-            sysvars = {}
+            sys_vars = {}
 
         if self._comm:
+            comm = self._comm
+
             # gather all the case data to proc 0
-            desvars = self._comm.gather(desvars, root=0)
-            print('desvars:', desvars)
-            sys.stdout.flush()
-            responses = self._comm.gather(responses, root=0)
-            print('responses:', responses)
-            sys.stdout.flush()
-            objectives = self._comm.gather(objectives, root=0)
-            print('objectives:', objectives)
-            sys.stdout.flush()
-            constraints = self._comm.gather(constraints, root=0)
-            print('constraints:', constraints)
-            sys.stdout.flush()
-            sysvars = self._comm.gather(sysvars, root=0)
-            print('sysvars:', sysvars)
-            sys.stdout.flush()
-            metadata = self._comm.gather(metadata, root=0)
-            print('metadata:', metadata)
-            sys.stdout.flush()
+            des_vars = comm.gather(des_vars, root=0)
+            res_vars = comm.gather(res_vars, root=0)
+            obj_vars = comm.gather(obj_vars, root=0)
+            con_vars = comm.gather(con_vars, root=0)
+            sys_vars = comm.gather(sys_vars, root=0)
+
+            metadata = comm.gather(self._metadata, root=0)
 
             # on proc 0, record the data for all cases
-            if self._comm.rank == 0:
-                for i in range(self._comm.size):
-                    data['des'] = desvars[i]
-                    data['res'] = responses[i]
-                    data['obj'] = objectives[i]
-                    data['con'] = constraints[i]
-                    data['sys'] = sysvars[i]
-
-                    print(i, 'data to record:')
-                    from pprint import pprint
-                    pprint(data)
-                    pprint(metadata[i])
-                    sys.stdout.flush()
+            if comm.rank == 0:
+                data = {}
+                for i in range(comm.size):
+                    data['des'] = des_vars[i]
+                    data['res'] = res_vars[i]
+                    data['obj'] = obj_vars[i]
+                    data['con'] = con_vars[i]
+                    data['sys'] = sys_vars[i]
 
                     self._rec_mgr.record_iteration(self, data, metadata[i])
-                    print(i, 'data recorded')
-                    sys.stdout.flush()
-
         else:
-            data['des'] = desvars
-            data['res'] = responses
-            data['obj'] = objectives
-            data['con'] = constraints
-            data['sys'] = sysvars
+            data = {}
+            data['des'] = des_vars
+            data['res'] = res_vars
+            data['obj'] = obj_vars
+            data['con'] = con_vars
+            data['sys'] = sys_vars
 
-            print('data to record:', data, metadata)
-            sys.stdout.flush()
-            self._rec_mgr.record_iteration(self, data, metadata)
+            self._rec_mgr.record_iteration(self, data, self._metadata)

@@ -324,7 +324,7 @@ class Driver(object):
 
     def _setup_recording(self):
         """
-        Setup case recording.
+        Set up case recording.
         """
         problem = self._problem
         model = problem.model

@@ -43,6 +43,11 @@ def get_formatted_iteration_coordinate(rank=None):
 
     'rank0:pyoptsparsedriver|6|root._solve_nonlinear|6|mda._solve_nonlinear|6|mda.d1._solve_nonlinear|45'
 
+    Parameters
+    ----------
+    rank : int or None
+        if not None, the rank to use instead of the current rank.
+
     Returns
     -------
     str :

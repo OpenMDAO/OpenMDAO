@@ -1,7 +1,7 @@
 """
 Test DOE Driver and Generators.
 """
-from __future__ import division
+from __future__ import print_function, division
 
 import unittest
 
@@ -557,8 +557,8 @@ class TestParallelDOE(unittest.TestCase):
                 print('success:', case.success)
                 print('msg:', case.msg)
                 print(cases.get_case(n).desvars['x'],
-                      cases.get_case(n).desvars['y'])
-                      # cases.get_case(n).desvars['f_xy'])
+                      cases.get_case(n).desvars['y'],
+                      cases.get_case(n).objectives['f_xy'])
                 # self.assertEqual(cases.get_case(n).desvars['x'], expected[n]['x'])
                 # self.assertEqual(cases.get_case(n).desvars['y'], expected[n]['y'])
                 # self.assertEqual(cases.get_case(n).objectives['f_xy'], expected[n]['f_xy'])

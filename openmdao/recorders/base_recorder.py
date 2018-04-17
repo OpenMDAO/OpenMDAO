@@ -190,7 +190,8 @@ class BaseRecorder(object):
 
         self._counter += 1
 
-        self._iteration_coordinate = get_formatted_iteration_coordinate(rank=metadata.get('override_rank'))
+        self._iteration_coordinate = \
+            get_formatted_iteration_coordinate(rank=metadata.get('override_rank'))
 
         if isinstance(recording_requester, Driver):
             self.record_iteration_driver(recording_requester, data, metadata)
