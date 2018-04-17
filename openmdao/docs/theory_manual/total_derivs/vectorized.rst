@@ -1,4 +1,4 @@
-.. _theory_vectorized_derivaties:
+.. _theory_vectorized_derivatives:
 
 *************************************************************************
 Vectorizing Derivative Solves for Array Variables At a Larger Memory Cost
