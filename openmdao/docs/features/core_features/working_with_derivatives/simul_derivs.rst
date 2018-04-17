@@ -1,8 +1,8 @@
 .. _feature_simul_coloring:
 
-************************************************
+********************************************
 Simultaneous Coloring For Separable Problems
-************************************************
+********************************************
 
 When OpenMDAO solves for total derivatives, it loops over either design variables in 'fwd' mode
 or responses in 'rev' mode.  For each of those variables, it performs a linear solve for each
@@ -14,14 +14,14 @@ Certain problems have a special kind of sparsity structure in the total derivati
 allows OpenMDAO to solve for multiple derivatives simultaneously. This results in far fewer linear
 solves and much-improved performance.
 These problems are said to have separable variables.
-The concept of separability is explained in the :ref:`theory manual<theory_separable_variables>`.
+The concept of separability is explained in the :ref:`Theory Manual<theory_separable_variables>`.
 
 .. note::
 
    While it is possible for problems to exist where simultaneous reverse solves would be possible,
    OpenMDAO does not currently support simultaneous derivatives in reverse mode.
 
-In order to tell OpenMDAO to take advantage of the separable sparsity in your model, you call the
+In order to tell OpenMDAO to take advantage of the separable sparsity in your model, call the
 :code:`set_simul_deriv_color` method on a :code:`Driver` instance.
 
 .. automethod:: openmdao.core.driver.Driver.set_simul_deriv_color
@@ -287,7 +287,7 @@ The coloring will be written in json format to the given file and can be loaded 
     prob.driver.set_simul_deriv_color('my_coloring.json')
 
 
-If you run *openmdao simul_coloring* and it turns out there is no simultaneous coloring available or that you don't gain very much by coloring,
+If you run *openmdao simul_coloring* and it turns out there is no simultaneous coloring available, or that you don't gain very much by coloring,
 don't be surprised.
 Problems that have the necessary total Jacobian sparsity to allow simultaneous derivatives are relatively uncommon.
 
