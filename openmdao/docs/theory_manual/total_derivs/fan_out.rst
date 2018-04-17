@@ -69,7 +69,7 @@ The fundamental problem is that both :code:`z1` and :code:`z2` need to back-prop
 However, we already have two processors (one for :code:`s1,z1` and one for :code:`s2,z2`), so we can duplicate :code:`y` and :code:`x` on each processor and then handle the back-propagation for each of the two linear solves on separate processors.
 At the end of that back-propagation each processor will now have the correct derivative for one of the constraints, and the derivative values need to be all-gathered before they can be used.
 
-This duplication will come with potentially a small additional memory cost, because space for (:code:`x,y`) must now be allocated in the linear vectors on all processors.
+This duplication will come with a small additional memory cost, because space for (:code:`x,y`) must now be allocated in the linear vectors on all processors.
 As long as the  :code:`s1,z1` and :code:`s2,z1` variables are much larger, this additional memory cost is negligible.
 
 When using this parallelization algorithm, there are still :math:`n` linear solves, for :math:`n` variables, but now all of them can be run in parallel to gain back the scaling that is inherently present in the forward mode for this model structure.
