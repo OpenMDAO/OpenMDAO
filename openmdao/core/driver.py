@@ -740,66 +740,54 @@ class Driver(object):
         if not self._rec_mgr._recorders:
             return
 
-        metadata = create_local_meta(self._get_name())
+        # Get the data to record (collective calls that get across all ranks)
+        opts = self.recording_options
+        filt = self._filtered_vars_to_record
 
-        # Get the data to record
-        data = {}
-        if self.recording_options['record_desvars']:
-            # collective call that gets across all ranks
-            desvars = self.get_design_var_values()
+        if opts['record_desvars']:
+            des_vars = self.get_design_var_values(filt['des'])
         else:
-            desvars = {}
+            des_vars = {}
 
-        if self.recording_options['record_responses']:
-            # responses = self.get_response_values() # not really working yet
-            responses = {}
+        if opts['record_objectives']:
+            obj_vars = self.get_objective_values(filt['obj'])
         else:
-            responses = {}
+            obj_vars = {}
 
-        if self.recording_options['record_objectives']:
-            objectives = self.get_objective_values()
+        if opts['record_constraints']:
+            con_vars = self.get_constraint_values(filt['con'])
         else:
-            objectives = {}
+            con_vars = {}
 
-        if self.recording_options['record_constraints']:
-            constraints = self.get_constraint_values()
+        if False:  # opts['record_responses']:  # not really working yet
+            res_vars = self.get_response_values(filt['res'])
         else:
-            constraints = {}
-
-        desvars = {name: desvars[name]
-                   for name in self._filtered_vars_to_record['des']}
-        # responses not working yet
-        # responses = {name: responses[name] for name in self._filtered_vars_to_record['res']}
-        objectives = {name: objectives[name]
-                      for name in self._filtered_vars_to_record['obj']}
-        constraints = {name: constraints[name]
-                       for name in self._filtered_vars_to_record['con']}
+            res_vars = {}
 
         model = self._problem.model
 
-        if self.recording_options['includes']:
+        if opts['includes']:
             outputs = model._outputs
-            # outputsinputs, outputs, residuals = root.get_nonlinear_vectors()
-            sysvars = {}
             views = outputs._views
-            for name in outputs._names:
-                if name in self._filtered_vars_to_record['sys']:
-                    sysvars[name] = views[name]
+            sys_vars = {name: views[name] for name in outputs._names if name in filt['sys']}
         else:
-            sysvars = {}
+            sys_vars = {}
 
         if MPI:
-            desvars = self._gather_vars(model, desvars)
-            responses = self._gather_vars(model, responses)
-            objectives = self._gather_vars(model, objectives)
-            constraints = self._gather_vars(model, constraints)
-            sysvars = self._gather_vars(model, sysvars)
+            des_vars = self._gather_vars(model, des_vars)
+            res_vars = self._gather_vars(model, res_vars)
+            obj_vars = self._gather_vars(model, obj_vars)
+            con_vars = self._gather_vars(model, con_vars)
+            sys_vars = self._gather_vars(model, sys_vars)
 
-        data['des'] = desvars
-        data['res'] = responses
-        data['obj'] = objectives
-        data['con'] = constraints
-        data['sys'] = sysvars
+        data = {}
+        data['des'] = des_vars
+        data['res'] = res_vars
+        data['obj'] = obj_vars
+        data['con'] = con_vars
+        data['sys'] = sys_vars
+
+        metadata = create_local_meta(self._get_name())
 
         self._rec_mgr.record_iteration(self, data, metadata)
 
