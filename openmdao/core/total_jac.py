@@ -350,7 +350,7 @@ class _TotalJacInfo(object):
                 if matmat or parallel_deriv_color:
                     rhsname = name
 
-                    if parallel_deriv_color:
+                    if parallel_deriv_color and self.debug_print:
                         if parallel_deriv_color not in self.par_deriv:
                             self.par_deriv[parallel_deriv_color] = []
                         self.par_deriv[parallel_deriv_color].append(name)
