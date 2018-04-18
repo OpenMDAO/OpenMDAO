@@ -339,10 +339,10 @@ class AssembledJacobian(Jacobian):
 
                     # Masking
                     try:
-                        mask = self._mask_caches[d_inputs._names, mode]
+                        mask = self._mask_caches[d_inputs._names]
                     except KeyError:
-                        mask = ext_mtx._create_mask_cache(d_inputs, d_residuals, mode)
-                        self._mask_caches[d_inputs._names, mode] = mask
+                        mask = ext_mtx._create_mask_cache(d_inputs)
+                        self._mask_caches[d_inputs._names] = mask
 
                     d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, None, mask=mask))
 
@@ -355,12 +355,12 @@ class AssembledJacobian(Jacobian):
 
                     # Masking
                     try:
-                        mask_cols = self._mask_caches[d_inputs._names, mode]
+                        mask = self._mask_caches[d_inputs._names]
                     except KeyError:
-                        mask_cols = ext_mtx._create_mask_cache(d_inputs, d_residuals, mode)
-                        self._mask_caches[d_inputs._names, mode] = mask_cols
+                        mask = ext_mtx._create_mask_cache(d_inputs)
+                        self._mask_caches[d_inputs._names] = mask
 
-                    d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None, mask=mask_cols))
+                    d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None, mask=mask))
 
 
 class DenseJacobian(AssembledJacobian):

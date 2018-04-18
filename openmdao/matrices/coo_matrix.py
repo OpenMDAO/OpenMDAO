@@ -259,7 +259,7 @@ class COOMatrix(Matrix):
                 mat.data = save
                 return val
 
-    def _create_mask_cache(self, d_inputs, d_residuals, mode):
+    def _create_mask_cache(self, d_inputs):
         """
         Create masking array for this matrix.
 
@@ -270,10 +270,6 @@ class COOMatrix(Matrix):
         ----------
         d_inputs : Vector
             The inputs linear vector.
-        d_residuals : Vector
-            The residuals linear vector.
-        mode : str
-            Derivative direction ('fwd' or 'rev').
 
         Returns
         -------
@@ -281,17 +277,10 @@ class COOMatrix(Matrix):
             The mask array or None.
         """
         if len(d_inputs._views) > len(d_inputs._names):
-            if mode == 'fwd':
-                vec = d_inputs
-                key_idx = 1
-            else:
-                vec = d_residuals
-                key_idx = 0
-
-            sub = vec._names
+            input_names = d_inputs._names
             mask = np.ones(self._matrix.data.size, dtype=np.bool)
             for key, val in iteritems(self._key_ranges):
-                if key[key_idx] in sub:
+                if key[1] in input_names:
                     ind1, ind2, _ = val
                     mask[ind1:ind2] = False
 

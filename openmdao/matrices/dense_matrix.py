@@ -178,7 +178,7 @@ class DenseMatrix(Matrix):
                 masked_product = np.ma.dot(masked_mtx.T, in_vec).flatten()
                 return np.ma.filled(masked_product, fill_value=0.0)
 
-    def _create_mask_cache(self, d_inputs, d_residuals, mode):
+    def _create_mask_cache(self, d_inputs):
         """
         Create masking array for this matrix.
 
@@ -189,10 +189,6 @@ class DenseMatrix(Matrix):
         ----------
         d_inputs : Vector
             The inputs linear vector.
-        d_residuals : Vector
-            The residuals linear vector.
-        mode : str
-            Derivative direction ('fwd' or 'rev').
 
         Returns
         -------
