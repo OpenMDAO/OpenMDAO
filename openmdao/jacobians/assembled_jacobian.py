@@ -341,21 +341,10 @@ class AssembledJacobian(Jacobian):
                     try:
                         mask = self._mask_caches[d_inputs._names, mode]
                     except KeyError:
-                        mask = _create_mask_cache(d_inputs, d_residuals, ext_mtx, mode)
+                        mask = ext_mtx._create_mask_cache(d_inputs, d_residuals, mode)
                         self._mask_caches[d_inputs._names, mode] = mask
 
-                    if mask is None:
-                        d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, None))
-                    else:
-                        if isinstance(ext_mtx, DenseMatrix):
-                            inputs_masked = np.ma.array(d_inputs.get_data(), mask=mask)
-
-                            # Use the special dot product function from masking module so that we
-                            # ignore masked parts.
-                            d_residuals.iadd_data(np.ma.dot(ext_mtx._matrix, inputs_masked))
-                        else:
-                            d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, None,
-                                                  mask=mask))
+                    d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, None, mask=mask))
 
             else:  # rev
                 dresids = d_residuals.get_data()
@@ -368,69 +357,10 @@ class AssembledJacobian(Jacobian):
                     try:
                         mask_cols = self._mask_caches[d_inputs._names, mode]
                     except KeyError:
-                        mask_cols = _create_mask_cache(d_inputs, d_residuals, ext_mtx, mode)
+                        mask_cols = ext_mtx._create_mask_cache(d_inputs, d_residuals, mode)
                         self._mask_caches[d_inputs._names, mode] = mask_cols
 
-                    if mask_cols is not None:
-                        # Mask need to be applied to ext_mtx so that we can ignore multiplication
-                        # by certain columns.
-                        if isinstance(ext_mtx, DenseMatrix):
-                            mask = np.zeros(ext_mtx._matrix.T.shape, dtype=np.bool)
-                            mask[mask_cols, :] = True
-                            masked_mtx = np.ma.array(ext_mtx._matrix, mask=mask, fill_value=0.0)
-
-                            masked_product = np.ma.dot(masked_mtx.T, dresids).flatten()
-                            d_inputs.iadd_data(np.ma.filled(masked_product, fill_value=0.0))
-                        else:  # sparse matrix
-                            d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None, mask=mask_cols))
-                    else:
-                        d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None))
-
-
-def _create_mask_cache(d_inputs, d_residuals, ext_mtx, mode):
-    """
-    Create masking array for d_inputs vector.
-
-    Parameters
-    ----------
-    d_inputs : Vector
-        The inputs linear vector.
-    d_residuals : Vector
-        The residuals linear vector.
-    ext_mtx : Matrix
-        External matrix.
-    mode : str
-        Derivative direction ('fwd' or 'rev').
-
-    Returns
-    -------
-    ndarray or None
-        The mask array or None.
-    """
-    if mode == 'fwd':
-        vec = d_inputs
-        key_idx = 1
-    else:
-        vec = d_residuals
-        key_idx = 0
-
-    if len(d_inputs._views) > len(d_inputs._names):
-        if isinstance(ext_mtx, DenseMatrix):
-            sub = d_inputs._names
-            mask = np.ones(len(d_inputs), dtype=np.bool)
-            for key, val in iteritems(ext_mtx._metadata):
-                if key[1] in sub:
-                    mask[val[1]] = False
-
-        else:  # sparse matrix type
-            sub = vec._names
-            mask = np.ones(ext_mtx._matrix.data.size, dtype=np.bool)
-            for key, val in iteritems(ext_mtx._key_ranges):
-                if key[key_idx] in sub:
-                    ind1, ind2, _ = val
-                    mask[ind1:ind2] = False
-
-        return mask
+                    d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None, mask=mask_cols))
 
 
 class DenseJacobian(AssembledJacobian):

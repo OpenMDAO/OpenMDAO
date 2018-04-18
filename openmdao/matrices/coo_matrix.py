@@ -221,7 +221,6 @@ class COOMatrix(Matrix):
             'fwd' or 'rev'.
         ranges : (int, int, int, int)
             Min row, max row, min col, max col for the current system.
-
         mask : ndarray of type bool, or None
             Array used to zero out part of the matrix data.
 
@@ -259,3 +258,41 @@ class COOMatrix(Matrix):
                 val = mat.T.dot(in_vec)
                 mat.data = save
                 return val
+
+    def _create_mask_cache(self, d_inputs, d_residuals, mode):
+        """
+        Create masking array for this matrix.
+
+        Note: this only applies when this Matrix is an 'ext_mtx' inside of a
+        Jacobian object.
+
+        Parameters
+        ----------
+        d_inputs : Vector
+            The inputs linear vector.
+        d_residuals : Vector
+            The residuals linear vector.
+        mode : str
+            Derivative direction ('fwd' or 'rev').
+
+        Returns
+        -------
+        ndarray or None
+            The mask array or None.
+        """
+        if len(d_inputs._views) > len(d_inputs._names):
+            if mode == 'fwd':
+                vec = d_inputs
+                key_idx = 1
+            else:
+                vec = d_residuals
+                key_idx = 0
+
+            sub = vec._names
+            mask = np.ones(self._matrix.data.size, dtype=np.bool)
+            for key, val in iteritems(self._key_ranges):
+                if key[key_idx] in sub:
+                    ind1, ind2, _ = val
+                    mask[ind1:ind2] = False
+
+            return mask
