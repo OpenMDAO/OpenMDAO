@@ -5,6 +5,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, CrossProductComp
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestDotProductCompNx3(unittest.TestCase):
@@ -163,6 +164,57 @@ class TestDotProductCompNonVectorized(unittest.TestCase):
 
     def test_partials(self):
         cpd = self.p.check_partials(out_stream=None, method='cs')
+
+        for comp in cpd:
+            for (var, wrt) in cpd[comp]:
+                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
+                                               desired=cpd[comp][var, wrt]['J_fd'],
+                                               decimal=6)
+
+
+class TestUnits(unittest.TestCase):
+
+    def setUp(self):
+        self.nn = 5
+
+        self.p = Problem(model=Group())
+
+        ivc = IndepVarComp()
+        ivc.add_output(name='a', shape=(self.nn, 3), units='ft')
+        ivc.add_output(name='b', shape=(self.nn, 3), units='lbf')
+
+        self.p.model.add_subsystem(name='ivc',
+                                   subsys=ivc,
+                                   promotes_outputs=['a', 'b'])
+
+        self.p.model.add_subsystem(name='cross_prod_comp',
+                                   subsys=CrossProductComp(vec_size=self.nn,
+                                                           a_units='m', b_units='N',
+                                                           c_units='N*m'))
+
+        self.p.model.connect('a', 'cross_prod_comp.a')
+        self.p.model.connect('b', 'cross_prod_comp.b')
+
+        self.p.setup()
+
+        self.p['a'] = np.random.rand(self.nn, 3)
+        self.p['b'] = np.random.rand(self.nn, 3)
+
+        self.p.run_model()
+
+    def test_results(self):
+
+        for i in range(self.nn):
+            a_i = self.p['a'][i, :]
+            b_i = self.p['b'][i, :]
+            c_i = self.p.get_val('cross_prod_comp.c', units='ft*lbf')[i, :]
+            expected_i = np.cross(a_i, b_i)
+
+            assert_rel_error(self, c_i, expected_i, tolerance=1.0E-12)
+
+    def test_partials(self):
+        np.set_printoptions(linewidth=1024)
+        cpd = self.p.check_partials(compact_print=True)
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:

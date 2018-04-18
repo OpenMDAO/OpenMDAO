@@ -151,6 +151,58 @@ class TestMatrixVectorProductCompNonVectorized(unittest.TestCase):
                                  actual=cpd[comp][var, wrt]['J_fwd'],
                                  desired=cpd[comp][var, wrt]['J_fd'])
 
+
+class TestUnits(unittest.TestCase):
+
+    def setUp(self):
+        self.nn = 5
+
+        self.p = Problem(model=Group())
+
+        ivc = IndepVarComp()
+        ivc.add_output(name='A', shape=(self.nn, 3, 3), units='ft')
+        ivc.add_output(name='x', shape=(self.nn, 3), units='lbf')
+
+        self.p.model.add_subsystem(name='ivc',
+                                   subsys=ivc,
+                                   promotes_outputs=['A', 'x'])
+
+        self.p.model.add_subsystem(name='mat_vec_product_comp',
+                                   subsys=MatrixVectorProductComp(vec_size=self.nn,
+                                                                  A_units='m', x_units='N',
+                                                                  b_units='N*m'))
+
+        self.p.model.connect('A', 'mat_vec_product_comp.A')
+        self.p.model.connect('x', 'mat_vec_product_comp.x')
+
+        self.p.setup(force_alloc_complex=True)
+
+        self.p['A'] = np.random.rand(self.nn, 3, 3)
+        self.p['x'] = np.random.rand(self.nn, 3)
+
+        self.p.run_model()
+
+    def test_results(self):
+
+        for i in range(self.nn):
+            A_i = self.p['A'][i, :, :]
+            x_i = self.p['x'][i, :]
+            b_i = self.p.get_val('mat_vec_product_comp.b', units='ft*lbf')[i, :]
+
+            expected_i = np.dot(A_i, x_i)
+            np.testing.assert_almost_equal(b_i, expected_i)
+
+    def test_partials(self):
+        np.set_printoptions(linewidth=1024)
+        cpd = self.p.check_partials(out_stream=None, method='cs')
+
+        for comp in cpd:
+            for (var, wrt) in cpd[comp]:
+                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
+                                               desired=cpd[comp][var, wrt]['J_fd'],
+                                               decimal=6)
+
+
 class TestForDocs(unittest.TestCase):
 
     def test(self):
