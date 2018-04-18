@@ -5,7 +5,7 @@ from six import string_types
 
 import numpy as np
 
-from openmdao.api import ExplicitComponent
+from openmdao.core.explicitcomponent import ExplicitComponent
 
 
 class DotProductComp(ExplicitComponent):
@@ -31,11 +31,11 @@ class DotProductComp(ExplicitComponent):
         self.metadata.declare('length', types=int, default=3,
                               desc='The length of vectors a and b')
         self.metadata.declare('a_name', types=string_types, default='a',
-                              desc='The variable name for vector a.')
+                              desc='The variable name for input vector a.')
         self.metadata.declare('b_name', types=string_types, default='b',
-                              desc='The variable name for vector b.')
+                              desc='The variable name for input vector b.')
         self.metadata.declare('c_name', types=string_types, default='c',
-                              desc='The variable name for vector c.')
+                              desc='The variable name for output vector c.')
         self.metadata.declare('a_units', types=string_types, default=None, allow_none=True,
                               desc='The units for vector a.')
         self.metadata.declare('b_units', types=string_types, default=None, allow_none=True,

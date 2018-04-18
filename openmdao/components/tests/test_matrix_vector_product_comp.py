@@ -171,7 +171,8 @@ class TestForDocs(unittest.TestCase):
                               promotes_outputs=['A', 'x'])
 
         p.model.add_subsystem(name='mat_vec_product_comp',
-                              subsys=MatrixVectorProductComp(A_name='M', vec_size=nn))
+                              subsys=MatrixVectorProductComp(A_name='M', vec_size=nn,
+                                                             b_name='y', b_units='m'))
 
         p.model.connect('A', 'mat_vec_product_comp.M')
         p.model.connect('x', 'mat_vec_product_comp.x')
@@ -186,10 +187,12 @@ class TestForDocs(unittest.TestCase):
         for i in range(nn):
             A_i = p['A'][i, :, :]
             x_i = p['x'][i, :]
-            b_i = p['mat_vec_product_comp.b'][i, :]
 
-            expected_i = np.dot(A_i, x_i)
-            assert_rel_error(self, b_i, expected_i, 1e-5)
+            expected_i = np.dot(A_i, x_i) * 3.2808399
+            assert_rel_error(self,
+                             p.get_val('mat_vec_product_comp.y', units='ft')[i, :],
+                             expected_i,
+                             tolerance=1.0E-8)
 
 if __name__ == "__main__":
     unittest.main()
