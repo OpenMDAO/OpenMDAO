@@ -6,7 +6,7 @@ from six import string_types
 import numpy as np
 import scipy.linalg as spla
 
-from openmdao.api import ExplicitComponent
+from openmdao.core.explicitcomponent import ExplicitComponent
 
 
 class MatrixVectorProductComp(ExplicitComponent):
@@ -28,7 +28,7 @@ class MatrixVectorProductComp(ExplicitComponent):
 
     otherwise.
 
-    The size of vectors x and b is determined by the number of for rows in m at any point.
+    The size of vectors x and b is determined by the number of rows in m at each point.
     """
 
     def initialize(self):
@@ -129,15 +129,3 @@ class MatrixVectorProductComp(ExplicitComponent):
         # Use the following for sparse partials
         partials[b_name, A_name] = np.repeat(x, A.shape[1], axis=0).ravel()
         partials[b_name, x_name] = A.ravel()
-
-
-def _for_docs():  # pragma: no cover
-    """
-    Provide documentation for metadata of MatrixVectorProductComp.
-
-    Returns
-    -------
-    comp
-        An instance of MatrixVectorProductComp for use by the sphinx doc extensions.
-    """
-    return MatrixVectorProductComp()

@@ -10,28 +10,28 @@ from openmdao.api import Problem, Group, IndepVarComp, CrossProductComp
 class TestDotProductCompNx3(unittest.TestCase):
 
     def setUp(self):
-        self.nn = 5
+        self.n = 5
 
         self.p = Problem(model=Group())
 
         ivc = IndepVarComp()
-        ivc.add_output(name='a', shape=(self.nn, 3))
-        ivc.add_output(name='b', shape=(self.nn, 3))
+        ivc.add_output(name='a', shape=(self.n, 3))
+        ivc.add_output(name='b', shape=(self.n, 3))
 
         self.p.model.add_subsystem(name='ivc',
                                    subsys=ivc,
                                    promotes_outputs=['a', 'b'])
 
         self.p.model.add_subsystem(name='cross_prod_comp',
-                                   subsys=CrossProductComp(vec_size=self.nn))
+                                   subsys=CrossProductComp(vec_size=self.n))
 
         self.p.model.connect('a', 'cross_prod_comp.a')
         self.p.model.connect('b', 'cross_prod_comp.b')
 
         self.p.setup(force_alloc_complex=True)
 
-        self.p['a'] = np.random.rand(self.nn, 3)
-        self.p['b'] = np.random.rand(self.nn, 3)
+        self.p['a'] = np.random.rand(self.n, 3)
+        self.p['b'] = np.random.rand(self.n, 3)
 
         self.p['a'][:, 0] = 2.0
         self.p['a'][:, 1] = 3.0
@@ -45,7 +45,7 @@ class TestDotProductCompNx3(unittest.TestCase):
 
     def test_results(self):
 
-        for i in range(self.nn):
+        for i in range(self.n):
             a_i = self.p['a'][i, :]
             b_i = self.p['b'][i, :]
             c_i = self.p['cross_prod_comp.c'][i, :]
@@ -171,55 +171,48 @@ class TestDotProductCompNonVectorized(unittest.TestCase):
                                                decimal=6)
 
 
-
 class TestForDocs(unittest.TestCase):
 
     def test(self):
         import numpy as np
         from openmdao.api import Problem, Group, IndepVarComp, CrossProductComp
+        from openmdao.utils.assert_utils import assert_rel_error
 
-        nn = 100
+        n = 100
 
         p = Problem(model=Group())
 
         ivc = IndepVarComp()
-        ivc.add_output(name='a', shape=(nn, 3))
-        ivc.add_output(name='b', shape=(nn, 3))
+        ivc.add_output(name='r', shape=(n, 3))
+        ivc.add_output(name='F', shape=(n, 3))
 
         p.model.add_subsystem(name='ivc',
                               subsys=ivc,
-                              promotes_outputs=['a', 'b'])
+                              promotes_outputs=['r', 'F'])
 
         p.model.add_subsystem(name='cross_prod_comp',
-                              subsys=CrossProductComp(vec_size=nn))
+                              subsys=CrossProductComp(vec_size=n,
+                                                      a_name='r', b_name='F', c_name='torque',
+                                                      a_units='m', b_units='N', c_units='N*m'))
 
-        p.model.connect('a', 'cross_prod_comp.a')
-        p.model.connect('b', 'cross_prod_comp.b')
+        p.model.connect('r', 'cross_prod_comp.r')
+        p.model.connect('F', 'cross_prod_comp.F')
 
         p.setup()
 
-        p['a'] = np.random.rand(nn, 3)
-        p['b'] = np.random.rand(nn, 3)
-
-        p['a'][:, 0] = 2.0
-        p['a'][:, 1] = 3.0
-        p['a'][:, 2] = 4.0
-
-        p['b'][:, 0] = 5.0
-        p['b'][:, 1] = 6.0
-        p['b'][:, 2] = 7.0
+        p['r'] = np.random.rand(n, 3)
+        p['F'] = np.random.rand(n, 3)
 
         p.run_model()
 
-        expected = np.zeros_like(p['a'])
-
-        for i in range(nn):
-            a_i = p['a'][i, :]
-            b_i = p['b'][i, :]
-            # c_i = pp['cross_prod_comp.c'][i, :]
-            expected[i, :] = np.cross(a_i, b_i)
-
-        self.assertTrue(np.all(np.abs(p['cross_prod_comp.c'] - expected) < 1.0E-12))
+        # Check the output in units of ft*lbf to ensure that our units work as expected.
+        for i in range(n):
+            a_i = p['r'][i, :]
+            b_i = p['F'][i, :]
+            expected_i = np.cross(a_i, b_i) * 0.73756215
+            assert_rel_error(self,
+                             p.get_val('cross_prod_comp.torque', units='ft*lbf')[i, :],
+                             expected_i, tolerance=1.0E-8)
 
 
 if __name__ == "__main__":

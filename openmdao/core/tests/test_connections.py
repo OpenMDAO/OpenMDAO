@@ -569,6 +569,19 @@ class TestShapes(unittest.TestCase):
                          "for the connection 'indep.x' to 'C1.x'. Expected (5, 2) but "
                          "got (10,).")
 
+    def test_connect_1x1x1_to_1(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', val=np.ones(shape=(1,1,1))))
+        p.model.add_subsystem('C1', ExecComp('y=5*x',
+                                             x={'value': np.zeros((1,))},
+                                             y={'value': np.zeros((1,))}))
+        p.model.connect('indep.x', 'C1.x')
+
+        try:
+            p.setup()
+        except:
+            self.fail('Connecting shape (1,1,1) to shape (1,) raised unexpected exception.')
+
 
         #class TestUBCS(unittest.TestCase):
 

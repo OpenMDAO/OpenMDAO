@@ -4,7 +4,7 @@ from six import string_types
 
 import numpy as np
 
-from openmdao.api import ExplicitComponent
+from openmdao.core.explicitcomponent import ExplicitComponent
 
 
 class CrossProductComp(ExplicitComponent):

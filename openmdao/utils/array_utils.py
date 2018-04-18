@@ -172,13 +172,21 @@ def array_connection_compatible(shape1, shape2):
     size1 = np.prod(ashape1)
     size2 = np.prod(ashape2)
 
+    # Shapes are not connection-compatible if size is different
     if size1 != size2:
         return False
 
     nz1 = np.where(ashape1 > 1)[0]
-    fundamental_shape1 = ashape1[np.min(nz1): np.max(nz1) + 1]
-
     nz2 = np.where(ashape2 > 1)[0]
-    fundamental_shape2 = ashape2[np.min(nz2): np.max(nz2) + 1]
+
+    if len(nz1) > 0:
+        fundamental_shape1 = ashape1[np.min(nz1): np.max(nz1) + 1]
+    else:
+        fundamental_shape1 = np.ones((1,))
+
+    if len(nz2) > 0:
+        fundamental_shape2 = ashape2[np.min(nz2): np.max(nz2) + 1]
+    else:
+        fundamental_shape2 = np.ones((1,))
 
     return np.all(fundamental_shape1 == fundamental_shape2)

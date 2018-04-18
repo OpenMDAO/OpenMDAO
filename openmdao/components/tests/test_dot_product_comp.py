@@ -103,46 +103,52 @@ class TestDotProductCompNx4(unittest.TestCase):
                                                decimal=6)
 
 
-class TestDotProductCompForDocs(unittest.TestCase):
+class TestForDocs(unittest.TestCase):
 
     def test(self):
+        """
+        A simple example to compute power as the dot-product of force and velocity vectors
+        at 100 points simultaneously.
+        """
         import numpy as np
-        from openmdao.api import Problem, Group, IndepVarComp
-        from dymos.components import DotProductComp
+        from openmdao.api import Problem, Group, IndepVarComp, DotProductComp
+        from openmdao.utils.assert_utils import assert_rel_error
 
-        nn = 100
+        n = 100
 
         p = Problem(model=Group())
 
         ivc = IndepVarComp()
-        ivc.add_output(name='a', shape=(nn, 4))
-        ivc.add_output(name='b', shape=(nn, 4))
+        ivc.add_output(name='force', shape=(n, 3))
+        ivc.add_output(name='vel', shape=(n, 3))
 
         p.model.add_subsystem(name='ivc',
                               subsys=ivc,
-                              promotes_outputs=['a', 'b'])
+                              promotes_outputs=['force', 'vel'])
 
-        p.model.add_subsystem(name='dot_prod_comp',
-                              subsys=DotProductComp(num_nodes=nn, vec_size=4))
+        dp_comp = DotProductComp(vec_size=n, length=3, a_name='F', b_name='v', c_name='P',
+                                 a_units='N', b_units='m/s', c_units='W')
 
-        p.model.connect('a', 'dot_prod_comp.a')
-        p.model.connect('b', 'dot_prod_comp.b')
+        p.model.add_subsystem(name='dot_prod_comp', subsys=dp_comp)
+
+        p.model.connect('force', 'dot_prod_comp.F')
+        p.model.connect('vel', 'dot_prod_comp.v')
 
         p.setup()
 
-        p['a'] = np.random.rand(nn, 4)
-        p['b'] = np.random.rand(nn, 4)
+        p['force'] = np.random.rand(n, 3)
+        p['vel'] = np.random.rand(n, 3)
 
         p.run_model()
 
-        expected = np.zeros((nn,))
+        print(p.get_val('dot_prod_comp.P', units='W'))
 
-        for i in range(nn):
-            a_i = p['a'][i, :]
-            b_i = p['b'][i, :]
-            expected[i] = np.dot(a_i, b_i)
-
-        self.assertTrue(np.all(np.abs(p['dot_prod_comp.c'] - expected) < 1.0E-12))
+        # Verify the results against numpy.dot in a for loop.
+        for i in range(n):
+            a_i = p['force'][i, :]
+            b_i = p['vel'][i, :]
+            expected_i = np.dot(a_i, b_i) / 1000.0
+            assert_rel_error(self, p.get_val('dot_prod_comp.P', units='kW')[i], expected_i)
 
 
 if __name__ == '__main__':
