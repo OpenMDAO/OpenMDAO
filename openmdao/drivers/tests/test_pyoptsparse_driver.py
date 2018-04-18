@@ -1353,7 +1353,9 @@ class TestPyoptSparse(unittest.TestCase):
         finally:
             sys.stdout = stdout
 
-        output = strout.getvalue().split('\n')
+        output = strout.getvalue()
+        self.assertTrue('Solving variable: comp.f_xy' in output)
+        self.assertTrue('Solving variable: con.c' in output)
 
     def test_debug_print_option(self):
 
