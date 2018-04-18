@@ -20,6 +20,9 @@ Single-Discipline Optimization
     first_analysis.rst
     first_optimization.rst
 
+
+.. _user_guide_multi_disciplinary_opt:
+
 ------------------------------
 Multidisciplinary Optimization
 ------------------------------

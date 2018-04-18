@@ -490,6 +490,80 @@ def phase_model(order, nphases, dvgroup='pardv', congroup='parc', vectorize=Fals
 
 class MatMatTestCase(unittest.TestCase):
 
+
+    def test_feature_vectorized_derivs(self):
+        import numpy as np
+        from openmdao.api import ExplicitComponent, ExecComp, IndepVarComp, Problem, ScipyOptimizeDriver
+
+        SIZE = 5
+
+        class ExpensiveAnalysis(ExplicitComponent):
+
+            def setup(self):
+
+                self.add_input('x', val=np.ones(SIZE))
+                self.add_input('y', val=np.ones(SIZE))
+
+                self.add_output('f', shape=1)
+
+                self.declare_partials('f', 'x')
+                self.declare_partials('f', 'y')
+
+            def compute(self, inputs, outputs):
+
+                outputs['f'] = np.sum(inputs['x']**inputs['y'])
+
+            def compute_partials(self, inputs, J):
+
+                J['f', 'x'] = inputs['y']*inputs['x']**(inputs['y']-1)
+                J['f', 'y'] = (inputs['x']**inputs['y'])*np.log(inputs['x'])
+
+        class CheapConstraint(ExplicitComponent):
+
+            def setup(self):
+
+                self.add_input('y', val=np.ones(SIZE))
+                self.add_output('g', shape=SIZE)
+
+                row_col = np.arange(SIZE, dtype=int)
+                self.declare_partials('g', 'y', rows=row_col, cols=row_col)
+
+                self.limit = 2*np.arange(SIZE)
+
+            def compute(self, inputs, outputs):
+
+                outputs['g'] = inputs['y']**2 - self.limit
+
+            def compute_partials(self, inputs, J):
+
+                J['g', 'y'] = 2*inputs['y']
+
+
+        p = Problem()
+
+        dvs = p.model.add_subsystem('des_vars', IndepVarComp(), promotes=['*'])
+        dvs.add_output('x', 2*np.ones(SIZE))
+        dvs.add_output('y', 2*np.ones(SIZE))
+
+        p.model.add_subsystem('obj', ExpensiveAnalysis(), promotes=['x', 'y', 'f'])
+        p.model.add_subsystem('constraint', CheapConstraint(), promotes=['y', 'g'])
+
+        p.model.add_design_var('x', lower=.1, upper=10000)
+        p.model.add_design_var('y', lower=-1000, upper=10000)
+        p.model.add_constraint('g', upper=0, vectorize_derivs=True)
+        p.model.add_objective('f')
+
+
+        p.setup(mode='rev')
+
+        p.run_model()
+
+        p.driver = ScipyOptimizeDriver()
+        p.run_driver()
+
+        assert_rel_error(self, p['x'], [0.10000691, 0.1, 0.1, 0.1, 0.1], 1e-5)
+        assert_rel_error(self, p['y'], [0, 1.41421, 2.0, 2.44948, 2.82842], 1e-5)
+
     def test_simple_multi_fwd(self):
         p, expected = simple_model(order=20, vectorize=True)
 
