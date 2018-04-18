@@ -222,6 +222,9 @@ class COOMatrix(Matrix):
         ranges : (int, int, int, int)
             Min row, max row, min col, max col for the current system.
 
+        mask : ndarray of type bool, or None
+            Array used to zero out part of the matrix data.
+
         Returns
         -------
         ndarray[:]
@@ -239,6 +242,20 @@ class COOMatrix(Matrix):
                                    "is currently not supported.")
 
         if mode == 'fwd':
-            return mat.dot(in_vec)
+            if mask is None:
+                return mat.dot(in_vec)
+            else:
+                save = mat.data.copy()
+                mat.data[mask] = 0.0
+                val = mat.dot(in_vec)
+                mat.data = save
+                return val
         else:  # rev
-            return mat.T.dot(in_vec)
+            if mask is None:
+                return mat.T.dot(in_vec)
+            else:
+                save = mat.data.copy()
+                mat.data[mask] = 0.0
+                val = mat.T.dot(in_vec)
+                mat.data = save
+                return val

@@ -44,6 +44,8 @@ class AssembledJacobian(Jacobian):
     _mask_caches : dict
         Contains masking arrays for when a subset of the variables are present in a vector, keyed
         by the input._names set.
+    _matrix_class : type
+        Class used to create Matrix objects.
     _subjac_iters : dict
         Mapping of system pathname to tuple of lists of absolute key tuples used to index into
         the jacobian.
@@ -337,20 +339,23 @@ class AssembledJacobian(Jacobian):
 
                     # Masking
                     try:
-                        mask = self._mask_caches[d_inputs._names]
+                        mask = self._mask_caches[d_inputs._names, mode]
                     except KeyError:
-                        mask = _create_mask_cache(d_inputs, ext_mtx)
-                        self._mask_caches[d_inputs._names] = mask
+                        mask = _create_mask_cache(d_inputs, d_residuals, ext_mtx, mode)
+                        self._mask_caches[d_inputs._names, mode] = mask
 
-                    if mask is not None:
-                        inputs_masked = np.ma.array(d_inputs.get_data(), mask=mask)
-
-                        # Use the special dot product function from masking module so that we
-                        # ignore masked parts.
-                        d_residuals.iadd_data(np.ma.dot(ext_mtx._matrix, inputs_masked))
-
-                    else:
+                    if mask is None:
                         d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, None))
+                    else:
+                        if isinstance(ext_mtx, DenseMatrix):
+                            inputs_masked = np.ma.array(d_inputs.get_data(), mask=mask)
+
+                            # Use the special dot product function from masking module so that we
+                            # ignore masked parts.
+                            d_residuals.iadd_data(np.ma.dot(ext_mtx._matrix, inputs_masked))
+                        else:
+                            d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, None,
+                                                  mask=mask))
 
             else:  # rev
                 dresids = d_residuals.get_data()
@@ -361,10 +366,10 @@ class AssembledJacobian(Jacobian):
 
                     # Masking
                     try:
-                        mask_cols = self._mask_caches[d_inputs._names]
+                        mask_cols = self._mask_caches[d_inputs._names, mode]
                     except KeyError:
-                        mask_cols = _create_mask_cache(d_inputs, ext_mtx)
-                        self._mask_caches[d_inputs._names] = mask_cols
+                        mask_cols = _create_mask_cache(d_inputs, d_residuals, ext_mtx, mode)
+                        self._mask_caches[d_inputs._names, mode] = mask_cols
 
                     if mask_cols is not None:
                         # Mask need to be applied to ext_mtx so that we can ignore multiplication
@@ -382,7 +387,7 @@ class AssembledJacobian(Jacobian):
                         d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None))
 
 
-def _create_mask_cache(d_inputs, ext_mtx):
+def _create_mask_cache(d_inputs, d_residuals, ext_mtx, mode):
     """
     Create masking array for d_inputs vector.
 
@@ -390,28 +395,40 @@ def _create_mask_cache(d_inputs, ext_mtx):
     ----------
     d_inputs : Vector
         The inputs linear vector.
+    d_residuals : Vector
+        The residuals linear vector.
     ext_mtx : Matrix
         External matrix.
+    mode : str
+        Derivative direction ('fwd' or 'rev').
 
     Returns
     -------
     ndarray or None
         The mask array or None.
     """
+    if mode == 'fwd':
+        vec = d_inputs
+        key_idx = 1
+    else:
+        vec = d_residuals
+        key_idx = 0
+
     if len(d_inputs._views) > len(d_inputs._names):
-        sub = d_inputs._names
         if isinstance(ext_mtx, DenseMatrix):
+            sub = d_inputs._names
             mask = np.ones(len(d_inputs), dtype=np.bool)
             for key, val in iteritems(ext_mtx._metadata):
                 if key[1] in sub:
                     mask[val[1]] = False
 
         else:  # sparse matrix type
-            mask = np.zeros(ext_mtx._matrix.data.size, dtype=np.bool)
+            sub = vec._names
+            mask = np.ones(ext_mtx._matrix.data.size, dtype=np.bool)
             for key, val in iteritems(ext_mtx._key_ranges):
-                if key[1] in sub:
+                if key[key_idx] in sub:
                     ind1, ind2, _ = val
-                    mask[ind1:ind2] = True
+                    mask[ind1:ind2] = False
 
         return mask
 
