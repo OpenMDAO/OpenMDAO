@@ -103,6 +103,57 @@ class TestDotProductCompNx4(unittest.TestCase):
                                                decimal=6)
 
 
+class TestUnits(unittest.TestCase):
+
+    def setUp(self):
+        self.nn = 5
+
+        self.p = Problem(model=Group())
+
+        ivc = IndepVarComp()
+        ivc.add_output(name='a', shape=(self.nn, 3), units='lbf')
+        ivc.add_output(name='b', shape=(self.nn, 3), units='ft/s')
+
+        self.p.model.add_subsystem(name='ivc',
+                                   subsys=ivc,
+                                   promotes_outputs=['a', 'b'])
+
+        self.p.model.add_subsystem(name='dot_prod_comp',
+                                   subsys=DotProductComp(vec_size=self.nn,
+                                                         a_units='N', b_units='m/s',
+                                                         c_units='W'))
+
+        self.p.model.connect('a', 'dot_prod_comp.a')
+        self.p.model.connect('b', 'dot_prod_comp.b')
+
+        self.p.setup()
+
+        self.p['a'] = np.random.rand(self.nn, 3)
+        self.p['b'] = np.random.rand(self.nn, 3)
+
+        self.p.run_model()
+
+    def test_results(self):
+
+        for i in range(self.nn):
+            a_i = self.p['a'][i, :]
+            b_i = self.p['b'][i, :]
+            c_i = self.p.get_val('dot_prod_comp.c', units='hp')[i]
+            expected_i = np.dot(a_i, b_i) / 550.0
+
+            np.testing.assert_almost_equal(c_i, expected_i)
+
+    def test_partials(self):
+        np.set_printoptions(linewidth=1024)
+        cpd = self.p.check_partials(compact_print=True)
+
+        for comp in cpd:
+            for (var, wrt) in cpd[comp]:
+                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
+                                               desired=cpd[comp][var, wrt]['J_fd'],
+                                               decimal=6)
+
+
 class TestForDocs(unittest.TestCase):
 
     def test(self):
