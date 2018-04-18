@@ -5,6 +5,21 @@ April 2, 2018
 
 New Features:
 --------------
+<<<<<<< HEAD
+- check_partials() improvements to formatting and clarity. Report of potential bad derivatives summarized at bottom of output
+- check_partials() only compares fwd analytic to FD for any components that provide derivatives directly through the Jacobian argument to compute_partials or linearize. (significantly less output to view now)
+- Docs for UnstructuredMetaModel improved
+- pyoptsparse wrapper only calls run_model before optimization if LinearConstraints are included
+- ScipyOptimizerDriver is now smarter about how it handles linear constraints. It caches the derivatives and doesn't recompute them any more.
+- Docs for ExternalCode improved to show how to handle derivatives
+- Cache_linear_solution argument to add_design_var, add_constraint, add_objective, allows iterative linear solves to use previous solution as initial guess
+- New solver debugging tool via the `debug_print` option: writes out initial state values so failed cases can be more easily replicated.
+- Added generic KS component
+- Added generic Bspline component
+- Improved error msg when class is passed into add_subsystem
+- Automated Jacobian coloring algorithm now works across all variables (it was just local within a variable before)
+- Major refactor of the `compute_totals` method to clean up and simplify
+=======
 - check_partials() improvements to formatting and clarity. Report of potentially-bad derivatives summarized at bottom of output.
 - check_partials() only compares fwd analytic to FD for any components that provide derivatives directly through the Jacobian
     argument to compute_partials or linearize. (significantly less output to view now).
@@ -19,6 +34,7 @@ New Features:
 - Improved error msg when class is passed into add_subsystem.
 - Automated Jacobian coloring algorithm now works across all variables (previously, it was just local within a variable).
 - Major refactor of the `compute_totals` method to clean up and simplify.
+>>>>>>> 82cdc7b0d5bd55dd3f3931ab2857339738684c47
 
 Backwards-Compatible API Changes:
 -----------------------------------
@@ -32,7 +48,12 @@ Bug Fixes:
 -----------
 - compute_totals works without any arguments now (just uses the default set of des_vars, objectives, and constraints)
 - UnstructuredMetaModel can now be sub-classed
+<<<<<<< HEAD
+- Deprecated ScipyOptimizer class wasn't working correctly, but can now actually be used
+
+=======
 - Deprecated ScipyOptimizer class wasn't working correctly, but can now actually be used.
+>>>>>>> 82cdc7b0d5bd55dd3f3931ab2857339738684c47
 
 ################################################################################################
 Release Notes for OpenMDAO 2.2.0

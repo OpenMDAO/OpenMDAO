@@ -1,3 +1,4 @@
+.. _feature_pyoptsparse:
 
 *****************
 pyOptSparseDriver
