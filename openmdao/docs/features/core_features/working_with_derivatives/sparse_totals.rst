@@ -1,14 +1,14 @@
 .. _sparse-totals:
 
-*****************************
-Sparsity of Total Derivatives
-*****************************
+****************************************
+Computing Sparsity of Total Derivatives
+****************************************
 
 
 If your total derivative jacobian is sparse, certain optimizers, e.g., the SNOPT optimizer
-in pyOptSparseDriver, can take advantage of this to improve the performance of computing total
+in :ref:`pyOptSparseDriver<feature_pyoptsparse>`, can take advantage of this to improve the performance of computing total
 derivatives.  Detailed sparsity of each sub-jacobian in the total jacobian can be computed
-automatically using the `openmdao sparsity` command line tool.  The sparsity dictionary can
+automatically using the :code:`openmdao sparsity` command line tool.  The sparsity dictionary can
 be displayed on the terminal and can be cut-and-pasted into your python script, or you can
 specify an output file on the command line and the sparsity dictionary will be written in JSON
 format to the specified file.  Here's an example of writing the sparsity information to the
@@ -71,5 +71,6 @@ and we would specify the sparsity in our python script as follows:
     # we would specify total jacobian sparsity by calling this on our driver
     prob.driver.set_total_jac_sparsity('sparsity.json')
 
+.. note::
 
-This assumes that we're running our script in the same directory where we put the json file.
+  The above code assumes that we're running our script in the same directory where we put the json file.
