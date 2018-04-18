@@ -40,17 +40,19 @@ value or shape when adding the balance that reflects the correct shape.
 Balance accepts the following other arguments (which are all passed
 to ``add_balance`` during initialization):
 
-=========== ======================== ==================================================================================
+=========== ======================== ===================================================================================
 Name        Type                     Description
-=========== ======================== ==================================================================================
-eq_units    str or None              Units associated with LHS and RHS.  (mult is treated as unitless)
+=========== ======================== ===================================================================================
+eq_units    str or None              Units associated with left-hand and right-hand side. (mult is treated as unitless).
 lhs_name    str or None              Optional name associated with the left-hand side of the balance.
 rhs_name    str or None              Optional name associated with the right-hand side of the balance.
-mult_name   str or None              Optional name associated with the right-hand side of the balance.
-rhs_val     int, float, or np.array  Default value for the RHS.
-mult_val    int, float, or np.array  Default value for the multiplier.
+rhs_val     int, float, or np.array  Default value for the right-hand side.
+guess_func  callable or None         Callable function that returns an initial “guess” value of the state variable.
+use_mult    bool                     Specifies whether the left-hand side multiplier is to be used.
+mult_name   str or None              Optional name associated with the left-hand side multiplier variable.
+mult_val    int, float, or np.array  Default value for the left-hand side multiplier.
 kwargs      dict or named arguments  Additional arguments to be passed for the creation of the implicit state variable.
-=========== ======================== ==================================================================================
+=========== ======================== ===================================================================================
 
 Example:  Scalar Root Finding
 -----------------------------
@@ -68,6 +70,12 @@ it finds the positive root.
 
 .. embed-code::
     openmdao.components.tests.test_balance_comp.TestBalanceComp.test_feature_scalar
+    :layout: interleave
+
+Alternatively, we could simplify the code by using the :code:`mult_val` argument.
+
+.. embed-code::
+    openmdao.components.tests.test_balance_comp.TestBalanceComp.test_feature_scalar_with_default_mult
     :layout: interleave
 
 
