@@ -1173,6 +1173,9 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
     def test_debug_print_option_totals(self):
 
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizeDriver, ExecComp
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
         prob = Problem()
         model = prob.model = Group()
 
