@@ -52,6 +52,8 @@ The implementation of each method will be illustrated using a simple explicit co
   .. embed-code::
       openmdao.core.tests.test_expl_comp.RectangleJacVec.compute_jacvec_product
 
+- :code:`compute_multi_jacvec_product(self, inputs, d_inputs, d_outputs, mode):` :
+
   [Optional] Provide the partial derivatives as a matrix-matrix product. If :code:`mode` is :code:`'fwd'`, this method must
   compute :math:`d\_{outputs} = J \cdot d\_{inputs}`, where :math:`J` is the partial derivative Jacobian, and where both
   d_outputs and d_inputs are matrices instead of vectors. If :code:`mode` is :code:`'rev'`, this method must similarly

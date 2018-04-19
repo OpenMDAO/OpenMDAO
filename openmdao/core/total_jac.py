@@ -1040,13 +1040,9 @@ class _TotalJacInfo(object):
 
         model._setup_jacobians(recurse=False)
 
-        # Need to temporarily disable size checking to support indices in des_vars and quantities.
-        model.jacobian._override_checks = True
-
         # Linearize Model
         model._linearize()
 
-        model.jacobian._override_checks = False
         approx_jac = model._jacobian._subjacs
 
         of_idx = model._owns_approx_of_idx

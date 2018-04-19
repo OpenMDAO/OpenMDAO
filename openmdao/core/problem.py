@@ -703,11 +703,12 @@ class Problem(object):
             model._outputs.set_vec(output_cache)
             # Make sure we're in a valid state
             model.run_apply_nonlinear()
-            model.run_linearize()
 
             jac_key = 'J_' + mode
 
             for comp in comps:
+
+                comp.run_linearize()
 
                 # Skip IndepVarComps
                 if isinstance(comp, IndepVarComp):
