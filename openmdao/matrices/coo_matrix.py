@@ -286,19 +286,19 @@ class COOMatrix(Matrix):
             if mask is None:
                 return mat.dot(in_vec)
             else:
-                save = mat.data.copy()
+                save = mat.data[mask]
                 mat.data[mask] = 0.0
                 val = mat.dot(in_vec)
-                mat.data = save
+                mat.data[mask] = save
                 return val
         else:  # rev
             if mask is None:
                 return mat.T.dot(in_vec)
             else:
-                save = mat.data.copy()
+                save = mat.data[mask]
                 mat.data[mask] = 0.0
                 val = mat.T.dot(in_vec)
-                mat.data = save
+                mat.data[mask] = save
                 return val
 
     def _create_mask_cache(self, d_inputs):

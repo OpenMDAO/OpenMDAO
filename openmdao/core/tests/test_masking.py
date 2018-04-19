@@ -23,6 +23,7 @@ def _baseline(mode):
     p.setup(mode=mode)
 
     p.model.nonlinear_solver = NewtonSolver()
+    p.model.nonlinear_solver.options['solve_subsystems'] = True
 
     p.run_model()
 
@@ -54,6 +55,8 @@ def _masking_case(mode):
     p.model.double_sellar.g2.linear_solver = DirectSolver()
     p.model.double_sellar.g2.nonlinear_solver = NewtonSolver()
 
+    p.model.nonlinear_solver = NewtonSolver()
+    p.model.nonlinear_solver.options['solve_subsystems'] = True
     p.model.linear_solver = ScipyKrylov()
     p.model.linear_solver.precon = LinearRunOnce()
 

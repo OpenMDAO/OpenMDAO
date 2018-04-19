@@ -860,7 +860,7 @@ class System(object):
         """
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
-        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
+        self._var_allprocs_prom2abs_list = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {}
         self._var_abs2meta = {}
@@ -1324,7 +1324,7 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._subjacs_info = {}
+        self._subjacs_info = OrderedDict()
 
         if recurse:
             for subsys in self._subsystems_myproc:

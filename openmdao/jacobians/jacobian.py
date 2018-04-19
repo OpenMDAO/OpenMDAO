@@ -2,6 +2,7 @@
 from __future__ import division
 import numpy as np
 
+from collections import OrderedDict
 from scipy.sparse import issparse
 
 from openmdao.utils.name_maps import key2abs_key
@@ -34,8 +35,8 @@ class Jacobian(object):
         Initialize all attributes.
         """
         self._system = None
-        self._subjacs = {}
-        self._subjacs_info = {}
+        self._subjacs = OrderedDict()
+        self._subjacs_info = OrderedDict()
         self._override_checks = False
 
     def _abs_key2shape(self, abs_key):
