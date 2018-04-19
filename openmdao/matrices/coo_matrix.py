@@ -254,7 +254,7 @@ class COOMatrix(Matrix):
         mat = self._matrix
         if ranges is not None:
             rstart, rend, cstart, cend = ranges
-            if not (rstart == 0 and cstart == 0 and rend == mat.shape[0] and cend == mat.shape[1]):
+            if rstart != 0 or cstart != 0 or rend != mat.shape[0] or cend != mat.shape[1]:
                 if ranges in self._mat_range_cache:
                     mat, idxs = self._mat_range_cache[ranges]
 
