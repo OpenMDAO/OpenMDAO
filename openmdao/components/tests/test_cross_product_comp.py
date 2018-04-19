@@ -154,13 +154,13 @@ class TestDotProductCompNonVectorized(unittest.TestCase):
 
     def test_results(self):
 
-            a_i = self.p['a'][:, 0]
-            b_i = self.p['b'][:, 0]
-            c_i = self.p['cross_prod_comp.c'][:]
+        a_i = self.p['a'][:, 0]
+        b_i = self.p['b'][:, 0]
+        c_i = self.p['cross_prod_comp.c'][:]
 
-            expected = np.cross(a_i, b_i)
+        expected = np.cross(a_i, b_i)
 
-            np.testing.assert_almost_equal(c_i.ravel(), expected)
+        np.testing.assert_almost_equal(c_i.ravel(), expected)
 
     def test_partials(self):
         cpd = self.p.check_partials(out_stream=None, method='cs')
