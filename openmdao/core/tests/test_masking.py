@@ -69,16 +69,16 @@ class CSCMaskingTestCase(unittest.TestCase):
         base_objective, base_jac = _baseline('fwd')
         obj, jac = _masking_case('fwd')
 
-        assert_almost_equal(base_objective, obj, decimal=7)
+        assert_almost_equal(base_objective, obj, decimal=6)
 
         for key in jac:
-            assert_almost_equal(base_jac[key], jac[key], decimal=7)
+            assert_almost_equal(base_jac[key], jac[key], decimal=6)
 
     def test_csc_masking_rev(self):
         base_objective, base_jac = _baseline('rev')
         obj, jac = _masking_case('rev')
 
-        assert_almost_equal(base_objective, obj, decimal=7)
+        assert_almost_equal(base_objective, obj, decimal=6)
 
         for key in jac:
-            assert_almost_equal(base_jac[key], jac[key], decimal=7)
+            assert_almost_equal(base_jac[key], jac[key], decimal=6)
