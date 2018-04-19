@@ -153,7 +153,7 @@ def _get_input(system, name, idxs=None):
     """
     if name in system._inputs:
         val = system._inputs[name]
-        if idxs and isinstance(val, np.ndarray):
+        if idxs is not None and isinstance(val, np.ndarray):
             val = val.flatten()[idxs]
         return val
     return "<on remote proc>"
@@ -165,7 +165,7 @@ def _get_output(system, name, idxs=None):
     """
     if name in system._outputs:
         val = system._outputs[name]
-        if idxs and isinstance(val, np.ndarray):
+        if idxs is not None and isinstance(val, np.ndarray):
             val = val.flatten()[idxs]
         return val
     return "<on remote proc>"
