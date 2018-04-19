@@ -16,7 +16,25 @@ from openmdao.matrices.matrix import Matrix, _compute_index_map, sparse_types
 class COOMatrix(Matrix):
     """
     Sparse matrix in Coordinate list format.
+
+    Attributes
+    ----------
+    _mat_range_cache : dict
+        Dictionary of cached CSC matrices needed for solving on a sub-range of the
+        parent CSC matrix.
     """
+
+    def __init__(self, comm):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm>
+            communicator of the top-level system that owns the <Jacobian>.
+        """
+        super(COOMatrix, self).__init__(comm)
+        self._mat_range_cache = {}
 
     def _build_sparse(self, num_rows, num_cols):
         """
@@ -236,9 +254,33 @@ class COOMatrix(Matrix):
         mat = self._matrix
         if ranges is not None:
             rstart, rend, cstart, cend = ranges
-            if not((rend - rstart) == mat.shape[0] and (cend - cstart) == mat.shape[1]):
-                raise RuntimeError("Placing a sparse jacobian under another assembled jacobian "
-                                   "is currently not supported.")
+            if not (rstart == 0 and cstart == 0 and rend == mat.shape[0] and cend == mat.shape[1]):
+                if ranges in self._mat_range_cache:
+                    mat, idxs = self._mat_range_cache[ranges]
+
+                    # update the data array of our smaller cached matrix with current data from
+                    # self._matrix
+                    mat.data[:] = self._matrix.data[idxs]
+                else:
+                    rstart, rend, cstart, cend = ranges
+                    rmat = mat.tocoo()
+                    # find all row and col indices that are within the desired range
+                    ridxs = np.nonzero(np.logical_and(rmat.row >= rstart, rmat.row < rend))[0]
+                    cidxs = np.nonzero(np.logical_and(rmat.col >= cstart, rmat.col < cend))[0]
+
+                    # take the intersection since both rows and cols must be within range
+                    idxs = np.intersect1d(ridxs, cidxs, assume_unique=True)
+
+                    # create a new smaller csc matrix using only the parts of self._matrix that
+                    # are within range
+                    mat = coo_matrix((rmat.data[idxs], (rmat.row[idxs] - rstart,
+                                                        rmat.col[idxs] - cstart)),
+                                     shape=(rend - rstart, cend - cstart))
+                    mat = mat.tocsc()
+                    self._mat_range_cache[ranges] = mat, idxs
+
+        # NOTE: both mask and ranges will never be defined at the same time.  ranges applies only
+        #       to int_mtx and mask applies only to ext_mtx.
 
         if mode == 'fwd':
             if mask is None:

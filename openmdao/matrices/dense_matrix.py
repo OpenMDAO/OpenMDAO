@@ -171,11 +171,12 @@ class DenseMatrix(Matrix):
             else:
                 # Mask need to be applied to ext_mtx so that we can ignore multiplication
                 # by certain columns.
-                arrmask = np.zeros(mat.T.shape, dtype=np.bool)
+                mat_T = mat.T
+                arrmask = np.zeros(mat_T.shape, dtype=np.bool)
                 arrmask[mask, :] = True
-                masked_mtx = np.ma.array(mat, mask=arrmask, fill_value=0.0)
+                masked_mtx = np.ma.array(mat_T, mask=arrmask, fill_value=0.0)
 
-                masked_product = np.ma.dot(masked_mtx.T, in_vec).flatten()
+                masked_product = np.ma.dot(masked_mtx, in_vec).flatten()
                 return np.ma.filled(masked_product, fill_value=0.0)
 
     def _create_mask_cache(self, d_inputs):
