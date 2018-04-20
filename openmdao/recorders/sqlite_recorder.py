@@ -92,9 +92,11 @@ class SqliteRecorder(BaseRecorder):
         If True, open, write, and close the sqlite file. Needed for when running under MPI.
     _pickle_version: int
         The pickle protocol version to use when pickling metadata.
+    _all_procs: bool
+        If True, write to a separate sqlite file on each processor.
     """
 
-    def __init__(self, filepath, append=False, pickle_version=2):
+    def __init__(self, filepath, append=False, pickle_version=2, all_procs=False):
         """
         Initialize the SqliteRecorder.
 
@@ -106,10 +108,12 @@ class SqliteRecorder(BaseRecorder):
             Optional. If True, append to an existing case recorder file.
         pickle_version : int
             Optional. The pickle protocol version to use when pickling metadata.
+        all_procs: bool
+            If True, write to a separate sqlite file on each processor.
         """
         super(SqliteRecorder, self).__init__()
 
-        if MPI and MPI.COMM_WORLD.rank > 0:
+        if MPI and MPI.COMM_WORLD.rank > 0 and not all_procs:
             self._open_close_sqlite = False
         else:
             self._open_close_sqlite = True
@@ -119,6 +123,11 @@ class SqliteRecorder(BaseRecorder):
         self._prom2abs = {'input': {}, 'output': {}}
         self._abs2meta = {}
         self._pickle_version = pickle_version
+        self._all_procs = all_procs
+
+        if all_procs:
+            self._parallel = True
+            filepath = '%s_%d' % (filepath, MPI.COMM_WORLD.rank)
 
         if append:
             raise NotImplementedError("Append feature not implemented for SqliteRecorder")
@@ -226,7 +235,7 @@ class SqliteRecorder(BaseRecorder):
         constraints = data['con']
         sysvars = data['sys']
 
-        if MPI is None or MPI.COMM_WORLD.rank == 0:
+        if MPI is None or MPI.COMM_WORLD.rank == 0 or self._all_procs:
             desvars_array = values_to_array(desvars)
             responses_array = values_to_array(responses)
             objectives_array = values_to_array(objectives)

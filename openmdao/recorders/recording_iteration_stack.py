@@ -37,16 +37,11 @@ def print_recording_iteration_stack():
     print(60 * '^')
 
 
-def get_formatted_iteration_coordinate(rank=None):
+def get_formatted_iteration_coordinate():
     """
     Format the iteration coordinate into human-readable form.
 
     'rank0:pyoptsparsedriver|6|root._solve_nonlinear|6|mda._solve_nonlinear|6|mda.d1._solve_nonlinear|45'
-
-    Parameters
-    ----------
-    rank : int or None
-        if not None, the rank to use instead of the current rank.
 
     Returns
     -------
@@ -59,11 +54,10 @@ def get_formatted_iteration_coordinate(rank=None):
     for name, iter_count in recording_iteration.stack:
         iteration_coord_list.append('{}{}{}'.format(name, separator, iter_count))
 
-    if rank is None:
-        if MPI and MPI.COMM_WORLD.rank > 0:
-            rank = MPI.COMM_WORLD.rank
-        else:
-            rank = 0
+    if MPI and MPI.COMM_WORLD.rank > 0:
+        rank = MPI.COMM_WORLD.rank
+    else:
+        rank = 0
 
     formatted_iteration_coordinate = ':'.join(["rank%d" % rank,
                                                separator.join(iteration_coord_list)])

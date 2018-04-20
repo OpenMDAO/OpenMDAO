@@ -520,7 +520,7 @@ class TestParallelDOE(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("CASES.sql"))
+        prob.driver.add_recorder(SqliteRecorder("CASES.sql", all_procs=True))
         prob.driver.options['run_parallel'] =  True
 
         prob.setup(vector_class=PETScVector)
@@ -541,27 +541,28 @@ class TestParallelDOE(unittest.TestCase):
             8: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         }
 
-        if model.comm.rank == 0:
-            cases = CaseReader("CASES.sql").driver_cases
-            print('# cases:', cases.num_cases)
+        rank = prob.comm.rank
+        size = prob.comm.size
+        filename = "CASES.sql_%d" % rank
+        cases = CaseReader(filename).driver_cases
 
-            # self.assertEqual(cases.num_cases, 9)
+        self.assertEqual(cases.num_cases, len(expected)//size+(rank<len(expected)%size))
 
-            for n in range(cases.num_cases):
-                case = cases.get_case(n)
-                print('-----------')
-                print('filename:', case.filename)
-                print('counter:', case.counter)
-                print('iteration_coordinate:', case.iteration_coordinate)
-                print('timestamp:', case.timestamp)
-                print('success:', case.success)
-                print('msg:', case.msg)
-                print(cases.get_case(n).desvars['x'],
-                      cases.get_case(n).desvars['y'],
-                      cases.get_case(n).objectives['f_xy'])
-                # self.assertEqual(cases.get_case(n).desvars['x'], expected[n]['x'])
-                # self.assertEqual(cases.get_case(n).desvars['y'], expected[n]['y'])
-                # self.assertEqual(cases.get_case(n).objectives['f_xy'], expected[n]['f_xy'])
+        for n in range(cases.num_cases):
+            case = cases.get_case(n)
+            print('-----------')
+            print('filename:', case.filename)
+            print('counter:', case.counter)
+            print('iteration_coordinate:', case.iteration_coordinate)
+            print('timestamp:', case.timestamp)
+            print('success:', case.success)
+            print('msg:', case.msg)
+            print(cases.get_case(n).desvars['x'],
+                  cases.get_case(n).desvars['y'],
+                  cases.get_case(n).objectives['f_xy'])
+            self.assertEqual(cases.get_case(n).desvars['x'], expected[n*size+rank]['x'])
+            self.assertEqual(cases.get_case(n).desvars['y'], expected[n*size+rank]['y'])
+            self.assertEqual(cases.get_case(n).objectives['f_xy'], expected[n*size+rank]['f_xy'])
 
 
 if __name__ == "__main__":

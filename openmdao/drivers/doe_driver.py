@@ -14,6 +14,8 @@ import numpy as np
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.core.analysis_error import AnalysisError
 
+from openmdao.utils.mpi import MPI, debug
+
 
 class DOEGenerator(object):
     """
@@ -112,8 +114,12 @@ class DOEDriver(Driver):
         problem : <Problem>
             Pointer to the containing problem.
         """
-        if self.options['run_parallel']:
-            self._comm = problem.comm
+        if MPI and self.options['run_parallel']:
+            comm = self._comm = problem.comm
+            color = self._color = comm.rank % comm.size
+
+            problem.model.comm = comm.Split(color)
+            problem.model.resetup('full')
         else:
             self._comm = None
 
@@ -168,10 +174,6 @@ class DOEDriver(Driver):
                 metadata['msg'] = traceback.format_exc()
                 print(metadata['msg'])
 
-            # so we get the proper rank when recording on rank 0
-            if self._comm:
-                metadata['override_rank'] = self._comm.rank
-
             # save reference to metadata for use in record_iteration
             self._metadata = metadata
 
@@ -189,32 +191,12 @@ class DOEDriver(Driver):
         list
             list of name, value tuples for the design variables.
         """
-        rank = self._comm.rank
         size = self._comm.size
+        color = self._color
 
         for i, case in enumerate(self._generator(design_vars)):
-            if rank == i % size:
+            if i % size == color:
                 yield case
-
-        # duplicate last case on extra procs
-        extra_procs = size - (self._generator._num_samples % size)
-        if rank >= (size - extra_procs):
-            yield case
-        else:
-            raise StopIteration
-
-    def _setup_recording(self):
-        """
-        Set up case recording.
-
-        We want to gather the same variables from all processors when running
-        in parallel.
-        """
-        super(DOEDriver, self)._setup_recording()
-
-        if self._comm:
-            self._filtered_vars_to_record = \
-                self._comm.bcast(self._filtered_vars_to_record, root=0)
 
     def record_iteration(self):
         """
@@ -256,35 +238,12 @@ class DOEDriver(Driver):
         else:
             sys_vars = {}
 
-        if self._comm:
-            comm = self._comm
+        data = {}
+        data['des'] = des_vars
+        data['res'] = res_vars
+        data['obj'] = obj_vars
+        data['con'] = con_vars
+        data['sys'] = sys_vars
 
-            # gather all the case data to proc 0
-            des_vars = comm.gather(des_vars, root=0)
-            res_vars = comm.gather(res_vars, root=0)
-            obj_vars = comm.gather(obj_vars, root=0)
-            con_vars = comm.gather(con_vars, root=0)
-            sys_vars = comm.gather(sys_vars, root=0)
-
-            metadata = comm.gather(self._metadata, root=0)
-
-            # on proc 0, record the data for all cases
-            if comm.rank == 0:
-                data = {}
-                for i in range(comm.size):
-                    data['des'] = des_vars[i]
-                    data['res'] = res_vars[i]
-                    data['obj'] = obj_vars[i]
-                    data['con'] = con_vars[i]
-                    data['sys'] = sys_vars[i]
-
-                    self._rec_mgr.record_iteration(self, data, metadata[i])
-        else:
-            data = {}
-            data['des'] = des_vars
-            data['res'] = res_vars
-            data['obj'] = obj_vars
-            data['con'] = con_vars
-            data['sys'] = sys_vars
-
-            self._rec_mgr.record_iteration(self, data, self._metadata)
+        debug('recording:', data,  self._metadata)
+        self._rec_mgr.record_iteration(self, data, self._metadata)
