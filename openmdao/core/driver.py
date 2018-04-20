@@ -172,9 +172,8 @@ class Driver(object):
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
                                        '(processed post-includes)')
-        self.recording_options.declare('record_derivatives', types=bool, default=False,
-                                       desc='Set to True to record derivatives at the driver \
-                                       level')
+        self.recording_options.declare('record_inputs', types=bool, default=True,
+                                       desc='Set to True to record inputs at the driver level')
         ###########################
 
         # What the driver supports.
@@ -307,6 +306,7 @@ class Driver(object):
 
         # Case recording setup
         mydesvars = myobjectives = myconstraints = myresponses = set()
+        myinputs = set()
         mysystem_outputs = set()
         incl = self.recording_options['includes']
         excl = self.recording_options['excludes']
@@ -314,6 +314,7 @@ class Driver(object):
         rec_objectives = self.recording_options['record_objectives']
         rec_constraints = self.recording_options['record_constraints']
         rec_responses = self.recording_options['record_responses']
+        rec_inputs = self.recording_options['record_inputs']
 
         all_desvars = {n for n in self._designvars
                        if check_path(n, incl, excl, True)}
@@ -358,6 +359,19 @@ class Driver(object):
             mysystem_outputs = mysystem_outputs.difference(all_desvars, all_objectives,
                                                            all_constraints)
 
+        if rec_inputs:
+            prob = self._problem
+            root = prob.model
+            myinputs = {n for n in root._inputs
+                        if check_path(n, incl, excl, True)}
+
+            if MPI:
+                all_vars = root.comm.gather(myinputs, root=0)
+                if MPI.COMM_WORLD.rank == 0:
+                    myinputs = all_vars[-1]
+                    for d in all_vars[:-1]:
+                        myinputs.update(d)
+
         if MPI:  # filter based on who owns the variables
             # TODO Eventually, we think we can get rid of this next check. But to be safe,
             #       we are leaving it in there.
@@ -372,6 +386,7 @@ class Driver(object):
             myobjectives = [n for n in myobjectives if rrank == rowned[n]]
             myconstraints = [n for n in myconstraints if rrank == rowned[n]]
             mysystem_outputs = [n for n in mysystem_outputs if rrank == rowned[n]]
+            myinputs = [n for n in myinputs if rrank == rowned[n]]
 
         self._filtered_vars_to_record = {
             'des': mydesvars,
@@ -379,6 +394,7 @@ class Driver(object):
             'con': myconstraints,
             'res': myresponses,
             'sys': mysystem_outputs,
+            'inp': myinputs
         }
 
         self._rec_mgr.startup(self)
@@ -749,15 +765,23 @@ class Driver(object):
 
         if self.recording_options['includes']:
             root = self._problem.model
-            outputs = root._outputs
+            outputs_v = root._outputs
+            inputs_v = root._inputs
             # outputsinputs, outputs, residuals = root.get_nonlinear_vectors()
             sysvars = {}
-            views = outputs._views
-            for name in outputs._names:
+            inputs = {}
+            views_out = outputs_v._views
+            views_in = inputs_v._views
+            for name in outputs_v._names:
                 if name in self._filtered_vars_to_record['sys']:
-                    sysvars[name] = views[name]
+                    sysvars[name] = views_out[name]
+            if self.recording_options['record_inputs']:
+                for name in inputs_v._names:
+                    if name in self._filtered_vars_to_record['inp']:
+                        inputs[name] = views_in[name]
         else:
             sysvars = {}
+            inputs = {}
 
         if MPI:
             root = self._problem.model
@@ -766,12 +790,16 @@ class Driver(object):
             objectives = self._gather_vars(root, objectives)
             constraints = self._gather_vars(root, constraints)
             sysvars = self._gather_vars(root, sysvars)
+            inputs = self._gather_vars(root, inputs)
 
-        data['des'] = desvars
-        data['res'] = responses
-        data['obj'] = objectives
-        data['con'] = constraints
-        data['sys'] = sysvars
+        outs = desvars
+        outs.update(responses)
+        outs.update(objectives)
+        outs.update(constraints)
+        outs.update(sysvars)
+
+        data['out'] = outs
+        data['in'] = inputs
 
         self._rec_mgr.record_iteration(self, data, metadata)
 

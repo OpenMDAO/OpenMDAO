@@ -112,6 +112,9 @@ class SqliteCaseReader(BaseCaseReader):
         self.driver_cases._prom2abs = self._prom2abs
         self.system_cases._prom2abs = self._prom2abs
         self.solver_cases._prom2abs = self._prom2abs
+        self.driver_cases._abs2meta = self._abs2meta
+        self.system_cases._abs2meta = self._abs2meta
+        self.solver_cases._abs2meta = self._abs2meta
 
         if self.format_version in (1,):
             with sqlite3.connect(self.filename) as con:
@@ -734,18 +737,15 @@ class DriverCases(BaseCases):
             row = cur.fetchone()
         con.close()
 
-        idx, counter, iteration_coordinate, timestamp, success, msg, desvars_blob, responses_blob, \
-            objectives_blob, constraints_blob, sysincludes_blob = row
+        idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob, \
+            outputs_blob, = row
 
-        desvars_array = blob_to_array(desvars_blob)
-        responses_array = blob_to_array(responses_blob)
-        objectives_array = blob_to_array(objectives_blob)
-        constraints_array = blob_to_array(constraints_blob)
-        sysincludes_array = blob_to_array(sysincludes_blob)
+        inputs_array = blob_to_array(inputs_blob)
+        outputs_array = blob_to_array(outputs_blob)
 
         case = DriverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
-                          desvars_array, responses_array, objectives_array, constraints_array,
-                          sysincludes_array, self._prom2abs)
+                          inputs_array, outputs_array,
+                          self._prom2abs, self._abs2meta)
 
         return case
 
@@ -789,7 +789,8 @@ class SystemCases(BaseCases):
         residuals_array = blob_to_array(residuals_blob)
 
         case = SystemCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
-                          inputs_array, outputs_array, residuals_array, self._prom2abs)
+                          inputs_array, outputs_array, residuals_array,
+                          self._prom2abs, self._abs2meta)
 
         return case
 
@@ -833,6 +834,6 @@ class SolverCases(BaseCases):
 
         case = SolverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
                           abs_err, rel_err, input_array, output_array, residuals_array,
-                          self._prom2abs)
+                          self._prom2abs, self._abs2meta)
 
         return case

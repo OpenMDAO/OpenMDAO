@@ -142,8 +142,7 @@ class SqliteRecorder(BaseRecorder):
                                     "record_type TEXT, rowid INT)")
                 self.cursor.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
                                     "counter INT,iteration_coordinate TEXT, timestamp REAL, "
-                                    "success INT, msg TEXT, desvars BLOB, responses BLOB, "
-                                    "objectives BLOB, constraints BLOB, sysincludes BLOB)")
+                                    "success INT, msg TEXT, inputs BLOB, outputs BLOB)")
                 self.cursor.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
                                     "counter INT, iteration_coordinate TEXT,  timestamp REAL, "
                                     "success INT, msg TEXT, inputs BLOB, outputs BLOB, "
@@ -208,11 +207,12 @@ class SqliteRecorder(BaseRecorder):
                 if name not in self._abs2meta:
                     self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy()
                     self._abs2meta[name]['type'] = set()
+                    if name in states:
+                        self._abs2meta[name]['explicit'] = False
+
                 if var_type not in self._abs2meta[name]['type']:
                     self._abs2meta[name]['type'].add(var_type)
                 self._abs2meta[name]['explicit'] = True
-                if name in states:
-                    self._abs2meta[name]['explicit'] = False
 
         for name in inputs:
             self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy()
@@ -243,11 +243,8 @@ class SqliteRecorder(BaseRecorder):
         metadata : dict
             Dictionary containing execution metadata.
         """
-        desvars = data['des']
-        responses = data['res']
-        objectives = data['obj']
-        constraints = data['con']
-        sysvars = data['sys']
+        outputs = data['out']
+        inputs = data['in']
 
         # Need to gather up the values from across the ranks, if MPI
         # if MPI:
@@ -258,27 +255,19 @@ class SqliteRecorder(BaseRecorder):
         #     sysvars = self._gather_vars(root, sysvars)
 
         if MPI is None or MPI.COMM_WORLD.rank == 0:
-            desvars_array = values_to_array(desvars)
-            responses_array = values_to_array(responses)
-            objectives_array = values_to_array(objectives)
-            constraints_array = values_to_array(constraints)
-            sysvars_array = values_to_array(sysvars)
+            outputs_array = values_to_array(outputs)
+            inputs_array = values_to_array(inputs)
 
-            desvars_blob = array_to_blob(desvars_array)
-            responses_blob = array_to_blob(responses_array)
-            objectives_blob = array_to_blob(objectives_array)
-            constraints_blob = array_to_blob(constraints_array)
-            sysvars_blob = array_to_blob(sysvars_array)
+            outputs_blob = array_to_blob(outputs_array)
+            inputs_blob = array_to_blob(inputs_array)
 
             with self.con:
                 self.cursor.execute("INSERT INTO driver_iterations(counter, iteration_coordinate, "
-                                    "timestamp, success, msg, desvars , responses , objectives , "
-                                    "constraints, sysincludes ) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                                    "timestamp, success, msg, inputs, outputs) "
+                                    "VALUES(?,?,?,?,?,?,?)",
                                     (self._counter, self._iteration_coordinate,
                                      metadata['timestamp'], metadata['success'],
-                                     metadata['msg'], desvars_blob,
-                                     responses_blob, objectives_blob,
-                                     constraints_blob, sysvars_blob))
+                                     metadata['msg'], inputs_blob, outputs_blob))
                 self.con.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
                                  ('driver', self.cursor.lastrowid))
 

@@ -23,8 +23,8 @@ class Case(object):
         Message associated with the case.
     """
 
-    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, inputs=None,
-                 outputs=None, residuals=None):
+    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg,
+                 prom2abs, meta, inputs, outputs, residuals=None):
         """
         Initialize.
 
@@ -42,12 +42,17 @@ class Case(object):
             Success flag for the case.
         msg : str
             Message associated with the case.
+        prom2abs : {'input': dict, 'output': dict}
+            Dictionary mapping promoted names to absolute names.
+        meta : dict
+            Dicitonary mapping absolute variable names to variable metadata.
         inputs : array
             Inputs to read in from the recording file.
         outputs : array
             Outputs to read in from the recording file.
-        residuals : array
+        residuals : array, optional
             Residuals to read in from the recording file.
+
         """
         self.filename = filename
         self.counter = counter
@@ -56,31 +61,98 @@ class Case(object):
         self.timestamp = timestamp
         self.success = success
         self.msg = msg
-        self.inputs = inputs
-        self.outputs = outputs
-        self.residuals = residuals
+        self.inputs = None
+        self.outputs = None
+        self.residuals = None
+        self.meta = meta
+
+        if inputs is not None and inputs.dtype.names:
+            self.inputs = PromotedToAbsoluteMap(inputs[0], prom2abs, False)
+        if outputs is not None and outputs.dtype.names:
+            self.outputs = PromotedToAbsoluteMap(outputs[0], prom2abs)
+        if residuals is not None and residuals.dtype.names:
+            self.residuals = PromotedToAbsoluteMap(residuals[0], prom2abs)
+
+    def get_desvars(self):
+        """
+        Get the design variables and their values.
+
+        Returns
+        -------
+        dict
+            Map of variables to their values.
+        """
+        if self.outputs is None:
+            return {}
+
+        desvars = {}
+        for var in self.outputs._values.dtype.names:
+            if 'desvar' in self.meta[var]['type']:
+                desvars[var] = self.outputs._values[var]
+        return desvars
+
+    def get_objectives(self):
+        """
+        Get the objective variables and their values.
+
+        Returns
+        -------
+        dict
+            Map of variables to their values.
+        """
+        if self.outputs is None:
+            return {}
+
+        objectives = {}
+        for var in self.outputs._values.dtype.names:
+            if 'objective' in self.meta[var]['type']:
+                objectives[var] = self.outputs._values[var]
+        return objectives
+
+    def get_constraints(self):
+        """
+        Get the constraint variables and their values.
+
+        Returns
+        -------
+        dict
+            Map of variables to their values.
+        """
+        if self.outputs is None:
+            return {}
+
+        constraints = {}
+        for var in self.outputs._values.dtype.names:
+            if 'constraint' in self.meta[var]['type']:
+                constraints[var] = self.outputs._values[var]
+        return constraints
+
+    def get_responses(self):
+        """
+        Get the response variables and their values.
+
+        Returns
+        -------
+        dict
+            Map of variables to their values.
+        """
+        if self.outputs is None:
+            return {}
+
+        responses = {}
+        for var in self.outputs._values.dtype.names:
+            if 'response' in self.meta[var]['type']:
+                responses[var] = self.outputs._values[var]
+        return responses
 
 
 class DriverCase(Case):
     """
     Wrap data from a single iteration of a Driver recording to make it more easily accessible.
-
-    Attributes
-    ----------
-    desvars : PromotedToAbsoluteMap
-        Driver design variables that have been read in from the recording file.
-    responses : PromotedToAbsoluteMap
-        Driver responses that have been read in from the recording file.
-    objectives : PromotedToAbsoluteMap
-        Driver objectives that have been read in from the recording file.
-    constraints : PromotedToAbsoluteMap
-        Driver constraints that have been read in from the recording file.
-    sysincludes : PromotedToAbsoluteMap
-        Driver sysincludes that have been read in from the recording file.
     """
 
-    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, desvars,
-                 responses, objectives, constraints, sysincludes, prom2abs):
+    def __init__(self, filename, counter, iteration_coordinate, timestamp, success,
+                 msg, inputs, outputs, prom2abs, meta):
         """
         Initialize.
 
@@ -98,50 +170,26 @@ class DriverCase(Case):
             Success flag for the case.
         msg : str
             Message associated with the case.
-        desvars : array
-            Driver design variables to read in from the recording file.
-        responses : array
-            Driver responses to read in from the recording file.
-        objectives : array
-            Driver objectives to read in from the recording file.
-        constraints : array
-            Driver constraints to read in from the recording file.
-        sysincludes : array
-            Driver sysincludes to read in from the recording file.
+        inputs : array
+            Driver inputs to read in from the recording file.
+        outputs : array
+            Driver outputs to read in from the recording file.
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
+        meta : dict
+            Dicitonary mapping absolute variable names to variable metadata.
         """
         super(DriverCase, self).__init__(filename, counter, iteration_coordinate,
-                                         timestamp, success, msg)
-
-        self.desvars = PromotedToAbsoluteMap(desvars[0], prom2abs)\
-            if desvars.dtype.names else None
-        self.responses = PromotedToAbsoluteMap(responses[0], prom2abs)\
-            if responses.dtype.names else None
-        self.objectives = PromotedToAbsoluteMap(objectives[0], prom2abs)\
-            if objectives.dtype.names else None
-        self.constraints = PromotedToAbsoluteMap(constraints[0], prom2abs)\
-            if constraints.dtype.names else None
-        self.sysincludes = PromotedToAbsoluteMap(sysincludes[0], prom2abs)\
-            if sysincludes.dtype.names else None
+                                         timestamp, success, msg, prom2abs, meta, inputs, outputs)
 
 
 class SystemCase(Case):
     """
     Wraps data from a single iteration of a System recording to make it more accessible.
-
-    Attributes
-    ----------
-    inputs : PromotedToAbsoluteMap
-        System inputs that have been read in from the recording file.
-    outputs : PromotedToAbsoluteMap
-        System outputs that have been read in from the recording file.
-    residuals : PromotedToAbsoluteMap
-        System residuals that have been read in from the recording file.
     """
 
     def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, inputs,
-                 outputs, residuals, prom2abs):
+                 outputs, residuals, prom2abs, meta):
         """
         Initialize.
 
@@ -167,16 +215,12 @@ class SystemCase(Case):
             System residuals to read in from the recording file.
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
+        meta : dict
+            Dicitonary mapping absolute variable names to variable metadata.
         """
         super(SystemCase, self).__init__(filename, counter, iteration_coordinate,
-                                         timestamp, success, msg)
-
-        self.inputs = PromotedToAbsoluteMap(inputs[0], prom2abs, False) if inputs.dtype.names\
-            else None
-        self.outputs = PromotedToAbsoluteMap(outputs[0], prom2abs) if outputs.dtype.names\
-            else None
-        self.residuals = PromotedToAbsoluteMap(residuals[0], prom2abs) if residuals.dtype.names\
-            else None
+                                         timestamp, success, msg, prom2abs, meta, inputs, outputs,
+                                         residuals)
 
 
 class SolverCase(Case):
@@ -189,16 +233,10 @@ class SolverCase(Case):
         Solver absolute error that has been read in from the recording file.
     rel_err : array
         Solver relative error that has been read in from the recording file.
-    inputs : array
-        Solver inputs that have been read in from the recording file.
-    outputs : PromotedToAbsoluteMap
-        Solver outputs that have been read in from the recording file.
-    residuals : PromotedToAbsoluteMap
-        Solver residuals that have been read in from the recording file.
     """
 
     def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg,
-                 abs_err, rel_err, inputs, outputs, residuals, prom2abs):
+                 abs_err, rel_err, inputs, outputs, residuals, prom2abs, meta):
         """
         Initialize.
 
@@ -228,18 +266,14 @@ class SolverCase(Case):
             Solver residuals to read in from the recording file.
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
+        meta : dict
+            Dicitonary mapping absolute variable names to variable metadata.
         """
         super(SolverCase, self).__init__(filename, counter, iteration_coordinate, timestamp,
-                                         success, msg)
+                                         success, msg, prom2abs, meta, inputs, outputs, residuals)
 
         self.abs_err = abs_err
         self.rel_err = rel_err
-        self.inputs = PromotedToAbsoluteMap(inputs[0], prom2abs, False) if inputs.dtype.names\
-            else None
-        self.outputs = PromotedToAbsoluteMap(outputs[0], prom2abs) if outputs.dtype.names\
-            else None
-        self.residuals = PromotedToAbsoluteMap(residuals[0], prom2abs) if residuals.dtype.names\
-            else None
 
 
 class PromotedToAbsoluteMap:
