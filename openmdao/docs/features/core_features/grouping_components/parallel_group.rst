@@ -1,3 +1,5 @@
+.. _feature_parallel_group: 
+
 ***************
 Parallel Groups
 ***************

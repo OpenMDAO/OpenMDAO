@@ -23,9 +23,11 @@ from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.array_utils import array_viz
 
-# If this is True, then IF simul coloring is specified, use it.  If False, don't use it regardless.
-# The command line simul_coloring command makes this False when generating a new coloring.
-_use_simul_coloring = True
+# If this is True, then IF simul coloring/sparsity is specified, use it.
+# If False, don't use it regardless.
+# The command line simul_coloring and sparsity commands make this False when generating a
+# new coloring and/or sparsity.
+_use_sparsity = True
 
 
 class _SubjacRandomizer(object):
@@ -142,6 +144,8 @@ def _get_full_disjoint(J, start, end):
 
         if len(full) > 1:
             full_disjoint.append(sorted(full))
+        else:
+            rows[col] = None
 
     return sorted(full_disjoint, key=lambda x: len(x)), rows
 
@@ -174,14 +178,13 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15):
     ndarray
         A boolean composite of 'repeats' total jacobians.
     """
-    # TODO: fix this to work in rev mode as well
-    assert mode == 'fwd', "Only fwd mode is supported."
-
     # clear out any old simul coloring info
     prob.driver._simul_coloring_info = None
     prob.driver._res_jacs = {}
 
     prob.setup(mode=mode)
+
+    prob.run_model()
 
     seen = set()
     for system in prob.model.system_iter(recurse=True, include_self=True):
@@ -189,8 +192,6 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15):
             # replace jacobian set_abs with one that replaces all subjacs with random numbers
             system._jacobian._set_abs = _SubjacRandomizer(system._jacobian, tol)
             seen.add(system._jacobian)
-
-    prob.run_model()
 
     wrt = list(prob.driver._designvars)
 
@@ -208,6 +209,14 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15):
             fullJ = np.abs(J)
         else:
             fullJ += np.abs(J)
+
+    # now revert the _jacobian _set_abs methods back to their original values
+    seen = set()
+    for system in prob.model.system_iter(recurse=True, include_self=True):
+        if system._jacobian not in seen:
+            randomizer = system._jacobian._set_abs
+            system._jacobian._set_abs = randomizer._orig_set_abs
+            seen.add(system._jacobian)
 
     # normalize the full J by dividing by the max value
     fullJ /= np.max(fullJ)
@@ -232,39 +241,12 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15):
     print("\nUsing tolerance: %g" % good_tol)
     print("Most common number of zero entries (%d of %d) repeated %d times out of %d tolerances "
           "tested.\n" % (sorted_items[0][0], fullJ.size, len(sorted_items[0][1]), n_tested))
+    print("Total jacobian shape:", fullJ.shape, "\n")
 
     boolJ = np.zeros(fullJ.shape, dtype=bool)
     boolJ[fullJ > good_tol] = True
 
     return boolJ
-
-
-def _compute_ranges(names, vois):
-    """
-    Get a list of varible ranges with one entry per row or column in the jacobian.
-
-    Parameters
-    ----------
-    names : iter of str
-        Names of vois.
-    vois : dict
-        Metadata of vois.
-
-    Returns
-    -------
-    list
-        List of size total_voi_size containing tuples of the form (start, end, name).
-    """
-    ranges = []
-    start = 0
-    end = -1
-    for name in names:
-        end += vois[name]['size']
-        tup = (start, end, name)
-        ranges.extend([tup] * (end - start + 1))
-        start = end + 1
-
-    return ranges
 
 
 def _find_global_disjoint(prob, J):
@@ -330,6 +312,7 @@ def _sparsity_from_jac(J, of, wrt, driver):
 
             # save sparsity structure as  (rows, cols, shape)
             irows, icols = np.nonzero(J[row_start:row_end, col_start:col_end])
+
             # convert to make JSON serializable
             irows = [int(i) for i in irows]
             icols = [int(i) for i in icols]
@@ -338,6 +321,151 @@ def _sparsity_from_jac(J, of, wrt, driver):
             col_start = col_end
 
         row_start = row_end
+
+    return sparsity
+
+
+def _write_sparsity(sparsity, stream):
+    """
+    Write the sparsity structure to the given stream.
+
+    Parameters
+    ----------
+    sparsity : dict
+        Nested dict of subjac sparsity for each total derivative.
+    stream : file-like
+        Output stream.
+    """
+    stream.write("{\n")
+
+    last_res_idx = len(sparsity) - 1
+    for i, (out, out_dict) in enumerate(iteritems(sparsity)):
+        stream.write('"%s": {\n' % out)
+        last_dv_idx = len(out_dict) - 1
+        for j, (inp, subjac) in enumerate(iteritems(out_dict)):
+            rows, cols, shape = subjac
+            if len(rows) > 15:
+                stream.write('   "%s": [\n' % inp)
+                stream.write('        %s,\n' % rows)
+                stream.write('        %s,\n' % cols)
+                stream.write('        %s]' % list(shape))
+            else:
+                stream.write('   "%s": [%s, %s, %s]' % (inp, rows, cols, list(shape)))
+            if j == last_dv_idx:
+                stream.write('\n')
+            else:
+                stream.write(',\n')
+        stream.write("}")
+        if i == last_res_idx:
+            stream.write('\n')
+        else:
+            stream.write(',\n')
+
+    stream.write("}")
+
+
+def _write_coloring(col_lists, rows, sparsity, stream):
+    """
+    Write the coloring and sparsity structures to the given stream.
+
+    Parameters
+    ----------
+    col_lists : list of lists
+        Lists of groups of columns of the same color.  First list is the list of all non-colored
+        columns.
+    rows : list of lists
+        For each colored column, the list of all nonzero row entries.  For non-colored columns,
+        the value is None.
+    sparsity : dict
+        Nested dict of subjac sparsity for each total derivative.
+    stream : file-like
+        Output stream.
+    """
+    tty = stream.isatty()
+    none = 'None' if tty else 'null'
+
+    stream.write("[[\n")
+    last_idx = len(col_lists) - 1
+    for i, col_list in enumerate(col_lists):
+        stream.write("   %s" % col_list)
+        if i < last_idx:
+            stream.write(",")
+
+        if tty:
+            if i == 0:
+                stream.write("   # uncolored columns")
+            else:
+                stream.write("   # color %d" % i)
+
+        stream.write("\n")
+
+    stream.write("],\n[\n")
+    last_idx = len(rows) - 1
+    for i, row_list in enumerate(rows):
+        if row_list is None:
+            stream.write("   %s" % none)
+        else:
+            stream.write("   %s" % row_list)
+
+        if i < last_idx:
+            stream.write(",")
+
+        if tty:
+            stream.write("   # column %d" % i)
+
+        stream.write("\n")
+
+    stream.write("]")
+
+    if sparsity:
+        stream.write(",\n")
+        _write_sparsity(sparsity, stream)
+    else:
+        stream.write(",\n%s" % none)
+
+    stream.write("]")
+
+
+def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False, stream=sys.stdout):
+    """
+    Compute simultaneous derivative colorings for the given problem.
+
+    Parameters
+    ----------
+    problem : Problem
+        The Problem being analyzed.
+    mode : str
+        Derivative direction.
+    repeats : int
+        Number of times to repeat total jacobian computation.
+    tol : float
+        Tolerance used to determine if an array entry is nonzero.
+    show_jac : bool
+        If True, display a visualiation of the final total jacobian used to compute the coloring.
+    stream : file-like or None
+        Stream where output coloring info will be written.
+
+    Returns
+    -------
+    dict
+        A nested dict specifying subjac sparsity for each total deriv, e.g., sparsity[resp][dv].
+    """
+    driver = problem.driver
+
+    J = _get_bool_jac(problem, mode=mode, repeats=repeats, tol=tol)
+
+    of = driver._get_ordered_nl_responses()
+    wrt = list(driver._designvars)
+
+    sparsity = _sparsity_from_jac(J, of, wrt, driver)
+
+    if stream is not None:
+        _write_sparsity(sparsity, stream)
+        stream.write("\n")
+
+        if show_jac and stream is not None:
+            stream.write("\n\n")
+            array_viz(J, problem, of, wrt, stream)
 
     return sparsity
 
@@ -367,10 +495,10 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
 
     Returns
     -------
-    tuple of the form (simul_colorings, simul_maps)
-        Where simul_colorings is a dict of the form {dvname1: coloring_array, ...} and
-        simul_maps is a dict of the form
-        {resp_name: {dvname: {color: (row_idxs, col_idxs), ...}, ...}, ...}
+    tuple of the form (col_lists, row_maps, sparsity)
+        col_lists is a list of column lists, where the first list is the list of uncolored columns.
+        row_maps is a list of nonzero rows for each column, or None for uncolored columns.
+        sparsity is a nested dict specifying subjac sparsity for each total derivative, or None.
     """
     driver = problem.driver
 
@@ -398,48 +526,16 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
 
     if stream is not None:
         if stream.isatty():
-            stream.write("\n########### BEGIN COLORING DATA ################")
-            stream.write("\n([\n")
-            for color, col_list in enumerate(col_lists):
-                if color == 0:
-                    stream.write("   %s,   # uncolored columns\n" % col_list)
-                else:
-                    stream.write("   %s,   # color %d\n" % (col_list, color))
-            stream.write("],")
+            stream.write("\n########### BEGIN COLORING DATA ################\n")
+            _write_coloring(col_lists, rows, sparsity, stream)
+            stream.write("\n########### END COLORING DATA ############\n")
+        else:
+            _write_coloring(col_lists, rows, sparsity, stream)
 
-            stream.write("\n[\n")
-            for col, row_list in enumerate(rows):
-                stream.write("   %s,   # column %d\n" % (row_list, col))
-            stream.write("]")
-
-            if sparsity:
-                # convert from OrderedDict to dict for printing
-                for out in sparsity:
-                    sparsity[out] = dict(sparsity[out].items())
-                sparsity = dict(sparsity.items())
-                import pprint
-                stream.write(",\n")
-                pprint.pprint(sparsity)
-            else:
-                stream.write(",\nNone")
-
-            stream.write(")\n")
-            stream.write("########### END COLORING DATA ############\n")
-
-        else:  # output json format to a file
-            s = json.dumps((col_lists, rows, sparsity))
-
-            # do a little pretty printing since the built-in json pretty printing stretches
-            # the output vertically WAY too much.
-            s = s.replace(', [', ',\n[')
-            s = s.replace(', null', ',\nnull')
-            s = s.replace(']]', ']\n]')
-            stream.write(s)
-            stream.write("\n")
-
-        if show_jac and stream is not None:
-            stream.write("\n\n")
-            array_viz(J, problem, of, wrt, stream)
+        if show_jac:
+            s = stream if stream.isatty() else sys.stdout
+            s.write("\n\n")
+            array_viz(J, problem, of, wrt, s)
 
     return col_lists, rows, sparsity
 
@@ -474,10 +570,7 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
     else:  # rev
         raise RuntimeError("rev mode currently not supported for simultaneous derivs.")
 
-    if sparsity is not None:
-        stream.write("Sparsity structure has been computed for all response/design_var "
-                     "sub-jacobians.")
-    if tot_size == tot_colors:
+    if tot_size == tot_colors or tot_colors == 0:
         stream.write("No simultaneous derivative solves are possible in this configuration.\n")
     else:
         stream.write("\nTotal colors vs. total size: %d vs %d  (%.1f%% improvement)\n" %
@@ -495,15 +588,15 @@ def _simul_coloring_setup_parser(parser):
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', action='store', dest='outfile', help='output file (json format)')
-    parser.add_argument('-n', action='store', dest='num_jacs', default=1, type=int,
+    parser.add_argument('-n', action='store', dest='num_jacs', default=3, type=int,
                         help='number of times to repeat total derivative computation')
     parser.add_argument('-t', action='store', dest='tolerance', default=1.e-15, type=float,
                         help='tolerance used to determine if a total jacobian entry is nonzero')
     parser.add_argument('-j', '--jac', action='store_true', dest='show_jac',
                         help="Display a visualization of the final total jacobian used to "
                         "compute the coloring.")
-    parser.add_argument('-s', '--sparsity', action='store_true', dest='include_sparsity',
-                        help="Include the sparsity structure in the coloring data structure.")
+    parser.add_argument('--no-sparsity', action='store_true', dest='no_sparsity',
+                        help="Exclude the sparsity structure from the coloring data structure.")
 
 
 def _simul_coloring_cmd(options):
@@ -521,9 +614,9 @@ def _simul_coloring_cmd(options):
         The post-setup hook function.
     """
     from openmdao.core.problem import Problem
-    global _use_simul_coloring
+    global _use_sparsity
 
-    _use_simul_coloring = False
+    _use_sparsity = False
 
     def _simul_coloring(prob):
         if options.outfile is None:
@@ -533,10 +626,61 @@ def _simul_coloring_cmd(options):
         Problem._post_setup_func = None  # avoid recursive loop
         color_info = get_simul_meta(prob, repeats=options.num_jacs, tol=options.tolerance,
                                     show_jac=options.show_jac,
-                                    include_sparsity=options.include_sparsity,
+                                    include_sparsity=not options.no_sparsity,
                                     stream=outfile)
         if sys.stdout.isatty():
             simul_coloring_summary(prob, color_info, stream=sys.stdout)
 
         exit()
     return _simul_coloring
+
+
+def _sparsity_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao sparsity' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-o', action='store', dest='outfile', help='output file (json format).')
+    parser.add_argument('-n', action='store', dest='num_jacs', default=3, type=int,
+                        help='number of times to repeat total derivative computation.')
+    parser.add_argument('-t', action='store', dest='tolerance', default=1.e-15, type=float,
+                        help='tolerance used to determine if a total jacobian entry is nonzero.')
+    parser.add_argument('-j', '--jac', action='store_true', dest='show_jac',
+                        help="Display a visualization of the final total jacobian used to "
+                        "compute the sparsity.")
+
+
+def _sparsity_cmd(options):
+    """
+    Return the post_setup hook function for 'openmdao sparsity'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
+    from openmdao.core.problem import Problem
+    global _use_sparsity
+
+    _use_sparsity = False
+
+    def _sparsity(prob):
+        if options.outfile is None:
+            outfile = sys.stdout
+        else:
+            outfile = open(options.outfile, 'w')
+        Problem._post_setup_func = None  # avoid recursive loop
+        get_sparsity(prob, repeats=options.num_jacs, tol=options.tolerance, mode=prob._mode,
+                     show_jac=options.show_jac, stream=outfile)
+        exit()
+    return _sparsity

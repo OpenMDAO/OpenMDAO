@@ -2,14 +2,16 @@
 
 from __future__ import print_function
 
+from distutils.version import LooseVersion
 from six import StringIO
 import sys
 import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, IndepVarComp, Group, ExplicitComponent
+from openmdao.api import Problem, IndepVarComp, Group, ExecComp, ScipyOptimizeDriver
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.general_utils import printoptions
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
 
@@ -100,6 +102,19 @@ class TestDriver(unittest.TestCase):
         prob = Problem()
         prob.model = model = SellarDerivatives()
 
+        model.add_design_var('z')
+        model.add_objective('obj')
+        model.add_constraint('con1')
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        base = prob.compute_totals(of=['obj', 'con1'], wrt=['z'])
+
+        prob = Problem()
+        prob.model = model = SellarDerivatives()
+
         model.add_design_var('z', ref=2.0, ref0=0.0)
         model.add_objective('obj', ref=1.0, ref0=0.0)
         model.add_constraint('con1', lower=0, ref=2.0, ref0=0.0)
@@ -108,7 +123,6 @@ class TestDriver(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        base = prob.compute_totals(of=['obj', 'con1'], wrt=['z'])
         derivs = prob.driver._compute_totals(of=['obj_cmp.obj', 'con_cmp1.con1'], wrt=['pz.z'],
                                              return_format='dict')
         assert_rel_error(self, base[('con1', 'z')][0], derivs['con_cmp1.con1']['pz.z'][0], 1e-5)
@@ -238,6 +252,110 @@ class TestDriver(unittest.TestCase):
         self.assertEqual(str(context.exception),
                          "Function is_valid returns False for debug_print.")
 
+    def test_debug_print_desvar_physical_with_indices(self):
+        prob = Problem()
+        model = prob.model = Group()
+
+        size = 3
+        model.add_subsystem('p1', IndepVarComp('x', np.array([50.0] * size)))
+        model.add_subsystem('p2', IndepVarComp('y', np.array([50.0] * size)))
+        model.add_subsystem('comp', ExecComp('f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                             x=np.zeros(size), y=np.zeros(size),
+                                             f_xy=np.zeros(size)))
+        model.add_subsystem('con', ExecComp('c = - x + y',
+                                            c=np.zeros(size), x=np.zeros(size),
+                                            y=np.zeros(size)))
+
+        model.connect('p1.x', 'comp.x')
+        model.connect('p2.y', 'comp.y')
+        model.connect('p1.x', 'con.x')
+        model.connect('p2.y', 'con.y')
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('p1.x', indices=[1], lower=-50.0, upper=50.0, ref=[5.0,])
+        model.add_design_var('p2.y', indices=[1], lower=-50.0, upper=50.0)
+        model.add_objective('comp.f_xy', index=1)
+        model.add_constraint('con.c', indices=[1], upper=-15.0)
+
+        prob.setup(check=False)
+
+        prob.driver.options['debug_print'] = ['desvars',]
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+
+        try:
+            # formatting has changed in numpy 1.14 and beyond.
+            if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+                with printoptions(precision=2, legacy="1.13"):
+                    prob.run_driver()
+            else:
+                with printoptions(precision=2):
+                    prob.run_driver()
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+        # should see unscaled (physical) and the full arrays, not just what is indicated by indices
+        self.assertEqual(output[3], "{'p1.x': array([ 50.,  50.,  50.]), 'p2.y': array([ 50.,  50.,  50.])}")
+
+    def test_debug_print_response_physical(self):
+        prob = Problem()
+        model = prob.model = Group()
+
+        size = 3
+        model.add_subsystem('p1', IndepVarComp('x', np.array([50.0] * size)))
+        model.add_subsystem('p2', IndepVarComp('y', np.array([50.0] * size)))
+        model.add_subsystem('comp', ExecComp('f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                             x=np.zeros(size), y=np.zeros(size),
+                                             f_xy=np.zeros(size)))
+        model.add_subsystem('con', ExecComp('c = - x + y + 1',
+                                            c=np.zeros(size), x=np.zeros(size),
+                                            y=np.zeros(size)))
+
+        model.connect('p1.x', 'comp.x')
+        model.connect('p2.y', 'comp.y')
+        model.connect('p1.x', 'con.x')
+        model.connect('p2.y', 'con.y')
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('p1.x', indices=[1], lower=-50.0, upper=50.0)
+        model.add_design_var('p2.y', indices=[1], lower=-50.0, upper=50.0)
+        model.add_objective('comp.f_xy', index=1, ref=1.5)
+        model.add_constraint('con.c', indices=[1], upper=-15.0, ref=1.02)
+
+        prob.setup(check=False)
+
+        prob.driver.options['debug_print'] = ['objs', 'nl_cons']
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+
+        try:
+            # formatting has changed in numpy 1.14 and beyond.
+            if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+                with printoptions(precision=2, legacy="1.13"):
+                    prob.run_driver()
+            else:
+                with printoptions(precision=2):
+                    prob.run_driver()
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+        # should see unscaled (physical) and the full arrays, not just what is indicated by indices
+        self.assertEqual(output[3], "{'con.c': array([ 1.])}")
+        self.assertEqual(output[6], "{'comp.f_xy': array([ 7622.])}")
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,12 +2,13 @@
 
 from __future__ import division
 
-import numpy as np
+from collections import OrderedDict, Iterable
+from copy import deepcopy
 from itertools import product
 from six import string_types, iteritems, itervalues
+
+import numpy as np
 from scipy.sparse import issparse
-from copy import deepcopy
-from collections import OrderedDict, Iterable
 
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -15,7 +16,7 @@ from openmdao.core.system import System
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    warn_deprecation, ContainsAll, find_matches
+    warn_deprecation, find_matches
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 
 
@@ -23,6 +24,10 @@ from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 _supported_methods = {'fd': FiniteDifference,
                       'cs': ComplexStep,
                       'exact': None}
+
+
+# Certain characters are not valid in variable names.
+forbidden_chars = ['.', '*', '?', '!', '[', ']']
 
 
 class Component(System):
@@ -159,7 +164,7 @@ class Component(System):
         global_meta_names = {
             'input': ('units', 'shape', 'size', 'var_set'),
             'output': ('units', 'shape', 'size', 'var_set',
-                       'ref', 'ref0', 'res_ref', 'distributed'),
+                       'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper'),
         }
 
         for type_ in ['input', 'output']:
@@ -312,6 +317,8 @@ class Component(System):
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('The name argument should be a string')
+        if any([True for character in forbidden_chars if character in name]):
+            raise NameError("'%s' is not a valid input name." % name)
         if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
             raise TypeError('The val argument should be a float, list, tuple, ndarray or Iterable')
         if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
@@ -433,14 +440,20 @@ class Component(System):
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('The name argument should be a string')
+        if any([True for character in forbidden_chars if character in name]):
+            raise NameError("'%s' is not a valid output name." % name)
         if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
-            raise TypeError('The val argument should be a float, list, tuple, or ndarray')
+            msg = 'The val argument should be a float, list, tuple, ndarray or Iterable'
+            raise TypeError(msg)
         if not np.isscalar(ref) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
-            raise TypeError('The ref argument should be a float, list, tuple, or ndarray')
+            msg = 'The ref argument should be a float, list, tuple, ndarray or Iterable'
+            raise TypeError(msg)
         if not np.isscalar(ref0) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
-            raise TypeError('The ref0 argument should be a float, list, tuple, or ndarray')
+            msg = 'The ref0 argument should be a float, list, tuple, ndarray or Iterable'
+            raise TypeError(msg)
         if not np.isscalar(res_ref) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
-            raise TypeError('The res_ref argument should be a float, list, tuple, or ndarray')
+            msg = 'The res_ref argument should be a float, list, tuple, ndarray or Iterable'
+            raise TypeError(msg)
         if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
             raise TypeError("The shape argument should be an int, tuple, or list but "
                             "a '%s' was given" % type(shape))

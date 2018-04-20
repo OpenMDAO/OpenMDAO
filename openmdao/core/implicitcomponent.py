@@ -159,7 +159,7 @@ class ImplicitComponent(Component):
                         if d_inputs._ncol > 1:
                             if self.has_apply_multi_linear:
                                 self.apply_multi_linear(self._inputs, self._outputs,
-                                                        d_inputs, d_residuals, mode)
+                                                        d_inputs, d_outputs, d_residuals, mode)
                             else:
                                 for i in range(d_inputs._ncol):
                                     # need to make the multivecs look like regular single vecs
@@ -416,3 +416,14 @@ class ImplicitComponent(Component):
             List of all states.
         """
         return [name for name in self._outputs._names]
+
+    def _list_states_allprocs(self):
+        """
+        Return list of all states for this component.
+
+        Returns
+        -------
+        list
+            List of all states.
+        """
+        return self._list_states()

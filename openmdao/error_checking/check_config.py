@@ -16,6 +16,7 @@ from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.class_util import overrides_method
+from openmdao.utils.mpi import MPI
 
 
 def _check_dataflow(group, infos, warnings):
@@ -357,17 +358,18 @@ def _check_config_cmd(options):
         The post-setup hook function.
     """
     def _check_config(prob):
-        if options.outfile is None:
-            logger = get_logger('check_config', use_format=True)
-        else:
-            outfile = open(options.outfile, 'w')
-            logger = get_logger('check_config', out_stream=outfile, use_format=True)
+        if not MPI or MPI.COMM_WORLD.rank == 0:
+            if options.outfile is None:
+                logger = get_logger('check_config', use_format=True)
+            else:
+                outfile = open(options.outfile, 'w')
+                logger = get_logger('check_config', out_stream=outfile, use_format=True)
 
-        if not options.checks:
-            options.checks = sorted(_checks.keys())
+            if not options.checks:
+                options.checks = sorted(_checks.keys())
 
-        for c in options.checks:
-            _checks[c](prob, logger)
+            for c in options.checks:
+                _checks[c](prob, logger)
 
         exit()
 

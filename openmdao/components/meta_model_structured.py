@@ -4,7 +4,7 @@ from __future__ import division, print_function, absolute_import
 import warnings
 
 from six import raise_from
-from six.moves import range
+from six.moves import range, zip
 
 from scipy import __version__ as scipy_version
 try:
@@ -769,7 +769,3 @@ class MetaModelStructured(ExplicitComponent):
 
             if self.metadata['training_data_gradients']:
                 partials[out_name, "%s_train" % out_name] = dy_ddata
-
-
-def _for_docs():
-    return MetaModelStructured()

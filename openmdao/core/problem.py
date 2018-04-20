@@ -3,7 +3,6 @@
 from __future__ import division, print_function
 
 import sys
-from copy import deepcopy
 
 from collections import OrderedDict, defaultdict, namedtuple
 from itertools import product
@@ -24,10 +23,10 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration
-from openmdao.utils.general_utils import warn_deprecation, ContainsAll
+from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
-from openmdao.utils.general_utils import pad_name
+from openmdao.utils.units import get_conversion
 from openmdao.vectors.default_vector import DefaultVector
 
 try:
@@ -88,10 +87,6 @@ class Problem(object):
         0 -- Newly initialized problem or newly added model.
         1 -- The `setup` method has been called, but vectors not initialized.
         2 -- The `final_setup` has been run, everything ready to run.
-    _lin_sol_cache : dict
-        Dict of indices keyed to solution vectors.
-    _tot_jac_info_cache : dict
-        Dict of _TotalJacInfo objects from previous total derivative computations.
     cite : str
         Listing of relevant citataions that should be referenced when
         publishing work that uses this class.
@@ -154,9 +149,6 @@ class Problem(object):
         # 1 -- The `setup` method has been called, but vectors not initialized.
         # 2 -- The `final_setup` has been run, everything ready to run.
         self._setup_status = 0
-
-        self._lin_sol_cache = {}
-        self._tot_jac_info_cache = defaultdict(lambda: None)
 
     def __getitem__(self, name):
         """
@@ -233,6 +225,102 @@ class Problem(object):
 
         return val
 
+    def get_val(self, name, units=None, indices=None):
+        """
+        Get an output/input variable.
+
+        Function is used if you want to specify display units.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+        units : str, optional
+            Units to convert to before upon return.
+        indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
+            Indices or slice to return.
+
+        Returns
+        -------
+        float or ndarray
+            The requested output/input variable.
+        """
+        val = self[name]
+
+        if indices is not None:
+            val = val[indices]
+
+        if units is not None:
+            base_units = self._get_units(name)
+
+            if base_units is None:
+                msg = "Incompatible units for conversion: '{}' and '{}'."
+                raise TypeError(msg.format(base_units, units))
+
+            try:
+                scale, offset = get_conversion(base_units, units)
+            except TypeError:
+                msg = "Incompatible units for conversion: '{}' and '{}'."
+                raise TypeError(msg.format(base_units, units))
+
+            val = (val + offset) * scale
+
+        return val
+
+    def _get_units(self, name):
+        """
+        Get the units for a variable name.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+
+        Returns
+        -------
+        str
+            Unit string.
+        """
+        if self._setup_status == 1:
+            proms = self.model._var_allprocs_prom2abs_list
+            meta = self.model._var_abs2meta
+            if name in meta:
+                units = meta[name]['units']
+
+            elif name in proms['input']:
+                # This triggers a check for unconnected non-unique inputs, and
+                # raises the same error as vector access.
+                abs_name = prom_name2abs_name(self.model, name, 'input')
+                units = meta[abs_name]['units']
+
+            elif name in proms['output']:
+                abs_name = prom_name2abs_name(self.model, name, 'output')
+                units = meta[abs_name]['units']
+
+            else:
+                msg = 'Variable name "{}" not found.'
+                raise KeyError(msg.format(name))
+
+        elif name in self.model._outputs:
+            try:
+                units = self.model._var_abs2meta[name]['units']
+            except KeyError:
+                abs_name = self.model._var_allprocs_prom2abs_list['output'][name][0]
+                units = self.model._var_abs2meta[abs_name]['units']
+
+        elif name in self.model._inputs:
+            try:
+                units = self.model._var_abs2meta[name]['units']
+            except KeyError:
+                abs_name = self.model._var_allprocs_prom2abs_list['input'][name][0]
+                units = self.model._var_abs2meta[abs_name]['units']
+
+        else:
+            msg = 'Variable name "{}" not found.'
+            raise KeyError(msg.format(name))
+
+        return units
+
     def __setitem__(self, name, value):
         """
         Set an output/input variable.
@@ -255,6 +343,43 @@ class Problem(object):
             else:
                 msg = 'Variable name "{}" not found.'
                 raise KeyError(msg.format(name))
+
+    def set_val(self, name, value, units=None, indices=None):
+        """
+        Set an output/input variable.
+
+        Function is used if you want to set a value using a different unit.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+        value : float or ndarray or list
+            Value to set this variable to.
+        units : str, optional
+            Units that value is defined in.
+        indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
+            Indices or slice to set to specified value.
+        """
+        if units is not None:
+            base_units = self._get_units(name)
+
+            if base_units is None:
+                msg = "Incompatible units for conversion: '{}' and '{}'."
+                raise TypeError(msg.format(units, base_units))
+
+            try:
+                scale, offset = get_conversion(units, base_units)
+            except TypeError:
+                msg = "Incompatible units for conversion: '{}' and '{}'."
+                raise TypeError(msg.format(units, base_units))
+
+            value = (value + offset) * scale
+
+        if indices is not None:
+            self[name][indices] = value
+        else:
+            self[name] = value
 
     def _set_initial_conditions(self):
         """
@@ -578,11 +703,12 @@ class Problem(object):
             model._outputs.set_vec(output_cache)
             # Make sure we're in a valid state
             model.run_apply_nonlinear()
-            model.run_linearize()
 
             jac_key = 'J_' + mode
 
             for comp in comps:
+
+                comp.run_linearize()
 
                 # Skip IndepVarComps
                 if isinstance(comp, IndepVarComp):
@@ -896,17 +1022,11 @@ class Problem(object):
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
-        if wrt is None:
-            wrt = list(self.driver._designvars)
-            global_names = True
-        if of is None:
-            of = self.driver._get_ordered_nl_responses()
-            global_names = True
-
         with self.model._scaled_context_all():
 
             # Calculate Total Derivatives
-            Jcalc = self._compute_totals(of=of, wrt=wrt, global_names=global_names)
+            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict')
+            Jcalc = total_info.compute_totals()
 
             # Approximate FD
             fd_args = {
@@ -915,8 +1035,8 @@ class Problem(object):
                 'step_calc': step_calc,
             }
             model.approx_totals(method=method, **fd_args)
-            Jfd = self._compute_totals_approx(of=of, wrt=wrt, global_names=global_names,
-                                              initialize=True)
+            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True)
+            Jfd = total_info.compute_totals_approx(initialize=True)
 
         # Assemble and Return all metrics.
         data = {}
@@ -962,267 +1082,11 @@ class Problem(object):
 
         with self.model._scaled_context_all():
             if self.model._owns_approx_jac:
-                totals = self._compute_totals_approx(of=of, wrt=wrt,
-                                                     return_format=return_format,
-                                                     global_names=False,
-                                                     initialize=True)
+                total_info = _TotalJacInfo(self, of, wrt, False, return_format, approx=True)
+                return total_info.compute_totals_approx(initialize=True)
             else:
-                totals = self._compute_totals(of=of, wrt=wrt,
-                                              return_format=return_format,
-                                              global_names=False)
-        return totals
-
-    def _compute_totals_approx(self, of=None, wrt=None, return_format='flat_dict',
-                               global_names=True, initialize=False):
-        """
-        Compute derivatives of desired quantities with respect to desired inputs.
-
-        Uses an approximation method, e.g., fd or cs to calculate the derivatives.
-
-        Parameters
-        ----------
-        of : list of variable name strings or None
-            Variables whose derivatives will be computed.
-        wrt : list of variable name strings or None
-            Variables with respect to which the derivatives will be computed.
-        return_format : string
-            Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
-            Default is a 'flat_dict', which returns them in a dictionary whose keys are
-            tuples of form (of, wrt).
-        global_names : bool
-            Set to True when passing in global names to skip some translation steps.
-        initialize : bool
-            Set to True to re-initialize the FD in model. This is only needed when manually
-            calling compute_totals on the problem.
-
-        Returns
-        -------
-        derivs : object
-            Derivatives in form requested by 'return_format'.
-        """
-        recording_iteration.stack.append(('_compute_totals', 0))
-        model = self.model
-        mode = self._mode
-        vec_dinput = model._vectors['input']
-        vec_doutput = model._vectors['output']
-        vec_dresid = model._vectors['residual']
-        approx = model._owns_approx_jac
-        prom2abs = model._var_allprocs_prom2abs_list['output']
-
-        # TODO - Pull 'of' and 'wrt' from driver if unspecified.
-        if wrt is None:
-            raise NotImplementedError("Need to specify 'wrt' for now.")
-        if of is None:
-            raise NotImplementedError("Need to specify 'of' for now.")
-
-        # Prepare model for calculation by cleaning out the derivatives
-        # vectors.
-        for vec_name in model._lin_vec_names:
-
-            # TODO: Do all three deriv vectors have the same keys?
-
-            vec_dinput[vec_name].set_const(0.0)
-            vec_doutput[vec_name].set_const(0.0)
-            vec_dresid[vec_name].set_const(0.0)
-
-        # Convert of and wrt names from promoted to absolute path
-        oldwrt, oldof = wrt, of
-        if not global_names:
-            of = [prom2abs[name][0] for name in oldof]
-            wrt = [prom2abs[name][0] for name in oldwrt]
-
-        input_list, output_list = wrt, of
-        old_input_list, old_output_list = oldwrt, oldof
-
-        # Solve for derivs with the approximation_scheme.
-        # This cuts out the middleman by grabbing the Jacobian directly after linearization.
-
-        # Re-initialize so that it is clean.
-        if initialize:
-
-            if model._approx_schemes:
-                method = list(model._approx_schemes.keys())[0]
-                kwargs = model._owns_approx_jac_meta
-                model.approx_totals(method=method, **kwargs)
-            else:
-                model.approx_totals(method='fd')
-
-        # Initialization based on driver (or user) -requested "of" and "wrt".
-        if not model._owns_approx_jac or model._owns_approx_of != set(of) \
-           or model._owns_approx_wrt != set(wrt):
-            model._owns_approx_of = set(of)
-            model._owns_approx_wrt = set(wrt)
-
-            # Support for indices defined on driver vars.
-            dvs = self.driver._designvars
-            cons = self.driver._cons
-            objs = self.driver._objs
-
-            response_idx = {key: val['indices'] for key, val in iteritems(cons)
-                            if val['indices'] is not None}
-            for key, val in iteritems(objs):
-                if val['indices'] is not None:
-                    response_idx[key] = val['indices']
-
-            model._owns_approx_of_idx = response_idx
-
-            model._owns_approx_wrt_idx = {key: val['indices'] for key, val in iteritems(dvs)
-                                          if val['indices'] is not None}
-
-        model._setup_jacobians(recurse=False)
-
-        # Need to temporarily disable size checking to support indices in des_vars and quantities.
-        model.jacobian._override_checks = True
-
-        # Linearize Model
-        model._linearize()
-
-        model.jacobian._override_checks = False
-        approx_jac = model._jacobian._subjacs
-
-        # Create data structures (and possibly allocate space) for the total
-        # derivatives that we will return.
-        totals = OrderedDict()
-
-        if return_format == 'flat_dict':
-            for ocount, output_name in enumerate(output_list):
-                okey = old_output_list[ocount]
-                for icount, input_name in enumerate(input_list):
-                    ikey = old_input_list[icount]
-                    jac = approx_jac[output_name, input_name]
-                    if isinstance(jac, list):
-                        # This is a design variable that was declared as an obj/con.
-                        totals[okey, ikey] = np.eye(len(jac[0]))
-                        odx = model._owns_approx_of_idx.get(okey)
-                        idx = model._owns_approx_wrt_idx.get(ikey)
-                        if odx is not None:
-                            totals[okey, ikey] = totals[okey, ikey][odx, :]
-                        if idx is not None:
-                            totals[okey, ikey] = totals[okey, ikey][:, idx]
-                    else:
-                        totals[okey, ikey] = -jac
-
-        elif return_format == 'dict':
-            for ocount, output_name in enumerate(output_list):
-                okey = old_output_list[ocount]
-                totals[okey] = tot = OrderedDict()
-                for icount, input_name in enumerate(input_list):
-                    ikey = old_input_list[icount]
-                    jac = approx_jac[output_name, input_name]
-                    if isinstance(jac, list):
-                        # This is a design variable that was declared as an obj/con.
-                        tot[ikey] = np.eye(len(jac[0]))
-                    else:
-                        tot[ikey] = -jac
-        else:
-            msg = "Unsupported return format '%s." % return_format
-            raise NotImplementedError(msg)
-
-        recording_iteration.stack.pop()
-        return totals
-
-    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
-        """
-        Compute derivatives of desired quantities with respect to desired inputs.
-
-        Parameters
-        ----------
-        of : list of variable name strings or None
-            Variables whose derivatives will be computed. Default is None, which
-            uses the driver's objectives and constraints.
-        wrt : list of variable name strings or None
-            Variables with respect to which the derivatives will be computed.
-            Default is None, which uses the driver's desvars.
-        return_format : string
-            Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
-            Default is a 'flat_dict', which returns them in a dictionary whose keys are
-            tuples of form (of, wrt).
-        global_names : bool
-            Set to True when passing in global names to skip some translation steps.
-
-        Returns
-        -------
-        derivs : object
-            Derivatives in form requested by 'return_format'.
-        """
-        recording_iteration.stack.append(('_compute_totals', 0))
-
-        total_info = key = None
-        if of is not None and wrt is not None:
-            key = (frozenset(of), frozenset(wrt), return_format, self._mode,
-                   self.model._owns_approx_jac)
-            total_info = self._tot_jac_info_cache[key]
-
-        if total_info is None:
-            total_info = _TotalJacInfo(self, of, wrt, global_names, return_format)
-            if key is not None and not total_info.has_lin_cons:
-                self._tot_jac_info_cache[key] = total_info
-        else:
-            total_info.J[:] = 0.0
-
-        has_lin_cons = total_info.has_lin_cons
-
-        vec_dinput = self.model._vectors['input']
-        vec_doutput = self.model._vectors['output']
-        vec_dresid = self.model._vectors['residual']
-
-        model = self.model
-        fwd = self._mode == 'fwd'
-
-        # Prepare model for calculation by cleaning out the derivatives
-        # vectors.
-        for vec_name in model._lin_vec_names:
-            vec_dinput[vec_name].set_const(0.0)
-            vec_doutput[vec_name].set_const(0.0)
-            vec_dresid[vec_name].set_const(0.0)
-
-        # Linearize Model
-        model._linearize()
-
-        # Main loop over columns (fwd) or rows (rev) of the jacobian
-        for _, _, idxs, idx_iter in itervalues(total_info.idx_iter_dict):
-            for inds, input_setter, jac_setter in idx_iter(idxs):
-                # this sets dinputs for the current par_deriv_color to 0
-                # dinputs is dresids in fwd, doutouts in rev
-                vec_doutput['linear'].set_const(0.0)
-                if fwd:
-                    vec_dresid['linear'].set_const(0.0)
-                else:  # rev
-                    vec_dinput['linear'].set_const(0.0)
-
-                rel_systems, vec_names, cache_key = input_setter(inds)
-
-                # restore old linear solution if cache_linear_solution was set by the user for
-                # any input variables involved in this linear solution.
-                if cache_key is not None and not has_lin_cons:
-                    lin_sol_cache = self._lin_sol_cache
-                    if cache_key in lin_sol_cache:
-                        lin_sol = lin_sol_cache[cache_key]
-                        for i, vec_name in enumerate(vec_names):
-                            save_vec = lin_sol[i]
-                            doutputs = total_info.output_vec[vec_name]
-                            for vs in doutputs._data:
-                                doutputs._data[vs][:] = save_vec[vs]
-                    else:
-                        lin_sol_cache[cache_key] = lin_sol = []
-                        for vec_name in vec_names:
-                            lin_sol.append(deepcopy(total_info.output_vec[vec_name]._data))
-
-                model._solve_linear(model._lin_vec_names, self._mode, rel_systems)
-
-                if cache_key is not None and not has_lin_cons:
-                    lin_sol = self._lin_sol_cache[cache_key]
-                    for i, vec_name in enumerate(vec_names):
-                        save_vec = lin_sol[i]
-                        doutputs = total_info.output_vec[vec_name]
-                        for vs, data in iteritems(doutputs._data):
-                            save_vec[vs][:] = data
-
-                jac_setter(inds)
-
-        recording_iteration.stack.pop()
-
-        return total_info.Jfinal
+                total_info = _TotalJacInfo(self, of, wrt, False, return_format)
+                return total_info.compute_totals()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
@@ -1245,6 +1109,169 @@ class Problem(object):
             self._solver_print_cache.append((level, depth, type_))
 
         self.model._set_solver_print(level=level, depth=depth, type_=type_)
+
+    def list_problem_vars(self,
+                          show_promoted_name=True,
+                          print_arrays=False,
+                          desvar_opts=[],
+                          cons_opts=[],
+                          objs_opts=[],
+                          ):
+        """
+        Print all design variables and responses (objectives and constraints).
+
+        Parameters
+        ----------
+        show_promoted_name : bool
+            If True, then show the promoted names of the variables.
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
+            by the values set with numpy.set_printoptions
+            Default is False.
+        desvar_opts : list of str
+            List of optional columns to be displayed in the desvars table.
+            Allowed values are:
+            ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler', 'parallel_deriv_color',
+            'vectorize_derivs', 'simul_coloring', 'cache_linear_solution']
+        cons_opts : list of str
+            List of optional columns to be displayed in the cons table.
+            Allowed values are:
+            ['lower', 'upper', 'equals', ref', 'ref0', 'indices', 'index', adder', 'scaler',
+            'linear', parallel_deriv_color', 'vectorize_derivs', 'simul_coloring', 'simul_map',
+            'cache_linear_solution']
+        objs_opts : list of str
+            List of optional columns to be displayed in the objs table.
+            Allowed values are:
+            ['ref', 'ref0', 'indices', 'adder', 'scaler',
+            'parallel_deriv_color', 'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+            'cache_linear_solution']
+
+        """
+        default_col_names = ['name', 'value', 'size']
+
+        # Design vars
+        desvars = self.model.get_design_vars()
+        header = "Design Variables"
+        col_names = default_col_names + desvar_opts
+        self._write_var_info_table(header, col_names, desvars,
+                                   show_promoted_name=show_promoted_name,
+                                   print_arrays=print_arrays,
+                                   col_spacing=2)
+
+        # Constraints
+        cons = self.model.get_constraints()
+        header = "Constraints"
+        col_names = default_col_names + cons_opts
+        self._write_var_info_table(header, col_names, cons, show_promoted_name=show_promoted_name,
+                                   print_arrays=print_arrays,
+                                   col_spacing=2)
+
+        objs = self.model.get_objectives()
+        header = "Objectives"
+        col_names = default_col_names + objs_opts
+        self._write_var_info_table(header, col_names, objs, show_promoted_name=show_promoted_name,
+                                   print_arrays=print_arrays,
+                                   col_spacing=2)
+
+    def _write_var_info_table(self, header, col_names, vars, print_arrays=False,
+                              show_promoted_name=True, col_spacing=1):
+        """
+        Write a table of information for the data in vars.
+
+        Parameters
+        ----------
+        header : str
+            The header line for the table.
+        col_names : list of str
+            List of column labels.
+        vars : OrderedDict
+            Keys are variable names and values are metadata for the variables.
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
+            by the values set with numpy.set_printoptions
+            Default is False.
+        show_promoted_name : bool
+            If True, then show the promoted names of the variables.
+        col_spacing : int
+            Number of spaces between columns in the table.
+        """
+        abs2prom = self.model._var_abs2prom
+
+        # Get the values for all the elements in the tables
+        rows = []
+        for name, meta in iteritems(vars):
+            row = {}
+            for col_name in col_names:
+                if col_name == 'name':
+                    if show_promoted_name:
+                        row[col_name] = name
+                    else:
+                        if name in abs2prom['input']:
+                            row[col_name] = abs2prom['input'][name]
+                        else:
+                            row[col_name] = abs2prom['output'][name]
+                elif col_name == 'value':
+                    row[col_name] = self[name]
+                else:
+                    row[col_name] = meta[col_name]
+            rows.append(row)
+
+        col_space = ' ' * col_spacing
+        print("-" * len(header))
+        print(header)
+        print("-" * len(header))
+
+        # loop through the rows finding the max widths
+        max_width = {}
+        for col_name in col_names:
+            max_width[col_name] = len(col_name)
+        for row in rows:
+            for col_name in col_names:
+                cell = row[col_name]
+                if isinstance(cell, np.ndarray) and cell.size > 1:
+                    out = '|{}|'.format(str(np.linalg.norm(cell)))
+                else:
+                    out = str(cell)
+                max_width[col_name] = max(len(out), max_width[col_name])
+
+        # print col headers
+        header_div = ''
+        header_col_names = ''
+        for col_name in col_names:
+            header_div += '-' * max_width[col_name] + col_space
+            header_col_names += pad_name(col_name, max_width[col_name], quotes=False) + col_space
+        print(header_col_names)
+        print(header_div[:-1])
+
+        # print rows with var info
+        for row in rows:
+            have_array_values = []  # keep track of which values are arrays
+            row_string = ''
+            for col_name in col_names:
+                cell = row[col_name]
+                if isinstance(cell, np.ndarray) and cell.size > 1:
+                    out = '|{}|'.format(str(np.linalg.norm(cell)))
+                    have_array_values.append(col_name)
+                else:
+                    out = str(cell)
+                row_string += pad_name(out, max_width[col_name], quotes=False) + col_space
+            print(row_string)
+
+            if print_arrays:
+                left_column_width = max_width['name']
+                for col_name in have_array_values:
+                    print("{}{}:".format((left_column_width + col_spacing) * ' ', col_name))
+                    cell = row[col_name]
+                    out_str = str(cell)
+                    indented_lines = [(left_column_width + col_spacing) * ' ' +
+                                      s for s in out_str.splitlines()]
+                    print('\n'.join(indented_lines) + '\n')
+
+        print()
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,

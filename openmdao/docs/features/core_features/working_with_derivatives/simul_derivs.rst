@@ -1,8 +1,8 @@
-.. _simul-derivs-theory:
+.. _feature_simul_coloring:
 
-************************
-Simultaneous Derivatives
-************************
+********************************************
+Simultaneous Coloring For Separable Problems
+********************************************
 
 When OpenMDAO solves for total derivatives, it loops over either design variables in 'fwd' mode
 or responses in 'rev' mode.  For each of those variables, it performs a linear solve for each
@@ -12,62 +12,17 @@ there would be *N* solves for an array variable of size *N*.
 
 Certain problems have a special kind of sparsity structure in the total derivative Jacobian that
 allows OpenMDAO to solve for multiple derivatives simultaneously. This results in far fewer linear
-solves and much-improved performance. For example, in 'fwd' mode, this requires that there is some
-subset of the design variables that don't affect any of the same responses.  In other words, there
-is some subset of columns of the total Jacobian where none of those columns have nonzero values
-in any of the same rows.
+solves and much-improved performance.
+These problems are said to have separable variables.
+The concept of separability is explained in the :ref:`Theory Manual<theory_separable_variables>`.
 
 .. note::
 
    While it is possible for problems to exist where simultaneous reverse solves would be possible,
    OpenMDAO does not currently support simultaneous derivatives in reverse mode.
 
-Consider, for example, a hypothetical optimization problem with a constraint that
-:code:`y=10` where :math:`y` is defined by
-
-
-.. math::
-
-  y = 3*x[::2]^2 + 2*x[1::2]^2 ,
-
-
-where :math:`x` is our design variable (size 10) and :math:`y` is our constraint (size 5).
-Our derivative looks like this:
-
-
-.. math::
-
-  dy/dx = 6*x[::2] + 4*x[1::2] ,
-
-
-We can see that each value of our :math:`dy/dx` derivative is determined by only one even
-and one odd value of :math:`x`.  The following diagram shows which entries of :math:`x`
-affect which entries of :math:`y`.
-
-.. figure:: simple_coloring.png
-   :align: center
-   :width: 50%
-   :alt: Dependency of y on x
-
-
-Our total jacobian is shown below, with nonzero entries denoted by a :math:`+` and with
-columns colored such that no columns of the same color share any nonzero rows.
-
-.. figure:: simple_jac.png
-   :align: center
-   :width: 50%
-   :alt: Our total jacobian
-
-
-Looking at the total Jacobian above, it's clear that we can solve for all of the blue columns
-at the same time because none of them affect the same entries of :math:`y`.  We can similarly
-solve all of the red columns at the same time.  So instead of doing ten linear solves to get
-our total Jacobian, we can do only two instead.
-
-
-The way to tell OpenMDAO that you want to make use of simultaneous derivatives is to call the
-:code:`set_simul_deriv_color` method on the driver.
-
+In order to tell OpenMDAO to take advantage of the separable sparsity in your model, call the
+:code:`set_simul_deriv_color` method on a :code:`Driver` instance.
 
 .. automethod:: openmdao.core.driver.Driver.set_simul_deriv_color
     :noindex:
@@ -115,7 +70,7 @@ like this:
                 'x': (
                     [0, 0, 1, 1, 2, 2, 3, 3, 4, 4],   # sparse row indices
                     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],   # sparse column indices
-                    (5, 10)  # shape
+                    [5, 10]  # shape
                 )
             }
         }
@@ -130,22 +85,19 @@ simultaneous derivatives in the :ref:`Simple Optimization using Simultaneous Der
 example.
 
 
+.. _feature_automatic_coloring:
+
 Automatic Generation of Coloring
 ################################
 Although you *can* compute the coloring manually if you know enough information about your problem,
 doing so can be challenging. Also, even small changes to your model,
 e.g., adding new constraints or changing the sparsity of a sub-component, can change the
-simultaneous coloring of your model. So care must be taken to keep the coloring up to date when
+coloring of your model. So care must be taken to keep the coloring up to date when
 you change your model.
 
-To streamline the process, OpenMDAO provides an automatic coloring algorithm.
-OpenMDAO assigns random numbers to the nonzero entries of the partial derivative jacobian,
-then solves for the total jacobian.  Given this total jacobian, the coloring algorithm examines
-its sparsity and computes a coloring.
-
-OpenMDAO finds the nonzero entries based on the :ref:`declare_partials <feature_sparse_partials>`
-calls from all of the components in your model, so if you're not specifying the sparsity of the
-partial derivatives of your components, then it won't be possible to find an automatic coloring
+To streamline the process, OpenMDAO provides an automatic coloring algorithm that uses the
+sparsity pattern given by the :ref:`declare_partials <feature_sparse_partials>` calls from all of the components in your model.
+So if you're not :ref:`specifying the sparsity of the partial derivatives<feature_sparse_partials>` of your components, then it won't be possible to find an automatic coloring
 for your model.
 
 The *color_info* data structure can be generated automatically using the following command:
@@ -166,6 +118,8 @@ would look like this:
     Using tolerance: 1e-20
     Most common number of zero entries (400 of 462) repeated 11 times out of 11 tolerances tested.
 
+    Total jacobian shape: (22, 21)
+
     1 uncolored columns
     5 columns in color 1
     5 columns in color 2
@@ -173,7 +127,7 @@ would look like this:
     5 columns in color 4
 
     ########### BEGIN COLORING DATA ################
-    ([
+    [[
        [20],   # uncolored columns
        [0, 2, 4, 6, 8],   # color 1
        [1, 3, 5, 7, 9],   # color 2
@@ -203,7 +157,33 @@ would look like this:
        [10, 20],   # column 19
        None,   # column 20
     ],
-    None)
+    {
+    "circle.area": {
+       "indeps.x": [[], [], [1, 10]],
+       "indeps.y": [[], [], [1, 10]],
+       "indeps.r": [[0], [0], [1, 1]]
+    },
+    "r_con.g": {
+       "indeps.x": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+       "indeps.y": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+       "indeps.r": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [10, 1]]
+    },
+    "theta_con.g": {
+       "indeps.x": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+       "indeps.y": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+       "indeps.r": [[], [], [5, 1]]
+    },
+    "delta_theta_con.g": {
+       "indeps.x": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+       "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+       "indeps.r": [[], [], [5, 1]]
+    },
+    "l_conx.g": {
+       "indeps.x": [[0], [0], [1, 10]],
+       "indeps.y": [[], [], [1, 10]],
+       "indeps.r": [[], [], [1, 1]]
+    }
+    }]
     ########### END COLORING DATA ############
 
 
@@ -307,10 +287,9 @@ The coloring will be written in json format to the given file and can be loaded 
     prob.driver.set_simul_deriv_color('my_coloring.json')
 
 
-If you run *openmdao simul_coloring* and it turns out there is no simultaneous coloring available,
-don't be surprised.  Problems that have the necessary total Jacobian sparsity to allow
-simultaneous derivatives are relatively uncommon.
-
+If you run *openmdao simul_coloring* and it turns out there is no simultaneous coloring available, or that you don't gain very much by coloring,
+don't be surprised.
+Problems that have the necessary total Jacobian sparsity to allow simultaneous derivatives are relatively uncommon.
 
 
 Checking that it works

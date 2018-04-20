@@ -1540,9 +1540,6 @@ class Group(System):
             sub_do_ln = (self._linear_solver is not None) and \
                         (self._linear_solver._linearize_children())
 
-            for subsys in self._subsystems_myproc:
-                subsys._linearize(do_nl=sub_do_nl, do_ln=sub_do_ln)
-
             # Group finite difference
             if self._owns_approx_jac:
                 with self._unscaled_context(outputs=[self._outputs]):
@@ -1551,9 +1548,14 @@ class Group(System):
 
                 J._update()
 
-            # Update jacobian
-            elif self._owns_assembled_jac or self._views_assembled_jac:
-                J._update()
+            else:
+                # Only linearize subsystems if we aren't approximating the derivs at this level.
+                for subsys in self._subsystems_myproc:
+                    subsys._linearize(do_nl=sub_do_nl, do_ln=sub_do_ln)
+
+                # Update jacobian
+                if self._owns_assembled_jac or self._views_assembled_jac:
+                    J._update()
 
         if self._nonlinear_solver is not None and do_nl:
             self._nonlinear_solver._linearize()
@@ -1649,13 +1651,6 @@ class Group(System):
                         size = self._var_allprocs_abs2meta[key[0]]['size']
                         meta['rows'] = meta['cols'] = np.arange(size)
                         meta['value'] = np.ones(size)
-
-                    # This suppports desvar and constraint indices.
-                    if key[0] in self._owns_approx_of_idx:
-                        meta['idx_of'] = self._owns_approx_of_idx[key[0]]
-
-                    if key[1] in self._owns_approx_wrt_idx:
-                        meta['idx_wrt'] = self._owns_approx_wrt_idx[key[1]]
 
                     # A group under approximation needs all keys from below, so set dependent to
                     # True.

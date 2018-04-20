@@ -413,6 +413,58 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         for ind in range(3):
             self.assertTrue(2.4 <= top['comp.z'][ind] <= self.ub[ind])
 
+    def test_error_handling(self):
+        # Make sure the debug_print doen't bomb out.
+
+        class Bad(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_input('y', val=0.0)
+
+                self.add_output('f_xy', val=0.0, upper=1.0)
+
+                self.declare_partials(of='*', wrt='*')
+                self.count = 0
+
+            def compute(self, inputs, outputs):
+                if self.count < 1:
+                    x = inputs['x']
+                    y = inputs['y']
+                    outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+                else:
+                    outputs['f_xy'] = np.inf
+
+                self.count += 1
+
+            def compute_partials(self, inputs, partials):
+                x = inputs['x']
+                y = inputs['y']
+
+                partials['f_xy','x'] = 2.0*x - 6.0 + y
+                partials['f_xy','y'] = 2.0*y + 8.0 + x
+
+
+        top = Problem()
+        top.model = Group()
+        top.model.add_subsystem('px', IndepVarComp('x', 1.0))
+        top.model.add_subsystem('comp', ImplCompTwoStates())
+        top.model.add_subsystem('par', Bad())
+        top.model.connect('px.x', 'comp.x')
+        top.model.connect('comp.z', 'par.x')
+
+        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver.options['maxiter'] = 3
+
+        ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
+        ls.options['maxiter'] = 10
+        top.set_solver_print(level=0)
+
+        top.setup(check=False)
+
+        # Make sure we don't raise an error when we reach the final debug print.
+        top.run_model()
+
 
 class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
 

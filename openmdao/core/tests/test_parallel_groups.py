@@ -327,7 +327,7 @@ class MatMatParDevTestCase(unittest.TestCase):
         p.run_model()
 
         # prior to bug fix, this would raise an exception
-        J = p._compute_totals()
+        J = p.compute_totals()
         np.testing.assert_array_equal(J['par.C1.y', 'indeps.x'], np.eye(2)*2.)
         np.testing.assert_array_equal(J['par.C2.y', 'indeps.x'], np.zeros((1,2)))
         np.testing.assert_array_equal(J['par.C1.y', 'indeps.y'], np.zeros((2,1)))

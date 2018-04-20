@@ -1,8 +1,9 @@
 """ Unit tests for the problem interface."""
 
+import sys
 import unittest
 import warnings
-from six import assertRaisesRegex
+from six import assertRaisesRegex, StringIO, assertRegex
 
 import numpy as np
 
@@ -12,7 +13,7 @@ from openmdao.api import Problem, Group, IndepVarComp, PETScVector, NonlinearBlo
 from openmdao.utils.assert_utils import assert_rel_error
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesConnected
+from openmdao.test_suite.components.sellar import SellarDerivatives
 
 
 class TestProblem(unittest.TestCase):
@@ -538,6 +539,182 @@ class TestProblem(unittest.TestCase):
         # the connected input variable, referenced by the absolute path
         assert_rel_error(self, prob['d2.y1'], 27.3049178437, 1e-6)
 
+    def test_get_set_with_units_exhaustive(self):
+        from openmdao.api import Problem, ExecComp
+
+        prob = Problem()
+        comp = prob.model.add_subsystem('comp', ExecComp('y=x-25.', x={'value': 77.0, 'units': 'degF'},
+                                                         y={'units': 'degC'}))
+        comp = prob.model.add_subsystem('prom', ExecComp('yy=xx-25.', xx={'value': 77.0, 'units': 'degF'},
+                                                         yy={'units': 'degC'}),
+                                        promotes=['xx', 'yy'])
+        comp = prob.model.add_subsystem('acomp', ExecComp('y=x-25.', x={'value': np.array([77.0, 95.0]), 'units': 'degF'},
+                                                         y={'units': 'degC'}))
+        comp = prob.model.add_subsystem('aprom', ExecComp('ayy=axx-25.', axx={'value': np.array([77.0, 95.0]), 'units': 'degF'},
+                                                          ayy={'units': 'degC'}),
+                                        promotes=['axx', 'ayy'])
+
+        prob.setup(check=False)
+
+        # Make sure everything works before final setup with caching system.
+
+        # Gets
+
+        assert_rel_error(self, prob.get_val('comp.x'), 77.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'degC'), 25.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.y'), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.y', 'degF'), 32.0, 1e-6)
+
+        assert_rel_error(self, prob.get_val('xx'), 77.0, 1e-6)
+        assert_rel_error(self, prob.get_val('xx', 'degC'), 25.0, 1e-6)
+        assert_rel_error(self, prob.get_val('yy'), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('yy', 'degF'), 32.0, 1e-6)
+
+        assert_rel_error(self, prob.get_val('acomp.x', indices=0), 77.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=[0]), 25.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.y', indices=0), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.y', 'degF', indices=0), 32.0, 1e-6)
+
+        assert_rel_error(self, prob.get_val('axx', indices=0), 77.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', indices=1), 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=0), 25.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
+        assert_rel_error(self, prob.get_val('ayy', indices=0), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('ayy', 'degF', indices=0), 32.0, 1e-6)
+
+        # Sets
+
+        prob.set_val('comp.x', 30.0, 'degC')
+        assert_rel_error(self, prob['comp.x'], 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'degC'), 30.0, 1e-6)
+
+        prob.set_val('xx', 30.0, 'degC')
+        assert_rel_error(self, prob['xx'], 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('xx', 'degC'), 30.0, 1e-6)
+
+        prob.set_val('acomp.x', 30.0, 'degC', indices=[0])
+        assert_rel_error(self, prob['acomp.x'][0], 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=0), 30.0, 1e-6)
+
+        prob.set_val('axx', 30.0, 'degC', indices=0)
+        assert_rel_error(self, prob['axx'][0], 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([0])), 30.0, 1e-6)
+
+        prob.final_setup()
+
+        # Now we do it all over again for coverage.
+
+        # Gets
+
+        assert_rel_error(self, prob.get_val('comp.x'), 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'degC'), 30.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.y'), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.y', 'degF'), 32.0, 1e-6)
+
+        assert_rel_error(self, prob.get_val('xx'), 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('xx', 'degC'), 30.0, 1e-6)
+        assert_rel_error(self, prob.get_val('yy'), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('yy', 'degF'), 32.0, 1e-6)
+
+        assert_rel_error(self, prob.get_val('acomp.x', indices=0), 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=[0]), 30.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.y', indices=0), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.y', 'degF', indices=0), 32.0, 1e-6)
+
+        assert_rel_error(self, prob.get_val('axx', indices=0), 86.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', indices=1), 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=0), 30.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
+        assert_rel_error(self, prob.get_val('ayy', indices=0), 0.0, 1e-6)
+        assert_rel_error(self, prob.get_val('ayy', 'degF', indices=0), 32.0, 1e-6)
+
+        # Sets
+
+        prob.set_val('comp.x', 35.0, 'degC')
+        assert_rel_error(self, prob['comp.x'], 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'degC'), 35.0, 1e-6)
+
+        prob.set_val('xx', 35.0, 'degC')
+        assert_rel_error(self, prob['xx'], 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('xx', 'degC'), 35.0, 1e-6)
+
+        prob.set_val('acomp.x', 35.0, 'degC', indices=[0])
+        assert_rel_error(self, prob['acomp.x'][0], 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=0), 35.0, 1e-6)
+
+        prob.set_val('axx', 35.0, 'degC', indices=0)
+        assert_rel_error(self, prob['axx'][0], 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([0])), 35.0, 1e-6)
+
+    def test_get_set_with_units_error_messages(self):
+        from openmdao.api import Problem, ExecComp
+
+        prob = Problem()
+        comp = prob.model.add_subsystem('comp', ExecComp('y=x+1.', x={'value': 100.0, 'units': 'cm'},
+                                                         y={'units': 'm'}))
+        comp = prob.model.add_subsystem('no_unit', ExecComp('y=x+1.', x={'value': 100.0}))
+
+        prob.setup()
+        prob.run_model()
+
+        msg = "Incompatible units for conversion: 'cm' and 'degK'."
+        with assertRaisesRegex(self, TypeError, msg):
+            prob.get_val('comp.x', 'degK')
+
+        msg = "Incompatible units for conversion: 'degK' and 'cm'."
+        with assertRaisesRegex(self, TypeError, msg):
+            prob.set_val('comp.x', 55.0, 'degK')
+
+        msg = "Incompatible units for conversion: 'None' and 'degK'."
+        with assertRaisesRegex(self, TypeError, msg):
+            prob.get_val('no_unit.x', 'degK')
+
+        msg = "Incompatible units for conversion: 'degK' and 'None'."
+        with assertRaisesRegex(self, TypeError, msg):
+            prob.set_val('no_unit.x', 55.0, 'degK')
+
+    def test_feature_get_set_with_units(self):
+        from openmdao.api import Problem, ExecComp
+
+        prob = Problem()
+        comp = prob.model.add_subsystem('comp', ExecComp('y=x+1.', x={'value': 100.0, 'units': 'cm'},
+                                                         y={'units': 'm'}))
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob.get_val('comp.x'), 100, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'm'), 1.0, 1e-6)
+        prob.set_val('comp.x', 10.0, 'mm')
+        assert_rel_error(self, prob.get_val('comp.x'), 1.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'm'), 1.0e-2, 1e-6)
+
+    def test_feature_get_set_array_with_units(self):
+        from openmdao.api import Problem, ExecComp
+
+        prob = Problem()
+        comp = prob.model.add_subsystem('comp', ExecComp('y=x+1.', x={'value': np.array([100.0, 33.3]), 'units': 'cm'},
+                                                         y={'shape' : (2, ), 'units': 'm'}))
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob.get_val('comp.x'), np.array([100, 33.3]), 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'm'), np.array([1.0, 0.333]), 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'km', indices=[0]), 0.001, 1e-6)
+
+        prob.set_val('comp.x', 10.0, 'mm')
+        assert_rel_error(self, prob.get_val('comp.x'), np.array([1.0, 1.0]), 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'm', indices=0), 1.0e-2, 1e-6)
+
+        prob.set_val('comp.x', 50.0, 'mm', indices=[1])
+        assert_rel_error(self, prob.get_val('comp.x'), np.array([1.0, 5.0]), 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'm', indices=1), 5.0e-2, 1e-6)
+
     def test_feature_set_get_array(self):
         import numpy as np
 
@@ -1014,6 +1191,152 @@ class TestProblem(unittest.TestCase):
         finally:
             Problem._post_setup_func = None
 
+    def test_list_problem_vars(self):
+
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+        model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        # First, with no options
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.list_problem_vars()
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+        self.assertEquals(output[1], 'Design Variables')
+        assertRegex(self, output[5], '^pz.z +\|[0-9. e+-]+\| +2')
+        self.assertEquals(output[9], 'Constraints')
+        assertRegex(self, output[14], '^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
+        self.assertEquals(output[17], 'Objectives')
+        assertRegex(self, output[21], '^obj_cmp.obj +\[[0-9. e+-]+\] +1')
+
+
+        # With show_promoted_name=False
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.list_problem_vars(show_promoted_name=False)
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+        assertRegex(self, output[5], '^z +\|[0-9. e+-]+\| +2')
+        assertRegex(self, output[14], '^con2 +\[[0-9. e+-]+\] +1')
+        assertRegex(self, output[21], '^obj +\[[0-9. e+-]+\] +1')
+
+        # With all the optional columns
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.list_problem_vars(
+                                   desvar_opts=['lower', 'upper', 'ref', 'ref0',
+                                                'indices', 'adder', 'scaler',
+                                                'parallel_deriv_color',
+                                                'vectorize_derivs', 'simul_deriv_color',
+                                                'cache_linear_solution'],
+                                   cons_opts=['lower', 'upper', 'equals', 'ref', 'ref0',
+                                              'indices', 'adder', 'scaler', 'linear',
+                                              'parallel_deriv_color',
+                                              'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+                                              'cache_linear_solution'],
+                                   objs_opts=['ref', 'ref0',
+                                              'indices', 'adder', 'scaler',
+                                              'parallel_deriv_color',
+                                              'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+                                              'cache_linear_solution'],
+                                   )
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+        assertRegex(self, output[3],'^name\s+value\s+size\s+lower\s+upper\s+ref\s+ref0\s+'
+                         'indices\s+adder\s+scaler\s+parallel_deriv_color\s+'
+                         'vectorize_derivs\s+simul_deriv_color\s+cache_linear_solution')
+        assertRegex(self, output[5],'^pz.z\s+\|[0-9.e+-]+\|\s+2\s+\|10.0\|\s+\|[0-9.e+-]+\|\s+None\s+'
+                         'None\s+None\s+None\s+None\s+None\s+False\s+None\s+False')
+
+        # With all the optional columns and print_arrays
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.list_problem_vars(print_arrays=True,
+                                   desvar_opts=['lower', 'upper', 'ref', 'ref0',
+                                                'indices', 'adder', 'scaler',
+                                                'parallel_deriv_color',
+                                                'vectorize_derivs', 'simul_deriv_color',
+                                                'cache_linear_solution'],
+                                   cons_opts=['lower', 'upper', 'equals', 'ref', 'ref0',
+                                              'indices', 'adder', 'scaler', 'linear',
+                                              'parallel_deriv_color',
+                                              'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+                                              'cache_linear_solution'],
+                                   objs_opts=['ref', 'ref0',
+                                              'indices', 'adder', 'scaler',
+                                              'parallel_deriv_color',
+                                              'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+                                              'cache_linear_solution'],
+                                   )
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+        assertRegex(self, output[6], '^\s+value:')
+        assertRegex(self, output[7], '^\s+\[[0-9. e+-]+\]')
+        assertRegex(self, output[9], '^\s+lower:')
+        assertRegex(self, output[10], '^\s+\[[0-9. e+-]+\]')
+        assertRegex(self, output[12], '^\s+upper:')
+        assertRegex(self, output[13], '^\s+\[[0-9. e+-]+\]')
+
+    def test_feature_list_problem_vars(self):
+        import numpy as np
+        from openmdao.api import Problem, ScipyOptimizeDriver, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+        model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        prob.list_problem_vars(print_arrays=True,
+                               desvar_opts=['lower', 'upper', 'ref', 'ref0',
+                                            'indices', 'adder', 'scaler',
+                                            'parallel_deriv_color',
+                                            'vectorize_derivs'],
+                               cons_opts=['lower', 'upper', 'equals', 'ref', 'ref0',
+                                          'indices', 'adder', 'scaler', 'linear'],
+                               objs_opts=['ref', 'ref0',
+                                          'indices', 'adder', 'scaler',
+                                          'parallel_deriv_color',
+                                          'vectorize_derivs']
+                               )
 
 if __name__ == "__main__":
     unittest.main()

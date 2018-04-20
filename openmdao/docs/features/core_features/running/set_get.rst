@@ -87,4 +87,19 @@ Hence you need a specific path to reference each of the two different inputs sep
     :layout: interleave
 
 
+Specifying Units
+----------------
+
+You can also set an input or request the valuable of any variable in a different unit than the one it is declared in, and OpenMDAO will
+peform the conversion for you. This is done with the `Problem` methods `get_val` and `set_val`.
+
+.. embed-code:: openmdao.core.tests.test_problem.TestProblem.test_feature_get_set_with_units
+    :layout: interleave
+
+When dealing with arrays, you can set or get specific indices or index ranges by adding the "index" argument to the calls:
+
+.. embed-code:: openmdao.core.tests.test_problem.TestProblem.test_feature_get_set_array_with_units
+    :layout: interleave
+
+
 .. tags:: SetGet

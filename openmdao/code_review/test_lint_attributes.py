@@ -92,7 +92,7 @@ class LintAttributesTestCase(unittest.TestCase):
                     # Loop over classes
                     classes = [x for x in dir(mod)
                                if inspect.isclass(getattr(mod, x)) and
-                               getattr(mod, x).__module__ == module_name]
+                               getattr(mod, x).__module__ == module_name and not x.startswith('_')]
                     for class_name in classes:
                         new_failures = []
                         if print_info:

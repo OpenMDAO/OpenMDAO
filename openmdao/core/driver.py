@@ -4,12 +4,14 @@ from __future__ import print_function
 import os
 import json
 from collections import OrderedDict
+import pprint
 import warnings
 
 from six import iteritems, itervalues, string_types
 
 import numpy as np
 
+from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
@@ -115,8 +117,12 @@ class Driver(object):
         A combined dict containing entries from _remote_cons and _remote_objs.
     _simul_coloring_info : tuple of dicts
         A data structure describing coloring for simultaneous derivs.
+    _total_jac_sparsity : dict, str, or None
+        Specifies sparsity of sub-jacobians of the total jacobian. Only used by pyOptSparseDriver.
     _res_jacs : dict
         Dict of sparse subjacobians for use with certain optimizers, e.g. pyOptSparseDriver.
+    _total_jac : _TotalJacInfo or None
+        Cached total jacobian handling object.
     """
 
     def __init__(self):
@@ -181,6 +187,7 @@ class Driver(object):
         self.supports.declare('gradients', types=bool, default=False)
         self.supports.declare('active_set', types=bool, default=False)
         self.supports.declare('simultaneous_derivatives', types=bool, default=False)
+        self.supports.declare('total_jac_sparsity', types=bool, default=False)
 
         # Debug printing.
         self.debug_print = OptionsDictionary()
@@ -204,7 +211,9 @@ class Driver(object):
         self.supports.declare('integer_design_vars', types=bool, default=False)
 
         self._simul_coloring_info = None
+        self._total_jac_sparsity = None
         self._res_jacs = {}
+        self._total_jac = None
 
         self.fail = False
 
@@ -239,6 +248,7 @@ class Driver(object):
         self._problem = problem
         model = problem.model
 
+        self._total_jac = None
         self._objs = objs = OrderedDict()
         self._cons = cons = OrderedDict()
         self._responses = model.get_responses(recurse=True)
@@ -298,7 +308,7 @@ class Driver(object):
         self._setup_recording()
 
         # set up simultaneous deriv coloring
-        if (coloring_mod._use_simul_coloring and self._simul_coloring_info and
+        if (coloring_mod._use_sparsity and self._simul_coloring_info and
                 self.supports['simultaneous_derivatives']):
             if problem._mode == 'fwd':
                 self._setup_simul_coloring(problem._mode)
@@ -409,7 +419,7 @@ class Driver(object):
         if self.recording_options['record_metadata']:
             self._rec_mgr.record_metadata(self)
 
-    def _get_voi_val(self, name, meta, remote_vois):
+    def _get_voi_val(self, name, meta, remote_vois, unscaled=False, ignore_indices=False):
         """
         Get the value of a variable of interest (objective, constraint, or design var).
 
@@ -424,6 +434,10 @@ class Driver(object):
         remote_vois : dict
             Dict containing (owning_rank, size) for all remote vois of a particular
             type (design var, constraint, or objective).
+        unscaled : bool
+            Set to True if unscaled (physical) design variables are desired.
+        ignore_indices : bool
+            Set to True if the full array is desired, not just those indicated by indices.
 
         Returns
         -------
@@ -438,7 +452,7 @@ class Driver(object):
         if name in remote_vois:
             owner, size = remote_vois[name]
             if owner == comm.rank:
-                if indices is None:
+                if indices is None or ignore_indices:
                     val = vec[name].copy()
                 else:
                     val = vec[name][indices]
@@ -448,12 +462,12 @@ class Driver(object):
                 val = np.empty(size)
             comm.Bcast(val, root=owner)
         else:
-            if indices is None:
+            if indices is None or ignore_indices:
                 val = vec[name].copy()
             else:
                 val = vec[name][indices]
 
-        if self._has_scaling:
+        if self._has_scaling and not unscaled:
             # Scale design variable values
             adder = meta['adder']
             if adder is not None:
@@ -465,7 +479,7 @@ class Driver(object):
 
         return val
 
-    def get_design_var_values(self, filter=None):
+    def get_design_var_values(self, filter=None, unscaled=False, ignore_indices=False):
         """
         Return the design variable values.
 
@@ -475,6 +489,10 @@ class Driver(object):
         ----------
         filter : list
             List of desvar names used by recorders.
+        unscaled : bool
+            Set to True if unscaled (physical) design variables are desired.
+        ignore_indices : bool
+            Set to True if the full array is desired, not just those indicated by indices.
 
         Returns
         -------
@@ -487,7 +505,8 @@ class Driver(object):
             # use all the designvars
             dvs = self._designvars
 
-        return {n: self._get_voi_val(n, self._designvars[n], self._remote_dvs) for n in dvs}
+        return {n: self._get_voi_val(n, self._designvars[n], self._remote_dvs, unscaled=unscaled,
+                                     ignore_indices=ignore_indices) for n in dvs}
 
     def set_design_var(self, name, value):
         """
@@ -543,12 +562,14 @@ class Driver(object):
 
         return {n: self._get_voi_val(n, self._responses[n], self._remote_objs) for n in resps}
 
-    def get_objective_values(self, filter=None):
+    def get_objective_values(self, unscaled=False, filter=None):
         """
         Return objective values.
 
         Parameters
         ----------
+        unscaled : bool
+            Set to True if unscaled (physical) design variables are desired.
         filter : list
             List of objective names used by recorders.
 
@@ -562,9 +583,10 @@ class Driver(object):
         else:
             objs = self._objs
 
-        return {n: self._get_voi_val(n, self._objs[n], self._remote_objs) for n in objs}
+        return {n: self._get_voi_val(n, self._objs[n], self._remote_objs, unscaled=unscaled)
+                for n in objs}
 
-    def get_constraint_values(self, ctype='all', lintype='all', filter=None):
+    def get_constraint_values(self, ctype='all', lintype='all', unscaled=False, filter=None):
         """
         Return constraint values.
 
@@ -576,6 +598,8 @@ class Driver(object):
         lintype : string
             Default is 'all'. Optionally return just the linear constraints
             with 'linear' or the nonlinear constraints with 'nonlinear'.
+        unscaled : bool
+            Set to True if unscaled (physical) design variables are desired.
         filter : list
             List of constraint names used by recorders.
 
@@ -605,7 +629,7 @@ class Driver(object):
             if ctype == 'ineq' and meta['equals'] is not None:
                 continue
 
-            con_dict[name] = self._get_voi_val(name, meta, self._remote_cons)
+            con_dict[name] = self._get_voi_val(name, meta, self._remote_cons, unscaled=unscaled)
 
         return con_dict
 
@@ -644,34 +668,6 @@ class Driver(object):
         self.iter_count += 1
         return failure_flag
 
-    def _dict2array_jac(self, derivs):
-        osize = 0
-        isize = 0
-        do_wrt = True
-        islices = {}
-        oslices = {}
-        for okey, oval in iteritems(derivs):
-            if do_wrt:
-                for ikey, val in iteritems(oval):
-                    istart = isize
-                    isize += val.shape[1]
-                    islices[ikey] = slice(istart, isize)
-                do_wrt = False
-            ostart = osize
-            osize += oval[ikey].shape[0]
-            oslices[okey] = slice(ostart, osize)
-
-        new_derivs = np.zeros((osize, isize))
-
-        relevant = self._problem.model._relevant
-
-        for okey, odict in iteritems(derivs):
-            for ikey, val in iteritems(odict):
-                if okey in relevant[ikey] or ikey in relevant[okey]:
-                    new_derivs[oslices[okey], islices[ikey]] = val
-
-        return new_derivs
-
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
@@ -698,40 +694,22 @@ class Driver(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        prob = self._problem
+        total_jac = self._total_jac
 
-        # Compute the derivatives in dict format...
-        if prob.model._owns_approx_jac:
-            derivs = prob._compute_totals_approx(of=of, wrt=wrt, return_format='dict',
-                                                 global_names=global_names)
+        if self._problem.model._owns_approx_jac:
+            if total_jac is None:
+                self._total_jac = total_jac = _TotalJacInfo(self._problem, of, wrt, global_names,
+                                                            return_format, approx=True)
+            return total_jac.compute_totals_approx()
         else:
-            derivs = prob._compute_totals(of=of, wrt=wrt, return_format='dict',
-                                          global_names=global_names)
+            if total_jac is None:
+                total_jac = _TotalJacInfo(self._problem, of, wrt, global_names, return_format)
 
-        # ... then convert to whatever the driver needs.
-        if return_format in ('dict', 'array'):
-            if self._has_scaling:
-                for okey, odict in iteritems(derivs):
-                    for ikey, val in iteritems(odict):
+            # don't cache linear constraint jacobian
+            if not total_jac.has_lin_cons:
+                self._total_jac = total_jac
 
-                        iscaler = self._designvars[ikey]['scaler']
-                        oscaler = self._responses[okey]['scaler']
-
-                        # Scale response side
-                        if oscaler is not None:
-                            val[:] = (oscaler * val.T).T
-
-                        # Scale design var side
-                        if iscaler is not None:
-                            val *= 1.0 / iscaler
-        else:
-            raise RuntimeError("Derivative scaling by the driver only supports the 'dict' and "
-                               "'array' formats at present.")
-
-        if return_format == 'array':
-            derivs = self._dict2array_jac(derivs)
-
-        return derivs
+            return total_jac.compute_totals()
 
     def record_iteration(self):
         """
@@ -832,7 +810,7 @@ class Driver(object):
 
     def set_simul_deriv_color(self, simul_info):
         """
-        Set the coloring (and possibly the sub-jacobian sparsity) for simultaneous derivatives.
+        Set the coloring (and possibly the sub-jac sparsity) for simultaneous total derivatives.
 
         Parameters
         ----------
@@ -888,6 +866,39 @@ class Driver(object):
             raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
                                self._get_name())
 
+    def set_total_jac_sparsity(self, sparsity):
+        """
+        Set the sparsity of sub-jacobians of the total jacobian.
+
+        Note: This currently will have no effect if you are not using the pyOptSparseDriver.
+
+        Parameters
+        ----------
+        sparsity : str or dict
+
+            ::
+
+                # Sparsity is a nested dictionary where the outer keys are response
+                # names, the inner keys are design variable names, and the value is a tuple of
+                # the form (row_list, col_list, shape).
+                {
+                    resp1: {
+                        dv1: (rows, cols, shape),  # for sub-jac d_resp1/d_dv1
+                        dv2: (rows, cols, shape),
+                          ...
+                    },
+                    resp2: {
+                        ...
+                    }
+                    ...
+                }
+        """
+        if self.supports['total_jac_sparsity']:
+            self._total_jac_sparsity = sparsity
+        else:
+            raise RuntimeError("Driver '%s' does not support setting of total jacobian sparsity." %
+                               self._get_name())
+
     def _setup_simul_coloring(self, mode='fwd'):
         """
         Set up metadata for simultaneous derivative solution.
@@ -902,7 +913,7 @@ class Driver(object):
                                       "in 'rev' mode")
 
         # command line simul_coloring uses this env var to turn pre-existing coloring off
-        if not coloring_mod._use_simul_coloring:
+        if not coloring_mod._use_sparsity:
             return
 
         prom2abs = self._problem.model._var_allprocs_prom2abs_list['output']
@@ -914,9 +925,12 @@ class Driver(object):
                 column_lists, row_map = tup[:2]
                 if len(tup) > 2:
                     sparsity = tup[2]
-                else:
-                    sparsity = None
-                self._simul_coloring_info = column_lists, row_map, sparsity
+                    if self._total_jac_sparsity is not None:
+                        raise RuntimeError("Total jac sparsity was set in both _simul_coloring_info"
+                                           " and _total_jac_sparsity.")
+                    self._total_jac_sparsity = sparsity
+
+                self._simul_coloring_info = column_lists, row_map
 
     def _pre_run_model_debug_print(self):
         """
@@ -932,12 +946,11 @@ class Driver(object):
             print(len(header) * '-')
 
         if 'desvars' in self.options['debug_print']:
-            desvar_vals = self.get_design_var_values()
+            desvar_vals = self.get_design_var_values(unscaled=True, ignore_indices=True)
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Design Vars")
                 if desvar_vals:
-                    for name, value in iteritems(desvar_vals):
-                        print("{}: {}".format(name, repr(value)))
+                    pprint.pprint(desvar_vals)
                 else:
                     print("None")
                 print()
@@ -947,34 +960,31 @@ class Driver(object):
         Optionally print some debugging information after the model runs.
         """
         if 'nl_cons' in self.options['debug_print']:
-            cons = self.get_constraint_values(lintype='nonlinear')
+            cons = self.get_constraint_values(lintype='nonlinear', unscaled=True)
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Nonlinear constraints")
                 if cons:
-                    for name, value in iteritems(cons):
-                        print("{}: {}".format(name, repr(value)))
+                    pprint.pprint(cons)
                 else:
                     print("None")
                 print()
 
         if 'ln_cons' in self.options['debug_print']:
-            cons = self.get_constraint_values(lintype='linear')
+            cons = self.get_constraint_values(lintype='linear', unscaled=True)
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Linear constraints")
                 if cons:
-                    for name, value in iteritems(cons):
-                        print("{}: {}".format(name, repr(value)))
+                    pprint.pprint(cons)
                 else:
                     print("None")
                 print()
 
         if 'objs' in self.options['debug_print']:
-            objs = self.get_objective_values()
+            objs = self.get_objective_values(unscaled=True)
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Objectives")
                 if objs:
-                    for name, value in iteritems(objs):
-                        print("{}: {}".format(name, repr(value)))
+                    pprint.pprint(objs)
                 else:
                     print("None")
                 print()

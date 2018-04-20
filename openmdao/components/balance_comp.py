@@ -317,7 +317,6 @@ class BalanceComp(ImplicitComponent):
             Additional arguments to be passed for the creation of the implicit state variable.
         """
         if guess_func is not None and not callable(guess_func):
-            print(guess_func)
             raise ValueError("Argument 'guess_func' must be a callable if specified")
 
         self._state_vars[name] = {'kwargs': kwargs,
