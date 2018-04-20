@@ -215,8 +215,10 @@ class SqliteRecorder(BaseRecorder):
                 self._abs2meta[name]['explicit'] = True
 
         for name in inputs:
+            if 'type' not in self._abs2meta[name]:
+                self._abs2meta[name]['type'] = set()
             self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy()
-            self._abs2meta[name]['type'] = 'input'
+            self._abs2meta[name]['type'].add('input')
             self._abs2meta[name]['explicit'] = True
             if name in states:
                 self._abs2meta[name]['explicit'] = False
