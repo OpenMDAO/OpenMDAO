@@ -470,6 +470,33 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
+    def test_solve_subsystems_assembled_jac_top_csc(self):
+        prob = Problem(model=DoubleSellar())
+        model = prob.model
+        model.jacobian = CSCJacobian()
+
+        g1 = model.g1
+        g1.nonlinear_solver = NewtonSolver()
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = ScipyKrylov()
+
+        g2 = model.g2
+        g2.nonlinear_solver = NewtonSolver()
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = ScipyKrylov()
+
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = DirectSolver()
+        model.nonlinear_solver.options['solve_subsystems'] = True
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
+        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+
     def test_solve_subsystems_assembled_jac_top_implicit(self):
         prob = Problem(model=DoubleSellarImplicit())
         model = prob.model
