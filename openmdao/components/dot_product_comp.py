@@ -26,7 +26,7 @@ class DotProductComp(ExplicitComponent):
         """
         Declare metadata.
         """
-        self.metadata.declare('vec_size', types=int,
+        self.metadata.declare('vec_size', types=int, default=1,
                               desc='The number of points at which the dot product is computed')
         self.metadata.declare('length', types=int, default=3,
                               desc='The length of vectors a and b')
