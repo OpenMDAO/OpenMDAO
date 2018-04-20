@@ -119,15 +119,3 @@ class CrossProductComp(ExplicitComponent):
             np.einsum('...j,ji->...i', b, self._k * -1).ravel()
         partials[meta['c_name'], meta['b_name']] = \
             np.einsum('...j,ji->...i', a, self._k).ravel()
-
-
-def _for_docs():  # pragma: no cover
-    """
-    Provide documentation for metadata of CrossProductComp.
-
-    Returns
-    -------
-    comp
-        An instance of CrossProductComp for use by the sphinx doc extensions.
-    """
-    return CrossProductComp()
