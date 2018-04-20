@@ -14,3 +14,6 @@ Components
     metamodelunstructured.rst
     ks.rst
     interp.rst
+    cross_product_comp.rst
+    dot_product_comp.rst
+    matrix_vector_product_comp.rst
