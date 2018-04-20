@@ -22,7 +22,7 @@ from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
-from openmdao.utils.array_utils import convert_neg
+from openmdao.utils.array_utils import convert_neg, array_connection_compatible
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ancestors
 from openmdao.utils.units import is_compatible
 from openmdao.utils.mpi import MPI
@@ -806,8 +806,7 @@ class Group(System):
                 if src_indices is None and out_shape != in_shape:
                     # out_shape != in_shape is allowed if
                     # there's no ambiguity in storage order
-                    if not (np.prod(out_shape) == abs2meta[abs_in]['size']
-                            == np.max(out_shape) == np.max(in_shape)):
+                    if not array_connection_compatible(in_shape, out_shape):
                         msg = ("The source and target shapes do not match or are ambiguous"
                                " for the connection '%s' to '%s'. Expected %s but got %s.")
                         raise ValueError(msg % (abs_out, abs_in,
