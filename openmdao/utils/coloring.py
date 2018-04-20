@@ -84,8 +84,10 @@ class _SubjacRandomizer(object):
         elif isinstance(subjac, sparse_types):  # sparse
             subjac = subjac.copy()
             subjac.data = rand(subjac.data.size) + 1.0
-        else:   # dense
+        elif isinstance(subjac, np.ndarray):   # dense array
             subjac = rand(*(subjac.shape)) + 1.0
+        else:  # scalar
+            subjac = rand() + 1.0
 
         self._orig_set_abs(key, subjac)
 
